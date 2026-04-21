@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": false,
+    "watchAssets": false,
+    "assets": ["**/*.hbs", "**/*.json"],
+    "externalAssets": [
+      {
+        "include": "node_modules/@prisma/client/**/*",
+        "output": "../node_modules/.prisma/client"
+      }
+    ]
+  },
+  "generated": {
+    "collection": {
+      "type": "library",
+      "name": "lib"
+    }
+  }
+}

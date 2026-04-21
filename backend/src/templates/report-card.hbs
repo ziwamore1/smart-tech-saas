@@ -1,0 +1,362 @@
+<html>
+<head>
+<style>
+
+body{
+font-family: Arial, Helvetica, sans-serif;
+padding:30px;
+color:#333;
+}
+
+.header{
+text-align:center;
+margin-bottom:15px;
+}
+
+{{#if primaryColor}}
+.school-name{
+font-size:24px;
+font-weight:bold;
+color:{{primaryColor}};
+}
+{{else}}
+.school-name{
+font-size:24px;
+font-weight:bold;
+}
+{{/if}}
+
+.report-title{
+font-size:16px;
+margin-top:5px;
+}
+
+{{#if headerText}}
+.header-text{
+font-size:12px;
+color:#666;
+margin-bottom:10px;
+font-style:italic;
+}
+{{/if}}
+
+.student-info{
+margin-top:15px;
+margin-bottom:15px;
+}
+
+.info-grid{
+display:grid;
+grid-template-columns: 1fr 1fr;
+gap:8px;
+}
+
+.info-box{
+padding:6px;
+border:1px solid #ddd;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:15px;
+}
+
+th{
+{{#if primaryColor}}
+background:{{primaryColor}};
+color:white;
+{{else}}
+background:#1976d2;
+color:white;
+{{/if}}
+padding:8px;
+text-align:center;
+font-size:12px;
+}
+
+th, td{
+border:1px solid #ddd;
+padding:6px;
+text-align:center;
+font-size:11px;
+}
+
+tr:nth-child(even){
+background:{{#if secondaryColor}}{{secondaryColor}}{{else}}#f5f5f5{{/if}};
+}
+
+.summary{
+margin-top:15px;
+}
+
+.summary-grid{
+display:grid;
+grid-template-columns: repeat(3, 1fr);
+gap:8px;
+}
+
+.summary-item{
+padding:8px;
+border:1px solid #ddd;
+text-align:center;
+}
+
+.footer{
+margin-top:40px;
+display:flex;
+justify-content:space-between;
+align-items:flex-end;
+}
+
+.signature-section{
+text-align:center;
+}
+
+.signature-line{
+margin-top:30px;
+border-top:1px solid #333;
+width:180px;
+margin-left:auto;
+margin-right:auto;
+}
+
+.stamp-section{
+text-align:center;
+}
+
+.stamp-image{
+max-width:100px;
+max-height:100px;
+}
+
+.legend{
+margin-top:20px;
+font-size:11px;
+}
+
+{{#if footerText}}
+.footer-text{
+margin-top:30px;
+font-size:11px;
+color:#666;
+text-align:center;
+font-style:italic;
+border-top:1px solid #ddd;
+padding-top:10px;
+}
+{{/if}}
+
+.comments{
+margin-top:20px;
+}
+
+.comment-box{
+margin-bottom:10px;
+padding:10px;
+border:1px solid #ddd;
+background:{{#if secondaryColor}}{{secondaryColor}}{{else}}#f5f5f5{{/if}};
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="header">
+
+{{#if schoolLogo}}
+<div style="margin-bottom:10px">
+<img src="{{schoolLogo}}" height="60" style="max-width:150px"/>
+</div>
+{{/if}}
+
+<div class="school-name">
+{{schoolName}}
+</div>
+
+<div class="report-title">
+Student Report Card
+</div>
+
+<div style="font-size:13px; margin-top:5px">
+{{academicYear}} — {{termName}}
+</div>
+
+{{#if headerText}}
+<div class="header-text">
+{{headerText}}
+</div>
+{{/if}}
+
+</div>
+
+
+<div class="student-info">
+
+<div class="info-grid">
+
+<div class="info-box">
+<strong>Student:</strong> {{student.firstName}} {{student.lastName}}
+</div>
+
+<div class="info-box">
+<strong>Admission No:</strong> {{student.admissionNumber}}
+</div>
+
+{{#if showRankings}}
+<div class="info-box">
+<strong>Position:</strong> {{summary.positionInClass}} / {{summary.totalStudents}}
+</div>
+{{/if}}
+
+<div class="info-box">
+<strong>Subjects Taken:</strong> {{summary.numberOfSubjects}}
+</div>
+
+</div>
+
+</div>
+
+
+<table>
+
+<tr>
+<th>Subject</th>
+<th>Score</th>
+<th>Grade</th>
+<th>Points</th>
+{{#if showRemarks}}
+<th>Remarks</th>
+{{/if}}
+</tr>
+
+{{#each subjects}}
+
+<tr>
+<td style="text-align:left">{{subject}}</td>
+<td>{{score}}</td>
+<td>{{grade}}</td>
+<td>{{points}}</td>
+{{#if ../showRemarks}}
+<td>{{remark}}</td>
+{{/if}}
+</tr>
+
+{{/each}}
+
+</table>
+
+
+<div class="summary">
+
+<h3 style="font-size:14px; margin-bottom:10px">Summary</h3>
+
+<div class="summary-grid">
+
+<div class="summary-item">
+<strong>Total Marks</strong><br>
+{{summary.totalMarks}}
+</div>
+
+<div class="summary-item">
+<strong>Average</strong><br>
+{{summary.average}}
+</div>
+
+<div class="summary-item">
+<strong>Total Points</strong><br>
+{{summary.totalPoints}}
+</div>
+
+{{#if showBestSix}}
+<div class="summary-item">
+<strong>Best Six Points</strong><br>
+{{summary.bestSixTotal}}
+</div>
+{{/if}}
+
+{{#if showUniversity}}
+<div class="summary-item">
+<strong>University Eligible</strong><br>
+{{summary.eligibleForUniversity}}
+</div>
+{{/if}}
+
+</div>
+
+</div>
+
+{{#if teacherComment}}
+<div class="comments">
+
+<div class="comment-box">
+<p style="margin:0; font-size:12px"><strong>Teacher's Comment:</strong> {{teacherComment}}</p>
+</div>
+
+{{#if headComment}}
+<div class="comment-box">
+<p style="margin:0; font-size:12px"><strong>Head Teacher's Comment:</strong> {{headComment}}</p>
+</div>
+{{/if}}
+
+</div>
+{{/if}}
+
+{{#if showGrading}}
+<div class="legend">
+
+<strong>Grading Legend</strong>
+
+<p style="margin:5px 0">
+1-2 = Distinction |  
+3-4 = Merit |  
+5-6 = Credit |  
+7-8 = Pass |  
+9 = Fail
+</p>
+
+</div>
+{{/if}}
+
+
+<div class="footer">
+
+<div class="signature-section">
+{{#if includeSignature}}
+{{#if signatureUrl}}
+<img src="{{signatureUrl}}" class="stamp-image" style="max-height:60px; margin-bottom:5px"/>
+{{/if}}
+{{/if}}
+<div class="signature-line"></div>
+Class Teacher
+</div>
+
+<div class="stamp-section">
+{{#if includeStamp}}
+{{#if stampUrl}}
+<img src="{{stampUrl}}" class="stamp-image"/>
+{{/if}}
+{{/if}}
+</div>
+
+<div class="signature-section">
+{{#if includeSignature}}
+{{#if signatureUrl}}
+<img src="{{signatureUrl}}" class="stamp-image" style="max-height:60px; margin-bottom:5px"/>
+{{/if}}
+{{/if}}
+<div class="signature-line"></div>
+{{#if directorName}}{{directorName}}{{else}}Head Teacher{{/if}}
+</div>
+
+</div>
+
+{{#if footerText}}
+<div class="footer-text">
+{{footerText}}
+</div>
+{{/if}}
+
+</body>
+</html>
