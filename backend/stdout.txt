@@ -1,0 +1,2 @@
+[32m[Nest] 36608  - [39m12/04/2026, 8:42:56 pm [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 36608  - [39m12/04/2026, 8:42:57 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +359ms[39m
