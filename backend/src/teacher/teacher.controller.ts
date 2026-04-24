@@ -17,7 +17,6 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('teacher')
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class TeacherController {
   private readonly logger = new Logger(TeacherController.name);
 
@@ -39,10 +38,9 @@ export class TeacherController {
   }
 
   @Get()
-  @Roles('Director')
-  findAll(@Req() req: any) {
-    this.logger.log(`findAll called: userId=${req.user.id}, schoolId=${req.user.schoolId}`);
-    return this.teacherService.findAll(req.user.schoolId);
+  findAll(@Query('schoolId') schoolId?: string, @Req() req?: any) {
+    const targetSchoolId = schoolId || req?.user?.schoolId;
+    return this.teacherService.findAll(targetSchoolId);
   }
 
   @Get(':id')

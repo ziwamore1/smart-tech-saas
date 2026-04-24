@@ -73,6 +73,7 @@ model School {
   teachingAssignments    TeachingAssignment[]
   timetables             Timetable[]
   timetableConstraint    TimetableConstraint?
+  setting              SchoolSetting?
   users                  User[]
   galleries              Gallery[]
   libraries              Library[]
@@ -440,6 +441,22 @@ model Timetable {
   termId            String
   classId           String
   createdAt         DateTime           @default(now())
+  name              String?
+  
+  // Time configuration (per timetable)
+  startTime         String?           @default("07:30")
+  periodDuration   Int?             @default(40)
+  periodsPerDay   Int?             @default(7)
+  daysPerWeek     Int?             @default(5)
+  breakAfterPeriod Int?             @default(3)
+  
+  // Session type
+  sessionType     String?          @default("MORNING") // MORNING | AFTERNOON | EVENING
+  
+  // Status
+  status          String           @default("DRAFT") // DRAFT | PUBLISHED
+  publishedAt    DateTime?
+  
   class             Class              @relation(fields: [classId], references: [id])
   school            School             @relation(fields: [schoolId], references: [id])
   term              Term               @relation(fields: [termId], references: [id])
@@ -449,6 +466,8 @@ model Timetable {
   @@index([termId])
   @@index([classId])
   @@index([schoolId, termId])
+  @@index([classId, termId, sessionType])
+  @@index([classId, termId, status])
 }
 
 model TimetableSlot {
@@ -502,6 +521,17 @@ model BreakPeriod {
   day      Int
   period   Int
   school   School @relation(fields: [schoolId], references: [id])
+}
+
+model SchoolSetting {
+  id                  String  @id @default(uuid())
+  schoolId            String  @unique
+  startTime           String  @default("07:30")
+  periodDuration     Int     @default(40)
+  periodsPerDay     Int     @default(7)
+  daysPerWeek       Int     @default(5)
+  breakAfterPeriod   Int     @default(3)
+  school            School  @relation(fields: [schoolId], references: [id])
 }
 
 model TimetableAuditLog {
