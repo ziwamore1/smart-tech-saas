@@ -155,13 +155,16 @@ export class TimetableMasterEngine {
     initialSchedule: TimetableSchedule,
     lessons: Lesson[],
     timeslots: Timeslot[]
-  ): TimetableSchedule {
+  ): { schedule: TimetableSchedule; score: number } {
     const genetic = createGeneticOptimizer(lessons, timeslots, this.context, this.config.genetic);
     
     const result = genetic.optimize((gen) => {
     });
 
-    return result.schedule;
+    return {
+      schedule: result.schedule,
+      score: scoreSchedule(result.schedule, this.context),
+    };
   }
 
   private runWithRelaxation(

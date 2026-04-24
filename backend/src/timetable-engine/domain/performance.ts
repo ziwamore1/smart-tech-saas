@@ -226,7 +226,7 @@ export function createBitmask(days: number, periods: number): number[] {
 }
 
 export function setBitmask(bits: number[], day: number, period: number, value: number): void {
-  const idx = (day - 1) * periods + (period - 1);
+  const idx = (day - 1) * period + (period - 1);
   if (value === 1) {
     bits[idx] |= 1;
   } else {
@@ -235,7 +235,7 @@ export function setBitmask(bits: number[], day: number, period: number, value: n
 }
 
 export function getBitmask(bits: number[], day: number, periods: number): boolean {
-  const idx = (day - 1) * periods + (period - 1);
+  const idx = (day - 1) * periods + (periods - 1);
   return (bits[idx] & 1) === 1;
 }
 

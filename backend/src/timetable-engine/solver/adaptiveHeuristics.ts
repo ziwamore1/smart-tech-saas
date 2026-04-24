@@ -1,5 +1,6 @@
 import { TimetableCache, SlotIndex } from '../entities/cache';
-import { Lesson, Assignment, Chromosome } from './fastHybridSolver';
+import { Lesson, Assignment } from './fastCSPSolver';
+import { Chromosome } from './fastHybridSolver';
 
 export interface HeuristicStats {
   failures: number;

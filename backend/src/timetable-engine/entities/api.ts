@@ -38,7 +38,19 @@ import {
   detectConflicts,
   autoFix,
   AutoFixResult,
+  Conflict,
 } from './conflictDetector';
+
+function convertConflictsToViolations(conflicts: Conflict[]): ConstraintViolation[] {
+  return conflicts.map(conflict => ({
+    type: 'hard' as const,
+    code: `CONFLICT_${conflict.type}`,
+    message: `Conflict: ${conflict.type} - ${conflict.conflictingWith.join(', ')}`,
+    penalty: 100,
+    lessonId: conflict.lessonId,
+    timeslotId: conflict.timeslotId,
+  }));
+}
 
 export interface GenerateTimetableRequest {
   classes: ClassEntity[];
@@ -152,7 +164,7 @@ export async function generateTimetable(
     method: result.method,
     iterations: result.iterations,
     unassigned: result.unassigned.map(l => l.instanceId),
-    violations: conflictResult.conflicts,
+    violations: convertConflictsToViolations(conflictResult.conflicts),
     errors: [],
     warnings: validation.warnings,
     statistics: getStatistics(request),
@@ -208,22 +220,19 @@ function solveTimetable(
 function calculateScore(schedule: ScheduleEntry[], timeslots: TimeslotEntity[]): number {
   let score = 1000;
 
-  const byDay = new Map<number, number[]>();
+  const byDay = new Map<number, number>();
   for (const entry of schedule) {
     const ts = timeslots.find(t => t.id === entry.timeslotId);
     if (!ts) continue;
 
-    if (!byDay.has(ts.day)) {
-      byDay.set(ts.day, []);
-    }
-    byDay.get(ts.day)!.push(entry.timeslotId);
+    byDay.set(ts.day, (byDay.get(ts.day) || 0) + 1);
   }
 
   for (const [, entries] of byDay) {
-    if (entries.length > 0 && entries.length <= 3) {
+    if (entries > 0 && entries <= 3) {
       score += 5;
-    } else if (entries.length > 6) {
-      score -= (entries.length - 6) * 2;
+    } else if (entries > 6) {
+      score -= (entries - 6) * 2;
     }
   }
 

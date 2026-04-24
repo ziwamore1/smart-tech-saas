@@ -175,7 +175,7 @@ export class ConstraintMatrix {
   teacherMaxPerDay: Map<string, number>;
   classMaxPerDay: Map<string, number>;
 
-  buildTeacherAvailability(teachers: { id: string; unavailableSlots?: string[] }[], timeslots: TimeslotEntity[]): void {
+  buildTeacherAvailability(teachers: any[], timeslots: TimeslotEntity[]): void {
     for (const teacher of teachers) {
       const available: number[] = [];
       
@@ -183,7 +183,7 @@ export class ConstraintMatrix {
         const ts = timeslots[i];
         if (ts.isBreak) continue;
         
-        const isUnavailable = teacher.unavailableSlots?.some(s => s === ts.id);
+        const isUnavailable = teacher.unavailableSlots?.some((s: string) => s === ts.id);
         if (!isUnavailable) {
           available.push(this.getSlotIndex(ts.day, ts.period));
         }

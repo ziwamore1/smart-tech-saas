@@ -12,15 +12,15 @@ export class TeacherService {
     private unifiedMessaging: UnifiedMessagingService,
   ) {}
 
-  async findAll(schoolId: string) {
+  async findAll(schoolId?: string) {
     this.logger.log(`findAll called with schoolId=${schoolId}`);
     const teachers = await this.prisma.teacher.findMany({
-      where: { schoolId },
+      where: schoolId ? { schoolId } : undefined,
       include: { user: true },
       orderBy: { user: { firstName: 'asc' } },
     });
     this.logger.log(`findAll returned ${teachers.length} teachers`);
-    return teachers;
+    return { data: teachers };
   }
 
   async findOne(id: string) {

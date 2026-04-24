@@ -277,12 +277,55 @@ export class TimetableController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('Director', 'Admin')
+  @Post('generate-ai/:classId')
+  async generateTimetableAI(
+    @Request() req: AuthenticatedRequest,
+    @Param('classId') classId: string,
+    @Body()
+    body: {
+      termId: string;
+    },
+  ) {
+    console.log('--- AI TIMETABLE GENERATE REQUEST ---');
+    console.log('classId (from URL param):', classId);
+    console.log('schoolId (from auth):', req.user.schoolId);
+    console.log('termId (from body):', body.termId);
+    console.log('--------------------------------------');
+    return this.timetableService.generateTimetableWithAI(
+      req.user.schoolId,
+      body.termId,
+      classId,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Director', 'Admin')
   @Delete(':timetableId')
   deleteTimetable(
     @Param('timetableId') timetableId: string,
     @Request() req: AuthenticatedRequest,
   ) {
     return this.timetableService.deleteTimetable(timetableId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Director', 'Admin')
+  @Post(':timetableId/publish')
+  publishTimetable(
+    @Param('timetableId') timetableId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.timetableService.publishTimetable(timetableId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Director', 'Admin')
+  @Post(':timetableId/unpublish')
+  unpublishTimetable(
+    @Param('timetableId') timetableId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.timetableService.unpublishTimetable(timetableId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

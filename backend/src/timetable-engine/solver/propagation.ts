@@ -85,6 +85,7 @@ export function domainReduction(
   state: TimetableState,
 ): Map<string, { day: number; period: number }[]> {
   const newDomains = new Map(domains);
+  let changed = false;
 
   for (const [lessonId, slots] of domains) {
     if (lessonId === lesson.id) continue;

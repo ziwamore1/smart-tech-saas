@@ -13,6 +13,7 @@ import { LevelTypeModule } from './level-type/level-type.module';
 import { ClassModule } from './class/class.module';
 import { SubjectModule } from './subject/subject.module';
 import { ClassSubjectModule } from './class-subject/class-subject.module';
+import { ClassroomModule } from './classroom/classroom.module';
 import { TeachingAssignmentModule } from './teaching-assignment/teaching-assignment.module';
 import { TeacherModule } from './teacher/teacher.module';
 import { ResultModule } from './result/result.module';
@@ -66,6 +67,7 @@ import { LessonPlanModule } from './lesson-plan/lesson-plan.module';
     ClassModule,
     SubjectModule,
     ClassSubjectModule,
+    ClassroomModule,
     TeachingAssignmentModule,
     TeacherModule,
     ResultModule,

@@ -1,5 +1,6 @@
 import { TimetableCache, SlotIndex, EntityId } from '../entities/cache';
 
+export { SlotIndex, EntityId };
 export type Lesson = {
   id: string;
   teacherId: string;
@@ -115,9 +116,12 @@ function backtrack(
   const lesson = lessons[index];
   const validSlots = enableValidSlotCache
     ? computeValidSlots(lesson, slots, cache)
-    : slots.filter(slot =>
-        cache.isSlotFree(lesson.teacherId, lesson.classId, slot, lesson.roomId)
-      );
+    : slots.filter(slot => {
+        if (!cache.isSlotFree(lesson.teacherId, lesson.classId, slot, lesson.roomId)) {
+          return false;
+        }
+        return cache.canAssign(lesson.teacherId, lesson.classId, slot, lesson.roomId).valid;
+      });
 
   for (const slot of validSlots) {
     cache.assignLesson(lesson.teacherId, lesson.classId, slot, lesson.roomId);
@@ -165,9 +169,13 @@ function computeValidSlots(
   const cached = cache.getValidSlots(lesson.id);
   if (cached) return cached;
 
-  const valid = slots.filter(slot =>
-    cache.isSlotFree(lesson.teacherId, lesson.classId, slot, lesson.roomId)
-  );
+  const valid = slots.filter(slot => {
+    if (!cache.isSlotFree(lesson.teacherId, lesson.classId, slot, lesson.roomId)) {
+      return false;
+    }
+    const canAssign = cache.canAssign(lesson.teacherId, lesson.classId, slot, lesson.roomId);
+    return canAssign.valid;
+  });
 
   cache.setValidSlots(lesson.id, valid);
   return valid;
@@ -181,9 +189,12 @@ function forwardCheck(
 ): boolean {
   for (let i = startIndex; i < lessons.length; i++) {
     const lesson = lessons[i];
-    const hasValid = slots.some(slot =>
-      cache.isSlotFree(lesson.teacherId, lesson.classId, slot, lesson.roomId)
-    );
+    const hasValid = slots.some(slot => {
+      if (!cache.isSlotFree(lesson.teacherId, lesson.classId, slot, lesson.roomId)) {
+        return false;
+      }
+      return cache.canAssign(lesson.teacherId, lesson.classId, slot, lesson.roomId).valid;
+    });
 
     if (!hasValid) return false;
   }

@@ -1,5 +1,8 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, ForbiddenException, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+
+export const RolesKey = 'roles';
+export const Roles = (...roles: string[]) => SetMetadata(RolesKey, roles);
 
 @Injectable()
 export class SchoolGuard implements CanActivate {
@@ -46,7 +49,7 @@ export class RoleGuard implements CanActivate {
       throw new ForbiddenException('User not authenticated');
     }
 
-    const requiredRoles = this.reflector.get<string[]>('roles', context.getHandler());
+    const requiredRoles = this.reflector.get<string[]>(RolesKey, context.getHandler());
     
     if (!requiredRoles || requiredRoles.length === 0) {
       return true;
@@ -62,13 +65,6 @@ export class RoleGuard implements CanActivate {
     return true;
   }
 }
-
-export const Roles = (...roles: string[]) => {
-  return (target: any, key: string, descriptor: PropertyDescriptor) => {
-    descriptor && (descriptor.value = target[key]);
-    return Reflector.defineMetadata('roles', roles, descriptor?.value || target);
-  };
-};
 
 @Injectable()
 export class SchoolMiddleware {

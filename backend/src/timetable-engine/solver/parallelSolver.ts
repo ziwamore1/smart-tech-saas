@@ -1,8 +1,8 @@
 import { Worker } from 'worker_threads';
 import * as path from 'path';
 import * as os from 'os';
-import { Lesson, SlotIndex } from '../solver/fastCSPSolver';
-import { HybridConfig, PenaltyWeights, HybridResult } from '../solver/fastHybridSolver';
+import { Lesson, SlotIndex } from './fastCSPSolver';
+import { HybridConfig, PenaltyWeights, HybridResult } from './fastHybridSolver';
 
 interface ParallelSolveOptions {
   workers?: number;

@@ -8,6 +8,9 @@ import { TimetableGateway } from './timetable.gateway';
 import { solveTimetable } from './solver/solver';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
+import { generateTimetableHybrid, HybridConfig } from '../timetable-engine/solver/fastHybridSolver';
+import { TimetableCache, SlotIndex } from '../timetable-engine/entities/cache';
+import { Lesson } from '../timetable-engine/solver/fastCSPSolver';
 
 // ---------------- Types ----------------
 type LessonRequirement = {
@@ -15,6 +18,8 @@ type LessonRequirement = {
   teacherId: string;
   lessonsPerWeek: number;
 };
+
+type LessonWithSubject = Lesson & { subjectId: string };
 
 type Slot = {
   day: number;
@@ -108,9 +113,13 @@ export class TimetableService {
   }
 
   // ---------------- Timetable ----------------
-  async getClassTimetable(classId: string, termId: string) {
+  async getClassTimetable(classId: string, termId: string, sessionType?: string) {
     return this.prisma.timetable.findFirst({
-      where: { classId, termId },
+      where: { 
+        classId, 
+        termId,
+        ...(sessionType ? { sessionType } : {}),
+      },
       include: {
         slots: {
           include: { 
@@ -124,9 +133,46 @@ export class TimetableService {
     });
   }
 
+  async getClassTimetables(classId: string, termId: string) {
+    return this.prisma.timetable.findMany({
+      where: { classId, termId },
+      include: {
+        slots: {
+          include: { 
+            subject: true, 
+            teacher: { include: { user: true } },
+            classroom: true,
+          },
+          orderBy: [{ day: 'asc' }, { period: 'asc' }],
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+  }
+
   async deleteTimetable(timetableId: string) {
     await this.prisma.timetableSlot.deleteMany({ where: { timetableId } });
     return this.prisma.timetable.delete({ where: { id: timetableId } });
+  }
+
+  async publishTimetable(timetableId: string) {
+    return this.prisma.timetable.update({
+      where: { id: timetableId },
+      data: {
+        status: 'PUBLISHED',
+        publishedAt: new Date(),
+      },
+    });
+  }
+
+  async unpublishTimetable(timetableId: string) {
+    return this.prisma.timetable.update({
+      where: { id: timetableId },
+      data: {
+        status: 'DRAFT',
+        publishedAt: null,
+      },
+    });
   }
 
   async moveSlot(slotId: string, day: number, period: number) {
@@ -246,6 +292,7 @@ export class TimetableService {
     });
 
     // 7️⃣ Save slots
+    console.log('Saving slots:', solution.length);
     await this.prisma.timetableSlot.createMany({
       data: solution.map((s) => ({
         timetableId: timetable.id,
@@ -256,6 +303,12 @@ export class TimetableService {
       })),
     });
 
+    // Verify slots saved
+    const savedCount = await this.prisma.timetableSlot.count({
+      where: { timetableId: timetable.id },
+    });
+    console.log('Saved slots:', savedCount);
+
     // 8️⃣ Return timetable with slots
     return this.prisma.timetable.findUnique({
       where: { id: timetable.id },
@@ -265,6 +318,164 @@ export class TimetableService {
             subject: true,
             teacher: true,
           },
+          orderBy: [{ day: 'asc' }, { period: 'asc' }],
+        },
+      },
+    });
+  }
+
+  // ---------------- New Fast Hybrid Solver ----------------
+  async generateTimetableWithAI(schoolId: string, termId: string, classId: string) {
+    if (!classId) {
+      throw new Error('ClassId is required');
+    }
+
+    // 1️⃣ Get lesson requirements
+    const requirements = await this.prisma.lessonRequirement.findMany({
+      where: { classId },
+      include: {
+        subject: true,
+        teacher: true,
+      },
+    });
+
+    if (!requirements || requirements.length === 0) {
+      throw new Error('No lesson requirements found for this class');
+    }
+
+    // 2️⃣ Get school time settings
+    const schoolSetting = await this.prisma.schoolSetting.findUnique({
+      where: { schoolId },
+    });
+    
+    const periodsPerDay = schoolSetting?.periodsPerDay ?? 7;
+    const daysPerWeek = schoolSetting?.daysPerWeek ?? 5;
+    const breakAfterPeriod = schoolSetting?.breakAfterPeriod ?? 3;
+    const startTime = schoolSetting?.startTime ?? "07:30";
+    const periodDuration = schoolSetting?.periodDuration ?? 40;
+
+    // 3️⃣ Get teachers
+    const teachers = await this.prisma.teacher.findMany({
+      where: { schoolId },
+    });
+
+    // 4️⃣ Create slots based on school config
+    const totalSlots = periodsPerDay * daysPerWeek;
+    const slots: SlotIndex[] = Array.from({ length: totalSlots }, (_, i) => i);
+
+    // 4️⃣ Create lessons for the hybrid solver with subjectId
+    const expandedLessons: LessonWithSubject[] = [];
+    let lessonIdx = 0;
+    for (const req of requirements) {
+      for (let i = 0; i < req.lessonsPerWeek; i++) {
+        expandedLessons.push({
+          id: `lesson-${lessonIdx++}`,
+          teacherId: req.teacherId,
+          classId: req.classId,
+          subjectId: req.subjectId,
+          roomId: undefined,
+        });
+      }
+    }
+
+    // 5️⃣ Run the hybrid solver with school time config
+    const config: HybridConfig = {
+      cspMaxIterations: 10000,
+      cspMaxTime: 30000,
+      populationSize: 20,
+      generations: 50,
+      mutationRate: 0.15,
+      crossoverRate: 0.7,
+      eliteSize: 2,
+      tournamentSize: 3,
+      targetScore: 850,
+      enableForwardCheck: true,
+      enableValidSlotCache: true,
+      periodsPerDay,
+      breakAfterPeriod,
+    };
+
+    const result = generateTimetableHybrid(expandedLessons, slots, config);
+
+    if (!result.success || !result.schedule) {
+      throw new Error('Failed to generate timetable');
+    }
+
+    console.log('AI Generated:', result.schedule.length, 'slots with score:', result.score);
+    console.log('First few assignments:', result.schedule.slice(0, 3));
+
+    // Verify schedule has valid lessonIds
+    const invalidLessons = result.schedule.filter(s => !s.lessonId || !expandedLessons.find(l => l.id === s.lessonId));
+    if (invalidLessons.length > 0) {
+      console.error('WARNING: Found assignments with invalid lessonIds:', invalidLessons);
+    }
+
+    // 6️⃣ Find existing timetable
+    const existing = await this.prisma.timetable.findFirst({
+      where: { classId, termId },
+    });
+
+    // Delete old slots first
+    if (existing) {
+      await this.prisma.timetableSlot.deleteMany({
+        where: { timetableId: existing.id },
+      });
+      await this.prisma.timetable.delete({
+        where: { id: existing.id },
+      });
+    }
+
+    // 7️⃣ Create new timetable with time config from school settings
+    const timetable = await this.prisma.timetable.create({
+      data: {
+        school: { connect: { id: schoolId } },
+        term: { connect: { id: termId } },
+        class: { connect: { id: classId } },
+        startTime: startTime,
+        periodDuration: periodDuration,
+        periodsPerDay: periodsPerDay,
+        daysPerWeek: daysPerWeek,
+        breakAfterPeriod: breakAfterPeriod,
+        sessionType: "MORNING",
+        status: "DRAFT",
+      },
+    });
+
+    // 8️⃣ Save slots (convert from teaching slots to display slots)
+    const slotData = result.schedule.map((assignment) => {
+      const rawSlot = assignment.slot;
+      const teachingDay = Math.floor(rawSlot / periodsPerDay) + 1;
+      const rawPeriod = rawSlot % periodsPerDay;
+      const teachingPeriod = rawPeriod + 1;
+      const lesson = expandedLessons.find(l => l.id === assignment.lessonId);
+      return {
+        timetableId: timetable.id,
+        subjectId: lesson?.subjectId || 'unknown',
+        teacherId: lesson?.teacherId || 'unknown',
+        day: teachingDay,
+        period: teachingPeriod,
+      };
+    });
+
+    await this.prisma.timetableSlot.createMany({ data: slotData });
+
+    // Verify slots were saved
+    const savedCount = await this.prisma.timetableSlot.count({
+      where: { timetableId: timetable.id },
+    });
+    console.log('Saved slots:', savedCount, 'of', slotData.length);
+
+    if (savedCount === 0) {
+      console.error('CRITICAL: No slots were saved to the database!');
+      console.error('slotData:', slotData);
+    }
+
+    // 9️⃣ Return timetable with slots
+    return this.prisma.timetable.findUnique({
+      where: { id: timetable.id },
+      include: {
+        slots: {
+          include: { subject: true, teacher: true },
           orderBy: [{ day: 'asc' }, { period: 'asc' }],
         },
       },

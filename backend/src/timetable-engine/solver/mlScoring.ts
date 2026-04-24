@@ -1,4 +1,5 @@
-import { Lesson, Assignment, Chromosome } from './fastHybridSolver';
+import { Lesson, Assignment } from './fastCSPSolver';
+import { Chromosome } from './fastHybridSolver';
 import { SlotIndex } from '../entities/cache';
 
 export interface Features {

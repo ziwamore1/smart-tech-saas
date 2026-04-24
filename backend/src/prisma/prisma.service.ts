@@ -40,7 +40,7 @@ export class PrismaService
     params,
     next,
   ) => {
-    const skipModels = ['School', 'AcademicYear', 'Role', 'UserRole', 'User', 'FeatureLock', 'SubscriptionPlan', 'DeviceToken', 'Notification'];
+    const skipModels = ['School', 'AcademicYear', 'Role', 'UserRole', 'User', 'FeatureLock', 'SubscriptionPlan', 'DeviceToken', 'Notification', 'TimetableSlot'];
     const modelName = params.model as string;
 
     if (skipModels.includes(modelName)) {

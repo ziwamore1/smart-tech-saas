@@ -241,11 +241,11 @@ export class SchoolService {
     });
   }
 
-  async getProfile(schoolId: string) {
+  async getProfile(schoolId?: string) {
     if (!schoolId) {
-      return null;
+      return { data: null };
     }
-    return this.prisma.school.findUnique({
+    const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
       select: {
         id: true,
@@ -336,5 +336,50 @@ export class SchoolService {
       totalSubjects,
       studentsByClass,
     };
+  }
+
+  async getTimeSettings(schoolId: string) {
+    let settings = await this.prisma.schoolSetting.findUnique({
+      where: { schoolId },
+    });
+
+    if (!settings) {
+      settings = await this.prisma.schoolSetting.create({
+        data: {
+          schoolId,
+          startTime: "07:30",
+          periodDuration: 40,
+          periodsPerDay: 7,
+          daysPerWeek: 5,
+          breakAfterPeriod: 3,
+        },
+      });
+    }
+
+    return settings;
+  }
+
+  async updateTimeSettings(
+    schoolId: string,
+    data: {
+      startTime?: string;
+      periodDuration?: number;
+      periodsPerDay?: number;
+      daysPerWeek?: number;
+      breakAfterPeriod?: number;
+    }
+  ) {
+    return this.prisma.schoolSetting.upsert({
+      where: { schoolId },
+      update: data,
+      create: {
+        schoolId,
+        startTime: data.startTime ?? "07:30",
+        periodDuration: data.periodDuration ?? 40,
+        periodsPerDay: data.periodsPerDay ?? 7,
+        daysPerWeek: data.daysPerWeek ?? 5,
+        breakAfterPeriod: data.breakAfterPeriod ?? 3,
+      },
+    });
   }
 }

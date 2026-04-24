@@ -1,8 +1,8 @@
 import { Controller, Post, Get, Body, Query } from '@nestjs/common';
-import { TimetableAssistant, createAssistant } from './ai/assistant';
+import { TimetableAssistant, createAssistant } from './assistant';
 import { TimetableCache, SlotIndex } from '../entities/cache';
 import { Lesson } from '../solver/fastCSPSolver';
-import { Intent } from './ai/types';
+import { Intent } from './types';
 
 class ChatRequest {
   message: string;

@@ -1,29 +1,64 @@
-import { Rule, RuleContext, RuleEngine, RuleConfig } from './rules';
-import { UserRule } from '../ui/types/rules';
-import { ExpandedLesson, TimeslotEntity, ScheduleEntry } from './index';
-import { parseTimeslotKey } from './index';
+import { Rule } from './rules';
+import { ExpandedLesson, TimeslotEntity, ScheduleEntry } from '../index';
+import { parseTimeslotKey } from '../index';
+
+export interface UserRule {
+  id: string;
+  name: string;
+  type: 'hard' | 'soft' | 'HARD' | 'SOFT';
+  weight?: number;
+  enabled?: boolean;
+  conditions: any[];
+  action: any;
+}
+
+export interface RuleContext {
+  lesson?: ExpandedLesson;
+  timeslot?: TimeslotEntity;
+  timeslots?: TimeslotEntity[];
+  state?: any;
+  schedule?: ScheduleEntry[];
+}
+
+export interface RuleConfig {
+  priority?: number;
+}
+
+export interface RuleEngine {
+  rules: Rule[];
+  addRule: (rule: Rule) => void;
+  evaluate: (context: RuleContext) => Rule[];
+}
 
 export interface CompiledRule extends Rule {
   userRuleId: string;
 }
 
+export function createRuleEngine(): RuleEngine {
+  return {
+    rules: [],
+    addRule: (rule: Rule) => {},
+    evaluate: () => [],
+  };
+}
+
 export function compileUserRule(userRule: UserRule): CompiledRule {
-  const baseRule: Rule = {
-    type: userRule.type,
+  const baseRule: any = {
+    id: userRule.id,
     name: userRule.name,
-    weight: userRule.weight,
-    enabled: userRule.enabled,
+    type: userRule.type,
     validate: () => true,
+    priority: 0,
   };
 
   const conditionEvaluator = buildConditionEvaluator(userRule.conditions);
   const actionEvaluator = buildActionEvaluator(userRule.action);
 
-  if (userRule.type === 'HARD') {
+  if (userRule.type === 'HARD' || userRule.type === 'hard') {
     return {
       ...baseRule,
       userRuleId: userRule.id,
-      validate: (context: RuleContext) => {
+      validate: (context: any) => {
         if (!conditionEvaluator(context)) return true;
         return actionEvaluator(context);
       },
@@ -33,10 +68,10 @@ export function compileUserRule(userRule: UserRule): CompiledRule {
   return {
     ...baseRule,
     userRuleId: userRule.id,
-    validate: (context: RuleContext) => {
-      if (!conditionEvaluator(context)) return 0;
-      const penalty = actionEvaluator(context);
-      return penalty;
+    validate: (context: any) => {
+      if (!conditionEvaluator(context)) return true;
+      const penalty = actionEvaluator(context) as number;
+      return penalty > 0;
     },
   };
 }
@@ -261,7 +296,7 @@ export function compileRulesToEngine(
   userRules: UserRule[],
   existingEngine?: RuleEngine
 ): RuleEngine {
-  const engine = existingEngine || new RuleEngine();
+  const engine = existingEngine || createRuleEngine();
 
   for (const userRule of userRules) {
     if (!userRule.enabled) continue;
@@ -273,7 +308,7 @@ export function compileRulesToEngine(
   return engine;
 }
 
-export function convertUserRulesToConfig(userRules: UserRule[]): RuleConfig[] {
+export function convertUserRulesToConfig(userRules: UserRule[]): any[] {
   return userRules
     .filter(r => r.enabled)
     .map(r => ({
@@ -281,5 +316,6 @@ export function convertUserRulesToConfig(userRules: UserRule[]): RuleConfig[] {
       name: r.name,
       weight: r.weight,
       enabled: r.enabled,
+      priority: r.weight || 0,
     }));
 }

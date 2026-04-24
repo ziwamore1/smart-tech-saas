@@ -137,7 +137,7 @@ export function quickFix(
   slots: SlotIndex[],
   cache: TimetableCache,
   intent: Intent
-): AIResponse {
+): Promise<AIResponse> {
   const assistant = createAssistant({ enableLearning: false });
   const timetable: TimetableData = { lessons, slots, cache };
 

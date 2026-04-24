@@ -70,7 +70,7 @@ export class ActionEngine {
     const conflicts: ConflictInfo[] = [];
     const changes: AppliedChange[] = [];
 
-    const slotMap = new Map<SlotIndex, Lesson[]>();
+    const slotMap = new Map<string, Lesson[]>();
     for (const lesson of timetable.lessons) {
       const existing = slotMap.get(lesson.id) || [];
       existing.push(lesson);
