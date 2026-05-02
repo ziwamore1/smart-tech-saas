@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Delete, Request } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -6,7 +6,9 @@ import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('classrooms')
 export class ClassroomController {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {
+    console.log('ClassroomController initialized');
+  }
 
   @Get()
   async findAll(@Request() req: any) {
@@ -33,6 +35,18 @@ export class ClassroomController {
         name: dto.name,
         capacity: dto.capacity,
         schoolId: dto.schoolId,
+      },
+    });
+    return { data: classroom };
+  }
+
+  @Patch(':id')
+  async update(@Param('id') id: string, @Body() dto: { name?: string; capacity?: number; code?: string }) {
+    const classroom = await this.prisma.classroom.update({
+      where: { id },
+      data: {
+        name: dto.name,
+        capacity: dto.capacity,
       },
     });
     return { data: classroom };

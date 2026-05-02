@@ -1,7 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { BullModule } from '@nestjs/bull';
-
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { NotificationModule } from './notification/notification.module';
@@ -28,9 +26,10 @@ import { TimetableModule } from './timetable/timetable.module';
 import { ConstraintsModule } from './constraints/constraints.module';
 import { DashboardConfigModule } from './dashboard-config/dashboard-config.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
+import { RoleModule } from './role/role.module';
+import { PaymentModule } from './payment/payment.module';
 import { CommunicationModule } from './communication/communication.module';
 import { EmailModule } from './email/email.module';
-import { PaymentModule } from './payment/payment.module';
 import { FeatureLockModule } from './feature-lock/feature-lock.module';
 import { GradingSystemModule } from './grading-system/grading-system.module';
 import { AttendanceModule } from './attendance/attendance.module';
@@ -48,17 +47,10 @@ import { LessonPlanModule } from './lesson-plan/lesson-plan.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
-
-    BullModule.forRoot({
-      redis: process.env.REDIS_URL || 'redis://localhost:6379',
-    }),
-
+    ConfigModule.forRoot({ isGlobal: true }),
+    AuthModule,
     PrismaModule,
     NotificationModule,
-    AuthModule,
     DirectorModule,
     AcademicYearModule,
     TermModule,
@@ -82,6 +74,7 @@ import { LessonPlanModule } from './lesson-plan/lesson-plan.module';
     ConstraintsModule,
     DashboardConfigModule,
     SuperAdminModule,
+    RoleModule,
     PaymentModule,
     CommunicationModule,
     EmailModule,

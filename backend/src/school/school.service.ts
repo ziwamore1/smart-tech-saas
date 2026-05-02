@@ -242,6 +242,7 @@ export class SchoolService {
   }
 
   async getProfile(schoolId?: string) {
+    console.log(`[SchoolService] getProfile called with schoolId: ${schoolId}`);
     if (!schoolId) {
       return { data: null };
     }
@@ -261,6 +262,8 @@ export class SchoolService {
         createdAt: true,
       },
     });
+    console.log(`[SchoolService] getProfile result:`, school);
+    return { data: school };
   }
 
   async updateProfile(

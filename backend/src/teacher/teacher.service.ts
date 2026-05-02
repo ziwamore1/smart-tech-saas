@@ -16,7 +16,11 @@ export class TeacherService {
     this.logger.log(`findAll called with schoolId=${schoolId}`);
     const teachers = await this.prisma.teacher.findMany({
       where: schoolId ? { schoolId } : undefined,
-      include: { user: true },
+      include: { 
+        user: {
+          include: { userRoles: { include: { role: true } } }
+        }
+      },
       orderBy: { user: { firstName: 'asc' } },
     });
     this.logger.log(`findAll returned ${teachers.length} teachers`);

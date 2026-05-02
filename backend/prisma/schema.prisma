@@ -56,14 +56,19 @@ model School {
   exams                  Exam[]
   FeeCategory            FeeCategory[]
   FeePayment             FeePayment[]
+  galleries              Gallery[]
   gradingSystems         GradingSystem[]
   homeworks              Homework[]
+  lessonPlans            LessonPlan[]
   lessonRequirements     LessonRequirement[]
   levelTypes             LevelType[]
+  libraries              Library[]
   NoticeBoard            NoticeBoard[]
   parents                Parent[]
+  readingSessions        ReadingSession[]
   reportTemplates        ReportTemplate[]
   results                Result[]
+  setting                SchoolSetting?
   schoolUsers            SchoolUser[]
   students               Student[]
   subjects               Subject[]
@@ -73,12 +78,7 @@ model School {
   teachingAssignments    TeachingAssignment[]
   timetables             Timetable[]
   timetableConstraint    TimetableConstraint?
-  setting              SchoolSetting?
   users                  User[]
-  galleries              Gallery[]
-  libraries              Library[]
-  lessonPlans            LessonPlan[]
-  readingSessions     ReadingSession[]
 
   @@index([isActive])
   @@index([createdAt])
@@ -139,14 +139,14 @@ model User {
   deviceTokens        DeviceToken[]
   createdExams        Exam[]
   createdHomeworks    Homework[]
+  lessonPlans         LessonPlan[]
   NoticeBoard         NoticeBoard[]
   notifications       Notification[]
+  readingSessions     ReadingSession[]
   results             Result[]             @relation("TeacherResults")
   schoolUsers         SchoolUser[]
   teacher             Teacher?
   teachingAssignments TeachingAssignment[]
-  lessonPlans         LessonPlan[]
-  readingSessions   ReadingSession[]
   school              School?              @relation(fields: [schoolId], references: [id])
   student             Student?             @relation(fields: [studentId], references: [id])
   userRoles           UserRole[]
@@ -195,8 +195,8 @@ model Class {
   enrollments         Enrollment[]
   exams               Exam[]
   homeworks           Homework[]
-  lessonRequirements  LessonRequirement[]
   lessonPlans         LessonPlan[]
+  lessonRequirements  LessonRequirement[]
   resultPublications  ResultPublication[]
   teachingAssignments TeachingAssignment[]
   timetables          Timetable[]
@@ -206,17 +206,17 @@ model Subject {
   id                 String               @id @default(uuid())
   name               String
   code               String?
-  category           String?
-  description        String?
-  credits            Int?
   isCore             Boolean              @default(false)
   schoolId           String
+  category           String?
+  credits            Int?
+  description        String?
   assessments        AssessmentType[]
   classSubjects      ClassSubject[]
   exams              Exam[]
   homeworks          Homework[]
-  lessonRequirements LessonRequirement[]
   lessonPlans        LessonPlan[]
+  lessonRequirements LessonRequirement[]
   results            Result[]
   school             School               @relation(fields: [schoolId], references: [id])
   assignments        TeachingAssignment[]
@@ -441,22 +441,15 @@ model Timetable {
   termId            String
   classId           String
   createdAt         DateTime           @default(now())
+  breakAfterPeriod  Int?               @default(3)
+  daysPerWeek       Int?               @default(5)
   name              String?
-  
-  // Time configuration (per timetable)
-  startTime         String?           @default("07:30")
-  periodDuration   Int?             @default(40)
-  periodsPerDay   Int?             @default(7)
-  daysPerWeek     Int?             @default(5)
-  breakAfterPeriod Int?             @default(3)
-  
-  // Session type
-  sessionType     String?          @default("MORNING") // MORNING | AFTERNOON | EVENING
-  
-  // Status
-  status          String           @default("DRAFT") // DRAFT | PUBLISHED
-  publishedAt    DateTime?
-  
+  periodDuration    Int?               @default(40)
+  periodsPerDay     Int?               @default(7)
+  publishedAt       DateTime?
+  sessionType       String?            @default("MORNING")
+  startTime         String?            @default("07:30")
+  status            String             @default("DRAFT")
   class             Class              @relation(fields: [classId], references: [id])
   school            School             @relation(fields: [schoolId], references: [id])
   term              Term               @relation(fields: [termId], references: [id])
@@ -524,14 +517,14 @@ model BreakPeriod {
 }
 
 model SchoolSetting {
-  id                  String  @id @default(uuid())
-  schoolId            String  @unique
-  startTime           String  @default("07:30")
-  periodDuration     Int     @default(40)
-  periodsPerDay     Int     @default(7)
-  daysPerWeek       Int     @default(5)
-  breakAfterPeriod   Int     @default(3)
-  school            School  @relation(fields: [schoolId], references: [id])
+  id               String @id @default(uuid())
+  schoolId         String @unique
+  startTime        String @default("07:30")
+  periodDuration   Int    @default(40)
+  periodsPerDay    Int    @default(7)
+  daysPerWeek      Int    @default(5)
+  breakAfterPeriod Int    @default(3)
+  school           School @relation(fields: [schoolId], references: [id])
 }
 
 model TimetableAuditLog {
@@ -1249,6 +1242,97 @@ model MessageLog {
   @@index([recipientEmail])
 }
 
+model Gallery {
+  id          String         @id @default(uuid())
+  title       String
+  description String?
+  eventDate   DateTime?
+  schoolId    String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  school      School         @relation(fields: [schoolId], references: [id])
+  photos      GalleryPhoto[]
+
+  @@index([schoolId])
+}
+
+model GalleryPhoto {
+  id        String   @id @default(uuid())
+  galleryId String
+  url       String
+  caption   String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  gallery   Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+  @@index([galleryId])
+}
+
+model Library {
+  id              String           @id @default(uuid())
+  title           String
+  description     String?
+  category        String
+  fileType        String?
+  fileSize        Int?
+  url             String?
+  fileUrl         String?
+  schoolId        String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  school          School           @relation(fields: [schoolId], references: [id])
+  readingSessions ReadingSession[]
+
+  @@index([schoolId])
+}
+
+model ReadingSession {
+  id              String   @id @default(uuid())
+  documentId      String
+  userId          String
+  schoolId        String
+  durationSeconds Int
+  pagesViewed     String[] @default([])
+  completedAt     DateTime
+  document        Library  @relation(fields: [documentId], references: [id])
+  school          School   @relation(fields: [schoolId], references: [id])
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@index([documentId])
+  @@index([userId])
+  @@index([schoolId])
+}
+
+model LessonPlan {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  classId     String
+  subjectId   String
+  weekStart   DateTime
+  weekEnd     DateTime
+  objectives  String[]
+  materials   String?
+  procedures  String?
+  assessment  String?
+  notes       String?
+  attachments Json?    @default("[]")
+  status      String   @default("draft")
+  schoolId    String
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  class       Class    @relation(fields: [classId], references: [id])
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  school      School   @relation(fields: [schoolId], references: [id])
+  subject     Subject  @relation(fields: [subjectId], references: [id])
+
+  @@index([schoolId])
+  @@index([classId])
+  @@index([subjectId])
+  @@index([weekStart])
+}
+
 enum EnrollmentStatus {
   ACTIVE
   INACTIVE
@@ -1330,97 +1414,6 @@ enum MessageChannel {
   EMAIL
   SMS
   WHATSAPP
-}
-
-model Gallery {
-  id          String         @id @default(uuid())
-  title       String
-  description String?
-  eventDate   DateTime?
-  schoolId    String
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  photos      GalleryPhoto[]
-  school      School         @relation(fields: [schoolId], references: [id])
-
-  @@index([schoolId])
-}
-
-model GalleryPhoto {
-  id        String   @id @default(uuid())
-  galleryId String
-  url       String
-  caption   String?
-  order     Int      @default(0)
-  createdAt DateTime @default(now())
-  gallery   Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
-
-  @@index([galleryId])
-}
-
-model Library {
-  id          String   @id @default(uuid())
-  title       String
-  description String?
-  category    String
-  fileType    String?
-  fileSize    Int?
-  url         String?
-  fileUrl     String?
-  schoolId    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  school      School   @relation(fields: [schoolId], references: [id])
-  readingSessions ReadingSession[]
-
-  @@index([schoolId])
-}
-
-model ReadingSession {
-  id              String   @id @default(uuid())
-  documentId      String
-  document       Library  @relation(fields: [documentId], references: [id])
-  userId         String
-  user           User     @relation(fields: [userId], references: [id])
-  schoolId       String
-  school         School   @relation(fields: [schoolId], references: [id])
-  durationSeconds Int
-  pagesViewed    String[] @default([])
-  completedAt    DateTime
-
-  @@index([documentId])
-  @@index([userId])
-  @@index([schoolId])
-}
-
-model LessonPlan {
-  id            String   @id @default(uuid())
-  title         String
-  description   String?
-  classId       String
-  subjectId     String
-  weekStart     DateTime
-  weekEnd       DateTime
-  objectives    String[]
-  materials     String?
-  procedures    String?
-  assessment    String?
-  notes         String?
-  attachments   Json?    @default("[]")
-  status        String   @default("draft")
-  schoolId      String
-  createdById   String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  school        School   @relation(fields: [schoolId], references: [id])
-  createdBy     User     @relation(fields: [createdById], references: [id])
-  class         Class    @relation(fields: [classId], references: [id])
-  subject       Subject  @relation(fields: [subjectId], references: [id])
-
-  @@index([schoolId])
-  @@index([classId])
-  @@index([subjectId])
-  @@index([weekStart])
 }
 
 enum MessageStatus {

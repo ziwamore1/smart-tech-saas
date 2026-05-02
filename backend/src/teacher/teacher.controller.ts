@@ -51,7 +51,12 @@ export class TeacherController {
   @Post()
   @Roles('Director')
   create(@Body() body: any, @Req() req: any) {
-    return this.teacherService.create(body, req.user.schoolId);
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) {
+      console.error('Teacher creation failed: No schoolId found for user', req.user);
+      throw new Error('Cannot create teacher: User is not associated with a school. Please log out and log back in.');
+    }
+    return this.teacherService.create(body, schoolId);
   }
 
   @Put(':id')
