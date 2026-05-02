@@ -147,105 +147,37 @@ export class SchoolService {
         isDefault: true,
       },
     });
+
     await this.prisma.gradeScale.createMany({
       data: [
-        {
-          gradingSystemId: gradingSystem.id,
-          minScore: 75,
-          maxScore: 100,
-          grade: '1',
-          remark: 'Distinction',
-          points: 1,
-        },
-        {
-          gradingSystemId: gradingSystem.id,
-          minScore: 70,
-          maxScore: 74,
-          grade: '2',
-          remark: 'Distinction',
-          points: 2,
-        },
-        {
-          gradingSystemId: gradingSystem.id,
-          minScore: 65,
-          maxScore: 69,
-          grade: '3',
-          remark: 'Merit',
-          points: 3,
-        },
-        {
-          gradingSystemId: gradingSystem.id,
-          minScore: 60,
-          maxScore: 64,
-          grade: '4',
-          remark: 'Merit',
-          points: 4,
-        },
-        {
-          gradingSystemId: gradingSystem.id,
-          minScore: 55,
-          maxScore: 59,
-          grade: '5',
-          remark: 'Credit',
-          points: 5,
-        },
-        {
-          gradingSystemId: gradingSystem.id,
-          minScore: 50,
-          maxScore: 54,
-          grade: '6',
-          remark: 'Credit',
-          points: 6,
-        },
-        {
-          gradingSystemId: gradingSystem.id,
-          minScore: 45,
-          maxScore: 49,
-          grade: '7',
-          remark: 'Pass',
-          points: 7,
-        },
-        {
-          gradingSystemId: gradingSystem.id,
-          minScore: 40,
-          maxScore: 44,
-          grade: '8',
-          remark: 'Pass',
-          points: 8,
-        },
-        {
-          gradingSystemId: gradingSystem.id,
-          minScore: 0,
-          maxScore: 39,
-          grade: '9',
-          remark: 'Fail',
-          points: 9,
-        },
+        { gradingSystemId: gradingSystem.id, minScore: 80, maxScore: 100, grade: 'A', remark: 'Distinction', points: 5 },
+        { gradingSystemId: gradingSystem.id, minScore: 70, maxScore: 79, grade: 'B', remark: 'Merit', points: 4 },
+        { gradingSystemId: gradingSystem.id, minScore: 60, maxScore: 69, grade: 'C', remark: 'Credit', points: 3 },
+        { gradingSystemId: gradingSystem.id, minScore: 50, maxScore: 59, grade: 'D', remark: 'Pass', points: 2 },
+        { gradingSystemId: gradingSystem.id, minScore: 0, maxScore: 49, grade: 'F', remark: 'Fail', points: 1 },
       ],
     });
-  }
-  async updateBranding(
-    schoolId: string,
-    data: {
-      logo?: string;
-      motto?: string;
-      address?: string;
-      primaryColor?: string;
-      directorSignature?: string;
-      schoolStamp?: string;
-    },
-  ) {
-    return this.prisma.school.update({
-      where: { id: schoolId },
-      data,
+
+    await this.prisma.schoolSetting.create({
+      data: {
+        schoolId,
+        startTime: '07:30',
+        periodDuration: 40,
+        periodsPerDay: 7,
+        daysPerWeek: 5,
+        breakAfterPeriod: 3,
+      },
     });
+
+    this.logger.log(`School ${schoolId} initialized with default data`);
   }
 
   async getProfile(schoolId?: string) {
     console.log(`[SchoolService] getProfile called with schoolId: ${schoolId}`);
     if (!schoolId) {
-      return { data: null };
+      return null;
     }
+    
     const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
       select: {
@@ -262,8 +194,9 @@ export class SchoolService {
         createdAt: true,
       },
     });
-    console.log(`[SchoolService] getProfile result:`, school);
-    return { data: school };
+    
+    console.log(`[SchoolService] getProfile result:`, JSON.stringify(school));
+    return school;
   }
 
   async updateProfile(

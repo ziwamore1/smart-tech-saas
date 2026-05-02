@@ -292,6 +292,9 @@ export class AuthService {
         userRoles: {
           include: { role: true },
         },
+        schoolUsers: {
+          select: { schoolId: true, isPrimary: true },
+        },
       },
     });
     
@@ -312,9 +315,14 @@ export class AuthService {
     const roles = user.userRoles.map((ur) => ur.role.name);
     const primaryRole = roles[0] || 'USER';
 
+    const resolvedSchoolId = user.schoolId
+      || user.schoolUsers?.find(su => su.isPrimary)?.schoolId
+      || user.schoolUsers?.[0]?.schoolId
+      || null;
+
     const payload = {
       sub: user.id,
-      schoolId: user.schoolId,
+      schoolId: resolvedSchoolId,
       roles,
       type: 'user',
     };
@@ -322,7 +330,7 @@ export class AuthService {
     this.logger.log(
       `Login successful for ${email}, roles: ${roles.join(', ')}, schoolId: ${payload.schoolId}`,
     );
-    this.logger.log(`User data - schoolId in DB: ${user.schoolId}`);
+    this.logger.log(`User data - schoolId in DB: ${user.schoolId}, resolved: ${resolvedSchoolId}`);
 
     return {
       message: 'Login successful',
@@ -334,7 +342,7 @@ export class AuthService {
         lastName: user.lastName,
         roles,
         primaryRole,
-        schoolId: user.schoolId,
+        schoolId: resolvedSchoolId,
       },
     };
   }
