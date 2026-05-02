@@ -41,6 +41,7 @@ export class SchoolController {
   @Get('profile')
   getProfile(@Query('schoolId') schoolId?: string, @Req() req?: any) {
     const targetSchoolId = schoolId || req?.user?.schoolId;
+    console.log(`[School Profile] Requested schoolId: ${targetSchoolId}, from req.user: ${req?.user?.schoolId}`);
     return this.schoolService.getProfile(targetSchoolId);
   }
 

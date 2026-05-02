@@ -72,11 +72,16 @@ export class AuthService {
       where: { email: email.toLowerCase() },
     });
 
+    this.logger.log(`SuperAdmin user found:`, user);
+
     if (!user) {
+      this.logger.warn(`SuperAdmin user not found: ${email}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    
+    this.logger.log(`Password valid:`, isPasswordValid);
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
@@ -289,6 +294,8 @@ export class AuthService {
         },
       },
     });
+    
+    this.logger.log(`User found: ${user?.email}, schoolId: ${user?.schoolId}`);
 
     if (!user) {
       this.logger.warn(`User not found for email: ${email}`);
@@ -315,6 +322,7 @@ export class AuthService {
     this.logger.log(
       `Login successful for ${email}, roles: ${roles.join(', ')}, schoolId: ${payload.schoolId}`,
     );
+    this.logger.log(`User data - schoolId in DB: ${user.schoolId}`);
 
     return {
       message: 'Login successful',
