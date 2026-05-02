@@ -17,6 +17,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('teacher')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class TeacherController {
   private readonly logger = new Logger(TeacherController.name);
 

@@ -39,10 +39,42 @@ export class SchoolController {
   }
 
   @Get('profile')
-  getProfile(@Query('schoolId') schoolId?: string, @Req() req?: any) {
+  @UseGuards(JwtAuthGuard)
+  async getProfile(@Query('schoolId') schoolId?: string, @Req() req?: any) {
     const targetSchoolId = schoolId || req?.user?.schoolId;
-    console.log(`[School Profile] Requested schoolId: ${targetSchoolId}, from req.user: ${req?.user?.schoolId}`);
-    return this.schoolService.getProfile(targetSchoolId);
+    console.log(`[School Profile] Query: "${schoolId}", req.user.schoolId: "${req?.user?.schoolId}", resolved: "${targetSchoolId}"`);
+    const result = await this.schoolService.getProfile(targetSchoolId);
+    console.log(`[School Profile] Returning:`, JSON.stringify(result));
+    return result;
+  }
+
+  @Get('current')
+  @UseGuards(JwtAuthGuard)
+  async getCurrentSchool(@Req() req?: any) {
+    const schoolId = req?.user?.schoolId;
+    console.log(`[School Current] req.user.schoolId: ${schoolId}, full user:`, JSON.stringify(req?.user));
+    return this.schoolService.getProfile(schoolId);
+  }
+
+  @Get('debug')
+  @UseGuards(JwtAuthGuard)
+  async debugSchool(@Req() req?: any) {
+    const schoolId = req?.user?.schoolId;
+    console.log(`[School Debug] schoolId from JWT: ${schoolId}`);
+    
+    const allSchools = await this.prisma.school.findMany({ select: { id: true, name: true } });
+    console.log(`[School Debug] All schools in DB:`, JSON.stringify(allSchools));
+    
+    if (schoolId) {
+      const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+      console.log(`[School Debug] School lookup result:`, JSON.stringify(school));
+    }
+    
+    return {
+      schoolIdFromJWT: schoolId,
+      userRoles: req?.user?.roles,
+      schoolExists: !!schoolId && !!await this.prisma.school.findUnique({ where: { id: schoolId } }),
+    };
   }
 
   @Patch('profile')
@@ -55,12 +87,6 @@ export class SchoolController {
   @UseGuards(JwtAuthGuard)
   getStats(@Req() req: any) {
     return this.schoolService.getStats(req.user.schoolId);
-  }
-
-  @Patch('branding')
-  @Roles('Director')
-  updateBranding(@Req() req: any, @Body() body: any) {
-    return this.schoolService.updateBranding(req.user.schoolId, body);
   }
 
   @Get('time-settings')
