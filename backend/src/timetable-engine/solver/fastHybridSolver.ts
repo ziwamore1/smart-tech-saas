@@ -18,6 +18,12 @@ export type Gene = {
 
 export type Chromosome = Gene[];
 
+export interface BreakDef {
+  afterPeriod: number;
+  duration: number;
+  name?: string;
+}
+
 export interface HybridConfig {
   cspMaxIterations: number;
   cspMaxTime: number;
@@ -31,7 +37,12 @@ export interface HybridConfig {
   enableForwardCheck: boolean;
   enableValidSlotCache: boolean;
   periodsPerDay?: number;
-  breakAfterPeriod?: number;
+  breaks?: BreakDef[];
+  /** 0-indexed compact period indices where double lessons are valid
+   *  (consecutive display periods, not separated by a break). */
+  validCompactDoublePeriods?: number[];
+  /** Max lessons a teacher can have in a single day (0 = no limit). */
+  maxTeacherLessonsPerDay?: number;
 }
 
 export const DEFAULT_HYBRID_CONFIG: HybridConfig = {
@@ -46,6 +57,7 @@ export const DEFAULT_HYBRID_CONFIG: HybridConfig = {
   targetScore: 950,
   enableForwardCheck: true,
   enableValidSlotCache: true,
+  breaks: [],
 };
 
 export interface HybridResult {
@@ -65,16 +77,18 @@ export function generateTimetableHybrid(
   config: Partial<HybridConfig> = {},
   weights?: PenaltyWeights
 ): HybridResult {
-const cfg = { ...DEFAULT_HYBRID_CONFIG, ...config };
+ const cfg = { ...DEFAULT_HYBRID_CONFIG, ...config };
   const startTime = Date.now();
 
   const periodsPerDay = cfg.periodsPerDay ?? Math.ceil(slots.length / 5);
-  const breakAfterPeriod = cfg.breakAfterPeriod ?? Math.ceil(periodsPerDay / 2);
+  const breaks = cfg.breaks ?? [];
 
   const cache = new TimetableCache({ 
     totalSlots: slots.length, 
     periodsPerDay,
-    breakAfterPeriod,
+    breaks,
+    validCompactDoublePeriods: cfg.validCompactDoublePeriods,
+    maxTeacherLessonsPerDay: cfg.maxTeacherLessonsPerDay,
   });
 
   lessons.forEach(lesson => {
@@ -93,7 +107,7 @@ const cfg = { ...DEFAULT_HYBRID_CONFIG, ...config };
     heuristic: 'mrv',
   };
 
-  const fastSolve = createFastSolver(slots.length);
+  const fastSolve = createFastSolver(slots.length, periodsPerDay, cfg.validCompactDoublePeriods, cfg.maxTeacherLessonsPerDay);
   const cspResult = fastSolve(lessons, slots, cspOptions);
 
   if (!cspResult.assignments) {
@@ -305,12 +319,13 @@ function calculateFitness(
   const cached = cache.getScore(hash);
   if (cached !== undefined) return cached;
 
+  const periodsPerDay = cache.getPeriodsPerDay();
   let score = 1000;
 
-  score -= teacherGapsPenalty(chromosome, lessonMap, slots) * weights.teacherGaps;
-  score -= subjectSpreadPenalty(chromosome, lessonMap, slots) * weights.subjectSpread;
-  score -= lateLessonPenalty(chromosome, lessonMap, slots) * weights.lateLesson;
-  score -= consecutiveLessonsPenalty(chromosome, lessonMap, slots) * weights.consecutiveLessons;
+  score -= teacherGapsPenalty(chromosome, lessonMap, slots, periodsPerDay) * weights.teacherGaps;
+  score -= subjectSpreadPenalty(chromosome, lessonMap, slots, periodsPerDay) * weights.subjectSpread;
+  score -= lateLessonPenalty(chromosome, lessonMap, slots, periodsPerDay) * weights.lateLesson;
+  score -= consecutiveLessonsPenalty(chromosome, lessonMap, slots, periodsPerDay) * weights.consecutiveLessons;
 
   cache.setScore(hash, score);
   return score;
@@ -320,14 +335,14 @@ function hashChromosome(chromosome: Chromosome): string {
   return chromosome.map(g => `${g.lessonId}:${g.slot}`).join('|');
 }
 
-function teacherGapsPenalty(chromosome: Chromosome, lessonMap: Map<string, Lesson>, slots: SlotIndex[]): number {
+function teacherGapsPenalty(chromosome: Chromosome, lessonMap: Map<string, Lesson>, slots: SlotIndex[], periodsPerDay: number): number {
   const teacherDays = new Map<string, Set<number>>();
 
   for (const gene of chromosome) {
     const lesson = lessonMap.get(gene.lessonId);
     if (!lesson) continue;
 
-    const day = Math.floor(gene.slot / 7);
+    const day = Math.floor(gene.slot / periodsPerDay);
     
     if (!teacherDays.has(lesson.teacherId)) {
       teacherDays.set(lesson.teacherId, new Set());
@@ -348,14 +363,14 @@ function teacherGapsPenalty(chromosome: Chromosome, lessonMap: Map<string, Lesso
   return penalty;
 }
 
-function subjectSpreadPenalty(chromosome: Chromosome, lessonMap: Map<string, Lesson>, slots: SlotIndex[]): number {
+function subjectSpreadPenalty(chromosome: Chromosome, lessonMap: Map<string, Lesson>, slots: SlotIndex[], periodsPerDay: number): number {
   const subjectDays = new Map<string, Set<number>>();
 
   for (const gene of chromosome) {
     const lesson = lessonMap.get(gene.lessonId);
     if (!lesson) continue;
 
-    const day = Math.floor(gene.slot / 7);
+    const day = Math.floor(gene.slot / periodsPerDay);
     
     if (!subjectDays.has(lesson.classId)) {
       subjectDays.set(lesson.classId, new Set());
@@ -366,15 +381,15 @@ function subjectSpreadPenalty(chromosome: Chromosome, lessonMap: Map<string, Les
   return Math.max(0, 5 - subjectDays.size) * 2;
 }
 
-function lateLessonPenalty(chromosome: Chromosome, lessonMap: Map<string, Lesson>, slots: SlotIndex[]): number {
+function lateLessonPenalty(chromosome: Chromosome, lessonMap: Map<string, Lesson>, slots: SlotIndex[], periodsPerDay: number): number {
   let penalty = 0;
 
   for (const gene of chromosome) {
     const lesson = lessonMap.get(gene.lessonId);
     if (!lesson) continue;
 
-    const period = gene.slot % 8;
-    if (period >= 6) {
+    const period = gene.slot % periodsPerDay;
+    if (period >= periodsPerDay - 2) {
       penalty += 1;
     }
   }
@@ -382,27 +397,27 @@ function lateLessonPenalty(chromosome: Chromosome, lessonMap: Map<string, Lesson
   return penalty;
 }
 
-function consecutiveLessonsPenalty(chromosome: Chromosome, lessonMap: Map<string, Lesson>, slots: SlotIndex[]): number {
-  const teacherDaySlots = new Map<string, { before: number; after: number; count: number; consecutive: number; maxConsecutive: number }>();
+function consecutiveLessonsPenalty(chromosome: Chromosome, lessonMap: Map<string, Lesson>, slots: SlotIndex[], periodsPerDay: number): number {
+  const teacherDaySlots = new Map<string, { before: number; after: number }>();
+
+  const midPoint = Math.floor(periodsPerDay / 2);
 
   for (const gene of chromosome) {
     const lesson = lessonMap.get(gene.lessonId);
     if (!lesson) continue;
 
-    const day = Math.floor(gene.slot / 7);
-    const dayPeriod = gene.slot % 7;
-    const period = dayPeriod === 0 ? 7 : dayPeriod;
+    const day = Math.floor(gene.slot / periodsPerDay);
+    const period = gene.slot % periodsPerDay;
 
     const key = `${lesson.teacherId}-${day}`;
     if (!teacherDaySlots.has(key)) {
-      teacherDaySlots.set(key, { before: 0, after: 0, count: 0, consecutive: 0, maxConsecutive: 0 });
+      teacherDaySlots.set(key, { before: 0, after: 0 });
     }
     const dayData = teacherDaySlots.get(key)!;
-    dayData.count++;
 
-    if (period <= 3) {
+    if (period < midPoint) {
       dayData.before++;
-    } else if (period >= 5) {
+    } else {
       dayData.after++;
     }
   }
@@ -413,7 +428,7 @@ function consecutiveLessonsPenalty(chromosome: Chromosome, lessonMap: Map<string
     const lesson = lessonMap.get(gene.lessonId);
     if (!lesson) continue;
 
-    const day = Math.floor(gene.slot / 7);
+    const day = Math.floor(gene.slot / periodsPerDay);
     const key = `${lesson.teacherId}-${day}`;
     if (!prevSlots.has(key)) {
       prevSlots.set(key, []);
@@ -428,14 +443,8 @@ function consecutiveLessonsPenalty(chromosome: Chromosome, lessonMap: Map<string
     let prevPeriod = -1;
 
     for (const slot of slotsArr) {
-      const dayPeriod = slot % 7;
-      const period = dayPeriod === 0 ? 7 : dayPeriod;
-      const day = Math.floor(slot / 7);
-
-      if (period === 4) {
-        penalty += 1000;
-        continue;
-      }
+      const period = slot % periodsPerDay;
+      const day = Math.floor(slot / periodsPerDay);
 
       if (day === prevDay && period === prevPeriod + 1) {
         currentConsecutive++;

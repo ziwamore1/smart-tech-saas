@@ -46,15 +46,22 @@ export class TimetableService {
     subjectId: string,
     teacherId: string,
     lessonsPerWeek: number,
+    lessonType?: string,
   ) {
     return this.prisma.lessonRequirement.create({
-      data: { schoolId, classId, subjectId, teacherId, lessonsPerWeek },
+      data: { schoolId, classId, subjectId, teacherId, lessonsPerWeek, lessonType: lessonType || 'single' },
     });
   }
 
   async deleteLessonRequirement(id: string) {
     return this.prisma.lessonRequirement.delete({
       where: { id },
+    });
+  }
+
+  async deleteLessonRequirementsByClass(classId: string) {
+    return this.prisma.lessonRequirement.deleteMany({
+      where: { classId },
     });
   }
 
@@ -181,28 +188,35 @@ export class TimetableService {
     });
     if (!slot) throw new Error('Slot not found');
 
-    const conflict = await this.prisma.timetableSlot.findFirst({
-      where: {
-        day,
-        period,
-        teacherId: slot.teacherId,
-        timetableId: slot.timetableId,
-      },
-    });
-    if (conflict) throw new Error('Teacher conflict');
+    const lessonSize = slot.lessonSize || 1;
+
+    for (let p = period; p < period + lessonSize; p++) {
+      const existingSlot = await this.prisma.timetableSlot.findFirst({
+        where: {
+          day,
+          period: p,
+          timetableId: slot.timetableId,
+          NOT: { id: slot.id },
+        },
+      });
+      if (existingSlot) throw new Error('Target position already occupied');
+
+      const teacherConflict = await this.prisma.timetableSlot.findFirst({
+        where: {
+          day,
+          period: p,
+          teacherId: slot.teacherId,
+          timetableId: slot.timetableId,
+          NOT: { id: slot.id },
+        },
+      });
+      if (teacherConflict) throw new Error('Teacher conflict');
+    }
 
     return this.prisma.timetableSlot.update({
       where: { id: slotId },
       data: { day, period },
     });
-  }
-
-  // ---------------- Break Periods ----------------
-  private async getBreakPeriods(schoolId: string) {
-    const breaks = await this.prisma.breakPeriod.findMany({
-      where: { schoolId },
-    });
-    return breaks.map((b) => ({ day: b.day, period: b.period }));
   }
 
   // ---------------- Timetable Generation ----------------
@@ -250,7 +264,18 @@ export class TimetableService {
     console.log('Slots Generated:', solution?.length);
 
     if (!solution || solution.length === 0) {
-      throw new Error('Timetable solver returned no slots');
+      const teacherIds = [...new Set(lessons.map(l => l.teacherId))];
+      const teachers = await this.prisma.teacher.findMany({
+        where: { id: { in: teacherIds } },
+        include: { user: true },
+      });
+      const teacherNames = teachers.map(t => `${t.user.firstName} ${t.user.lastName}`).join(', ');
+      throw new Error(
+        `Timetable solver could not find a valid schedule. ` +
+        `${lessons.length} lessons for ${context.days} days × ${context.periods} periods. ` +
+        `Try: reducing lessons, adding more periods, or checking teacher availability. ` +
+        `Teachers: ${teacherNames}`
+      );
     }
 
     // Find existing timetable
@@ -276,7 +301,12 @@ export class TimetableService {
       });
     }
 
-    // 6️⃣ Create new timetable
+    // 6️⃣ Load school time settings
+    const timeSettings = await this.prisma.schoolSetting.findUnique({
+      where: { schoolId },
+    });
+
+    // 7️⃣ Create new timetable with time settings
     const timetable = await this.prisma.timetable.create({
       data: {
         school: {
@@ -288,6 +318,11 @@ export class TimetableService {
         class: {
           connect: { id: classId },
         },
+        startTime: timeSettings?.startTime || '07:30',
+        periodsPerDay: timeSettings?.periodsPerDay || 7,
+        periodDuration: timeSettings?.periodDuration || 40,
+        daysPerWeek: timeSettings?.daysPerWeek || 5,
+        breakAfterPeriod: timeSettings?.breakAfterPeriod || 3,
       },
     });
 
@@ -350,37 +385,95 @@ export class TimetableService {
     
     const periodsPerDay = schoolSetting?.periodsPerDay ?? 7;
     const daysPerWeek = schoolSetting?.daysPerWeek ?? 5;
-    const breakAfterPeriod = schoolSetting?.breakAfterPeriod ?? 3;
     const startTime = schoolSetting?.startTime ?? "07:30";
     const periodDuration = schoolSetting?.periodDuration ?? 40;
+
+    let breaks: any[] = [];
+    if (schoolSetting?.breaks) {
+      try {
+        breaks = typeof schoolSetting.breaks === 'string'
+          ? JSON.parse(schoolSetting.breaks)
+          : schoolSetting.breaks;
+      } catch { breaks = []; }
+    }
 
     // 3️⃣ Get teachers
     const teachers = await this.prisma.teacher.findMany({
       where: { schoolId },
     });
 
-    // 4️⃣ Create slots based on school config
+    // 4️⃣ Compute valid compact double period positions from break definitions.
+    //    A break's afterPeriod=N means break BETWEEN display periods N and N+1.
+    //    A double at compact period cp spans display periods (cp+1, cp+2).
+    //    It crosses a break when b.afterPeriod === cp + 1.
+    const breakAfterSet = new Set<number>();
+    if (breaks) {
+      for (const b of breaks) {
+        breakAfterSet.add(b.afterPeriod);
+      }
+    }
+
+    // compactPeriodIndex (0-based) → displayPeriod (1-based) is identity: cp + 1
+    const validCompactDoublePeriods: number[] = [];
+    for (let cp = 0; cp < periodsPerDay - 1; cp++) {
+      if (!breakAfterSet.has(cp + 1)) {
+        validCompactDoublePeriods.push(cp);
+      }
+    }
+
     const totalSlots = periodsPerDay * daysPerWeek;
+    const maxUtilization = 0.95;
+    const maxSchedulable = Math.floor(totalSlots * maxUtilization);
+
+    // Slot indices — the full Day × Period matrix (breaks are BETWEEN periods, not in the matrix)
     const slots: SlotIndex[] = Array.from({ length: totalSlots }, (_, i) => i);
 
-    // 4️⃣ Create lessons for the hybrid solver with subjectId
+    // 5️⃣ Create lessons — expand by session count, not period count.
+    //    lessonsPerWeek = total periods. lessonType = period grouping.
+    //    e.g. lessonsPerWeek: 8, lessonType: 'double' → 4 double sessions (8 periods)
+    const typeMultiplier: Record<string, number> = {
+      single: 1, double: 2, triple: 3, quadruple: 4,
+      quintuple: 5, sextuple: 6, septuple: 7, octuple: 8,
+    };
     const expandedLessons: LessonWithSubject[] = [];
     let lessonIdx = 0;
     for (const req of requirements) {
-      for (let i = 0; i < req.lessonsPerWeek; i++) {
+      const mult = typeMultiplier[req.lessonType] || 1;
+      const sessionCount = Math.ceil(req.lessonsPerWeek / mult);
+      for (let i = 0; i < sessionCount; i++) {
         expandedLessons.push({
           id: `lesson-${lessonIdx++}`,
           teacherId: req.teacherId,
           classId: req.classId,
           subjectId: req.subjectId,
           roomId: undefined,
+          isDouble: mult >= 2,
         });
       }
     }
 
-    // 5️⃣ Run the hybrid solver with school time config
+    // 6️⃣ Validate — slotDemand = sessions × type slots
+    const slotDemand = expandedLessons.reduce((sum, l) => sum + (l.isDouble ? 2 : 1), 0);
+
+    if (slotDemand > totalSlots) {
+      const detail =
+        `Cannot fit ${slotDemand} scheduled period-slots into ${totalSlots} available slots ` +
+        `(${expandedLessons.length} sessions, ` +
+        `${periodsPerDay} periods/day × ${daysPerWeek} days). ` +
+        `Reduce total lesson periods (currently ${requirements.reduce((s, r) => s + r.lessonsPerWeek, 0)}).`;
+      throw new Error(`Failed to generate timetable: ${detail}`);
+    }
+
+    // Warn if utilization exceeds 95%
+    if (slotDemand > maxSchedulable) {
+      console.warn(
+        `High utilization: ${slotDemand}/${totalSlots} (${Math.round((slotDemand / totalSlots) * 100)}%) — proceeding anyway.`,
+      );
+    }
+
+    // 7️⃣ Run the hybrid solver
     const config: HybridConfig = {
-      cspMaxIterations: 10000,
+      cspMaxIterations: 200000,
       cspMaxTime: 30000,
       populationSize: 20,
       generations: 50,
@@ -392,12 +485,25 @@ export class TimetableService {
       enableForwardCheck: true,
       enableValidSlotCache: true,
       periodsPerDay,
-      breakAfterPeriod,
+      validCompactDoublePeriods,
+      maxTeacherLessonsPerDay: 6,
     };
 
     const result = generateTimetableHybrid(expandedLessons, slots, config);
 
     if (!result.success || !result.schedule) {
+      console.error('Timetable solver failed:', {
+        method: result.method,
+        score: result.score,
+        cspIterations: result.cspIterations,
+        cspBacktracks: result.cspBacktracks,
+        timeElapsed: result.timeElapsed,
+        lessonsCount: expandedLessons.length,
+        slotsCount: slots.length,
+        periodsPerDay,
+        targetScore: config.targetScore,
+        slotDemand,
+      });
       throw new Error('Failed to generate timetable');
     }
 
@@ -435,25 +541,25 @@ export class TimetableService {
         periodDuration: periodDuration,
         periodsPerDay: periodsPerDay,
         daysPerWeek: daysPerWeek,
-        breakAfterPeriod: breakAfterPeriod,
+        breakAfterPeriod: 0,
         sessionType: "MORNING",
         status: "DRAFT",
       },
     });
 
-    // 8️⃣ Save slots (convert from teaching slots to display slots)
+    // 8️⃣ Save slots — raw slot index → display day/period (breaks inserted at render time)
     const slotData = result.schedule.map((assignment) => {
       const rawSlot = assignment.slot;
-      const teachingDay = Math.floor(rawSlot / periodsPerDay) + 1;
-      const rawPeriod = rawSlot % periodsPerDay;
-      const teachingPeriod = rawPeriod + 1;
+      const displayDay = Math.floor(rawSlot / periodsPerDay) + 1;
+      const displayPeriod = (rawSlot % periodsPerDay) + 1;
       const lesson = expandedLessons.find(l => l.id === assignment.lessonId);
       return {
         timetableId: timetable.id,
         subjectId: lesson?.subjectId || 'unknown',
         teacherId: lesson?.teacherId || 'unknown',
-        day: teachingDay,
-        period: teachingPeriod,
+        day: displayDay,
+        period: displayPeriod,
+        lessonSize: lesson?.isDouble ? 2 : 1,
       };
     });
 
@@ -593,6 +699,8 @@ export class TimetableService {
       });
 
       if (!source) throw new Error('Source slot not found');
+      const sourceLessonSize = source.lessonSize || 1;
+
       // Check if target already exists
       const target = await tx.timetableSlot.findFirst({
         where: {
@@ -604,18 +712,28 @@ export class TimetableService {
 
       // ---------------- CASE 1: Empty Target → Move ----------------
       if (!target) {
-        // Reuse teacher conflict validation from move logic
-        const conflict = await tx.timetableSlot.findFirst({
-          where: {
-            day: targetDay,
-            period: targetPeriod,
-            teacherId: source.teacherId,
-            timetableId: source.timetableId,
-            NOT: { id: source.id },
-          },
-        });
+        for (let p = targetPeriod; p < targetPeriod + sourceLessonSize; p++) {
+          const existing = await tx.timetableSlot.findFirst({
+            where: {
+              day: targetDay,
+              period: p,
+              timetableId: source.timetableId,
+              NOT: { id: source.id },
+            },
+          });
+          if (existing) throw new Error('Target position already occupied');
 
-        if (conflict) throw new Error('Teacher conflict');
+          const conflict = await tx.timetableSlot.findFirst({
+            where: {
+              day: targetDay,
+              period: p,
+              teacherId: source.teacherId,
+              timetableId: source.timetableId,
+              NOT: { id: source.id },
+            },
+          });
+          if (conflict) throw new Error('Teacher conflict');
+        }
 
         return tx.timetableSlot.update({
           where: { id: source.id },
@@ -627,6 +745,33 @@ export class TimetableService {
       }
 
       // ---------------- CASE 2: Swap ----------------
+      const targetLessonSize = target.lessonSize || 1;
+
+      // Validate source's target span — only the slot at targetPeriod is the swap partner
+      for (let p = targetPeriod; p < targetPeriod + sourceLessonSize; p++) {
+        if (p === targetPeriod) continue;
+        const existing = await tx.timetableSlot.findFirst({
+          where: {
+            day: targetDay,
+            period: p,
+            timetableId: source.timetableId,
+          },
+        });
+        if (existing) throw new Error('Target span overlaps with existing slot');
+      }
+
+      // Validate target's source span — only the source slot itself is allowed
+      for (let p = source.period; p < source.period + targetLessonSize; p++) {
+        if (p === source.period) continue;
+        const existing = await tx.timetableSlot.findFirst({
+          where: {
+            day: source.day,
+            period: p,
+            timetableId: source.timetableId,
+          },
+        });
+        if (existing) throw new Error('Source span overlaps after swap');
+      }
 
       // Prevent teacher conflict after swap
       const teacherConflict = await tx.timetableSlot.findFirst({
@@ -641,9 +786,17 @@ export class TimetableService {
 
       if (teacherConflict) throw new Error('Teacher conflict on swap');
 
-      // Perform atomic swap
-      const tempDay = source.day;
-      const tempPeriod = source.period;
+      // Perform atomic swap using temp placeholder to avoid unique constraint
+      const placeholderDay = 999;
+      const placeholderPeriod = 999;
+
+      await tx.timetableSlot.update({
+        where: { id: target.id },
+        data: {
+          day: placeholderDay,
+          period: placeholderPeriod,
+        },
+      });
 
       await tx.timetableSlot.update({
         where: { id: source.id },
@@ -656,8 +809,8 @@ export class TimetableService {
       await tx.timetableSlot.update({
         where: { id: target.id },
         data: {
-          day: tempDay,
-          period: tempPeriod,
+          day: source.day,
+          period: source.period,
         },
       });
 
@@ -673,8 +826,8 @@ export class TimetableService {
         slotId: source.id,
         userId,
         action: target ? 'SWAP' : 'MOVE',
-        fromDay: tempDay,
-        fromPeriod: tempPeriod,
+        fromDay: source.day,
+        fromPeriod: source.period,
         toDay: targetDay,
         toPeriod: targetPeriod,
       });

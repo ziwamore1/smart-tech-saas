@@ -231,6 +231,7 @@ export class TimetableController {
       subjectId: string;
       teacherId: string;
       lessonsPerWeek: number;
+      lessonType?: string;
     },
   ) {
     return this.timetableService.createLessonRequirement(
@@ -239,6 +240,7 @@ export class TimetableController {
       body.subjectId,
       body.teacherId,
       body.lessonsPerWeek,
+      body.lessonType,
     );
   }
 
@@ -250,6 +252,15 @@ export class TimetableController {
     @Param('id') id: string,
   ) {
     return this.timetableService.deleteLessonRequirement(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Director', 'Admin')
+  @Delete('lesson-requirements/class/:classId')
+  deleteLessonRequirementsByClass(
+    @Param('classId') classId: string,
+  ) {
+    return this.timetableService.deleteLessonRequirementsByClass(classId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -268,7 +279,7 @@ export class TimetableController {
     console.log('schoolId (from auth):', req.user.schoolId);
     console.log('termId (from body):', body.termId);
     console.log('---------------------------------');
-    return this.timetableService.generateTimetable(
+    return this.timetableService.generateTimetableWithAI(
       req.user.schoolId,
       body.termId,
       classId,
@@ -355,7 +366,7 @@ export class TimetableController {
       body.sourceSlotId,
       body.targetDay,
       body.targetPeriod,
-      req.user.sub,
+      req.user?.sub || 'system',
     );
   }
 

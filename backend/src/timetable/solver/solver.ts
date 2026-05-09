@@ -10,10 +10,24 @@ export function solveTimetable(
   breakPeriods: Slot[],
   constraints,
 ): TimetableSlot[] | null {
+  const maxAttempts = 50;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const result = trySchedule(lessons, days, periods, breakPeriods);
+    if (result) return result;
+  }
+
+  return null;
+}
+
+function trySchedule(
+  lessons: Lesson[],
+  days: number,
+  periods: number,
+  breakPeriods: Slot[],
+): TimetableSlot[] | null {
   const slots = generateSlots({ days, periods, breakPeriods });
-
   const schedule: TimetableSlot[] = [];
-
   const shuffledLessons = _.shuffle(lessons);
 
   for (const lesson of shuffledLessons) {
@@ -52,3 +66,4 @@ export function solveTimetable(
 
   return schedule;
 }
+

@@ -1,22 +1,20 @@
 import { PrismaService } from '../../prisma/prisma.service';
-import { ConstraintContext, Slot } from './types';
+import { ConstraintContext } from './types';
 
 export async function buildConstraints(
   prisma: PrismaService,
   schoolId: string,
 ): Promise<ConstraintContext> {
-  const breakPeriods = await prisma.breakPeriod.findMany({
+  const settings = await prisma.schoolSetting.findUnique({
     where: { schoolId },
   });
 
-  const breaks: Slot[] = breakPeriods.map((b) => ({
-    day: b.day,
-    period: b.period,
-  }));
+  const periodsPerDay = settings?.periodsPerDay ?? 8;
+  const daysPerWeek = settings?.daysPerWeek ?? 5;
 
   return {
-    days: 5,
-    periods: 8,
-    breakPeriods: breaks,
+    days: daysPerWeek,
+    periods: periodsPerDay,
+    breakPeriods: [],
   };
 }

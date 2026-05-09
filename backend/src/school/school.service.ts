@@ -275,11 +275,14 @@ export class SchoolService {
   }
 
   async getTimeSettings(schoolId: string) {
+    console.log('[SchoolService] Getting time settings for school:', schoolId);
     let settings = await this.prisma.schoolSetting.findUnique({
       where: { schoolId },
     });
+    console.log('[SchoolService] Time settings from DB:', JSON.stringify(settings));
 
     if (!settings) {
+      console.log('[SchoolService] No settings found, creating defaults');
       settings = await this.prisma.schoolSetting.create({
         data: {
           schoolId,
@@ -288,11 +291,19 @@ export class SchoolService {
           periodsPerDay: 7,
           daysPerWeek: 5,
           breakAfterPeriod: 3,
+          breakDuration: 15,
+          breaks: [],
+          periodDurations: [],
         },
       });
+      console.log('[SchoolService] Created defaults:', JSON.stringify(settings));
     }
 
-    return settings;
+    return {
+      ...settings,
+      breaks: typeof settings.breaks === "string" ? JSON.parse(settings.breaks) : (settings.breaks || []),
+      periodDurations: typeof settings.periodDurations === "string" ? JSON.parse(settings.periodDurations) : (settings.periodDurations || []),
+    };
   }
 
   async updateTimeSettings(
@@ -303,11 +314,24 @@ export class SchoolService {
       periodsPerDay?: number;
       daysPerWeek?: number;
       breakAfterPeriod?: number;
+      breakDuration?: number;
+      breaks?: any[];
+      periodDurations?: number[];
     }
   ) {
-    return this.prisma.schoolSetting.upsert({
+    console.log('[SchoolService] Updating time settings for school:', schoolId, JSON.stringify(data));
+    const result = await this.prisma.schoolSetting.upsert({
       where: { schoolId },
-      update: data,
+      update: {
+        ...(data.startTime && { startTime: data.startTime }),
+        ...(data.periodDuration && { periodDuration: data.periodDuration }),
+        ...(data.periodsPerDay && { periodsPerDay: data.periodsPerDay }),
+        ...(data.daysPerWeek && { daysPerWeek: data.daysPerWeek }),
+        ...(data.breakAfterPeriod !== undefined && { breakAfterPeriod: data.breakAfterPeriod }),
+        ...(data.breakDuration && { breakDuration: data.breakDuration }),
+        ...(data.breaks && { breaks: JSON.stringify(data.breaks) as any }),
+        ...(data.periodDurations && { periodDurations: JSON.stringify(data.periodDurations) as any }),
+      },
       create: {
         schoolId,
         startTime: data.startTime ?? "07:30",
@@ -315,7 +339,12 @@ export class SchoolService {
         periodsPerDay: data.periodsPerDay ?? 7,
         daysPerWeek: data.daysPerWeek ?? 5,
         breakAfterPeriod: data.breakAfterPeriod ?? 3,
+        breakDuration: data.breakDuration ?? 15,
+        breaks: data.breaks ? (JSON.stringify(data.breaks) as any) : null,
+        periodDurations: data.periodDurations ? (JSON.stringify(data.periodDurations) as any) : null,
       },
     });
+    console.log('[SchoolService] Upsert result:', JSON.stringify(result));
+    return result;
   }
 }

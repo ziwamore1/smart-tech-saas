@@ -4,14 +4,13 @@ import _ from 'lodash';
 import { expandLessons } from './lesson-expander';
 import { generateSlots } from './slot-generator';
 import { scoreSlot } from './scorer';
-import { Lesson, Slot, LessonRequirement, TimetableSlot, ConstraintContext } from './types';
+import { Lesson, Slot, LessonRequirement, TimetableSlot } from './types';
 
 export interface ScheduleContext {
   schoolId: string;
   termId: string;
   days: number;
   periods: number;
-  breakPeriods: Slot[];
   lessonRequirements: LessonRequirement[];
   slots: Slot[];
 }
@@ -37,15 +36,6 @@ export class TimetableSolverService {
     termId: string,
     classIds?: string[],
   ): Promise<ScheduleContext> {
-    const breakPeriods = await this.prisma.breakPeriod.findMany({
-      where: { schoolId },
-    });
-
-    const breaks: Slot[] = breakPeriods.map((b) => ({
-      day: b.day,
-      period: b.period,
-    }));
-
     const whereClause: any = { class: { schoolId } };
     if (classIds && classIds.length > 0) {
       whereClause.classId = { in: classIds };
@@ -67,9 +57,8 @@ export class TimetableSolverService {
       termId,
       days: 5,
       periods: 8,
-      breakPeriods: breaks,
       lessonRequirements,
-      slots: generateSlots({ days: 5, periods: 8, breakPeriods: breaks }),
+      slots: generateSlots({ days: 5, periods: 8, breakPeriods: [] }),
     };
   }
 
