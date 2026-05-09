@@ -14,9 +14,10 @@ export class ConstraintsService {
       return this.prisma.timetableConstraint.create({
         data: {
           schoolId,
-          maxLessonsPerTeacherPerDay: 3,
-          maxSubjectPerDay: 2,
-          allowDoublePeriods: false,
+          maxLessonsPerTeacherPerDay: 6,
+          maxSubjectPerDay: 5,
+          maxConsecutivePeriods: 4,
+          allowDoublePeriods: true,
         },
       });
     }
@@ -31,6 +32,7 @@ export class ConstraintsService {
       update: {
         maxLessonsPerTeacherPerDay: data.maxLessonsPerTeacherPerDay,
         maxSubjectPerDay: data.maxSubjectPerDay,
+        maxConsecutivePeriods: data.maxConsecutivePeriods,
         allowDoublePeriods: data.allowDoublePeriods,
       },
 
@@ -38,6 +40,7 @@ export class ConstraintsService {
         schoolId,
         maxLessonsPerTeacherPerDay: data.maxLessonsPerTeacherPerDay,
         maxSubjectPerDay: data.maxSubjectPerDay,
+        maxConsecutivePeriods: data.maxConsecutivePeriods,
         allowDoublePeriods: data.allowDoublePeriods,
       },
     });

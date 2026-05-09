@@ -471,6 +471,7 @@ model TimetableSlot {
   subjectId          String
   teacherId          String
   classroomId        String?
+  lessonSize         Int                 @default(1)
   attendances        Attendance[]
   homeworks          Homework[]
   timetableAuditLogs TimetableAuditLog[]
@@ -492,6 +493,7 @@ model LessonRequirement {
   subjectId      String
   teacherId      String
   lessonsPerWeek Int
+  lessonType     String  @default("single")
   class          Class   @relation(fields: [classId], references: [id])
   school         School  @relation(fields: [schoolId], references: [id])
   subject        Subject @relation(fields: [subjectId], references: [id])
@@ -524,6 +526,9 @@ model SchoolSetting {
   periodsPerDay    Int    @default(7)
   daysPerWeek      Int    @default(5)
   breakAfterPeriod Int    @default(3)
+  breakDuration    Int    @default(15)
+  breaks           Json?
+  periodDurations  Json?
   school           School @relation(fields: [schoolId], references: [id])
 }
 
