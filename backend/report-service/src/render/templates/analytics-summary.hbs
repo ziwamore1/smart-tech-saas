@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Analytics Summary - {{className}}</title>
+<style>
+  @page { margin: 15mm 12mm; size: A4; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; font-size: 11px; color: #1f2937; line-height: 1.5; }
+
+  .page-break { page-break-after: always; }
+
+  .report-header { text-align: center; margin-bottom: 20px; }
+  .report-header h2 { font-size: 18px; color: {{primaryColor}}; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+  .report-header .subtitle { font-size: 12px; color: #6b7280; }
+
+  .metric-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+  .metric-card { flex: 1; min-width: 120px; background: {{secondaryColor}}; border-radius: 8px; padding: 14px; text-align: center; border: 1px solid #e5e7eb; }
+  .metric-card .value { font-size: 24px; font-weight: 700; color: {{primaryColor}}; }
+  .metric-card .label { font-size: 9px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  .metric-card.highlight { background: {{primaryColor}}; color: white; }
+  .metric-card.highlight .value { color: white; }
+  .metric-card.highlight .label { color: rgba(255,255,255,0.8); }
+
+  .section-title { font-size: 13px; font-weight: 700; color: {{primaryColor}}; margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 2px solid {{primaryColor}}; }
+
+  table.data-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  table.data-table th { background: {{primaryColor}}; color: white; padding: 7px 10px; font-size: 10px; font-weight: 600; text-align: center; text-transform: uppercase; letter-spacing: 0.3px; }
+  table.data-table td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #e5e7eb; font-size: 10px; }
+  table.data-table tr:nth-child(even) { background: #f9fafb; }
+
+  .chart-container { text-align: center; margin: 16px 0; }
+  .chart-container svg { max-width: 100%; }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page-break { page-break-after: always; }
+  }
+</style>
+</head>
+<body>
+
+{{> header primaryColor=template.primaryColor secondaryColor=template.secondaryColor }}
+
+<div class="report-header">
+  <h2>Analytics Summary Report</h2>
+  <div class="subtitle">{{className}} &mdash; {{termName}}, {{academicYear}}</div>
+</div>
+
+<div class="metric-grid">
+  <div class="metric-card highlight">
+    <div class="value">{{formatNumber classAverage}}</div>
+    <div class="label">Class Average</div>
+  </div>
+  <div class="metric-card">
+    <div class="value">{{studentCount}}</div>
+    <div class="label">Students</div>
+  </div>
+  <div class="metric-card">
+    <div class="value">{{subjectCount}}</div>
+    <div class="label">Subjects</div>
+  </div>
+</div>
+
+{{#if distribution.length}}
+<div class="section-title">Grade Distribution</div>
+<div class="chart-container">
+  {{{chart_bar (json distributionMap.labels) (json distributionMap.data) width=500 height=250 color=template.primaryColor}}}
+</div>
+<table class="data-table">
+  <thead>
+    <tr><th>Grade</th><th>Count</th><th>Percentage</th></tr>
+  </thead>
+  <tbody>
+    {{#each distribution}}
+    <tr>
+      <td><strong>{{grade}}</strong></td>
+      <td>{{count}}</td>
+      <td>{{formatNumber percentage}}%</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+
+{{#if subjectAverages.length}}
+<div class="section-title">Subject Performance Overview</div>
+<div class="chart-container">
+  {{{chart_bar (json subjectLabels) (json subjectAvgData) width=550 height=280 color=template.primaryColor}}}
+</div>
+<table class="data-table">
+  <thead>
+    <tr><th style="text-align:left;">Subject</th><th>Average</th><th>Highest</th><th>Lowest</th></tr>
+  </thead>
+  <tbody>
+    {{#each subjectAverages}}
+    <tr>
+      <td style="text-align:left; font-weight:600;">{{subject}}</td>
+      <td><strong>{{formatNumber average}}</strong></td>
+      <td>{{highest}}</td>
+      <td>{{lowest}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+
+{{#if topStudents.length}}
+<div class="section-title">Top Performing Students</div>
+<table class="data-table">
+  <thead>
+    <tr><th>#</th><th style="text-align:left;">Student Name</th><th>Average</th></tr>
+  </thead>
+  <tbody>
+    {{#each topStudents}}
+    <tr>
+      <td>{{position}}</td>
+      <td style="text-align:left;">{{name}}</td>
+      <td><strong>{{formatNumber average}}</strong></td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+
+{{#if trends.length}}
+<div class="page-break"></div>
+<div class="section-title">Performance Trends</div>
+<div class="chart-container">
+  {{{chart_trend (json trends) width=550 height=250 color=template.primaryColor}}}
+</div>
+<table class="data-table">
+  <thead>
+    <tr><th>Period</th><th>Value</th></tr>
+  </thead>
+  <tbody>
+    {{#each trends}}
+    <tr>
+      <td>{{label}}</td>
+      <td><strong>{{value}}</strong></td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+
+</body>
+</html>

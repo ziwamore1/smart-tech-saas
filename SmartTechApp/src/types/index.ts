@@ -155,3 +155,53 @@ export interface ReportCard {
 }
 
 export type UserRole = 'Student' | 'Parent' | 'Teacher' | 'Class Teacher' | 'Director' | 'SuperAdmin';
+
+export interface LearningStyleResult {
+  visual: number;
+  aural: number;
+  readWrite: number;
+  kinesthetic: number;
+  dominantStyle: string;
+}
+
+export interface AiTutorMessage {
+  role: 'user' | 'tutor' | 'system';
+  content: string;
+  timestamp: string;
+}
+
+export interface AiTutorSession {
+  sessionId: string;
+  messages: AiTutorMessage[];
+}
+
+export interface BenchmarkComparison {
+  subject: string;
+  schoolAverage: number;
+  nationalAverage: number;
+  gap: number;
+  significant: boolean;
+}
+
+export interface PsychometricResult {
+  cronbachAlpha: number;
+  splitHalf: number;
+  itemCount: number;
+  items: Array<{
+    itemNumber: number;
+    difficulty: number;
+    discrimination: number;
+    flag: string;
+  }>;
+}
+
+export interface MobileIntelligence {
+  studentStats: {
+    average: number;
+    grade: string;
+    rank: number;
+    totalStudents: number;
+  } | null;
+  learningStyle: LearningStyleResult | null;
+  recentResults: Result[];
+}

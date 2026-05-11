@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Class List - {{className}}</title>
+<style>
+  @page { margin: 15mm 10mm; size: A4 landscape; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; font-size: 10px; color: #1f2937; line-height: 1.4; }
+
+  .school-header { text-align: center; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 3px solid {{primaryColor}}; }
+  .school-header h1 { font-size: 20px; font-weight: 700; color: {{primaryColor}}; margin: 0; }
+  .school-header p { font-size: 11px; color: #6b7280; margin: 4px 0 0; }
+
+  .report-title { text-align: center; margin-bottom: 14px; }
+  .report-title h2 { font-size: 16px; font-weight: 700; color: #1f2937; margin: 0; }
+  .report-title p { font-size: 11px; color: #6b7280; margin: 2px 0 0; }
+
+  .summary-grid { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .summary-card { flex: 1; min-width: 100px; border-radius: 6px; padding: 10px 14px; text-align: center; border: 1px solid #e5e7eb; }
+  .summary-card .card-value { font-size: 20px; font-weight: 700; }
+  .summary-card .card-label { font-size: 8px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+  .summary-card.total { background: #f9fafb; } .summary-card.total .card-value { color: {{primaryColor}}; }
+  .summary-card.male { background: #eff6ff; } .summary-card.male .card-value { color: #2563eb; }
+  .summary-card.female { background: #fdf2f8; } .summary-card.female .card-value { color: #db2777; }
+  .summary-card.capacity { background: #f0fdf4; } .summary-card.capacity .card-value { color: #059669; }
+
+  .info-bar { display: flex; gap: 20px; font-size: 11px; color: #6b7280; margin-bottom: 12px; padding: 8px 12px; background: #f9fafb; border-radius: 6px; }
+  .info-bar strong { color: #374151; }
+
+  table.students { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  table.students th { background: {{primaryColor}}; color: white; padding: 7px 10px; font-size: 9px; font-weight: 600; text-align: center; text-transform: uppercase; letter-spacing: 0.4px; }
+  table.students td { padding: 5px 10px; text-align: center; border-bottom: 1px solid #e5e7eb; font-size: 10px; }
+  table.students tr:nth-child(even) { background: #f9fafb; }
+  table.students tr:hover { background: #f3f4f6; }
+  table.students .left { text-align: left; }
+  table.students .name { text-align: left; font-weight: 600; }
+
+  .gender-male { color: #2563eb; font-weight: 700; }
+  .gender-female { color: #db2777; font-weight: 700; }
+  .status-active { color: #059669; font-weight: 600; }
+  .status-inactive { color: #dc2626; font-weight: 600; }
+
+  .footer { margin-top: 18px; font-size: 9px; color: #9ca3af; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+  .footer .meta { display: flex; justify-content: space-between; }
+
+  .page-break { page-break-after: always; }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<div class="school-header">
+  <h1>{{school.name}}</h1>
+  {{#if school.address}}<p>{{school.address}}</p>{{/if}}
+</div>
+
+<div class="report-title">
+  <h2>Class List - {{className}}</h2>
+  <p>{{levelType}} | Generated on {{generatedAt}}</p>
+</div>
+
+<div class="summary-grid">
+  <div class="summary-card total">
+    <div class="card-value">{{summary.total}}</div>
+    <div class="card-label">Total Students</div>
+  </div>
+  <div class="summary-card male">
+    <div class="card-value">{{summary.male}}</div>
+    <div class="card-label">Male</div>
+  </div>
+  <div class="summary-card female">
+    <div class="card-value">{{summary.female}}</div>
+    <div class="card-label">Female</div>
+  </div>
+  {{#if summary.capacity}}
+  <div class="summary-card capacity">
+    <div class="card-value">{{summary.capacity}}</div>
+    <div class="card-label">Capacity</div>
+  </div>
+  {{/if}}
+</div>
+
+<div class="info-bar">
+  <span><strong>Class:</strong> {{className}}</span>
+  <span><strong>Level:</strong> {{levelType}}</span>
+  <span><strong>Male:</strong> {{summary.male}}</span>
+  <span><strong>Female:</strong> {{summary.female}}</span>
+  <span><strong>Total:</strong> {{summary.total}}</span>
+  {{#if summary.capacity}}<span><strong>Capacity:</strong> {{summary.capacity}}</span>{{/if}}
+  <span><strong>M:F Ratio:</strong> {{summary.maleRatio}}:{{summary.femaleRatio}}</span>
+</div>
+
+<table class="students">
+  <thead>
+    <tr>
+      <th style="width:36px;">#</th>
+      <th style="width:50px;">Photo</th>
+      <th style="width:90px;">Admission No</th>
+      <th class="left">Full Name</th>
+      <th style="width:70px;">Gender</th>
+      <th style="width:110px;">Date of Birth</th>
+      <th style="width:40px;">Age</th>
+      <th style="width:70px;">Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each students}}
+    <tr>
+      <td>{{add @index 1}}</td>
+      <td>
+        {{#if photoUrl}}
+        <img src="{{photoUrl}}" alt="{{name}}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #e5e7eb;" />
+        {{else}}
+        <div style="width:36px;height:36px;border-radius:50%;background:#f3f4f6;border:2px solid #e5e7eb;display:flex;align-items:center;justify-content:center;font-size:12px;color:#9ca3af;">—</div>
+        {{/if}}
+      </td>
+      <td>{{admNo}}</td>
+      <td class="left name">{{name}}</td>
+      <td class="gender-{{genderClass}}">{{genderLabel}}</td>
+      <td>{{dob}}</td>
+      <td>{{age}}</td>
+      <td class="status-{{statusClass}}">{{status}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+
+<div class="footer">
+  <div class="meta">
+    <span>{{school.name}}</span>
+    <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+    <span>{{generatedAt}}</span>
+  </div>
+</div>
+
+</body>
+</html>

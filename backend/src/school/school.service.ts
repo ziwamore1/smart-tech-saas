@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterSchoolDto } from './dto/register-school.dto';
 import { UnifiedMessagingService } from '../messaging/unified-messaging.service';
+import { GradingSystemService } from '../grading-system/grading-system.service';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 
@@ -13,6 +14,7 @@ export class SchoolService {
     private prisma: PrismaService,
     private unifiedMessaging: UnifiedMessagingService,
     private configService: ConfigService,
+    private gradingSystemService: GradingSystemService,
   ) {}
 
   async registerSchool(dto: RegisterSchoolDto) {
@@ -140,23 +142,7 @@ export class SchoolService {
       ],
     });
 
-    const gradingSystem = await this.prisma.gradingSystem.create({
-      data: {
-        name: 'ECZ Point Grading System',
-        schoolId,
-        isDefault: true,
-      },
-    });
-
-    await this.prisma.gradeScale.createMany({
-      data: [
-        { gradingSystemId: gradingSystem.id, minScore: 80, maxScore: 100, grade: 'A', remark: 'Distinction', points: 5 },
-        { gradingSystemId: gradingSystem.id, minScore: 70, maxScore: 79, grade: 'B', remark: 'Merit', points: 4 },
-        { gradingSystemId: gradingSystem.id, minScore: 60, maxScore: 69, grade: 'C', remark: 'Credit', points: 3 },
-        { gradingSystemId: gradingSystem.id, minScore: 50, maxScore: 59, grade: 'D', remark: 'Pass', points: 2 },
-        { gradingSystemId: gradingSystem.id, minScore: 0, maxScore: 49, grade: 'F', remark: 'Fail', points: 1 },
-      ],
-    });
+    await this.gradingSystemService.seedDefaultGradingSystems(schoolId);
 
     await this.prisma.schoolSetting.create({
       data: {

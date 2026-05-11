@@ -44,6 +44,9 @@ import { MessagingModule } from './messaging/messaging.module';
 import { LibraryModule } from './library/library.module';
 import { GalleryModule } from './gallery/gallery.module';
 import { LessonPlanModule } from './lesson-plan/lesson-plan.module';
+import { IntelligenceModule } from './intelligence/intelligence.module';
+import { ReportQueueModule } from './report-queue/report-queue.module';
+import { QueuesModule } from './queues/queues.module';
 
 @Module({
   imports: [
@@ -92,6 +95,9 @@ import { LessonPlanModule } from './lesson-plan/lesson-plan.module';
     LibraryModule,
     GalleryModule,
     LessonPlanModule,
+    IntelligenceModule,
+    ReportQueueModule,
+    QueuesModule,
   ],
 })
 export class AppModule {}
