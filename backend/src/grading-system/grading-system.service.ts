@@ -167,6 +167,59 @@ export class GradingSystemService {
     return { message: 'Grading system deleted' };
   }
 
+  async seedDefaultGradingSystems(schoolId: string) {
+    const eczScale = await this.prisma.gradeScale.findFirst({
+      where: { gradingSystem: { schoolId, name: 'ECZ Point Grading System' } },
+    });
+
+    if (!eczScale) {
+      const eczSystem = await this.prisma.gradingSystem.create({
+        data: { name: 'ECZ Point Grading System', schoolId, isDefault: true },
+      });
+
+      await this.prisma.gradeScale.createMany({
+        data: [
+          { gradingSystemId: eczSystem.id, minScore: 75, maxScore: 100, grade: '1', remark: 'Distinction', points: 1 },
+          { gradingSystemId: eczSystem.id, minScore: 70, maxScore: 74, grade: '2', remark: 'Very Good', points: 2 },
+          { gradingSystemId: eczSystem.id, minScore: 65, maxScore: 69, grade: '3', remark: 'Good', points: 3 },
+          { gradingSystemId: eczSystem.id, minScore: 60, maxScore: 64, grade: '4', remark: 'Credit', points: 4 },
+          { gradingSystemId: eczSystem.id, minScore: 55, maxScore: 59, grade: '5', remark: 'Credit', points: 5 },
+          { gradingSystemId: eczSystem.id, minScore: 50, maxScore: 54, grade: '6', remark: 'Pass', points: 6 },
+          { gradingSystemId: eczSystem.id, minScore: 45, maxScore: 49, grade: '7', remark: 'Pass', points: 7 },
+          { gradingSystemId: eczSystem.id, minScore: 40, maxScore: 44, grade: '8', remark: 'Marginal', points: 8 },
+          { gradingSystemId: eczSystem.id, minScore: 0, maxScore: 39, grade: '9', remark: 'Fail', points: 9 },
+        ],
+      });
+    }
+
+    const gpaScale = await this.prisma.gradeScale.findFirst({
+      where: { gradingSystem: { schoolId, name: 'GPA (4.0 Scale)' } },
+    });
+
+    if (!gpaScale) {
+      const gpaSystem = await this.prisma.gradingSystem.create({
+        data: { name: 'GPA (4.0 Scale)', schoolId, isDefault: false },
+      });
+
+      await this.prisma.gradeScale.createMany({
+        data: [
+          { gradingSystemId: gpaSystem.id, minScore: 97, maxScore: 100, grade: 'A+', remark: 'Excellent', points: 40 },
+          { gradingSystemId: gpaSystem.id, minScore: 93, maxScore: 96, grade: 'A', remark: 'Excellent', points: 40 },
+          { gradingSystemId: gpaSystem.id, minScore: 90, maxScore: 92, grade: 'A-', remark: 'Excellent', points: 37 },
+          { gradingSystemId: gpaSystem.id, minScore: 87, maxScore: 89, grade: 'B+', remark: 'Good', points: 33 },
+          { gradingSystemId: gpaSystem.id, minScore: 83, maxScore: 86, grade: 'B', remark: 'Good', points: 30 },
+          { gradingSystemId: gpaSystem.id, minScore: 80, maxScore: 82, grade: 'B-', remark: 'Good', points: 27 },
+          { gradingSystemId: gpaSystem.id, minScore: 77, maxScore: 79, grade: 'C+', remark: 'Satisfactory', points: 23 },
+          { gradingSystemId: gpaSystem.id, minScore: 73, maxScore: 76, grade: 'C', remark: 'Satisfactory', points: 20 },
+          { gradingSystemId: gpaSystem.id, minScore: 70, maxScore: 72, grade: 'C-', remark: 'Satisfactory', points: 17 },
+          { gradingSystemId: gpaSystem.id, minScore: 67, maxScore: 69, grade: 'D+', remark: 'Passing', points: 13 },
+          { gradingSystemId: gpaSystem.id, minScore: 65, maxScore: 66, grade: 'D', remark: 'Passing', points: 10 },
+          { gradingSystemId: gpaSystem.id, minScore: 0, maxScore: 64, grade: 'F', remark: 'Fail', points: 0 },
+        ],
+      });
+    }
+  }
+
   async setDefault(id: string, schoolId: string) {
     const existing = await this.prisma.gradingSystem.findUnique({
       where: { id },

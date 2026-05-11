@@ -1,4 +1,6 @@
-import { Controller, Post, Get, Put, Patch, Delete, Body, Param, Req, Query, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Put, Patch, Delete, Body, Param, Req, Query, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
 import { StudentService } from './student.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -40,6 +42,30 @@ export class StudentController {
   @Roles('Director')
   delete(@Param('id') id: string) {
     return this.service.delete(id);
+  }
+
+  @Post(':id/upload-photo')
+  @Roles('Director', 'Teacher')
+  @UseInterceptors(
+    FileInterceptor('photo', {
+      storage: diskStorage({
+        destination: './uploads/students',
+        filename: (req, file, cb) => {
+          const ext = file.originalname.split('.').pop();
+          cb(null, `student-${req.params.id}-${Date.now()}.${ext}`);
+        },
+      }),
+      limits: { fileSize: 2 * 1024 * 1024 },
+    }),
+  )
+  async uploadPhoto(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: any,
+  ) {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const photoUrl = `${baseUrl}/uploads/students/${file.filename}`;
+    return this.service.uploadPhoto(id, photoUrl, req.user.schoolId);
   }
 
   @Post('enroll')

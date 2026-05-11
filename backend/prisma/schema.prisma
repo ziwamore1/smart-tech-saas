@@ -38,10 +38,13 @@ model School {
   subscriptionStartDate  DateTime?
   subscriptionTier       String                  @default("basic")
   academicYears          AcademicYear[]
+  adaptiveTestSessions   AdaptiveTestSession[]
+  aiTutorSessions        AiTutorSession[]
   assessmentScores       AssessmentScore[]
   assessments            AssessmentType[]
   attendances            Attendance[]
   auditLogs              AuditLog[]
+  behavioralRecords      BehavioralRecord[]
   breakPeriods           BreakPeriod[]
   calendarSyncs          CalendarSync[]
   classes                Class[]
@@ -50,6 +53,7 @@ model School {
   communications         Communication[]
   communicationSettings  CommunicationSettings?
   communicationTemplates CommunicationTemplate[]
+  competencyScores       CompetencyScore[]
   conversations          Conversation[]
   dashboardConfigs       DashboardConfig?
   enrollments            Enrollment[]
@@ -59,6 +63,9 @@ model School {
   galleries              Gallery[]
   gradingSystems         GradingSystem[]
   homeworks              Homework[]
+  interventions          Intervention[]
+  learningAreas          LearningArea[]
+  learningStyleProfiles  LearningStyleProfile[]
   lessonPlans            LessonPlan[]
   lessonRequirements     LessonRequirement[]
   levelTypes             LevelType[]
@@ -71,6 +78,8 @@ model School {
   setting                SchoolSetting?
   schoolUsers            SchoolUser[]
   students               Student[]
+  studentGrowthRecords   StudentGrowthRecord[]
+  studentInterventions   StudentIntervention[]
   subjects               Subject[]
   subscription           Subscription?
   teachers               Teacher[]
@@ -104,20 +113,22 @@ model AcademicYear {
 }
 
 model Term {
-  id               String              @id @default(uuid())
-  name             String
-  startDate        DateTime
-  endDate          DateTime
-  isCurrent        Boolean             @default(false)
-  academicYearId   String
-  resultsFinalized Boolean             @default(false)
-  resultsLocked    Boolean             @default(false)
-  assessments      AssessmentType[]
-  exams            Exam[]
-  results          Result[]
-  publications     ResultPublication[]
-  academicYear     AcademicYear        @relation(fields: [academicYearId], references: [id])
-  timetables       Timetable[]
+  id                   String                @id @default(uuid())
+  name                 String
+  startDate            DateTime
+  endDate              DateTime
+  isCurrent            Boolean               @default(false)
+  academicYearId       String
+  resultsFinalized     Boolean               @default(false)
+  resultsLocked        Boolean               @default(false)
+  assessments          AssessmentType[]
+  competencyScores     CompetencyScore[]
+  exams                Exam[]
+  results              Result[]
+  publications         ResultPublication[]
+  studentGrowthRecords StudentGrowthRecord[]
+  academicYear         AcademicYear          @relation(fields: [academicYearId], references: [id])
+  timetables           Timetable[]
 
   @@index([academicYearId])
   @@index([isCurrent])
@@ -203,24 +214,27 @@ model Class {
 }
 
 model Subject {
-  id                 String               @id @default(uuid())
-  name               String
-  code               String?
-  isCore             Boolean              @default(false)
-  schoolId           String
-  category           String?
-  credits            Int?
-  description        String?
-  assessments        AssessmentType[]
-  classSubjects      ClassSubject[]
-  exams              Exam[]
-  homeworks          Homework[]
-  lessonPlans        LessonPlan[]
-  lessonRequirements LessonRequirement[]
-  results            Result[]
-  school             School               @relation(fields: [schoolId], references: [id])
-  assignments        TeachingAssignment[]
-  timetableSlots     TimetableSlot[]
+  id                   String                @id @default(uuid())
+  name                 String
+  code                 String?
+  isCore               Boolean               @default(false)
+  schoolId             String
+  category             String?
+  credits              Int?
+  description          String?
+  adaptiveTestSessions AdaptiveTestSession[]
+  assessments          AssessmentType[]
+  classSubjects        ClassSubject[]
+  exams                Exam[]
+  homeworks            Homework[]
+  learningAreas        LearningArea[]
+  lessonPlans          LessonPlan[]
+  lessonRequirements   LessonRequirement[]
+  nationalBenchmarks   NationalBenchmark[]
+  results              Result[]
+  school               School                @relation(fields: [schoolId], references: [id])
+  assignments          TeachingAssignment[]
+  timetableSlots       TimetableSlot[]
 
   @@unique([name, schoolId])
 }
@@ -272,23 +286,31 @@ model Teacher {
 }
 
 model Student {
-  id                  String               @id @default(uuid())
-  admissionNumber     String
-  dateOfBirth         DateTime?
-  schoolId            String
-  firstName           String
-  lastName            String
-  gender              String?
-  assessmentScores    AssessmentScore[]
-  attendances         Attendance[]
-  enrollments         Enrollment[]
-  exams               ExamAttempt[]
-  FeePayment          FeePayment[]
-  homeworkSubmissions HomeworkSubmission[]
-  parents             ParentStudent[]
-  results             Result[]
-  school              School               @relation(fields: [schoolId], references: [id])
-  user                User?
+  id                   String                @id @default(uuid())
+  admissionNumber      String
+  dateOfBirth          DateTime?
+  schoolId             String
+  firstName            String
+  lastName             String
+  gender               String?
+  photoUrl             String?
+  adaptiveTestSessions AdaptiveTestSession[]
+  aiTutorSessions      AiTutorSession[]
+  assessmentScores     AssessmentScore[]
+  attendances          Attendance[]
+  behavioralRecords    BehavioralRecord[]
+  competencyScores     CompetencyScore[]
+  enrollments          Enrollment[]
+  exams                ExamAttempt[]
+  FeePayment           FeePayment[]
+  homeworkSubmissions  HomeworkSubmission[]
+  learningStyleProfile LearningStyleProfile?
+  parents              ParentStudent[]
+  results              Result[]
+  school               School                @relation(fields: [schoolId], references: [id])
+  studentGrowthRecords StudentGrowthRecord[]
+  studentInterventions StudentIntervention[]
+  user                 User?
 
   @@unique([admissionNumber, schoolId])
   @@index([schoolId])
@@ -1338,6 +1360,275 @@ model LessonPlan {
   @@index([weekStart])
 }
 
+model LearningArea {
+  id        String            @id @default(uuid())
+  name      String
+  subjectId String
+  schoolId  String
+  scores    CompetencyScore[]
+  school    School            @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  subject   Subject           @relation(fields: [subjectId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([name, subjectId, schoolId])
+  @@index([subjectId])
+}
+
+model CompetencyScore {
+  id             String       @id @default(uuid())
+  studentId      String
+  learningAreaId String
+  termId         String
+  schoolId       String
+  score          Float
+  createdAt      DateTime     @default(now())
+  learningArea   LearningArea @relation(fields: [learningAreaId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  school         School       @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  term           Term         @relation(fields: [termId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([studentId, learningAreaId, termId])
+  @@index([studentId])
+  @@index([learningAreaId])
+  @@index([termId])
+}
+
+model Intervention {
+  id          String                @id @default(uuid())
+  name        String
+  description String?
+  category    InterventionCategory  @default(ACADEMIC)
+  schoolId    String
+  isActive    Boolean               @default(true)
+  createdAt   DateTime              @default(now())
+  school      School                @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  assignments StudentIntervention[]
+
+  @@index([schoolId])
+  @@index([category])
+}
+
+model StudentIntervention {
+  id             String               @id @default(uuid())
+  studentId      String
+  interventionId String
+  assignedAt     DateTime             @default(now())
+  completedAt    DateTime?
+  outcome        InterventionOutcome?
+  outcomeScore   Float?
+  notes          String?
+  schoolId       String
+  intervention   Intervention         @relation(fields: [interventionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  school         School               @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student        Student              @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([studentId, interventionId, assignedAt])
+  @@index([studentId])
+  @@index([interventionId])
+}
+
+model BehavioralRecord {
+  id           String           @id @default(uuid())
+  studentId    String
+  recordDate   DateTime
+  category     BehaviorCategory @default(GENERAL)
+  severity     BehaviorSeverity @default(MILD)
+  description  String?
+  actionTaken  String?
+  recordedById String?
+  schoolId     String
+  createdAt    DateTime         @default(now())
+  school       School           @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student      Student          @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([studentId])
+  @@index([recordDate])
+  @@index([schoolId])
+}
+
+model StudentGrowthRecord {
+  id         String       @id @default(uuid())
+  studentId  String
+  termId     String
+  schoolId   String
+  gpa        Float?
+  percentile Float?
+  classRank  Int?
+  growthRate Float?
+  status     GrowthStatus @default(STABLE)
+  snapshot   Json?
+  createdAt  DateTime     @default(now())
+  school     School       @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student    Student      @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  term       Term         @relation(fields: [termId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([studentId, termId])
+  @@index([studentId])
+  @@index([termId])
+  @@index([status])
+}
+
+model NationalBenchmark {
+  id         String   @id @default(uuid())
+  subjectId  String
+  year       Int
+  termName   String?
+  average    Float
+  stdDev     Float?
+  passRate   Float?
+  median     Float?
+  schoolType String?
+  region     String?
+  source     String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  subject    Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([subjectId, year, termName])
+  @@index([subjectId])
+  @@index([year])
+}
+
+model AiTutorSession {
+  id        String           @id @default(uuid())
+  studentId String
+  subjectId String?
+  topic     String?
+  status    String           @default("active")
+  schoolId  String
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @default(now()) @updatedAt
+  feedback  AiTutorFeedback?
+  messages  AiTutorMessage[]
+  school    School           @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student   Student          @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([studentId])
+  @@index([schoolId])
+}
+
+model AiTutorMessage {
+  id        String         @id @default(uuid())
+  sessionId String
+  role      String
+  content   String
+  metadata  Json?
+  createdAt DateTime       @default(now())
+  session   AiTutorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([sessionId])
+}
+
+model AiTutorFeedback {
+  id        String         @id @default(uuid())
+  sessionId String         @unique
+  rating    Int?
+  helpful   Boolean?
+  comment   String?
+  createdAt DateTime       @default(now())
+  session   AiTutorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model LearningStyleProfile {
+  id               String    @id @default(uuid())
+  studentId        String    @unique
+  visualScore      Int       @default(0)
+  auralScore       Int       @default(0)
+  readWriteScore   Int       @default(0)
+  kinestheticScore Int       @default(0)
+  dominantStyle    String?
+  lastAssessed     DateTime?
+  schoolId         String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
+  school           School    @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student          Student   @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([schoolId])
+}
+
+model AdaptiveTestSession {
+  id              String                 @id @default(uuid())
+  studentId       String
+  subjectId       String
+  startedAt       DateTime               @default(now())
+  completedAt     DateTime?
+  abilityEstimate Float                  @default(0)
+  abilitySE       Float                  @default(0)
+  questionsAsked  Int                    @default(0)
+  status          AdaptiveTestStatus     @default(IN_PROGRESS)
+  schoolId        String
+  responses       AdaptiveTestResponse[]
+  school          School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student         Student                @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  subject         Subject                @relation(fields: [subjectId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([studentId])
+  @@index([schoolId])
+}
+
+model AdaptiveTestResponse {
+  id             String              @id @default(uuid())
+  sessionId      String
+  questionId     String
+  questionText   String
+  correctAnswer  String
+  studentAnswer  String?
+  isCorrect      Boolean?
+  difficulty     Float
+  discrimination Float               @default(0.3)
+  guessed        Boolean             @default(false)
+  responseTime   Int?
+  session        AdaptiveTestSession @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([sessionId])
+}
+
+enum AdaptiveTestStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+enum InterventionCategory {
+  ACADEMIC
+  BEHAVIORAL
+  ATTENDANCE
+  WELLNESS
+  PARENTAL
+}
+
+enum InterventionOutcome {
+  IMPROVED
+  STABLE
+  DECLINED
+  COMPLETED
+  DISCONTINUED
+}
+
+enum BehaviorCategory {
+  GENERAL
+  POSITIVE
+  NEGATIVE
+  ACADEMIC
+  SOCIAL
+  ATTENDANCE
+}
+
+enum BehaviorSeverity {
+  MILD
+  MODERATE
+  SEVERE
+  CRITICAL
+}
+
+enum GrowthStatus {
+  EXCELLENT
+  IMPROVING
+  STABLE
+  DECLINING
+  CRITICAL
+}
+
 enum EnrollmentStatus {
   ACTIVE
   INACTIVE
@@ -1398,6 +1689,10 @@ enum AttendanceStatus {
   ABSENT
   LATE
   EXCUSED
+  SICK
+  SUSPENDED
+  ACTIVITY
+  PARTIAL_ATTENDANCE
 }
 
 enum ExamType {

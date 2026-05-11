@@ -185,6 +185,68 @@ class ApiService {
     const response = await this.client.post('/mobile/logout-device', { deviceToken });
     return response.data;
   }
+
+  // Intelligence endpoints
+  async getStudentStats(studentId: string) {
+    const response = await this.client.get(`/intelligence/descriptive-stats/student/${studentId}`);
+    return response.data;
+  }
+
+  async getLearningStyleProfile(studentId: string) {
+    const response = await this.client.get(`/intelligence/learning-style/profile/${studentId}`);
+    return response.data;
+  }
+
+  async assessLearningStyle(studentId: string, visual: number, aural: number, readWrite: number, kinesthetic: number) {
+    const response = await this.client.post('/intelligence/learning-style/assess', { studentId, visual, aural, readWrite, kinesthetic });
+    return response.data;
+  }
+
+  async getStudentRecommendations(studentId: string, termId: string) {
+    const response = await this.client.get(`/intelligence/recommendations/student/${studentId}`, { params: { termId } });
+    return response.data;
+  }
+
+  async askTutor(studentId: string, question: string, subjectId?: string) {
+    const response = await this.client.post('/intelligence/ai-tutor/ask', { studentId, question, subjectId });
+    return response.data;
+  }
+
+  async startTutorSession(studentId: string, subjectId?: string, topic?: string) {
+    const response = await this.client.post('/intelligence/ai-tutor/start', { studentId, subjectId, topic });
+    return response.data;
+  }
+
+  async sendTutorMessage(sessionId: string, studentId: string, message: string) {
+    const response = await this.client.post('/intelligence/ai-tutor/message', { sessionId, studentId, message });
+    return response.data;
+  }
+
+  async getTutorInsights(studentId: string) {
+    const response = await this.client.get(`/intelligence/ai-tutor/insights/${studentId}`);
+    return response.data;
+  }
+
+  async getExamReliability(examId: string) {
+    const response = await this.client.get(`/intelligence/psychometric/reliability/${examId}`);
+    return response.data;
+  }
+
+  async getCompetencyDiagnosis(studentId: string, termId: string) {
+    const response = await this.client.get(`/intelligence/diagnostic/competency/${studentId}`, { params: { termId } });
+    return response.data;
+  }
+
+  async getStudentGrowthTrajectory(studentId: string) {
+    const response = await this.client.get(`/intelligence/trends/student/${studentId}`);
+    return response.data;
+  }
+
+  // Mobile-specific intelligence summary
+  async getMobileIntelligenceSummary(studentId: string) {
+    const response = await this.client.get(`/mobile/intelligence-summary/${studentId}`);
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

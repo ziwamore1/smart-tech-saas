@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Res, NotFoundException } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Response } from 'express';
 
 @Controller('attendance')
 @UseGuards(JwtAuthGuard)
@@ -204,5 +205,136 @@ export class AttendanceController {
     @Query('endDate') endDate: string,
   ) {
     return this.attendanceService.getAttendanceHeatmap(schoolId, classId, startDate, endDate);
+  }
+
+  @Get('longitudinal/:studentId')
+  async getStudentLongitudinalAnalysis(@Param('studentId') studentId: string) {
+    return this.attendanceService.getStudentLongitudinalAnalysis(studentId);
+  }
+
+  @Get('performance-correlation')
+  async getAttendancePerformanceCorrelation(
+    @Query('classId') classId: string,
+    @Query('termId') termId: string,
+  ) {
+    return this.attendanceService.getAttendancePerformanceCorrelation(classId, termId);
+  }
+
+  @Get('chronic-absenteeism')
+  async getChronicAbsenteeismReport(
+    @Query('schoolId') schoolId: string,
+    @Query('threshold') threshold?: string,
+  ) {
+    return this.attendanceService.getChronicAbsenteeismReport(schoolId, threshold ? parseInt(threshold) : undefined);
+  }
+
+  @Get('punctuality-trends')
+  async getPunctualityTrends(
+    @Query('classId') classId: string,
+    @Query('termId') termId?: string,
+  ) {
+    return this.attendanceService.getPunctualityTrends(classId, termId);
+  }
+
+  @Get('register/:classId/pdf')
+  async getAttendanceRegisterPdf(
+    @Param('classId') classId: string,
+    @Query('date') date: string,
+    @Query('schoolId') schoolId: string,
+    @Res() res: Response,
+  ) {
+    const data = await this.attendanceService.getAttendanceRegisterData(classId, date, schoolId);
+    const reportServiceUrl = process.env.REPORT_SERVICE_URL || 'http://localhost:3005';
+
+    try {
+      const response = await fetch(`${reportServiceUrl}/render/attendance-register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Report service error: ${error}`);
+      }
+
+      const pdfBuffer = await response.arrayBuffer();
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="attendance-register-${data.className?.replace(/\s+/g, '_') || 'report'}.pdf"`,
+        'Content-Length': pdfBuffer.byteLength,
+      });
+      res.send(Buffer.from(pdfBuffer));
+    } catch (err: any) {
+      throw new NotFoundException(`Failed to generate PDF: ${err.message}`);
+    }
+  }
+
+  @Get('student/:studentId/pdf')
+  async getStudentAttendancePdf(
+    @Param('studentId') studentId: string,
+    @Query('schoolId') schoolId: string,
+    @Res() res: Response,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const data = await this.attendanceService.getStudentAttendanceReportData(studentId, schoolId, startDate, endDate);
+    const reportServiceUrl = process.env.REPORT_SERVICE_URL || 'http://localhost:3005';
+
+    try {
+      const response = await fetch(`${reportServiceUrl}/render/student-attendance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Report service error: ${error}`);
+      }
+
+      const pdfBuffer = await response.arrayBuffer();
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="student-attendance-${studentId}.pdf"`,
+        'Content-Length': pdfBuffer.byteLength,
+      });
+      res.send(Buffer.from(pdfBuffer));
+    } catch (err: any) {
+      throw new NotFoundException(`Failed to generate PDF: ${err.message}`);
+    }
+  }
+
+  @Get('class-list/:classId/pdf')
+  async getClassListPdf(
+    @Param('classId') classId: string,
+    @Query('schoolId') schoolId: string,
+    @Res() res: Response,
+  ) {
+    const data = await this.attendanceService.getClassListData(classId, schoolId);
+    const reportServiceUrl = process.env.REPORT_SERVICE_URL || 'http://localhost:3005';
+
+    try {
+      const response = await fetch(`${reportServiceUrl}/render/class-list`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Report service error: ${error}`);
+      }
+
+      const pdfBuffer = await response.arrayBuffer();
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="class-list-${data.className?.replace(/\s+/g, '_') || 'report'}.pdf"`,
+        'Content-Length': pdfBuffer.byteLength,
+      });
+      res.send(Buffer.from(pdfBuffer));
+    } catch (err: any) {
+      throw new NotFoundException(`Failed to generate PDF: ${err.message}`);
+    }
   }
 }

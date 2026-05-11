@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Report Card - {{student.firstName}} {{student.lastName}}</title>
+<style>
+  @page { margin: 15mm 12mm; size: A4; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; font-size: 11px; color: #1f2937; line-height: 1.5; }
+  .page-break { page-break-after: always; }
+
+  .student-info { background: {{secondaryColor}}; border-radius: 8px; padding: 14px 18px; margin-bottom: 18px; border-left: 4px solid {{primaryColor}}; }
+  .student-info table { width: 100%; border-collapse: collapse; }
+  .student-info td { padding: 3px 8px; font-size: 12px; }
+  .student-info .label { color: #6b7280; font-weight: 600; width: 130px; }
+  .student-info .value { font-weight: 600; color: #1f2937; }
+
+  .section-title { font-size: 14px; font-weight: 700; color: {{primaryColor}}; margin: 18px 0 10px; padding-bottom: 6px; border-bottom: 2px solid {{primaryColor}}; }
+
+  table.results { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  table.results th { background: {{primaryColor}}; color: white; padding: 8px 10px; font-size: 10px; font-weight: 600; text-align: center; text-transform: uppercase; letter-spacing: 0.5px; }
+  table.results td { padding: 7px 10px; text-align: center; border-bottom: 1px solid #e5e7eb; font-size: 11px; }
+  table.results tr:nth-child(even) { background: #f9fafb; }
+  table.results tr:hover { background: #f3f4f6; }
+  table.results .subject-name { text-align: left; font-weight: 600; }
+
+  .summary-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+  .summary-item { flex: 1; min-width: 100px; background: {{secondaryColor}}; border-radius: 6px; padding: 10px 14px; text-align: center; border: 1px solid #e5e7eb; }
+  .summary-item .value { font-size: 18px; font-weight: 700; color: {{primaryColor}}; }
+  .summary-item .label { font-size: 9px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+  .summary-item.highlight { background: {{primaryColor}}; color: white; }
+  .summary-item.highlight .value { color: white; }
+  .summary-item.highlight .label { color: rgba(255,255,255,0.8); }
+
+  .comments-section { margin-bottom: 18px; }
+  .comment-box { background: white; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px 16px; margin-bottom: 10px; }
+  .comment-box .author { font-weight: 700; color: {{primaryColor}}; font-size: 11px; margin-bottom: 4px; }
+  .comment-box .text { font-size: 11px; color: #374151; line-height: 1.6; }
+
+  .grading-legend { margin-bottom: 18px; }
+  .grading-legend table { width: 100%; border-collapse: collapse; font-size: 9px; }
+  .grading-legend th { background: #f3f4f6; padding: 5px 8px; text-align: center; font-weight: 600; color: #374151; border: 1px solid #e5e7eb; }
+  .grading-legend td { padding: 4px 8px; text-align: center; border: 1px solid #e5e7eb; }
+
+  .signature-area { display: flex; justify-content: space-between; margin-top: 30px; padding-top: 20px; }
+  .signature-box { text-align: center; min-width: 180px; }
+  .signature-line { border-top: 1px solid #374151; width: 180px; margin: 0 auto 6px; padding-top: 4px; }
+  .signature-box img { max-height: 50px; max-width: 150px; display: block; margin: 0 auto 4px; }
+  .signature-label { font-size: 10px; color: #6b7280; }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page-break { page-break-after: always; }
+  }
+</style>
+</head>
+<body>
+
+{{> header primaryColor=template.primaryColor secondaryColor=template.secondaryColor }}
+
+<div class="student-info">
+  <table>
+    <tr><td class="label">Student Name</td><td class="value">{{student.firstName}} {{student.lastName}}</td><td class="label">Admission No.</td><td class="value">{{student.admissionNumber}}</td></tr>
+    <tr><td class="label">Academic Year</td><td class="value">{{term.academicYear}}</td><td class="label">Term</td><td class="value">{{term.name}}</td></tr>
+  </table>
+</div>
+
+<div class="section-title">Academic Performance</div>
+
+<table class="results">
+  <thead>
+    <tr>
+      <th style="text-align:left; width:30%;">Subject</th>
+      <th style="width:12%;">Score</th>
+      <th style="width:10%;">Grade</th>
+      {{#if template.remarksEnabled}}<th style="width:28%;">Remark</th>{{/if}}
+      <th style="width:10%;">Points</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each subjects}}
+    <tr>
+      <td class="subject-name">{{subject}}</td>
+      <td>{{score}}</td>
+      <td><strong>{{grade}}</strong></td>
+      {{#if ../template.remarksEnabled}}<td>{{remark}}</td>{{/if}}
+      <td>{{points}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+
+<div class="section-title">Performance Summary</div>
+
+<div class="summary-grid">
+  <div class="summary-item">
+    <div class="value">{{summary.totalMarks}}</div>
+    <div class="label">Total Marks</div>
+  </div>
+  <div class="summary-item">
+    <div class="value">{{formatNumber summary.average}}</div>
+    <div class="label">Average</div>
+  </div>
+  <div class="summary-item">
+    <div class="value">{{summary.totalPoints}}</div>
+    <div class="label">Total Points</div>
+  </div>
+  {{#if template.includeRankings}}
+  <div class="summary-item highlight">
+    <div class="value">{{summary.positionInClass}} / {{summary.totalStudents}}</div>
+    <div class="label">Class Rank</div>
+  </div>
+  {{/if}}
+  {{#if template.includeBestSix}}
+  <div class="summary-item">
+    <div class="value">{{summary.bestSixTotal}}</div>
+    <div class="label">Best 6 Points</div>
+  </div>
+  {{/if}}
+  {{#if template.includeUniversity}}
+  <div class="summary-item">
+    <div class="value">{{summary.eligibleForUniversity}}</div>
+    <div class="label">University Eligible</div>
+  </div>
+  {{/if}}
+  <div class="summary-item">
+    <div class="value">{{summary.numberOfSubjects}}</div>
+    <div class="label">Subjects Taken</div>
+  </div>
+</div>
+
+{{#if template.includeComments}}
+{{#if teacherComment}}
+<div class="section-title">Teacher's Comments</div>
+<div class="comments-section">
+  <div class="comment-box">
+    <div class="author">Class Teacher</div>
+    <div class="text">{{teacherComment}}</div>
+  </div>
+</div>
+{{/if}}
+
+{{#if headComment}}
+<div class="section-title">Head Teacher's Remarks</div>
+<div class="comments-section">
+  <div class="comment-box">
+    <div class="author">Head Teacher</div>
+    <div class="text">{{headComment}}</div>
+  </div>
+</div>
+{{/if}}
+{{/if}}
+
+{{#if template.includeGrading}}
+<div class="section-title">Grading Legend</div>
+<div class="grading-legend">
+  <table>
+    <thead>
+      <tr>
+        <th>Grade</th>
+        <th>Score Range</th>
+        <th>Remark</th>
+        <th>Points</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each gradingLegend}}
+      <tr>
+        <td><strong>{{grade}}</strong></td>
+        <td>{{minScore}} - {{maxScore}}</td>
+        <td>{{remark}}</td>
+        <td>{{points}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</div>
+{{/if}}
+
+<div class="signature-area">
+  {{#if template.includeSignature}}
+  <div class="signature-box">
+    {{#if template.signatureUrl}}<img src="{{template.signatureUrl}}" alt="Signature" />{{/if}}
+    <div class="signature-line"></div>
+    <div class="signature-label">{{template.directorName}}<br/>Head Teacher</div>
+  </div>
+  {{/if}}
+  {{#if template.includeStamp}}
+  <div class="signature-box">
+    {{#if template.stampUrl}}<img src="{{template.stampUrl}}" alt="School Stamp" />{{/if}}
+    <div class="signature-line"></div>
+    <div class="signature-label">School Stamp</div>
+  </div>
+  {{/if}}
+  <div class="signature-box">
+    <div class="signature-line"></div>
+    <div class="signature-label">Date</div>
+  </div>
+</div>
+
+</body>
+</html>

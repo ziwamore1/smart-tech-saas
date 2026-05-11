@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Academic Transcript - {{student.firstName}} {{student.lastName}}</title>
+<style>
+  @page { margin: 15mm 12mm; size: A4; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; font-size: 11px; color: #1f2937; line-height: 1.5; }
+
+  .page-break { page-break-after: always; }
+
+  .student-info { background: {{secondaryColor}}; border-radius: 8px; padding: 14px 18px; margin-bottom: 18px; border-left: 4px solid {{primaryColor}}; }
+  .student-info table { width: 100%; border-collapse: collapse; }
+  .student-info td { padding: 3px 8px; font-size: 12px; }
+  .student-info .label { color: #6b7280; font-weight: 600; width: 130px; }
+  .student-info .value { font-weight: 600; color: #1f2937; }
+
+  .section-title { font-size: 16px; font-weight: 700; color: {{primaryColor}}; text-align: center; margin: 20px 0; text-transform: uppercase; letter-spacing: 1px; }
+
+  table.transcript { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px; }
+  table.transcript th { background: {{primaryColor}}; color: white; padding: 7px 8px; font-weight: 600; text-align: center; text-transform: uppercase; letter-spacing: 0.3px; }
+  table.transcript td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #e5e7eb; }
+  table.transcript tr:nth-child(even) { background: #f9fafb; }
+  table.transcript .year-group td { background: #f3f4f6; font-weight: 700; color: #374151; border-bottom: 2px solid #d1d5db; }
+
+  .summary-block { background: {{secondaryColor}}; border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px 20px; margin-bottom: 18px; }
+  .summary-block table { width: auto; margin: 0 auto; }
+  .summary-block td { padding: 4px 16px; font-size: 11px; }
+  .summary-block .label { color: #6b7280; font-weight: 600; }
+  .summary-block .value { font-weight: 700; color: {{primaryColor}}; }
+
+  .stamp-area { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #e5e7eb; }
+  .stamp-area .line { border-top: 1px solid #374151; width: 200px; margin: 0 auto 4px; padding-top: 4px; }
+  .stamp-area .label { font-size: 10px; color: #6b7280; }
+
+  .verification { text-align: center; font-size: 8px; color: #9ca3af; margin-top: 20px; }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page-break { page-break-after: always; }
+  }
+</style>
+</head>
+<body>
+
+{{> header primaryColor=template.primaryColor secondaryColor=template.secondaryColor }}
+
+<div class="section-title">Official Academic Transcript</div>
+
+<div class="student-info">
+  <table>
+    <tr><td class="label">Student Name</td><td class="value">{{student.firstName}} {{student.lastName}}</td><td class="label">Admission No.</td><td class="value">{{student.admissionNumber}}</td></tr>
+  </table>
+</div>
+
+{{#if entries.length}}
+<table class="transcript">
+  <thead>
+    <tr>
+      <th>Year</th>
+      <th>Term</th>
+      <th>Class</th>
+      <th>Subject</th>
+      <th>Score</th>
+      <th>Grade</th>
+      <th>Points</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each entries}}
+    <tr>
+      <td>{{academicYear}}</td>
+      <td>{{term}}</td>
+      <td>{{className}}</td>
+      <td style="text-align:left;">{{subject}}</td>
+      <td>{{score}}</td>
+      <td><strong>{{grade}}</strong></td>
+      <td>{{points}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p style="text-align:center; padding:40px; color:#9ca3af;">No academic records found for this student.</p>
+{{/if}}
+
+<div class="summary-block">
+  <table>
+    <tr><td class="label">Total Terms Completed</td><td class="value">{{summary.totalTerms}}</td></tr>
+    <tr><td class="label">Total Subjects Taken</td><td class="value">{{summary.totalSubjects}}</td></tr>
+    <tr><td class="label">Overall Average</td><td class="value">{{formatNumber summary.overallAverage}}%</td></tr>
+  </table>
+</div>
+
+<div class="stamp-area">
+  <div style="display:flex; justify-content:space-around;">
+    <div>
+      <div class="line"></div>
+      <div class="label">Head Teacher</div>
+    </div>
+    <div>
+      <div class="line"></div>
+      <div class="label">School Stamp</div>
+    </div>
+    <div>
+      <div class="line"></div>
+      <div class="label">Date</div>
+    </div>
+  </div>
+</div>
+
+<div class="verification">
+  This transcript is an official document of {{school.name}}. Verified electronically.
+</div>
+
+</body>
+</html>

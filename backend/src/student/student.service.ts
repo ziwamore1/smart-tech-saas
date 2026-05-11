@@ -60,7 +60,7 @@ export class StudentService {
   async update(id: string, dto: UpdateStudentDto) {
     const student = await this.prisma.student.findUnique({ where: { id } });
     if (!student) throw new NotFoundException('Student not found');
-    const allowedFields = ['firstName', 'lastName', 'admissionNumber', 'dateOfBirth', 'gender'];
+    const allowedFields = ['firstName', 'lastName', 'admissionNumber', 'dateOfBirth', 'gender', 'photoUrl'];
     const data: any = {};
     for (const key of allowedFields) {
       if (dto[key]) data[key] = dto[key];
@@ -71,6 +71,16 @@ export class StudentService {
     return this.prisma.student.update({
       where: { id },
       data,
+    });
+  }
+
+  async uploadPhoto(id: string, photoUrl: string, schoolId: string) {
+    const student = await this.prisma.student.findUnique({ where: { id } });
+    if (!student) throw new NotFoundException('Student not found');
+    if (student.schoolId !== schoolId) throw new ForbiddenException('Invalid student');
+    return this.prisma.student.update({
+      where: { id },
+      data: { photoUrl },
     });
   }
 

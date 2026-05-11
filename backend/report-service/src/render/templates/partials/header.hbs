@@ -1,0 +1,14 @@
+<header style="border-bottom: 3px solid {{primaryColor}}; padding-bottom: 12px; margin-bottom: 20px;">
+  <table style="width: 100%; border-collapse: collapse;">
+    <tr>
+      {{#if school.logo}}<td style="width: 80px; vertical-align: middle; text-align: center;">
+        <img src="{{school.logo}}" alt="School Logo" style="max-width: 70px; max-height: 70px;" />
+      </td>{{/if}}
+      <td style="vertical-align: middle; text-align: center;">
+        <h1 style="margin: 0; font-size: 22px; color: {{primaryColor}}; font-weight: 700;">{{school.name}}</h1>
+        {{#if school.address}}<p style="margin: 4px 0 0; font-size: 11px; color: #6b7280;">{{school.address}}</p>{{/if}}
+        {{#if headerText}}<p style="margin: 2px 0 0; font-size: 10px; color: #9ca3af; font-style: italic;">{{headerText}}</p>{{/if}}
+      </td>
+    </tr>
+  </table>
+</header>

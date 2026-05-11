@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Attendance Summary - {{className}}</title>
+<style>
+  @page { margin: 12mm 10mm; size: A4; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; font-size: 10px; color: #1f2937; line-height: 1.4; }
+
+  .section-title { font-size: 14px; font-weight: 700; color: {{primaryColor}}; margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 2px solid {{primaryColor}}; }
+
+  .summary-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .summary-card { flex: 1; min-width: 100px; background: #f9fafb; border-radius: 6px; padding: 10px 14px; text-align: center; border: 1px solid #e5e7eb; }
+  .summary-card .value { font-size: 20px; font-weight: 700; }
+  .summary-card .label { font-size: 8px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+  .summary-card.present .value { color: #059669; }
+  .summary-card.absent .value { color: #dc2626; }
+  .summary-card.late .value { color: #ea580c; }
+  .summary-card.excused .value { color: #2563eb; }
+  .summary-card.sick .value { color: #ca8a04; }
+  .summary-card.rate .value { color: {{primaryColor}}; }
+
+  table.students { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  table.students th { background: {{primaryColor}}; color: white; padding: 6px 8px; font-size: 8px; font-weight: 600; text-align: center; text-transform: uppercase; }
+  table.students td { padding: 5px 8px; text-align: center; border-bottom: 1px solid #e5e7eb; font-size: 9px; }
+  table.students tr:nth-child(even) { background: #f9fafb; }
+  table.students .name { text-align: left; font-weight: 600; }
+  table.students .rate-high { color: #059669; font-weight: 700; }
+  table.students .rate-mid { color: #ea580c; font-weight: 700; }
+  table.students .rate-low { color: #dc2626; font-weight: 700; }
+
+  .insight-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 14px; margin: 12px 0; }
+  .insight-box.warning { background: #fef2f2; border-color: #fecaca; }
+  .insight-box.success { background: #f0fdf4; border-color: #bbf7d0; }
+
+  .footer { margin-top: 20px; font-size: 9px; color: #9ca3af; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+{{> header primaryColor=template.primaryColor secondaryColor=template.secondaryColor }}
+
+<h2 style="margin-bottom:4px;">Attendance Summary Report</h2>
+<p style="font-size:11px; color:#6b7280;">{{className}} | {{startDate}} to {{endDate}}</p>
+
+<div class="summary-grid">
+  <div class="summary-card rate"><div class="value">{{overallRate}}%</div><div class="label">Attendance Rate</div></div>
+  <div class="summary-card present"><div class="value">{{stats.present}}</div><div class="label">Present</div></div>
+  <div class="summary-card absent"><div class="value">{{stats.absent}}</div><div class="label">Absent</div></div>
+  <div class="summary-card late"><div class="value">{{stats.late}}</div><div class="label">Late</div></div>
+  <div class="summary-card excused"><div class="value">{{stats.excused}}</div><div class="label">Excused</div></div>
+  <div class="summary-card sick"><div class="value">{{stats.sick}}</div><div class="label">Sick</div></div>
+</div>
+
+{{#if insight}}
+<div class="insight-box {{insight.type}}">
+  <strong>Insight:</strong> {{insight.text}}
+</div>
+{{/if}}
+
+<div class="section-title">Student Attendance Breakdown</div>
+
+<table class="students">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Student</th>
+      <th>Adm No.</th>
+      <th>Total</th>
+      <th>Present</th>
+      <th>Absent</th>
+      <th>Late</th>
+      <th>Excused</th>
+      <th>Sick</th>
+      <th>Rate</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each students}}
+    <tr>
+      <td>{{inc @index}}</td>
+      <td class="name">{{name}}</td>
+      <td>{{admNo}}</td>
+      <td>{{total}}</td>
+      <td>{{present}}</td>
+      <td>{{absent}}</td>
+      <td>{{late}}</td>
+      <td>{{excused}}</td>
+      <td>{{sick}}</td>
+      <td class="rate-{{rateClass}}">{{rate}}%</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+
+<div class="footer">Generated on {{generatedAt}} | {{schoolName}} | {{totalStudents}} students</div>
+
+</body>
+</html>

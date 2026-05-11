@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Student Attendance Report - {{student.firstName}} {{student.lastName}}</title>
+<style>
+  @page { margin: 12mm 10mm; size: A4; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; font-size: 10px; color: #1f2937; line-height: 1.4; }
+
+  .student-header { background: {{secondaryColor}}; border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; border-left: 4px solid {{primaryColor}}; }
+  .student-header table { width: 100%; border-collapse: collapse; }
+  .student-header td { padding: 3px 8px; font-size: 11px; }
+  .student-header .label { color: #6b7280; font-weight: 600; width: 120px; }
+  .student-header .value { font-weight: 600; color: #1f2937; }
+
+  .section-title { font-size: 14px; font-weight: 700; color: {{primaryColor}}; margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 2px solid {{primaryColor}}; }
+
+  .stats-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .stat-box { flex: 1; min-width: 80px; background: #f9fafb; border-radius: 6px; padding: 10px; text-align: center; border: 1px solid #e5e7eb; }
+  .stat-box .value { font-size: 22px; font-weight: 700; }
+  .stat-box .label { font-size: 8px; color: #6b7280; text-transform: uppercase; margin-top: 2px; }
+
+  .rate-high { color: #059669; } .rate-mid { color: #ea580c; } .rate-low { color: #dc2626; }
+
+  table.records { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  table.records th { background: {{primaryColor}}; color: white; padding: 6px 8px; font-size: 8px; font-weight: 600; text-align: center; text-transform: uppercase; }
+  table.records td { padding: 4px 8px; text-align: center; border-bottom: 1px solid #e5e7eb; font-size: 9px; }
+  table.records tr:nth-child(even) { background: #f9fafb; }
+  table.records .subject { text-align: left; }
+
+  .status-badge { display: inline-block; padding: 1px 8px; border-radius: 8px; font-size: 8px; font-weight: 600; }
+  .status-PRESENT { background: #f0fdf4; color: #059669; }
+  .status-ABSENT { background: #fef2f2; color: #dc2626; }
+  .status-LATE { background: #fff7ed; color: #ea580c; }
+  .status-EXCUSED { background: #eff6ff; color: #2563eb; }
+  .status-SICK { background: #fefce8; color: #ca8a04; }
+  .status-SUSPENDED { background: #f3f4f6; color: #6b7280; }
+  .status-ACTIVITY { background: #faf5ff; color: #7c3aed; }
+  .status-PARTIAL_ATTENDANCE { background: #f0fdfa; color: #0d9488; }
+
+  .insight-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 14px; margin: 12px 0; }
+  .insight-box.warning { background: #fef2f2; border-color: #fecaca; }
+  .insight-box.success { background: #f0fdf4; border-color: #bbf7d0; }
+
+  .footer { margin-top: 20px; font-size: 9px; color: #9ca3af; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+{{> header primaryColor=template.primaryColor secondaryColor=template.secondaryColor }}
+
+<div class="student-header">
+  <table>
+    <tr><td class="label">Student Name</td><td class="value">{{student.firstName}} {{student.lastName}}</td>
+      <td style="text-align:right;vertical-align:middle;" rowspan="3">
+        {{#if student.photoUrl}}
+        <img src="{{student.photoUrl}}" alt="{{student.firstName}}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid #e5e7eb;" />
+        {{else}}
+        <div style="width:64px;height:64px;border-radius:50%;background:#f3f4f6;border:3px solid #e5e7eb;display:inline-flex;align-items:center;justify-content:center;font-size:18px;color:#9ca3af;">—</div>
+        {{/if}}
+      </td>
+    </tr>
+    <tr><td class="label">Admission No.</td><td class="value">{{student.admissionNumber}}</td></tr>
+    <tr><td class="label">Class</td><td class="value">{{student.className}}</td></tr>
+    <tr><td class="label">Period</td><td class="value">{{startDate}} to {{endDate}}</td></tr>
+  </table>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-box"><div class="value rate-{{rateClass}}">{{attendanceRate}}%</div><div class="label">Attendance Rate</div></div>
+  <div class="stat-box"><div class="value" style="color:#059669;">{{stats.present}}</div><div class="label">Present</div></div>
+  <div class="stat-box"><div class="value" style="color:#dc2626;">{{stats.absent}}</div><div class="label">Absent</div></div>
+  <div class="stat-box"><div class="value" style="color:#ea580c;">{{stats.late}}</div><div class="label">Late</div></div>
+  <div class="stat-box"><div class="value" style="color:#2563eb;">{{stats.excused}}</div><div class="label">Excused</div></div>
+  <div class="stat-box"><div class="value" style="color:#ca8a04;">{{stats.sick}}</div><div class="label">Sick</div></div>
+  <div class="stat-box"><div class="value" style="color:#6b7280;">{{stats.suspended}}</div><div class="label">Suspended</div></div>
+  <div class="stat-box"><div class="value" style="color:#7c3aed;">{{stats.activity}}</div><div class="label">Activity</div></div>
+  <div class="stat-box"><div class="value" style="color:#0d9488;">{{stats.partial}}</div><div class="label">Partial</div></div>
+</div>
+
+{{#if insights}}
+<div class="section-title">AI Insights</div>
+{{#each insights}}
+<div class="insight-box {{type}}">
+  <strong>{{title}}:</strong> {{text}}
+</div>
+{{/each}}
+{{/if}}
+
+<div class="section-title">Attendance Records</div>
+
+<table class="records">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Subject</th>
+      <th>Status</th>
+      <th>Check In</th>
+      <th>Check Out</th>
+      <th>Late (min)</th>
+      <th>Remarks</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each records}}
+    <tr>
+      <td>{{date}}</td>
+      <td class="subject">{{subject}}</td>
+      <td><span class="status-badge status-{{status}}">{{statusLabel}}</span></td>
+      <td>{{checkIn}}</td>
+      <td>{{checkOut}}</td>
+      <td>{{lateMinutes}}</td>
+      <td>{{remarks}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+
+<div class="footer">Generated on {{generatedAt}} | {{schoolName}}</div>
+
+</body>
+</html>
