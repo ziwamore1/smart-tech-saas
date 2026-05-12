@@ -1,0 +1,533 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  PanResponder,
+  Dimensions,
+  Platform,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as DocumentPicker from 'expo-document-picker';
+import { apiService } from '../../services/api';
+import { DigitalSignature } from '../../types';
+import { colors, spacing, borderRadius, typography, shadows } from '../../theme';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const PAD_WIDTH = SCREEN_WIDTH - spacing.md * 4;
+const PAD_HEIGHT = 200;
+
+function truncateHash(hash?: string): string {
+  if (!hash) return '';
+  return hash.length > 20 ? hash.substring(0, 10) + '...' + hash.substring(hash.length - 6) : hash;
+}
+
+function SignaturePad({ onCapture }: { onCapture: (data: string) => void }) {
+  const [paths, setPaths] = useState<{ x: number; y: number }[][]>([]);
+  const [currentPath, setCurrentPath] = useState<{ x: number; y: number }[]>([]);
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        const { locationX, locationY } = evt.nativeEvent;
+        setIsDrawing(true);
+        setCurrentPath([{ x: locationX, y: locationY }]);
+      },
+      onPanResponderMove: (evt) => {
+        if (!isDrawing) return;
+        const { locationX, locationY } = evt.nativeEvent;
+        setCurrentPath((prev) => [...prev, { x: locationX, y: locationY }]);
+      },
+      onPanResponderRelease: () => {
+        setIsDrawing(false);
+        if (currentPath.length > 0) {
+          setPaths((prev) => [...prev, currentPath]);
+        }
+        setCurrentPath([]);
+      },
+    })
+  ).current;
+
+  const handleClear = () => {
+    setPaths([]);
+    setCurrentPath([]);
+  };
+
+  const handleSave = () => {
+    if (paths.length === 0 && currentPath.length === 0) {
+      Alert.alert('Empty', 'Please draw a signature first');
+      return;
+    }
+    const allPoints = paths.flat();
+    if (allPoints.length === 0) return;
+    const data = JSON.stringify({ points: allPoints, width: PAD_WIDTH, height: PAD_HEIGHT });
+    onCapture(data);
+    handleClear();
+  };
+
+  const renderPoints = () => {
+    const elements: React.ReactNode[] = [];
+    const allPaths = [...paths];
+    if (currentPath.length > 0) {
+      allPaths.push(currentPath);
+    }
+
+    allPaths.forEach((path, pathIndex) => {
+      if (path.length < 2) return;
+      for (let i = 1; i < path.length; i++) {
+        const prev = path[i - 1];
+        const curr = path[i];
+        const dx = curr.x - prev.x;
+        const dy = curr.y - prev.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx);
+        const segments = Math.max(1, Math.floor(distance / 3));
+        for (let s = 0; s <= segments; s++) {
+          const t = s / segments;
+          const x = prev.x + dx * t;
+          const y = prev.y + dy * t;
+          elements.push(
+            <View
+              key={`${pathIndex}-${i}-${s}`}
+              style={[
+                styles.dot,
+                { left: x - 3, top: y - 3 },
+              ]}
+            />
+          );
+        }
+      }
+    });
+
+    return elements;
+  };
+
+  return (
+    <View style={styles.padContainer}>
+      <View
+        style={styles.pad}
+        {...panResponder.panHandlers}
+      >
+        {renderPoints()}
+        {paths.length === 0 && currentPath.length === 0 && (
+          <Text style={styles.padPlaceholder}>Draw your signature here</Text>
+        )}
+      </View>
+      <View style={styles.padActions}>
+        <TouchableOpacity style={styles.clearPadBtn} onPress={handleClear}>
+          <Text style={styles.clearPadBtnText}>Clear</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.savePadBtn} onPress={handleSave}>
+          <Text style={styles.savePadBtnText}>Capture</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+export function DigitalSignatureScreen({ navigation }: any) {
+  const [signatures, setSignatures] = useState<DigitalSignature[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [name, setName] = useState('');
+  const [title, setTitle] = useState('');
+  const [email, setEmail] = useState('');
+  const [signatureMethod, setSignatureMethod] = useState<'draw' | 'upload'>('draw');
+  const [signatureImageUrl, setSignatureImageUrl] = useState('');
+  const [signatureData, setSignatureData] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const [signDocModalVisible, setSignDocModalVisible] = useState(false);
+  const [signDocSignatureId, setSignDocSignatureId] = useState('');
+  const [documentHash, setDocumentHash] = useState('');
+  const [signingDoc, setSigningDoc] = useState(false);
+
+  const fetchSignatures = useCallback(async () => {
+    try {
+      const data = await apiService.getSignatures();
+      setSignatures(data?.signatures ?? data ?? []);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to load signatures');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchSignatures();
+  }, [fetchSignatures]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchSignatures();
+  }, [fetchSignatures]);
+
+  const resetForm = () => {
+    setName('');
+    setTitle('');
+    setEmail('');
+    setSignatureMethod('draw');
+    setSignatureImageUrl('');
+    setSignatureData('');
+  };
+
+  const handleUploadImage = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'image/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+      const file = result.assets[0];
+      setSignatureImageUrl(file.uri);
+      setSignatureMethod('upload');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to pick image');
+    }
+  };
+
+  const handleCaptureSignature = (data: string) => {
+    setSignatureData(data);
+    setSignatureMethod('draw');
+    Alert.alert('Success', 'Signature captured');
+  };
+
+  const handleCreateSignature = async () => {
+    if (!name.trim()) {
+      Alert.alert('Input Required', 'Please enter a name');
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload: any = {
+        name: name.trim(),
+        title: title.trim() || undefined,
+        email: email.trim() || undefined,
+      };
+      if (signatureMethod === 'upload' && signatureImageUrl) {
+        payload.imageUrl = signatureImageUrl;
+      } else if (signatureMethod === 'draw' && signatureData) {
+        payload.signatureData = signatureData;
+      }
+      const result = await apiService.createSignature(payload);
+      setSignatures((prev) => [...prev, result?.signature ?? result]);
+      setModalVisible(false);
+      resetForm();
+      Alert.alert('Success', 'Signature created');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to create signature');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteSignature = (id: string) => {
+    Alert.alert('Delete Signature', 'Are you sure you want to delete this signature?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await apiService.deleteSignature(id);
+            setSignatures((prev) => prev.filter((s) => s.id !== id));
+          } catch (err: any) {
+            Alert.alert('Error', err?.message || 'Failed to delete signature');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleSignDocumentPress = (signatureId: string) => {
+    setSignDocSignatureId(signatureId);
+    setDocumentHash('');
+    setSignDocModalVisible(true);
+  };
+
+  const handleSignDocument = async () => {
+    if (!documentHash.trim()) {
+      Alert.alert('Input Required', 'Please enter a document hash');
+      return;
+    }
+    setSigningDoc(true);
+    try {
+      await apiService.signDocument(signDocSignatureId, documentHash.trim());
+      setSignDocModalVisible(false);
+      Alert.alert('Success', 'Document signed successfully');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to sign document');
+    } finally {
+      setSigningDoc(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Digital Signatures</Text>
+        <TouchableOpacity style={styles.createHeaderBtn} onPress={() => { resetForm(); setModalVisible(true); }}>
+          <Text style={styles.createHeaderBtnText}>+ Create</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
+      >
+        {signatures.length === 0 ? (
+          <Text style={styles.emptyText}>No signatures yet. Create one to get started!</Text>
+        ) : (
+          signatures.map((sig) => (
+            <View key={sig.id} style={styles.signatureCard}>
+              <View style={styles.sigHeader}>
+                <Text style={styles.sigName}>{sig.name}</Text>
+                {sig.isDefault && (
+                  <View style={styles.defaultBadge}>
+                    <Text style={styles.defaultBadgeText}>Default</Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.sigBody}>
+                <View style={styles.sigPreview}>
+                  {sig.imageUrl ? (
+                    <View style={styles.sigImagePlaceholder}>
+                      <Text style={styles.sigImageIcon}>🖋️</Text>
+                    </View>
+                  ) : sig.signatureData ? (
+                    <View style={styles.sigDrawnPreview}>
+                      <Text style={styles.sigDrawnIcon}>✍️</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.sigNoImage}>
+                      <Text style={styles.sigNoImageText}>No signature</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.sigInfo}>
+                  {sig.title && <Text style={styles.sigDetail}>{sig.title}</Text>}
+                  {sig.email && <Text style={styles.sigDetail}>{sig.email}</Text>}
+                  {sig.certificate && (
+                    <Text style={styles.sigHash}>Hash: {truncateHash(sig.certificate)}</Text>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.sigActions}>
+                <TouchableOpacity style={styles.signDocBtn} onPress={() => handleSignDocumentPress(sig.id)}>
+                  <Text style={styles.signDocBtnText}>Sign Document</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.deleteSigBtn} onPress={() => handleDeleteSignature(sig.id)}>
+                  <Text style={styles.deleteSigBtnText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
+        )}
+      </ScrollView>
+
+      <Modal visible={modalVisible} animationType="slide" transparent>
+        <ScrollView style={styles.modalOverlay} contentContainerStyle={styles.modalContentContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Create Signature</Text>
+
+            <Text style={styles.fieldLabel}>Name</Text>
+            <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Full name" placeholderTextColor={colors.textLight} />
+
+            <Text style={styles.fieldLabel}>Title (optional)</Text>
+            <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g. Principal" placeholderTextColor={colors.textLight} />
+
+            <Text style={styles.fieldLabel}>Email (optional)</Text>
+            <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="email@school.com" placeholderTextColor={colors.textLight} autoCapitalize="none" keyboardType="email-address" />
+
+            <Text style={styles.fieldLabel}>Signature Input Method</Text>
+            <View style={styles.methodRow}>
+              <TouchableOpacity
+                style={[styles.methodBtn, signatureMethod === 'draw' && styles.methodBtnActive]}
+                onPress={() => setSignatureMethod('draw')}
+              >
+                <Text style={[styles.methodBtnText, signatureMethod === 'draw' && styles.methodBtnTextActive]}>Draw</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.methodBtn, signatureMethod === 'upload' && styles.methodBtnActive]}
+                onPress={() => setSignatureMethod('upload')}
+              >
+                <Text style={[styles.methodBtnText, signatureMethod === 'upload' && styles.methodBtnTextActive]}>Upload Image</Text>
+              </TouchableOpacity>
+            </View>
+
+            {signatureMethod === 'draw' ? (
+              <SignaturePad onCapture={handleCaptureSignature} />
+            ) : (
+              <View>
+                <TouchableOpacity style={styles.uploadImageBtn} onPress={handleUploadImage}>
+                  <Text style={styles.uploadImageBtnText}>
+                    {signatureImageUrl ? 'Change Image' : 'Pick Signature Image'}
+                  </Text>
+                </TouchableOpacity>
+                {signatureImageUrl ? (
+                  <Text style={styles.uploadedFileName} numberOfLines={1}>Image selected</Text>
+                ) : null}
+              </View>
+            )}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelModalBtn} onPress={() => setModalVisible(false)}>
+                <Text style={styles.cancelModalBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveModalBtn} onPress={handleCreateSignature} disabled={saving}>
+                {saving ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={styles.saveModalBtnText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </Modal>
+
+      <Modal visible={signDocModalVisible} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.simpleModal}>
+            <Text style={styles.modalTitle}>Sign Document</Text>
+            <Text style={styles.fieldLabel}>Document Hash</Text>
+            <TextInput
+              style={styles.input}
+              value={documentHash}
+              onChangeText={setDocumentHash}
+              placeholder="Enter document hash"
+              placeholderTextColor={colors.textLight}
+              autoCapitalize="none"
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelModalBtn} onPress={() => setSignDocModalVisible(false)}>
+                <Text style={styles.cancelModalBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveModalBtn} onPress={handleSignDocument} disabled={signingDoc}>
+                {signingDoc ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={styles.saveModalBtnText}>Sign</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  title: { ...typography.h1 },
+  createHeaderBtn: { backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.md },
+  createHeaderBtnText: { color: colors.white, fontWeight: '600', fontSize: 14 },
+  scrollContent: { padding: spacing.md, paddingBottom: spacing.xxl },
+  emptyText: { ...typography.bodySmall, textAlign: 'center', padding: spacing.xxl },
+  signatureCard: { backgroundColor: colors.white, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, ...shadows.sm },
+  sigHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  sigName: { ...typography.h3 },
+  defaultBadge: { backgroundColor: colors.success, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.sm },
+  defaultBadgeText: { color: colors.white, fontSize: 11, fontWeight: '600' },
+  sigBody: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.sm },
+  sigPreview: { width: 70, height: 50, borderRadius: borderRadius.md, overflow: 'hidden' },
+  sigImagePlaceholder: { flex: 1, backgroundColor: '#f0fdf4', justifyContent: 'center', alignItems: 'center' },
+  sigImageIcon: { fontSize: 24 },
+  sigDrawnPreview: { flex: 1, backgroundColor: '#fef3c7', justifyContent: 'center', alignItems: 'center' },
+  sigDrawnIcon: { fontSize: 24 },
+  sigNoImage: { flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
+  sigNoImageText: { ...typography.caption, fontSize: 10 },
+  sigInfo: { flex: 1, justifyContent: 'center' },
+  sigDetail: { ...typography.bodySmall, marginBottom: 2 },
+  sigHash: { ...typography.caption, fontFamily: 'monospace', marginTop: 2 },
+  sigActions: { flexDirection: 'row', gap: spacing.sm },
+  signDocBtn: { flex: 2, backgroundColor: colors.primary, paddingVertical: spacing.sm, borderRadius: borderRadius.md, alignItems: 'center' },
+  signDocBtnText: { color: colors.white, fontWeight: '600', fontSize: 14 },
+  deleteSigBtn: { flex: 1, backgroundColor: colors.error, paddingVertical: spacing.sm, borderRadius: borderRadius.md, alignItems: 'center' },
+  deleteSigBtnText: { color: colors.white, fontWeight: '600', fontSize: 14 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalContentContainer: { justifyContent: 'center', padding: spacing.md },
+  modalContent: { backgroundColor: colors.white, borderRadius: borderRadius.xl, padding: spacing.lg },
+  simpleModal: { backgroundColor: colors.white, borderRadius: borderRadius.xl, padding: spacing.lg, margin: spacing.md },
+  modalTitle: { ...typography.h2, marginBottom: spacing.md },
+  fieldLabel: { ...typography.bodySmall, fontWeight: '600', marginBottom: spacing.xs, marginTop: spacing.sm },
+  input: { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md, padding: spacing.sm, fontSize: 15, color: colors.text, marginBottom: spacing.sm },
+  methodRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  methodBtn: { flex: 1, paddingVertical: spacing.sm, borderRadius: borderRadius.md, alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
+  methodBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  methodBtnText: { ...typography.bodySmall, fontWeight: '600', color: colors.text },
+  methodBtnTextActive: { color: colors.white },
+  padContainer: { marginBottom: spacing.md },
+  pad: {
+    width: PAD_WIDTH,
+    height: PAD_HEIGHT,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    position: 'relative',
+    overflow: 'hidden',
+    alignSelf: 'center',
+  },
+  dot: {
+    position: 'absolute',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#000',
+  },
+  padPlaceholder: { ...typography.bodySmall, color: colors.textLight, textAlign: 'center', lineHeight: PAD_HEIGHT },
+  padActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  clearPadBtn: { flex: 1, paddingVertical: spacing.sm, borderRadius: borderRadius.md, alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
+  clearPadBtnText: { ...typography.bodySmall, fontWeight: '600' },
+  savePadBtn: { flex: 1, paddingVertical: spacing.sm, borderRadius: borderRadius.md, alignItems: 'center', backgroundColor: colors.primary },
+  savePadBtnText: { color: colors.white, fontWeight: '600' },
+  uploadImageBtn: { backgroundColor: colors.secondary, paddingVertical: spacing.md, borderRadius: borderRadius.md, alignItems: 'center', marginBottom: spacing.sm },
+  uploadImageBtnText: { color: colors.white, fontWeight: '600', fontSize: 15 },
+  uploadedFileName: { ...typography.bodySmall, textAlign: 'center', color: colors.success },
+  modalActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+  cancelModalBtn: { flex: 1, paddingVertical: spacing.md, borderRadius: borderRadius.md, alignItems: 'center', backgroundColor: colors.background },
+  cancelModalBtnText: { ...typography.body, fontWeight: '600', color: colors.text },
+  saveModalBtn: { flex: 1, paddingVertical: spacing.md, borderRadius: borderRadius.md, alignItems: 'center', backgroundColor: colors.primary },
+  saveModalBtnText: { ...typography.body, fontWeight: '600', color: colors.white },
+});

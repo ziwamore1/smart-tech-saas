@@ -47,6 +47,7 @@ import { LessonPlanModule } from './lesson-plan/lesson-plan.module';
 import { IntelligenceModule } from './intelligence/intelligence.module';
 import { ReportQueueModule } from './report-queue/report-queue.module';
 import { QueuesModule } from './queues/queues.module';
+import { ReportTemplateBuilderModule } from './report-template-builder/report-template-builder.module';
 
 @Module({
   imports: [
@@ -98,6 +99,7 @@ import { QueuesModule } from './queues/queues.module';
     IntelligenceModule,
     ReportQueueModule,
     QueuesModule,
+    ReportTemplateBuilderModule,
   ],
 })
 export class AppModule {}

@@ -2,6 +2,7 @@ import puppeteer, { Browser } from 'puppeteer';
 import Handlebars from 'handlebars';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { config } from '../config';
 import { ChartRenderer } from './chart-renderer';
 import {
@@ -163,13 +164,19 @@ export class ReportRenderer {
   }
 
   private async getBrowser(): Promise<Browser> {
-    if (!this.browser || !this.browser.connected) {
-      this.browser = await puppeteer.launch({
-        headless: config.puppeteer.headless,
-        args: config.puppeteer.args,
-        timeout: config.puppeteer.timeout,
-      });
+    if (this.browser && this.browser.connected) return this.browser;
+    if (this.browser && !this.browser.connected) {
+      try { await this.browser.close(); } catch {}
+      this.browser = null;
     }
+    this.browser = await puppeteer.launch({
+      headless: config.puppeteer.headless,
+      args: [
+        ...config.puppeteer.args,
+        `--user-data-dir=${fs.mkdtempSync(path.join(os.tmpdir(), 'puppeteer-'))}`,
+      ],
+      timeout: config.puppeteer.timeout,
+    });
     return this.browser;
   }
 
@@ -184,9 +191,8 @@ export class ReportRenderer {
     const browser = await this.getBrowser();
     const page = await browser.newPage();
     page.setDefaultTimeout(60000);
-    page.setDefaultNavigationTimeout(60000);
 
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
 
     const pdf = await page.pdf({
       format: 'A4',
@@ -230,22 +236,14 @@ export class ReportRenderer {
   }
 
   async renderClassList(data: any): Promise<Buffer> {
-    if (!this.browser || !this.browser.connected) {
-      this.browser = await puppeteer.launch({
-        headless: config.puppeteer.headless,
-        args: config.puppeteer.args,
-        timeout: config.puppeteer.timeout,
-      });
-    }
-
+    const browser = await this.getBrowser();
     const template = this.loadTemplate('class-list');
     const html = template(data);
 
-    const page = await this.browser.newPage();
+    const page = await browser.newPage();
     page.setDefaultTimeout(60000);
-    page.setDefaultNavigationTimeout(60000);
 
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
 
     const pdf = await page.pdf({
       format: 'A4',
@@ -266,22 +264,14 @@ export class ReportRenderer {
   }
 
   async renderAttendanceRegister(data: any): Promise<Buffer> {
-    if (!this.browser || !this.browser.connected) {
-      this.browser = await puppeteer.launch({
-        headless: config.puppeteer.headless,
-        args: config.puppeteer.args,
-        timeout: config.puppeteer.timeout,
-      });
-    }
-
+    const browser = await this.getBrowser();
     const template = this.loadTemplate('attendance-register');
     const html = template(data);
 
-    const page = await this.browser.newPage();
+    const page = await browser.newPage();
     page.setDefaultTimeout(60000);
-    page.setDefaultNavigationTimeout(60000);
 
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
 
     const pdf = await page.pdf({
       format: 'A4',
@@ -302,22 +292,14 @@ export class ReportRenderer {
   }
 
   async renderStudentAttendance(data: any): Promise<Buffer> {
-    if (!this.browser || !this.browser.connected) {
-      this.browser = await puppeteer.launch({
-        headless: config.puppeteer.headless,
-        args: config.puppeteer.args,
-        timeout: config.puppeteer.timeout,
-      });
-    }
-
+    const browser = await this.getBrowser();
     const template = this.loadTemplate('student-attendance');
     const html = template(data);
 
-    const page = await this.browser.newPage();
+    const page = await browser.newPage();
     page.setDefaultTimeout(60000);
-    page.setDefaultNavigationTimeout(60000);
 
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
 
     const pdf = await page.pdf({
       format: 'A4',

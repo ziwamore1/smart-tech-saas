@@ -442,6 +442,42 @@ Email: ${director.email}
       },
     });
 
+    const totalTemplates = await this.prisma.reportTemplate.count();
+    const totalMarketplace = await this.prisma.templateMarketplace.count();
+    const totalAssets = await this.prisma.templateAsset.count();
+    const totalSignatures = await this.prisma.digitalSignature.count();
+    const totalBrandPresets = await this.prisma.brandPreset.count();
+    const totalCertificates = await this.prisma.certificateTemplate.count();
+    const totalAISuggestions = await this.prisma.aITemplateSuggestion.count();
+
+    const templatesByType = await this.prisma.reportTemplate.groupBy({
+      by: ['templateType'],
+      _count: { templateType: true },
+    });
+
+    const templatesByStatus = await this.prisma.reportTemplate.groupBy({
+      by: ['status'],
+      _count: { status: true },
+    });
+
+    const assetsByType = await this.prisma.templateAsset.groupBy({
+      by: ['type'],
+      _count: { type: true },
+    });
+
+    const recentTemplates = await this.prisma.reportTemplate.findMany({
+      take: 5,
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        templateType: true,
+        status: true,
+        updatedAt: true,
+        schoolId: true,
+      },
+    });
+
     return {
       totalSchools,
       activeSchools,
@@ -449,8 +485,19 @@ Email: ${director.email}
       totalStudents,
       totalTeachers,
       totalUsers,
+      totalTemplates,
+      totalMarketplace,
+      totalAssets,
+      totalSignatures,
+      totalBrandPresets,
+      totalCertificates,
+      totalAISuggestions,
       schoolsByStatus,
       recentSchools,
+      templatesByType,
+      templatesByStatus,
+      assetsByType,
+      recentTemplates,
     };
   }
 

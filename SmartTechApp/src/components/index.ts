@@ -2,3 +2,8 @@ export { Button } from './Button';
 export { Input } from './Input';
 export { Card } from './Card';
 export { Loading } from './Loading';
+export { Toolbar } from './editor/Toolbar';
+export { LayerPanel } from './editor/LayerPanel';
+export { PropertyPanel } from './editor/PropertyPanel';
+export { ZoomControls } from './editor/ZoomControls';
+export { CanvasArea } from './editor/CanvasArea';
