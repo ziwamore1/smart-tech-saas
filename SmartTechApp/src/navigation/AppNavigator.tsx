@@ -20,6 +20,13 @@ import { TeacherMarksScreen } from '../screens/teacher/MarksScreen';
 import { LearningStyleScreen } from '../screens/intelligence/LearningStyleScreen';
 import { AiTutorScreen } from '../screens/intelligence/AiTutorScreen';
 import { AnalyticsScreen } from '../screens/intelligence/AnalyticsScreen';
+import { DocumentEditorScreen } from '../screens/editor/DocumentEditorScreen';
+import { TemplateMarketplaceScreen } from '../screens/templates/TemplateMarketplaceScreen';
+import { AITemplateGeneratorScreen } from '../screens/templates/AITemplateGeneratorScreen';
+import { BrandingPresetsScreen } from '../screens/templates/BrandingPresetsScreen';
+import { CloudAssetLibraryScreen } from '../screens/assets/CloudAssetLibraryScreen';
+import { DigitalSignatureScreen } from '../screens/signature/DigitalSignatureScreen';
+import { CollaborationScreen } from '../screens/collaboration/CollaborationScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -66,6 +73,7 @@ function TeacherTabs() {
       <Tab.Screen name="TDashboard" component={TeacherDashboardScreen} options={{ tabBarLabel: 'Home', tabBarIcon: ({ focused }) => <TabIcon name="📊" focused={focused} /> }} />
       <Tab.Screen name="TClasses" component={TeacherClassesScreen} options={{ tabBarLabel: 'Classes', tabBarIcon: ({ focused }) => <TabIcon name="🏫" focused={focused} /> }} />
       <Tab.Screen name="TMarks" component={TeacherMarksScreen} options={{ tabBarLabel: 'Marks', tabBarIcon: ({ focused }) => <TabIcon name="✏️" focused={focused} /> }} />
+      <Tab.Screen name="TTemplates" component={TemplateMarketplaceScreen} options={{ tabBarLabel: 'Templates', tabBarIcon: ({ focused }) => <TabIcon name="📄" focused={focused} /> }} />
       <Tab.Screen name="TProfile" component={ProfileScreen} options={{ tabBarLabel: 'Profile', tabBarIcon: ({ focused }) => <TabIcon name="👤" focused={focused} /> }} />
     </Tab.Navigator>
   );
@@ -99,6 +107,13 @@ export function AppNavigator() {
             <Stack.Screen name="LearningStyle" component={LearningStyleScreen} />
             <Stack.Screen name="AiTutor" component={AiTutorScreen} />
             <Stack.Screen name="Analytics" component={AnalyticsScreen} />
+            <Stack.Screen name="DocumentEditor" component={DocumentEditorScreen} />
+            <Stack.Screen name="TemplateMarketplace" component={TemplateMarketplaceScreen} />
+            <Stack.Screen name="AITemplateGenerator" component={AITemplateGeneratorScreen} />
+            <Stack.Screen name="BrandingPresets" component={BrandingPresetsScreen} />
+            <Stack.Screen name="CloudAssetLibrary" component={CloudAssetLibraryScreen} />
+            <Stack.Screen name="DigitalSignature" component={DigitalSignatureScreen} />
+            <Stack.Screen name="Collaboration" component={CollaborationScreen} />
           </>
         )}
       </Stack.Navigator>

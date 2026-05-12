@@ -247,6 +247,251 @@ class ApiService {
     const response = await this.client.get(`/mobile/intelligence-summary/${studentId}`);
     return response.data;
   }
+
+  // ===== Template Builder API =====
+
+  async getAvailableComponents() {
+    const response = await this.client.get('/template-builder/components');
+    return response.data;
+  }
+
+  async getTemplateCategories() {
+    const response = await this.client.get('/template-builder/categories');
+    return response.data;
+  }
+
+  async createTemplateCategory(data: { name: string; slug: string; description?: string; icon?: string }) {
+    const response = await this.client.post('/template-builder/categories', data);
+    return response.data;
+  }
+
+  async deleteTemplateCategory(id: string) {
+    const response = await this.client.delete(`/template-builder/categories/${id}`);
+    return response.data;
+  }
+
+  async getTemplates(type?: string, status?: string, categoryId?: string) {
+    const params: any = {};
+    if (type) params.type = type;
+    if (status) params.status = status;
+    if (categoryId) params.categoryId = categoryId;
+    const response = await this.client.get('/template-builder', { params });
+    return response.data;
+  }
+
+  async getTemplate(id: string) {
+    const response = await this.client.get(`/template-builder/${id}`);
+    return response.data;
+  }
+
+  async createTemplate(data: any) {
+    const response = await this.client.post('/template-builder', data);
+    return response.data;
+  }
+
+  async updateTemplate(id: string, data: any) {
+    const response = await this.client.patch(`/template-builder/${id}`, data);
+    return response.data;
+  }
+
+  async deleteTemplate(id: string) {
+    const response = await this.client.delete(`/template-builder/${id}`);
+    return response.data;
+  }
+
+  async duplicateTemplate(id: string) {
+    const response = await this.client.post(`/template-builder/${id}/duplicate`);
+    return response.data;
+  }
+
+  async publishTemplate(id: string) {
+    const response = await this.client.post(`/template-builder/${id}/publish`);
+    return response.data;
+  }
+
+  async archiveTemplate(id: string) {
+    const response = await this.client.post(`/template-builder/${id}/archive`);
+    return response.data;
+  }
+
+  async saveTemplateLayout(id: string, layout: any) {
+    const response = await this.client.post(`/template-builder/${id}/layout`, { layout });
+    return response.data;
+  }
+
+  async addTemplateComponent(templateId: string, data: any) {
+    const response = await this.client.post(`/template-builder/${templateId}/components`, data);
+    return response.data;
+  }
+
+  async updateTemplateComponent(templateId: string, componentId: string, data: any) {
+    const response = await this.client.patch(`/template-builder/${templateId}/components/${componentId}`, data);
+    return response.data;
+  }
+
+  async deleteTemplateComponent(templateId: string, componentId: string) {
+    const response = await this.client.delete(`/template-builder/${templateId}/components/${componentId}`);
+    return response.data;
+  }
+
+  async reorderComponents(templateId: string, order: { id: string; sortOrder: number }[]) {
+    const response = await this.client.post(`/template-builder/${templateId}/components/reorder`, { order });
+    return response.data;
+  }
+
+  async getCertificateSettings(templateId: string) {
+    const response = await this.client.get(`/template-builder/${templateId}/certificate`);
+    return response.data;
+  }
+
+  async updateCertificateSettings(templateId: string, data: any) {
+    const response = await this.client.patch(`/template-builder/${templateId}/certificate`, data);
+    return response.data;
+  }
+
+  async renderTemplatePreview(templateId: string, data?: any) {
+    const response = await this.client.post(`/template-builder/${templateId}/preview`, { data });
+    return response.data;
+  }
+
+  async renderCertificate(templateId: string, data: any) {
+    const response = await this.client.post(`/template-builder/${templateId}/certificate/render`, data);
+    return response.data;
+  }
+
+  // ===== AI Template Generator =====
+
+  async generateAILayout(templateType: string, preferences?: any) {
+    const response = await this.client.post('/template-builder/ai/generate-layout', { templateType, preferences });
+    return response.data;
+  }
+
+  async getAITemplateSuggestions() {
+    const response = await this.client.get('/template-builder/ai/suggestions');
+    return response.data;
+  }
+
+  async suggestTemplateFromStudentData(studentId: string) {
+    const response = await this.client.post('/template-builder/ai/suggest-from-student', { studentId });
+    return response.data;
+  }
+
+  // ===== Branding Presets =====
+
+  async getBrandingPresets() {
+    const response = await this.client.get('/template-builder/branding');
+    return response.data;
+  }
+
+  async getBrandingPreset(id: string) {
+    const response = await this.client.get(`/template-builder/branding/${id}`);
+    return response.data;
+  }
+
+  async createBrandingPreset(data: any) {
+    const response = await this.client.post('/template-builder/branding', data);
+    return response.data;
+  }
+
+  async updateBrandingPreset(id: string, data: any) {
+    const response = await this.client.patch(`/template-builder/branding/${id}`, data);
+    return response.data;
+  }
+
+  async deleteBrandingPreset(id: string) {
+    const response = await this.client.delete(`/template-builder/branding/${id}`);
+    return response.data;
+  }
+
+  async applyBrandingToTemplate(templateId: string, presetId: string) {
+    const response = await this.client.post(`/template-builder/branding/apply`, { templateId, presetId });
+    return response.data;
+  }
+
+  // ===== Template Marketplace =====
+
+  async getMarketplaceTemplates(filters?: { category?: string; featured?: boolean; search?: string }) {
+    const params: any = {};
+    if (filters?.category) params.category = filters.category;
+    if (filters?.featured) params.featured = filters.featured;
+    if (filters?.search) params.search = filters.search;
+    const response = await this.client.get('/template-builder/marketplace', { params });
+    return response.data;
+  }
+
+  async publishToMarketplace(templateId: string, data: any) {
+    const response = await this.client.post(`/template-builder/marketplace/${templateId}`, data);
+    return response.data;
+  }
+
+  async downloadFromMarketplace(marketplaceId: string) {
+    const response = await this.client.post(`/template-builder/marketplace/download/${marketplaceId}`);
+    return response.data;
+  }
+
+  async likeMarketplaceItem(marketplaceId: string) {
+    const response = await this.client.post(`/template-builder/marketplace/like/${marketplaceId}`);
+    return response.data;
+  }
+
+  async getMarketplaceCategories() {
+    const response = await this.client.get('/template-builder/marketplace/categories');
+    return response.data;
+  }
+
+  // ===== Cloud Assets =====
+
+  async getAssets(type?: string, search?: string) {
+    const params: any = {};
+    if (type) params.type = type;
+    if (search) params.search = search;
+    const response = await this.client.get('/template-builder/cloud-assets', { params });
+    return response.data;
+  }
+
+  async uploadAsset(formData: FormData) {
+    const response = await this.client.post('/template-builder/cloud-assets', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async deleteAsset(id: string) {
+    const response = await this.client.delete(`/template-builder/cloud-assets/${id}`);
+    return response.data;
+  }
+
+  async getAssetCategories() {
+    const response = await this.client.get('/template-builder/cloud-assets/categories');
+    return response.data;
+  }
+
+  // ===== Digital Signatures =====
+
+  async getSignatures() {
+    const response = await this.client.get('/template-builder/signatures');
+    return response.data;
+  }
+
+  async createSignature(data: any) {
+    const response = await this.client.post('/template-builder/signatures', data);
+    return response.data;
+  }
+
+  async updateSignature(id: string, data: any) {
+    const response = await this.client.patch(`/template-builder/signatures/${id}`, data);
+    return response.data;
+  }
+
+  async deleteSignature(id: string) {
+    const response = await this.client.delete(`/template-builder/signatures/${id}`);
+    return response.data;
+  }
+
+  async signDocument(signatureId: string, documentHash: string) {
+    const response = await this.client.post('/template-builder/signatures/sign', { signatureId, documentHash });
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

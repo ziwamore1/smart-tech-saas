@@ -981,9 +981,9 @@ model FeatureLock {
 }
 
 model ReportTemplate {
-  id                String   @id @default(uuid())
+  id                String               @id @default(uuid())
   name              String
-  isDefault         Boolean  @default(false)
+  isDefault         Boolean              @default(false)
   schoolId          String
   headerText        String?
   footerText        String?
@@ -991,24 +991,216 @@ model ReportTemplate {
   stampUrl          String?
   signatureUrl      String?
   directorName      String?
-  includeLogo       Boolean  @default(true)
-  includeStamp      Boolean  @default(false)
-  includeSignature  Boolean  @default(false)
-  includeUniversity Boolean  @default(true)
-  includeBestSix    Boolean  @default(true)
-  includeRankings   Boolean  @default(true)
-  includeComments   Boolean  @default(true)
-  includeGrading    Boolean  @default(true)
-  primaryColor      String   @default("#1976d2")
-  secondaryColor    String   @default("#f5f5f5")
-  remarksEnabled    Boolean  @default(true)
-  customRemarks     Json?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  school            School   @relation(fields: [schoolId], references: [id])
+  includeLogo       Boolean              @default(true)
+  includeStamp      Boolean              @default(false)
+  includeSignature  Boolean              @default(false)
+  includeUniversity Boolean              @default(true)
+  includeBestSix    Boolean              @default(true)
+  includeRankings   Boolean              @default(true)
+  includeComments   Boolean              @default(true)
+  includeGrading    Boolean              @default(true)
+  primaryColor      String               @default("#1976d2")
+  secondaryColor    String               @default("#f5f5f5")
+  remarksEnabled    Boolean              @default(true)
+  customRemarks     Json?                @default("[]")
+  templateType      ReportTemplateType   @default(REPORT_CARD)
+  layoutJson        Json?                @default("{}")
+  pageSize          String               @default("A4")
+  orientation       String               @default("portrait")
+  marginTop         Float                @default(15)
+  marginBottom      Float                @default(15)
+  marginLeft        Float                @default(15)
+  marginRight       Float                @default(15)
+  fontFamily        String               @default("Arial")
+  fontSize          Int                  @default(11)
+  colorPalette      Json?                @default("[]")
+  status            TemplateStatus       @default(DRAFT)
+  version           Int                  @default(1)
+  categoryId        String?
+  parentId          String?
+  metadata          Json?                @default("{}")
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  school            School               @relation(fields: [schoolId], references: [id])
+  category          TemplateCategory?    @relation(fields: [categoryId], references: [id])
+  parent            ReportTemplate?      @relation("TemplateVersions", fields: [parentId], references: [id])
+  versions          ReportTemplate[]     @relation("TemplateVersions")
+  components        TemplateComponent[]
+  certificate       CertificateTemplate?
 
   @@unique([name, schoolId])
   @@index([schoolId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([templateType])
+}
+
+model TemplateCategory {
+  id        String           @id @default(uuid())
+  name      String
+  slug      String
+  description String?
+  icon      String?
+  schoolId  String
+  sortOrder Int              @default(0)
+  createdAt DateTime         @default(now())
+  school    School           @relation(fields: [schoolId], references: [id])
+  templates ReportTemplate[]
+
+  @@unique([slug, schoolId])
+  @@index([schoolId])
+}
+
+model TemplateComponent {
+  id          String          @id @default(uuid())
+  templateId  String
+  type        ComponentType
+  label       String
+  content     Json?
+  styles      Json?           @default("{}")
+  position    Json?           @default("{}")
+  size        Json?           @default("{}")
+  settings    Json?           @default("{}")
+  placeholder String?
+  isRequired  Boolean         @default(false)
+  isLocked    Boolean         @default(false)
+  sortOrder   Int             @default(0)
+  parentId    String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  template    ReportTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  parent      TemplateComponent? @relation("ComponentChildren", fields: [parentId], references: [id])
+  children    TemplateComponent[] @relation("ComponentChildren")
+
+  @@index([templateId])
+  @@index([type])
+}
+
+model CertificateTemplate {
+  id              String       @id @default(uuid())
+  templateId      String       @unique
+  certificateType CertificateType @default(ACADEMIC_EXCELLENCE)
+  borderStyle     String       @default("classic")
+  borderColor     String       @default("#1a365d")
+  sealUrl         String?
+  showQrCode      Boolean      @default(true)
+  autoNumbering   Boolean      @default(true)
+  nextNumber      Int          @default(1)
+  showPhoto       Boolean      @default(true)
+  signature1Label String       @default("Head Teacher")
+  signature1Name  String?
+  signature1Title String?
+  signature2Label String?
+  signature2Name  String?
+  signature2Title String?
+  awardText       String       @default("This certificate is awarded to")
+  showBadge       Boolean      @default(true)
+  badgeStyle      String       @default("star")
+  showWatermark   Boolean      @default(false)
+  watermarkText   String?
+  layoutJson      Json?        @default("{}")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  template        ReportTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([certificateType])
+}
+
+model TemplateAsset {
+  id        String   @id @default(uuid())
+  schoolId  String
+  name      String
+  type      String
+  url       String
+  size      Int?
+  metadata  Json?    @default("{}")
+  createdAt DateTime @default(now())
+  school    School   @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
+  @@index([type])
+}
+
+enum ReportTemplateType {
+  REPORT_CARD
+  TRANSCRIPT
+  ATTENDANCE_REPORT
+  STUDENT_PROFILE
+  ANALYTICS_SUMMARY
+  SCHOOL_PERFORMANCE
+  CERTIFICATE
+  TESTIMONIAL
+  RECOMMENDATION_LETTER
+  MINISTRY_REPORT
+  ID_CARD
+  FEE_STATEMENT
+  PROGRESS_REPORT
+}
+
+enum TemplateStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ComponentType {
+  TEXT_BLOCK
+  HEADING
+  PARAGRAPH
+  STUDENT_NAME
+  STUDENT_PHOTO
+  STUDENT_INFO
+  SCHOOL_LOGO
+  SCHOOL_NAME
+  SCHOOL_INFO
+  CLASS_NAME
+  TERM_INFO
+  RESULTS_TABLE
+  SUBJECT_TABLE
+  GRADE_TABLE
+  ATTENDANCE_TABLE
+  PERFORMANCE_CHART
+  RADAR_CHART
+  BAR_CHART
+  LINE_CHART
+  HEATMAP
+  DISTRIBUTION_CURVE
+  RANKING_TABLE
+  ANALYTICS_SUMMARY
+  COMPETENCY_HEATMAP
+  ATTENDANCE_CHART
+  STUDENT_PROFILE_CARD
+  TEACHER_REMARKS
+  AI_NARRATIVE
+  RECOMMENDATIONS
+  STRENGTHS_WEAKNESSES
+  HEADER
+  FOOTER
+  PAGE_NUMBER
+  WATERMARK
+  IMAGE
+  DIVIDER
+  SPACER
+  TABLE
+  SIGNATURE
+  STAMP
+  BADGE
+  SEAL
+  QR_CODE
+  AWARD_TEXT
+  CUSTOM_TEXT
+  DYNAMIC_PLACEHOLDER
+}
+
+enum CertificateType {
+  ACADEMIC_EXCELLENCE
+  PARTICIPATION
+  GRADUATION
+  ATTENDANCE
+  MERIT_AWARD
+  SPORTS_AWARD
+  LEADERSHIP_AWARD
+  CUSTOM
 }
 
 model Attendance {
@@ -1721,4 +1913,112 @@ enum MessageStatus {
   SENT
   DELIVERED
   FAILED
+}
+
+model TemplateMarketplace {
+  id              String   @id @default(uuid())
+  templateId      String   @unique
+  schoolId        String
+  title           String
+  description     String?
+  category        String?
+  tags            String[]
+  previewUrl      String?
+  downloads       Int      @default(0)
+  likes           Int      @default(0)
+  featured        Boolean  @default(false)
+  verified        Boolean  @default(false)
+  price           Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  template        ReportTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  school          School   @relation(fields: [schoolId], references: [id])
+
+  @@index([category])
+  @@index([featured])
+  @@index([downloads])
+}
+
+model BrandPreset {
+  id          String   @id @default(uuid())
+  schoolId    String
+  name        String
+  isDefault   Boolean  @default(false)
+  palette     Json     @default("{}")
+  fonts       Json     @default("{}")
+  logos       Json     @default("{}")
+  layout      Json     @default("{}")
+  metadata    Json?    @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  school      School   @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
+}
+
+model DigitalSignature {
+  id          String   @id @default(uuid())
+  schoolId    String
+  name        String
+  title       String?
+  email       String?
+  imageUrl    String?
+  signatureData String?
+  certificate String?
+  isDefault   Boolean  @default(false)
+  passcode    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  school      School   @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
+}
+
+model CollaborationSession {
+  id          String   @id @default(uuid())
+  templateId  String
+  schoolId    String
+  userId      String
+  userName    String?
+  socketId    String?
+  cursorPos   Json?    @default("{}")
+  selectedId  String?
+  isActive    Boolean  @default(true)
+  joinedAt    DateTime @default(now())
+  lastActive  DateTime @updatedAt
+  template    ReportTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  school      School   @relation(fields: [schoolId], references: [id])
+
+  @@index([templateId])
+  @@index([socketId])
+}
+
+model EditorSnapshot {
+  id          String   @id @default(uuid())
+  templateId  String
+  schoolId    String
+  userId      String
+  snapshot    Json
+  action      String?
+  description String?
+  version     Int
+  createdAt   DateTime @default(now())
+  template    ReportTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  school      School   @relation(fields: [schoolId], references: [id])
+
+  @@index([templateId])
+  @@index([version])
+}
+
+model AITemplateSuggestion {
+  id          String   @id @default(uuid())
+  schoolId    String
+  prompt      String
+  result      Json
+  templateType String?
+  used        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  school      School   @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
 }

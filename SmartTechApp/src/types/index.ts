@@ -205,3 +205,227 @@ export interface MobileIntelligence {
   learningStyle: LearningStyleResult | null;
   recentResults: Result[];
 }
+
+// ====== Template Builder Types ======
+
+export interface TemplateCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  sortOrder: number;
+}
+
+export interface TemplateComponent {
+  id: string;
+  templateId: string;
+  type: string;
+  label: string;
+  content: any;
+  styles: any;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  settings: any;
+  placeholder?: string;
+  isRequired: boolean;
+  sortOrder: number;
+  parentId?: string;
+  children?: TemplateComponent[];
+}
+
+export interface ReportTemplate {
+  id: string;
+  name: string;
+  schoolId: string;
+  templateType: string;
+  status: string;
+  pageSize?: string;
+  orientation?: string;
+  fontFamily?: string;
+  fontSize?: number;
+  primaryColor?: string;
+  secondaryColor?: string;
+  colorPalette?: any;
+  layoutJson?: any;
+  version: number;
+  isDefault: boolean;
+  categoryId?: string;
+  category?: TemplateCategory;
+  logoUrl?: string;
+  marginTop?: number;
+  marginBottom?: number;
+  marginLeft?: number;
+  marginRight?: number;
+  headerText?: string;
+  footerText?: string;
+  components: TemplateComponent[];
+  certificate?: CertificateSettings;
+  _count?: { components: number; versions: number };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CertificateSettings {
+  id: string;
+  templateId: string;
+  certificateType: string;
+  borderStyle: string;
+  borderColor: string;
+  sealUrl?: string;
+  showQrCode: boolean;
+  autoNumbering: boolean;
+  nextNumber: number;
+  showPhoto: boolean;
+  signature1Label?: string;
+  signature1Name?: string;
+  signature1Title?: string;
+  signature2Label?: string;
+  signature2Name?: string;
+  signature2Title?: string;
+  awardText?: string;
+  showBadge: boolean;
+  badgeStyle: string;
+  showWatermark: boolean;
+  watermarkText?: string;
+}
+
+export interface AvailableComponent {
+  type: string;
+  label: string;
+  icon: string;
+  category: string;
+}
+
+// ====== AI Template Generator Types ======
+
+export interface AITemplateSuggestion {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  preview: string;
+  popularity: number;
+}
+
+export interface GeneratedLayout {
+  pageSize: string;
+  orientation: string;
+  components: Partial<TemplateComponent>[];
+}
+
+// ====== Branding Preset Types ======
+
+export interface BrandPreset {
+  id: string;
+  schoolId: string;
+  name: string;
+  palette: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+    text: string;
+  };
+  fonts: {
+    heading: string;
+    body: string;
+    title: string;
+  };
+  logos: any;
+  layout: {
+    margins: { top: number; bottom: number; left: number; right: number };
+    spacing: string;
+  };
+  metadata?: any;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ====== Template Marketplace Types ======
+
+export interface MarketplaceItem {
+  id: string;
+  templateId: string;
+  schoolId: string;
+  title: string;
+  description?: string;
+  category?: string;
+  tags: string[];
+  price: number;
+  previewUrl?: string;
+  downloads: number;
+  likes: number;
+  featured: boolean;
+  template?: { id: string; name: string; templateType: string; pageSize?: string };
+  school?: { name: string };
+  createdAt: string;
+}
+
+// ====== Cloud Asset Types ======
+
+export interface TemplateAsset {
+  id: string;
+  schoolId: string;
+  name: string;
+  type: string;
+  url: string;
+  size: number;
+  metadata?: {
+    originalName?: string;
+    mimeType?: string;
+    thumbnailUrl?: string;
+    alt?: string;
+    tags?: string[];
+    dimensions?: { width: number; height?: number };
+  };
+  createdAt: string;
+}
+
+export interface AssetCategory {
+  id: string;
+  label: string;
+  icon: string;
+}
+
+// ====== Digital Signature Types ======
+
+export interface DigitalSignature {
+  id: string;
+  schoolId: string;
+  name: string;
+  title?: string;
+  email?: string;
+  imageUrl?: string;
+  signatureData?: string;
+  certificate?: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ====== Editor State Types ======
+
+export interface EditorComponent extends TemplateComponent {
+  isSelected: boolean;
+  isLocked: boolean;
+  isHidden: boolean;
+}
+
+export interface EditorState {
+  template: ReportTemplate | null;
+  components: EditorComponent[];
+  selectedId: string | null;
+  zoom: number;
+  history: EditorSnapshot[];
+  historyIndex: number;
+  showGuides: boolean;
+  snapToGrid: boolean;
+  gridSize: number;
+  clipboard: EditorComponent | null;
+}
+
+export interface EditorSnapshot {
+  components: EditorComponent[];
+}
