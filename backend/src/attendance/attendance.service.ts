@@ -834,11 +834,11 @@ export class AttendanceService {
       },
     });
 
-    const recordMap = new Map(existingRecords.map(r => [r.studentId, r]));
+    const recordMap = new Map(existingRecords.map((r: any) => [r.studentId, r]));
 
     const records = enrollments.map(e => {
-      const s = e.student;
-      const record = recordMap.get(s.id);
+      const s = e.student as any;
+      const record = recordMap.get(s.id) as any;
       const status = record?.status || null;
 
       return {

@@ -3,6 +3,9 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
+  phone?: string | null;
+  photoUrl?: string | null;
+  createdAt?: string;
   roles: string[];
   schoolId: string | null;
   school?: School | null;
@@ -35,7 +38,7 @@ export interface DashboardData {
     name: string;
     academicYear: string;
   } | null;
-  userType: 'parent' | 'student' | 'teacher' | 'other';
+  userType: 'parent' | 'student' | 'teacher' | 'class_teacher' | 'director' | 'other';
   children?: Child[];
   stats?: DashboardStats;
   recentAnnouncements?: Announcement[];
@@ -50,6 +53,11 @@ export interface DashboardStats {
   totalClasses?: number;
   classes?: { id: string; name: string }[];
   todayLessons?: number;
+  averageScore?: number;
+  pendingTasks?: number;
+  activeAlerts?: number;
+  weakStudents?: number;
+  topPerformers?: number;
 }
 
 export interface Child {
@@ -428,4 +436,163 @@ export interface EditorState {
 
 export interface EditorSnapshot {
   components: EditorComponent[];
+}
+
+// ====== Exam Types ======
+
+export type QuestionType = 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER' | 'ESSAY' | 'MATCHING' | 'FILL_IN_BLANK' | 'STRUCTURED' | 'PRACTICAL';
+export type DifficultyLevel = 'EASY' | 'MEDIUM' | 'HARD' | 'ADVANCED';
+export type ExamType = 'EXAM' | 'QUIZ' | 'TEST' | 'MID_TERM' | 'END_TERM' | 'PRACTICAL' | 'OBJECTIVE' | 'STRUCTURED';
+
+export interface Exam {
+  id: string;
+  title: string;
+  description?: string;
+  type: ExamType;
+  classId: string;
+  subjectId: string;
+  termId: string;
+  schoolId: string;
+  templateId?: string;
+  duration: number;
+  totalScore: number;
+  passingScore: number;
+  instructions?: string;
+  shuffleQuestions: boolean;
+  showResults: boolean;
+  maxAttempts: number;
+  allowReview: boolean;
+  randomizeOrder: boolean;
+  scheduledAt?: string;
+  startsAt: string;
+  endsAt: string;
+  isPublished: boolean;
+  status: string;
+  createdById?: string;
+  createdAt: string;
+  updatedAt: string;
+  subject?: { id: string; name: string; code?: string };
+  class?: { id: string; name: string };
+  term?: { id: string; name: string };
+  questions?: ExamQuestion[];
+  sections?: ExamSection[];
+  _count?: { questions: number; attempts: number };
+}
+
+export interface ExamQuestion {
+  id: string;
+  examId: string;
+  sectionId?: string;
+  question: string;
+  questionType: QuestionType;
+  options?: string[];
+  correctAnswer?: string;
+  explanation?: string;
+  score: number;
+  difficulty: DifficultyLevel;
+  competencyId?: string;
+  topic?: string;
+  tags: string[];
+  partialScoring: boolean;
+  negativeMarking: number;
+  order: number;
+  attachmentUrl?: string;
+  metadata?: any;
+}
+
+export interface ExamSection {
+  id: string;
+  examId: string;
+  title: string;
+  instructions?: string;
+  order: number;
+  totalScore?: number;
+}
+
+export interface ExamAttempt {
+  id: string;
+  examId: string;
+  studentId: string;
+  score?: number;
+  totalScore?: number;
+  percentage?: number;
+  grade?: string;
+  negativeScore: number;
+  startedAt: string;
+  submittedAt?: string;
+  isSubmitted: boolean;
+  isGraded: boolean;
+  gradedAt?: string;
+  gradedById?: string;
+  timeSpent?: number;
+  answers: ExamAnswer[];
+  exam?: Exam;
+}
+
+export interface ExamAnswer {
+  id: string;
+  attemptId: string;
+  questionId: string;
+  sectionId?: string;
+  answer?: string;
+  answerJson?: any;
+  isCorrect?: boolean;
+  score?: number;
+  maxScore?: number;
+  feedback?: string;
+  gradedAt?: string;
+  gradedById?: string;
+  timeSpent?: number;
+  question?: ExamQuestion;
+}
+
+export interface AutoMarkResult {
+  attemptId: string;
+  examId: string;
+  studentId: string;
+  score: number;
+  totalScore: number;
+  percentage: number;
+  grade: string;
+  isGraded: boolean;
+  gradedAt: string;
+  questionResults: Array<{
+    questionId: string;
+    score: number;
+    maxScore: number;
+    isCorrect: boolean;
+    feedback: string;
+  }>;
+}
+
+export interface ExamStats {
+  examId: string;
+  totalAttempts: number;
+  averageScore: number;
+  highestScore: number;
+  lowestScore: number;
+  medianScore: number;
+  passRate: number;
+  standardDeviation: number;
+  averageTime: number;
+  itemAnalysis: Array<{
+    questionId: string;
+    difficulty: number;
+    discrimination: number;
+    flag: string;
+  }>;
+  gradeDistribution: Array<{ grade: string; count: number; percentage: number }>;
+}
+
+export interface UploadedExam {
+  id: string;
+  title?: string;
+  fileName: string;
+  fileUrl: string;
+  fileType: string;
+  fileSize: number;
+  status: string;
+  schoolId: string;
+  createdById: string;
+  createdAt: string;
 }

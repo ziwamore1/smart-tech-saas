@@ -1,0 +1,58 @@
+{
+  "name": "smarttech-blockchain",
+  "version": "1.0.0",
+  "description": "SMART_TECH Certificate Verification Smart Contracts",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:amoy": "hardhat run scripts/deploy.ts --network polygonAmoy",
+    "deploy:polygon": "hardhat run scripts/deploy.ts --network polygon",
+    "deploy:ethereum": "hardhat run scripts/deploy.ts --network ethereum",
+    "verify:amoy": "hardhat verify --network polygonAmoy",
+    "verify:polygon": "hardhat verify --network polygon",
+    "register": "hardhat run scripts/verify.ts --network polygonAmoy -- register",
+    "verify-cert": "hardhat run scripts/verify.ts --network polygonAmoy -- verify",
+    "revoke": "hardhat run scripts/verify.ts --network polygonAmoy -- revoke",
+    "total": "hardhat run scripts/verify.ts --network polygonAmoy -- total",
+    "clean": "hardhat clean",
+    "node": "hardhat node",
+    "coverage": "hardhat coverage"
+  },
+  "keywords": [
+    "smart-contracts",
+    "certificate-verification",
+    "blockchain",
+    "polygon",
+    "education"
+  ],
+  "author": "SmartTech SaaS",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-ignition": "^0.15.16",
+    "@nomicfoundation/hardhat-ignition-ethers": "^0.15.17",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@nomicfoundation/ignition-core": "^0.15.15",
+    "@typechain/ethers-v6": "^0.5.0",
+    "@typechain/hardhat": "^9.0.0",
+    "@types/chai": "^4.2.0",
+    "@types/mocha": ">=9.1.0",
+    "@types/node": ">=16.0.0",
+    "chai": "^4.2.0",
+    "ethers": "^6.4.0",
+    "hardhat": "^2.22.0",
+    "hardhat-gas-reporter": "^1.0.8",
+    "solidity-coverage": "^0.8.1",
+    "ts-node": ">=8.0.0",
+    "typechain": "^8.3.0",
+    "typescript": ">=4.5.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0",
+    "dotenv": "^16.3.0"
+  }
+}

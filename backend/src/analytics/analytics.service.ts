@@ -463,7 +463,7 @@ export class AnalyticsService {
       );
       for (const r of results) {
         const key = `${r.studentId}_${r.subjectId}`;
-        const prevScore = prevMap.get(key);
+        const prevScore = prevMap.get(key) as number | undefined;
         if (
           prevScore !== undefined &&
           prevScore - r.score >= prevScore * 0.25

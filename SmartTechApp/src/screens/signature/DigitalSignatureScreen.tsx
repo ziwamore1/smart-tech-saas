@@ -16,6 +16,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import Svg, { Path, G } from 'react-native-svg';
 import { apiService } from '../../services/api';
 import { DigitalSignature } from '../../types';
 import { colors, spacing, borderRadius, typography, shadows } from '../../theme';
@@ -75,52 +78,30 @@ function SignaturePad({ onCapture }: { onCapture: (data: string) => void }) {
     handleClear();
   };
 
-  const renderPoints = () => {
-    const elements: React.ReactNode[] = [];
-    const allPaths = [...paths];
-    if (currentPath.length > 0) {
-      allPaths.push(currentPath);
+  const pathToSvgPath = (points: { x: number; y: number }[]): string => {
+    if (points.length < 2) return '';
+    let d = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length; i++) {
+      d += ` L ${points[i].x} ${points[i].y}`;
     }
-
-    allPaths.forEach((path, pathIndex) => {
-      if (path.length < 2) return;
-      for (let i = 1; i < path.length; i++) {
-        const prev = path[i - 1];
-        const curr = path[i];
-        const dx = curr.x - prev.x;
-        const dy = curr.y - prev.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const angle = Math.atan2(dy, dx);
-        const segments = Math.max(1, Math.floor(distance / 3));
-        for (let s = 0; s <= segments; s++) {
-          const t = s / segments;
-          const x = prev.x + dx * t;
-          const y = prev.y + dy * t;
-          elements.push(
-            <View
-              key={`${pathIndex}-${i}-${s}`}
-              style={[
-                styles.dot,
-                { left: x - 3, top: y - 3 },
-              ]}
-            />
-          );
-        }
-      }
-    });
-
-    return elements;
+    return d;
   };
 
   return (
     <View style={styles.padContainer}>
-      <View
-        style={styles.pad}
-        {...panResponder.panHandlers}
-      >
-        {renderPoints()}
+      <View style={styles.pad} {...panResponder.panHandlers}>
+        <Svg width={PAD_WIDTH} height={PAD_HEIGHT}>
+          <G stroke="#000" strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round">
+            {paths.map((path, i) => (
+              <Path key={i} d={pathToSvgPath(path)} />
+            ))}
+            {currentPath.length > 0 && <Path d={pathToSvgPath(currentPath)} />}
+          </G>
+        </Svg>
         {paths.length === 0 && currentPath.length === 0 && (
-          <Text style={styles.padPlaceholder}>Draw your signature here</Text>
+          <View style={styles.padPlaceholderOverlay}>
+            <Text style={styles.padPlaceholder}>Draw your signature here</Text>
+          </View>
         )}
       </View>
       <View style={styles.padActions}>
@@ -261,6 +242,33 @@ export function DigitalSignatureScreen({ navigation }: any) {
     setSignDocModalVisible(true);
   };
 
+  const handleExportSignature = async (sig: DigitalSignature) => {
+    try {
+      const dir = FileSystem.documentDirectory + 'signatures/';
+      const dirInfo = await FileSystem.getInfoAsync(dir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+      }
+
+      const fileUri = dir + `${sig.name.replace(/\s+/g, '_')}.json`;
+      const content = JSON.stringify({
+        name: sig.name,
+        title: sig.title,
+        email: sig.email,
+        certificate: sig.certificate,
+        createdAt: new Date().toISOString(),
+      }, null, 2);
+
+      await FileSystem.writeAsStringAsync(fileUri, content);
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'application/json',
+        dialogTitle: `Share ${sig.name} Signature`,
+      });
+    } catch (e) {
+      Alert.alert('Error', 'Failed to export signature');
+    }
+  };
+
   const handleSignDocument = async () => {
     if (!documentHash.trim()) {
       Alert.alert('Input Required', 'Please enter a document hash');
@@ -343,6 +351,9 @@ export function DigitalSignatureScreen({ navigation }: any) {
               <View style={styles.sigActions}>
                 <TouchableOpacity style={styles.signDocBtn} onPress={() => handleSignDocumentPress(sig.id)}>
                   <Text style={styles.signDocBtnText}>Sign Document</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.exportSigBtn} onPress={() => handleExportSignature(sig)}>
+                  <Text style={styles.exportSigBtnText}>📤</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.deleteSigBtn} onPress={() => handleDeleteSignature(sig.id)}>
                   <Text style={styles.deleteSigBtnText}>Delete</Text>
@@ -483,6 +494,8 @@ const styles = StyleSheet.create({
   sigActions: { flexDirection: 'row', gap: spacing.sm },
   signDocBtn: { flex: 2, backgroundColor: colors.primary, paddingVertical: spacing.sm, borderRadius: borderRadius.md, alignItems: 'center' },
   signDocBtnText: { color: colors.white, fontWeight: '600', fontSize: 14 },
+  exportSigBtn: { backgroundColor: colors.secondary, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: borderRadius.md, alignItems: 'center', justifyContent: 'center' },
+  exportSigBtnText: { fontSize: 16 },
   deleteSigBtn: { flex: 1, backgroundColor: colors.error, paddingVertical: spacing.sm, borderRadius: borderRadius.md, alignItems: 'center' },
   deleteSigBtnText: { color: colors.white, fontWeight: '600', fontSize: 14 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
@@ -505,18 +518,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: borderRadius.md,
-    position: 'relative',
     overflow: 'hidden',
     alignSelf: 'center',
   },
-  dot: {
-    position: 'absolute',
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#000',
+  padPlaceholderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  padPlaceholder: { ...typography.bodySmall, color: colors.textLight, textAlign: 'center', lineHeight: PAD_HEIGHT },
+  padPlaceholder: { ...typography.bodySmall, color: colors.textLight, textAlign: 'center' },
   padActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   clearPadBtn: { flex: 1, paddingVertical: spacing.sm, borderRadius: borderRadius.md, alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
   clearPadBtnText: { ...typography.bodySmall, fontWeight: '600' },

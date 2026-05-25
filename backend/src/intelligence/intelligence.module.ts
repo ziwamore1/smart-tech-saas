@@ -37,6 +37,7 @@ import { AiTutorService } from './services/ai-tutor.service';
     DescriptiveStatsService,
     TrendAnalysisService,
     DiagnosticAnalysisService,
+    AiTutorService,
   ],
 })
 export class IntelligenceModule {}

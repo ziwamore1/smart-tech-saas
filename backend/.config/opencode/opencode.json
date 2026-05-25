@@ -1,0 +1,43 @@
+{
+    "provider": {
+      "glm": {
+        "npm": "@ai-sdk/openai-compatible",
+        "options": {
+          "baseURL": "https://open.bigmodel.cn/api/paas/v4/"
+        },
+        "models": {
+          "glm-5": {
+            "name": "glm-5"
+          }
+        }
+      }
+    },
+  
+    "model": "glm/glm-5",
+  
+    "theme": "opencode",
+  
+    "autoupdate": true,
+  
+    "shell": "powershell",
+  
+    "permissions": {
+        "edit": "allow",
+        "bash": {
+          "npm": "allow",
+          "git": "allow",
+          "python": "allow"
+        }
+    },
+  
+    "context": {
+      "files": [
+        "README.md",
+        "package.json",
+        "tsconfig.json",
+        ".env"
+      ]
+    },
+  
+    "telemetry": false
+  }

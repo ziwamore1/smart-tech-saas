@@ -88,6 +88,34 @@ model School {
   timetables             Timetable[]
   timetableConstraint    TimetableConstraint?
   users                  User[]
+  templateCategories     TemplateCategory[]
+  templateAssets         TemplateAsset[]
+  marketplaceEntries     TemplateMarketplace[]
+  brandPresets           BrandPreset[]
+  digitalSignatures      DigitalSignature[]
+  collaborationSessions  CollaborationSession[]
+  editorSnapshots        EditorSnapshot[]
+  aiTemplateSuggestions  AITemplateSuggestion[]
+  digitalStamps          DigitalStamp[]
+  stampVerifications     StampVerification[]
+  uploadedExams          UploadedExam[]
+  questionBankCategories QuestionBankCategory[]
+  questionBankQuestions  QuestionBank[]
+  examTemplates          ExamTemplate[]
+  documentStamps         DocumentStamp[]
+  approvalRequests       ApprovalRequest[]
+  approvalWorkflows      ApprovalWorkflow[]
+  documentSignatures     DocumentSignature[]
+  ministryVerifications  MinistryVerification[]
+  assessmentDefinitions  AssessmentDefinition[]
+  assessmentBatches      AssessmentBatch[]
+  gradingPolicies        GradingPolicy[]
+  classGradingPolicies   ClassGradingPolicy[]
+  computedResults        ComputedResult[]
+  termSummaries          TermSummary[]
+  assessmentAnalytics    AssessmentAnalytics[]
+  remarks                Remark[]
+  longitudinalRecords    LongitudinalRecord[]
 
   @@index([isActive])
   @@index([createdAt])
@@ -129,6 +157,14 @@ model Term {
   studentGrowthRecords StudentGrowthRecord[]
   academicYear         AcademicYear          @relation(fields: [academicYearId], references: [id])
   timetables           Timetable[]
+  uploadedExams        UploadedExam[]
+  assessmentConfigs    TermAssessmentConfiguration[]
+  assessmentResults    StudentAssessmentResult[]
+  assessmentBatches    AssessmentBatch[]
+  computedResults      ComputedResult[]
+  termSummaries        TermSummary[]
+  classGradingPolicies ClassGradingPolicy[]
+  longitudinalRecords  LongitudinalRecord[]
 
   @@index([academicYearId])
   @@index([isCurrent])
@@ -141,14 +177,21 @@ model User {
   email               String               @unique
   phone               String?
   password            String
+  photoUrl            String?
   isActive            Boolean              @default(true)
+  resetToken          String?
+  resetTokenExpiry    DateTime?
   createdAt           DateTime             @default(now())
+  updatedAt           DateTime?            @updatedAt
   schoolId            String?
   studentId           String?              @unique
   auditLogs           AuditLog[]
   communications      Communication[]
   deviceTokens        DeviceToken[]
   createdExams        Exam[]
+  createdTemplates    ExamTemplate[]
+  createdBankQuestions QuestionBank[]
+  uploadedExams       UploadedExam[]
   createdHomeworks    Homework[]
   lessonPlans         LessonPlan[]
   NoticeBoard         NoticeBoard[]
@@ -160,7 +203,14 @@ model User {
   teachingAssignments TeachingAssignment[]
   school              School?              @relation(fields: [schoolId], references: [id])
   student             Student?             @relation(fields: [studentId], references: [id])
+  studentPhotos       StudentPhoto[]
   userRoles           UserRole[]
+  aiTutorSessions     AiTutorSession[]
+  appliedStamps       DocumentStamp[]      @relation("DocumentStampAppliedBy")
+  requestedApprovals  ApprovalRequest[]    @relation("ApprovalRequestRequestedBy")
+  approvedRequests    ApprovalRequest[]    @relation("ApprovalRequestApprover")
+  createdWorkflows    ApprovalWorkflow[]   @relation("ApprovalWorkflowCreatedBy")
+  auditTrailLogs      ApprovalAuditLog[]   @relation("ApprovalAuditLogUser")
 
   @@index([schoolId])
   @@index([isActive])
@@ -211,6 +261,14 @@ model Class {
   resultPublications  ResultPublication[]
   teachingAssignments TeachingAssignment[]
   timetables          Timetable[]
+  uploadedExams       UploadedExam[]
+  assessmentConfigs   TermAssessmentConfiguration[]
+  assessmentResults   StudentAssessmentResult[]
+  assessmentBatches   AssessmentBatch[]
+  computedResults     ComputedResult[]
+  classGradingPolicies ClassGradingPolicy[]
+  termSummaries       TermSummary[]
+  longitudinalRecords LongitudinalRecord[]
 }
 
 model Subject {
@@ -235,6 +293,17 @@ model Subject {
   school               School                @relation(fields: [schoolId], references: [id])
   assignments          TeachingAssignment[]
   timetableSlots       TimetableSlot[]
+  uploadedExams        UploadedExam[]
+  questionBankCategories QuestionBankCategory[]
+  questionBankQuestions  QuestionBank[]
+  examTemplates          ExamTemplate[]
+  assessmentConfigs    TermAssessmentConfiguration[]
+  assessmentResults    StudentAssessmentResult[]
+  assessmentBatches    AssessmentBatch[]
+  computedResults      ComputedResult[]
+  classGradingPolicies ClassGradingPolicy[]
+  remarks              Remark[]
+  longitudinalRecords  LongitudinalRecord[]
 
   @@unique([name, schoolId])
 }
@@ -310,11 +379,31 @@ model Student {
   school               School                @relation(fields: [schoolId], references: [id])
   studentGrowthRecords StudentGrowthRecord[]
   studentInterventions StudentIntervention[]
+  studentPhotos        StudentPhoto[]
   user                 User?
+  assessmentResults    StudentAssessmentResult[]
+  computedResults      ComputedResult[]
+  termSummaries        TermSummary[]
+  longitudinalRecords  LongitudinalRecord[]
 
   @@unique([admissionNumber, schoolId])
   @@index([schoolId])
   @@index([gender])
+}
+
+model StudentPhoto {
+  id           String   @id @default(uuid())
+  studentId    String
+  imageUrl     String
+  thumbnailUrl String?
+  uploadedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+
+  @@index([studentId])
+  @@index([uploadedById])
 }
 
 model Enrollment {
@@ -440,6 +529,8 @@ model AssessmentType {
   school    School            @relation(fields: [schoolId], references: [id])
   subject   Subject           @relation(fields: [subjectId], references: [id])
   term      Term              @relation(fields: [termId], references: [id])
+
+  // Legacy: Use AssessmentDefinition and TermAssessmentConfiguration instead
 }
 
 model AssessmentScore {
@@ -1025,8 +1116,12 @@ model ReportTemplate {
   category          TemplateCategory?    @relation(fields: [categoryId], references: [id])
   parent            ReportTemplate?      @relation("TemplateVersions", fields: [parentId], references: [id])
   versions          ReportTemplate[]     @relation("TemplateVersions")
-  components        TemplateComponent[]
-  certificate       CertificateTemplate?
+  components            TemplateComponent[]
+  certificate           CertificateTemplate?
+  marketplaceEntry      TemplateMarketplace?
+  collaborationSessions CollaborationSession[]
+  editorSnapshots       EditorSnapshot[]
+  templateStamps        TemplateStamp[]
 
   @@unique([name, schoolId])
   @@index([schoolId])
@@ -1356,84 +1451,287 @@ model Notification {
   @@index([createdAt])
 }
 
+model NotificationLog {
+  id          String   @id @default(uuid())
+  recipient   String
+  channel     String
+  type        String
+  status      String
+  subject     String?
+  message     String?
+  error       String?
+  sentAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([recipient])
+  @@index([channel])
+  @@index([status])
+  @@index([createdAt])
+}
+
 model Exam {
-  id           String         @id @default(uuid())
-  title        String
-  description  String?
-  type         ExamType       @default(EXAM)
-  classId      String
-  subjectId    String
-  termId       String
-  schoolId     String
-  duration     Int
-  totalScore   Float
-  passingScore Float          @default(50)
-  scheduledAt  DateTime?
-  startsAt     DateTime
-  endsAt       DateTime
-  isPublished  Boolean        @default(false)
-  createdById  String?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  class        Class          @relation(fields: [classId], references: [id])
-  createdBy    User?          @relation(fields: [createdById], references: [id])
-  school       School         @relation(fields: [schoolId], references: [id])
-  subject      Subject        @relation(fields: [subjectId], references: [id])
-  term         Term           @relation(fields: [termId], references: [id])
-  attempts     ExamAttempt[]
-  questions    ExamQuestion[]
+  id              String         @id @default(uuid())
+  title           String
+  description     String?
+  type            ExamType       @default(EXAM)
+  classId         String
+  subjectId       String
+  termId          String
+  schoolId        String
+  templateId      String?
+  duration        Int
+  totalScore      Float
+  passingScore    Float          @default(50)
+  instructions    String?
+  shuffleQuestions Boolean       @default(false)
+  showResults     Boolean        @default(true)
+  maxAttempts     Int            @default(1)
+  allowReview     Boolean        @default(true)
+  randomizeOrder  Boolean        @default(false)
+  scheduledAt     DateTime?
+  startsAt        DateTime
+  endsAt          DateTime
+  isPublished     Boolean        @default(false)
+  status          String         @default("draft")
+  createdById     String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  class           Class          @relation(fields: [classId], references: [id])
+  createdBy       User?          @relation(fields: [createdById], references: [id])
+  school          School         @relation(fields: [schoolId], references: [id])
+  subject         Subject        @relation(fields: [subjectId], references: [id])
+  term            Term           @relation(fields: [termId], references: [id])
+  template        ExamTemplate?  @relation(fields: [templateId], references: [id])
+  attempts        ExamAttempt[]
+  questions       ExamQuestion[]
+  sections        ExamSection[]
 
   @@index([classId])
   @@index([subjectId])
   @@index([termId])
   @@index([schoolId])
   @@index([startsAt])
+  @@index([status])
 }
 
 model ExamQuestion {
-  id            String       @id @default(uuid())
-  examId        String
-  question      String
-  questionType  QuestionType @default(MULTIPLE_CHOICE)
-  options       Json?
-  correctAnswer String
-  explanation   String?
-  score         Float
-  order         Int
-  attachmentUrl String?
-  exam          Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  id              String       @id @default(uuid())
+  examId          String
+  sectionId       String?
+  question        String
+  questionType    QuestionType @default(MULTIPLE_CHOICE)
+  options         Json?
+  correctAnswer   String?
+  explanation     String?
+  score           Float
+  difficulty      DifficultyLevel @default(MEDIUM)
+  competencyId    String?
+  topic           String?
+  tags            String[]
+  partialScoring  Boolean      @default(false)
+  negativeMarking Float        @default(0)
+  order           Int
+  attachmentUrl   String?
+  metadata        Json?
+  exam            Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  section         ExamSection? @relation(fields: [sectionId], references: [id])
 
   @@index([examId])
+  @@index([sectionId])
+  @@index([difficulty])
 }
 
 model ExamAttempt {
-  id          String       @id @default(uuid())
-  examId      String
-  studentId   String
-  score       Float?
-  startedAt   DateTime     @default(now())
-  submittedAt DateTime?
-  isSubmitted Boolean      @default(false)
-  answers     ExamAnswer[]
-  exam        Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
-  student     Student      @relation(fields: [studentId], references: [id])
+  id            String       @id @default(uuid())
+  examId        String
+  studentId     String
+  score         Float?
+  totalScore    Float?
+  percentage    Float?
+  grade         String?
+  negativeScore Float       @default(0)
+  startedAt     DateTime     @default(now())
+  submittedAt   DateTime?
+  isSubmitted   Boolean      @default(false)
+  isGraded      Boolean      @default(false)
+  gradedAt      DateTime?
+  gradedById    String?
+  timeSpent     Int?
+  ipAddress     String?
+  userAgent     String?
+  answers       ExamAnswer[]
+  exam          Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student       Student      @relation(fields: [studentId], references: [id])
 
   @@unique([examId, studentId])
   @@index([examId])
   @@index([studentId])
+  @@index([isSubmitted])
 }
 
 model ExamAnswer {
   id         String      @id @default(uuid())
   attemptId  String
   questionId String
-  answer     String
+  sectionId  String?
+  answer     String?
+  answerJson Json?
   isCorrect  Boolean?
   score      Float?
+  maxScore   Float?
+  feedback   String?
+  gradedAt   DateTime?
+  gradedById String?
+  timeSpent  Int?
   attempt    ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
 
   @@index([attemptId])
   @@index([questionId])
+  @@index([sectionId])
+}
+
+model ExamSection {
+  id          String         @id @default(uuid())
+  examId      String
+  title       String
+  description String?
+  instructions String?
+  type        ExamSectionType @default(OBJECTIVE)
+  totalMarks  Float          @default(0)
+  order       Int
+  shuffleQuestions Boolean    @default(false)
+  questions   ExamQuestion[]
+  exam        Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@index([examId])
+}
+
+model UploadedExam {
+  id              String   @id @default(uuid())
+  title           String
+  subjectId       String
+  classId         String
+  termId          String
+  schoolId        String
+  fileUrl         String
+  fileName        String
+  fileType        String
+  fileSize        Int
+  answerScriptUrl String?
+  markingSchemeUrl String?
+  previewHtml     String?
+  parsedContent   Json?
+  metadata        Json?
+  duration        Int?
+  totalMarks      Float?
+  status          UploadedExamStatus @default(PENDING)
+  createdById     String?
+  createdBy       User?    @relation(fields: [createdById], references: [id])
+  school          School   @relation(fields: [schoolId], references: [id])
+  subject         Subject  @relation(fields: [subjectId], references: [id])
+  class           Class    @relation(fields: [classId], references: [id])
+  term            Term     @relation(fields: [termId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([subjectId])
+  @@index([classId])
+}
+
+model QuestionBankCategory {
+  id          String       @id @default(uuid())
+  name        String
+  description String?
+  subjectId   String
+  schoolId    String
+  parentId    String?
+  parent      QuestionBankCategory? @relation("CategoryTree", fields: [parentId], references: [id])
+  children    QuestionBankCategory[] @relation("CategoryTree")
+  questions   QuestionBank[]
+  createdAt   DateTime    @default(now())
+  school      School      @relation(fields: [schoolId], references: [id])
+  subject     Subject     @relation(fields: [subjectId], references: [id])
+
+  @@unique([name, subjectId, schoolId])
+  @@index([subjectId])
+  @@index([schoolId])
+}
+
+model QuestionBank {
+  id            String   @id @default(uuid())
+  question      String
+  questionType  QuestionType @default(MULTIPLE_CHOICE)
+  options       Json?
+  correctAnswer String?
+  explanation   String?
+  score         Float    @default(1)
+  difficulty    DifficultyLevel @default(MEDIUM)
+  subjectId     String
+  classId       String?
+  schoolId      String
+  categoryId    String?
+  competencyId  String?
+  topic         String?
+  tags          String[]
+  isPublic      Boolean  @default(false)
+  usageCount    Int      @default(0)
+  createdById   String?
+  createdBy     User?    @relation(fields: [createdById], references: [id])
+  category      QuestionBankCategory? @relation(fields: [categoryId], references: [id])
+  school        School   @relation(fields: [schoolId], references: [id])
+  subject       Subject  @relation(fields: [subjectId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([subjectId])
+  @@index([schoolId])
+  @@index([categoryId])
+  @@index([difficulty])
+  @@index([questionType])
+}
+
+model ExamTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  subjectId   String
+  schoolId    String
+  type        ExamType @default(EXAM)
+  duration    Int      @default(60)
+  totalMarks  Float    @default(100)
+  instructions String?
+  headerHtml  String?
+  footerHtml  String?
+  branding    Json?
+  sections    ExamTemplateSection[]
+  exams       Exam[]
+  isDefault   Boolean  @default(false)
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  school      School   @relation(fields: [schoolId], references: [id])
+  subject     Subject  @relation(fields: [subjectId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([subjectId])
+  @@index([isDefault])
+}
+
+model ExamTemplateSection {
+  id           String   @id @default(uuid())
+  templateId   String
+  title        String
+  description  String?
+  instructions String?
+  type         ExamSectionType @default(OBJECTIVE)
+  totalMarks   Float    @default(0)
+  order        Int
+  questionCount Int?
+  template     ExamTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
 }
 
 model MessageLog {
@@ -1682,7 +1980,8 @@ model NationalBenchmark {
 
 model AiTutorSession {
   id        String           @id @default(uuid())
-  studentId String
+  studentId String?
+  userId    String?
   subjectId String?
   topic     String?
   status    String           @default("active")
@@ -1692,9 +1991,11 @@ model AiTutorSession {
   feedback  AiTutorFeedback?
   messages  AiTutorMessage[]
   school    School           @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  student   Student          @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student   Student?         @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user      User?            @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@index([studentId])
+  @@index([userId])
   @@index([schoolId])
 }
 
@@ -1891,6 +2192,20 @@ enum ExamType {
   EXAM
   QUIZ
   TEST
+  MID_TERM
+  END_TERM
+  PRACTICAL
+  OBJECTIVE
+  STRUCTURED
+}
+
+enum ExamSectionType {
+  OBJECTIVE
+  STRUCTURED
+  ESSAY
+  PRACTICAL
+  MATCHING
+  FILL_BLANKS
 }
 
 enum QuestionType {
@@ -1900,6 +2215,29 @@ enum QuestionType {
   ESSAY
   WORD_DOCUMENT
   FILE_UPLOAD
+  MATCHING
+  FILL_IN_BLANK
+  DRAG_DROP
+  IMAGE_BASED
+  PRACTICAL
+  STRUCTURED
+  COMPREHENSION
+  ORDERING
+}
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+  ADVANCED
+}
+
+enum UploadedExamStatus {
+  PENDING
+  PARSING
+  PARSED
+  READY
+  FAILED
 }
 
 enum MessageChannel {
@@ -2021,4 +2359,752 @@ model AITemplateSuggestion {
   school      School   @relation(fields: [schoolId], references: [id])
 
   @@index([schoolId])
+}
+
+enum StampType {
+  OFFICIAL_SCHOOL
+  PRINCIPAL
+  EXAMINATION
+  REGISTRAR
+  PAID
+  APPROVED
+  VERIFIED
+  CONFIDENTIAL
+  MINISTRY
+  DEPARTMENT
+  REGISTRATION_BOARD
+  CUSTOM
+}
+
+enum StampShape {
+  CIRCULAR
+  RECTANGULAR
+  SQUARE
+  OVAL
+}
+
+model DigitalStamp {
+  id          String     @id @default(uuid())
+  schoolId    String
+  name        String
+  type        StampType  @default(CUSTOM)
+  shape       StampShape @default(CIRCULAR)
+  imageUrl    String?
+  svgContent  String?
+  opacity     Float      @default(1.0)
+  width       Int        @default(150)
+  height      Int        @default(150)
+  isActive    Boolean    @default(true)
+  isDefault   Boolean    @default(false)
+  metadata    Json?      @default("{}")
+  createdBy   String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  school      School     @relation(fields: [schoolId], references: [id])
+  templateStamps    TemplateStamp[]
+  stampVerifications StampVerification[]
+  documentStamps    DocumentStamp[]
+
+  @@index([schoolId])
+  @@index([type])
+}
+
+model TemplateStamp {
+  id          String   @id @default(uuid())
+  templateId  String
+  stampId     String
+  positionX   Float    @default(0)
+  positionY   Float    @default(0)
+  width       Float    @default(150)
+  height      Float    @default(150)
+  rotation    Float    @default(0)
+  opacity     Float    @default(1.0)
+  layerOrder  Int      @default(0)
+  locked      Boolean  @default(false)
+  visible     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  template    ReportTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  stamp       DigitalStamp  @relation(fields: [stampId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@index([stampId])
+}
+
+model StampVerification {
+  id              String   @id @default(uuid())
+  documentId      String
+  documentType    String
+  schoolId        String
+  stampId         String?
+  verificationHash String  @unique
+  verificationUrl String?
+  qrCodeDataUrl   String?
+  metadata        Json?    @default("{}")
+  verifiedAt      DateTime?
+  verifiedBy      String?
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+  school          School   @relation(fields: [schoolId], references: [id])
+  stamp           DigitalStamp? @relation(fields: [stampId], references: [id])
+
+  @@index([documentId])
+  @@index([verificationHash])
+  @@index([schoolId])
+}
+
+model DocumentStamp {
+  id               String   @id @default(uuid())
+  documentId       String
+  documentType     String
+  stampId          String
+  appliedById      String
+  schoolId         String
+  verificationHash String   @unique
+  status           String   @default("approved")
+  appliedAt        DateTime @default(now())
+  stamp            DigitalStamp @relation(fields: [stampId], references: [id])
+  appliedBy        User     @relation("DocumentStampAppliedBy", fields: [appliedById], references: [id])
+  school           School   @relation(fields: [schoolId], references: [id])
+
+  @@index([documentId])
+  @@index([stampId])
+  @@index([schoolId])
+  @@index([verificationHash])
+}
+
+model ApprovalRequest {
+  id              String   @id @default(uuid())
+  documentId      String
+  documentName    String
+  documentType    String
+  requestedById   String
+  approverId      String?
+  schoolId        String
+  status          String   @default("pending")
+  note            String?
+  requestedAt     DateTime @default(now())
+  approvedAt      DateTime?
+  requestedBy     User     @relation("ApprovalRequestRequestedBy", fields: [requestedById], references: [id])
+  approver        User?    @relation("ApprovalRequestApprover", fields: [approverId], references: [id])
+  school          School   @relation(fields: [schoolId], references: [id])
+
+  @@index([documentId])
+  @@index([schoolId])
+  @@index([status])
+}
+
+model ApprovalWorkflow {
+  id           String   @id @default(uuid())
+  documentId   String
+  documentName String
+  documentType String
+  createdById  String
+  schoolId     String
+  status       String   @default("pending")
+  currentStep  Int      @default(0)
+  finalStatus  String   @default("pending")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  completedAt  DateTime?
+  createdBy    User     @relation("ApprovalWorkflowCreatedBy", fields: [createdById], references: [id])
+  school       School   @relation(fields: [schoolId], references: [id])
+  steps        ApprovalStep[]
+
+  @@index([documentId])
+  @@index([schoolId])
+  @@index([status])
+}
+
+model ApprovalStep {
+  id          String   @id @default(uuid())
+  workflowId  String
+  role        String
+  userId      String?
+  userName    String?
+  status      String   @default("pending")
+  order       Int
+  action      String?
+  note        String?
+  comments    String?
+  signedAt    DateTime?
+  completedAt DateTime?
+  signature   String?
+  workflow    ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  approvalComments ApprovalComment[]
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([userId])
+}
+
+model ApprovalAuditLog {
+  id         String   @id @default(uuid())
+  documentId String
+  action     String
+  userId     String?
+  stampId    String?
+  note       String?
+  schoolId   String
+  createdAt  DateTime @default(now())
+  user       User?    @relation("ApprovalAuditLogUser", fields: [userId], references: [id])
+
+  @@index([documentId])
+  @@index([schoolId])
+  @@index([action])
+}
+
+// ==========================================
+// DOCUMENT VERIFICATION & SECURITY MODELS
+// ==========================================
+
+model DocumentSignature {
+  id                    String   @id @default(uuid())
+  documentId            String
+  documentType          String
+  documentHash          String   @unique
+  signerId              String
+  signerRole            String
+  signatureCertificate  String?
+  signedAt              DateTime @default(now())
+  verificationToken     String   @unique
+  blockchainHash        String?
+  verificationUrl       String?
+  schoolId              String
+  metadata              Json?    @default("{}")
+  isValid               Boolean  @default(true)
+  revokedAt             DateTime?
+  revokedBy             String?
+  school                School   @relation(fields: [schoolId], references: [id])
+  blockchainCertificate BlockchainCertificate?
+
+  @@index([documentId])
+  @@index([schoolId])
+  @@index([verificationToken])
+  @@index([documentHash])
+}
+
+model BlockchainCertificate {
+  id                 String   @id @default(uuid())
+  documentId         String
+  documentSignatureId String? @unique
+  certificateHash    String   @unique
+  blockchainNetwork  String
+  transactionHash    String   @unique
+  smartContract      String?
+  verificationUrl    String?
+  qrCodeData         String?
+  createdAt          DateTime @default(now())
+  metadata           Json?    @default("{}")
+  documentSignature  DocumentSignature? @relation(fields: [documentSignatureId], references: [id])
+
+  @@index([documentId])
+  @@index([certificateHash])
+  @@index([blockchainNetwork])
+}
+
+model MinistryVerification {
+  id                  String   @id @default(uuid())
+  documentId          String
+  documentType        String
+  schoolId            String
+  ministryApiEndpoint String?
+  ministryReference   String?  @unique
+  verificationStatus  String   @default("pending")
+  verificationData    Json?    @default("{}")
+  verifiedAt          DateTime?
+  expiresAt           DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  school              School   @relation(fields: [schoolId], references: [id])
+
+  @@index([documentId])
+  @@index([schoolId])
+  @@index([ministryReference])
+  @@index([verificationStatus])
+}
+
+model ApprovalComment {
+  id         String   @id @default(uuid())
+  stepId     String
+  userId     String
+  comment    String
+  createdAt  DateTime @default(now())
+  step       ApprovalStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@index([stepId])
+  @@index([userId])
+}
+
+enum BlockchainNetwork {
+  POLYGON
+  ETHEREUM
+  HYPERLEDGER
+  BINANCE_SMART_CHAIN
+  CUSTOM
+}
+
+// ==========================================
+// EDUCATIONAL RESULTS MANAGEMENT & CONTINUOUS ASSESSMENT ENGINE
+// ==========================================
+
+model AssessmentDefinition {
+  id                    String                  @id @default(uuid())
+  schoolId              String
+  name                  String
+  code                  String
+  category              String                  @default("continuous")
+  description           String?
+  defaultMaxScore       Float                   @default(100)
+  defaultWeight         Float                   @default(0)
+  contributesToFinal    Boolean                 @default(true)
+  termBased             Boolean                 @default(true)
+  active                Boolean                 @default(true)
+  isSystemDefault       Boolean                 @default(false)
+  sortOrder             Int                     @default(0)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  school                School                  @relation(fields: [schoolId], references: [id])
+  configurations        TermAssessmentConfiguration[]
+  results               StudentAssessmentResult[]
+  assessmentBatches     AssessmentBatch[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId])
+  @@index([category])
+  @@index([active])
+}
+
+model TermAssessmentConfiguration {
+  id                    String                  @id @default(uuid())
+  classId               String
+  subjectId             String
+  termId                String
+  assessmentDefId       String
+  maxScore              Float
+  weightPercentage      Float
+  mandatory             Boolean                 @default(false)
+  sequenceOrder         Int                     @default(0)
+  allowHalfMarks        Boolean                 @default(true)
+  allowNegative         Boolean                 @default(false)
+  decimalPlaces         Int                     @default(0)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  assessmentDef         AssessmentDefinition    @relation(fields: [assessmentDefId], references: [id])
+  class                 Class                   @relation(fields: [classId], references: [id])
+  subject               Subject                 @relation(fields: [subjectId], references: [id])
+  term                  Term                    @relation(fields: [termId], references: [id])
+
+  @@unique([classId, subjectId, termId, assessmentDefId])
+  @@index([classId])
+  @@index([subjectId])
+  @@index([termId])
+  @@index([assessmentDefId])
+}
+
+model StudentAssessmentResult {
+  id                    String                  @id @default(uuid())
+  studentId             String
+  subjectId             String
+  termId                String
+  classId               String
+  assessmentDefId       String
+  batchId               String?
+  rawScore              Float?
+  maxScore              Float
+  weightedScore         Float?
+  percentage            Float?
+  grade                 String?
+  remarks               String?
+  enteredBy             String
+  enteredAt             DateTime                @default(now())
+  verifiedBy            String?
+  verifiedAt            DateTime?
+  status                AssessmentResultStatus  @default(DRAFT)
+  syncStatus            SyncStatus              @default(SYNCED)
+  metadata              Json?                   @default("{}")
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  assessmentDef         AssessmentDefinition    @relation(fields: [assessmentDefId], references: [id])
+  batch                 AssessmentBatch?        @relation(fields: [batchId], references: [id])
+  class                 Class                   @relation(fields: [classId], references: [id])
+  student               Student                 @relation(fields: [studentId], references: [id])
+  subject               Subject                 @relation(fields: [subjectId], references: [id])
+  term                  Term                    @relation(fields: [termId], references: [id])
+
+  @@unique([studentId, subjectId, termId, assessmentDefId])
+  @@index([studentId])
+  @@index([subjectId])
+  @@index([termId])
+  @@index([classId])
+  @@index([assessmentDefId])
+  @@index([batchId])
+  @@index([status])
+  @@index([syncStatus])
+}
+
+model AssessmentBatch {
+  id                    String                  @id @default(uuid())
+  schoolId              String
+  classId               String
+  subjectId             String
+  termId                String
+  assessmentDefId       String
+  title                 String
+  description           String?
+  maxScore              Float
+  totalStudents         Int                     @default(0)
+  enteredCount          Int                     @default(0)
+  verifiedCount         Int                     @default(0)
+  status                BatchStatus             @default(IN_PROGRESS)
+  createdBy             String
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  completedAt           DateTime?
+  assessmentDef         AssessmentDefinition    @relation(fields: [assessmentDefId], references: [id])
+  class                 Class                   @relation(fields: [classId], references: [id])
+  results               StudentAssessmentResult[]
+  school                School                  @relation(fields: [schoolId], references: [id])
+  subject               Subject                 @relation(fields: [subjectId], references: [id])
+  term                  Term                    @relation(fields: [termId], references: [id])
+
+  @@index([schoolId])
+  @@index([classId])
+  @@index([subjectId])
+  @@index([termId])
+  @@index([assessmentDefId])
+  @@index([status])
+}
+
+model GradingPolicy {
+  id                    String                  @id @default(uuid())
+  schoolId              String
+  name                  String
+  code                  String                  @unique
+  description           String?
+  type                  GradingPolicyType       @default(PERCENTAGE)
+  isDefault             Boolean                 @default(false)
+  active                Boolean                 @default(true)
+  config                Json                    @default("{}")
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  school                School                  @relation(fields: [schoolId], references: [id])
+  scales                GradingScale[]
+  classPolicies         ClassGradingPolicy[]
+
+  @@index([schoolId])
+  @@index([type])
+  @@index([active])
+}
+
+model GradingScale {
+  id                    String                  @id @default(uuid())
+  policyId              String
+  minScore              Float
+  maxScore              Float
+  grade                 String
+  remark                String
+  points                Float?
+  gpa                   Float?
+  color                 String?
+  sortOrder             Int                     @default(0)
+  createdAt             DateTime                @default(now())
+  policy                GradingPolicy           @relation(fields: [policyId], references: [id])
+
+  @@index([policyId])
+  @@index([grade])
+}
+
+model ClassGradingPolicy {
+  id                    String                  @id @default(uuid())
+  classId               String
+  subjectId             String?
+  termId                String?
+  policyId              String
+  schoolId              String
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  class                 Class                   @relation(fields: [classId], references: [id])
+  policy                GradingPolicy           @relation(fields: [policyId], references: [id])
+  school                School                  @relation(fields: [schoolId], references: [id])
+  subject               Subject?                @relation(fields: [subjectId], references: [id])
+  term                  Term?                   @relation(fields: [termId], references: [id])
+
+  @@unique([classId, subjectId, termId, policyId])
+  @@index([classId])
+  @@index([policyId])
+  @@index([schoolId])
+}
+
+model ComputedResult {
+  id                    String                  @id @default(uuid())
+  studentId             String
+  subjectId             String
+  termId                String
+  classId               String
+  schoolId              String
+  totalRawScore         Float?
+  totalWeightedScore    Float?
+  finalPercentage       Float?
+  finalGrade            String?
+  finalRemark           String?
+  classRank             Int?
+  subjectRank           Int?
+  gpa                   Float?
+  points                Float?
+  status                ComputedResultStatus    @default(PENDING)
+  computedAt            DateTime?
+  verifiedBy            String?
+  verifiedAt            DateTime?
+  metadata              Json?                   @default("{}")
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  class                 Class                   @relation(fields: [classId], references: [id])
+  school                School                  @relation(fields: [schoolId], references: [id])
+  student               Student                 @relation(fields: [studentId], references: [id])
+  subject               Subject                 @relation(fields: [subjectId], references: [id])
+  term                  Term                    @relation(fields: [termId], references: [id])
+
+  @@unique([studentId, subjectId, termId])
+  @@index([studentId])
+  @@index([subjectId])
+  @@index([termId])
+  @@index([classId])
+  @@index([schoolId])
+  @@index([status])
+}
+
+model TermSummary {
+  id                    String                  @id @default(uuid())
+  studentId             String
+  termId                String
+  classId               String
+  schoolId              String
+  totalSubjects         Int                     @default(0)
+  subjectsPassed        Int                     @default(0)
+  subjectsFailed        Int                     @default(0)
+  overallPercentage     Float?
+  overallGrade          String?
+  overallRemark         String?
+  gpa                   Float?
+  totalPoints           Float?
+  classRank             Int?
+  classSize             Int                     @default(0)
+  percentile            Float?
+  attendanceRate        Float?
+  competencyScores      Json?                   @default("{}")
+  strengths             String[]
+  weaknesses            String[]
+  teacherRemarks        String?
+  aiInsights            Json?                   @default("{}")
+  status                TermSummaryStatus       @default(PENDING)
+  computedAt            DateTime?
+  approvedBy            String?
+  approvedAt            DateTime?
+  publishedAt           DateTime?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  class                 Class                   @relation(fields: [classId], references: [id])
+  school                School                  @relation(fields: [schoolId], references: [id])
+  student               Student                 @relation(fields: [studentId], references: [id])
+  term                  Term                    @relation(fields: [termId], references: [id])
+
+  @@unique([studentId, termId])
+  @@index([studentId])
+  @@index([termId])
+  @@index([classId])
+  @@index([schoolId])
+  @@index([status])
+}
+
+model SyncQueue {
+  id                    String                  @id @default(uuid())
+  userId                String
+  schoolId              String
+  operationType         SyncOperationType
+  entityType            SyncEntityType
+  entityId              String?
+  payload               Json
+  priority              Int                     @default(0)
+  status                SyncQueueStatus         @default(PENDING)
+  retryCount            Int                     @default(0)
+  maxRetries            Int                     @default(3)
+  errorMessage          String?
+  processedAt           DateTime?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  @@index([userId])
+  @@index([schoolId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([operationType])
+}
+
+model AssessmentAnalytics {
+  id                    String                  @id @default(uuid())
+  schoolId              String
+  classId               String?
+  subjectId             String?
+  termId                String?
+  assessmentDefId       String?
+  metricType            AnalyticsMetricType
+  metricName            String
+  metricValue           Float
+  metadata              Json?                   @default("{}")
+  computedAt            DateTime                @default(now())
+  school                School                  @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
+  @@index([classId])
+  @@index([subjectId])
+  @@index([termId])
+  @@index([metricType])
+  @@index([computedAt])
+}
+
+model Remark {
+  id                    String                  @id @default(uuid())
+  schoolId              String
+  type                  RemarkType
+  text                  String
+  gradeRange            String?
+  subjectId             String?
+  isActive              Boolean                 @default(true)
+  sortOrder             Int                     @default(0)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  school                School                  @relation(fields: [schoolId], references: [id])
+  subject               Subject?                @relation(fields: [subjectId], references: [id])
+
+  @@index([schoolId])
+  @@index([type])
+  @@index([isActive])
+}
+
+model LongitudinalRecord {
+  id                    String                  @id @default(uuid())
+  studentId             String
+  schoolId              String
+  academicYearId        String
+  termId                String
+  classId               String
+  subjectId             String
+  percentage            Float?
+  grade                 String?
+  gpa                   Float?
+  rank                  Int?
+  attendanceRate        Float?
+  competencyData        Json?                   @default("{}")
+  trendData             Json?                   @default("{}")
+  createdAt             DateTime                @default(now())
+  school                School                  @relation(fields: [schoolId], references: [id])
+  student               Student                 @relation(fields: [studentId], references: [id])
+  term                  Term                    @relation(fields: [termId], references: [id])
+  class                 Class                   @relation(fields: [classId], references: [id])
+  subject               Subject                 @relation(fields: [subjectId], references: [id])
+
+  @@unique([studentId, academicYearId, termId, subjectId])
+  @@index([studentId])
+  @@index([schoolId])
+  @@index([academicYearId])
+  @@index([subjectId])
+}
+
+enum AssessmentResultStatus {
+  DRAFT
+  SUBMITTED
+  VERIFIED
+  APPROVED
+  PUBLISHED
+  LOCKED
+}
+
+enum BatchStatus {
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+  LOCKED
+}
+
+enum GradingPolicyType {
+  PERCENTAGE
+  POINTS
+  GPA
+  COMPETENCY
+  STANDARDS_BASED
+  PASS_FAIL
+  ECZ_ZAMBIA
+  CUSTOM
+}
+
+enum ComputedResultStatus {
+  PENDING
+  COMPUTING
+  COMPUTED
+  VERIFIED
+  LOCKED
+}
+
+enum TermSummaryStatus {
+  PENDING
+  COMPUTING
+  COMPUTED
+  APPROVED
+  PUBLISHED
+  LOCKED
+}
+
+enum SyncOperationType {
+  CREATE
+  UPDATE
+  DELETE
+  BATCH_CREATE
+  BATCH_UPDATE
+}
+
+enum SyncEntityType {
+  ASSESSMENT_RESULT
+  REMARK
+  COMPUTED_RESULT
+  TERM_SUMMARY
+}
+
+enum SyncQueueStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  RETRYING
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  CONFLICT
+  FAILED
+}
+
+enum AnalyticsMetricType {
+  CLASS_AVERAGE
+  SUBJECT_AVERAGE
+  PASS_RATE
+  DISTINCTION_RATE
+  TOP_PERFORMER
+  BOTTOM_PERFORMER
+  TREND_UP
+  TREND_DOWN
+  AT_RISK_COUNT
+  IMPROVEMENT_RATE
+  COMPLETION_RATE
+  TEACHER_PERFORMANCE
+}
+
+enum RemarkType {
+  SUBJECT_REMARK
+  CLASS_TEACHER_REMARK
+  HEAD_TEACHER_REMARK
+  GENERAL_REMARK
+  PARENT_RESPONSE
+  AI_GENERATED
 }

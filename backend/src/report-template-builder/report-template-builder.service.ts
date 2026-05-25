@@ -6,9 +6,9 @@ import type { ReportTemplateType, TemplateStatus, ComponentType } from '@prisma/
 export class ReportTemplateBuilderService {
   constructor(private prisma: PrismaService) {}
 
-  async getCategories(schoolId: string) {
+  async getCategories(schoolId?: string) {
     return this.prisma.templateCategory.findMany({
-      where: { schoolId },
+      where: { ...(schoolId ? { schoolId } : {}) },
       orderBy: { sortOrder: 'asc' },
     });
   }
@@ -25,8 +25,8 @@ export class ReportTemplateBuilderService {
     return this.prisma.templateCategory.delete({ where: { id } });
   }
 
-  async getTemplates(schoolId: string, filters?: { type?: string; status?: string; categoryId?: string }) {
-    const where: any = { schoolId };
+  async getTemplates(schoolId?: string, filters?: { type?: string; status?: string; categoryId?: string }) {
+    const where: any = { ...(schoolId ? { schoolId } : {}) };
     if (filters?.type) where.templateType = filters.type;
     if (filters?.status) where.status = filters.status;
     if (filters?.categoryId) where.categoryId = filters.categoryId;
@@ -40,9 +40,9 @@ export class ReportTemplateBuilderService {
     });
   }
 
-  async getTemplate(schoolId: string, id: string) {
+  async getTemplate(id: string, schoolId?: string) {
     const t = await this.prisma.reportTemplate.findFirst({
-      where: { id, schoolId },
+      where: { id, ...(schoolId ? { schoolId } : {}) },
       include: {
         category: true,
         components: { orderBy: { sortOrder: 'asc' }, include: { children: { orderBy: { sortOrder: 'asc' } } } },
@@ -282,8 +282,8 @@ export class ReportTemplateBuilderService {
     return { success: true };
   }
 
-  async getAssets(schoolId: string, type?: string) {
-    const where: any = { schoolId };
+  async getAssets(schoolId?: string, type?: string) {
+    const where: any = { ...(schoolId ? { schoolId } : {}) };
     if (type) where.type = type;
     return this.prisma.templateAsset.findMany({
       where,
@@ -301,6 +301,20 @@ export class ReportTemplateBuilderService {
     const a = await this.prisma.templateAsset.findFirst({ where: { id, schoolId } });
     if (!a) throw new NotFoundException('Asset not found');
     return this.prisma.templateAsset.delete({ where: { id } });
+  }
+
+  async getStats() {
+    const [totalTemplates, totalMarketplace, totalAssets, totalSignatures, totalStamps, totalBrandPresets, totalCertificates, totalAISuggestions] = await Promise.all([
+      this.prisma.reportTemplate.count(),
+      this.prisma.templateMarketplace.count(),
+      this.prisma.templateAsset.count(),
+      this.prisma.digitalSignature.count(),
+      this.prisma.digitalStamp.count(),
+      this.prisma.brandPreset.count(),
+      this.prisma.certificateTemplate.count(),
+      this.prisma.aITemplateSuggestion.count(),
+    ]);
+    return { totalTemplates, totalMarketplace, totalAssets, totalSignatures, totalStamps, totalBrandPresets, totalCertificates, totalAISuggestions };
   }
 
   async getAvailableComponents() {

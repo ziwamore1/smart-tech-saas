@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,83 +12,138 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { io, Socket } from 'socket.io-client';
+import Constants from 'expo-constants';
 import { colors, spacing, borderRadius, typography, shadows } from '../../theme';
 
-const MOCK_SESSIONS = [
-  {
-    id: '1',
-    templateName: 'Term 1 Report Card',
-    editors: [
-      { id: 'a', name: 'Alice', color: '#3B82F6' },
-      { id: 'b', name: 'Bob', color: '#10B981' },
-      { id: 'c', name: 'Carol', color: '#F59E0B' },
-    ],
-    lastActivity: '2 min ago',
-    status: 'active' as const,
-  },
-  {
-    id: '2',
-    templateName: 'Certificate of Achievement',
-    editors: [
-      { id: 'd', name: 'Dave', color: '#EF4444' },
-    ],
-    lastActivity: '15 min ago',
-    status: 'idle' as const,
-  },
-  {
-    id: '3',
-    templateName: 'Progress Report Template',
-    editors: [
-      { id: 'a', name: 'Alice', color: '#3B82F6' },
-      { id: 'e', name: 'Eve', color: '#8B5CF6' },
-    ],
-    lastActivity: '1 hour ago',
-    status: 'active' as const,
-  },
-];
+const extra = Constants.expoConfig?.extra || {};
+const API_BASE_URL = extra.apiBaseUrl || 'http://192.168.43.134:3001/api/v1';
+const SOCKET_URL = API_BASE_URL.replace('/api/v1', '');
 
-const MOCK_ACTIVITY_FEED = [
-  { id: '1', user: 'Alice', action: 'added a header component', time: '2 min ago' },
-  { id: '2', user: 'Bob', action: 'changed primary color to blue', time: '5 min ago' },
-  { id: '3', user: 'Carol', action: 'added student name field', time: '8 min ago' },
-  { id: '4', user: 'Alice', action: 'adjusted margins to 20px', time: '12 min ago' },
-  { id: '5', user: 'Dave', action: 'uploaded new logo', time: '20 min ago' },
-];
+interface Editor {
+  id: string;
+  name: string;
+  color: string;
+}
+
+interface Session {
+  id: string;
+  templateName: string;
+  editors: Editor[];
+  lastActivity: string;
+  status: 'active' | 'idle';
+}
+
+interface ActivityItem {
+  id: string;
+  user: string;
+  action: string;
+  time: string;
+}
+
+interface ChatMessage {
+  id: string;
+  user: string;
+  text: string;
+  time: string;
+}
 
 export function CollaborationScreen({ navigation }: any) {
+  const socketRef = useRef<Socket | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
   const [chatVisible, setChatVisible] = useState(false);
-  const [chatMessages, setChatMessages] = useState<
-    { id: string; user: string; text: string; time: string }[]
-  >([
-    { id: '1', user: 'Alice', text: 'I think we should use the new branding', time: '2 min ago' },
-    { id: '2', user: 'Bob', text: 'Agreed, let me update the colors', time: '1 min ago' },
-  ]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const chatInputRef = useRef<TextInput>(null);
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const socket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      autoConnect: true,
+    });
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      setConnected(true);
+      socket.emit('join-collaboration', { room: 'global' });
+    });
+
+    socket.on('disconnect', () => setConnected(false));
+
+    socket.on('session-update', (data: Session[]) => {
+      setSessions(data);
+    });
+
+    socket.on('activity', (data: ActivityItem) => {
+      setActivityFeed(prev => [data, ...prev].slice(0, 20));
+    });
+
+    socket.on('chat-message', (data: ChatMessage) => {
+      setChatMessages(prev => [...prev, data]);
+    });
+
+    socket.on('editor-joined', (data: { sessionId: string; editor: Editor }) => {
+      setSessions(prev => prev.map(s =>
+        s.id === data.sessionId
+          ? { ...s, editors: [...s.editors, data.editor] }
+          : s
+      ));
+    });
+
+    socket.on('editor-left', (data: { sessionId: string; editorId: string }) => {
+      setSessions(prev => prev.map(s =>
+        s.id === data.sessionId
+          ? { ...s, editors: s.editors.filter(e => e.id !== data.editorId) }
+          : s
+      ));
+    });
+
+    socket.on('cursor-update', (data: { sessionId: string; editorId: string; position: { line: number; col: number } }) => {
+      // Could render live cursors on editor canvas
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   const handleSendMessage = () => {
-    if (!chatInput.trim()) return;
-    const newMsg = {
+    if (!chatInput.trim() || !socketRef.current) return;
+    const newMsg: ChatMessage = {
       id: Date.now().toString(),
       user: 'You',
       text: chatInput.trim(),
       time: 'Just now',
     };
-    setChatMessages((prev) => [...prev, newMsg]);
+    socketRef.current.emit('chat-message', { ...newMsg, sessionId: currentSessionId });
+    setChatMessages(prev => [...prev, newMsg]);
     setChatInput('');
   };
 
   const handleStartNewSession = () => {
-    Alert.alert('New Session', 'Navigating to editor for a new collaborative session...');
-    navigation.navigate('Editor');
+    if (socketRef.current) {
+      socketRef.current.emit('create-session', { templateName: 'New Collaborative Session' });
+    }
+    navigation.navigate('DocumentEditor');
+  };
+
+  const joinSession = (sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    if (socketRef.current) {
+      socketRef.current.emit('join-session', { sessionId });
+    }
   };
 
   const toggleSession = (id: string) => {
-    setExpandedSession((prev) => (prev === id ? null : id));
+    setExpandedSession(prev => (prev === id ? null : id));
+    joinSession(id);
   };
 
-  const renderSession = (session: typeof MOCK_SESSIONS[0]) => {
+  const renderSession = (session: Session) => {
     const isExpanded = expandedSession === session.id;
     const onlineCount = session.editors.length;
 
@@ -150,7 +205,10 @@ export function CollaborationScreen({ navigation }: any) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Collaboration</Text>
+          <View style={styles.headerLeft}>
+            <Text style={styles.title}>Collaboration</Text>
+            <View style={[styles.connectionDot, { backgroundColor: connected ? colors.success : colors.error }]} />
+          </View>
           <TouchableOpacity style={styles.newSessionBtn} onPress={handleStartNewSession}>
             <Text style={styles.newSessionBtnText}>+ New Session</Text>
           </TouchableOpacity>
@@ -158,21 +216,29 @@ export function CollaborationScreen({ navigation }: any) {
 
         <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
           <Text style={styles.sectionTitle}>Active Sessions</Text>
-          {MOCK_SESSIONS.map(renderSession)}
+          {sessions.length === 0 ? (
+            <Text style={styles.emptyText}>No active sessions. Start one to collaborate!</Text>
+          ) : (
+            sessions.map(renderSession)
+          )}
 
           <Text style={styles.sectionTitle}>Activity Feed</Text>
           <View style={styles.activityFeed}>
-            {MOCK_ACTIVITY_FEED.map((item) => (
-              <View key={item.id} style={styles.activityItem}>
-                <View style={styles.activityDot} />
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityText}>
-                    <Text style={styles.activityUser}>{item.user}</Text> {item.action}
-                  </Text>
-                  <Text style={styles.activityTime}>{item.time}</Text>
+            {activityFeed.length === 0 ? (
+              <Text style={styles.emptyActivity}>No recent activity</Text>
+            ) : (
+              activityFeed.map((item) => (
+                <View key={item.id} style={styles.activityItem}>
+                  <View style={styles.activityDot} />
+                  <View style={styles.activityContent}>
+                    <Text style={styles.activityText}>
+                      <Text style={styles.activityUser}>{item.user}</Text> {item.action}
+                    </Text>
+                    <Text style={styles.activityTime}>{item.time}</Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              ))
+            )}
           </View>
         </ScrollView>
 
@@ -229,20 +295,19 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: spacing.md, paddingVertical: spacing.md,
+    backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border,
   },
+  headerLeft: { flexDirection: 'row', alignItems: 'center' },
+  connectionDot: { width: 8, height: 8, borderRadius: 4, marginLeft: spacing.sm },
   title: { ...typography.h1 },
   newSessionBtn: { backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.md },
   newSessionBtnText: { color: colors.white, fontWeight: '600', fontSize: 14 },
   scrollContent: { padding: spacing.md, paddingBottom: spacing.xxl },
   sectionTitle: { ...typography.h3, marginTop: spacing.md, marginBottom: spacing.sm },
+  emptyText: { ...typography.bodySmall, textAlign: 'center', padding: spacing.xl, color: colors.textLight },
+  emptyActivity: { ...typography.bodySmall, textAlign: 'center', padding: spacing.md, color: colors.textLight },
   sessionCard: { backgroundColor: colors.white, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.sm, ...shadows.sm },
   sessionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   sessionInfo: { flex: 1 },

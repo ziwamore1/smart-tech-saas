@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { apiService } from '../../services/api';
 import { TemplateAsset, AssetCategory } from '../../types';
 import { colors, spacing, borderRadius, typography, shadows } from '../../theme';
@@ -145,6 +147,59 @@ export function CloudAssetLibraryScreen({ navigation }: any) {
     ]);
   };
 
+  const handleDownloadAsset = async (asset: TemplateAsset) => {
+    try {
+      if (!asset.url) {
+        Alert.alert('Error', 'No download URL available');
+        return;
+      }
+
+      const dir = FileSystem.documentDirectory + 'assets/';
+      const dirInfo = await FileSystem.getInfoAsync(dir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+      }
+
+      const fileName = asset.metadata?.originalName || asset.name || 'asset';
+      const fileUri = dir + fileName;
+
+      const downloadResult = await FileSystem.downloadAsync(asset.url, fileUri);
+      
+      if (downloadResult.status === 200) {
+        Alert.alert('Downloaded', `Saved to: ${fileUri}`, [
+          { text: 'OK' },
+          { text: 'Share', onPress: () => Sharing.shareAsync(fileUri) },
+        ]);
+      } else {
+        Alert.alert('Error', 'Failed to download asset');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to download asset');
+    }
+  };
+
+  const handleShareAsset = async (asset: TemplateAsset) => {
+    try {
+      if (!asset.url) {
+        Alert.alert('Error', 'No URL available to share');
+        return;
+      }
+
+      const dir = FileSystem.cacheDirectory + 'share/';
+      const dirInfo = await FileSystem.getInfoAsync(dir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+      }
+
+      const fileName = asset.metadata?.originalName || asset.name || 'asset';
+      const fileUri = dir + fileName;
+      await FileSystem.downloadAsync(asset.url, fileUri);
+      await Sharing.shareAsync(fileUri);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to share asset');
+    }
+  };
+
   const renderAsset = ({ item }: { item: TemplateAsset }) => {
     const icon = ASSET_TYPE_ICONS[item.type] || ASSET_TYPE_ICONS.other;
     const ext = item.metadata?.originalName?.split('.').pop()?.toUpperCase() || item.type.toUpperCase();
@@ -153,7 +208,7 @@ export function CloudAssetLibraryScreen({ navigation }: any) {
       <TouchableOpacity
         style={styles.assetCard}
         onLongPress={() => handleDelete(item)}
-        onPress={() => {}}
+        onPress={() => handleDownloadAsset(item)}
       >
         <View style={styles.thumbnail}>
           <Text style={styles.thumbnailIcon}>{icon}</Text>
@@ -165,9 +220,14 @@ export function CloudAssetLibraryScreen({ navigation }: any) {
           </View>
           <Text style={styles.assetSize}>{formatFileSize(item.size)}</Text>
         </View>
-        <TouchableOpacity style={styles.deleteIcon} onPress={() => handleDelete(item)}>
-          <Text style={styles.deleteIconText}>✕</Text>
-        </TouchableOpacity>
+        <View style={styles.assetActions}>
+          <TouchableOpacity style={styles.assetActionBtn} onPress={() => handleShareAsset(item)}>
+            <Text style={styles.assetActionText}>📤</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.deleteIcon} onPress={() => handleDelete(item)}>
+            <Text style={styles.deleteIconText}>✕</Text>
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -286,6 +346,9 @@ const styles = StyleSheet.create({
   typeBadge: { backgroundColor: '#e0e7ff', paddingHorizontal: 6, paddingVertical: 1, borderRadius: borderRadius.sm },
   typeBadgeText: { fontSize: 10, color: colors.primary, fontWeight: '600' },
   assetSize: { ...typography.caption, fontSize: 11 },
+  assetActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.xs, marginTop: spacing.xs },
+  assetActionBtn: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center' },
+  assetActionText: { fontSize: 11 },
   deleteIcon: { position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.error, justifyContent: 'center', alignItems: 'center' },
   deleteIconText: { color: colors.white, fontSize: 11, fontWeight: '700' },
   emptyText: { ...typography.bodySmall, textAlign: 'center', padding: spacing.xxl },

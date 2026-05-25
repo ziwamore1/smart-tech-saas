@@ -9,6 +9,7 @@ import { BrandingPresetService } from './branding-preset.service';
 import { TemplateMarketplaceService } from './template-marketplace.service';
 import { CloudAssetService } from './cloud-asset.service';
 import { DigitalSignatureService } from './digital-signature.service';
+import { DigitalStampService } from './digital-stamp.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
@@ -23,6 +24,7 @@ import { PrismaService } from '../prisma/prisma.service';
     TemplateMarketplaceService,
     CloudAssetService,
     DigitalSignatureService,
+    DigitalStampService,
     PrismaService,
   ],
   exports: [
@@ -35,6 +37,7 @@ import { PrismaService } from '../prisma/prisma.service';
     TemplateMarketplaceService,
     CloudAssetService,
     DigitalSignatureService,
+    DigitalStampService,
   ],
 })
 export class ReportTemplateBuilderModule {}

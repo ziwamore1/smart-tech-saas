@@ -1,50 +1,43 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+interface ExamCreateInput {
+  title: string; description?: string; type?: string;
+  classId: string; subjectId: string; termId: string; schoolId: string;
+  duration: number; totalScore: number; passingScore?: number;
+  instructions?: string; shuffleQuestions?: boolean; showResults?: boolean;
+  maxAttempts?: number; allowReview?: boolean; randomizeOrder?: boolean;
+  startsAt: string; endsAt: string; scheduledAt?: string;
+  templateId?: string; createdById?: string;
+}
+
 @Injectable()
 export class ExamService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: {
-    title: string;
-    description?: string;
-    type?: string;
-    classId: string;
-    subjectId: string;
-    termId: string;
-    schoolId: string;
-    duration: number;
-    totalScore: number;
-    passingScore?: number;
-    scheduledAt?: Date;
-    startsAt: Date;
-    endsAt: Date;
-    createdById?: string;
-    questions?: Array<{
-      question: string;
-      questionType?: string;
-      options?: any;
-      correctAnswer: string;
-      explanation?: string;
-      score: number;
-      order: number;
-    }>;
-  }) {
+  async create(data: ExamCreateInput & { questions?: any[] }) {
     const exam = await this.prisma.exam.create({
       data: {
         title: data.title,
         description: data.description,
-        type: data.type as any || 'EXAM',
+        type: (data.type as any) || 'EXAM',
         classId: data.classId,
         subjectId: data.subjectId,
         termId: data.termId,
         schoolId: data.schoolId,
+        templateId: data.templateId,
         duration: data.duration,
         totalScore: data.totalScore,
         passingScore: data.passingScore || 50,
-        scheduledAt: data.scheduledAt,
-        startsAt: data.startsAt,
-        endsAt: data.endsAt,
+        instructions: data.instructions,
+        shuffleQuestions: data.shuffleQuestions ?? false,
+        showResults: data.showResults ?? true,
+        maxAttempts: data.maxAttempts ?? 1,
+        allowReview: data.allowReview ?? true,
+        randomizeOrder: data.randomizeOrder ?? false,
+        scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
+        startsAt: new Date(data.startsAt),
+        endsAt: new Date(data.endsAt),
         createdById: data.createdById,
       },
     });
@@ -88,18 +81,17 @@ export class ExamService {
   }
 
   async getAll(schoolId: string, filters?: {
-    classId?: string;
-    subjectId?: string;
-    termId?: string;
-    type?: string;
-    isPublished?: boolean;
+    classId?: string; subjectId?: string; termId?: string;
+    type?: string; isPublished?: string; status?: string; search?: string;
   }) {
     const where: any = { schoolId };
     if (filters?.classId) where.classId = filters.classId;
     if (filters?.subjectId) where.subjectId = filters.subjectId;
     if (filters?.termId) where.termId = filters.termId;
     if (filters?.type) where.type = filters.type;
-    if (filters?.isPublished !== undefined) where.isPublished = filters.isPublished;
+    if (filters?.status) where.status = filters.status;
+    if (filters?.isPublished !== undefined) where.isPublished = filters.isPublished === 'true';
+    if (filters?.search) where.title = { contains: filters.search, mode: 'insensitive' };
 
     return this.prisma.exam.findMany({
       where,
@@ -107,6 +99,8 @@ export class ExamService {
         class: { select: { id: true, name: true } },
         subject: { select: { id: true, name: true } },
         term: { select: { id: true, name: true } },
+        template: { select: { id: true, name: true } },
+        sections: { orderBy: { order: 'asc' } },
         _count: { select: { questions: true, attempts: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -124,6 +118,7 @@ export class ExamService {
     startsAt?: Date;
     endsAt?: Date;
     isPublished?: boolean;
+    status?: string;
   }) {
     await this.getById(id);
 
@@ -140,6 +135,7 @@ export class ExamService {
         startsAt: data.startsAt,
         endsAt: data.endsAt,
         isPublished: data.isPublished,
+        status: data.status,
       },
     });
   }
@@ -243,50 +239,31 @@ export class ExamService {
     });
   }
 
-  async submitAnswer(attemptId: string, questionId: string, answer: string) {
+  async submitAnswer(attemptId: string, questionId: string, answer: string, timeSpent?: number) {
     const attempt = await this.prisma.examAttempt.findUnique({
       where: { id: attemptId },
       include: { exam: true },
     });
+    if (!attempt) throw new NotFoundException('Attempt not found');
+    if (attempt.isSubmitted) throw new ForbiddenException('Exam already submitted');
 
-    if (!attempt) {
-      throw new NotFoundException('Attempt not found');
-    }
+    const question = await this.prisma.examQuestion.findUnique({ where: { id: questionId } });
+    if (!question) throw new NotFoundException('Question not found');
 
-    if (attempt.isSubmitted) {
-      throw new ForbiddenException('Exam already submitted');
-    }
-
-    const question = await this.prisma.examQuestion.findUnique({
-      where: { id: questionId },
-    });
-
-    if (!question) {
-      throw new NotFoundException('Question not found');
-    }
-
-    const isCorrect = answer.toLowerCase() === question.correctAnswer.toLowerCase();
+    const isCorrect = answer?.toLowerCase() === (question.correctAnswer || '').toLowerCase();
 
     const existingAnswer = await this.prisma.examAnswer.findFirst({
       where: { attemptId, questionId },
     });
 
-    if (existingAnswer) {
-      return this.prisma.examAnswer.update({
-        where: { id: existingAnswer.id },
-        data: { answer, isCorrect, score: isCorrect ? question.score : 0 },
-      });
-    }
+    const data: any = { answer, isCorrect, timeSpent };
+    if (isCorrect) data.score = question.score;
+    else data.score = 0;
 
-    return this.prisma.examAnswer.create({
-      data: {
-        attemptId,
-        questionId,
-        answer,
-        isCorrect,
-        score: isCorrect ? question.score : 0,
-      },
-    });
+    if (existingAnswer) {
+      return this.prisma.examAnswer.update({ where: { id: existingAnswer.id }, data });
+    }
+    return this.prisma.examAnswer.create({ data: { attemptId, questionId, ...data } });
   }
 
   async submitExam(attemptId: string) {
@@ -377,4 +354,186 @@ export class ExamService {
       attempts,
     };
   }
+
+  // ===== Sections =====
+  async addSection(examId: string, data: any) {
+    const maxOrder = await this.prisma.examSection.count({ where: { examId } });
+    return this.prisma.examSection.create({
+      data: { examId, ...data, order: data.order ?? maxOrder },
+    });
+  }
+
+  async getSections(examId: string) {
+    return this.prisma.examSection.findMany({
+      where: { examId },
+      include: { questions: { orderBy: { order: 'asc' } } },
+      orderBy: { order: 'asc' },
+    });
+  }
+
+  async updateSection(sectionId: string, data: any) {
+    return this.prisma.examSection.update({ where: { id: sectionId }, data });
+  }
+
+  async deleteSection(sectionId: string) {
+    await this.prisma.examSection.delete({ where: { id: sectionId } });
+    return { success: true };
+  }
+
+  async reorderQuestions(examId: string, order: { id: string; order: number }[]) {
+    for (const item of order) {
+      await this.prisma.examQuestion.update({
+        where: { id: item.id },
+        data: { order: item.order },
+      });
+    }
+    return { success: true };
+  }
+
+  // ===== Preview =====
+  async getPreview(examId: string) {
+    return this.prisma.exam.findUnique({
+      where: { id: examId },
+      include: {
+        sections: {
+          orderBy: { order: 'asc' },
+          include: { questions: { orderBy: { order: 'asc' } } },
+        },
+        questions: { orderBy: { order: 'asc' } },
+        subject: { select: { id: true, name: true } },
+        class: { select: { id: true, name: true } },
+        term: { select: { id: true, name: true } },
+      },
+    });
+  }
+
+  async renderPreviewHtml(examId: string) {
+    const exam = await this.getPreview(examId);
+    if (!exam) throw new NotFoundException('Exam not found');
+
+    let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+      <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; }
+        .exam-header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #1a365d; padding-bottom: 20px; }
+        .exam-header h1 { color: #1a365d; margin: 0 0 8px; }
+        .exam-meta { display: flex; justify-content: center; gap: 20px; font-size: 14px; color: #666; }
+        .instructions { background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 24px; border-left: 4px solid #3b82f6; }
+        .section { margin-bottom: 32px; }
+        .section h2 { color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
+        .question { margin-bottom: 20px; padding: 16px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
+        .question-text { font-size: 15px; margin-bottom: 12px; line-height: 1.6; }
+        .question-marks { color: #3b82f6; font-weight: 600; font-size: 13px; }
+        .option { padding: 8px 12px; margin: 4px 0; border: 1px solid #e2e8f0; border-radius: 6px; }
+        .page-break { page-break-after: always; border-bottom: 1px dashed #ccc; margin: 20px 0; }
+        @media print { body { padding: 0; } .page-break { page-break-after: always; } }
+      </style>
+      <script>window.MathJax = { tex: { inlineMath: [['$','$'],['\\\\(','\\\\)']] } };</script>
+      <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+      </head><body>`;
+
+    html += `<div class="exam-header">
+      <h1>${exam.title}</h1>
+      <p style="color:#666;margin:4px 0">${exam.subject?.name || ''} | ${exam.class?.name || ''} | ${exam.term?.name || ''}</p>
+      <div class="exam-meta">
+        <span>Duration: ${exam.duration} min</span>
+        <span>Total: ${exam.totalScore} marks</span>
+        <span>Passing: ${exam.passingScore} marks</span>
+      </div>
+    </div>`;
+
+    if (exam.instructions) {
+      html += `<div class="instructions"><strong>Instructions:</strong><br>${exam.instructions}</div>`;
+    }
+
+    if (exam.sections && exam.sections.length > 0) {
+      for (const section of exam.sections) {
+        html += `<div class="section"><h2>${section.title}</h2>`;
+        if (section.description) html += `<p style="color:#666">${section.description}</p>`;
+        const qs = (section as any).questions || [];
+        for (const q of qs) {
+          html += this.renderQuestionHtml(q);
+        }
+        html += `</div>`;
+      }
+    } else {
+      for (const q of exam.questions) {
+        html += this.renderQuestionHtml(q);
+      }
+    }
+
+    html += `</body></html>`;
+    return { html };
+  }
+
+  private renderQuestionHtml(q: any): string {
+    let html = `<div class="question">
+      <div class="question-text">${q.question} <span class="question-marks">[${q.score} marks]</span></div>`;
+    if (q.options && Array.isArray(q.options)) {
+      for (const opt of q.options) {
+        html += `<div class="option">${opt}</div>`;
+      }
+    }
+    html += `</div>`;
+    return html;
+  }
+
+  // ===== Template Application =====
+  async applyTemplate(examId: string, templateId: string) {
+    const template = await this.prisma.examTemplate.findUnique({
+      where: { id: templateId },
+      include: { sections: { orderBy: { order: 'asc' } } },
+    });
+    if (!template) throw new NotFoundException('Template not found');
+
+    await this.prisma.exam.update({
+      where: { id: examId },
+      data: {
+        templateId,
+        instructions: template.instructions || undefined,
+        duration: template.duration,
+        totalScore: template.totalMarks,
+      },
+    });
+
+    await this.prisma.examSection.deleteMany({ where: { examId } });
+    for (const s of template.sections) {
+      await this.prisma.examSection.create({
+        data: {
+          examId,
+          title: s.title,
+          description: s.description,
+          instructions: s.instructions,
+          type: s.type,
+          totalMarks: s.totalMarks,
+          order: s.order,
+        },
+      });
+    }
+    return { success: true };
+  }
+
+  // ===== Attempts =====
+  async getAttempt(attemptId: string) {
+    const a = await this.prisma.examAttempt.findUnique({
+      where: { id: attemptId },
+      include: {
+        answers: true,
+        exam: {
+          include: {
+            questions: { orderBy: { order: 'asc' } },
+            sections: { orderBy: { order: 'asc' } },
+          },
+        },
+      },
+    });
+    if (!a) throw new NotFoundException('Attempt not found');
+    return a;
+  }
+
+  async getAttemptsForMarking(examId: string) {
+    return this.prisma.examAttempt.findMany({
+      where: { examId, isSubmitted: true, isGraded: false },
+    });
+  }
+
 }

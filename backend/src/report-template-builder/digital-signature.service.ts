@@ -6,13 +6,15 @@ import * as crypto from 'crypto';
 export class DigitalSignatureService {
   constructor(private prisma: PrismaService) {}
 
-  async getSignatures(schoolId: string) {
+  async getSignatures(schoolId: string | null) {
+    if (!schoolId) return [];
     return this.prisma.digitalSignature.findMany({ where: { schoolId }, orderBy: { updatedAt: 'desc' } });
   }
 
   async createSignature(schoolId: string, data: {
     name: string; title?: string; email?: string; imageUrl?: string; signatureData?: string; isDefault?: boolean;
   }) {
+    if (!schoolId) throw new NotFoundException('School ID required');
     if (data.isDefault) {
       await this.prisma.digitalSignature.updateMany({ where: { schoolId, isDefault: true }, data: { isDefault: false } });
     }

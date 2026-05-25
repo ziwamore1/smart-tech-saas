@@ -5,6 +5,7 @@ import { Card, Loading } from '../../components';
 import { colors, spacing, shadows } from '../../theme';
 import { useAuthStore, useAppStore } from '../../store';
 import { apiService } from '../../services/api';
+import { VictoryLine, VictoryChart, VictoryTheme, VictoryAxis, VictoryScatter, VictoryArea, VictoryPie } from 'victory-native';
 
 export const AnalyticsScreen: React.FC = () => {
   const { user } = useAuthStore();
@@ -70,15 +71,31 @@ export const AnalyticsScreen: React.FC = () => {
         {trajectory?.history && (
           <Card style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Growth Trajectory</Text>
-            {trajectory.history.map((h: any, i: number) => (
-              <View key={i} style={styles.trajectoryRow}>
-                <View style={[styles.trajectoryDot, { backgroundColor: h.trend === 'up' ? '#10b981' : h.trend === 'down' ? '#ef4444' : '#f59e0b' }]} />
-                <Text style={styles.trajectoryLabel}>{h.term || h.label || `Term ${i + 1}`}</Text>
-                <Text style={styles.trajectoryValue}>{h.average || h.score || 0}%</Text>
-              </View>
-            ))}
+            <VictoryChart theme={VictoryTheme.material} height={200} padding={{ top: 20, bottom: 40, left: 40, right: 20 }}>
+              <VictoryAxis style={{ axis: { stroke: colors.border }, tickLabels: { fill: colors.textLight, fontSize: 10 } }} tickFormat={(_, i) => trajectory.history[i]?.term || `T${i + 1}`} />
+              <VictoryAxis dependentAxis domain={[0, 100]} style={{ axis: { stroke: colors.border }, tickLabels: { fill: colors.textLight, fontSize: 10 } }} />
+              <VictoryArea
+                data={trajectory.history.map((h: any, i: number) => ({ x: i, y: h.average || h.score || 0 }))}
+                style={{ data: { fill: colors.primaryLight, fillOpacity: 0.2, stroke: colors.primary, strokeWidth: 2 } }}
+                animate={{ duration: 500 }}
+              />
+              <VictoryLine
+                data={trajectory.history.map((h: any, i: number) => ({ x: i, y: h.average || h.score || 0 }))}
+                style={{ data: { stroke: colors.primary, strokeWidth: 3 } }}
+                animate={{ duration: 500 }}
+              />
+              <VictoryScatter
+                data={trajectory.history.map((h: any, i: number) => ({
+                  x: i,
+                  y: h.average || h.score || 0,
+                  fill: h.trend === 'up' ? '#10b981' : h.trend === 'down' ? '#ef4444' : '#f59e0b',
+                }))}
+                size={6}
+                animate={{ duration: 500 }}
+              />
+            </VictoryChart>
             {trajectory.prediction && (
-              <View style={[styles.trajectoryRow, { opacity: 0.6 }]}>
+              <View style={[styles.trajectoryRow, { opacity: 0.6, marginTop: spacing.sm }]}>
                 <View style={[styles.trajectoryDot, { backgroundColor: '#8b5cf6' }]} />
                 <Text style={styles.trajectoryLabel}>Predicted Next</Text>
                 <Text style={styles.trajectoryValue}>{trajectory.prediction}%</Text>
