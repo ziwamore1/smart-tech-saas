@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PushNotificationService } from '../push-notification/push-notification.service';
+import { AiTutorService } from '../intelligence/services/ai-tutor.service';
 
 @Injectable()
 export class MobileService {
@@ -9,6 +10,7 @@ export class MobileService {
   constructor(
     private prisma: PrismaService,
     private pushNotificationService: PushNotificationService,
+    private aiTutorService: AiTutorService,
   ) {}
 
   async getDashboard(userId: string, schoolId: string, roles: string[]) {
@@ -571,5 +573,561 @@ export class MobileService {
     }
 
     return Array.from(classMap.values());
+  }
+
+  async getAiTutorSessions(userId: string, schoolId: string, roles: string[]) {
+    let studentId: string | null = null;
+
+    if (roles.includes('Student')) {
+      const student = await this.prisma.student.findFirst({ where: { user: { id: userId } } });
+      studentId = student?.id || null;
+    }
+
+    if (!studentId) {
+      return { sessions: [], hasStudentProfile: false };
+    }
+
+    const sessions = await this.prisma.aiTutorSession.findMany({
+      where: { studentId, schoolId },
+      orderBy: { updatedAt: 'desc' },
+      take: 20,
+      include: {
+        messages: {
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+        },
+      },
+    });
+
+    return {
+      hasStudentProfile: true,
+      sessions: sessions.map(s => ({
+        id: s.id,
+        subjectId: s.subjectId,
+        topic: s.topic,
+        status: s.status,
+        createdAt: s.createdAt,
+        lastActive: s.updatedAt,
+        lastMessage: s.messages[0]?.content || null,
+      })),
+    };
+  }
+
+  async startAiTutorSession(userId: string, schoolId: string, roles: string[], options?: { subjectId?: string; topic?: string; studentId?: string }) {
+    let studentId: string | null = options?.studentId || null;
+
+    if (!studentId && roles.includes('Student')) {
+      const student = await this.prisma.student.findFirst({ where: { user: { id: userId } } });
+      studentId = student?.id || null;
+    }
+
+    if (!studentId) {
+      const greeting = this.generateGeneralGreeting(options?.topic, options?.subjectId);
+      const session = await this.prisma.aiTutorSession.create({
+        data: {
+          schoolId,
+          subjectId: options?.subjectId,
+          topic: options?.topic,
+          userId,
+        },
+      });
+
+      await this.prisma.aiTutorMessage.create({
+        data: { sessionId: session.id, role: 'tutor', content: greeting },
+      });
+
+      return { sessionId: session.id, message: greeting, isGeneral: true };
+    }
+
+    return this.aiTutorService.startSession(studentId, schoolId, options);
+  }
+
+  async sendAiTutorMessage(userId: string, schoolId: string, sessionId: string, message: string) {
+    const session = await this.prisma.aiTutorSession.findUnique({
+      where: { id: sessionId },
+      include: { messages: { orderBy: { createdAt: 'asc' } } },
+    });
+
+    if (!session || session.schoolId !== schoolId) {
+      return { error: 'Session not found' };
+    }
+
+    await this.prisma.aiTutorMessage.create({
+      data: { sessionId, role: 'user', content: message },
+    });
+
+    const response = this.generateTutorResponse(message, session);
+
+    await this.prisma.aiTutorMessage.create({
+      data: { sessionId, role: 'tutor', content: response },
+    });
+
+    return { response };
+  }
+
+  async askAiTutor(userId: string, schoolId: string, roles: string[], question: string, subjectId?: string) {
+    let studentId: string | null = null;
+
+    if (roles.includes('Student')) {
+      const student = await this.prisma.student.findFirst({ where: { user: { id: userId } } });
+      studentId = student?.id || null;
+    }
+
+    if (!studentId) {
+      const response = this.generateGeneralTutorResponse(question, subjectId);
+      return { response, isGeneral: true };
+    }
+
+    return this.aiTutorService.askQuestion(studentId, schoolId, question, subjectId);
+  }
+
+  private generateGeneralGreeting(topic?: string, subjectId?: string): string {
+    if (topic && subjectId) {
+      return `Hello! I'm your AI tutor. Let's explore ${topic} together. What would you like to learn?`;
+    }
+    if (topic) {
+      return `Hi! I'm your AI tutor. Let's discuss ${topic}. What specific aspect would you like to explore?`;
+    }
+    return `Welcome! I'm your AI tutor. I can help with concepts, practice questions, study tips, and more. What would you like to learn today?`;
+  }
+
+  private generateTutorResponse(message: string, session: any): string {
+    const lower = message.toLowerCase();
+
+    if (/^(hi|hello|hey|greetings|good\s(morning|afternoon|evening))/.test(lower)) {
+      const topic = session.topic || 'your studies';
+      return `Hello! Ready to dive into ${topic}? Ask me anything or I can give you a practice question.`;
+    }
+
+    if (/help|struggling|confused|don't understand|difficult/.test(lower)) {
+      return `I'm here to help! Can you tell me specifically which concept or problem you're working on? Try asking something like "Explain [concept]" or "How do I solve [problem]?"`;
+    }
+
+    if (/practice|exercise|problem|question|test me|quiz/.test(lower)) {
+      return `Here's a practice question:\n\n**Question**: Based on what you've been studying, can you explain the key concepts and provide a real-world example?\n\nTry answering in your own words and I'll give you feedback!`;
+    }
+
+    if (/explain|what is|how does|why does|mean|define|tell me about/.test(lower)) {
+      const topicMatch = message.match(/(?:explain|what is|how does|why does|define|tell me about)\s+(.+?)(?:\?|$)/i);
+      const topic = topicMatch ? topicMatch[1].trim() : 'this concept';
+      return `Great question about ${topic}!\n\n1. **Definition**: ${topic} is a key concept that you'll encounter frequently.\n2. **Key Points**: Focus on understanding the core principles and how they connect.\n3. **Example**: Think about how ${topic} applies in different scenarios.\n4. **Practice**: Work through related problems to reinforce understanding.\n\nWould you like me to go deeper or give you a practice question?`;
+    }
+
+    if (/tired|bored|demotivated|give up|hard|frustrated/.test(lower)) {
+      return `Learning can be challenging! Remember every expert was once a beginner.\n\n1. **Break it down**: Focus on one small concept at a time\n2. **Take breaks**: Short breaks help your brain learn better\n3. **Ask questions**: Every question helps you learn\n4. **Practice**: Regular practice makes things easier\n\nWhat's one small thing we can work on together?`;
+    }
+
+    return `That's a great point! Here's my guidance:\n\nApproach this systematically. Make sure you understand the fundamentals before moving to complex applications.\n\nWould you like me to:\n1. Explain a specific concept?\n2. Give you a practice problem?\n3. Provide study tips?`;
+  }
+
+  private generateGeneralTutorResponse(question: string, subjectId?: string): string {
+    const subjectHint = subjectId ? 'this subject' : 'your studies';
+    return `Based on your question about ${subjectHint}:\n\nThe key is to approach this systematically. Start with the fundamentals and build up gradually.\n\nWould you like me to:\n1. Explain a specific concept?\n2. Give you a practice problem?\n3. Provide study tips for ${subjectHint}?`;
+  }
+
+  async getClasses(schoolId: string) {
+    const currentAcademicYear = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+    });
+
+    const classes = await this.prisma.class.findMany({
+      where: { schoolId },
+      include: {
+        levelType: { select: { name: true } },
+        enrollments: {
+          where: currentAcademicYear ? { academicYearId: currentAcademicYear.id } : {},
+          include: { student: { select: { id: true, firstName: true, lastName: true } } },
+        },
+        teachingAssignments: {
+          include: {
+            teacher: { select: { id: true, firstName: true, lastName: true, email: true } },
+            subject: { select: { id: true, name: true, code: true } },
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return classes.map(c => ({
+      id: c.id,
+      name: c.name,
+      levelType: c.levelType?.name || null,
+      studentCount: c.enrollments.length,
+      students: c.enrollments.map(e => ({
+        id: e.student.id,
+        name: `${e.student.firstName} ${e.student.lastName}`,
+      })),
+      teachers: c.teachingAssignments.map(ta => ({
+        id: ta.teacher.id,
+        name: `${ta.teacher.firstName} ${ta.teacher.lastName}`,
+        email: ta.teacher.email,
+        subject: ta.subject.name,
+      })),
+    }));
+  }
+
+  async getStudents(schoolId: string, classId?: string) {
+    const currentAcademicYear = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+    });
+
+    const where: any = {
+      enrollments: {
+        some: currentAcademicYear ? { academicYearId: currentAcademicYear.id } : {},
+      },
+    };
+    if (classId) {
+      where.enrollments.some.classId = classId;
+    }
+
+    const students = await this.prisma.student.findMany({
+      where,
+      include: {
+        enrollments: {
+          where: currentAcademicYear ? { academicYearId: currentAcademicYear.id } : {},
+          include: { class: { select: { id: true, name: true } } },
+        },
+        user: { select: { id: true, email: true, isActive: true } },
+      },
+      orderBy: { firstName: 'asc' },
+    });
+
+    return students.map(s => ({
+      id: s.id,
+      firstName: s.firstName,
+      lastName: s.lastName,
+      admissionNumber: s.admissionNumber,
+      email: s.user?.email || null,
+      isActive: s.user?.isActive ?? true,
+      class: s.enrollments[0]?.class?.name || 'Not assigned',
+      classId: s.enrollments[0]?.class?.id || null,
+    }));
+  }
+
+  async getStaff(schoolId: string) {
+    const teachers = await this.prisma.teacher.findMany({
+      where: { schoolId },
+      include: {
+        user: {
+          select: { id: true, firstName: true, lastName: true, email: true, phone: true, isActive: true },
+        },
+      },
+    });
+
+    const teacherIds = teachers.map(t => t.userId);
+
+    const userRoles = await this.prisma.userRole.findMany({
+      where: { userId: { in: teacherIds } },
+      include: { role: { select: { name: true } } },
+    });
+
+    const assignments = await this.prisma.teachingAssignment.findMany({
+      where: { teacherId: { in: teacherIds } },
+      include: {
+        subject: { select: { id: true, name: true } },
+        class: { select: { id: true, name: true } },
+      },
+    });
+
+    const rolesByUser = new Map<string, string[]>();
+    userRoles.forEach(ur => {
+      const existing = rolesByUser.get(ur.userId) || [];
+      existing.push(ur.role.name);
+      rolesByUser.set(ur.userId, existing);
+    });
+
+    const assignmentsByTeacher = new Map<string, typeof assignments>();
+    assignments.forEach(a => {
+      const existing = assignmentsByTeacher.get(a.teacherId) || [];
+      existing.push(a);
+      assignmentsByTeacher.set(a.teacherId, existing);
+    });
+
+    return teachers.map(t => {
+      const ta = assignmentsByTeacher.get(t.userId) || [];
+      return {
+        id: t.user.id,
+        firstName: t.user.firstName,
+        lastName: t.user.lastName,
+        email: t.user.email,
+        phone: t.user.phone,
+        isActive: t.user.isActive,
+        employeeNo: t.employeeNo,
+        roles: rolesByUser.get(t.userId) || [],
+        subjects: [...new Set(ta.map(a => a.subject.name))],
+        classes: [...new Set(ta.map(a => a.class.name))],
+      };
+    });
+  }
+
+  async getSubjects(schoolId: string) {
+    const subjects = await this.prisma.subject.findMany({
+      where: { schoolId },
+      orderBy: { name: 'asc' },
+    });
+
+    const subjectIds = subjects.map(s => s.id);
+    const assignments = await this.prisma.teachingAssignment.findMany({
+      where: { subjectId: { in: subjectIds } },
+      include: {
+        teacher: { select: { firstName: true, lastName: true } },
+        class: { select: { name: true } },
+      },
+    });
+
+    const assignmentsBySubject = new Map<string, typeof assignments>();
+    assignments.forEach(a => {
+      const existing = assignmentsBySubject.get(a.subjectId) || [];
+      existing.push(a);
+      assignmentsBySubject.set(a.subjectId, existing);
+    });
+
+    return subjects.map(s => {
+      const ta = assignmentsBySubject.get(s.id) || [];
+      return {
+        id: s.id,
+        name: s.name,
+        code: s.code,
+        teacherCount: ta.length,
+        assignments: ta.map(ta => ({
+          teacher: `${ta.teacher.firstName} ${ta.teacher.lastName}`,
+          class: ta.class.name,
+        })),
+      };
+    });
+  }
+
+  async getUsers(schoolId: string, role?: string) {
+    const where: any = { schoolId };
+    if (role) {
+      where.userRoles = { some: { role: { name: role } } };
+    }
+
+    const users = await this.prisma.user.findMany({
+      where,
+      include: {
+        userRoles: { include: { role: { select: { name: true } } } },
+        teacher: { select: { id: true, employeeNo: true } },
+      },
+      orderBy: { firstName: 'asc' },
+    });
+
+    return users.map(u => ({
+      id: u.id,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      email: u.email,
+      phone: u.phone,
+      isActive: u.isActive,
+      roles: u.userRoles.map(ur => ur.role.name),
+      employeeNo: u.teacher?.employeeNo || null,
+    }));
+  }
+
+  async createUser(creatorId: string, schoolId: string, data: { firstName: string; lastName: string; email: string; password: string; roles: string[] }) {
+    const existingUser = await this.prisma.user.findFirst({
+      where: { email: data.email.toLowerCase() },
+    });
+    if (existingUser) {
+      throw new Error('Email already in use');
+    }
+
+    const hashedPassword = require('bcrypt').hashSync(data.password, 10);
+
+    const roles = await this.prisma.role.findMany({
+      where: { name: { in: data.roles } },
+    });
+
+    const user = await this.prisma.user.create({
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email.toLowerCase(),
+        password: hashedPassword,
+        schoolId,
+        userRoles: {
+          create: roles.map(role => ({
+            role: { connect: { id: role.id } },
+          })),
+        },
+      },
+      include: {
+        userRoles: { include: { role: { select: { name: true } } } },
+      },
+    });
+
+    return {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      roles: user.userRoles.map(ur => ur.role.name),
+    };
+  }
+
+  async updateUser(schoolId: string, userId: string, data: { firstName?: string; lastName?: string; email?: string; roles?: string[]; isActive?: boolean }) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, schoolId },
+    });
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const updateData: any = {};
+    if (data.firstName !== undefined) updateData.firstName = data.firstName;
+    if (data.lastName !== undefined) updateData.lastName = data.lastName;
+    if (data.email !== undefined) updateData.email = data.email.toLowerCase();
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      include: {
+        userRoles: { include: { role: { select: { name: true } } } },
+      },
+    });
+
+    if (data.roles && data.roles.length > 0) {
+      const roles = await this.prisma.role.findMany({
+        where: { name: { in: data.roles } },
+      });
+      await this.prisma.userRole.deleteMany({ where: { userId } });
+      await this.prisma.userRole.createMany({
+        data: roles.map(role => ({
+          userId,
+          roleId: role.id,
+        })),
+      });
+    }
+
+    const finalRoles = await this.prisma.userRole.findMany({
+      where: { userId },
+      include: { role: { select: { name: true } } },
+    });
+
+    return {
+      id: updatedUser.id,
+      firstName: updatedUser.firstName,
+      lastName: updatedUser.lastName,
+      email: updatedUser.email,
+      isActive: updatedUser.isActive,
+      roles: finalRoles.map(ur => ur.role.name),
+    };
+  }
+
+  async deleteUser(schoolId: string, userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, schoolId },
+    });
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    await this.prisma.userRole.deleteMany({ where: { userId } });
+    await this.prisma.user.delete({ where: { id: userId } });
+
+    return { message: 'User deleted successfully' };
+  }
+
+  async getAttendanceRegister(schoolId: string, classId: string, date: string) {
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { classId, status: 'ACTIVE' },
+      include: {
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            admissionNumber: true,
+            photoUrl: true,
+          },
+        },
+      },
+      orderBy: { student: { firstName: 'asc' } },
+    });
+
+    const attendanceDate = new Date(date);
+    const existingRecords = await this.prisma.attendance.findMany({
+      where: {
+        studentId: { in: enrollments.map(e => e.studentId) },
+        date: attendanceDate,
+      },
+    });
+
+    const recordMap = new Map(existingRecords.map(r => [r.studentId, r]));
+
+    const students = enrollments.map(e => {
+      const record = recordMap.get(e.student.id);
+      return {
+        id: e.student.id,
+        firstName: e.student.firstName,
+        lastName: e.student.lastName,
+        admissionNumber: e.student.admissionNumber,
+        photoUrl: e.student.photoUrl,
+        status: record?.status || 'PRESENT',
+      };
+    });
+
+    const stats = {
+      total: students.length,
+      present: students.filter(s => s.status === 'PRESENT').length,
+      absent: students.filter(s => s.status === 'ABSENT').length,
+      late: students.filter(s => s.status === 'LATE').length,
+      excused: students.filter(s => s.status === 'EXCUSED').length,
+      unmarked: students.filter(s => !s.status).length,
+    };
+
+    return { students, stats, date };
+  }
+
+  async submitBulkAttendance(schoolId: string, classId: string, date: string, records: { studentId: string; status: string; remarks?: string }[]) {
+    const attendanceDate = new Date(date);
+
+    const studentIds = records.map(r => r.studentId);
+    await this.prisma.attendance.deleteMany({
+      where: {
+        studentId: { in: studentIds },
+        date: attendanceDate,
+      },
+    });
+
+    const results = await this.prisma.attendance.createMany({
+      data: records.map(r => ({
+        studentId: r.studentId,
+        date: attendanceDate,
+        status: r.status.toUpperCase() as any,
+        remarks: r.remarks,
+        schoolId,
+      })),
+    });
+
+    return { message: 'Attendance saved', count: results.count };
+  }
+
+  async markAllAttendance(schoolId: string, classId: string, date: string, status: string) {
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { classId, status: 'ACTIVE' },
+      select: { studentId: true },
+    });
+
+    const attendanceDate = new Date(date);
+
+    await this.prisma.attendance.deleteMany({
+      where: {
+        studentId: { in: enrollments.map(e => e.studentId) },
+        date: attendanceDate,
+      },
+    });
+
+    const results = await this.prisma.attendance.createMany({
+      data: enrollments.map(e => ({
+        studentId: e.studentId,
+        date: attendanceDate,
+        status: status.toUpperCase() as any,
+        schoolId,
+      })),
+    });
+
+    return { message: `All marked as ${status}`, count: results.count };
   }
 }

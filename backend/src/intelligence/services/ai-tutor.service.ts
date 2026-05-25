@@ -113,6 +113,21 @@ export class AiTutorService {
   }
 
   async askQuestion(studentId: string, schoolId: string, question: string, subjectId?: string) {
+    if (!studentId) {
+      const response = this.generateGeneralTutoringResponse(question, {});
+      return { response };
+    }
+
+    const student = await this.prisma.student.findUnique({
+      where: { id: studentId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      const response = this.generateGeneralTutoringResponse(question, {});
+      return { response };
+    }
+
     const sessions = await this.prisma.aiTutorSession.findMany({
       where: { studentId, schoolId, status: 'active' },
       orderBy: { updatedAt: 'desc' },

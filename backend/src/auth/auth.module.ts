@@ -5,11 +5,13 @@ import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from '../prisma/prisma.module';
 import { JwtStrategy } from '../strategies/jwt.strategy';
 import { PushNotificationModule } from '../push-notification/push-notification.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
     PrismaModule,
     PushNotificationModule,
+    EmailModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'default-secret-key',
       signOptions: { expiresIn: '7d' },

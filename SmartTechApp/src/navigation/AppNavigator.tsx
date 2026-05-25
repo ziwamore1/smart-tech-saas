@@ -1,12 +1,13 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet } from 'react-native';
 import { useAuthStore } from '../store';
-import { colors, spacing, typography } from '../theme';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
+import { NotificationsScreen } from '../screens/common/NotificationsScreen';
+import { QRScannerScreen } from '../screens/common/QRScannerScreen';
+import { VerificationResultScreen } from '../screens/common/VerificationResultScreen';
+import { ManualVerificationScreen } from '../screens/common/ManualVerificationScreen';
 import { StudentDashboardScreen } from '../screens/student/DashboardScreen';
 import { StudentResultsScreen } from '../screens/student/ResultsScreen';
 import { StudentTimetableScreen } from '../screens/student/TimetableScreen';
@@ -17,6 +18,8 @@ import { ParentChildResultsScreen } from '../screens/parent/ChildResultsScreen';
 import { TeacherDashboardScreen } from '../screens/teacher/DashboardScreen';
 import { TeacherClassesScreen } from '../screens/teacher/ClassesScreen';
 import { TeacherMarksScreen } from '../screens/teacher/MarksScreen';
+import { DirectorTabNavigator } from './DirectorTabNavigator';
+import { ClassTeacherTabNavigator } from './ClassTeacherTabNavigator';
 import { LearningStyleScreen } from '../screens/intelligence/LearningStyleScreen';
 import { AiTutorScreen } from '../screens/intelligence/AiTutorScreen';
 import { AnalyticsScreen } from '../screens/intelligence/AnalyticsScreen';
@@ -27,60 +30,29 @@ import { BrandingPresetsScreen } from '../screens/templates/BrandingPresetsScree
 import { CloudAssetLibraryScreen } from '../screens/assets/CloudAssetLibraryScreen';
 import { DigitalSignatureScreen } from '../screens/signature/DigitalSignatureScreen';
 import { CollaborationScreen } from '../screens/collaboration/CollaborationScreen';
+import { ExamListScreen } from '../screens/exam/ExamListScreen';
+import { ExamDetailScreen } from '../screens/exam/ExamDetailScreen';
+import { ExamCreateScreen } from '../screens/exam/ExamCreateScreen';
+import { ExamTakingScreen } from '../screens/exam/ExamTakingScreen';
+import { ExamResultsScreen } from '../screens/exam/ExamResultsScreen';
+import { ExamAnalyticsScreen } from '../screens/exam/ExamAnalyticsScreen';
+import { DigitalStampScreen } from '../screens/stamps/DigitalStampScreen';
+import { PDFPreviewScreen } from '../screens/stamps/PDFPreviewScreen';
+import { QRVerificationScreen } from '../screens/stamps/QRVerificationScreen';
+import { ApprovalWorkflowScreen } from '../screens/stamps/ApprovalWorkflowScreen';
+import { AssessmentEntryScreen } from '../screens/assessment/AssessmentEntryScreen';
+import { AssessmentConfigScreen } from '../screens/assessment/AssessmentConfigScreen';
+import { PendingAssessmentsScreen } from '../screens/assessment/PendingAssessmentsScreen';
 
 const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
-
-const TabIcon = ({ name, focused }: { name: string; focused: boolean }) => (
-  <View style={[tabStyles.iconContainer, focused && tabStyles.iconActive]}>
-    <Text style={[tabStyles.icon, focused && tabStyles.iconActiveText]}>{name}</Text>
-  </View>
-);
-
-const tabStyles = StyleSheet.create({
-  iconContainer: { width: 28, height: 28, justifyContent: 'center', alignItems: 'center' },
-  icon: { fontSize: 14, color: colors.textLight },
-  iconActive: { backgroundColor: colors.secondary + '20', borderRadius: 8 },
-  iconActiveText: { color: colors.secondary, fontWeight: '700' },
-});
-
-function StudentTabs() {
-  return (
-    <Tab.Navigator screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.secondary, tabBarStyle: { borderTopColor: colors.border, paddingBottom: 4, height: 60 } }}>
-      <Tab.Screen name="SDashboard" component={StudentDashboardScreen} options={{ tabBarLabel: 'Home', tabBarIcon: ({ focused }) => <TabIcon name="📊" focused={focused} /> }} />
-      <Tab.Screen name="SResults" component={StudentResultsScreen} options={{ tabBarLabel: 'Results', tabBarIcon: ({ focused }) => <TabIcon name="📝" focused={focused} /> }} />
-      <Tab.Screen name="STimetable" component={StudentTimetableScreen} options={{ tabBarLabel: 'Timetable', tabBarIcon: ({ focused }) => <TabIcon name="📅" focused={focused} /> }} />
-      <Tab.Screen name="SAttendance" component={StudentAttendanceScreen} options={{ tabBarLabel: 'Attendance', tabBarIcon: ({ focused }) => <TabIcon name="✅" focused={focused} /> }} />
-      <Tab.Screen name="SProfile" component={ProfileScreen} options={{ tabBarLabel: 'Profile', tabBarIcon: ({ focused }) => <TabIcon name="👤" focused={focused} /> }} />
-    </Tab.Navigator>
-  );
-}
-
-function ParentTabs() {
-  return (
-    <Tab.Navigator screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.secondary, tabBarStyle: { borderTopColor: colors.border, paddingBottom: 4, height: 60 } }}>
-      <Tab.Screen name="PDashboard" component={ParentDashboardScreen} options={{ tabBarLabel: 'Home', tabBarIcon: ({ focused }) => <TabIcon name="📊" focused={focused} /> }} />
-      <Tab.Screen name="PChildren" component={ParentChildrenScreen} options={{ tabBarLabel: 'Children', tabBarIcon: ({ focused }) => <TabIcon name="👨‍👩‍👧‍👦" focused={focused} /> }} />
-      <Tab.Screen name="PResults" component={ParentChildResultsScreen} options={{ tabBarLabel: 'Results', tabBarIcon: ({ focused }) => <TabIcon name="📝" focused={focused} /> }} />
-      <Tab.Screen name="PProfile" component={ProfileScreen} options={{ tabBarLabel: 'Profile', tabBarIcon: ({ focused }) => <TabIcon name="👤" focused={focused} /> }} />
-    </Tab.Navigator>
-  );
-}
-
-function TeacherTabs() {
-  return (
-    <Tab.Navigator screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.secondary, tabBarStyle: { borderTopColor: colors.border, paddingBottom: 4, height: 60 } }}>
-      <Tab.Screen name="TDashboard" component={TeacherDashboardScreen} options={{ tabBarLabel: 'Home', tabBarIcon: ({ focused }) => <TabIcon name="📊" focused={focused} /> }} />
-      <Tab.Screen name="TClasses" component={TeacherClassesScreen} options={{ tabBarLabel: 'Classes', tabBarIcon: ({ focused }) => <TabIcon name="🏫" focused={focused} /> }} />
-      <Tab.Screen name="TMarks" component={TeacherMarksScreen} options={{ tabBarLabel: 'Marks', tabBarIcon: ({ focused }) => <TabIcon name="✏️" focused={focused} /> }} />
-      <Tab.Screen name="TTemplates" component={TemplateMarketplaceScreen} options={{ tabBarLabel: 'Templates', tabBarIcon: ({ focused }) => <TabIcon name="📄" focused={focused} /> }} />
-      <Tab.Screen name="TProfile" component={ProfileScreen} options={{ tabBarLabel: 'Profile', tabBarIcon: ({ focused }) => <TabIcon name="👤" focused={focused} /> }} />
-    </Tab.Navigator>
-  );
-}
 
 export function AppNavigator() {
   const { isAuthenticated, user } = useAuthStore();
+  const isStudent = user?.roles?.includes('Student');
+  const isParent = user?.roles?.includes('Parent');
+  const isClassTeacher = user?.roles?.includes('Class Teacher');
+  const isTeacher = user?.roles?.includes('Teacher') && !isClassTeacher;
+  const isDirector = user?.roles?.includes('Director') || user?.roles?.includes('Head Teacher') || user?.roles?.includes('Deputy');
 
   return (
     <NavigationContainer>
@@ -89,21 +61,27 @@ export function AppNavigator() {
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : (
           <>
-            {user?.roles?.includes('Student') && (
-              <Stack.Screen name="StudentApp" component={StudentTabs} />
-            )}
-            {user?.roles?.includes('Parent') && (
-              <Stack.Screen name="ParentApp" component={ParentTabs} />
-            )}
-            {(user?.roles?.includes('Teacher') || user?.roles?.includes('Class Teacher')) && (
-              <Stack.Screen name="TeacherApp" component={TeacherTabs} />
-            )}
-            {(user?.roles?.includes('Director') || user?.roles?.includes('Head Teacher') || user?.roles?.includes('Deputy')) && (
-              <Stack.Screen name="TeacherApp" component={TeacherTabs} />
-            )}
+            {isStudent && <Stack.Screen name="StudentDashboard" component={StudentDashboardScreen} />}
+            {isParent && <Stack.Screen name="ParentDashboard" component={ParentDashboardScreen} />}
+            {isClassTeacher && <Stack.Screen name="ClassTeacherTabNavigator" component={ClassTeacherTabNavigator} />}
+            {isTeacher && <Stack.Screen name="TeacherDashboard" component={TeacherDashboardScreen} />}
+            {isDirector && <Stack.Screen name="DirectorDashboard" component={DirectorTabNavigator} />}
             {(!user?.roles || user.roles.length === 0) && (
-              <Stack.Screen name="StudentApp" component={StudentTabs} />
+              <Stack.Screen name="StudentDashboard" component={StudentDashboardScreen} />
             )}
+
+            {isStudent && <Stack.Screen name="StudentResults" component={StudentResultsScreen} />}
+            {isStudent && <Stack.Screen name="StudentTimetable" component={StudentTimetableScreen} />}
+            {isStudent && <Stack.Screen name="StudentAttendance" component={StudentAttendanceScreen} />}
+
+            {isParent && <Stack.Screen name="ParentChildren" component={ParentChildrenScreen} />}
+            {isParent && <Stack.Screen name="ParentChildResults" component={ParentChildResultsScreen} />}
+
+            {(isTeacher || isClassTeacher) && <Stack.Screen name="TeacherClasses" component={TeacherClassesScreen} />}
+            {(isTeacher || isClassTeacher) && <Stack.Screen name="TeacherMarks" component={TeacherMarksScreen} />}
+
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="LearningStyle" component={LearningStyleScreen} />
             <Stack.Screen name="AiTutor" component={AiTutorScreen} />
             <Stack.Screen name="Analytics" component={AnalyticsScreen} />
@@ -114,6 +92,26 @@ export function AppNavigator() {
             <Stack.Screen name="CloudAssetLibrary" component={CloudAssetLibraryScreen} />
             <Stack.Screen name="DigitalSignature" component={DigitalSignatureScreen} />
             <Stack.Screen name="Collaboration" component={CollaborationScreen} />
+            <Stack.Screen name="ExamList" component={ExamListScreen} />
+            <Stack.Screen name="ExamDetail" component={ExamDetailScreen} />
+            <Stack.Screen name="ExamCreate" component={ExamCreateScreen} />
+            <Stack.Screen name="ExamTaking" component={ExamTakingScreen} />
+            <Stack.Screen name="ExamResults" component={ExamResultsScreen} />
+            <Stack.Screen name="ExamAnalytics" component={ExamAnalyticsScreen} />
+            <Stack.Screen name="DigitalStamps" component={DigitalStampScreen} />
+            <Stack.Screen name="PDFPreview" component={PDFPreviewScreen} />
+            <Stack.Screen name="QRVerification" component={QRVerificationScreen} />
+            <Stack.Screen name="ApprovalWorkflow" component={ApprovalWorkflowScreen} />
+
+            {/* Assessment Screens */}
+            {(isTeacher || isClassTeacher) && <Stack.Screen name="PendingAssessments" component={PendingAssessmentsScreen} />}
+            {(isTeacher || isClassTeacher) && <Stack.Screen name="AssessmentEntry" component={AssessmentEntryScreen} />}
+            {(isTeacher || isClassTeacher) && <Stack.Screen name="AssessmentConfig" component={AssessmentConfigScreen} />}
+
+            {/* Verification Screens */}
+            <Stack.Screen name="QRScanner" component={QRScannerScreen} />
+            <Stack.Screen name="VerificationResult" component={VerificationResultScreen} />
+            <Stack.Screen name="ManualVerification" component={ManualVerificationScreen} />
           </>
         )}
       </Stack.Navigator>

@@ -446,6 +446,7 @@ Email: ${director.email}
     const totalMarketplace = await this.prisma.templateMarketplace.count();
     const totalAssets = await this.prisma.templateAsset.count();
     const totalSignatures = await this.prisma.digitalSignature.count();
+    const totalStamps = await this.prisma.digitalStamp.count();
     const totalBrandPresets = await this.prisma.brandPreset.count();
     const totalCertificates = await this.prisma.certificateTemplate.count();
     const totalAISuggestions = await this.prisma.aITemplateSuggestion.count();
@@ -458,6 +459,11 @@ Email: ${director.email}
     const templatesByStatus = await this.prisma.reportTemplate.groupBy({
       by: ['status'],
       _count: { status: true },
+    });
+
+    const stampsByType = await this.prisma.digitalStamp.groupBy({
+      by: ['type'],
+      _count: { type: true },
     });
 
     const assetsByType = await this.prisma.templateAsset.groupBy({
@@ -489,6 +495,7 @@ Email: ${director.email}
       totalMarketplace,
       totalAssets,
       totalSignatures,
+      totalStamps,
       totalBrandPresets,
       totalCertificates,
       totalAISuggestions,
@@ -496,6 +503,7 @@ Email: ${director.email}
       recentSchools,
       templatesByType,
       templatesByStatus,
+      stampsByType,
       assetsByType,
       recentTemplates,
     };

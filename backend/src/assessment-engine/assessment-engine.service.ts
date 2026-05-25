@@ -1,0 +1,735 @@
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { GradingEngineService } from '../grading-engine/grading-engine.service';
+
+export interface CreateAssessmentDefinitionDto {
+  name: string;
+  code: string;
+  category?: string;
+  description?: string;
+  defaultMaxScore?: number;
+  defaultWeight?: number;
+  contributesToFinal?: boolean;
+  termBased?: boolean;
+  sortOrder?: number;
+  active?: boolean;
+}
+
+export interface ConfigureTermAssessmentDto {
+  classId: string;
+  subjectId: string;
+  termId: string;
+  configurations: {
+    assessmentDefId: string;
+    maxScore: number;
+    weightPercentage: number;
+    mandatory?: boolean;
+    sequenceOrder?: number;
+    allowHalfMarks?: boolean;
+    allowNegative?: boolean;
+    decimalPlaces?: number;
+  }[];
+}
+
+export interface BulkScoreEntryDto {
+  batchId?: string;
+  classId: string;
+  subjectId: string;
+  termId: string;
+  assessmentDefId: string;
+  title?: string;
+  description?: string;
+  maxScore: number;
+  scores: {
+    studentId: string;
+    rawScore: number | null;
+    remarks?: string;
+  }[];
+  enteredBy: string;
+}
+
+export interface ScoreEntryDto {
+  studentId: string;
+  subjectId: string;
+  termId: string;
+  classId: string;
+  assessmentDefId: string;
+  rawScore: number | null;
+  maxScore?: number;
+  remarks?: string;
+  enteredBy: string;
+}
+
+@Injectable()
+export class AssessmentEngineService {
+  private readonly logger = new Logger(AssessmentEngineService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private gradingEngine: GradingEngineService,
+  ) {}
+
+  async createAssessmentDefinition(schoolId: string, data: CreateAssessmentDefinitionDto) {
+    const existing = await this.prisma.assessmentDefinition.findUnique({
+      where: { schoolId_code: { schoolId, code: data.code } },
+    });
+
+    if (existing) {
+      throw new BadRequestException(`Assessment definition with code "${data.code}" already exists`);
+    }
+
+    return this.prisma.assessmentDefinition.create({
+      data: {
+        schoolId,
+        name: data.name,
+        code: data.code,
+        category: data.category || 'continuous',
+        description: data.description,
+        defaultMaxScore: data.defaultMaxScore || 100,
+        defaultWeight: data.defaultWeight || 0,
+        contributesToFinal: data.contributesToFinal ?? true,
+        termBased: data.termBased ?? true,
+        sortOrder: data.sortOrder || 0,
+      },
+    });
+  }
+
+  async getAssessmentDefinitions(schoolId: string, activeOnly = true) {
+    return this.prisma.assessmentDefinition.findMany({
+      where: {
+        schoolId,
+        ...(activeOnly ? { active: true } : {}),
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+  }
+
+  async updateAssessmentDefinition(id: string, data: Partial<CreateAssessmentDefinitionDto>) {
+    const existing = await this.prisma.assessmentDefinition.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Assessment definition not found');
+    }
+
+    return this.prisma.assessmentDefinition.update({
+      where: { id },
+      data: {
+        ...(data.name && { name: data.name }),
+        ...(data.code && { code: data.code }),
+        ...(data.category && { category: data.category }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.defaultMaxScore !== undefined && { defaultMaxScore: data.defaultMaxScore }),
+        ...(data.defaultWeight !== undefined && { defaultWeight: data.defaultWeight }),
+        ...(data.contributesToFinal !== undefined && { contributesToFinal: data.contributesToFinal }),
+        ...(data.termBased !== undefined && { termBased: data.termBased }),
+        ...(data.sortOrder !== undefined && { sortOrder: data.sortOrder }),
+        ...(data.active !== undefined && { active: data.active }),
+      },
+    });
+  }
+
+  async deleteAssessmentDefinition(id: string) {
+    const existing = await this.prisma.assessmentDefinition.findUnique({
+      where: { id },
+      include: { configurations: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Assessment definition not found');
+    }
+
+    if (existing.configurations.length > 0) {
+      throw new BadRequestException('Cannot delete assessment definition with active configurations');
+    }
+
+    return this.prisma.assessmentDefinition.delete({ where: { id } });
+  }
+
+  async configureTermAssessment(schoolId: string, data: ConfigureTermAssessmentDto) {
+    const { classId, subjectId, termId, configurations } = data;
+
+    const classExists = await this.prisma.class.findUnique({
+      where: { id: classId },
+      select: { schoolId: true },
+    });
+
+    if (!classExists || classExists.schoolId !== schoolId) {
+      throw new NotFoundException('Class not found or access denied');
+    }
+
+    const termExists = await this.prisma.term.findUnique({
+      where: { id: termId },
+      include: { academicYear: { select: { schoolId: true } } },
+    });
+
+    if (!termExists || termExists.academicYear.schoolId !== schoolId) {
+      throw new NotFoundException('Term not found or access denied');
+    }
+
+    const results = [];
+
+    for (const config of configurations) {
+      const assessmentDef = await this.prisma.assessmentDefinition.findUnique({
+        where: { id: config.assessmentDefId },
+        select: { schoolId: true },
+      });
+
+      if (!assessmentDef || assessmentDef.schoolId !== schoolId) {
+        throw new NotFoundException(`Assessment definition "${config.assessmentDefId}" not found`);
+      }
+
+      const result = await this.prisma.termAssessmentConfiguration.upsert({
+        where: {
+          classId_subjectId_termId_assessmentDefId: {
+            classId,
+            subjectId,
+            termId,
+            assessmentDefId: config.assessmentDefId,
+          },
+        },
+        update: {
+          maxScore: config.maxScore,
+          weightPercentage: config.weightPercentage,
+          mandatory: config.mandatory ?? false,
+          sequenceOrder: config.sequenceOrder ?? 0,
+          allowHalfMarks: config.allowHalfMarks ?? true,
+          allowNegative: config.allowNegative ?? false,
+          decimalPlaces: config.decimalPlaces ?? 0,
+        },
+        create: {
+          classId,
+          subjectId,
+          termId,
+          assessmentDefId: config.assessmentDefId,
+          maxScore: config.maxScore,
+          weightPercentage: config.weightPercentage,
+          mandatory: config.mandatory ?? false,
+          sequenceOrder: config.sequenceOrder ?? 0,
+          allowHalfMarks: config.allowHalfMarks ?? true,
+          allowNegative: config.allowNegative ?? false,
+          decimalPlaces: config.decimalPlaces ?? 0,
+        },
+        include: {
+          assessmentDef: true,
+        },
+      });
+
+      results.push(result);
+    }
+
+    this.logger.log(`Configured ${results.length} assessment types for class ${classId}, subject ${subjectId}, term ${termId}`);
+
+    return results;
+  }
+
+  async getTermAssessmentConfigurations(classId: string, subjectId: string, termId: string) {
+    return this.prisma.termAssessmentConfiguration.findMany({
+      where: { classId, subjectId, termId },
+      include: {
+        assessmentDef: true,
+      },
+      orderBy: { sequenceOrder: 'asc' },
+    });
+  }
+
+  async updateTermAssessmentConfiguration(
+    schoolId: string,
+    classId: string,
+    subjectId: string,
+    termId: string,
+    assessmentDefId: string,
+    data: { weightPercentage?: number; maxScore?: number; mandatory?: boolean }
+  ) {
+    const config = await this.prisma.termAssessmentConfiguration.findUnique({
+      where: {
+        classId_subjectId_termId_assessmentDefId: {
+          classId,
+          subjectId,
+          termId,
+          assessmentDefId,
+        },
+      },
+    });
+
+    if (!config) {
+      throw new NotFoundException('Configuration not found');
+    }
+
+    return this.prisma.termAssessmentConfiguration.update({
+      where: {
+        classId_subjectId_termId_assessmentDefId: {
+          classId,
+          subjectId,
+          termId,
+          assessmentDefId,
+        },
+      },
+      data: {
+        ...(data.weightPercentage !== undefined && { weightPercentage: data.weightPercentage }),
+        ...(data.maxScore !== undefined && { maxScore: data.maxScore }),
+        ...(data.mandatory !== undefined && { mandatory: data.mandatory }),
+      },
+      include: {
+        assessmentDef: true,
+      },
+    });
+  }
+
+  async bulkEnterScores(schoolId: string, data: BulkScoreEntryDto) {
+    const { classId, subjectId, termId, assessmentDefId, maxScore, scores, enteredBy } = data;
+
+    const config = await this.prisma.termAssessmentConfiguration.findUnique({
+      where: {
+        classId_subjectId_termId_assessmentDefId: {
+          classId,
+          subjectId,
+          termId,
+          assessmentDefId,
+        },
+      },
+    });
+
+    const effectiveMaxScore = config?.maxScore || maxScore;
+    const decimalPlaces = config?.decimalPlaces ?? 0;
+    const allowNegative = config?.allowNegative ?? false;
+    const allowHalfMarks = config?.allowHalfMarks ?? true;
+
+    const batch = await this.prisma.assessmentBatch.create({
+      data: {
+        schoolId,
+        classId,
+        subjectId,
+        termId,
+        assessmentDefId,
+        title: data.title || `${assessmentDefId} Entry`,
+        description: data.description,
+        maxScore: effectiveMaxScore,
+        totalStudents: scores.length,
+        createdBy: enteredBy,
+      },
+    });
+
+    const results = [];
+
+    for (const scoreEntry of scores) {
+      const { rawScore, remarks } = scoreEntry;
+
+      if (rawScore !== null) {
+        if (!allowNegative && rawScore < 0) {
+          throw new BadRequestException(`Negative scores not allowed. Student: ${scoreEntry.studentId}`);
+        }
+
+        if (rawScore > effectiveMaxScore) {
+          throw new BadRequestException(`Score ${rawScore} exceeds max score ${effectiveMaxScore}. Student: ${scoreEntry.studentId}`);
+        }
+
+        if (!allowHalfMarks && !Number.isInteger(rawScore)) {
+          throw new BadRequestException(`Half marks not allowed. Student: ${scoreEntry.studentId}`);
+        }
+      }
+
+      const roundedScore = rawScore !== null
+        ? parseFloat(rawScore.toFixed(decimalPlaces))
+        : null;
+
+      const weightedScore = roundedScore !== null
+        ? (roundedScore / effectiveMaxScore) * 100
+        : null;
+
+      const grade = weightedScore !== null
+        ? await this.gradingEngine.computeGrade(weightedScore, classId, subjectId, termId, schoolId)
+        : null;
+
+      const result = await this.prisma.studentAssessmentResult.upsert({
+        where: {
+          studentId_subjectId_termId_assessmentDefId: {
+            studentId: scoreEntry.studentId,
+            subjectId,
+            termId,
+            assessmentDefId,
+          },
+        },
+        update: {
+          rawScore: roundedScore,
+          maxScore: effectiveMaxScore,
+          weightedScore,
+          percentage: weightedScore,
+          grade,
+          remarks: remarks || null,
+          enteredBy,
+          status: 'DRAFT',
+          batchId: batch.id,
+        },
+        create: {
+          studentId: scoreEntry.studentId,
+          subjectId,
+          termId,
+          classId,
+          assessmentDefId,
+          rawScore: roundedScore,
+          maxScore: effectiveMaxScore,
+          weightedScore,
+          percentage: weightedScore,
+          grade,
+          remarks: remarks || null,
+          enteredBy,
+          status: 'DRAFT',
+          batchId: batch.id,
+        },
+      });
+
+      results.push(result);
+    }
+
+    await this.prisma.assessmentBatch.update({
+      where: { id: batch.id },
+      data: {
+        enteredCount: results.filter(r => r.rawScore !== null).length,
+        status: 'IN_PROGRESS',
+      },
+    });
+
+    this.logger.log(`Bulk entered ${results.length} scores for batch ${batch.id}`);
+
+    return {
+      batch,
+      results,
+      summary: {
+        total: results.length,
+        entered: results.filter(r => r.rawScore !== null).length,
+        missing: results.filter(r => r.rawScore === null).length,
+      },
+    };
+  }
+
+  async enterSingleScore(schoolId: string, data: ScoreEntryDto) {
+    const config = await this.prisma.termAssessmentConfiguration.findUnique({
+      where: {
+        classId_subjectId_termId_assessmentDefId: {
+          classId: data.classId,
+          subjectId: data.subjectId,
+          termId: data.termId,
+          assessmentDefId: data.assessmentDefId,
+        },
+      },
+    });
+
+    const effectiveMaxScore = config?.maxScore || data.maxScore || 100;
+    const decimalPlaces = config?.decimalPlaces ?? 0;
+
+    if (data.rawScore !== null) {
+      if (data.rawScore < 0 && !(config?.allowNegative)) {
+        throw new BadRequestException('Negative scores not allowed');
+      }
+
+      if (data.rawScore > effectiveMaxScore) {
+        throw new BadRequestException(`Score exceeds max score ${effectiveMaxScore}`);
+      }
+    }
+
+    const roundedScore = data.rawScore !== null
+      ? parseFloat(data.rawScore.toFixed(decimalPlaces))
+      : null;
+
+    const weightedScore = roundedScore !== null
+      ? (roundedScore / effectiveMaxScore) * 100
+      : null;
+
+    const grade = weightedScore !== null
+      ? await this.gradingEngine.computeGrade(weightedScore, data.classId, data.subjectId, data.termId, schoolId)
+      : null;
+
+    return this.prisma.studentAssessmentResult.upsert({
+      where: {
+        studentId_subjectId_termId_assessmentDefId: {
+          studentId: data.studentId,
+          subjectId: data.subjectId,
+          termId: data.termId,
+          assessmentDefId: data.assessmentDefId,
+        },
+      },
+      update: {
+        rawScore: roundedScore,
+        maxScore: effectiveMaxScore,
+        weightedScore,
+        percentage: weightedScore,
+        grade,
+        remarks: data.remarks || null,
+        enteredBy: data.enteredBy,
+        status: 'DRAFT',
+      },
+      create: {
+        studentId: data.studentId,
+        subjectId: data.subjectId,
+        termId: data.termId,
+        classId: data.classId,
+        assessmentDefId: data.assessmentDefId,
+        rawScore: roundedScore,
+        maxScore: effectiveMaxScore,
+        weightedScore,
+        percentage: weightedScore,
+        grade,
+        remarks: data.remarks || null,
+        enteredBy: data.enteredBy,
+        status: 'DRAFT',
+      },
+    });
+  }
+
+  async getStudentResults(studentId: string, termId?: string) {
+    return this.prisma.studentAssessmentResult.findMany({
+      where: {
+        studentId,
+        ...(termId ? { termId } : {}),
+      },
+      include: {
+        assessmentDef: true,
+        subject: { select: { id: true, name: true, code: true } },
+        term: { select: { id: true, name: true } },
+        class: { select: { id: true, name: true } },
+      },
+      orderBy: [
+        { term: { startDate: 'asc' } },
+        { subject: { name: 'asc' } },
+        { assessmentDef: { sortOrder: 'asc' } },
+      ],
+    });
+  }
+
+  async getClassResults(classId: string, subjectId: string, termId: string, assessmentDefId?: string) {
+    const where: any = { classId, subjectId, termId };
+    if (assessmentDefId) {
+      where.assessmentDefId = assessmentDefId;
+    }
+
+    return this.prisma.studentAssessmentResult.findMany({
+      where,
+      include: {
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            admissionNumber: true,
+          },
+        },
+        assessmentDef: true,
+      },
+      orderBy: [
+        { student: { lastName: 'asc' } },
+        { assessmentDef: { sortOrder: 'asc' } },
+      ],
+    });
+  }
+
+  async getBatchResults(batchId: string) {
+    const batch = await this.prisma.assessmentBatch.findUnique({
+      where: { id: batchId },
+      include: {
+        assessmentDef: true,
+        class: true,
+        subject: true,
+        term: true,
+        results: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                admissionNumber: true,
+              },
+            },
+          },
+          orderBy: { student: { lastName: 'asc' } },
+        },
+      },
+    });
+
+    if (!batch) {
+      throw new NotFoundException('Batch not found');
+    }
+
+    return batch;
+  }
+
+  async verifyBatch(batchId: string, verifiedBy: string) {
+    const batch = await this.prisma.assessmentBatch.findUnique({
+      where: { id: batchId },
+      include: { results: true },
+    });
+
+    if (!batch) {
+      throw new NotFoundException('Batch not found');
+    }
+
+    const missingScores = batch.results.filter(r => r.rawScore === null);
+
+    if (missingScores.length > 0) {
+      throw new BadRequestException(`${missingScores.length} scores are missing. Cannot verify batch.`);
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.assessmentBatch.update({
+        where: { id: batchId },
+        data: {
+          status: 'VERIFIED',
+          verifiedCount: batch.results.length,
+          completedAt: new Date(),
+        },
+      }),
+      this.prisma.studentAssessmentResult.updateMany({
+        where: { batchId },
+        data: {
+          status: 'VERIFIED',
+          verifiedBy,
+          verifiedAt: new Date(),
+        },
+      }),
+    ]);
+
+    this.logger.log(`Batch ${batchId} verified by ${verifiedBy}`);
+
+    return this.getBatchResults(batchId);
+  }
+
+  async lockBatch(batchId: string) {
+    await this.prisma.$transaction([
+      this.prisma.assessmentBatch.update({
+        where: { id: batchId },
+        data: { status: 'LOCKED' },
+      }),
+      this.prisma.studentAssessmentResult.updateMany({
+        where: { batchId },
+        data: { status: 'LOCKED' },
+      }),
+    ]);
+
+    this.logger.log(`Batch ${batchId} locked`);
+
+    return this.getBatchResults(batchId);
+  }
+
+  async getTeacherPendingAssessments(teacherId: string, schoolId: string) {
+    const assignments = await this.prisma.teachingAssignment.findMany({
+      where: { teacherId, schoolId },
+      include: {
+        class: true,
+        subject: true,
+      },
+    });
+
+    const pending = [];
+
+    for (const assignment of assignments) {
+      const currentTerm = await this.prisma.term.findFirst({
+        where: {
+          academicYear: { schoolId },
+          isCurrent: true,
+        },
+      });
+
+      if (!currentTerm) continue;
+
+      const configs = await this.prisma.termAssessmentConfiguration.findMany({
+        where: {
+          classId: assignment.classId,
+          subjectId: assignment.subjectId,
+          termId: currentTerm.id,
+        },
+        include: { assessmentDef: true },
+        orderBy: { sequenceOrder: 'asc' },
+      });
+
+      for (const config of configs) {
+        const enrolledStudents = await this.prisma.enrollment.count({
+          where: {
+            classId: assignment.classId,
+            academicYearId: currentTerm.academicYearId,
+            status: 'ACTIVE',
+          },
+        });
+
+        const enteredCount = await this.prisma.studentAssessmentResult.count({
+          where: {
+            classId: assignment.classId,
+            subjectId: assignment.subjectId,
+            termId: currentTerm.id,
+            assessmentDefId: config.assessmentDefId,
+            rawScore: { not: null },
+            enteredBy: teacherId,
+          },
+        });
+
+        if (enteredCount < enrolledStudents) {
+          pending.push({
+            classId: assignment.classId,
+            className: assignment.class.name,
+            subjectId: assignment.subjectId,
+            subjectName: assignment.subject.name,
+            termId: currentTerm.id,
+            termName: currentTerm.name,
+            assessmentDefId: config.assessmentDefId,
+            assessmentName: config.assessmentDef.name,
+            maxScore: config.maxScore,
+            weightPercentage: config.weightPercentage,
+            totalStudents: enrolledStudents,
+            enteredCount,
+            missingCount: enrolledStudents - enteredCount,
+            completionRate: enrolledStudents > 0 ? (enteredCount / enrolledStudents) * 100 : 0,
+          });
+        }
+      }
+    }
+
+    return pending;
+  }
+
+  async getAssessmentCompletionStats(classId: string, subjectId: string, termId: string) {
+    const configs = await this.prisma.termAssessmentConfiguration.findMany({
+      where: { classId, subjectId, termId },
+      include: { assessmentDef: true },
+      orderBy: { sequenceOrder: 'asc' },
+    });
+
+    const enrolledStudents = await this.prisma.enrollment.count({
+      where: { classId, status: 'ACTIVE' },
+    });
+
+    const stats = [];
+
+    for (const config of configs) {
+      const enteredCount = await this.prisma.studentAssessmentResult.count({
+        where: {
+          classId,
+          subjectId,
+          termId,
+          assessmentDefId: config.assessmentDefId,
+          rawScore: { not: null },
+        },
+      });
+
+      stats.push({
+        assessmentDefId: config.assessmentDefId,
+        assessmentName: config.assessmentDef.name,
+        assessmentCode: config.assessmentDef.code,
+        maxScore: config.maxScore,
+        weightPercentage: config.weightPercentage,
+        totalStudents: enrolledStudents,
+        enteredCount,
+        missingCount: enrolledStudents - enteredCount,
+        completionRate: enrolledStudents > 0 ? (enteredCount / enrolledStudents) * 100 : 0,
+      });
+    }
+
+    return {
+      classId,
+      subjectId,
+      termId,
+      totalStudents: enrolledStudents,
+      assessments: stats,
+      overallCompletionRate: stats.length > 0
+        ? stats.reduce((sum, s) => sum + s.completionRate, 0) / stats.length
+        : 0,
+    };
+  }
+}

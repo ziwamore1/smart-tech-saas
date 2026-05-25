@@ -81,6 +81,18 @@ export class AuthController {
     );
   }
 
+  @Post('forgot-password')
+  async forgotPassword(@Body() body: { email: string }) {
+    this.logger.log(`Forgot password request for email: ${body.email}`);
+    return this.authService.forgotPassword(body.email);
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() body: { token: string; newPassword: string }) {
+    this.logger.log(`Reset password request with token`);
+    return this.authService.resetPassword(body.token, body.newPassword);
+  }
+
   @Post('register-teacher')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('Director')

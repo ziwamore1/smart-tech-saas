@@ -315,12 +315,12 @@ export class PublishingService {
 
     for (const enrollment of enrollments) {
       const studentSubjects = resultMap.get(enrollment.studentId) || new Set();
-      const hasAllSubjects = subjectIds.every((s) => studentSubjects.has(s));
+      const hasAllSubjects = (subjectIds as string[]).every((s) => studentSubjects.has(s));
 
       if (hasAllSubjects) {
         completeStudents++;
       } else {
-        const missingSubjectIds = subjectIds.filter((s) => !studentSubjects.has(s));
+        const missingSubjectIds = (subjectIds as string[]).filter((s) => !studentSubjects.has(s));
         const missingSubjects = teachingAssignments
           .filter((a) => missingSubjectIds.includes(a.subjectId))
           .map((a) => ({ id: a.subjectId, name: a.subject.name }));

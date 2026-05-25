@@ -6,36 +6,24 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import twilio from 'twilio';
+import { BeemService } from '../beem/beem.service';
 import mail from '@sendgrid/mail';
 import * as nodemailer from 'nodemailer';
-import AfricasTalking from 'africastalking';
 
 @Injectable()
 export class CommunicationService {
   private readonly logger = new Logger(CommunicationService.name);
-  private readonly atApiKey: string;
-  private readonly atSenderId: string;
   private readonly sendgridApiKey: string;
   private readonly sendgridFromEmail: string;
-  private readonly twilioAccountSid: string;
-  private readonly twilioAuthToken: string;
-  private readonly twilioPhoneNumber: string;
-  private readonly twilioWhatsAppNumber: string;
   private readonly zohoTransporter: any;
 
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private beemService: BeemService,
   ) {
-    this.atApiKey = this.configService.get<string>('AFRICASTALKING_API_KEY', '');
-    this.atSenderId = this.configService.get<string>('AFRICASTALKING_SENDER_ID', 'SmartTech');
     this.sendgridApiKey = this.configService.get<string>('SENDGRID_API_KEY', '');
     this.sendgridFromEmail = this.configService.get<string>('SENDGRID_FROM_EMAIL', 'noreply@smarttechsaas.com');
-    this.twilioAccountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID', '');
-    this.twilioAuthToken = this.configService.get<string>('TWILIO_AUTH_TOKEN', '');
-    this.twilioPhoneNumber = this.configService.get<string>('TWILIO_PHONE_NUMBER', '');
-    this.twilioWhatsAppNumber = this.configService.get<string>('TWILIO_WHATSAPP_NUMBER', '');
 
     const emailPassword = this.configService.get<string>('EMAIL_PASSWORD', '');
     this.zohoTransporter = nodemailer.createTransport({
@@ -302,18 +290,10 @@ export class CommunicationService {
 
     this.logger.log(`[WhatsApp] Sending to ${recipients.length} recipients`);
 
-    const finalSettings: any = { ...settings };
-    if (this.twilioAccountSid && this.twilioAuthToken && this.twilioWhatsAppNumber) {
-      finalSettings.whatsappProvider = 'twilio';
-      finalSettings.whatsappApiKey = this.twilioAccountSid;
-      finalSettings.whatsappApiSecret = this.twilioAuthToken;
-      finalSettings.whatsappPhoneId = this.twilioWhatsAppNumber;
-    }
-
     for (const recipient of recipients) {
       if (recipient.phone) {
         await this.simulateWhatsAppApi(
-          finalSettings,
+          settings,
           recipient.phone,
           communication.message,
         );
@@ -708,21 +688,13 @@ export class CommunicationService {
       select: { id: true, phone: true },
     });
 
-    const finalSettings: any = { ...settings };
-    if (this.twilioAccountSid && this.twilioAuthToken && this.twilioWhatsAppNumber) {
-      finalSettings.whatsappProvider = 'twilio';
-      finalSettings.whatsappApiKey = this.twilioAccountSid;
-      finalSettings.whatsappApiSecret = this.twilioAuthToken;
-      finalSettings.whatsappPhoneId = this.twilioWhatsAppNumber;
-    }
-
     let sentCount = 0;
     let failedCount = 0;
     const failures: string[] = [];
     for (const user of users) {
       if (user.phone) {
         const result = await this.simulateWhatsAppApi(
-          finalSettings,
+          settings,
           user.phone,
           communication.message,
         );
@@ -1050,25 +1022,19 @@ export class CommunicationService {
   }
 
   private async simulateSMSApi(settings: any, phone: string, message: string) {
-    if (settings.smsProvider === 'twilio' && settings.smsApiKey && settings.smsApiSecret && settings.smsSenderId) {
+    if (this.beemService.isConfigured()) {
       try {
-        const client = twilio(settings.smsApiKey, settings.smsApiSecret);
-        const result = await client.messages.create({
-          body: message,
-          from: settings.smsSenderId,
-          to: phone,
-        });
-        this.logger.log(`[Twilio SMS] Sent to ${phone}, SID: ${result.sid}`);
-        return { success: true, messageId: result.sid };
+        const result = await this.beemService.sendSms(phone, message);
+        if (result.success) {
+          this.logger.log(`[Beem SMS] Sent to ${phone}, messageId: ${result.messageId}`);
+          return { success: true, messageId: result.messageId };
+        }
+        this.logger.error(`[Beem SMS] Failed: ${result.error}`);
+        return { success: false, error: result.error };
       } catch (error) {
-        this.logger.error(`[Twilio SMS] Failed: ${error.message}`);
+        this.logger.error(`[Beem SMS] Error: ${error.message}`);
         return { success: false, error: error.message };
       }
-    }
-
-    if (settings.smsProvider === 'africastalking' && settings.smsApiKey && settings.smsSenderId) {
-      this.logger.log(`[Africa's Talking SMS] To: ${phone}, Message: ${message.substring(0, 30)}...`);
-      return { success: true, messageId: `at_${Date.now()}` };
     }
 
     this.logger.log(
@@ -1151,46 +1117,23 @@ export class CommunicationService {
     phone: string,
     message: string,
   ) {
-    if (settings.whatsappProvider === 'twilio' && settings.whatsappApiKey && settings.whatsappApiSecret && settings.whatsappPhoneId) {
+    if (this.beemService.isConfigured()) {
       try {
-        const client = twilio(settings.whatsappApiKey, settings.whatsappApiSecret);
-        const normalizedTo = phone.startsWith('+') ? phone : `+${phone}`;
-        const result = await client.messages.create({
-          body: message,
-          from: `whatsapp:${settings.whatsappPhoneId}`,
-          to: `whatsapp:${normalizedTo}`,
-        });
-        this.logger.log(`[Twilio WhatsApp] Sent to ${phone}, SID: ${result.sid}`);
-        return { success: true, messageId: result.sid };
+        const result = await this.beemService.sendWhatsApp(phone, message);
+        if (result.success) {
+          this.logger.log(`[Beem WhatsApp] Sent to ${phone}, messageId: ${result.messageId}`);
+          return { success: true, messageId: result.messageId };
+        }
+        this.logger.error(`[Beem WhatsApp] Failed: ${result.error}`);
+        return { success: false, error: result.error };
       } catch (error) {
-        this.logger.error(`[Twilio WhatsApp] Failed: ${error.message}`);
+        this.logger.error(`[Beem WhatsApp] Error: ${error.message}`);
         return { success: false, error: error.message };
       }
     }
 
-    const twilioAccountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID');
-    const twilioAuthToken = this.configService.get<string>('TWILIO_AUTH_TOKEN');
-    const twilioWhatsAppNumber = this.configService.get<string>('TWILIO_WHATSAPP_NUMBER');
-
-    if (twilioAccountSid && twilioAuthToken && twilioWhatsAppNumber) {
-      try {
-        const client = twilio(twilioAccountSid, twilioAuthToken);
-        const normalizedTo = phone.startsWith('+') ? phone : `+${phone}`;
-        const result = await client.messages.create({
-          body: message,
-          from: `whatsapp:${twilioWhatsAppNumber}`,
-          to: `whatsapp:${normalizedTo}`,
-        });
-        this.logger.log(`[Twilio WhatsApp] Sent to ${phone}, SID: ${result.sid}`);
-        return { success: true, messageId: result.sid };
-      } catch (error) {
-        this.logger.error(`[Twilio WhatsApp] Failed: ${error.message}`);
-        return { success: false, error: error.message };
-      }
-    }
-
-    this.logger.error('[WhatsApp] No WhatsApp provider configured or missing credentials');
-    return { success: false, error: 'WhatsApp provider not configured' };
+    this.logger.error('[WhatsApp] Beem WhatsApp not configured');
+    return { success: false, error: 'Beem WhatsApp not configured' };
   }
 
   private async simulateFacebookApi(
@@ -1310,9 +1253,6 @@ export class CommunicationService {
           schoolId: 'system', 
           emailEnabled: true, 
           whatsappEnabled: true,
-          whatsappProvider: this.atApiKey ? 'africastalking' : null,
-          whatsappApiKey: this.atApiKey,
-          smsSenderId: this.atSenderId,
         },
       });
     }
@@ -1322,41 +1262,10 @@ export class CommunicationService {
       return { success: false, error: 'WhatsApp not enabled' };
     }
 
-    if (this.twilioAccountSid && this.twilioAuthToken && this.twilioPhoneNumber) {
-      this.logger.log('[WhatsApp] Twilio configured via environment variables - skipping provider override');
-    } else if (this.atApiKey && (!settings.whatsappApiKey || settings.whatsappApiKey !== this.atApiKey)) {
-      settings.whatsappApiKey = this.atApiKey;
-      settings.whatsappProvider = 'africastalking';
-      settings.smsSenderId = this.atSenderId;
-      await this.prisma.communicationSettings.update({
-        where: { schoolId: 'system' },
-        data: {
-          whatsappApiKey: this.atApiKey,
-          whatsappProvider: 'africastalking',
-          smsSenderId: this.atSenderId,
-        },
-      });
-      this.logger.log('[WhatsApp] Updated settings with Africa\'s Talking credentials');
-    }
-
     const normalizedPhone = to.replace(/\s/g, '');
-    const finalSettings: any = { ...settings };
-
-    if (this.twilioAccountSid && this.twilioAuthToken && this.twilioWhatsAppNumber) {
-      finalSettings.whatsappProvider = 'twilio';
-      finalSettings.whatsappApiKey = this.twilioAccountSid;
-      finalSettings.whatsappApiSecret = this.twilioAuthToken;
-      finalSettings.whatsappPhoneId = this.twilioWhatsAppNumber;
-      this.logger.log('[WhatsApp] Using Twilio WhatsApp from environment variables');
-    } else {
-      finalSettings.whatsappApiKey = this.atApiKey || settings.whatsappApiKey;
-      finalSettings.whatsappProvider = this.atApiKey ? 'africastalking' : settings.whatsappProvider;
-      finalSettings.smsSenderId = this.atSenderId || settings.smsSenderId;
-    }
 
     try {
-      this.logger.log(`[WhatsApp] Calling simulateWhatsAppApi with provider=${finalSettings.whatsappProvider}, apiKey=${!!finalSettings.whatsappApiKey}`);
-      const result = await this.simulateWhatsAppApi(finalSettings, normalizedPhone, message);
+      const result = await this.simulateWhatsAppApi(settings, normalizedPhone, message);
       if (result.success) {
         this.logger.log(`[WhatsApp] Sent to ${normalizedPhone}`);
         return { success: true };

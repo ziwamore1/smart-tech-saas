@@ -1,61 +1,83 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Loading } from '../../components';
-import { colors, spacing, shadows } from '../../theme';
+import { HeaderBar, StatCard, QuickActionItem, WidgetCard } from '../../components';
+import { colors, spacing } from '../../theme';
 import { useAuthStore, useAppStore } from '../../store';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 export const TeacherDashboardScreen: React.FC = () => {
-  const { user } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const { dashboard, isLoadingDashboard, fetchDashboard } = useAppStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
   useEffect(() => { fetchDashboard(); }, []);
 
-  if (isLoadingDashboard && !dashboard) return <Loading fullScreen message="Loading..." />;
+  const handleLogout = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (err) {
+              console.error('Logout failed:', err);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const stats = dashboard?.stats;
 
+  const quickActions = [
+    { icon: '🏫', label: 'Classes', screen: 'TeacherClasses', gradient: ['#1E3A8A', '#3B82F6'] as const },
+    { icon: '✏️', label: 'Marks', screen: 'TeacherMarks', gradient: ['#0D9488', '#14B8A6'] as const },
+    { icon: '📋', label: 'Exams', screen: 'ExamList', gradient: ['#EA580C', '#F97316'] as const },
+    { icon: '🤖', label: 'AI Tutor', screen: 'AiTutor', gradient: ['#7C3AED', '#A78BFA'] as const },
+    { icon: '📊', label: 'Analytics', screen: 'Analytics', gradient: ['#D97706', '#F59E0B'] as const },
+    { icon: '📄', label: 'Templates', screen: 'TemplateMarketplace', gradient: ['#0D9488', '#5EEAD4'] as const },
+  ];
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hello, {user?.firstName}</Text>
-          <Text style={styles.subtitle}>Teacher Dashboard</Text>
-        </View>
-      </View>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <HeaderBar
+        title={user?.firstName ? `Hello, ${user.firstName}` : 'Dashboard'}
+        subtitle="Teacher Dashboard"
+        leftIcon={{ name: '🚪', onPress: handleLogout }}
+        rightIcon={{ name: '🔔', onPress: () => navigation.navigate('Notifications') }}
+      />
+
+      <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, { backgroundColor: '#eff6ff' }]}>
-            <Text style={[styles.statValue, { color: '#3b82f6' }]}>{stats?.totalClasses || 0}</Text>
-            <Text style={styles.statLabel}>Classes</Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: '#f0fdf4' }]}>
-            <Text style={[styles.statValue, { color: '#22c55e' }]}>{stats?.todayLessons || 0}</Text>
-            <Text style={styles.statLabel}>Today</Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: '#fef3c7' }]}>
-            <Text style={[styles.statValue, { color: '#f59e0b' }]}>{dashboard?.children?.length || 0}</Text>
-            <Text style={styles.statLabel}>Students</Text>
-          </View>
+          <StatCard label="Classes" value={stats?.totalClasses || 0} icon="🏫" color={colors.primaryLight} bgColor={colors.infoLight} />
+          <StatCard label="Today" value={stats?.todayLessons || 0} icon="📅" color={colors.success} bgColor={colors.successLight} />
+          <StatCard label="Students" value={dashboard?.children?.length || 0} icon="👥" color={colors.warning} bgColor={colors.warningLight} />
         </View>
 
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.actionsGrid}>
-          {[
-            { name: 'Classes', icon: '🏫', screen: 'TClasses' },
-            { name: 'Marks', icon: '✏️', screen: 'TMarks' },
-            { name: 'AI Tutor', icon: '🤖', screen: 'AiTutor' },
-            { name: 'Analytics', icon: '📊', screen: 'Analytics' },
-          ].map((a) => (
-            <TouchableOpacity key={a.name} style={styles.actionCard} onPress={() => navigation.navigate(a.screen)}>
-              <Text style={{ fontSize: 28 }}>{a.icon}</Text>
-              <Text style={styles.actionName}>{a.name}</Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
         </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickActionsScroll}>
+          {quickActions.map((a) => (
+            <QuickActionItem key={a.label} icon={a.icon} label={a.label} gradient={a.gradient as any} onPress={() => navigation.navigate(a.screen)} />
+          ))}
+        </ScrollView>
+
+        <WidgetCard title="Recent Activity" action={{ label: 'View All', onPress: () => {} }}>
+          <View style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
+            <Text style={{ fontSize: 14, color: colors.textLight }}>No recent activity</Text>
+          </View>
+        </WidgetCard>
+
+        <View style={{ height: spacing.xxl }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -63,16 +85,9 @@ export const TeacherDashboardScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
-  greeting: { fontSize: 22, fontWeight: '700', color: colors.text },
-  subtitle: { fontSize: 14, color: colors.textLight, marginTop: 2 },
-  scrollContent: { padding: spacing.md, paddingBottom: spacing.xxl },
+  scroll: { padding: spacing.md },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  statCard: { flex: 1, padding: spacing.md, borderRadius: 12, alignItems: 'center' },
-  statValue: { fontSize: 24, fontWeight: '700' },
-  statLabel: { fontSize: 11, color: colors.textLight, marginTop: 2 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: spacing.md },
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  actionCard: { width: '48%', backgroundColor: colors.white, borderRadius: 12, padding: spacing.lg, alignItems: 'center', ...shadows.sm },
-  actionName: { fontSize: 13, fontWeight: '500', color: colors.text, marginTop: spacing.sm },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md, marginTop: spacing.sm },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
+  quickActionsScroll: { marginBottom: spacing.lg },
 });

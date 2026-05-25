@@ -39,14 +39,14 @@ async function seedECZ() {
     await prisma.gradeScale.createMany({
       data: [
         { gradingSystemId: gradingSystem.id, minScore: 75, maxScore: 100, grade: '1', remark: 'Distinction', points: 1 },
-        { gradingSystemId: gradingSystem.id, minScore: 70, maxScore: 74, grade: '2', remark: 'Very Good', points: 2 },
-        { gradingSystemId: gradingSystem.id, minScore: 65, maxScore: 69, grade: '3', remark: 'Good', points: 3 },
-        { gradingSystemId: gradingSystem.id, minScore: 60, maxScore: 64, grade: '4', remark: 'Credit', points: 4 },
+        { gradingSystemId: gradingSystem.id, minScore: 70, maxScore: 74, grade: '2', remark: 'Distinction', points: 2 },
+        { gradingSystemId: gradingSystem.id, minScore: 65, maxScore: 69, grade: '3', remark: 'Merit', points: 3 },
+        { gradingSystemId: gradingSystem.id, minScore: 60, maxScore: 64, grade: '4', remark: 'Merit', points: 4 },
         { gradingSystemId: gradingSystem.id, minScore: 55, maxScore: 59, grade: '5', remark: 'Credit', points: 5 },
-        { gradingSystemId: gradingSystem.id, minScore: 50, maxScore: 54, grade: '6', remark: 'Pass', points: 6 },
-        { gradingSystemId: gradingSystem.id, minScore: 45, maxScore: 49, grade: '7', remark: 'Pass', points: 7 },
-        { gradingSystemId: gradingSystem.id, minScore: 40, maxScore: 44, grade: '8', remark: 'Marginal', points: 8 },
-        { gradingSystemId: gradingSystem.id, minScore: 0, maxScore: 39, grade: '9', remark: 'Fail', points: 9 },
+        { gradingSystemId: gradingSystem.id, minScore: 50, maxScore: 54, grade: '6', remark: 'Credit', points: 6 },
+        { gradingSystemId: gradingSystem.id, minScore: 45, maxScore: 49, grade: '7', remark: 'Satisfactory', points: 7 },
+        { gradingSystemId: gradingSystem.id, minScore: 40, maxScore: 44, grade: '8', remark: 'Satisfactory', points: 8 },
+        { gradingSystemId: gradingSystem.id, minScore: 0, maxScore: 39, grade: '9', remark: 'Unsatisfactory', points: 9 },
       ],
     });
 

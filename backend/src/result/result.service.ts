@@ -427,7 +427,7 @@ export class ResultService {
             LastName: e.student.lastName,
             Class: e.class.name,
           };
-          subjects.forEach((subject) => {
+          (subjects as string[]).forEach((subject) => {
             row[subject] = '';
           });
           return row;
@@ -466,7 +466,7 @@ export class ResultService {
         Class: e.class.name,
       };
 
-      uniqueSubjects.forEach((subject) => {
+      (uniqueSubjects as string[]).forEach((subject) => {
         row[subject] = '';
       });
 

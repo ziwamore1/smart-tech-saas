@@ -1,12 +1,41 @@
 import { Injectable } from '@nestjs/common';
 import * as QRCode from 'qrcode';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
 
 @Injectable()
 export class CertificateRendererService {
+  generateStampOverlayHtml(stamps: any[]): string {
+    if (!stamps || stamps.length === 0) return '';
+
+    const parts = stamps.map((s) => {
+      const svgContent = s.stamp?.svgContent || s.svgContent || '';
+      if (!svgContent) return '';
+
+      const opacity = s.opacity ?? s.stamp?.opacity ?? 1;
+      const rotation = s.rotation ?? 0;
+      const x = s.positionX ?? 0;
+      const y = s.positionY ?? 0;
+      const w = s.width ?? s.stamp?.width ?? 150;
+      const h = s.height ?? s.stamp?.height ?? 150;
+
+      const innerSvg = svgContent
+        .replace(/<svg[^>]*>/i, '')
+        .replace(/<\/svg>/i, '');
+
+      return `<g transform="translate(${x},${y}) rotate(${rotation},${w / 2},${h / 2})" opacity="${opacity}">
+  ${innerSvg}
+</g>`;
+    });
+
+    if (parts.length === 0) return '';
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" style="position:absolute;top:0;left:0;pointer-events:none;z-index:10;">
+${parts.join('\n')}
+</svg>`;
+  }
   async generateQrCodeDataUrl(data: string): Promise<string> {
     try {
       return await QRCode.toDataURL(data, {
@@ -194,6 +223,7 @@ export class CertificateRendererService {
       watermarkText?: string;
       orientation?: string;
       pageSize?: string;
+      stamps?: any[];
     },
   ): Promise<string> {
     const isLandscape = data.orientation === 'landscape';
@@ -204,6 +234,8 @@ export class CertificateRendererService {
     if (data.showQrCode && data.verificationUrl) {
       qrSvg = await this.generateQrSvg(data.verificationUrl);
     }
+
+    const stampOverlay = data.stamps ? this.generateStampOverlayHtml(data.stamps) : '';
 
     const borderSvg = this.generateBorderSvg(760, isLandscape ? 520 : 720, data.borderStyle, data.borderColor);
     const badgeSvg = data.showBadge ? this.generateBadgeSvg(data.badgeStyle) : '';
@@ -249,6 +281,7 @@ export class CertificateRendererService {
 <body>
   <div class="cert-page">
     <div class="border-layer">${borderSvg}</div>
+    ${stampOverlay ? `<div class="stamp-layer">${stampOverlay}</div>` : ''}
     ${data.showWatermark ? `<div class="watermark">${data.watermarkText || 'CERTIFICATE'}</div>` : ''}
     <div class="cert-inner">
       ${data.schoolLogo ? `<div class="logo-area"><img src="${data.schoolLogo}" alt="School Logo"/></div>` : ''}

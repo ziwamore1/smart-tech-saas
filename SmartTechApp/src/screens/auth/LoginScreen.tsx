@@ -1,154 +1,242 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Image,
-  Alert,
-} from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Alert, Dimensions, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Button, Input } from '../../components';
-import { colors, spacing } from '../../theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Device from 'expo-device';
+import { Input } from '../../components';
+import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useAuthStore } from '../../store';
+import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ForgotPasswordScreen } from './ForgotPasswordScreen';
 
-type LoginScreenProps = {
-  navigation: NativeStackNavigationProp<any>;
-};
+const { height, width } = Dimensions.get('window');
+const extra = Constants.expoConfig?.extra || {};
+const API_BASE_URL = extra.apiBaseUrl || 'http://192.168.43.134:3001/api/v1';
+const BASE_URL = API_BASE_URL.replace('/api/v1', '');
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
+export const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const { login, isLoading } = useAuthStore();
+
+  useEffect(() => {
+    setLogoUrl(`${BASE_URL}/uploads/logo.png`);
+  }, []);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('Error', 'Please enter email and password');
       return;
     }
-
     try {
-      await login(email.trim(), password);
+      const deviceToken = `${Device.deviceName || 'Unknown Device'} (${Platform.OS})`;
+      await login(email.trim(), password, deviceToken);
     } catch (err: any) {
       Alert.alert('Login Failed', err.response?.data?.message || 'Invalid credentials');
     }
   };
 
+  const handleClearSession = async () => {
+    Alert.alert(
+      'Clear Session',
+      'This will clear your saved login session. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await AsyncStorage.removeItem('auth-storage');
+              Alert.alert('Session Cleared', 'Please login again');
+            } catch (err) {
+              Alert.alert('Error', 'Failed to clear session');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  if (showForgotPassword) {
+    return <ForgotPasswordScreen onBack={() => setShowForgotPassword(false)} />;
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.logoContainer}>
-            <View style={styles.logoPlaceholder}>
-              <Text style={styles.logoText}>ST</Text>
+    <LinearGradient colors={['#1E3A8A', '#2563EB', '#3B82F6']} style={styles.gradient}>
+      <View style={styles.waveTop} />
+      <View style={styles.waveMid} />
+      <View style={styles.blob1} />
+      <View style={styles.blob2} />
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
+          <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+            <View style={styles.topSection}>
+              {logoUrl ? (
+                <Image
+                  source={{ uri: logoUrl }}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={styles.shieldOuter}>
+                  <View style={styles.shieldLogo}>
+                    <View style={styles.shieldInner}>
+                      <Text style={styles.shieldIcon}>🎓</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+              <Text style={styles.title}>SmartTech</Text>
+              <Text style={styles.subtitle}>Welcome to your school intelligence platform</Text>
             </View>
-            <Text style={styles.title}>SmartTech</Text>
-            <Text style={styles.subtitle}>School Management System</Text>
-          </View>
 
-          <View style={styles.formContainer}>
-            <Input
-              label="Email"
-              placeholder="Enter your email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
+            <View style={styles.formCard}>
+              <View style={styles.inputGroup}>
+                <View style={styles.inputIconWrap}>
+                  <Text style={styles.inputIcon}>✉️</Text>
+                </View>
+                <View style={styles.inputField}>
+                  <Input
+                    label="Email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
 
-            <Input
-              label="Password"
-              placeholder="Enter your password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
+              <View style={styles.inputGroup}>
+                <View style={styles.inputIconWrap}>
+                  <Text style={styles.inputIcon}>🔒</Text>
+                </View>
+                <View style={styles.inputField}>
+                  <Input
+                    label="Password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                  />
+                </View>
+              </View>
 
-            <Button
-              title="Login"
-              onPress={handleLogin}
-              loading={isLoading}
-              style={styles.loginButton}
-              size="large"
-            />
+              <TouchableOpacity onPress={handleLogin} disabled={isLoading} activeOpacity={0.8} style={{ marginTop: spacing.md }}>
+                <LinearGradient colors={['#F59E0B', '#D97706'] as const} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.loginBtn}>
+                  <Text style={styles.loginBtnText}>{isLoading ? 'Signing in...' : 'Sign In'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
 
-            <Text style={styles.helpText}>
-              Contact your school administrator if you need help logging in.
-            </Text>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+              <TouchableOpacity onPress={() => setShowForgotPassword(true)} style={{ marginTop: spacing.md }}>
+                <Text style={styles.forgotPassword}>Forgot Password?</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={handleClearSession} style={styles.clearSessionBtn}>
+                <Text style={styles.clearSessionText}>Clear Saved Session</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.bottomSection}>
+              <View style={styles.featureRow}>
+                <View style={styles.featureBadge}>
+                  <Text style={styles.featureBadgeIcon}>🔒</Text>
+                </View>
+                <Text style={styles.featureText}>Secure encrypted platform</Text>
+              </View>
+              <View style={styles.featureRow}>
+                <View style={styles.featureBadge}>
+                  <Text style={styles.featureBadgeIcon}>💬</Text>
+                </View>
+                <Text style={styles.featureText}>School communication hub</Text>
+              </View>
+              <Text style={styles.contactText}>Contact your school for account setup</Text>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
+  gradient: { flex: 1 },
+  safeArea: { flex: 1 },
+  flex: { flex: 1 },
+  scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing.lg, minHeight: height * 0.85 },
+
+  waveTop: {
+    position: 'absolute',
+    top: -60,
+    left: -40,
+    width: width * 1.3,
+    height: 200,
+    borderRadius: 200,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    transform: [{ rotate: '-10deg' }],
   },
-  keyboardView: {
-    flex: 1,
+  waveMid: {
+    position: 'absolute',
+    top: -30,
+    right: -60,
+    width: width * 0.9,
+    height: 160,
+    borderRadius: 160,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    transform: [{ rotate: '15deg' }],
   },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: spacing.lg,
+  blob1: {
+    position: 'absolute',
+    bottom: '20%',
+    left: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: spacing.xxl,
+  blob2: {
+    position: 'absolute',
+    bottom: '10%',
+    right: -80,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: 'rgba(255,255,255,0.04)',
   },
-  logoPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  logoText: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: colors.white,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textLight,
-  },
-  formContainer: {
+
+  topSection: { alignItems: 'center', marginBottom: spacing.xl },
+  logoImage: { width: 120, height: 120, marginBottom: spacing.md, borderRadius: 20 },
+  shieldOuter: { width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', marginBottom: spacing.md },
+  shieldLogo: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)' },
+  shieldInner: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center' },
+  shieldIcon: { fontSize: 32 },
+  title: { fontSize: 34, fontWeight: '800', color: colors.white, letterSpacing: -0.5 },
+  subtitle: { fontSize: 15, fontWeight: '500', color: 'rgba(255,255,255,0.8)', marginTop: spacing.xs, textAlign: 'center' },
+
+  formCard: {
     backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    borderRadius: borderRadius.xxl,
+    padding: spacing.xl,
+    ...shadows.lg,
   },
-  loginButton: {
-    marginTop: spacing.md,
-  },
-  helpText: {
-    textAlign: 'center',
-    color: colors.textLight,
-    fontSize: 14,
-    marginTop: spacing.lg,
-  },
+  inputGroup: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+  inputIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
+  inputIcon: { fontSize: 20 },
+  inputField: { flex: 1 },
+  loginBtn: { borderRadius: borderRadius.lg, paddingVertical: 16, alignItems: 'center', ...shadows.md },
+  loginBtnText: { color: colors.white, fontSize: 17, fontWeight: '700', letterSpacing: 0.5 },
+  forgotPassword: { textAlign: 'center', color: colors.textLight, fontSize: 14, fontWeight: '500', marginTop: spacing.lg },
+  clearSessionBtn: { marginTop: spacing.sm, paddingVertical: spacing.sm, alignItems: 'center' },
+  clearSessionText: { fontSize: 12, color: colors.primaryLight, fontWeight: '500' },
+
+  bottomSection: { alignItems: 'center', marginTop: spacing.xl, gap: spacing.md },
+  featureRow: { flexDirection: 'row', alignItems: 'center' },
+  featureBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center', alignItems: 'center', marginRight: spacing.sm },
+  featureBadgeIcon: { fontSize: 12 },
+  featureText: { fontSize: 13, fontWeight: '500', color: 'rgba(255,255,255,0.75)' },
+  contactText: { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: spacing.md, textAlign: 'center' },
 });

@@ -167,9 +167,10 @@ export class RecommendationService {
       }
     }
 
-    const atRiskStudents = results
-      .filter(r => r.score < 50)
-      .reduce<Record<string, { name: string; failingSubjects: string[] }>>((acc, r) => {
+    const resultList = results as any[];
+    const atRiskStudents: Record<string, { name: string; failingSubjects: string[] }> = resultList
+      .filter((r: any) => r.score < 50)
+      .reduce((acc: Record<string, { name: string; failingSubjects: string[] }>, r: any) => {
         const sid = r.studentId;
         if (!acc[sid]) {
           acc[sid] = { name: `${r.student.firstName} ${r.student.lastName}`, failingSubjects: [] };

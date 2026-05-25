@@ -48,10 +48,32 @@ import { IntelligenceModule } from './intelligence/intelligence.module';
 import { ReportQueueModule } from './report-queue/report-queue.module';
 import { QueuesModule } from './queues/queues.module';
 import { ReportTemplateBuilderModule } from './report-template-builder/report-template-builder.module';
+import { ProfileModule } from './profile/profile.module';
+import { StudentPhotoModule } from './student-photo/student-photo.module';
+import { CommonModule } from './common/common.module';
+import { SystemModule } from './system/system.module';
+import { StampsModule } from './stamps/stamps.module';
+import { SigningModule } from './signing-service/signing.module';
+import { BlockchainModule } from './blockchain-service/blockchain.module';
+import { MinistryGatewayModule } from './ministry-gateway/ministry-gateway.module';
+import { QrModule } from './qr-service/qr.module';
+import { CertificateValidationModule } from './certificate-validation-service/certificate-validation.module';
+import { VerificationModule } from './verification-service/verification.module';
+import { ApprovalModule } from './approval-service/approval.module';
+import { HealthModule } from './common/health.module';
+import { BeemModule } from './beem/beem.module';
+import { AssessmentEngineModule } from './assessment-engine/assessment-engine.module';
+import { GradingEngineModule } from './grading-engine/grading-engine.module';
+import { ResultAnalyticsModule } from './result-analytics/result-analytics.module';
+import { SyncEngineModule } from './sync-engine/sync-engine.module';
+import { ReportCardEngineModule } from './report-card-engine/report-card-engine.module';
+import { RankingModule } from './ranking-service/ranking.module';
+import { ProductionLogger } from './common/production-logger';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    CommonModule,
     AuthModule,
     PrismaModule,
     NotificationModule,
@@ -100,6 +122,26 @@ import { ReportTemplateBuilderModule } from './report-template-builder/report-te
     ReportQueueModule,
     QueuesModule,
     ReportTemplateBuilderModule,
+    ProfileModule,
+    StudentPhotoModule,
+    SystemModule,
+    StampsModule,
+    SigningModule,
+    BlockchainModule,
+    MinistryGatewayModule,
+    QrModule,
+    CertificateValidationModule,
+    VerificationModule,
+    ApprovalModule,
+    BeemModule,
+    AssessmentEngineModule,
+    GradingEngineModule,
+    ResultAnalyticsModule,
+    SyncEngineModule,
+    ReportCardEngineModule,
+    RankingModule,
+    HealthModule,
   ],
+  providers: [ProductionLogger],
 })
 export class AppModule {}

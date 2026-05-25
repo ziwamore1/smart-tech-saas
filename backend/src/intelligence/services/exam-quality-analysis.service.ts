@@ -179,12 +179,13 @@ export class ExamQualityAnalysisService {
 
     if (!exam || exam.schoolId !== schoolId) return { error: 'Exam not found' };
 
-    const questionTypes = exam.questions.reduce<Record<string, number>>((acc, q) => {
+    const questions = exam.questions as any[];
+    const questionTypes: Record<string, number> = questions.reduce<Record<string, number>>((acc, q) => {
       acc[q.questionType] = (acc[q.questionType] || 0) + 1;
       return acc;
     }, {});
 
-    const maxScores = exam.questions.map(q => q.score);
+    const maxScores = questions.map((q: any) => q.score);
     const difficultyLevels = ['MULTIPLE_CHOICE', 'TRUE_FALSE', 'SHORT_ANSWER', 'ESSAY', 'WORD_DOCUMENT', 'FILE_UPLOAD'];
 
     return {

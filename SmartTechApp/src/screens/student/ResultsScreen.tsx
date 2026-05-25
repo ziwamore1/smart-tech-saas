@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import { Card, Loading } from '../../components';
-import { colors, spacing, shadows } from '../../theme';
+import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useAuthStore, useAppStore } from '../../store';
 import { apiService } from '../../services/api';
 
@@ -31,6 +33,46 @@ export const StudentResultsScreen: React.FC = () => {
     }
   };
 
+  const handleShareResults = async () => {
+    if (results.length === 0) {
+      Alert.alert('No Results', 'No results available to share');
+      return;
+    }
+    try {
+      const content = generateResultsContent();
+      const fileUri = FileSystem.documentDirectory + 'My_Results.txt';
+      await FileSystem.writeAsStringAsync(fileUri, content);
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'text/plain',
+        dialogTitle: 'Share My Results',
+        UTI: 'public.plain-text',
+      });
+    } catch (e) {
+      Alert.alert('Error', 'Failed to share results');
+    }
+  };
+
+  const generateResultsContent = (): string => {
+    const date = new Date().toLocaleDateString();
+    const term = dashboard?.currentTerm?.name || 'Current Term';
+    let content = `SmartTech School - My Results\nTerm: ${term}\nGenerated: ${date}\n${'='.repeat(40)}\n\n`;
+    
+    results.forEach((r: any) => {
+      const subject = r.subject?.name || r.subject || 'Subject';
+      const score = r.score || 0;
+      const grade = r.grade || '-';
+      const remark = r.remark || '';
+      content += `${subject}: ${score}% (Grade: ${grade}) ${remark}\n`;
+    });
+    
+    const avg = results.length > 0
+      ? (results.reduce((sum: number, r: any) => sum + (r.score || 0), 0) / results.length).toFixed(1)
+      : 0;
+    content += `\n${'='.repeat(40)}\nAverage: ${avg}%\n`;
+    
+    return content;
+  };
+
   if (loading) return <Loading fullScreen message="Loading results..." />;
 
   return (
@@ -38,6 +80,11 @@ export const StudentResultsScreen: React.FC = () => {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Results</Text>
         <Text style={styles.headerSub}>{dashboard?.currentTerm?.name || 'Current Term'}</Text>
+        {results.length > 0 && (
+          <TouchableOpacity style={styles.shareBtn} onPress={handleShareResults}>
+            <Text style={styles.shareBtnText}>📤 Share</Text>
+          </TouchableOpacity>
+        )}
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {results.length === 0 ? (
@@ -71,6 +118,8 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
   headerTitle: { fontSize: 22, fontWeight: '700', color: colors.text },
   headerSub: { fontSize: 14, color: colors.textLight, marginTop: 2 },
+  shareBtn: { marginTop: spacing.sm, backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.md, alignSelf: 'flex-start' },
+  shareBtnText: { color: colors.white, fontSize: 13, fontWeight: '600' },
   scrollContent: { padding: spacing.md, gap: spacing.sm },
   emptyCard: { padding: spacing.xl },
   resultCard: { padding: spacing.md },

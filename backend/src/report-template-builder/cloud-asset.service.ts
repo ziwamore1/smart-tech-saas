@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -8,7 +8,8 @@ import * as fs from 'fs';
 export class CloudAssetService {
   constructor(private prisma: PrismaService) {}
 
-  async getAssets(schoolId: string, type?: string, search?: string) {
+  async getAssets(schoolId: string | null, type?: string, search?: string) {
+    if (!schoolId) return [];
     const where: any = { schoolId };
     if (type) where.type = type;
     if (search) where.name = { contains: search, mode: 'insensitive' };
@@ -18,6 +19,7 @@ export class CloudAssetService {
   async uploadAsset(schoolId: string, file: Express.Multer.File, metadata?: {
     name?: string; type?: string; alt?: string; tags?: string[];
   }): Promise<any> {
+    if (!schoolId) throw new NotFoundException('School ID required');
     const ext = path.extname(file.originalname).toLowerCase();
     const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'].includes(ext);
     let optimizedBuffer: Buffer | undefined;
@@ -61,7 +63,8 @@ export class CloudAssetService {
     });
   }
 
-  async deleteAsset(schoolId: string, id: string) {
+  async deleteAsset(schoolId: string | null, id: string) {
+    if (!schoolId) throw new NotFoundException('School ID required');
     const asset = await this.prisma.templateAsset.findFirst({ where: { id, schoolId } });
     if (!asset) throw new NotFoundException('Asset not found');
 
@@ -79,7 +82,8 @@ export class CloudAssetService {
     return this.prisma.templateAsset.delete({ where: { id } });
   }
 
-  async getAssetUsage(schoolId: string, assetId: string) {
+  async getAssetUsage(schoolId: string | null, assetId: string) {
+    if (!schoolId) throw new NotFoundException('School ID required');
     const asset = await this.prisma.templateAsset.findFirst({ where: { id: assetId, schoolId } });
     if (!asset) throw new NotFoundException('Asset not found');
 
@@ -88,7 +92,7 @@ export class CloudAssetService {
         schoolId,
         OR: [
           { logoUrl: { contains: asset.url } },
-          { layoutJson: { path: '$..url', string_contains: asset.url } },
+          { layoutJson: { path: ['$..url'], string_contains: asset.url } },
         ],
       },
       select: { id: true, name: true },

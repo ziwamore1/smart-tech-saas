@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { MobileController } from './mobile.controller';
 import { MobileService } from './mobile.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { IntelligenceModule } from '../intelligence/intelligence.module';
 
 @Module({
+  imports: [IntelligenceModule],
   controllers: [MobileController],
   providers: [MobileService],
 })

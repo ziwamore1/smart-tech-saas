@@ -185,6 +185,7 @@ export function TemplateMarketplaceScreen({ navigation }: any) {
           contentContainerStyle={styles.chipsContainer}
         >
           <TouchableOpacity
+            key="all-categories"
             style={[styles.chip, !selectedCategory && styles.chipActive]}
             onPress={() => setSelectedCategory(null)}
           >

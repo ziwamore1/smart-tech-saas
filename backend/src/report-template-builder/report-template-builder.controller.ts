@@ -21,6 +21,7 @@ import { BrandingPresetService } from './branding-preset.service';
 import { TemplateMarketplaceService } from './template-marketplace.service';
 import { CloudAssetService } from './cloud-asset.service';
 import { DigitalSignatureService } from './digital-signature.service';
+import { DigitalStampService } from './digital-stamp.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -38,6 +39,7 @@ export class ReportTemplateBuilderController {
     private readonly marketplaceService: TemplateMarketplaceService,
     private readonly cloudAssetService: CloudAssetService,
     private readonly signatureService: DigitalSignatureService,
+    private readonly digitalStampService: DigitalStampService,
   ) {}
 
   @Get('components')
@@ -93,10 +95,58 @@ export class ReportTemplateBuilderController {
     return this.builderService.getTemplates(req.user.schoolId, { type, status, categoryId });
   }
 
+  @Get('stats')
+  @Roles('Director', 'Teacher')
+  async getStats() {
+    return this.builderService.getStats();
+  }
+
+  @Get('marketplace')
+  @Roles('Director', 'Teacher')
+  async getMarketplace(
+    @Query('category') category?: string,
+    @Query('featured') featured?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.marketplaceService.getMarketplaceTemplates({
+      category,
+      featured: featured === 'true',
+      search,
+    });
+  }
+
+  @Get('cloud-assets')
+  @Roles('Director', 'Teacher')
+  async getCloudAssets(
+    @Req() req,
+    @Query('type') type?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.cloudAssetService.getAssets(req.user.schoolId, type, search);
+  }
+
+  @Get('signatures')
+  @Roles('Director', 'Teacher')
+  async getSignatures(@Req() req) {
+    return this.signatureService.getSignatures(req.user.schoolId);
+  }
+
+  @Get('stamps')
+  @Roles('Director', 'Teacher')
+  async getStamps(@Req() req, @Query('type') type?: string) {
+    return this.digitalStampService.getStamps(req.user.schoolId, type);
+  }
+
+  @Get('branding')
+  @Roles('Director', 'Teacher')
+  async getBrandingPresets(@Req() req) {
+    return this.brandingService.getPresets(req.user.schoolId);
+  }
+
   @Get(':id')
   @Roles('Director', 'Teacher')
   async getTemplate(@Req() req, @Param('id') id: string) {
-    return this.builderService.getTemplate(req.user.schoolId, id);
+    return this.builderService.getTemplate(id, req.user.schoolId);
   }
 
   @Post()
@@ -202,13 +252,20 @@ export class ReportTemplateBuilderController {
     @Param('id') id: string,
     @Body() body: any,
   ) {
-    const template = await this.builderService.getTemplate(req.user.schoolId, id);
+    const template = await this.builderService.getTemplate(id, req.user.schoolId);
     const school = await this.rendererService.getSchool(req.user.schoolId);
     const cert = await this.certificateService.getCertificateSettings(req.user.schoolId, id);
 
     const certNumber = await this.certificateService.getNextCertificateNumber(req.user.schoolId, id);
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const verificationUrl = await this.certificateRendererService.createVerificationUrl(baseUrl, certNumber || id);
+
+    let stamps: any[] = [];
+    try {
+      stamps = await this.digitalStampService.getTemplateStamps(req.user.schoolId, id);
+    } catch {
+      // Stamps are optional
+    }
 
     const html = await this.certificateRendererService.generateCertificateHtml(
       body.canvasJson || {},
@@ -236,6 +293,7 @@ export class ReportTemplateBuilderController {
         watermarkText: cert?.watermarkText,
         orientation: template?.orientation || 'landscape',
         pageSize: template?.pageSize || 'A4',
+        stamps,
       },
     );
 
@@ -304,12 +362,6 @@ export class ReportTemplateBuilderController {
 
   // ===== Branding Preset Routes =====
 
-  @Get('branding')
-  @Roles('Director', 'Teacher')
-  async getBrandingPresets(@Req() req) {
-    return this.brandingService.getPresets(req.user.schoolId);
-  }
-
   @Get('branding/:id')
   @Roles('Director', 'Teacher')
   async getBrandingPreset(@Req() req, @Param('id') id: string) {
@@ -341,20 +393,6 @@ export class ReportTemplateBuilderController {
   }
 
   // ===== Template Marketplace Routes =====
-
-  @Get('marketplace')
-  @Roles('Director', 'Teacher')
-  async getMarketplace(
-    @Query('category') category?: string,
-    @Query('featured') featured?: string,
-    @Query('search') search?: string,
-  ) {
-    return this.marketplaceService.getMarketplaceTemplates({
-      category,
-      featured: featured === 'true',
-      search,
-    });
-  }
 
   @Get('marketplace/categories')
   @Roles('Director', 'Teacher')
@@ -388,16 +426,6 @@ export class ReportTemplateBuilderController {
     return this.cloudAssetService.getAssetCategories();
   }
 
-  @Get('cloud-assets')
-  @Roles('Director', 'Teacher')
-  async getCloudAssets(
-    @Req() req,
-    @Query('type') type?: string,
-    @Query('search') search?: string,
-  ) {
-    return this.cloudAssetService.getAssets(req.user.schoolId, type, search);
-  }
-
   @Post('cloud-assets')
   @Roles('Director')
   async createCloudAsset(@Req() req, @Body() data: any) {
@@ -417,12 +445,6 @@ export class ReportTemplateBuilderController {
   }
 
   // ===== Digital Signature Routes =====
-
-  @Get('signatures')
-  @Roles('Director', 'Teacher')
-  async getSignatures(@Req() req) {
-    return this.signatureService.getSignatures(req.user.schoolId);
-  }
 
   @Post('signatures')
   @Roles('Director')
@@ -446,5 +468,91 @@ export class ReportTemplateBuilderController {
   @Roles('Director')
   async signDocument(@Req() req, @Body() body: { signatureId: string; documentHash: string }) {
     return this.signatureService.signDocument(req.user.schoolId, body.signatureId, body.documentHash);
+  }
+
+  // ===== Digital Stamp Routes =====
+
+  @Get('stamps/:id')
+  @Roles('Director', 'Teacher')
+  async getStamp(@Req() req, @Param('id') id: string) {
+    return this.digitalStampService.getStamp(req.user.schoolId, id);
+  }
+
+  @Post('stamps')
+  @Roles('Director')
+  async createStamp(@Req() req, @Body() data: any) {
+    return this.digitalStampService.createStamp(req.user.schoolId, data);
+  }
+
+  @Patch('stamps/:id')
+  @Roles('Director')
+  async updateStamp(@Req() req, @Param('id') id: string, @Body() data: any) {
+    return this.digitalStampService.updateStamp(req.user.schoolId, id, data);
+  }
+
+  @Delete('stamps/:id')
+  @Roles('Director')
+  async deleteStamp(@Req() req, @Param('id') id: string) {
+    return this.digitalStampService.deleteStamp(req.user.schoolId, id);
+  }
+
+  @Post('stamps/:id/duplicate')
+  @Roles('Director')
+  async duplicateStamp(@Req() req, @Param('id') id: string) {
+    return this.digitalStampService.duplicateStamp(req.user.schoolId, id);
+  }
+
+  @Get('stamps/defaults')
+  @Roles('Director', 'Teacher')
+  async getDefaultStamps(@Req() req) {
+    return this.digitalStampService.getDefaultStamps(req.user.schoolId);
+  }
+
+  // Template-Stamp assignment
+  @Get('templates/:templateId/stamps')
+  @Roles('Director', 'Teacher')
+  async getTemplateStamps(@Req() req, @Param('templateId') templateId: string) {
+    return this.digitalStampService.getTemplateStamps(req.user.schoolId, templateId);
+  }
+
+  @Post('templates/:templateId/stamps')
+  @Roles('Director')
+  async assignStampToTemplate(
+    @Req() req,
+    @Param('templateId') templateId: string,
+    @Body() body: { stampId: string; positionX?: number; positionY?: number; width?: number; height?: number; rotation?: number; opacity?: number; layerOrder?: number }
+  ) {
+    const { stampId, positionX, positionY, ...rest } = body;
+    return this.digitalStampService.assignStampToTemplate(req.user.schoolId, templateId, stampId, { x: positionX, y: positionY, ...rest });
+  }
+
+  @Patch('template-stamps/:templateStampId')
+  @Roles('Director')
+  async updateTemplateStamp(@Req() req, @Param('templateStampId') templateStampId: string, @Body() data: any) {
+    return this.digitalStampService.updateTemplateStamp(req.user.schoolId, templateStampId, data);
+  }
+
+  @Delete('template-stamps/:templateStampId')
+  @Roles('Director')
+  async removeTemplateStamp(@Req() req, @Param('templateStampId') templateStampId: string) {
+    return this.digitalStampService.removeTemplateStamp(req.user.schoolId, templateStampId);
+  }
+
+  // Verification
+  @Post('stamps/verify')
+  @Roles('Director', 'Teacher')
+  async createStampVerification(@Req() req, @Body() body: { documentId: string; documentType: string; stampId?: string; metadata?: any }) {
+    return this.digitalStampService.createStampVerification({ ...body, schoolId: req.user.schoolId });
+  }
+
+  @Get('stamps/verify/:verificationHash')
+  async verifyDocument(@Param('verificationHash') verificationHash: string) {
+    return this.digitalStampService.verifyDocument(verificationHash);
+  }
+
+  @Get('stamps/verify/document/:documentId')
+  @Roles('Director', 'Teacher')
+  async getVerificationStatus(@Req() req, @Param('documentId') documentId: string) {
+    return this.digitalStampService.getVerificationStatus(documentId);
   }
 }

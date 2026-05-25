@@ -1,9 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { BeemService } from '../beem/beem.service';
 import sgMail from '@sendgrid/mail';
-import AfricasTalking from 'africastalking';
-import twilio from 'twilio';
 
 interface UserInfo {
   id?: string;
@@ -113,18 +112,14 @@ export class UnifiedMessagingService {
   private readonly sandboxMode: boolean;
   private readonly retryAttempts: number;
   private readonly retryDelay: number;
-  private africasTalking: any;
-  private twilioClient: any;
   private sendgridApiKey: string;
   private sendgridFromEmail: string;
   private sendgridFromName: string;
-  private atSenderId: string;
-  private twilioPhoneNumber: string;
-  private twilioWhatsAppNumber: string;
 
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private beemService: BeemService,
   ) {
     this.sandboxMode = this.configService.get<string>('MESSAGING_SANDBOX_MODE', 'true') === 'true';
     this.retryAttempts = parseInt(this.configService.get<string>('MESSAGING_RETRY_ATTEMPTS', '3'), 10);
@@ -132,36 +127,10 @@ export class UnifiedMessagingService {
     this.sendgridApiKey = this.configService.get<string>('SENDGRID_API_KEY', '');
     this.sendgridFromEmail = this.configService.get<string>('SENDGRID_FROM_EMAIL', 'noreply@smarttechsaas.com');
     this.sendgridFromName = this.configService.get<string>('SENDGRID_FROM_NAME', 'Smart Tech');
-    this.atSenderId = this.configService.get<string>('AFRICASTALKING_SENDER_ID', 'SmartTech');
-    this.twilioPhoneNumber = this.configService.get<string>('TWILIO_PHONE_NUMBER', '');
-    this.twilioWhatsAppNumber = this.configService.get<string>('TWILIO_WHATSAPP_NUMBER', '');
 
-    this.initializeProviders();
-  }
-
-  private initializeProviders() {
     if (this.sendgridApiKey && this.sendgridApiKey !== 'your_sendgrid_api_key') {
       sgMail.setApiKey(this.sendgridApiKey);
       this.logger.log('[SendGrid] API initialized');
-    }
-
-    const twilioAccountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID', '');
-    const twilioAuthToken = this.configService.get<string>('TWILIO_AUTH_TOKEN', '');
-
-    if (twilioAccountSid && twilioAuthToken) {
-      this.twilioClient = twilio(twilioAccountSid, twilioAuthToken);
-      this.logger.log('[Twilio] Client initialized');
-    }
-
-    const atUsername = this.configService.get<string>('AFRICASTALKING_USERNAME', 'sandbox');
-    const atApiKey = this.configService.get<string>('AFRICASTALKING_API_KEY', '');
-
-    if (atApiKey && atApiKey !== 'your_africastalking_api_key') {
-      this.africasTalking = AfricasTalking({
-        username: atUsername,
-        apiKey: atApiKey,
-      });
-      this.logger.log("[Africa's Talking] API initialized");
     }
   }
 
@@ -277,65 +246,35 @@ export class UnifiedMessagingService {
   async sendSMS(phoneNumber: string, message: string): Promise<MessagingResult> {
     const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
 
+    if (this.sandboxMode) {
+      this.logger.log(`[SMS] Sandbox mode - Would send to: ${normalizedPhone}, Message: ${message.substring(0, 50)}...`);
+      await this.logMessage(null, 'SMS', 'SENT', undefined, normalizedPhone, undefined, message, 'sandbox_sms_id');
+      return { success: true, channel: 'SMS', messageId: 'sandbox_sms_id' };
+    }
+
+    if (!this.beemService.isConfigured()) {
+      this.logger.warn(`[SMS] Beem not configured. Would send to: ${normalizedPhone}`);
+      await this.logMessage(null, 'SMS', 'SENT', undefined, normalizedPhone, undefined, message, 'sandbox_sms_id');
+      return { success: true, channel: 'SMS', messageId: 'sandbox_sms_id' };
+    }
+
     try {
-      if (this.twilioClient && this.twilioPhoneNumber) {
-        if (this.sandboxMode) {
-          this.logger.log(`[SMS] Twilio Sandbox mode - Would send to: ${normalizedPhone}`);
-          return { success: true, channel: 'SMS', messageId: 'sandbox_sms_id' };
-        }
-
-        const result = await this.retryOperation(
-          async () => {
-            return this.twilioClient.messages.create({
-              body: message,
-              from: this.twilioPhoneNumber,
-              to: normalizedPhone,
-            });
-          },
-          `SMS to ${normalizedPhone}`,
-        );
-
-        this.logger.log(`[SMS] Twilio sent to ${normalizedPhone}, SID: ${result.sid}`);
-        await this.logMessage(null, 'SMS', 'SENT', undefined, normalizedPhone, undefined, message, result.sid);
-        return { success: true, channel: 'SMS', messageId: result.sid };
-      }
-
-      if (!this.africasTalking) {
-        this.logger.warn(`[SMS] No SMS provider configured. Would send to: ${normalizedPhone}`);
-        await this.logMessage(null, 'SMS', 'SENT', undefined, normalizedPhone, undefined, message, 'sandbox_sms_id');
-        return { success: true, channel: 'SMS', messageId: 'sandbox_sms_id' };
-      }
-
-      if (this.sandboxMode) {
-        this.logger.log(`[SMS] Sandbox mode - Would send to: ${normalizedPhone}, Message: ${message.substring(0, 50)}...`);
-        await this.logMessage(null, 'SMS', 'SENT', undefined, normalizedPhone, undefined, message, 'sandbox_sms_id');
-        return { success: true, channel: 'SMS', messageId: 'sandbox_sms_id' };
-      }
-
-      const sms = this.africasTalking.SMS;
       const result = await this.retryOperation(
-        async () => {
-          return sms.send({
-            to: [normalizedPhone],
-            message,
-            from: this.atSenderId,
-          });
-        },
+        () => this.beemService.sendSms(normalizedPhone, message),
         `SMS to ${normalizedPhone}`,
       );
 
-      const messageId = result.messages?.[0]?.messageId || result.SMSMessageData?.MessageID || `at_${Date.now()}`;
-      this.logger.log(`[SMS] Africa's Talking sent to ${normalizedPhone}, MessageId: ${messageId}`);
+      if (result.success) {
+        this.logger.log(`[SMS] Beem sent to ${normalizedPhone}, messageId: ${result.messageId}`);
+        await this.logMessage(null, 'SMS', 'SENT', undefined, normalizedPhone, undefined, message, result.messageId);
+        return { success: true, channel: 'SMS', messageId: result.messageId };
+      }
 
-      await this.logMessage(null, 'SMS', 'SENT', undefined, normalizedPhone, undefined, message, messageId);
-
-      return { success: true, channel: 'SMS', messageId };
+      throw new Error(result.error || 'Unknown Beem SMS error');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`[SMS] Failed to send to ${normalizedPhone}: ${errorMessage}`);
-
       await this.logMessage(null, 'SMS', 'FAILED', undefined, normalizedPhone, undefined, message, undefined, errorMessage);
-
       return { success: false, channel: 'SMS', error: errorMessage };
     }
   }
@@ -343,8 +282,8 @@ export class UnifiedMessagingService {
   async sendWhatsApp(phoneNumber: string, message: string): Promise<MessagingResult> {
     const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
 
-    if (!this.twilioClient || !this.twilioWhatsAppNumber) {
-      const errorMessage = 'Twilio WhatsApp not configured';
+    if (!this.beemService.isConfigured()) {
+      const errorMessage = 'Beem WhatsApp not configured';
       this.logger.error(`[WhatsApp] ${errorMessage}`);
       await this.logMessage(null, 'WHATSAPP', 'FAILED', undefined, normalizedPhone, undefined, message, undefined, errorMessage);
       return { success: false, channel: 'WHATSAPP', error: errorMessage };
@@ -352,25 +291,21 @@ export class UnifiedMessagingService {
 
     try {
       const result = await this.retryOperation(
-        async () => {
-          return this.twilioClient.messages.create({
-            body: message,
-            from: `whatsapp:${this.twilioWhatsAppNumber}`,
-            to: `whatsapp:${normalizedPhone}`,
-          });
-        },
+        () => this.beemService.sendWhatsApp(normalizedPhone, message),
         `WhatsApp to ${normalizedPhone}`,
       );
 
-      this.logger.log(`[WhatsApp] Twilio sent to ${normalizedPhone}, SID: ${result.sid}`);
-      await this.logMessage(null, 'WHATSAPP', 'SENT', undefined, normalizedPhone, undefined, message, result.sid);
-      return { success: true, channel: 'WHATSAPP', messageId: result.sid };
+      if (result.success) {
+        this.logger.log(`[WhatsApp] Beem sent to ${normalizedPhone}, messageId: ${result.messageId}`);
+        await this.logMessage(null, 'WHATSAPP', 'SENT', undefined, normalizedPhone, undefined, message, result.messageId);
+        return { success: true, channel: 'WHATSAPP', messageId: result.messageId };
+      }
+
+      throw new Error(result.error || 'Unknown Beem WhatsApp error');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`[WhatsApp] Failed to send to ${normalizedPhone}: ${errorMessage}`);
-
       await this.logMessage(null, 'WHATSAPP', 'FAILED', undefined, normalizedPhone, undefined, message, undefined, errorMessage);
-
       return { success: false, channel: 'WHATSAPP', error: errorMessage };
     }
   }
