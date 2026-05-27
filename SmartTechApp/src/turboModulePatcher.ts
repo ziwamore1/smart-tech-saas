@@ -11,7 +11,7 @@ const handler = {
 const mockModule = new Proxy({}, handler);
 
 try {
-  const TurboModuleRegistry = require('react-native/Libraries/TurboModule/TurboModuleRegistry');
+  const { TurboModuleRegistry } = require('react-native');
   if (TurboModuleRegistry) {
     const origGet = TurboModuleRegistry.get;
     if (origGet) {

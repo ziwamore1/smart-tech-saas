@@ -6,7 +6,7 @@ const API_BASE_URL = process.env.API_BASE_URL || 'http://192.168.43.134:3001/api
 module.exports = {
   expo: {
     name: process.env.APP_NAME || 'SmartTech',
-    slug: 'smarttech-app',
+    slug: 'smarttechapp',
     version: process.env.APP_VERSION || '1.0.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
@@ -45,6 +45,7 @@ module.exports = {
     plugins: [
       'expo-asset',
       'expo-splash-screen',
+      'expo-font',
       'expo-barcode-scanner',
       [
         'expo-notifications',
@@ -54,13 +55,14 @@ module.exports = {
         },
       ],
     ],
+    owner: 'smart-tech-saas-system-1',
     extra: {
       apiBaseUrl: API_BASE_URL,
       eas: {
-        projectId: 'smarttech-app',
+        projectId: 'b008f60c-3bb2-434b-8ed1-7e5a69362ce2',
       },
     },
-    runtimeVersion: { policy: 'appVersion' },
+    runtimeVersion: '1.0.0',
     updates: {
       url: 'https://u.expo.dev/smarttech-app',
       enabled: false,
