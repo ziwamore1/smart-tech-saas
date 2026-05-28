@@ -46,7 +46,6 @@ module.exports = {
       'expo-asset',
       'expo-splash-screen',
       'expo-font',
-      'expo-barcode-scanner',
       [
         'expo-notifications',
         {
