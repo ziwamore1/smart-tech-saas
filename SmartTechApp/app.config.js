@@ -31,6 +31,7 @@ module.exports = {
         backgroundColor: '#1E3A8A',
       },
       package: 'com.smarttech.school',
+      googleServicesFile: './google-services.json',
       useNextNotificationsApi: true,
       softwareKeyboardLayoutMode: 'pan',
       intentFilters: [
