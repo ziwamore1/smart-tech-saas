@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "709795956647",
+    "project_id": "smarttech-7b4ee",
+    "storage_bucket": "smarttech-7b4ee.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:709795956647:android:6625a9536dd076ba905882",
+        "android_client_info": {
+          "package_name": "com.smarttech.school"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6uAAij88xCVYyZCuSSfX9DSMocdWeOD4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
