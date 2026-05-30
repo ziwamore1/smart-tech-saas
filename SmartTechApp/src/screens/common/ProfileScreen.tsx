@@ -18,7 +18,7 @@ import { Card } from '../../components';
 import { Button } from '../../components';
 import { colors, spacing, borderRadius, typography, shadows } from '../../theme';
 import { useAuthStore } from '../../store';
-import { apiService } from '../../services/api';
+import { apiService, resolveImageUrl } from '../../services/api';
 
 type ProfileScreenProps = {
   navigation: NativeStackNavigationProp<any>;
@@ -93,7 +93,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       formData.append('photo', { uri, name: filename, type: 'image/jpeg' } as any);
       const result = await apiService.uploadProfilePhoto(formData);
       if (user) {
-        setUser({ ...user, photoUrl: result.photoUrl });
+        setUser({ ...user, photoUrl: resolveImageUrl(result.photoUrl) || result.photoUrl });
       }
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.message || 'Failed to upload photo');

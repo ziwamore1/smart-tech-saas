@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card, Loading } from '../../components';
 import { colors, spacing, shadows } from '../../theme';
 import { useExamStore } from '../../store/exam-store';
-import { VictoryBar, VictoryChart, VictoryTheme, VictoryAxis, VictoryTooltip, VictoryPie } from 'victory-native';
+
 
 export const ExamAnalyticsScreen: React.FC = () => {
   const { examStats, loading, fetchExamStats, exams, fetchExams } = useExamStore();
@@ -91,27 +91,24 @@ export const ExamAnalyticsScreen: React.FC = () => {
             {examStats.gradeDistribution && examStats.gradeDistribution.length > 0 && (
               <Card style={styles.distributionCard}>
                 <Text style={styles.sectionTitle}>Grade Distribution</Text>
-                <VictoryChart theme={VictoryTheme.material} height={220} padding={{ top: 20, bottom: 40, left: 40, right: 20 }}>
-                  <VictoryAxis style={{ axis: { stroke: colors.border }, tickLabels: { fill: colors.textLight, fontSize: 12 } }} />
-                  <VictoryAxis dependentAxis style={{ axis: { stroke: colors.border }, tickLabels: { fill: colors.textLight, fontSize: 12 } }} />
-                  <VictoryBar
-                    data={examStats.gradeDistribution.map((g: any, i: number) => ({
-                      x: g.grade,
-                      y: g.count,
-                      label: `${g.grade}: ${g.count}`,
-                      fill:
-                        g.grade === 'A' ? '#10b981' :
-                        g.grade === 'B' ? '#3b82f6' :
-                        g.grade === 'C' ? '#f59e0b' :
-                        g.grade === 'D' ? '#f97316' : '#ef4444',
-                    }))}
-                    cornerRadius={{ top: 4 }}
-                    barWidth={32}
-                    labels={({ datum }) => datum.label}
-                    labelComponent={<VictoryTooltip cornerRadius={4} />}
-                    animate={{ duration: 500 }}
-                  />
-                </VictoryChart>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 160, paddingVertical: spacing.sm }}>
+                  {examStats.gradeDistribution.map((g: any) => {
+                    const maxCount = Math.max(...examStats.gradeDistribution.map((x: any) => x.count));
+                    const barHeight = maxCount > 0 ? (g.count / maxCount) * 130 : 0;
+                    const barColor =
+                      g.grade === 'A' ? '#10b981' :
+                      g.grade === 'B' ? '#3b82f6' :
+                      g.grade === 'C' ? '#f59e0b' :
+                      g.grade === 'D' ? '#f97316' : '#ef4444';
+                    return (
+                      <View key={g.grade} style={{ alignItems: 'center', flex: 1 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '600', color: colors.textLight, marginBottom: 4 }}>{g.count}</Text>
+                        <View style={{ width: 32, height: Math.max(barHeight, 4), backgroundColor: barColor, borderRadius: 4, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }} />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: barColor, marginTop: 6 }}>{g.grade}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
               </Card>
             )}
 

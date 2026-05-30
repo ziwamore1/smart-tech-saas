@@ -91,7 +91,7 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
           ))}
         </ScrollView>
 
-        <WidgetCard title="School Performance" action={{ label: 'View All', onPress: () => navigation.navigate('DirectorReports') }}>
+        <WidgetCard title="School Performance" action={{ label: 'View All', onPress: () => handleNavigate('DirectorReports') }}>
           <View style={styles.performanceRow}>
             <View style={styles.perfItem}>
               <Text style={styles.perfValue}>87%</Text>

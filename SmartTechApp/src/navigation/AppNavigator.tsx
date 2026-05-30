@@ -53,6 +53,7 @@ export function AppNavigator() {
   const isClassTeacher = user?.roles?.includes('Class Teacher');
   const isTeacher = user?.roles?.includes('Teacher') && !isClassTeacher;
   const isDirector = user?.roles?.includes('Director') || user?.roles?.includes('Head Teacher') || user?.roles?.includes('Deputy');
+  const hasRoleDashboard = isStudent || isParent || isClassTeacher || isTeacher || isDirector;
 
   return (
     <NavigationContainer>
@@ -66,7 +67,7 @@ export function AppNavigator() {
             {isClassTeacher && <Stack.Screen name="ClassTeacherTabNavigator" component={ClassTeacherTabNavigator} />}
             {isTeacher && <Stack.Screen name="TeacherDashboard" component={TeacherDashboardScreen} />}
             {isDirector && <Stack.Screen name="DirectorDashboard" component={DirectorTabNavigator} />}
-            {(!user?.roles || user.roles.length === 0) && (
+            {!hasRoleDashboard && (
               <Stack.Screen name="StudentDashboard" component={StudentDashboardScreen} />
             )}
 

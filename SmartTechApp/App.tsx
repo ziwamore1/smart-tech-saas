@@ -62,15 +62,8 @@ export default function App() {
   const { isAuthenticated } = useAuthStore();
 
   useEffect(() => {
-    async function prepare() {
-      try {
-        await registerForPushNotificationsAsync();
-      } catch (e) {
-        console.warn(e);
-      }
-      setAppIsReady(true);
-    }
-    prepare();
+    registerForPushNotificationsAsync().catch(console.warn);
+    setAppIsReady(true);
   }, []);
 
   useEffect(() => {
