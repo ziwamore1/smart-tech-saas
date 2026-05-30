@@ -18,6 +18,14 @@ import {
 
 const extra = Constants.expoConfig?.extra || {};
 const API_BASE_URL = extra.apiBaseUrl || 'http://192.168.43.134:3001/api/v1';
+export const BASE_URL = API_BASE_URL.replace('/api/v1', '');
+
+export function resolveImageUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('file://') || url.startsWith('data:')) return url;
+  if (url.startsWith('/')) return `${BASE_URL}${url}`;
+  return url;
+}
 
 class ApiService {
   private client: AxiosInstance;
@@ -33,8 +41,15 @@ class ApiService {
     });
 
     this.client.interceptors.request.use(async (config) => {
+      if (config.url?.includes('/auth/mobile-login') || config.url?.includes('/auth/login') || config.url?.includes('/auth/register') || config.url?.includes('/auth/forgot-password') || config.url?.includes('/auth/reset-password')) {
+        return config;
+      }
       if (!this.token) {
-        this.token = await AsyncStorage.getItem('access_token');
+        try {
+          this.token = await AsyncStorage.getItem('access_token');
+        } catch (e) {
+          console.warn('Failed to load access token:', e);
+        }
       }
       if (this.token) {
         config.headers.Authorization = `Bearer ${this.token}`;
@@ -43,7 +58,12 @@ class ApiService {
     });
 
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        if (response.data && typeof response.data === 'object' && 'statusCode' in response.data && 'timestamp' in response.data) {
+          response.data = response.data.data !== undefined ? response.data.data : response.data;
+        }
+        return response;
+      },
       async (error) => {
         if (error.response?.status === 401) {
           await this.logout();
@@ -59,9 +79,16 @@ class ApiService {
 
   async login(data: MobileLoginRequest): Promise<LoginResponse> {
     const response = await this.client.post<LoginResponse>('/auth/mobile-login', data);
-    await AsyncStorage.setItem('access_token', response.data.access_token);
-    await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
     this.token = response.data.access_token;
+    if (response.data?.user?.photoUrl) {
+      response.data.user.photoUrl = resolveImageUrl(response.data.user.photoUrl) || response.data.user.photoUrl;
+    }
+    AsyncStorage.setItem('access_token', response.data.access_token).catch((e) =>
+      console.warn('Failed to persist access token:', e),
+    );
+    AsyncStorage.setItem('user', JSON.stringify(response.data.user)).catch((e) =>
+      console.warn('Failed to persist user:', e),
+    );
     return response.data;
   }
 
@@ -76,9 +103,9 @@ class ApiService {
   }
 
   async logout() {
-    await AsyncStorage.removeItem('access_token');
-    await AsyncStorage.removeItem('user');
     this.token = null;
+    AsyncStorage.removeItem('access_token').catch(() => {});
+    AsyncStorage.removeItem('user').catch(() => {});
   }
 
   async getDashboard(): Promise<DashboardData> {
@@ -682,7 +709,9 @@ class ApiService {
 
   async getProfile() {
     const response = await this.client.get('/profile');
-    return response.data;
+    const data = response.data;
+    if (data?.photoUrl) data.photoUrl = resolveImageUrl(data.photoUrl) || data.photoUrl;
+    return data;
   }
 
   async updateProfile(data: { firstName?: string; lastName?: string; email?: string; phone?: string }) {

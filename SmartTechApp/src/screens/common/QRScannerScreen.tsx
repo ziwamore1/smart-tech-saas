@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 const { width } = Dimensions.get('window');
 const SCAN_AREA_SIZE = width * 0.7;
 
-export default function QRScannerScreen() {
+export function QRScannerScreen() {
   const navigation = useNavigation<any>();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanning, setScanning] = useState(true);

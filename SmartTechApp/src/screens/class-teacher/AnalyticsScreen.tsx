@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, WidgetCard, GradientCard } from '../../components';
 import { colors, spacing, borderRadius, shadows, typography } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
-import { VictoryBar, VictoryChart, VictoryTheme, VictoryAxis, VictoryPie, VictoryLabel } from 'victory-native';
+
 
 export const ClassTeacherAnalyticsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -40,20 +40,15 @@ export const ClassTeacherAnalyticsScreen: React.FC = () => {
         </View>
 
         <WidgetCard title="Subject Performance">
-          <VictoryChart theme={VictoryTheme.material} height={200} padding={{ top: 20, bottom: 60, left: 50, right: 20 }}>
-            <VictoryAxis style={{ axis: { stroke: colors.border }, tickLabels: { fill: colors.textLight, fontSize: 10 } }} tickFormat={(t) => t.length > 8 ? t.substring(0, 7) + '…' : t} />
-            <VictoryAxis dependentAxis domain={[0, 100]} style={{ axis: { stroke: colors.border }, tickLabels: { fill: colors.textLight, fontSize: 10 } }} />
-            <VictoryBar
-              data={subjectPerformance.map((subj) => ({
-                x: subj.name,
-                y: subj.avg,
-                fill: subj.color,
-              }))}
-              cornerRadius={{ top: 4 }}
-              barWidth={24}
-              animate={{ duration: 500 }}
-            />
-          </VictoryChart>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 160, paddingVertical: spacing.sm }}>
+            {subjectPerformance.map((subj) => (
+              <View key={subj.name} style={{ alignItems: 'center', flex: 1 }}>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: subj.color, marginBottom: 2 }}>{subj.avg}%</Text>
+                <View style={{ width: 24, height: subj.avg * 1.4, backgroundColor: subj.color, borderRadius: 4, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }} />
+                <Text style={{ fontSize: 9, color: colors.textLight, marginTop: 4, textAlign: 'center' }}>{subj.name.length > 8 ? subj.name.substring(0, 7) + '…' : subj.name}</Text>
+              </View>
+            ))}
+          </View>
         </WidgetCard>
 
         <WidgetCard title="Risk Indicators" action={{ label: 'View All', onPress: () => {} }}>

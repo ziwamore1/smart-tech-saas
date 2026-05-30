@@ -191,9 +191,9 @@ export function TemplateMarketplaceScreen({ navigation }: any) {
           >
             <Text style={[styles.chipText, !selectedCategory && styles.chipTextActive]}>All</Text>
           </TouchableOpacity>
-          {categories.map((cat) => (
+          {categories.map((cat, idx) => (
             <TouchableOpacity
-              key={cat.id}
+              key={cat.id ?? idx}
               style={[styles.chip, selectedCategory === (cat.slug || cat.name) && styles.chipActive]}
               onPress={() => setSelectedCategory(cat.slug || cat.name)}
             >

@@ -18,7 +18,7 @@ type RouteParams = {
   error?: string;
 };
 
-export default function VerificationResultScreen() {
+export function VerificationResultScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { result, token, error } = route.params as RouteParams;

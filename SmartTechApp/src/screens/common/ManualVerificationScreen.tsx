@@ -14,7 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { verificationService } from '../../services/verification';
 
-export default function ManualVerificationScreen() {
+export function ManualVerificationScreen() {
   const navigation = useNavigation<any>();
   const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);

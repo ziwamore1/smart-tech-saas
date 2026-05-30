@@ -5,7 +5,7 @@ import { Card, Loading } from '../../components';
 import { colors, spacing, shadows } from '../../theme';
 import { useAuthStore, useAppStore } from '../../store';
 import { apiService } from '../../services/api';
-import { VictoryLine, VictoryChart, VictoryTheme, VictoryAxis, VictoryScatter, VictoryArea, VictoryPie } from 'victory-native';
+
 
 export const AnalyticsScreen: React.FC = () => {
   const { user } = useAuthStore();
@@ -71,29 +71,20 @@ export const AnalyticsScreen: React.FC = () => {
         {trajectory?.history && (
           <Card style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Growth Trajectory</Text>
-            <VictoryChart theme={VictoryTheme.material} height={200} padding={{ top: 20, bottom: 40, left: 40, right: 20 }}>
-              <VictoryAxis style={{ axis: { stroke: colors.border }, tickLabels: { fill: colors.textLight, fontSize: 10 } }} tickFormat={(_, i) => trajectory.history[i]?.term || `T${i + 1}`} />
-              <VictoryAxis dependentAxis domain={[0, 100]} style={{ axis: { stroke: colors.border }, tickLabels: { fill: colors.textLight, fontSize: 10 } }} />
-              <VictoryArea
-                data={trajectory.history.map((h: any, i: number) => ({ x: i, y: h.average || h.score || 0 }))}
-                style={{ data: { fill: colors.primaryLight, fillOpacity: 0.2, stroke: colors.primary, strokeWidth: 2 } }}
-                animate={{ duration: 500 }}
-              />
-              <VictoryLine
-                data={trajectory.history.map((h: any, i: number) => ({ x: i, y: h.average || h.score || 0 }))}
-                style={{ data: { stroke: colors.primary, strokeWidth: 3 } }}
-                animate={{ duration: 500 }}
-              />
-              <VictoryScatter
-                data={trajectory.history.map((h: any, i: number) => ({
-                  x: i,
-                  y: h.average || h.score || 0,
-                  fill: h.trend === 'up' ? '#10b981' : h.trend === 'down' ? '#ef4444' : '#f59e0b',
-                }))}
-                size={6}
-                animate={{ duration: 500 }}
-              />
-            </VictoryChart>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 160, paddingVertical: spacing.sm }}>
+              {trajectory.history.map((h: any, i: number) => {
+                const val = h.average || h.score || 0;
+                const dotColor = h.trend === 'up' ? '#10b981' : h.trend === 'down' ? '#ef4444' : '#f59e0b';
+                return (
+                  <View key={i} style={{ alignItems: 'center', flex: 1 }}>
+                    <Text style={{ fontSize: 9, fontWeight: '700', color: dotColor, marginBottom: 2 }}>{val}%</Text>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: dotColor, marginBottom: 2 }} />
+                    <View style={{ width: 24, height: val * 1.4, backgroundColor: colors.primaryLight, borderRadius: 3, opacity: 0.3 }} />
+                    <Text style={{ fontSize: 9, color: colors.textLight, marginTop: 4 }}>{h.term || `T${i + 1}`}</Text>
+                  </View>
+                );
+              })}
+            </View>
             {trajectory.prediction && (
               <View style={[styles.trajectoryRow, { opacity: 0.6, marginTop: spacing.sm }]}>
                 <View style={[styles.trajectoryDot, { backgroundColor: '#8b5cf6' }]} />

@@ -1,13 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { HeaderBar, WidgetCard, GradientCard } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { VictoryPie, VictoryChart, VictoryTheme, VictoryBar, VictoryAxis } from 'victory-native';
 
 interface DirectorReportsProps {
   onToggleDrawer?: () => void;
@@ -107,21 +106,19 @@ export const DirectorReportsScreen: React.FC<DirectorReportsProps> = ({ onToggle
         </GradientCard>
 
         <WidgetCard title="Performance Overview">
-          <VictoryChart theme={VictoryTheme.material} height={200} padding={{ top: 20, bottom: 40, left: 40, right: 20 }}>
-            <VictoryAxis style={{ axis: { stroke: colors.border }, tickLabels: { fill: colors.textLight, fontSize: 10 } }} />
-            <VictoryAxis dependentAxis domain={[0, 100]} style={{ axis: { stroke: colors.border }, tickLabels: { fill: colors.textLight, fontSize: 10 } }} />
-            <VictoryBar
-              data={[
-                { x: 'Pass', y: 87, fill: colors.success },
-                { x: 'Attendance', y: 92, fill: colors.primary },
-                { x: 'GPA (×20)', y: 84, fill: colors.purple },
-              ]}
-              cornerRadius={{ top: 4 }}
-              barWidth={40}
-              style={{ data: { fill: ({ datum }) => datum.fill } }}
-              animate={{ duration: 500 }}
-            />
-          </VictoryChart>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 160, paddingVertical: spacing.md }}>
+            {[
+              { label: 'Pass', value: 87, color: colors.success },
+              { label: 'Attendance', value: 92, color: colors.primaryLight },
+              { label: 'GPA (×20)', value: 84, color: colors.purple },
+            ].map((bar) => (
+              <View key={bar.label} style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: bar.color, marginBottom: 4 }}>{bar.value}%</Text>
+                <View style={{ width: 40, height: bar.value * 1.4, backgroundColor: bar.color, borderRadius: 4, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }} />
+                <Text style={{ fontSize: 10, color: colors.textLight, marginTop: 6 }}>{bar.label}</Text>
+              </View>
+            ))}
+          </View>
         </WidgetCard>
 
         {reportCategories.map((category, idx) => (
