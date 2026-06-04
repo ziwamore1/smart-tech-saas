@@ -52,6 +52,22 @@ const DEFAULT_FEATURES = [
   { key: 'advanced.restore', name: 'Data Restore', description: 'Restore from backup', category: 'advanced', minTier: 'BASIC' },
   { key: 'advanced.multiuser', name: 'Multi-user Access', description: 'Multiple admin user accounts', category: 'advanced', minTier: 'STANDARD' },
   { key: 'advanced.sso', name: 'Single Sign-On (SSO)', description: 'SSO integration with external systems', category: 'advanced', minTier: 'PREMIUM' },
+
+  // ── Primary School Features ──
+  { key: 'primary.dashboard', name: 'Primary Dashboard', description: 'View primary school dashboard overview', category: 'primary', minTier: 'BASIC' },
+  { key: 'primary.students', name: 'Primary Pupils', description: 'Manage pupil records and admissions', category: 'primary', minTier: 'BASIC' },
+  { key: 'primary.classes', name: 'Primary Classes', description: 'View and manage primary class rosters', category: 'primary', minTier: 'BASIC' },
+  { key: 'primary.attendance', name: 'Primary Attendance', description: 'Mark and track daily pupil attendance', category: 'primary', minTier: 'BASIC' },
+  { key: 'primary.results', name: 'Primary Results', description: 'Enter continuous assessment scores', category: 'primary', minTier: 'BASIC' },
+  { key: 'primary.staff', name: 'Primary Staff', description: 'Manage teaching and non-teaching staff', category: 'primary', minTier: 'STANDARD' },
+  { key: 'primary.parents', name: 'Parent Portal', description: 'Parent registration, linking, and communication', category: 'primary', minTier: 'STANDARD' },
+  { key: 'primary.reportCards', name: 'Curriculum Report Cards', description: 'Generate curriculum-based report cards with division badges', category: 'primary', minTier: 'STANDARD' },
+  { key: 'primary.curriculum', name: 'Curriculum Config', description: 'Configure scoring rules, best-subject selection, and performance categories', category: 'primary', minTier: 'STANDARD' },
+  { key: 'primary.analytics', name: 'Primary Analytics', description: 'Enrollment pipeline, attendance trends, and class performance', category: 'primary', minTier: 'STANDARD' },
+  { key: 'primary.ece', name: 'ECE Module', description: 'Early Childhood Education specific assessments and tracking', category: 'primary', minTier: 'STANDARD' },
+  { key: 'primary.grade7', name: 'Grade 7 ECZ Management', description: 'ECZ exam registration, raw score conversion, and division computation', category: 'primary', minTier: 'PREMIUM' },
+  { key: 'primary.benchmarking', name: 'Primary Benchmarking', description: 'Compare performance against national primary averages', category: 'primary', minTier: 'PREMIUM' },
+  { key: 'primary.aiReports', name: 'AI Report Comments', description: 'AI-generated personalized report card comments', category: 'primary', minTier: 'PREMIUM' },
 ];
 
 async function seedFeatureLocks() {
@@ -99,6 +115,8 @@ async function seedSubscriptionPlans() {
         'results.bulkImport', 'fees.view', 'fees.manage', 'communications.view',
         'communications.send', 'analytics.view', 'reports.generate', 'reports.export',
         'advanced.backup', 'advanced.restore',
+        'primary.dashboard', 'primary.students', 'primary.classes',
+        'primary.attendance', 'primary.results',
       ],
     },
     {
@@ -122,6 +140,9 @@ async function seedSubscriptionPlans() {
         'analytics.view', 'analytics.advanced',
         'reports.generate', 'reports.custom', 'reports.export',
         'integrations.api', 'advanced.backup', 'advanced.restore', 'advanced.multiuser',
+        'primary.dashboard', 'primary.students', 'primary.classes',
+        'primary.attendance', 'primary.results', 'primary.staff', 'primary.parents',
+        'primary.reportCards', 'primary.curriculum', 'primary.analytics', 'primary.ece',
       ],
     },
     {
@@ -146,6 +167,10 @@ async function seedSubscriptionPlans() {
         'reports.generate', 'reports.custom', 'reports.export',
         'integrations.api', 'integrations.webhooks',
         'advanced.backup', 'advanced.restore', 'advanced.multiuser', 'advanced.sso',
+        'primary.dashboard', 'primary.students', 'primary.classes',
+        'primary.attendance', 'primary.results', 'primary.staff', 'primary.parents',
+        'primary.reportCards', 'primary.curriculum', 'primary.analytics', 'primary.ece',
+        'primary.grade7', 'primary.benchmarking', 'primary.aiReports',
       ],
     },
   ];

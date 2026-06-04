@@ -613,13 +613,27 @@ export class MobileService {
     };
   }
 
-  async startAiTutorSession(userId: string, schoolId: string, roles: string[], options?: { subjectId?: string; topic?: string; studentId?: string }) {
+  async startAiTutorSession(userId: string, schoolId: string, roles: string[], options?: {
+    subjectId?: string;
+    topic?: string;
+    studentId?: string;
+    context?: { role?: string; screen?: string; subject?: string; topic?: string };
+  }) {
     let studentId: string | null = options?.studentId || null;
 
     if (!studentId && roles.includes('Student')) {
       const student = await this.prisma.student.findFirst({ where: { user: { id: userId } } });
       studentId = student?.id || null;
     }
+
+    const contextPayload = {
+      role: (options?.context?.role || roles[0]?.toLowerCase().replace(' ', '_') || 'student') as any,
+      screen: options?.context?.screen,
+      subject: options?.context?.subject || options?.subjectId,
+      topic: options?.context?.topic || options?.topic,
+      studentId: studentId || undefined,
+      userId,
+    };
 
     if (!studentId) {
       const greeting = this.generateGeneralGreeting(options?.topic, options?.subjectId);
@@ -639,10 +653,16 @@ export class MobileService {
       return { sessionId: session.id, message: greeting, isGeneral: true };
     }
 
-    return this.aiTutorService.startSession(studentId, schoolId, options);
+    return this.aiTutorService.startSession(studentId, schoolId, {
+      subjectId: options?.subjectId,
+      topic: options?.topic,
+      context: contextPayload,
+    });
   }
 
-  async sendAiTutorMessage(userId: string, schoolId: string, sessionId: string, message: string) {
+  async sendAiTutorMessage(userId: string, schoolId: string, sessionId: string, message: string, context?: {
+    role?: string; screen?: string; subject?: string; topic?: string; studentId?: string;
+  }) {
     const session = await this.prisma.aiTutorSession.findUnique({
       where: { id: sessionId },
       include: { messages: { orderBy: { createdAt: 'asc' } } },
@@ -652,11 +672,20 @@ export class MobileService {
       return { error: 'Session not found' };
     }
 
+    const contextPayload = context ? {
+      role: (context.role || 'student') as any,
+      screen: context.screen,
+      subject: context.subject || session.subjectId || undefined,
+      topic: context.topic || session.topic || undefined,
+      studentId: context.studentId || session.studentId || undefined,
+      userId,
+    } : { studentId: session.studentId || undefined, userId };
+
     await this.prisma.aiTutorMessage.create({
       data: { sessionId, role: 'user', content: message },
     });
 
-    const response = this.generateTutorResponse(message, session);
+    const response = await this.generateTutorResponse(message, session, contextPayload);
 
     await this.prisma.aiTutorMessage.create({
       data: { sessionId, role: 'tutor', content: response },
@@ -665,7 +694,9 @@ export class MobileService {
     return { response };
   }
 
-  async askAiTutor(userId: string, schoolId: string, roles: string[], question: string, subjectId?: string) {
+  async askAiTutor(userId: string, schoolId: string, roles: string[], question: string, subjectId?: string, context?: {
+    role?: string; screen?: string; subject?: string; topic?: string; studentId?: string;
+  }) {
     let studentId: string | null = null;
 
     if (roles.includes('Student')) {
@@ -673,12 +704,35 @@ export class MobileService {
       studentId = student?.id || null;
     }
 
+    const contextPayload = {
+      role: (context?.role || roles[0]?.toLowerCase().replace(' ', '_') || 'student') as any,
+      screen: context?.screen,
+      subject: context?.subject || subjectId,
+      topic: context?.topic,
+      studentId: context?.studentId || studentId || undefined,
+      userId,
+    };
+
     if (!studentId) {
-      const response = this.generateGeneralTutorResponse(question, subjectId);
+      const response = await this.generateTutorResponse(question, null, contextPayload);
       return { response, isGeneral: true };
     }
 
-    return this.aiTutorService.askQuestion(studentId, schoolId, question, subjectId);
+    return this.aiTutorService.askQuestion(studentId, schoolId, question, subjectId, contextPayload);
+  }
+
+  private async generateTutorResponse(message: string, session: any, context?: any): Promise<string> {
+    if (!session) {
+      return this.generateGeneralTutorResponse(message, context?.subject);
+    }
+    const result = await this.aiTutorService.sendMessage(
+      session.id,
+      session.studentId || 'unknown',
+      message,
+      session.schoolId,
+      context || {},
+    );
+    return result.response;
   }
 
   private generateGeneralGreeting(topic?: string, subjectId?: string): string {
@@ -689,35 +743,6 @@ export class MobileService {
       return `Hi! I'm your AI tutor. Let's discuss ${topic}. What specific aspect would you like to explore?`;
     }
     return `Welcome! I'm your AI tutor. I can help with concepts, practice questions, study tips, and more. What would you like to learn today?`;
-  }
-
-  private generateTutorResponse(message: string, session: any): string {
-    const lower = message.toLowerCase();
-
-    if (/^(hi|hello|hey|greetings|good\s(morning|afternoon|evening))/.test(lower)) {
-      const topic = session.topic || 'your studies';
-      return `Hello! Ready to dive into ${topic}? Ask me anything or I can give you a practice question.`;
-    }
-
-    if (/help|struggling|confused|don't understand|difficult/.test(lower)) {
-      return `I'm here to help! Can you tell me specifically which concept or problem you're working on? Try asking something like "Explain [concept]" or "How do I solve [problem]?"`;
-    }
-
-    if (/practice|exercise|problem|question|test me|quiz/.test(lower)) {
-      return `Here's a practice question:\n\n**Question**: Based on what you've been studying, can you explain the key concepts and provide a real-world example?\n\nTry answering in your own words and I'll give you feedback!`;
-    }
-
-    if (/explain|what is|how does|why does|mean|define|tell me about/.test(lower)) {
-      const topicMatch = message.match(/(?:explain|what is|how does|why does|define|tell me about)\s+(.+?)(?:\?|$)/i);
-      const topic = topicMatch ? topicMatch[1].trim() : 'this concept';
-      return `Great question about ${topic}!\n\n1. **Definition**: ${topic} is a key concept that you'll encounter frequently.\n2. **Key Points**: Focus on understanding the core principles and how they connect.\n3. **Example**: Think about how ${topic} applies in different scenarios.\n4. **Practice**: Work through related problems to reinforce understanding.\n\nWould you like me to go deeper or give you a practice question?`;
-    }
-
-    if (/tired|bored|demotivated|give up|hard|frustrated/.test(lower)) {
-      return `Learning can be challenging! Remember every expert was once a beginner.\n\n1. **Break it down**: Focus on one small concept at a time\n2. **Take breaks**: Short breaks help your brain learn better\n3. **Ask questions**: Every question helps you learn\n4. **Practice**: Regular practice makes things easier\n\nWhat's one small thing we can work on together?`;
-    }
-
-    return `That's a great point! Here's my guidance:\n\nApproach this systematically. Make sure you understand the fundamentals before moving to complex applications.\n\nWould you like me to:\n1. Explain a specific concept?\n2. Give you a practice problem?\n3. Provide study tips?`;
   }
 
   private generateGeneralTutorResponse(question: string, subjectId?: string): string {

@@ -1,11 +1,35 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import OpenAI from 'openai';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AiContextService } from './ai-context.service';
+import { SubjectEngineService } from './subject-engine.service';
+import { buildSystemPrompt, buildUserPrompt, AiContext, Role } from './prompt-templates';
 
 @Injectable()
 export class AiTutorService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(AiTutorService.name);
+  private openai: OpenAI;
 
-  async startSession(studentId: string, schoolId: string, options?: { subjectId?: string; topic?: string }) {
+  constructor(
+    private prisma: PrismaService,
+    private config: ConfigService,
+    private aiContext: AiContextService,
+    private subjectEngine: SubjectEngineService,
+  ) {
+    const apiKey = this.config.get<string>('OPENAI_API_KEY');
+    if (apiKey) {
+      this.openai = new OpenAI({ apiKey });
+    } else {
+      this.logger.warn('OPENAI_API_KEY not configured. AI Tutor will use fallback responses.');
+    }
+  }
+
+  async startSession(
+    studentId: string,
+    schoolId: string,
+    options?: { subjectId?: string; topic?: string; context?: Partial<AiContext> },
+  ) {
     const session = await this.prisma.aiTutorSession.create({
       data: {
         studentId,
@@ -15,26 +39,32 @@ export class AiTutorService {
       },
     });
 
-    const greeting = this.generateGreeting(options?.topic, options?.subjectId);
+    const context = await this.buildFullContext(schoolId, options?.context);
+    const greeting = await this.generateGreeting(context, options);
 
     await this.prisma.aiTutorMessage.create({
-      data: {
-        sessionId: session.id,
-        role: 'tutor',
-        content: greeting,
-      },
+      data: { sessionId: session.id, role: 'tutor', content: greeting },
     });
 
     return { sessionId: session.id, message: greeting };
   }
 
-  async sendMessage(sessionId: string, studentId: string, message: string, schoolId: string) {
+  async sendMessage(
+    sessionId: string,
+    studentId: string,
+    message: string,
+    schoolId: string,
+    context?: Partial<AiContext>,
+  ) {
     const session = await this.prisma.aiTutorSession.findUnique({
       where: { id: sessionId },
-      include: { messages: { orderBy: { createdAt: 'asc' } } },
+      include: { messages: { orderBy: { createdAt: 'asc' }, take: 50 } },
     });
 
-    if (!session || session.schoolId !== schoolId || session.studentId !== studentId) {
+    if (!session || session.schoolId !== schoolId) {
+      return { error: 'Session not found' };
+    }
+    if (session.studentId && session.studentId !== studentId) {
       return { error: 'Session not found' };
     }
 
@@ -42,13 +72,56 @@ export class AiTutorService {
       data: { sessionId, role: 'student', content: message },
     });
 
-    const response = await this.generateResponse(message, session);
+    const fullContext = await this.buildFullContext(schoolId, {
+      ...context,
+      studentId,
+      message,
+      previousMessages: session.messages.slice(-10).map(m => ({ role: m.role === 'student' ? 'user' : 'assistant', content: m.content })),
+      subject: context?.subject || session.subjectId || undefined,
+      topic: context?.topic || session.topic || undefined,
+    });
+
+    const response = await this.generateLLMResponse(fullContext);
 
     await this.prisma.aiTutorMessage.create({
       data: { sessionId, role: 'tutor', content: response },
     });
 
     return { response };
+  }
+
+  async askQuestion(
+    studentId: string,
+    schoolId: string,
+    question: string,
+    subjectId?: string,
+    context?: Partial<AiContext>,
+  ) {
+    if (!studentId) {
+      const genericCtx: AiContext = {
+        role: 'student',
+        message: question,
+        subject: subjectId,
+      };
+      const response = await this.generateLLMResponse(genericCtx);
+      return { response, isGeneral: true };
+    }
+
+    const sessions = await this.prisma.aiTutorSession.findMany({
+      where: { studentId, schoolId, status: 'active' },
+      orderBy: { updatedAt: 'desc' },
+      take: 1,
+    });
+
+    let sessionId: string;
+    if (sessions.length > 0) {
+      sessionId = sessions[0].id;
+    } else {
+      const result = await this.startSession(studentId, schoolId, { subjectId, context });
+      sessionId = result.sessionId;
+    }
+
+    return this.sendMessage(sessionId, studentId, question, schoolId, context);
   }
 
   async getSessionHistory(sessionId: string, schoolId: string) {
@@ -89,7 +162,11 @@ export class AiTutorService {
     }));
   }
 
-  async endSession(sessionId: string, schoolId: string, feedback?: { rating?: number; helpful?: boolean; comment?: string }) {
+  async endSession(
+    sessionId: string,
+    schoolId: string,
+    feedback?: { rating?: number; helpful?: boolean; comment?: string },
+  ) {
     const session = await this.prisma.aiTutorSession.findUnique({
       where: { id: sessionId },
     });
@@ -112,40 +189,6 @@ export class AiTutorService {
     return { message: 'Session ended', sessionId };
   }
 
-  async askQuestion(studentId: string, schoolId: string, question: string, subjectId?: string) {
-    if (!studentId) {
-      const response = this.generateGeneralTutoringResponse(question, {});
-      return { response };
-    }
-
-    const student = await this.prisma.student.findUnique({
-      where: { id: studentId },
-      select: { id: true },
-    });
-
-    if (!student) {
-      const response = this.generateGeneralTutoringResponse(question, {});
-      return { response };
-    }
-
-    const sessions = await this.prisma.aiTutorSession.findMany({
-      where: { studentId, schoolId, status: 'active' },
-      orderBy: { updatedAt: 'desc' },
-      take: 1,
-    });
-
-    let sessionId: string;
-
-    if (sessions.length > 0) {
-      sessionId = sessions[0].id;
-    } else {
-      const result = await this.startSession(studentId, schoolId, { subjectId });
-      sessionId = result.sessionId;
-    }
-
-    return this.sendMessage(sessionId, studentId, question, schoolId);
-  }
-
   async getTutorInsights(studentId: string, schoolId: string) {
     const sessions = await this.prisma.aiTutorSession.findMany({
       where: { studentId, schoolId },
@@ -164,8 +207,9 @@ export class AiTutorService {
     const topics = sessions.filter(s => s.topic).map(s => s.topic);
     const uniqueTopics = [...new Set(topics)];
 
-    const messages = sessions.flatMap(s => s.messages);
-    const keywords = this.extractKeywords(messages.filter(m => m.role === 'student').map(m => m.content));
+    const keywords = this.extractKeywords(
+      sessions.flatMap(s => s.messages).filter(m => m.role === 'student').map(m => m.content),
+    );
 
     return {
       totalSessions: sessions.length,
@@ -180,7 +224,121 @@ export class AiTutorService {
     };
   }
 
-  private generateGreeting(topic?: string, subjectId?: string): string {
+  private async buildFullContext(schoolId: string, partial?: Partial<AiContext>): Promise<AiContext> {
+    const context: AiContext = {
+      role: partial?.role || 'student',
+      subject: partial?.subject,
+      topic: partial?.topic,
+      screen: partial?.screen,
+      message: partial?.message,
+      previousMessages: partial?.previousMessages,
+    };
+
+    if (partial?.studentId) {
+      const studentCtx = await this.aiContext.getStudentContext(partial.studentId, schoolId);
+      if (studentCtx) {
+        context.name = studentCtx.name;
+        context.grade = studentCtx.grade;
+        context.className = studentCtx.className;
+        context.currentPerformance = studentCtx.currentPerformance;
+        context.attendance = studentCtx.attendance;
+        context.recentResults = studentCtx.recentResults;
+        context.competency = studentCtx.competency;
+        context.growth = studentCtx.growth;
+      }
+    }
+
+    if (partial?.role === 'teacher' || partial?.role === 'class_teacher') {
+      const teacherCtx = await this.aiContext.getTeacherContext(partial.userId || '', schoolId);
+      if (teacherCtx) {
+        context.name = partial?.name;
+        context.classPerformance = teacherCtx.classes;
+      }
+    }
+
+    if (partial?.role === 'director') {
+      const directorCtx = await this.aiContext.getDirectorContext(schoolId);
+      if (directorCtx) {
+        context.schoolStats = directorCtx.schoolStats;
+        context.classPerformance = directorCtx.classPerformance;
+        context.className = directorCtx.currentTerm || undefined;
+      }
+    }
+
+    if (partial?.role === 'parent') {
+      const parentCtx = await this.aiContext.getParentContext(partial.userId || '', schoolId);
+      if (parentCtx) {
+        context.children = parentCtx.children;
+      }
+    }
+
+    return context;
+  }
+
+  private async generateLLMResponse(context: AiContext): Promise<string> {
+    if (!this.openai) {
+      return this.fallbackResponse(context);
+    }
+
+    try {
+      const subject = context.subject || this.subjectEngine.detectSubjectFromQuery(context.message || '');
+      const subjectPrompt = this.subjectEngine.getSystemPromptForSubject(subject);
+      const rolePrompt = buildSystemPrompt(context);
+      const systemPrompt = subjectPrompt
+        ? `${rolePrompt}\n\n=== SUBJECT-SPECIFIC INSTRUCTIONS ===\n${subjectPrompt}\n\nRemember: You are teaching ${subject}. Follow the subject-specific methodology above while also adapting to the user's role and context.`
+        : rolePrompt;
+
+      const preprocessedQuery = await this.subjectEngine.preprocessQuery(subject, context.message || '', context);
+      const userPrompt = buildUserPrompt({ ...context, message: preprocessedQuery });
+
+      const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+        { role: 'system', content: systemPrompt },
+        ...(context.previousMessages?.map(m => ({
+          role: m.role === 'user' ? 'user' : 'assistant',
+          content: m.content,
+        })) as OpenAI.Chat.Completions.ChatCompletionMessageParam[]) || [],
+        { role: 'user', content: userPrompt },
+      ];
+
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages,
+        max_tokens: 1024,
+        temperature: 0.7,
+      });
+
+      return response.choices[0]?.message?.content || this.fallbackResponse(context);
+    } catch (error) {
+      this.logger.error('OpenAI API error:', error);
+      return this.fallbackResponse(context);
+    }
+  }
+
+  private async generateGreeting(context: AiContext, options?: { subjectId?: string; topic?: string }): Promise<string> {
+    if (this.openai) {
+      try {
+        const systemPrompt = buildSystemPrompt(context);
+        const introPrompt = `Generate a warm, personalized greeting for a ${context.role}${options?.topic ? ` who wants to learn about ${options.topic}` : ''}${options?.subjectId ? ` in ${context.subject || 'this subject'}` : ''}. Be specific and reference their performance context. Keep it under 3 sentences.`;
+
+        const response = await this.openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: introPrompt },
+          ],
+          max_tokens: 200,
+          temperature: 0.8,
+        });
+
+        return response.choices[0]?.message?.content || this.staticGreeting(options?.topic, options?.subjectId);
+      } catch {
+        return this.staticGreeting(options?.topic, options?.subjectId);
+      }
+    }
+    return this.staticGreeting(options?.topic, options?.subjectId);
+  }
+
+  private staticGreeting(topic?: string, subjectId?: string): string {
     if (topic && subjectId) {
       return `Hello! I'm your AI tutor. Let's explore ${topic} together. What would you like to learn about this topic?`;
     }
@@ -190,122 +348,51 @@ export class AiTutorService {
     return `Welcome! I'm your AI tutor. I can help you understand concepts, solve problems, and practice for exams. What would you like to learn today?`;
   }
 
-  private async generateResponse(message: string, session: any): Promise<string> {
+  private fallbackResponse(context: AiContext): string {
+    const message = context.message || '';
     const lower = message.toLowerCase();
+    const weakAreas = context.currentPerformance?.weakAreas;
 
-    if (this.isGreeting(lower)) {
-      return this.respondToGreeting(session);
+    if (/^(hi|hello|hey|greetings)/.test(lower)) {
+      return `Hello${context.name ? ` ${context.name.split(' ')[0]}` : ''}! Ready to learn? I can see ${context.currentPerformance?.weakAreas?.length ? `we should focus on ${weakAreas?.join(', ')}` : 'you\'re making progress'}. What would you like to work on?`;
     }
 
-    if (this.isHelpRequest(lower)) {
-      return this.respondToHelp(session);
+    if (/help|struggling|confused|don't understand|difficult/.test(lower)) {
+      if (weakAreas?.length) {
+        return `I see you've been finding ${weakAreas.slice(0, 2).join(' and ')} challenging. Let's break it down together. Can you tell me specifically what's confusing you?`;
+      }
+      return `I'm here to help! Tell me which concept or problem you're working on.`;
     }
 
-    if (this.isPracticeRequest(lower)) {
-      return this.generatePracticeQuestion(session);
+    if (/practice|exercise|problem|question|test me|quiz/.test(lower)) {
+      const subject = context.subject || 'this subject';
+      if (weakAreas?.length) {
+        return `Let's practice ${weakAreas[0]} to strengthen your understanding. Here's a question:\n\n**Question**: Can you explain the key concept in ${weakAreas[0]} and provide an example?\n\nTry answering and I'll give you feedback!`;
+      }
+      return `Here's a practice question for ${subject}:\n\n**Question**: Based on what you've studied, explain the main concepts and provide a real-world example.\n\nTry answering in your own words!`;
     }
 
-    if (this.isExplanationRequest(lower)) {
-      return this.generateExplanation(message, session);
+    if (/explain|what is|how does|why does|mean|define|tell me about/.test(lower)) {
+      const topicMatch = message.match(/(?:explain|what is|how does|why does|define|tell me about)\s+(.+?)(?:\?|$)/i);
+      const topic = topicMatch ? topicMatch[1].trim() : 'this concept';
+      const performanceNote = context.currentPerformance?.average !== null && context.currentPerformance?.average !== undefined && context.currentPerformance.average < 50
+        ? `\n\nSince you're working to improve, let me explain this in a simple, clear way.`
+        : '';
+      return `Great question about ${topic}!${performanceNote}\n\n1. **Definition**: ${topic} is an important concept.\n2. **Key Points**: Focus on the core ideas and how they connect.\n3. **Example**: Think about how this applies in practice.\n4. **Practice**: Try working through related problems.\n\nWould you like me to go deeper or give you a practice question?`;
     }
 
-    if (this.isMotivational(lower)) {
-      return this.respondToMotivation();
+    if (/tired|bored|demotivated|give up|hard|frustrated/.test(lower)) {
+      const encouragement = context.currentPerformance?.average !== null && context.currentPerformance?.average !== undefined && context.currentPerformance.average > 50
+        ? `Remember, your current average is ${context.currentPerformance.average}% - you're doing well! Keep pushing forward.`
+        : `Every expert was once a beginner. Let's take it step by step.`;
+      return `${encouragement}\n\n1. **Break it down**: Focus on one small concept at a time\n2. **Take breaks**: Short breaks help learning\n3. **Ask questions**: Every question helps\n\nWhat's one small thing we can work on together?`;
     }
 
-    return this.generateGeneralTutoringResponse(message, session);
-  }
-
-  private isGreeting(text: string): boolean {
-    return /^(hi|hello|hey|greetings|good\s(morning|afternoon|evening))/.test(text);
-  }
-
-  private isHelpRequest(text: string): boolean {
-    return /help|struggling|confused|don't understand|difficult/.test(text);
-  }
-
-  private isPracticeRequest(text: string): boolean {
-    return /practice|exercise|problem|question|test me|quiz/.test(text);
-  }
-
-  private isExplanationRequest(text: string): boolean {
-    return /explain|what is|how does|why does|mean|define|tell me about/.test(text);
-  }
-
-  private isMotivational(text: string): boolean {
-    return /tired|bored|demotivated|give up|hard|frustrated/.test(text);
-  }
-
-  private respondToGreeting(session: any): string {
-    const topic = session.topic || 'your studies';
-    return `Hello again! Ready to dive deeper into ${topic}? Feel free to ask me anything, or I can give you a practice question to test your understanding.`;
-  }
-
-  private respondToHelp(session: any): string {
-    const subjectHint = session.subjectId ? 'this subject' : 'this topic';
-    return `I'm here to help! Let's break down what you're finding difficult about ${subjectHint}. Can you tell me specifically which concept or problem you're working on? Try asking me a specific question like "Explain [concept]" or "How do I solve [problem type]?"`;
-  }
-
-  private generateExplanation(question: string, session: any): string {
-    const topic = this.extractTopic(question);
-    if (topic) {
-      return `Great question about ${topic}! Here's a structured explanation:\n\n` +
-        `1. **Definition**: ${topic} is a key concept in ${session.subjectId || 'this subject'}.\n` +
-        `2. **Key Points**: Understanding ${topic} requires focusing on its core principles and applications.\n` +
-        `3. **Example**: Consider how ${topic} applies in different contexts.\n` +
-        `4. **Practice**: Try working through related problems to reinforce your understanding.\n\n` +
-        `Would you like me to go deeper into any specific aspect of ${topic}, or would you like a practice question?`;
+    if (context.currentPerformance?.average !== null && context.currentPerformance?.average !== undefined && context.currentPerformance.average < 50 && weakAreas?.length) {
+      return `I can help you improve in ${weakAreas.slice(0, 2).join(' and ')}. Let's start with the basics and build up. Would you like me to:\n1. Explain a concept from ${weakAreas[0]}?\n2. Give you a practice problem?\n3. Create a study plan to improve your ${context.currentPerformance.average}% average?`;
     }
-    return `That's an interesting question! Let me break it down for you:\n\n` +
-      `The key to understanding this concept is to start with the fundamentals and build up gradually. Think about how it connects to what you've already learned.\n\n` +
-      `Would you like me to explain a specific example? That often helps make abstract concepts more concrete.`;
-  }
 
-  private generatePracticeQuestion(session: any): string {
-    return `Here's a practice question for you:\n\n` +
-      `**Question**: Based on what you've been studying, can you explain the relationship between the key concepts and provide a real-world example?\n\n` +
-      `Try answering in your own words, and I'll give you feedback on your response!`;
-  }
-
-  private respondToMotivation(): string {
-    return `I understand that learning can be challenging sometimes. Remember that every expert was once a beginner! Here are a few tips:\n\n` +
-      `1. **Break it down**: Focus on one small concept at a time\n` +
-      `2. **Take breaks**: Short breaks actually help your brain learn better\n` +
-      `3. **Ask questions**: There are no silly questions - every question helps you learn\n` +
-      `4. **Practice**: Regular practice makes things easier over time\n\n` +
-      `What's one small thing we can work on together right now?`;
-  }
-
-  private generateGeneralTutoringResponse(message: string, session: any): string {
-    const hasContent = message.length > 20;
-    if (hasContent) {
-      return `That's a good point! Based on what you've shared, here's my guidance:\n\n` +
-        `The key here is to approach this systematically. Make sure you understand the foundational concepts before moving to more complex applications.\n\n` +
-        `Would you like me to:\n` +
-        `1. Explain a specific concept in more detail?\n` +
-        `2. Give you a practice problem?\n` +
-        `3. Provide study tips for this topic?`;
-    }
-    return `I'd love to help you learn! Could you tell me more about what you're working on? You can ask me to:\n\n` +
-      `- Explain a concept (e.g., "Explain photosynthesis")\n` +
-      `- Give a practice question (e.g., "Give me a math problem")\n` +
-      `- Help with a topic (e.g., "Help me with algebra")\n\n` +
-      `What sounds most helpful to you right now?`;
-  }
-
-  private extractTopic(question: string): string {
-    const patterns = [
-      /explain\s+(.+?)(?:\?|$)/i,
-      /what\s+is\s+(.+?)(?:\?|$)/i,
-      /how\s+does\s+(.+?)(?:\?|$)/i,
-      /tell\s+me\s+about\s+(.+?)(?:\?|$)/i,
-      /define\s+(.+?)(?:\?|$)/i,
-    ];
-    for (const pattern of patterns) {
-      const match = question.match(pattern);
-      if (match) return match[1].trim();
-    }
-    return '';
+    return `Based on what you've shared, here's my guidance:\n\nApproach this systematically. ${weakAreas?.length ? `Pay extra attention to ${weakAreas[0]} as it's an area for growth.` : 'Start with the fundamentals and build up gradually.'}\n\nWould you like me to:\n1. Explain a specific concept?\n2. Give you a practice problem?\n3. Create a study plan tailored to you?`;
   }
 
   private extractKeywords(messages: string[]): string[] {

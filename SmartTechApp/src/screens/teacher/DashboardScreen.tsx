@@ -41,7 +41,7 @@ export const TeacherDashboardScreen: React.FC = () => {
     { icon: '🏫', label: 'Classes', screen: 'TeacherClasses', gradient: ['#1E3A8A', '#3B82F6'] as const },
     { icon: '✏️', label: 'Marks', screen: 'TeacherMarks', gradient: ['#0D9488', '#14B8A6'] as const },
     { icon: '📋', label: 'Exams', screen: 'ExamList', gradient: ['#EA580C', '#F97316'] as const },
-    { icon: '🤖', label: 'AI Tutor', screen: 'AiTutor', gradient: ['#7C3AED', '#A78BFA'] as const },
+    { icon: '🤖', label: 'AI Tutor', screen: 'AiTutor', gradient: ['#7C3AED', '#A78BFA'] as const, params: { sourceScreen: 'teacher_dashboard' } },
     { icon: '📊', label: 'Analytics', screen: 'Analytics', gradient: ['#D97706', '#F59E0B'] as const },
     { icon: '📄', label: 'Templates', screen: 'TemplateMarketplace', gradient: ['#0D9488', '#5EEAD4'] as const },
   ];
@@ -67,7 +67,7 @@ export const TeacherDashboardScreen: React.FC = () => {
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickActionsScroll}>
           {quickActions.map((a) => (
-            <QuickActionItem key={a.label} icon={a.icon} label={a.label} gradient={a.gradient as any} onPress={() => navigation.navigate(a.screen)} />
+            <QuickActionItem key={a.label} icon={a.icon} label={a.label} gradient={a.gradient as any} onPress={() => navigation.navigate(a.screen, (a as any).params)} />
           ))}
         </ScrollView>
 

@@ -20,6 +20,17 @@ export class GalleryService {
     });
   }
 
+  async findPublicRecent(limit: number = 6) {
+    return this.prisma.gallery.findMany({
+      where: {
+        photos: { some: {} },
+      },
+      include: { photos: { orderBy: { order: 'asc' } } },
+      orderBy: { eventDate: 'desc' },
+      take: limit,
+    });
+  }
+
   async findAll(schoolId: string) {
     return this.prisma.gallery.findMany({
       where: { schoolId },

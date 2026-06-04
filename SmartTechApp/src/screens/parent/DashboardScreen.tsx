@@ -76,7 +76,11 @@ export const ParentDashboardScreen: React.FC = () => {
             <Text style={{ fontSize: 28 }}>📝</Text>
             <Text style={styles.resourceName}>Results</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.resourceCard} onPress={() => navigation.navigate('AiTutor')}>
+          <TouchableOpacity style={[styles.resourceCard, { borderColor: '#10B981', borderWidth: 1 }]} onPress={() => navigation.navigate('ParentPrimaryDashboard')}>
+            <Text style={{ fontSize: 28 }}>🌿</Text>
+            <Text style={styles.resourceName}>Primary</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.resourceCard} onPress={() => navigation.navigate('AiTutor', { sourceScreen: 'parent_dashboard' })}>
             <Text style={{ fontSize: 28 }}>🤖</Text>
             <Text style={styles.resourceName}>AI Tutor</Text>
           </TouchableOpacity>

@@ -3,9 +3,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { Prisma, EnrollmentStatus } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class StudentService {
+  private readonly logger = new Logger(StudentService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async create(dto: CreateStudentDto, schoolId: string) {
@@ -18,8 +21,106 @@ export class StudentService {
     if (dto.dateOfBirth) {
       data.dateOfBirth = new Date(dto.dateOfBirth);
     }
-    return this.prisma.student.create({
-      data,
+
+    let parentId: string | undefined;
+
+    if (dto.linkingParentId) {
+      parentId = dto.linkingParentId;
+    }
+
+    const student = await this.prisma.student.create({ data });
+
+    if (parentId || dto.parentEmail || dto.parentPhone) {
+      await this.findOrCreateParent({
+        parentName: dto.parentName,
+        parentEmail: dto.parentEmail,
+        parentPhone: dto.parentPhone,
+        studentFirstName: dto.firstName,
+      }, student.id, schoolId, parentId);
+    }
+
+    return student;
+  }
+
+  async linkStudentToParent(studentId: string, parentId: string) {
+    const student = await this.prisma.student.findUnique({ where: { id: studentId } });
+    if (!student) throw new NotFoundException('Student not found');
+    const parent = await this.prisma.parent.findUnique({ where: { id: parentId } });
+    if (!parent) throw new NotFoundException('Parent not found');
+    if (parent.schoolId !== student.schoolId) throw new ForbiddenException('Parent and student must be in the same school');
+
+    await this.prisma.parentStudent.upsert({
+      where: { parentId_studentId: { parentId, studentId } },
+      create: { parentId, studentId },
+      update: {},
+    });
+
+    return { message: 'Student linked to parent successfully' };
+  }
+
+  async unlinkStudentFromParent(studentId: string, parentId: string) {
+    await this.prisma.parentStudent.deleteMany({
+      where: { parentId, studentId },
+    });
+    return { message: 'Student unlinked from parent successfully' };
+  }
+
+  private async findOrCreateParent(
+    info: { parentName?: string; parentEmail?: string; parentPhone?: string; studentFirstName: string },
+    studentId: string,
+    schoolId: string,
+    existingParentId?: string,
+  ) {
+    if (existingParentId) {
+      await this.prisma.parentStudent.upsert({
+        where: { parentId_studentId: { parentId: existingParentId, studentId } },
+        create: { parentId: existingParentId, studentId },
+        update: {},
+      });
+      return;
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      let parent: any = null;
+
+      if (info.parentEmail) {
+        parent = await tx.parent.findUnique({ where: { email: info.parentEmail } });
+      }
+
+      if (!parent && info.parentPhone) {
+        parent = await tx.parent.findFirst({ where: { phone: info.parentPhone, schoolId } });
+      }
+
+      if (parent) {
+        await tx.parentStudent.upsert({
+          where: { parentId_studentId: { parentId: parent.id, studentId } },
+          create: { parentId: parent.id, studentId },
+          update: {},
+        });
+        return;
+      }
+
+      const tempPassword = 'Parent123!';
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+      const parentName = info.parentName || `${info.studentFirstName}'s Parent`;
+      const nameParts = parentName.trim().split(/\s+/);
+      const firstName = nameParts[0];
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Parent';
+      const email = info.parentEmail
+        || (info.parentPhone ? `parent_${info.parentPhone.replace(/[^0-9]/g, '')}@internal.school` : null)
+        || `${firstName.toLowerCase()}.${lastName.toLowerCase()}.${schoolId.slice(0, 6)}@internal.school`;
+
+      await tx.parent.create({
+        data: {
+          firstName,
+          lastName,
+          email,
+          phone: info.parentPhone,
+          password: hashedPassword,
+          schoolId,
+          children: { create: { studentId } },
+        },
+      });
     });
   }
 

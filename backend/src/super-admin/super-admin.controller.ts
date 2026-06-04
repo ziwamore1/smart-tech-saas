@@ -15,12 +15,21 @@ import { SuperAdminService } from './super-admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { InstitutionTypeService } from '../institution/institution-type.service';
 
 @Controller('super-admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('SuperAdmin')
 export class SuperAdminController {
-  constructor(private readonly superAdminService: SuperAdminService) {}
+  constructor(
+    private readonly superAdminService: SuperAdminService,
+    private readonly institutionTypeService: InstitutionTypeService,
+  ) {}
+
+  @Get('institution-types')
+  async getInstitutionTypes() {
+    return this.institutionTypeService.getAllTypes();
+  }
 
   @Get('schools')
   async getAllSchools(@Query('status') status?: string) {

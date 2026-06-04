@@ -1,0 +1,9 @@
+npm warn Unknown project config "puppeteer_skip_download". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> backend@0.0.1 start:dev
+> node --max-old-space-size=8192 ./node_modules/@nestjs/cli/bin/nest.js start --watch
+
+[2J[3J[H[[90m1:10:11 am[0m] Starting compilation in watch mode...
+
+[[90m1:16:41 am[0m] Found 0 errors. Watching for file changes.
+

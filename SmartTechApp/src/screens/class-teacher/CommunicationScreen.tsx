@@ -1,34 +1,78 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, WidgetCard, GradientCard } from '../../components';
 import { colors, spacing, borderRadius, shadows, typography } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { apiService } from '../../services/api';
+
+interface Communication {
+  id: string;
+  type: string;
+  status: string;
+  subject: string | null;
+  message: string;
+  recipientType: string | null;
+  createdAt: string;
+}
+
+const STATUS_STYLES: Record<string, { color: string }> = {
+  PENDING: { color: colors.warning },
+  SENT: { color: colors.info },
+  DELIVERED: { color: colors.success },
+  FAILED: { color: colors.error },
+  CANCELLED: { color: colors.textLight },
+};
 
 export const ClassTeacherCommunicationScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [activeTab, setActiveTab] = useState<'messages' | 'notices'>('messages');
+  const [communications, setCommunications] = useState<Communication[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const conversations = [
-    { name: 'Mary Wanjiku', parent: 'Parent of John', preview: 'Thank you for the update...', time: '10m ago', unread: true },
-    { name: 'Peter Kamau', parent: 'Parent of Alice', preview: 'Is there a meeting tomorrow?', time: '1h ago', unread: false },
-    { name: 'Jane Mwangi', parent: 'Parent of David', preview: 'Noted, will work on it.', time: '3h ago', unread: true },
-    { name: 'Sarah Otieno', parent: 'Parent of Grace', preview: 'Could you send the schedule?', time: '1d ago', unread: false },
-  ];
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await apiService.getCommunications({ limit: 50 });
+      setCommunications(data || []);
+    } catch (err) {
+      console.log('Failed to fetch communications', err);
+      setCommunications([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const notices = [
-    { title: 'End of Term Exams', date: 'Jun 15, 2026', status: 'Scheduled', statusColor: colors.success },
-    { title: 'Parent-Teacher Meeting', date: 'Jun 20, 2026', status: 'Pending', statusColor: colors.warning },
-    { title: 'Science Fair', date: 'Jul 5, 2026', status: 'Draft', statusColor: colors.textLight },
-  ];
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const conversations = communications.filter((c) => c.type === 'EMAIL' || c.type === 'SMS' || c.type === 'WHATSAPP');
+  const notices = communications.filter((c) => c.type === 'PUSH_NOTIFICATION');
+
+  const formatTime = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString();
+  };
+
+  const getInitials = (name: string) => name.charAt(0).toUpperCase();
+  const getNameFromSubject = (subject: string | null) => subject || 'Message';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <HeaderBar
         title="Communication"
         subtitle="Parent Messages & Notices"
-        rightIcon={{ name: '✉️', onPress: () => {} }}
+        rightIcon={{ name: '🔄', onPress: fetchData }}
       />
 
       <View style={styles.tabRow}>
@@ -46,7 +90,9 @@ export const ClassTeacherCommunicationScreen: React.FC = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        {activeTab === 'messages' ? (
+        {loading ? (
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+        ) : activeTab === 'messages' ? (
           <>
             <GradientCard
               icon="💬"
@@ -57,22 +103,35 @@ export const ClassTeacherCommunicationScreen: React.FC = () => {
               style={styles.quickCompose}
             />
             <WidgetCard title="Recent Conversations">
-              {conversations.map((conv, i) => (
-                <TouchableOpacity key={i} style={styles.conversationRow}>
-                  <View style={styles.convAvatar}>
-                    <Text style={styles.convAvatarText}>{conv.name[0]}</Text>
-                  </View>
-                  <View style={styles.convContent}>
-                    <View style={styles.convHeader}>
-                      <Text style={styles.convName}>{conv.name}</Text>
-                      <Text style={styles.convTime}>{conv.time}</Text>
-                    </View>
-                    <Text style={styles.convParent}>{conv.parent}</Text>
-                    <Text style={styles.convPreview}>{conv.preview}</Text>
-                  </View>
-                  {conv.unread && <View style={styles.unreadDot} />}
-                </TouchableOpacity>
-              ))}
+              {conversations.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyIcon}>💬</Text>
+                  <Text style={styles.emptyText}>No messages yet</Text>
+                </View>
+              ) : (
+                conversations.map((conv) => {
+                  const statusStyle = STATUS_STYLES[conv.status] || { color: colors.textLight };
+                  return (
+                    <TouchableOpacity key={conv.id} style={styles.conversationRow}>
+                      <View style={styles.convAvatar}>
+                        <Text style={styles.convAvatarText}>{getNameFromSubject(conv.subject)[0]}</Text>
+                      </View>
+                      <View style={styles.convContent}>
+                        <View style={styles.convHeader}>
+                          <Text style={styles.convName}>{getNameFromSubject(conv.subject)}</Text>
+                          <Text style={styles.convTime}>{formatTime(conv.createdAt)}</Text>
+                        </View>
+                        <View style={styles.convTypeRow}>
+                          <Text style={styles.convType}>{conv.type}</Text>
+                          <View style={[styles.statusDot, { backgroundColor: statusStyle.color }]} />
+                          <Text style={styles.statusLabel}>{conv.status}</Text>
+                        </View>
+                        <Text style={styles.convPreview} numberOfLines={1}>{conv.message}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
             </WidgetCard>
           </>
         ) : (
@@ -82,17 +141,27 @@ export const ClassTeacherCommunicationScreen: React.FC = () => {
               <Text style={styles.createNoticeText}>Create New Notice</Text>
             </TouchableOpacity>
             <WidgetCard title="Class Notices">
-              {notices.map((notice, i) => (
-                <View key={i} style={styles.noticeRow}>
-                  <View style={styles.noticeInfo}>
-                    <Text style={styles.noticeTitle}>{notice.title}</Text>
-                    <Text style={styles.noticeDate}>{notice.date}</Text>
-                  </View>
-                  <View style={[styles.statusBadge, { backgroundColor: notice.statusColor + '20' }]}>
-                    <Text style={[styles.statusText, { color: notice.statusColor }]}>{notice.status}</Text>
-                  </View>
+              {notices.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyIcon}>📢</Text>
+                  <Text style={styles.emptyText}>No notices yet</Text>
                 </View>
-              ))}
+              ) : (
+                notices.map((notice) => {
+                  const statusStyle = STATUS_STYLES[notice.status] || { color: colors.textLight };
+                  return (
+                    <View key={notice.id} style={styles.noticeRow}>
+                      <View style={styles.noticeInfo}>
+                        <Text style={styles.noticeTitle}>{notice.subject || notice.message}</Text>
+                        <Text style={styles.noticeDate}>{new Date(notice.createdAt).toLocaleDateString()}</Text>
+                      </View>
+                      <View style={[styles.statusBadge, { backgroundColor: statusStyle.color + '20' }]}>
+                        <Text style={[styles.statusText, { color: statusStyle.color }]}>{notice.status}</Text>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
             </WidgetCard>
           </>
         )}
@@ -118,9 +187,11 @@ const styles = StyleSheet.create({
   convHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   convName: { fontSize: 15, fontWeight: '600', color: colors.text },
   convTime: { fontSize: 11, color: colors.textLight },
-  convParent: { fontSize: 12, color: colors.textLight, marginTop: 1 },
+  convTypeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 1, gap: 4 },
+  convType: { fontSize: 11, color: colors.textLight, fontWeight: '500' },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusLabel: { fontSize: 10, color: colors.textLight },
   convPreview: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primaryLight, marginLeft: spacing.sm },
   createNoticeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: colors.white, borderRadius: borderRadius.xl, marginBottom: spacing.md, borderWidth: 2, borderColor: colors.border, borderStyle: 'dashed' as any },
   createNoticeIcon: { fontSize: 24, fontWeight: '300', color: colors.textLight, marginRight: spacing.sm },
   createNoticeText: { fontSize: 15, fontWeight: '600', color: colors.textLight },
@@ -130,4 +201,7 @@ const styles = StyleSheet.create({
   noticeDate: { fontSize: 12, color: colors.textLight, marginTop: 2 },
   statusBadge: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.full },
   statusText: { fontSize: 12, fontWeight: '600' },
+  emptyState: { alignItems: 'center', paddingVertical: spacing.xl },
+  emptyIcon: { fontSize: 40, marginBottom: spacing.sm },
+  emptyText: { fontSize: 14, color: colors.textLight },
 });

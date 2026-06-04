@@ -68,6 +68,9 @@ import { ResultAnalyticsModule } from './result-analytics/result-analytics.modul
 import { SyncEngineModule } from './sync-engine/sync-engine.module';
 import { ReportCardEngineModule } from './report-card-engine/report-card-engine.module';
 import { RankingModule } from './ranking-service/ranking.module';
+import { IdentityModule } from './identity-service/identity.module';
+import { CurriculumModule } from './curriculum-service/curriculum.module';
+import { InstitutionModule } from './institution/institution.module';
 import { ProductionLogger } from './common/production-logger';
 
 @Module({
@@ -140,7 +143,10 @@ import { ProductionLogger } from './common/production-logger';
     SyncEngineModule,
     ReportCardEngineModule,
     RankingModule,
+    IdentityModule,
+    CurriculumModule,
     HealthModule,
+    InstitutionModule,
   ],
   providers: [ProductionLogger],
 })

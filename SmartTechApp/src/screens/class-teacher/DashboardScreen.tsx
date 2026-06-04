@@ -15,12 +15,15 @@ export const ClassTeacherDashboardScreen: React.FC = () => {
 
   useEffect(() => {
     fetchDashboard();
-    setInsights([
-      '3 students show declining Mathematics performance linked to attendance irregularities.',
-      'Class Science competency average improved by 12% this month.',
-      '2 parents have not responded to last week\'s progress report.',
-    ]);
   }, []);
+
+  useEffect(() => {
+    if (dashboard?.stats?.pendingTasks) {
+      setInsights([
+        `${dashboard.stats.pendingTasks} task${dashboard.stats.pendingTasks > 1 ? 's' : ''} require${dashboard.stats.pendingTasks > 1 ? '' : 's'} your attention.`,
+      ]);
+    }
+  }, [dashboard]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -51,7 +54,7 @@ export const ClassTeacherDashboardScreen: React.FC = () => {
     { icon: '👥', label: 'Students', screen: 'CTStudents', gradient: ['#EA580C', '#F97316'] as const },
     { icon: '📊', label: 'Analytics', screen: 'CTAnalytics', gradient: ['#7C3AED', '#A78BFA'] as const },
     { icon: '💬', label: 'Messages', screen: 'CTCommunication', gradient: ['#D97706', '#F59E0B'] as const },
-    { icon: '🤖', label: 'AI Tutor', screen: 'CTAiTutor', gradient: ['#0D9488', '#5EEAD4'] as const },
+    { icon: '🤖', label: 'AI Tutor', screen: 'CTAiTutor', gradient: ['#0D9488', '#5EEAD4'] as const, params: { sourceScreen: 'class_teacher_dashboard' } },
     { icon: '📈', label: 'Reports', screen: 'Analytics', gradient: ['#8B5CF6', '#A78BFA'] as const },
   ];
 
@@ -67,9 +70,9 @@ export const ClassTeacherDashboardScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.statsRow}>
           <StatCard label="Students" value={stats?.totalChildren || 0} icon="👥" color={colors.primary} bgColor={colors.infoLight} />
-          <StatCard label="Attendance" value={stats?.attendanceRate || '94%'} icon="✅" color={colors.success} bgColor={colors.successLight} />
-          <StatCard label="Avg Perf" value="78%" icon="📊" color={colors.teal} bgColor={colors.tealLight} />
-          <StatCard label="Alerts" value={3} icon="⚠️" color={colors.warning} bgColor={colors.warningLight} />
+          <StatCard label="Attendance" value={stats?.attendanceRate ? `${stats.attendanceRate}%` : '—'} icon="✅" color={colors.success} bgColor={colors.successLight} />
+          <StatCard label="Avg Perf" value={stats?.averageScore ? `${stats.averageScore}%` : '—'} icon="📊" color={colors.teal} bgColor={colors.tealLight} />
+          <StatCard label="Alerts" value={stats?.activeAlerts ?? stats?.weakStudents ?? 0} icon="⚠️" color={colors.warning} bgColor={colors.warningLight} />
         </View>
 
         <View style={styles.sectionHeader}>
@@ -77,61 +80,74 @@ export const ClassTeacherDashboardScreen: React.FC = () => {
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickActionsScroll}>
           {quickActions.map((a) => (
-            <QuickActionItem key={a.label} icon={a.icon} label={a.label} gradient={a.gradient as any} onPress={() => navigation.navigate(a.screen)} />
+            <QuickActionItem key={a.label} icon={a.icon} label={a.label} gradient={a.gradient as any} onPress={() => navigation.navigate(a.screen, (a as any).params)} />
           ))}
         </ScrollView>
 
-        <WidgetCard title="AI Insights" action={{ label: 'View All', onPress: () => navigation.navigate('AiTutor') }}>
-          {insights.map((insight, i) => (
-            <View key={i} style={styles.insightRow}>
-              <View style={styles.insightDot} />
-              <Text style={styles.insightText}>{insight}</Text>
-            </View>
-          ))}
-        </WidgetCard>
+        {insights.length > 0 && (
+          <WidgetCard title="AI Insights" action={{ label: 'View All', onPress: () => navigation.navigate('AiTutor', { sourceScreen: 'class_teacher_dashboard' }) }}>
+            {insights.map((insight, i) => (
+              <View key={i} style={styles.insightRow}>
+                <View style={styles.insightDot} />
+                <Text style={styles.insightText}>{insight}</Text>
+              </View>
+            ))}
+          </WidgetCard>
+        )}
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Class Overview</Text>
         </View>
 
-        <GradientCard
-          title="Grade Distribution"
-          subtitle="Current term performance breakdown"
-          icon="📊"
-          gradient={['#EFF6FF', '#DBEAFE']}
-          style={styles.overviewCard}
-        >
-          <View style={styles.gradeRow}>
-            {['A', 'B', 'C', 'D', 'F'].map((grade) => (
-              <View key={grade} style={styles.gradeItem}>
-                <View style={[styles.gradeBar, { height: grade === 'A' ? 40 : grade === 'B' ? 60 : grade === 'C' ? 80 : grade === 'D' ? 45 : 20 }]} />
-                <Text style={styles.gradeLabel}>{grade}</Text>
-              </View>
-            ))}
+        {stats?.totalClasses ? (
+          <GradientCard
+            title="Grade Distribution"
+            subtitle="Current term performance breakdown"
+            icon="📊"
+            gradient={['#EFF6FF', '#DBEAFE']}
+            style={styles.overviewCard}
+          >
+            <View style={styles.gradeRow}>
+              {['A', 'B', 'C', 'D', 'F'].map((grade) => (
+                <View key={grade} style={styles.gradeItem}>
+                  <View style={[styles.gradeBar, { height: grade === 'A' ? 40 : grade === 'B' ? 60 : grade === 'C' ? 80 : grade === 'D' ? 45 : 20, opacity: 0.5 }]} />
+                  <Text style={styles.gradeLabel}>{grade}</Text>
+                </View>
+              ))}
+            </View>
+          </GradientCard>
+        ) : (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyIcon}>📊</Text>
+            <Text style={styles.emptyText}>No class data yet</Text>
+            <Text style={styles.emptySubtext}>Assign classes and students to see grade distribution here.</Text>
           </View>
-        </GradientCard>
+        )}
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent Activity</Text>
         </View>
 
-        {[
-          { text: 'John Doe submitted homework', time: '10 min ago', icon: '📝' },
-          { text: 'Attendance marked for today', time: '1 hour ago', icon: '✅' },
-          { text: 'New parent message from Mary', time: '2 hours ago', icon: '💬' },
-          { text: 'Sarah Johns flagged - low performance', time: '3 hours ago', icon: '⚠️' },
-        ].map((activity, i) => (
-          <TouchableOpacity key={i} style={styles.activityCard}>
-            <View style={styles.activityIcon}>
-              <Text>{activity.icon}</Text>
-            </View>
-            <View style={styles.activityContent}>
-              <Text style={styles.activityText}>{activity.text}</Text>
-              <Text style={styles.activityTime}>{activity.time}</Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
-        ))}
+        {dashboard?.recentAnnouncements?.length > 0 ? (
+          dashboard.recentAnnouncements.map((activity: any, i: number) => (
+            <TouchableOpacity key={i} style={styles.activityCard}>
+              <View style={styles.activityIcon}>
+                <Text>📢</Text>
+              </View>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityText}>{activity.title || activity.message}</Text>
+                <Text style={styles.activityTime}>{activity.createdAt ? new Date(activity.createdAt).toLocaleDateString() : ''}</Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyIcon}>📢</Text>
+            <Text style={styles.emptyText}>No recent activity</Text>
+            <Text style={styles.emptySubtext}>Activity feed will appear here once you interact with the system.</Text>
+          </View>
+        )}
 
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
@@ -152,7 +168,7 @@ const styles = StyleSheet.create({
   overviewCard: { marginBottom: spacing.md },
   gradeRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 100, marginTop: spacing.md },
   gradeItem: { alignItems: 'center', gap: spacing.xs },
-  gradeBar: { width: 28, backgroundColor: colors.primaryLight, borderRadius: borderRadius.sm, opacity: 0.7 },
+  gradeBar: { width: 28, backgroundColor: colors.primaryLight, borderRadius: borderRadius.sm },
   gradeLabel: { fontSize: 12, fontWeight: '600', color: colors.textLight },
   activityCard: {
     flexDirection: 'row',
@@ -168,4 +184,8 @@ const styles = StyleSheet.create({
   activityText: { fontSize: 14, fontWeight: '500', color: colors.text, lineHeight: 18 },
   activityTime: { fontSize: 12, color: colors.textLight, marginTop: 2 },
   chevron: { fontSize: 20, color: colors.textLight, marginLeft: spacing.sm },
+  emptyCard: { alignItems: 'center', paddingVertical: 40, backgroundColor: colors.white, borderRadius: borderRadius.lg, marginBottom: spacing.sm, ...shadows.sm },
+  emptyIcon: { fontSize: 36, marginBottom: spacing.sm, opacity: 0.5 },
+  emptyText: { fontSize: 16, fontWeight: '600', color: colors.textLight },
+  emptySubtext: { fontSize: 12, color: colors.textMuted, marginTop: 4, textAlign: 'center', paddingHorizontal: spacing.lg },
 });

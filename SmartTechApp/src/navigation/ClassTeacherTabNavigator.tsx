@@ -1,7 +1,9 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet } from 'react-native';
+import { useAuthStore } from '../store';
 import { ClassTeacherDashboardScreen } from '../screens/class-teacher/DashboardScreen';
+import { PrimaryClassTeacherScreen } from '../screens/class-teacher/PrimaryClassTeacherScreen';
 import { ClassTeacherStudentsScreen } from '../screens/class-teacher/StudentsScreen';
 import { ClassTeacherCommunicationScreen } from '../screens/class-teacher/CommunicationScreen';
 import { ClassTeacherAnalyticsScreen } from '../screens/class-teacher/AnalyticsScreen';
@@ -20,6 +22,9 @@ const TabIcon: React.FC<{ icon: string; focused: boolean }> = ({ icon, focused }
 );
 
 export const ClassTeacherTabNavigator: React.FC = () => {
+  const institutionType = useAuthStore((state) => state.user?.institutionType);
+  const isPrimary = institutionType === 'PRIMARY_SCHOOL';
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -38,6 +43,14 @@ export const ClassTeacherTabNavigator: React.FC = () => {
           tabBarIcon: ({ focused }) => <TabIcon icon="🏠" focused={focused} />,
         }}
       />
+      {isPrimary && <Tab.Screen
+        name="CTPrimary"
+        component={PrimaryClassTeacherScreen}
+        options={{
+          tabBarLabel: 'Primary',
+          tabBarIcon: ({ focused }) => <TabIcon icon="🌿" focused={focused} />,
+        }}
+      />}
       <Tab.Screen
         name="CTStudents"
         component={ClassTeacherStudentsScreen}

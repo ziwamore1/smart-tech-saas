@@ -108,6 +108,47 @@ class ApiService {
     AsyncStorage.removeItem('user').catch(() => {});
   }
 
+  // Institution type API methods
+  async getInstitutionTypes() {
+    const response = await this.client.get('/auth/institution-types');
+    return response.data;
+  }
+
+  async getTypeByCode(code: string) {
+    const response = await this.client.get(`/institution/types/${code}`);
+    return response.data;
+  }
+
+  async getTypeModules(code: string) {
+    const response = await this.client.get(`/institution/types/${code}/modules`);
+    return response.data;
+  }
+
+  async getTypeRoles(code: string) {
+    const response = await this.client.get(`/institution/types/${code}/roles`);
+    return response.data;
+  }
+
+  async getTypeDashboards(code: string) {
+    const response = await this.client.get(`/institution/types/${code}/dashboards`);
+    return response.data;
+  }
+
+  async getSchoolType(schoolId: string) {
+    const response = await this.client.get(`/institution/${schoolId}/type`);
+    return response.data;
+  }
+
+  async getSchoolModules(schoolId: string) {
+    const response = await this.client.get(`/institution/${schoolId}/modules`);
+    return response.data;
+  }
+
+  async getSchoolRoles(schoolId: string) {
+    const response = await this.client.get(`/institution/${schoolId}/roles`);
+    return response.data;
+  }
+
   async getDashboard(): Promise<DashboardData> {
     const response = await this.client.get<DashboardData>('/mobile/dashboard');
     return response.data;
@@ -168,13 +209,14 @@ class ApiService {
     return response.data;
   }
 
-  async getParentChildResults(studentId: string, termId: string) {
-    const response = await this.client.get(`/parent/results/${studentId}/${termId}`);
+  async getParentChildResults(studentId: string, _termId?: string) {
+    const response = await this.client.get('/parent/results', { params: { studentId } });
     return response.data;
   }
 
   async getParentReportCard(studentId: string, termId: string) {
-    const response = await this.client.get(`/parent/report-card/${studentId}/${termId}/pdf`, {
+    const response = await this.client.get('/parent/report-card', {
+      params: { studentId, termId },
       responseType: 'blob',
     });
     return response.data;
@@ -300,13 +342,20 @@ class ApiService {
     return response.data;
   }
 
-  async startAiTutorSession(data: { subjectId?: string; topic?: string; studentId?: string }) {
+  async startAiTutorSession(data: {
+    subjectId?: string;
+    topic?: string;
+    studentId?: string;
+    context?: { role?: string; screen?: string; subject?: string; topic?: string };
+  }) {
     const response = await this.client.post('/mobile/ai-tutor/start', data);
     return response.data;
   }
 
-  async sendAiTutorMessage(sessionId: string, message: string) {
-    const response = await this.client.post('/mobile/ai-tutor/message', { sessionId, message });
+  async sendAiTutorMessage(sessionId: string, message: string, context?: {
+    role?: string; screen?: string; subject?: string; topic?: string;
+  }) {
+    const response = await this.client.post('/mobile/ai-tutor/message', { sessionId, message, context });
     return response.data;
   }
 
@@ -320,8 +369,10 @@ class ApiService {
     return response.data;
   }
 
-  async askAiTutor(question: string, subjectId?: string) {
-    const response = await this.client.post('/mobile/ai-tutor/ask', { question, subjectId });
+  async askAiTutor(question: string, subjectId?: string, context?: {
+    role?: string; screen?: string; subject?: string; topic?: string;
+  }) {
+    const response = await this.client.post('/mobile/ai-tutor/ask', { question, subjectId, context });
     return response.data;
   }
 
@@ -734,6 +785,55 @@ class ApiService {
   async changePassword(data: { currentPassword: string; newPassword: string }) {
     const response = await this.client.post('/profile/change-password', data);
     return response.data;
+  }
+
+  // ===== Security / Identity API =====
+
+  async generatePassword(length?: number) {
+    const response = await this.client.post('/identity/password/generate', { length });
+    return response.data;
+  }
+
+  async forgotUsername(data: { email?: string; phone?: string }) {
+    const response = await this.client.post('/identity/recovery/forgot-username', data);
+    return response.data;
+  }
+
+  async sendOtp(data: { destination: string; channel: string; purpose: string }) {
+    const response = await this.client.post('/identity/otp/send', data);
+    return response.data;
+  }
+
+  async verifyOtp(data: { destination: string; otp: string; purpose: string }) {
+    const response = await this.client.post('/identity/otp/verify', data);
+    return response.data;
+  }
+
+  async getActiveSessions() {
+    const response = await this.client.get('/identity/sessions');
+    return response.data;
+  }
+
+  async getRegisteredDevices() {
+    const response = await this.client.get('/identity/devices');
+    return response.data;
+  }
+
+  async removeDevice(deviceId: string) {
+    const response = await this.client.delete(`/identity/devices/${deviceId}`);
+    return response.data;
+  }
+
+  async getPasswordHistory(_limit?: number) {
+    return [];
+  }
+
+  async terminateSession(_sessionId: string) {
+    return { success: true };
+  }
+
+  async toggleTrustDevice(_deviceId: string, _trusted: boolean) {
+    return { success: true };
   }
 
   // ===== Student Photo API =====
@@ -1267,6 +1367,157 @@ class ApiService {
 
   async getSyncStatus() {
     const response = await this.client.get('/sync-engine/status');
+    return response.data;
+  }
+
+  // ===== Library API =====
+
+  async getLibraryDocuments() {
+    const response = await this.client.get('/library');
+    return response.data;
+  }
+
+  async getLibraryDocument(id: string) {
+    const response = await this.client.get(`/library/${id}`);
+    return response.data;
+  }
+
+  async createLibraryDocument(data: { title: string; description?: string; category: string; fileType?: string }) {
+    const response = await this.client.post('/library', data);
+    return response.data;
+  }
+
+  async updateLibraryDocument(id: string, data: { title?: string; description?: string; category?: string }) {
+    const response = await this.client.patch(`/library/${id}`, data);
+    return response.data;
+  }
+
+  async deleteLibraryDocument(id: string) {
+    const response = await this.client.delete(`/library/${id}`);
+    return response.data;
+  }
+
+  async uploadLibraryFile(id: string, formData: FormData) {
+    const response = await this.client.post(`/library/${id}/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async getLibraryDownloadUrl(id: string) {
+    const response = await this.client.get(`/library/${id}/download`, { responseType: 'blob' });
+    return response.data;
+  }
+
+  async logReadingSession(documentId: string, data: { durationSeconds: number; pagesViewed: string[]; completedAt: string }) {
+    const response = await this.client.post(`/library/${documentId}/reading-session`, data);
+    return response.data;
+  }
+
+  // ===== Communication API =====
+
+  async getCommunications(params?: { type?: string; status?: string; limit?: number; offset?: number }) {
+    const response = await this.client.get('/communications', { params });
+    return response.data;
+  }
+
+  async getCommunicationById(id: string) {
+    const response = await this.client.get(`/communications/${id}`);
+    return response.data;
+  }
+
+  async createCommunication(data: { type: string; subject?: string; message: string; recipientType?: string; recipientIds?: string[]; scheduledAt?: Date }) {
+    const response = await this.client.post('/communications', data);
+    return response.data;
+  }
+
+  async sendCommunication(id: string) {
+    const response = await this.client.post(`/communications/${id}/send`);
+    return response.data;
+  }
+
+  async sendBulkCommunication(id: string, recipientIds: string[]) {
+    const response = await this.client.post(`/communications/${id}/send-bulk`, { recipientIds });
+    return response.data;
+  }
+
+  async deleteCommunication(id: string) {
+    const response = await this.client.delete(`/communications/${id}`);
+    return response.data;
+  }
+
+  async getCommunicationStats(startDate?: string, endDate?: string) {
+    const params: any = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await this.client.get('/communications/stats', { params });
+    return response.data;
+  }
+
+  async scheduleCommunication(data: { type: string; subject?: string; message: string; recipientType?: string; scheduledAt: Date }) {
+    const response = await this.client.post('/communications/schedule', data);
+    return response.data;
+  }
+
+  async getCommunicationTemplates() {
+    const response = await this.client.get('/communications/templates/list');
+    return response.data;
+  }
+
+  async createCommunicationTemplate(data: { name: string; type: string; subject?: string; message: string }) {
+    const response = await this.client.post('/communications/templates', data);
+    return response.data;
+  }
+
+  // ===== Curriculum API =====
+
+  async getEducationLevels(schoolId?: string) {
+    const response = await this.client.get('/curriculum/education-levels', { params: { schoolId } });
+    return response.data;
+  }
+
+  async getCurriculumVersions(educationLevelId?: string) {
+    const response = await this.client.get('/curriculum/versions', { params: { educationLevelId } });
+    return response.data;
+  }
+
+  async getAcademicStages(educationLevelId?: string) {
+    const response = await this.client.get('/curriculum/stages', { params: { educationLevelId } });
+    return response.data;
+  }
+
+  async getGrade7Results(params?: { studentId?: string; termId?: string; schoolId?: string }) {
+    const response = await this.client.get('/curriculum/grade7/results', { params });
+    return response.data;
+  }
+
+  async computeGrade7(studentId: string, termId: string) {
+    const response = await this.client.post(`/curriculum/grade7/compute/${studentId}/${termId}`);
+    return response.data;
+  }
+
+  async batchComputeGrade7(classId: string, termId: string) {
+    const response = await this.client.post(`/curriculum/grade7/batch/${classId}/${termId}`);
+    return response.data;
+  }
+
+  async rankGrade7(schoolId: string, termId: string) {
+    const response = await this.client.post(`/curriculum/grade7/rank/${schoolId}/${termId}`);
+    return response.data;
+  }
+
+  async analyzeClassSelection(classId: string, termId: string) {
+    const response = await this.client.get(`/curriculum/selection/class/${classId}/${termId}`);
+    return response.data;
+  }
+
+  async getSchoolSelectionProfile(schoolId: string) {
+    const response = await this.client.get(`/curriculum/selection/school-profile/${schoolId}`);
+    return response.data;
+  }
+
+  async getCurriculumTree(schoolId?: string) {
+    const response = await this.client.get('/curriculum/tree', { params: { schoolId } });
     return response.data;
   }
 }

@@ -6,17 +6,31 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import * as puppeteer from 'puppeteer';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { ReportCardEngineService } from '../report-card-engine/report-card-engine.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as handlebars from 'handlebars';
 import * as os from 'os';
 import * as crypto from 'crypto';
 
+handlebars.registerHelper('math', (lhs: any, operator: string, rhs: any) => {
+  const a = parseFloat(lhs) || 0;
+  const b = parseFloat(rhs) || 0;
+  switch (operator) {
+    case '+': return a + b;
+    case '-': return a - b;
+    case '*': return a * b;
+    case '/': return b !== 0 ? a / b : 0;
+    default: return 0;
+  }
+});
+
 @Injectable()
 export class ReportCardService {
   constructor(
     private prisma: PrismaService,
     private analyticsService: AnalyticsService,
+    private reportCardEngineService: ReportCardEngineService,
   ) {}
 
   private async getBrowser() {
@@ -663,6 +677,157 @@ export class ReportCardService {
       printBackground: true,
     });
 
+    await browser.close();
+
+    return Buffer.from(pdf);
+  }
+
+  async generateCurriculumReportCardPdf(
+    schoolId: string,
+    studentId: string,
+    termId: string,
+  ): Promise<Buffer> {
+    const engineData = await this.reportCardEngineService.generateReportCardData(
+      studentId,
+      termId,
+      schoolId,
+    );
+
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+    });
+    if (!school) throw new Error('School not found');
+
+    const template = await this.prisma.reportTemplate.findFirst({
+      where: { schoolId, isDefault: true },
+    });
+    const reportTemplate = template || await this.prisma.reportTemplate.findFirst({
+      where: { schoolId },
+    });
+
+    const templatePath = path.join(process.cwd(), 'src', 'templates', 'report-card-curriculum.hbs');
+    let templateHtml = fs.readFileSync(templatePath, 'utf8');
+
+    const commentData = await this.analyticsService.generateStudentComment(schoolId, studentId, termId);
+    const teacherComment = commentData.teacherComment;
+    const headComment = commentData.headComment;
+
+    const templateData = {
+      schoolName: school.name,
+      schoolLogo: reportTemplate?.includeLogo !== false ? (school.logoUrl || school.logo) : undefined,
+      primaryColor: reportTemplate?.primaryColor || '#1976d2',
+      secondaryColor: reportTemplate?.secondaryColor || '#f5f5f5',
+      academicYear: engineData.academicYear?.name || '',
+      termName: engineData.term?.name || '',
+      student: engineData.student,
+      class: engineData.class,
+      subjectBreakdown: engineData.subjectBreakdown || [],
+      bestSubjects: engineData.bestSubjects || [],
+      totalPoints: engineData.totalPoints ?? 0,
+      bestSubjectsAverage: engineData.bestSubjectsAverage != null ? Math.round(engineData.bestSubjectsAverage * 100) / 100 : null,
+      division: engineData.division,
+      performanceCategory: engineData.performanceCategory,
+      attendance: engineData.attendance || { totalDays: 0, presentDays: 0, attendanceRate: 0 },
+      termSummary: engineData.termSummary,
+      curriculum: engineData.curriculum || { version: null, bestSubjectRule: null },
+      teacherComment: reportTemplate?.includeComments !== false ? teacherComment : undefined,
+      headComment: reportTemplate?.includeComments !== false ? headComment : undefined,
+      includeStamp: reportTemplate?.includeStamp || false,
+      includeSignature: reportTemplate?.includeSignature || false,
+      stampUrl: reportTemplate?.stampUrl,
+      signatureUrl: reportTemplate?.signatureUrl,
+      directorName: reportTemplate?.directorName || '',
+      headerText: reportTemplate?.headerText || '',
+      footerText: reportTemplate?.footerText || '',
+      showRemarks: reportTemplate?.remarksEnabled !== false,
+      generatedAt: engineData.generatedAt,
+    };
+
+    const compiledTemplate = handlebars.compile(templateHtml);
+    const html = compiledTemplate(templateData);
+
+    const browser = await this.getBrowser();
+    const page = await this.getPage(browser);
+    await page.setContent(html);
+    const pdf = await page.pdf({ format: 'A4', printBackground: true });
+    await browser.close();
+
+    return Buffer.from(pdf);
+  }
+
+  async generateClassCurriculumReportCardsPdf(
+    schoolId: string,
+    classId: string,
+    termId: string,
+  ): Promise<Buffer> {
+    const term = await this.prisma.term.findUnique({ where: { id: termId } });
+    if (!term) throw new Error('Invalid term');
+
+    const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+    if (!school) throw new Error('School not found');
+
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { classId, academicYearId: term.academicYearId, status: 'ACTIVE' },
+      include: { student: true },
+    });
+
+    if (enrollments.length === 0) throw new Error('No students found in class');
+
+    const reportTemplate = await this.prisma.reportTemplate.findFirst({
+      where: { schoolId, isDefault: true },
+    }) || await this.prisma.reportTemplate.findFirst({ where: { schoolId } });
+
+    const templatePath = path.join(process.cwd(), 'src', 'templates', 'report-card-curriculum.hbs');
+    const templateHtml = fs.readFileSync(templatePath, 'utf8');
+
+    let allHtml = '';
+
+    for (const e of enrollments) {
+      const engineData = await this.reportCardEngineService.generateReportCardData(
+        e.studentId, termId, schoolId,
+      );
+      const commentData = await this.analyticsService.generateStudentComment(schoolId, e.studentId, termId);
+
+      const templateData = {
+        schoolName: school.name,
+        schoolLogo: reportTemplate?.includeLogo !== false ? (school.logoUrl || school.logo) : undefined,
+        primaryColor: reportTemplate?.primaryColor || '#1976d2',
+        secondaryColor: reportTemplate?.secondaryColor || '#f5f5f5',
+        academicYear: engineData.academicYear?.name || '',
+        termName: engineData.term?.name || '',
+        student: engineData.student,
+        class: engineData.class,
+        subjectBreakdown: engineData.subjectBreakdown || [],
+        bestSubjects: engineData.bestSubjects || [],
+        totalPoints: engineData.totalPoints ?? 0,
+        bestSubjectsAverage: engineData.bestSubjectsAverage != null ? Math.round(engineData.bestSubjectsAverage * 100) / 100 : null,
+        division: engineData.division,
+        performanceCategory: engineData.performanceCategory,
+        attendance: engineData.attendance || { totalDays: 0, presentDays: 0, attendanceRate: 0 },
+        termSummary: engineData.termSummary,
+        curriculum: engineData.curriculum || { version: null, bestSubjectRule: null },
+        teacherComment: reportTemplate?.includeComments !== false ? commentData.teacherComment : undefined,
+        headComment: reportTemplate?.includeComments !== false ? commentData.headComment : undefined,
+        includeStamp: reportTemplate?.includeStamp || false,
+        includeSignature: reportTemplate?.includeSignature || false,
+        stampUrl: reportTemplate?.stampUrl,
+        signatureUrl: reportTemplate?.signatureUrl,
+        directorName: reportTemplate?.directorName || '',
+        headerText: reportTemplate?.headerText || '',
+        footerText: reportTemplate?.footerText || '',
+        showRemarks: reportTemplate?.remarksEnabled !== false,
+        generatedAt: engineData.generatedAt,
+      };
+
+      const compiledTemplate = handlebars.compile(templateHtml);
+      allHtml += `<div style="page-break-after:always">${compiledTemplate(templateData)}</div>`;
+    }
+
+    const html = `<html><body>${allHtml}</body></html>`;
+    const browser = await this.getBrowser();
+    const page = await this.getPage(browser);
+    await page.setContent(html);
+    const pdf = await page.pdf({ format: 'A4', printBackground: true });
     await browser.close();
 
     return Buffer.from(pdf);

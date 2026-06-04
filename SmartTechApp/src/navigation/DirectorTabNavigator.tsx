@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useAuthStore } from '../store';
 import { DirectorDashboardScreen } from '../screens/director/DashboardScreen';
 import { DirectorStaffScreen } from '../screens/director/StaffScreen';
 import { DirectorReportsScreen } from '../screens/director/ReportsScreen';
@@ -13,39 +14,55 @@ import { DirectorLibraryScreen } from '../screens/director/LibraryScreen';
 import { DirectorTimetableScreen } from '../screens/director/TimetableScreen';
 import { DirectorCommunicationScreen } from '../screens/director/CommunicationScreen';
 import { DirectorUsersScreen } from '../screens/director/UsersScreen';
+import { Grade7Screen } from '../screens/director/Grade7Screen';
+import { CurriculumScreen } from '../screens/director/CurriculumScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
 import { colors, spacing, borderRadius, shadows } from '../theme';
 
 const { width } = Dimensions.get('window');
 const DRAWER_WIDTH = 280;
 
-const drawerScreens = [
-  { name: 'DirectorHome', label: 'Dashboard', icon: '🏠', component: DirectorDashboardScreen },
-  { name: 'DirectorClasses', label: 'Classes', icon: '🏫', component: DirectorClassesScreen },
-  { name: 'DirectorStudents', label: 'Students', icon: '👨‍🎓', component: DirectorStudentsScreen },
-  { name: 'DirectorStaff', label: 'Staff', icon: '👥', component: DirectorStaffScreen },
-  { name: 'DirectorLibrary', label: 'Library', icon: '📚', component: DirectorLibraryScreen },
-  { name: 'DirectorTimetable', label: 'Timetable', icon: '📅', component: DirectorTimetableScreen },
-  { name: 'DirectorCommunication', label: 'Communication', icon: '💬', component: DirectorCommunicationScreen },
-  { name: 'DirectorUsers', label: 'Users', icon: '👤', component: DirectorUsersScreen },
-  { name: 'DirectorExams', label: 'Exams', icon: '📋', stackScreen: 'ExamList' },
-  { name: 'DirectorTemplates', label: 'Templates', icon: '📄', stackScreen: 'TemplateMarketplace' },
-  { name: 'DirectorAnalytics', label: 'Analytics', icon: '📊', stackScreen: 'Analytics' },
-  { name: 'DirectorAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor' },
-  { name: 'DirectorReports', label: 'Reports', icon: '📈', component: DirectorReportsScreen },
-  { name: 'DirectorStamps', label: 'Digital Stamps', icon: '🔏', stackScreen: 'DigitalStamps' },
-  { name: 'DirectorApprovals', label: 'Approvals', icon: '✅', stackScreen: 'ApprovalWorkflow' },
-  { name: 'DirectorSettings', label: 'Settings', icon: '⚙️', component: DirectorSettingsScreen },
-  { name: 'DirectorProfile', label: 'Profile', icon: '👤', component: ProfileScreen },
+interface DrawerScreen {
+  name: string;
+  label: string;
+  icon: string;
+  component?: React.FC<any>;
+  stackScreen?: string;
+  institutionTypes?: string[];
+}
+
+const allDrawerScreens: DrawerScreen[] = [
+  { name: 'DirectorHome', label: 'Dashboard', icon: '🏠', component: DirectorDashboardScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
+  { name: 'DirectorClasses', label: 'Classes', icon: '🏫', component: DirectorClassesScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
+  { name: 'DirectorStudents', label: 'Students', icon: '👨‍🎓', component: DirectorStudentsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
+  { name: 'DirectorStaff', label: 'Staff', icon: '👥', component: DirectorStaffScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
+  { name: 'DirectorLibrary', label: 'Library', icon: '📚', component: DirectorLibraryScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
+  { name: 'DirectorTimetable', label: 'Timetable', icon: '📅', component: DirectorTimetableScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
+  { name: 'DirectorCommunication', label: 'Communication', icon: '💬', component: DirectorCommunicationScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
+  { name: 'DirectorUsers', label: 'Users', icon: '👤', component: DirectorUsersScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
+  { name: 'DirectorExams', label: 'Exams', icon: '📋', stackScreen: 'ExamList', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
+  { name: 'DirectorTemplates', label: 'Templates', icon: '📄', stackScreen: 'TemplateMarketplace', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
+  { name: 'DirectorAnalytics', label: 'Analytics', icon: '📊', stackScreen: 'Analytics', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
+  { name: 'DirectorAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
+  { name: 'DirectorReports', label: 'Reports', icon: '📈', component: DirectorReportsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
+  { name: 'DirectorStamps', label: 'Digital Stamps', icon: '🔏', stackScreen: 'DigitalStamps', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
+  { name: 'DirectorApprovals', label: 'Approvals', icon: '✅', stackScreen: 'ApprovalWorkflow', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
+  { name: 'DirectorGrade7', label: 'Grade 7 ECZ', icon: '🎓', component: Grade7Screen, institutionTypes: ['PRIMARY_SCHOOL'] },
+  { name: 'DirectorCurriculum', label: 'Curriculum', icon: '📖', component: CurriculumScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
+  { name: 'DirectorSettings', label: 'Settings', icon: '⚙️', component: DirectorSettingsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
+  { name: 'DirectorProfile', label: 'Profile', icon: '👤', component: ProfileScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
 ];
 
-const drawerScreenNames = drawerScreens.map(s => s.name);
-const stackScreenMap = drawerScreens.filter(s => s.stackScreen).reduce((acc, s) => {
-  acc[s.name] = s.stackScreen!;
-  return acc;
-}, {} as Record<string, string>);
-
 export const DirectorTabNavigator: React.FC = () => {
+  const institutionType = useAuthStore((state) => state.user?.institutionType);
+  const drawerScreens = allDrawerScreens.filter((s) => !s.institutionTypes || (institutionType && s.institutionTypes.includes(institutionType)));
+
+  const drawerScreenNames = useMemo(() => drawerScreens.map(s => s.name), [drawerScreens]);
+  const stackScreenMap = useMemo(() => drawerScreens.filter(s => s.stackScreen).reduce((acc, s) => {
+    acc[s.name] = s.stackScreen!;
+    return acc;
+  }, {} as Record<string, string>), [drawerScreens]);
+
   const [activeScreen, setActiveScreen] = useState('DirectorHome');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;

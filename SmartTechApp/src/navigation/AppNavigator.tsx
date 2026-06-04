@@ -9,10 +9,12 @@ import { QRScannerScreen } from '../screens/common/QRScannerScreen';
 import { VerificationResultScreen } from '../screens/common/VerificationResultScreen';
 import { ManualVerificationScreen } from '../screens/common/ManualVerificationScreen';
 import { StudentDashboardScreen } from '../screens/student/DashboardScreen';
+import { PrimaryStudentResultsScreen } from '../screens/student/PrimaryStudentResultsScreen';
 import { StudentResultsScreen } from '../screens/student/ResultsScreen';
 import { StudentTimetableScreen } from '../screens/student/TimetableScreen';
 import { StudentAttendanceScreen } from '../screens/student/AttendanceScreen';
 import { ParentDashboardScreen } from '../screens/parent/DashboardScreen';
+import { ParentPrimaryDashboardScreen } from '../screens/parent/ParentPrimaryDashboardScreen';
 import { ParentChildrenScreen } from '../screens/parent/ChildrenScreen';
 import { ParentChildResultsScreen } from '../screens/parent/ChildResultsScreen';
 import { TeacherDashboardScreen } from '../screens/teacher/DashboardScreen';
@@ -44,15 +46,55 @@ import { AssessmentEntryScreen } from '../screens/assessment/AssessmentEntryScre
 import { AssessmentConfigScreen } from '../screens/assessment/AssessmentConfigScreen';
 import { PendingAssessmentsScreen } from '../screens/assessment/PendingAssessmentsScreen';
 
+import { DeviceSecurityScreen } from '../screens/security/DeviceSecurityScreen';
+import { PasswordManagementScreen } from '../screens/security/PasswordManagementScreen';
+import { AccountRecoveryScreen } from '../screens/security/AccountRecoveryScreen';
+import { OtpScreen } from '../screens/security/OtpScreen';
+import { SessionManagementScreen } from '../screens/security/SessionManagementScreen';
+import { INSTITUTION_TYPE_ROLES, InstitutionTypeCode, isRoleForType } from '../types';
+
 const Stack = createNativeStackNavigator();
+
+function useRoleCheck(user: any) {
+  const institutionType = user?.institutionType || null;
+  const roles: string[] = user?.roles || [];
+
+  const hasRole = (roleName: string) => roles.includes(roleName);
+
+  const isPrimaryLearner = institutionType === 'PRIMARY_SCHOOL' && hasRole('Learner');
+  const isSecondaryStudent = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && hasRole('Student');
+  const isCollegeStudent = institutionType === 'COLLEGE' && hasRole('Student');
+  const isUniStudent = institutionType === 'UNIVERSITY' && hasRole('Student');
+  const isStudent = isPrimaryLearner || isSecondaryStudent || isCollegeStudent || isUniStudent;
+
+  const isPrimaryParent = institutionType === 'PRIMARY_SCHOOL' && hasRole('Parent');
+  const isSecParent = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && hasRole('Parent');
+  const isParent = isPrimaryParent || isSecParent;
+
+  const isPrimaryTeacher = institutionType === 'PRIMARY_SCHOOL' && (hasRole('Head Teacher') || hasRole('Deputy Head') || hasRole('Primary Teacher'));
+  const isSecTeacher = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && (hasRole('Director') || hasRole('Deputy Director') || hasRole('HOD') || hasRole('Teacher') || hasRole('Class Teacher'));
+  const isCollegeTeacher = institutionType === 'COLLEGE' && (hasRole('Principal') || hasRole('Lecturer'));
+  const isUniTeacher = institutionType === 'UNIVERSITY' && (hasRole('Vice Chancellor') || hasRole('Dean') || hasRole('Lecturer') || hasRole('Research Supervisor'));
+  const isTeacher = isPrimaryTeacher || isSecTeacher || isCollegeTeacher || isUniTeacher;
+
+  const isClassTeacher = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && hasRole('Class Teacher');
+
+  const isDirector = institutionType === 'PRIMARY_SCHOOL'
+    ? (hasRole('Head Teacher') || hasRole('Deputy Head'))
+    : institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY'
+      ? (hasRole('Director') || hasRole('Deputy Director'))
+      : institutionType === 'COLLEGE'
+        ? (hasRole('Principal') || hasRole('Registrar'))
+        : institutionType === 'UNIVERSITY'
+          ? (hasRole('Vice Chancellor') || hasRole('Dean'))
+          : false;
+
+  return { isStudent, isParent, isClassTeacher, isTeacher, isDirector, institutionType };
+}
 
 export function AppNavigator() {
   const { isAuthenticated, user } = useAuthStore();
-  const isStudent = user?.roles?.includes('Student');
-  const isParent = user?.roles?.includes('Parent');
-  const isClassTeacher = user?.roles?.includes('Class Teacher');
-  const isTeacher = user?.roles?.includes('Teacher') && !isClassTeacher;
-  const isDirector = user?.roles?.includes('Director') || user?.roles?.includes('Head Teacher') || user?.roles?.includes('Deputy');
+  const { isStudent, isParent, isClassTeacher, isTeacher, isDirector, institutionType } = useRoleCheck(user);
   const hasRoleDashboard = isStudent || isParent || isClassTeacher || isTeacher || isDirector;
 
   return (
@@ -72,11 +114,13 @@ export function AppNavigator() {
             )}
 
             {isStudent && <Stack.Screen name="StudentResults" component={StudentResultsScreen} />}
+            {isStudent && institutionType === 'PRIMARY_SCHOOL' && <Stack.Screen name="PrimaryStudentResults" component={PrimaryStudentResultsScreen} />}
             {isStudent && <Stack.Screen name="StudentTimetable" component={StudentTimetableScreen} />}
             {isStudent && <Stack.Screen name="StudentAttendance" component={StudentAttendanceScreen} />}
 
             {isParent && <Stack.Screen name="ParentChildren" component={ParentChildrenScreen} />}
             {isParent && <Stack.Screen name="ParentChildResults" component={ParentChildResultsScreen} />}
+            {isParent && institutionType === 'PRIMARY_SCHOOL' && <Stack.Screen name="ParentPrimaryDashboard" component={ParentPrimaryDashboardScreen} />}
 
             {(isTeacher || isClassTeacher) && <Stack.Screen name="TeacherClasses" component={TeacherClassesScreen} />}
             {(isTeacher || isClassTeacher) && <Stack.Screen name="TeacherMarks" component={TeacherMarksScreen} />}
@@ -108,6 +152,13 @@ export function AppNavigator() {
             {(isTeacher || isClassTeacher) && <Stack.Screen name="PendingAssessments" component={PendingAssessmentsScreen} />}
             {(isTeacher || isClassTeacher) && <Stack.Screen name="AssessmentEntry" component={AssessmentEntryScreen} />}
             {(isTeacher || isClassTeacher) && <Stack.Screen name="AssessmentConfig" component={AssessmentConfigScreen} />}
+
+            {/* Security Screens */}
+            <Stack.Screen name="DeviceSecurity" component={DeviceSecurityScreen} />
+            <Stack.Screen name="PasswordManagement" component={PasswordManagementScreen} />
+            <Stack.Screen name="AccountRecovery" component={AccountRecoveryScreen} />
+            <Stack.Screen name="OtpVerification" component={OtpScreen} />
+            <Stack.Screen name="SessionManagement" component={SessionManagementScreen} />
 
             {/* Verification Screens */}
             <Stack.Screen name="QRScanner" component={QRScannerScreen} />

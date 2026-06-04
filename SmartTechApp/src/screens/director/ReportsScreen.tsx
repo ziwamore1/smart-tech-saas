@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Sharing from 'expo-sharing';
@@ -7,6 +7,8 @@ import { HeaderBar, WidgetCard, GradientCard } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useAppStore } from '../../store';
+import { apiService } from '../../services/api';
 
 interface DirectorReportsProps {
   onToggleDrawer?: () => void;
@@ -14,10 +16,17 @@ interface DirectorReportsProps {
 
 export const DirectorReportsScreen: React.FC<DirectorReportsProps> = ({ onToggleDrawer }) => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const { dashboard, isLoadingDashboard, fetchDashboard } = useAppStore();
+
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
+
+  const stats = dashboard?.stats;
 
   const handleShareReport = async (reportName: string) => {
     try {
-      const reportContent = generateReportContent(reportName);
+      const reportContent = `SmartTech School - ${reportName}\nGenerated: ${new Date().toLocaleDateString()}\n${'='.repeat(40)}\n\nKey Metrics:\n- Average Score: ${stats?.averageScore || '—'}%\n- Attendance: ${stats?.attendanceRate || '—'}%\n- Total Students: ${stats?.totalChildren || '—'}\n- Total Classes: ${stats?.totalClasses || '—'}\n- Today's Lessons: ${stats?.todayLessons || '—'}`;
       const fileUri = FileSystem.documentDirectory + `${reportName.replace(/\s+/g, '_')}.txt`;
       await FileSystem.writeAsStringAsync(fileUri, reportContent);
       await Sharing.shareAsync(fileUri, {
@@ -28,17 +37,6 @@ export const DirectorReportsScreen: React.FC<DirectorReportsProps> = ({ onToggle
     } catch (e) {
       Alert.alert('Error', 'Failed to share report');
     }
-  };
-
-  const generateReportContent = (reportName: string): string => {
-    const date = new Date().toLocaleDateString();
-    const header = `SmartTech School - ${reportName}\nGenerated: ${date}\n${'='.repeat(40)}\n\n`;
-    
-    const metrics = `Key Metrics:\n- Pass Rate: 87%\n- Attendance: 92%\n- Average GPA: 4.2\n\n`;
-    
-    const subjects = `Subject Performance:\n- Mathematics: 72%\n- English: 78%\n- Science: 81%\n- Social Studies: 65%\n- Kiswahili: 70%\n`;
-    
-    return header + metrics + subjects;
   };
 
   const reportCategories = [
@@ -89,36 +87,42 @@ export const DirectorReportsScreen: React.FC<DirectorReportsProps> = ({ onToggle
         >
           <View style={styles.metricsRow}>
             <View style={styles.metricItem}>
-              <Text style={styles.metricValue}>87%</Text>
-              <Text style={styles.metricLabel}>Pass Rate</Text>
+              <Text style={styles.metricValue}>{stats?.averageScore ? `${stats.averageScore}%` : '—'}</Text>
+              <Text style={styles.metricLabel}>Avg Score</Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metricItem}>
-              <Text style={styles.metricValue}>92%</Text>
+              <Text style={styles.metricValue}>{stats?.attendanceRate ? `${stats.attendanceRate}%` : '—'}</Text>
               <Text style={styles.metricLabel}>Attendance</Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metricItem}>
-              <Text style={styles.metricValue}>4.2</Text>
-              <Text style={styles.metricLabel}>Avg GPA</Text>
+              <Text style={styles.metricValue}>{stats?.totalChildren || 0}</Text>
+              <Text style={styles.metricLabel}>Students</Text>
             </View>
           </View>
         </GradientCard>
 
         <WidgetCard title="Performance Overview">
-          <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 160, paddingVertical: spacing.md }}>
-            {[
-              { label: 'Pass', value: 87, color: colors.success },
-              { label: 'Attendance', value: 92, color: colors.primaryLight },
-              { label: 'GPA (×20)', value: 84, color: colors.purple },
-            ].map((bar) => (
-              <View key={bar.label} style={{ alignItems: 'center' }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: bar.color, marginBottom: 4 }}>{bar.value}%</Text>
-                <View style={{ width: 40, height: bar.value * 1.4, backgroundColor: bar.color, borderRadius: 4, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }} />
-                <Text style={{ fontSize: 10, color: colors.textLight, marginTop: 6 }}>{bar.label}</Text>
-              </View>
-            ))}
-          </View>
+          {stats ? (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 160, paddingVertical: spacing.md }}>
+              {[
+                { label: 'Avg Score', value: Math.min(stats.averageScore || 0, 100), color: colors.success },
+                { label: 'Attendance', value: Math.min(stats.attendanceRate || 0, 100), color: colors.primaryLight },
+                { label: 'Classes', value: Math.min((stats.totalClasses || 0) * 10, 100), color: colors.purple },
+              ].map((bar) => (
+                <View key={bar.label} style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: bar.color, marginBottom: 4 }}>{stats.averageScore ? `${bar.value}%` : '—'}</Text>
+                  <View style={{ width: 40, height: Math.max(bar.value * 1.4, 10), backgroundColor: bar.color, borderRadius: 4, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }} />
+                  <Text style={{ fontSize: 10, color: colors.textLight, marginTop: 6 }}>{bar.label}</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={{ textAlign: 'center', color: colors.textLight, paddingVertical: 20 }}>
+              Performance data will appear once the school has registered data.
+            </Text>
+          )}
         </WidgetCard>
 
         {reportCategories.map((category, idx) => (

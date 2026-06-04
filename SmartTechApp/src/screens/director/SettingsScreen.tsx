@@ -76,10 +76,8 @@ export const DirectorSettingsScreen: React.FC<DirectorSettingsProps> = ({ onTogg
       title: 'Support',
       items: [
         { icon: '❓', label: 'Help & FAQ', action: () => {} },
-        { icon: '📧', label: 'support@smarttechsaas.com', action: () => {} },
-        { icon: '📞', label: '+260 978805917', action: () => {} },
-        { icon: '📍', label: '123 Education Street, Learning City', action: () => {} },
         { icon: '📝', label: 'Send Feedback', action: () => {} },
+        { icon: '📖', label: 'User Guide', action: () => {} },
       ],
     },
   ];

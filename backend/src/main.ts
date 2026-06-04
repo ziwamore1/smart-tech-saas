@@ -20,6 +20,17 @@ async function bootstrap() {
 
   setupSecurity(app);
 
+  app.use((req: any, _res: any, next: any) => {
+    global.request = req;
+    next();
+  });
+
+  app.enableCors({
+    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
+
   app.setGlobalPrefix('api/v1');
   app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads/' });
 

@@ -44,4 +44,8 @@ export class CreateStudentDto {
   @IsString()
   @IsOptional()
   parentEmail?: string;
+
+  @IsString()
+  @IsOptional()
+  linkingParentId?: string;
 }

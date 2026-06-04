@@ -5,9 +5,10 @@ import { SuperAdminSetupController } from './super-admin.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { MessagingModule } from '../messaging/messaging.module';
 import { CommunicationModule } from '../communication/communication.module';
+import { InstitutionModule } from '../institution/institution.module';
 
 @Module({
-  imports: [PrismaModule, MessagingModule, CommunicationModule],
+  imports: [PrismaModule, MessagingModule, CommunicationModule, InstitutionModule],
   controllers: [SuperAdminController, SuperAdminSetupController],
   providers: [SuperAdminService],
   exports: [SuperAdminService],
