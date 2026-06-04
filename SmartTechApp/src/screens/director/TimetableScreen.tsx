@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, WidgetCard } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { apiService } from '../../services/api';
 
 interface DirectorTimetableProps {
   onToggleDrawer?: () => void;
@@ -12,6 +13,7 @@ interface DirectorTimetableProps {
 }
 
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+const dayIndexMap: Record<string, number> = { Monday: 0, Tuesday: 1, Wednesday: 2, Thursday: 3, Friday: 4 };
 const periods = [
   { num: 1, time: '8:00 - 8:40' },
   { num: 2, time: '8:40 - 9:20' },
@@ -23,17 +25,30 @@ const periods = [
   { num: 8, time: '1:40 - 2:20' },
 ];
 
-const mockTimetable: Record<string, Record<number, { subject: string; teacher: string }>> = {
-  Monday: { 1: { subject: 'Mathematics', teacher: 'J. Smith' }, 2: { subject: 'English', teacher: 'M. Brown' }, 3: { subject: 'Science', teacher: 'S. Johnson' }, 5: { subject: 'History', teacher: 'E. Davis' }, 7: { subject: 'PE', teacher: 'D. Wilson' } },
-  Tuesday: { 1: { subject: 'English', teacher: 'M. Brown' }, 2: { subject: 'Mathematics', teacher: 'J. Smith' }, 4: { subject: 'Geography', teacher: 'L. Anderson' }, 6: { subject: 'Art', teacher: 'L. Anderson' }, 8: { subject: 'Biology', teacher: 'S. Johnson' } },
-  Wednesday: { 1: { subject: 'Science', teacher: 'S. Johnson' }, 2: { subject: 'History', teacher: 'E. Davis' }, 3: { subject: 'Mathematics', teacher: 'J. Smith' }, 5: { subject: 'English', teacher: 'M. Brown' }, 7: { subject: 'Chemistry', teacher: 'S. Johnson' } },
-  Thursday: { 1: { subject: 'Mathematics', teacher: 'J. Smith' }, 2: { subject: 'PE', teacher: 'D. Wilson' }, 4: { subject: 'English', teacher: 'M. Brown' }, 6: { subject: 'Science', teacher: 'S. Johnson' }, 8: { subject: 'Geography', teacher: 'L. Anderson' } },
-  Friday: { 1: { subject: 'History', teacher: 'E. Davis' }, 2: { subject: 'Mathematics', teacher: 'J. Smith' }, 3: { subject: 'Art', teacher: 'L. Anderson' }, 5: { subject: 'Biology', teacher: 'S. Johnson' }, 7: { subject: 'English', teacher: 'M. Brown' } },
-};
-
 export const DirectorTimetableScreen: React.FC<DirectorTimetableProps> = ({ onToggleDrawer, onNavigate }) => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [selectedDay, setSelectedDay] = useState('Monday');
+  const [slots, setSlots] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTimetable = async () => {
+      try {
+        const res = await apiService.getTeacherTimetable();
+        const data = res?.timetable || res?.data || [];
+        setSlots(Array.isArray(data) ? data : []);
+      } catch {
+        setSlots([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTimetable();
+  }, []);
+
+  const daySlots = slots.filter(
+    (s) => s.day === dayIndexMap[selectedDay]
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -54,25 +69,35 @@ export const DirectorTimetableScreen: React.FC<DirectorTimetableProps> = ({ onTo
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <WidgetCard title={`${selectedDay} Schedule`}>
-          {periods.map(period => {
-            const slot = mockTimetable[selectedDay]?.[period.num];
-            return (
-              <View key={period.num} style={[styles.periodRow, !slot && styles.periodEmpty]}>
-                <View style={styles.periodNum}>
-                  <Text style={styles.periodNumText}>{period.num}</Text>
-                  <Text style={styles.periodTime}>{period.time}</Text>
-                </View>
-                {slot ? (
-                  <View style={styles.periodInfo}>
-                    <Text style={styles.periodSubject}>{slot.subject}</Text>
-                    <Text style={styles.periodTeacher}>{slot.teacher}</Text>
+          {loading ? (
+            <ActivityIndicator color={colors.primary} style={{ paddingVertical: 40 }} />
+          ) : slots.length === 0 ? (
+            <Text style={{ textAlign: 'center', color: colors.textLight, paddingVertical: 40 }}>
+              No timetable data available.
+            </Text>
+          ) : (
+            periods.map(period => {
+              const slot = daySlots.find((s: any) => s.period === period.num);
+              return (
+                <View key={period.num} style={[styles.periodRow, !slot && styles.periodEmpty]}>
+                  <View style={styles.periodNum}>
+                    <Text style={styles.periodNumText}>{period.num}</Text>
+                    <Text style={styles.periodTime}>{period.time}</Text>
                   </View>
-                ) : (
-                  <Text style={styles.periodFree}>Free Period</Text>
-                )}
-              </View>
-            );
-          })}
+                  {slot ? (
+                    <View style={styles.periodInfo}>
+                      <Text style={styles.periodSubject}>{slot.subject?.name || 'Subject'}</Text>
+                      <Text style={styles.periodTeacher}>
+                        {slot.teacher ? `${slot.teacher.user?.firstName?.[0] || ''}. ${slot.teacher.user?.lastName || ''}` : slot.className || ''}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.periodFree}>Free Period</Text>
+                  )}
+                </View>
+              );
+            })
+          )}
         </WidgetCard>
 
         <View style={{ height: spacing.xxl }} />

@@ -56,6 +56,16 @@ export class ClassController {
     return this.service.update(id, body, req.user.schoolId);
   }
 
+  @Patch(':id/class-teacher')
+  @Roles('Director')
+  setClassTeacher(
+    @Param('id') id: string,
+    @Body() body: { teacherId: string | null },
+    @Req() req: any,
+  ) {
+    return this.service.setClassTeacher(id, body.teacherId, req.user.schoolId);
+  }
+
   @Get('by-level')
   @Roles('Director')
   findByLevel(@Query('levelTypeId') levelTypeId: string, @Req() req: any) {

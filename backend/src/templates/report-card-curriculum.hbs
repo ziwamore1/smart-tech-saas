@@ -1,0 +1,181 @@
+<html>
+<head>
+<style>
+body { font-family: Arial, Helvetica, sans-serif; padding: 30px; color: #333; }
+.header { text-align: center; margin-bottom: 15px; }
+.school-name { font-size: 24px; font-weight: bold; color: {{primaryColor}}; }
+.report-title { font-size: 16px; margin-top: 5px; }
+.header-text { font-size: 12px; color: #666; margin-bottom: 10px; font-style: italic; }
+.student-info { margin-top: 15px; margin-bottom: 15px; }
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.info-box { padding: 6px; border: 1px solid #ddd; font-size: 12px; }
+table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+th { background: {{primaryColor}}; color: white; padding: 7px; text-align: center; font-size: 11px; }
+th, td { border: 1px solid #ddd; padding: 5px; text-align: center; font-size: 11px; }
+tr:nth-child(even) { background: {{secondaryColor}}; }
+.section { margin-top: 18px; }
+.section-title { font-size: 14px; font-weight: bold; color: {{primaryColor}}; margin-bottom: 8px; border-bottom: 2px solid {{primaryColor}}; padding-bottom: 4px; }
+.best-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px; }
+.best-item { padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 11px; }
+.best-subject { font-weight: bold; }
+.best-score { font-size: 13px; font-weight: bold; }
+.division-badge { display: inline-block; padding: 6px 16px; border-radius: 4px; font-size: 14px; font-weight: bold; margin-top: 4px; }
+.summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px; }
+.summary-item { padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 11px; }
+.summary-value { font-size: 16px; font-weight: bold; }
+.comments { margin-top: 20px; }
+.comment-box { margin-bottom: 8px; padding: 8px; border: 1px solid #ddd; background: {{secondaryColor}}; font-size: 12px; }
+.legend { margin-top: 15px; font-size: 11px; }
+.footer { margin-top: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+.signature-section { text-align: center; }
+.signature-line { margin-top: 25px; border-top: 1px solid #333; width: 160px; margin-left: auto; margin-right: auto; }
+.stamp-section { text-align: center; }
+.stamp-image { max-width: 80px; max-height: 80px; }
+.footer-text { margin-top: 25px; font-size: 11px; color: #666; text-align: center; font-style: italic; border-top: 1px solid #ddd; padding-top: 8px; }
+.perf-cat { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: bold; }
+.curriculum-info { margin-top: 10px; font-size: 10px; color: #999; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="header">
+{{#if schoolLogo}}
+<div style="margin-bottom:8px"><img src="{{schoolLogo}}" height="50" style="max-width:120px"/></div>
+{{/if}}
+<div class="school-name">{{schoolName}}</div>
+<div class="report-title">Curriculum Report Card</div>
+<div style="font-size:13px; margin-top:3px">{{academicYear}} — {{termName}}</div>
+{{#if headerText}}<div class="header-text">{{headerText}}</div>{{/if}}
+</div>
+
+<div class="student-info">
+<div class="info-grid">
+<div class="info-box"><strong>Student:</strong> {{student.firstName}} {{student.lastName}}</div>
+<div class="info-box"><strong>Admission No:</strong> {{student.admissionNumber}}</div>
+<div class="info-box"><strong>Class:</strong> {{class.name}}</div>
+<div class="info-box"><strong>Attendance:</strong> {{attendance.attendanceRate}}% ({{attendance.presentDays}}/{{attendance.totalDays}})</div>
+</div>
+</div>
+
+<div class="section">
+<div class="section-title">Subject Results</div>
+<table>
+<tr>
+<th>#</th>
+<th>Subject</th>
+<th>Score</th>
+<th>%</th>
+<th>Grade</th>
+<th>Points</th>
+<th>Category</th>
+{{#if showRemarks}}<th>Remark</th>{{/if}}
+</tr>
+{{#each subjectBreakdown}}
+<tr>
+<td>{{math @index "+" 1}}</td>
+<td style="text-align:left">{{subjectName}}</td>
+<td>{{#if totalRawScore}}{{totalRawScore}}{{else}}—{{/if}}</td>
+<td>{{#if finalPercentage}}{{finalPercentage}}{{else}}—{{/if}}</td>
+<td>{{#if finalGrade}}{{finalGrade}}{{else}}—{{/if}}</td>
+<td>{{#if points}}{{points}}{{else}}—{{/if}}</td>
+<td>
+{{#if performanceCategory}}
+<span class="perf-cat" style="background:{{performanceCategory.color}}30; color:{{performanceCategory.color}}">{{performanceCategory.label}}</span>
+{{else}}—{{/if}}
+</td>
+{{#if ../showRemarks}}
+<td>{{#if finalRemark}}{{finalRemark}}{{else}}—{{/if}}</td>
+{{/if}}
+</tr>
+{{/each}}
+</table>
+</div>
+
+{{#if division}}
+<div class="section" style="text-align:center">
+<div class="section-title">Overall Division</div>
+<div class="division-badge" style="background:{{division.color}}30; color:{{division.color}}; border:2px solid {{division.color}}">
+{{division.division}} — {{division.label}}
+</div>
+</div>
+{{/if}}
+
+{{#if bestSubjects}}
+<div class="section">
+<div class="section-title">Best Subjects</div>
+<div class="best-grid">
+{{#each bestSubjects}}
+<div class="best-item" style="border-left:3px solid {{#if performanceCategory}}{{performanceCategory.color}}{{else}}{{../primaryColor}}{{/if}}">
+<div class="best-subject">{{subjectName}}</div>
+<div class="best-score" style="color:{{#if performanceCategory}}{{performanceCategory.color}}{{else}}{{../primaryColor}}{{/if}}">
+{{#if finalPercentage}}{{finalPercentage}}%{{/if}}
+</div>
+<div>{{points}} pts</div>
+{{#if performanceCategory}}
+<span class="perf-cat" style="background:{{performanceCategory.color}}30; color:{{performanceCategory.color}}">{{performanceCategory.label}}</span>
+{{/if}}
+</div>
+{{/each}}
+</div>
+<div style="text-align:center; margin-top:8px; font-size:13px">
+<strong>Total Points:</strong> {{totalPoints}} &nbsp;|&nbsp; <strong>Average:</strong> {{bestSubjectsAverage}}%
+</div>
+</div>
+{{/if}}
+
+{{#if performanceCategory}}
+<div class="section" style="text-align:center">
+<div class="section-title">Overall Performance</div>
+<span class="perf-cat" style="font-size:14px; padding:6px 20px; background:{{performanceCategory.color}}30; color:{{performanceCategory.color}}">{{performanceCategory.label}}</span>
+</div>
+{{/if}}
+
+<div class="section">
+<div class="section-title">Summary</div>
+<div class="summary-grid">
+{{#if termSummary.overallPercentage}}
+<div class="summary-item"><div class="summary-value">{{termSummary.overallPercentage}}%</div><div>Overall Score</div></div>
+{{/if}}
+{{#if termSummary.overallGrade}}
+<div class="summary-item"><div class="summary-value">{{termSummary.overallGrade}}</div><div>Overall Grade</div></div>
+{{/if}}
+{{#if termSummary.classRank}}
+<div class="summary-item"><div class="summary-value">{{termSummary.classRank}}/{{termSummary.classSize}}</div><div>Class Rank</div></div>
+{{/if}}
+{{#if termSummary.gpa}}
+<div class="summary-item"><div class="summary-value">{{termSummary.gpa}}</div><div>GPA</div></div>
+{{/if}}
+</div>
+</div>
+
+{{#if teacherComment}}
+<div class="comments">
+<div class="comment-box"><strong>Teacher:</strong> {{teacherComment}}</div>
+{{#if headComment}}<div class="comment-box"><strong>Head Teacher:</strong> {{headComment}}</div>{{/if}}
+</div>
+{{/if}}
+
+{{#if curriculum.version}}
+<div class="curriculum-info">Curriculum: {{curriculum.version}}{{#if curriculum.bestSubjectRule.name}} • Best Subject Rule: {{curriculum.bestSubjectRule.name}}{{/if}}</div>
+{{/if}}
+
+<div class="footer">
+<div class="signature-section">
+{{#if includeSignature}}{{#if signatureUrl}}<img src="{{signatureUrl}}" class="stamp-image" style="max-height:50px; margin-bottom:3px"/>{{/if}}{{/if}}
+<div class="signature-line"></div>
+Class Teacher
+</div>
+<div class="stamp-section">
+{{#if includeStamp}}{{#if stampUrl}}<img src="{{stampUrl}}" class="stamp-image"/>{{/if}}{{/if}}
+</div>
+<div class="signature-section">
+{{#if includeSignature}}{{#if signatureUrl}}<img src="{{signatureUrl}}" class="stamp-image" style="max-height:50px; margin-bottom:3px"/>{{/if}}{{/if}}
+<div class="signature-line"></div>
+{{#if directorName}}{{directorName}}{{else}}Head Teacher{{/if}}
+</div>
+</div>
+
+{{#if footerText}}<div class="footer-text">{{footerText}}</div>{{/if}}
+
+</body>
+</html>

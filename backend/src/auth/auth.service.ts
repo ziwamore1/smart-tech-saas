@@ -13,6 +13,9 @@ import { PushNotificationService } from '../push-notification/push-notification.
 import { NotificationService } from '../notification/notification.service';
 import { EmailService } from '../email/email.service';
 import { RegisterSuperAdminDto, CreateSchoolDto, CreateDirectorDto, RegisterTeacherDto } from './dto/registration.dto';
+import { InstitutionRegistrationService } from '../institution/institution-registration.service';
+import { InstitutionProvisioningService } from '../institution/institution-provisioning.service';
+import { RegisterInstitutionDto, InstitutionTypeCodeEnum } from '../institution/dto/institution-type.dto';
 
 @Injectable()
 export class AuthService {
@@ -24,6 +27,8 @@ export class AuthService {
     private pushNotificationService: PushNotificationService,
     private notificationService: NotificationService,
     private emailService: EmailService,
+    private institutionRegistrationService: InstitutionRegistrationService,
+    private provisioningService: InstitutionProvisioningService,
   ) {}
 
   async registerSuperAdmin(data: RegisterSuperAdminDto) {
@@ -298,6 +303,9 @@ export class AuthService {
         schoolUsers: {
           select: { schoolId: true, isPrimary: true },
         },
+        school: {
+          include: { institutionType: true },
+        },
       },
     });
     
@@ -323,15 +331,18 @@ export class AuthService {
       || user.schoolUsers?.[0]?.schoolId
       || null;
 
+    const institutionType = user.school?.institutionType?.code || null;
+
     const payload = {
       sub: user.id,
       schoolId: resolvedSchoolId,
+      institutionType,
       roles,
       type: 'user',
     };
 
     this.logger.log(
-      `Login successful for ${email}, roles: ${roles.join(', ')}, schoolId: ${payload.schoolId}`,
+      `Login successful for ${email}, roles: ${roles.join(', ')}, schoolId: ${payload.schoolId}, type: ${institutionType}`,
     );
     this.logger.log(`User data - schoolId in DB: ${user.schoolId}, resolved: ${resolvedSchoolId}`);
 
@@ -346,6 +357,7 @@ export class AuthService {
         roles,
         primaryRole,
         schoolId: resolvedSchoolId,
+        institutionType,
       },
     };
   }
@@ -373,6 +385,9 @@ export class AuthService {
             name: true,
             logo: true,
             primaryColor: true,
+            institutionType: {
+              select: { code: true, name: true },
+            },
           },
         },
       },
@@ -402,9 +417,12 @@ export class AuthService {
       );
     }
 
+    const institutionType = user.school?.institutionType?.code || null;
+
     const payload = {
       sub: user.id,
       schoolId: user.schoolId,
+      institutionType,
       roles,
       type: 'user',
     };
@@ -415,6 +433,7 @@ export class AuthService {
           name: user.school.name,
           logo: user.school.logo,
           primaryColor: user.school.primaryColor || '#1E3A8A',
+          institutionType: user.school.institutionType?.code || null,
         }
       : null;
 
@@ -433,6 +452,7 @@ export class AuthService {
         roles,
         primaryRole,
         schoolId: user.schoolId,
+        institutionType,
         school: schoolInfo,
       },
     };
@@ -440,83 +460,22 @@ export class AuthService {
 
   async registerSchool(data: any) {
     this.logger.log(
-      `Registering school: ${data.schoolName}, director email: ${data.email}`,
+      `Registering school: ${data.schoolName}, director email: ${data.email}, type: ${data.institutionType || 'PRIMARY_SCHOOL'}`,
     );
 
-    const normalizedEmail = data.email.trim().toLowerCase();
+    const institutionType = data.institutionType || 'PRIMARY_SCHOOL';
 
-    const existingUser = await this.prisma.user.findFirst({
-      where: { email: normalizedEmail },
-    });
+    const registerDto = new RegisterInstitutionDto();
+    registerDto.institutionName = data.schoolName;
+    registerDto.institutionType = institutionType as InstitutionTypeCodeEnum;
+    registerDto.directorFirstName = data.directorFirstName || 'School';
+    registerDto.directorLastName = data.directorLastName || 'Director';
+    registerDto.email = data.email;
+    registerDto.password = data.password;
+    registerDto.phone = data.phone;
+    registerDto.address = data.address;
 
-    if (existingUser) {
-      throw new BadRequestException('Email already in use');
-    }
-
-    const hashedPassword = await bcrypt.hash(data.password, 10);
-    this.logger.log(
-      `Password hash generated: ${hashedPassword.substring(0, 20)}...`,
-    );
-
-    const school = await this.prisma.school.create({
-      data: {
-        name: data.schoolName,
-        subscriptionStatus: 'trial',
-      },
-    });
-    this.logger.log(`School created: ${school.id}`);
-
-    const user = await this.prisma.user.create({
-      data: {
-        firstName: data.directorFirstName,
-        lastName: data.directorLastName,
-        email: normalizedEmail,
-        password: hashedPassword,
-        schoolId: school.id,
-      },
-    });
-    this.logger.log(
-      `User created: ${user.id}, email: ${user.email}, schoolId: ${user.schoolId}`,
-    );
-
-    const directorRole = await this.prisma.role.findUnique({
-      where: { name: 'Director' },
-    });
-
-    if (!directorRole) {
-      throw new Error('Director role not found. Please run seed script.');
-    }
-
-    await this.prisma.userRole.create({
-      data: {
-        userId: user.id,
-        roleId: directorRole.id,
-      },
-    });
-    this.logger.log(
-      `UserRole created for user: ${user.id}, role: ${directorRole.name}`,
-    );
-
-    const payload = {
-      sub: user.id,
-      schoolId: school.id,
-      roles: ['Director'],
-      type: 'user',
-    };
-
-    return {
-      message: 'School registered successfully',
-      access_token: await this.jwtService.signAsync(payload),
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        roles: ['Director'],
-        primaryRole: 'Director',
-        schoolId: school.id,
-      },
-    };
+    return this.institutionRegistrationService.registerInstitution(registerDto);
   }
 
   async registerTeacher(

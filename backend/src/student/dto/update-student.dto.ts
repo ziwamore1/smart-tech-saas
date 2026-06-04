@@ -20,4 +20,20 @@ export class UpdateStudentDto {
   @IsString()
   @IsOptional()
   dateOfBirth?: string;
+
+  @IsString()
+  @IsOptional()
+  parentName?: string;
+
+  @IsString()
+  @IsOptional()
+  parentPhone?: string;
+
+  @IsString()
+  @IsOptional()
+  parentEmail?: string;
+
+  @IsString()
+  @IsOptional()
+  linkingParentId?: string;
 }

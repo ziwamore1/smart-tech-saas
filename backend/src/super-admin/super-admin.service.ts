@@ -10,6 +10,7 @@ import { CommunicationService } from '../communication/communication.service';
 import { UnifiedMessagingService } from '../messaging/unified-messaging.service';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
+import { InstitutionProvisioningService } from '../institution/institution-provisioning.service';
 
 @Injectable()
 export class SuperAdminService {
@@ -20,6 +21,7 @@ export class SuperAdminService {
     private configService: ConfigService,
     private communicationService: CommunicationService,
     private unifiedMessaging: UnifiedMessagingService,
+    private provisioningService: InstitutionProvisioningService,
   ) {}
 
   async getAllSchools(status?: string) {
@@ -30,6 +32,9 @@ export class SuperAdminService {
     return this.prisma.school.findMany({
       where,
       include: {
+        institutionType: {
+          select: { code: true, name: true },
+        },
         _count: {
           select: {
             users: true,
@@ -52,6 +57,7 @@ export class SuperAdminService {
     motto?: string;
     subscriptionTier?: string;
     subscriptionStatus?: string;
+    institutionType?: string;
   }) {
     const existingSchool = await this.prisma.school.findFirst({
       where: {
@@ -70,9 +76,21 @@ export class SuperAdminService {
       );
     }
 
+    let institutionTypeId: string | undefined;
+    const institutionTypeCode = data.institutionType || 'PRIMARY_SCHOOL';
+
+    const institutionType = await this.prisma.institutionType.findUnique({
+      where: { code: institutionTypeCode as any },
+    });
+
+    if (institutionType) {
+      institutionTypeId = institutionType.id;
+    }
+
     const school = await this.prisma.school.create({
       data: {
         name: data.name,
+        institutionTypeId,
         registrationNumber: data.registrationNumber,
         phone: data.phone,
         email: data.email,
@@ -97,7 +115,11 @@ export class SuperAdminService {
       },
     });
 
-    this.logger.log(`School created: ${school.id} - ${school.name}`);
+    if (institutionType) {
+      await this.provisioningService.provisionInstitution(school.id, institutionTypeCode);
+    }
+
+    this.logger.log(`School created: ${school.id} - ${school.name} type: ${institutionTypeCode}`);
     return school;
   }
 
@@ -105,6 +127,9 @@ export class SuperAdminService {
     const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
       include: {
+        institutionType: {
+          select: { code: true, name: true },
+        },
         users: {
           include: { userRoles: { include: { role: true } } },
         },
@@ -244,7 +269,7 @@ export class SuperAdminService {
       .catch((err) => this.logger.error('Failed to send director welcome message:', err));
 
     return {
-      userId: user.id,
+      id: user.id,
       email: user.email,
       schoolId,
       schoolName: school.name,
@@ -422,6 +447,73 @@ Email: ${director.email}
     const totalTeachers = await this.prisma.teacher.count();
     const totalUsers = await this.prisma.user.count();
 
+    // Primary school metrics
+    const primarySchoolIds = (
+      await this.prisma.schoolEducationLevel.findMany({
+        where: {
+          educationLevel: { code: { in: ['PRIMARY', 'ECE'] } },
+          isActive: true,
+        },
+        select: { schoolId: true },
+      })
+    ).map((sel) => sel.schoolId);
+    const uniquePrimarySchoolIds = [...new Set(primarySchoolIds)];
+    const totalPrimarySchools = uniquePrimarySchoolIds.length;
+
+    const primaryStudents = await this.prisma.student.count({
+      where: { schoolId: { in: uniquePrimarySchoolIds } },
+    });
+    const primaryTeachers = await this.prisma.teacher.count({
+      where: { schoolId: { in: uniquePrimarySchoolIds } },
+    });
+    const primaryTeachingStaff = await this.prisma.teacher.count({
+      where: {
+        schoolId: { in: uniquePrimarySchoolIds },
+        staffType: 'TEACHING',
+      },
+    });
+    const primaryNonTeachingStaff = await this.prisma.teacher.count({
+      where: {
+        schoolId: { in: uniquePrimarySchoolIds },
+        staffType: 'NON_TEACHING',
+      },
+    });
+
+    // Enrollment pipeline: Grade 1-7 across primary schools
+    const primaryGradeNumbers = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
+    const enrollmentPipeline: { grade: string; count: number }[] = [];
+    for (const gradeName of primaryGradeNumbers) {
+      const matchingClasses = await this.prisma.class.findMany({
+        where: {
+          schoolId: { in: uniquePrimarySchoolIds },
+          name: { contains: gradeName, mode: 'insensitive' },
+        },
+        select: { id: true },
+      });
+      const classIds = matchingClasses.map((c) => c.id);
+      const count = classIds.length > 0
+        ? await this.prisma.enrollment.count({
+            where: { classId: { in: classIds }, status: 'ACTIVE' },
+          })
+        : 0;
+      enrollmentPipeline.push({ grade: gradeName, count });
+    }
+
+    // Recent primary schools
+    const recentPrimarySchools = await this.prisma.school.findMany({
+      where: { id: { in: uniquePrimarySchoolIds } },
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        subscriptionStatus: true,
+        isActive: true,
+        createdAt: true,
+        _count: { select: { students: true, teachers: true } },
+      },
+    });
+
     const schoolsByStatus = await this.prisma.school.groupBy({
       by: ['subscriptionStatus'],
       _count: { subscriptionStatus: true },
@@ -506,6 +598,14 @@ Email: ${director.email}
       stampsByType,
       assetsByType,
       recentTemplates,
+      // Primary school stats
+      totalPrimarySchools,
+      primaryStudents,
+      primaryTeachers,
+      primaryTeachingStaff,
+      primaryNonTeachingStaff,
+      enrollmentPipeline,
+      recentPrimarySchools,
     };
   }
 

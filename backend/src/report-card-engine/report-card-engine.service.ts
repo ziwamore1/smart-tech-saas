@@ -122,12 +122,92 @@ export class ReportCardEngineService {
       ? (attendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length / attendance.length) * 100
       : null;
 
-    const bestSix = [...subjectBreakdown]
-      .filter(s => s.points !== null)
-      .sort((a, b) => (a.points ?? 99) - (b.points ?? 99))
-      .slice(0, 6);
+    // Load curriculum rules for best-subject selection
+    const schoolCurriculum = await this.prisma.schoolCurriculum.findFirst({
+      where: { schoolId },
+      include: {
+        curriculumVersion: {
+          include: {
+            bestSubjectRules: true,
+          },
+        },
+      },
+    });
 
-    const totalPoints = bestSix.reduce((sum, s) => sum + (s.points ?? 0), 0);
+    const bestSubjectRule = schoolCurriculum?.curriculumVersion?.bestSubjectRules?.[0] ?? null;
+
+    const mustIncludeIds = new Set((bestSubjectRule?.mustIncludeSubjectIds as string[]) ?? []);
+    const excludeIds = new Set((bestSubjectRule?.excludeSubjectIds as string[]) ?? []);
+    const priorityGroupIds = (bestSubjectRule?.priorityGroupIds as string[]) ?? [];
+    const bestCount = bestSubjectRule?.count ?? 6;
+
+    // Load performance categories for this curriculum
+    const performanceCategories = await this.prisma.performanceCategory.findMany({
+      where: {
+        curriculumVersionId: schoolCurriculum?.curriculumVersionId ?? undefined,
+      },
+      orderBy: { minScore: 'desc' },
+    });
+
+    // Enrich subject breakdown with performance category
+    const enrichedBreakdown = subjectBreakdown.map(s => {
+      const cat = performanceCategories.find(
+        c => (c.minScore ?? 0) <= (s.finalPercentage ?? 0) && (!c.maxScore || c.maxScore >= (s.finalPercentage ?? 0)),
+      ) ?? performanceCategories.find(c => !c.minScore && !c.maxScore);
+      return { ...s, performanceCategory: cat ? { label: cat.label, color: cat.color } : null };
+    });
+
+    const getPerformanceCategory = (percentage: number | null) => {
+      if (percentage == null) return null;
+      const cat = performanceCategories.find(
+        c => (c.minScore ?? 0) <= percentage && (!c.maxScore || c.maxScore >= percentage),
+      );
+      return cat ? { label: cat.label, color: cat.color } : null;
+    };
+
+    // Curriculum-aware best subjects:
+    // 1. Must include mustIncludeSubjects (English, Math)
+    // 2. Exclude excludeSubjects (SP1, SP2)
+    // 3. Prefer subjects from priority groups
+    // 4. Select up to bestCount
+    let pool = [...enrichedBreakdown].filter(s => s.points !== null && !excludeIds.has(s.subjectId));
+
+    const compulsory: typeof enrichedBreakdown = [];
+    const remaining: typeof enrichedBreakdown = [];
+
+    for (const s of pool) {
+      if (mustIncludeIds.has(s.subjectId)) {
+        compulsory.push(s);
+      } else {
+        remaining.push(s);
+      }
+    }
+
+    // Sort remaining by points ascending (lower = better), then by priority group
+    remaining.sort((a, b) => {
+      const aPrio = priorityGroupIds.length > 0 && a.subjectId ? 0 : 1;
+      const bPrio = priorityGroupIds.length > 0 && b.subjectId ? 0 : 1;
+      if (aPrio !== bPrio) return aPrio - bPrio;
+      return (a.points ?? 99) - (b.points ?? 99);
+    });
+
+    const bestSubjects = [...compulsory, ...remaining].slice(0, bestCount);
+
+    const totalPoints = bestSubjects.reduce((sum, s) => sum + (s.points ?? 0), 0);
+
+    // Load division rules for classification
+    const divisionRules = await this.prisma.divisionRule.findMany({
+      where: {
+        curriculumVersionId: schoolCurriculum?.curriculumVersionId ?? undefined,
+        examStructureId: null,
+      },
+      orderBy: { maxScore: 'desc' },
+    });
+
+    const overallPct = termSummary?.overallPercentage ?? null;
+    const division = overallPct != null
+      ? divisionRules.find(r => r.minScore <= overallPct && r.maxScore >= overallPct) ?? null
+      : null;
 
     return {
       student: {
@@ -154,12 +234,19 @@ export class ReportCardEngineService {
         startDate: term.startDate,
         endDate: term.endDate,
       },
-      subjectBreakdown,
-      bestSix,
+      subjectBreakdown: enrichedBreakdown,
+      bestSubjects,
       totalPoints,
-      bestSixAverage: bestSix.length > 0
-        ? parseFloat((bestSix.reduce((sum, s) => sum + (s.finalPercentage ?? 0), 0) / bestSix.length).toFixed(2))
+      bestSubjectsAverage: bestSubjects.length > 0
+        ? parseFloat((bestSubjects.reduce((sum, s) => sum + (s.finalPercentage ?? 0), 0) / bestSubjects.length).toFixed(2))
         : null,
+      division: division ? {
+        code: division.code,
+        division: division.division,
+        label: division.label,
+        color: division.color,
+      } : null,
+      performanceCategory: getPerformanceCategory(overallPct),
       termSummary: termSummary ? {
         overallPercentage: termSummary.overallPercentage,
         overallGrade: termSummary.overallGrade,
@@ -180,6 +267,10 @@ export class ReportCardEngineService {
         absentDays: attendance.filter(a => a.status === 'ABSENT').length,
         lateDays: attendance.filter(a => a.status === 'LATE').length,
         attendanceRate: attendanceRate ? parseFloat(attendanceRate.toFixed(2)) : null,
+      },
+      curriculum: {
+        version: schoolCurriculum?.curriculumVersion?.name ?? null,
+        bestSubjectRule: bestSubjectRule ? { name: bestSubjectRule.name, count: bestSubjectRule.count } : null,
       },
       generatedAt: new Date(),
     };

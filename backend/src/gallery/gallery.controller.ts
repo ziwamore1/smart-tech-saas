@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   Req,
   UseInterceptors,
   UploadedFile,
@@ -23,6 +24,11 @@ export class GalleryController {
     private galleryService: GalleryService,
     private configService: ConfigService,
   ) {}
+
+  @Get('public/recent')
+  async findPublicRecent(@Query('limit') limit?: string) {
+    return this.galleryService.findPublicRecent(limit ? parseInt(limit, 10) : 6);
+  }
 
   @Get()
   async findAll(@Req() req: any) {

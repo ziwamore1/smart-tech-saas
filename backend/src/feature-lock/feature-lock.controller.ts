@@ -13,8 +13,6 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('feature-locks')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SuperAdmin')
 export class FeatureLockController {
   constructor(private readonly featureLockService: FeatureLockService) {}
 
@@ -25,12 +23,16 @@ export class FeatureLockController {
   }
 
   @Get(':key')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SuperAdmin')
   async findOne(@Param('key') key: string): Promise<{ data: FeatureLockDto }> {
     const feature = await this.featureLockService.findOne(key);
     return { data: feature };
   }
 
   @Patch(':key')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SuperAdmin')
   async update(
     @Param('key') key: string,
     @Body() data: {
@@ -52,6 +54,8 @@ export class FeatureLockController {
   }
 
   @Post('reset')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SuperAdmin')
   async resetToDefaults(): Promise<{ message: string }> {
     return this.featureLockService.resetToDefaults();
   }

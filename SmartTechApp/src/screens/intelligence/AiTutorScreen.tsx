@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useAuthStore } from '../../store';
 import { apiService } from '../../services/api';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 interface Message {
@@ -29,7 +29,18 @@ type Screen = 'sessions' | 'chat';
 export const AiTutorScreen: React.FC = () => {
   const { user } = useAuthStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const route = useRoute();
   const [screen, setScreen] = useState<Screen>('sessions');
+
+  const userRole = user?.roles?.[0]?.toLowerCase().replace(' ', '_') || 'student';
+  const sourceScreen = (route.params as any)?.sourceScreen || 'ai_tutor';
+
+  const buildContext = (overrides?: { subject?: string; topic?: string }) => ({
+    role: userRole,
+    screen: sourceScreen,
+    subject: overrides?.subject,
+    topic: overrides?.topic,
+  });
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -66,7 +77,11 @@ export const AiTutorScreen: React.FC = () => {
     setTopicInput('');
     setLoading(true);
     try {
-      const res = await apiService.startAiTutorSession({ topic, subjectId });
+      const res = await apiService.startAiTutorSession({
+        topic,
+        subjectId,
+        context: buildContext({ subject: subjectId, topic }),
+      });
       const session: Session = {
         id: res.sessionId,
         topic,
@@ -117,7 +132,14 @@ export const AiTutorScreen: React.FC = () => {
     setLoading(true);
 
     try {
-      const res = await apiService.sendAiTutorMessage(activeSession.id, question);
+      const res = await apiService.sendAiTutorMessage(
+        activeSession.id,
+        question,
+        buildContext({
+          subject: activeSession.subjectId,
+          topic: activeSession.topic,
+        }),
+      );
       const reply = res?.response || res?.data?.response || "I'll help you with that!";
       setMessages(prev => [...prev, { role: 'tutor', content: reply, createdAt: new Date().toISOString() }]);
     } catch {
@@ -238,6 +260,9 @@ export const AiTutorScreen: React.FC = () => {
               onChangeText={setTopicInput}
               autoFocus
             />
+            <Text style={styles.modalHint}>
+              Role: {userRole.replace('_', ' ')} | Context-aware AI will personalize responses based on your profile and performance.
+            </Text>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => { setShowTopicModal(false); setTopicInput(''); }}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
@@ -354,7 +379,8 @@ const styles = StyleSheet.create({
   modal: { backgroundColor: colors.white, borderRadius: borderRadius.xxl, padding: spacing.xl, width: '85%', ...shadows.lg },
   modalTitle: { fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
   modalSub: { fontSize: 14, color: colors.textLight, marginBottom: spacing.lg },
-  topicInput: { borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.md, fontSize: 15, color: colors.text, marginBottom: spacing.lg },
+  topicInput: { borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.md, fontSize: 15, color: colors.text, marginBottom: spacing.sm },
+  modalHint: { fontSize: 11, color: colors.textLight, marginBottom: spacing.lg, fontStyle: 'italic' },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.md },
   modalCancelBtn: { paddingVertical: spacing.sm, paddingHorizontal: spacing.lg },
   modalCancelText: { fontSize: 15, color: colors.textLight, fontWeight: '600' },

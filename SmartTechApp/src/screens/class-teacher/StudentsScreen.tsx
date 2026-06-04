@@ -1,22 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, WidgetCard } from '../../components';
-import { colors, spacing, borderRadius, shadows, typography } from '../../theme';
+import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useAppStore } from '../../store';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-
-const MOCK_STUDENTS = [
-  { name: 'Alice Kamau', grade: 'A', score: 92, attendance: 98, status: 'top' as const },
-  { name: 'Bob Ochieng', grade: 'B+', score: 85, attendance: 95, status: 'good' as const },
-  { name: 'Carol Wanjiku', grade: 'C', score: 70, attendance: 88, status: 'average' as const },
-  { name: 'David Mwangi', grade: 'D+', score: 55, attendance: 72, status: 'warning' as const },
-  { name: 'Eve Nyambura', grade: 'F', score: 38, attendance: 60, status: 'danger' as const },
-  { name: 'Frank Otieno', grade: 'B', score: 78, attendance: 90, status: 'good' as const },
-  { name: 'Grace Akinyi', grade: 'A-', score: 88, attendance: 96, status: 'top' as const },
-  { name: 'Henry Kiprop', grade: 'C+', score: 65, attendance: 82, status: 'average' as const },
-];
+import { apiService } from '../../services/api';
 
 const statusColors = {
   top: colors.success,
@@ -26,18 +16,86 @@ const statusColors = {
   danger: colors.error,
 };
 
+interface StudentRecord {
+  id: string;
+  firstName: string;
+  lastName: string;
+  admissionNumber?: string;
+  className?: string;
+  score?: number;
+  grade?: string;
+  attendance?: number;
+}
+
 export const ClassTeacherStudentsScreen: React.FC = () => {
   const { dashboard } = useAppStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [filter, setFilter] = useState<string>('all');
+  const [students, setStudents] = useState<StudentRecord[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = filter === 'all' ? MOCK_STUDENTS : MOCK_STUDENTS.filter(s => s.status === filter);
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        const res = await apiService.getTeacherClasses();
+        const data = Array.isArray(res) ? res : res?.data || [];
+        const flattened: StudentRecord[] = [];
+        for (const cls of data) {
+          if (cls.students) {
+            for (const s of cls.students) {
+              flattened.push({
+                id: s.id,
+                firstName: s.firstName || s.user?.firstName || '',
+                lastName: s.lastName || s.user?.lastName || '',
+                admissionNumber: s.admissionNumber,
+                className: cls.name || cls.className,
+                score: s.averageScore,
+                grade: s.grade,
+                attendance: s.attendanceRate,
+              });
+            }
+          }
+        }
+        setStudents(flattened);
+      } catch {
+        try {
+          const res = await apiService.getStudents();
+          const data = Array.isArray(res) ? res : res?.data || [];
+          setStudents(data.map((s: any) => ({
+            id: s.id,
+            firstName: s.firstName || s.user?.firstName || '',
+            lastName: s.lastName || s.user?.lastName || '',
+            admissionNumber: s.admissionNumber,
+            className: s.className,
+            score: s.averageScore,
+            grade: s.grade,
+            attendance: s.attendanceRate,
+          })));
+        } catch {
+          setStudents([]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStudents();
+  }, []);
+
+  const getStatus = (student: StudentRecord) => {
+    if (student.score >= 80) return 'top';
+    if (student.score >= 65) return 'good';
+    if (student.score >= 50) return 'average';
+    if (student.score >= 40) return 'warning';
+    return 'danger';
+  };
+
+  const filtered = filter === 'all' ? students : students.filter(s => getStatus(s) === filter);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <HeaderBar
         title="Students"
-        subtitle={`${MOCK_STUDENTS.length} enrolled`}
+        subtitle={`${students.length} enrolled`}
         rightIcon={{ name: '🔍', onPress: () => {} }}
       />
 
@@ -55,21 +113,42 @@ export const ClassTeacherStudentsScreen: React.FC = () => {
         </ScrollView>
 
         <WidgetCard title="Performance Overview">
-          {filtered.map((student, i) => (
-            <TouchableOpacity key={i} style={styles.studentRow}>
-              <View style={[styles.avatar, { backgroundColor: statusColors[student.status] + '20' }]}>
-                <Text style={[styles.avatarText, { color: statusColors[student.status] }]}>{student.name.split(' ').map(n => n[0]).join('')}</Text>
-              </View>
-              <View style={styles.studentInfo}>
-                <Text style={styles.studentName}>{student.name}</Text>
-                <Text style={styles.studentMeta}>Attendance: {student.attendance}%</Text>
-              </View>
-              <View style={styles.scoreArea}>
-                <Text style={[styles.score, { color: statusColors[student.status] }]}>{student.score}%</Text>
-                <Text style={[styles.gradeBadge, { backgroundColor: statusColors[student.status] + '20', color: statusColors[student.status] }]}>{student.grade}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+          {loading ? (
+            <ActivityIndicator color={colors.primary} style={{ paddingVertical: 40 }} />
+          ) : filtered.length === 0 ? (
+            <Text style={{ textAlign: 'center', color: colors.textLight, paddingVertical: 40 }}>
+              No student data available.
+            </Text>
+          ) : (
+            filtered.map((student, i) => {
+              const status = getStatus(student);
+              return (
+                <TouchableOpacity key={student.id || i} style={styles.studentRow}>
+                  <View style={[styles.avatar, { backgroundColor: statusColors[status] + '20' }]}>
+                    <Text style={[styles.avatarText, { color: statusColors[status] }]}>
+                      {student.firstName?.[0]}{student.lastName?.[0]}
+                    </Text>
+                  </View>
+                  <View style={styles.studentInfo}>
+                    <Text style={styles.studentName}>{student.firstName} {student.lastName}</Text>
+                    <Text style={styles.studentMeta}>
+                      {student.className ? `${student.className} • ` : ''}Attendance: {student.attendance ?? '—'}%
+                    </Text>
+                  </View>
+                  <View style={styles.scoreArea}>
+                    <Text style={[styles.score, { color: statusColors[status] }]}>
+                      {student.score ?? '—'}%
+                    </Text>
+                    {student.grade && (
+                      <Text style={[styles.gradeBadge, { backgroundColor: statusColors[status] + '20', color: statusColors[status] }]}>
+                        {student.grade}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
         </WidgetCard>
 
         <WidgetCard title="Quick Actions">

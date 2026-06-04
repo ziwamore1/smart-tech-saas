@@ -88,4 +88,50 @@ export class ReportCardController {
     });
     res.send(pdf);
   }
+
+  @Get(':studentId/:termId/curriculum-pdf')
+  @Roles('Director', 'Class Teacher')
+  async downloadCurriculumReportCard(
+    @Param('studentId') studentId: string,
+    @Param('termId') termId: string,
+    @Req() req,
+    @Res() res,
+  ) {
+    const schoolId = req.user.schoolId;
+
+    const pdf = await this.reportCardService.generateCurriculumReportCardPdf(
+      schoolId,
+      studentId,
+      termId,
+    );
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="curriculum-report-${studentId}-${termId}.pdf"`,
+    });
+    res.send(pdf);
+  }
+
+  @Get('class/:classId/term/:termId/curriculum-pdf')
+  @Roles('Director', 'Class Teacher')
+  async downloadClassCurriculumReports(
+    @Req() req,
+    @Param('classId') classId: string,
+    @Param('termId') termId: string,
+    @Res() res,
+  ) {
+    const schoolId = req.user.schoolId;
+
+    const pdf = await this.reportCardService.generateClassCurriculumReportCardsPdf(
+      schoolId,
+      classId,
+      termId,
+    );
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'attachment; filename=class-curriculum-report-cards.pdf',
+    });
+    res.send(pdf);
+  }
 }

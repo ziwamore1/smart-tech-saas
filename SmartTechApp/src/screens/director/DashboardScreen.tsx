@@ -1,11 +1,12 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, StatCard, QuickActionItem, WidgetCard, GradientCard } from '../../components';
 import { colors, spacing } from '../../theme';
 import { useAuthStore, useAppStore } from '../../store';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { apiService } from '../../services/api';
 
 interface DirectorDashboardProps {
   onToggleDrawer?: () => void;
@@ -17,8 +18,21 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
   const { user, logout } = useAuthStore();
   const { dashboard, isLoadingDashboard, fetchDashboard } = useAppStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const [signature, setSignature] = useState<any>(null);
 
   useEffect(() => { fetchDashboard(); }, []);
+
+  useEffect(() => {
+    const loadSignature = async () => {
+      try {
+        const res = await apiService.getSignatures();
+        const sigs = Array.isArray(res) ? res : res?.data || [];
+        const defaultSig = sigs.find((s: any) => s.isDefault) || sigs[0];
+        setSignature(defaultSig || null);
+      } catch { /* no signatures yet */ }
+    };
+    loadSignature();
+  }, []);
 
   const stats = dashboard?.stats;
 
@@ -45,13 +59,13 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
 
   const drawerScreens = ['DirectorReports', 'DirectorStaff', 'DirectorSettings', 'DirectorProfile', 'DirectorHome', 'DirectorClasses', 'DirectorStudents', 'DirectorLibrary', 'DirectorTimetable', 'DirectorCommunication'];
 
-  const handleNavigate = (screen: string) => {
+  const handleNavigate = (screen: string, params?: any) => {
     if (drawerScreens.includes(screen)) {
       if (onNavigate) onNavigate(screen);
     } else if (stackNavigation) {
-      stackNavigation.navigate(screen as never);
+      stackNavigation.navigate(screen as never, params as never);
     } else {
-      navigation.navigate(screen as never);
+      navigation.navigate(screen as never, params as never);
     }
   };
 
@@ -59,10 +73,11 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
     { icon: '📋', label: 'Exams', screen: 'ExamList', gradient: ['#1E3A8A', '#3B82F6'] as const },
     { icon: '📄', label: 'Templates', screen: 'TemplateMarketplace', gradient: ['#0D9488', '#14B8A6'] as const },
     { icon: '📊', label: 'Analytics', screen: 'Analytics', gradient: ['#7C3AED', '#A78BFA'] as const },
-    { icon: '🤖', label: 'AI Tutor', screen: 'AiTutor', gradient: ['#D97706', '#F59E0B'] as const },
+    { icon: '🤖', label: 'AI Tutor', screen: 'AiTutor', gradient: ['#D97706', '#F59E0B'] as const, params: { sourceScreen: 'director_dashboard' } },
     { icon: '📝', label: 'Reports', screen: 'DirectorReports', gradient: ['#EA580C', '#F97316'] as const },
     { icon: '👥', label: 'Staff', screen: 'DirectorStaff', gradient: ['#0D9488', '#5EEAD4'] as const },
     { icon: '🔑', label: 'Settings', screen: 'DirectorSettings', gradient: ['#8B5CF6', '#A78BFA'] as const },
+    { icon: '✍️', label: 'My Signature', screen: 'DigitalStamps', gradient: ['#059669', '#34D399'] as const },
   ];
 
   return (
@@ -82,33 +97,71 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
           <StatCard label="Staff" value={stats?.totalClasses || 0} icon="👨‍🏫" color={colors.teal} bgColor={colors.tealLight} />
         </View>
 
+        {stats?.pendingTasks != null && (
+          <View style={styles.pendingRow}>
+            <Text style={styles.pendingText}>
+              {stats.pendingTasks > 0 ? `${stats.pendingTasks} pending task${stats.pendingTasks > 1 ? 's' : ''} requiring attention` : 'No pending tasks'}
+            </Text>
+          </View>
+        )}
+
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickActionsScroll}>
           {quickActions.map((a) => (
-            <QuickActionItem key={a.label} icon={a.icon} label={a.label} gradient={a.gradient as any} onPress={() => handleNavigate(a.screen)} />
+            <QuickActionItem key={a.label} icon={a.icon} label={a.label} gradient={a.gradient as any} onPress={() => handleNavigate(a.screen, (a as any).params)} />
           ))}
         </ScrollView>
 
         <WidgetCard title="School Performance" action={{ label: 'View All', onPress: () => handleNavigate('DirectorReports') }}>
           <View style={styles.performanceRow}>
             <View style={styles.perfItem}>
-              <Text style={styles.perfValue}>87%</Text>
-              <Text style={styles.perfLabel}>Pass Rate</Text>
+              <Text style={styles.perfValue}>{stats?.averageScore ? `${stats.averageScore}%` : '—'}</Text>
+              <Text style={styles.perfLabel}>Average Score</Text>
             </View>
             <View style={styles.perfDivider} />
             <View style={styles.perfItem}>
-              <Text style={styles.perfValue}>92%</Text>
+              <Text style={styles.perfValue}>{stats?.attendanceRate ? `${stats.attendanceRate}%` : '—'}</Text>
               <Text style={styles.perfLabel}>Attendance</Text>
             </View>
             <View style={styles.perfDivider} />
             <View style={styles.perfItem}>
-              <Text style={styles.perfValue}>4.2</Text>
-              <Text style={styles.perfLabel}>Avg Score</Text>
+              <Text style={styles.perfValue}>{stats?.totalClasses || 0}</Text>
+              <Text style={styles.perfLabel}>Classes</Text>
             </View>
           </View>
         </WidgetCard>
+
+        {signature && (
+          <WidgetCard title="My Digital Signature" action={{ label: 'Manage', onPress: () => handleNavigate('DigitalStamps', { sourceScreen: 'director_dashboard' }) }}>
+            <View style={styles.signatureCard}>
+              {signature.imageUrl ? (
+                <Image source={{ uri: signature.imageUrl }} style={styles.signatureImage} resizeMode="contain" />
+              ) : signature.signatureData ? (
+                <View style={styles.signatureSvgPlaceholder}>
+                  <Text style={{ fontSize: 14, color: colors.textLight, fontStyle: 'italic' }}>{signature.name}</Text>
+                </View>
+              ) : (
+                <View style={styles.signatureSvgPlaceholder}>
+                  <Text style={{ fontSize: 11, color: colors.textMuted }}>No signature image</Text>
+                </View>
+              )}
+              <Text style={styles.signatureName}>{signature.name}</Text>
+              {signature.title && <Text style={styles.signatureTitle}>{signature.title}</Text>}
+            </View>
+          </WidgetCard>
+        )}
+
+        {!signature && (
+          <WidgetCard title="Digital Signature" action={{ label: 'Setup', onPress: () => handleNavigate('DigitalStamps', { sourceScreen: 'director_dashboard' }) }}>
+            <TouchableOpacity style={styles.setupSignatureBtn} onPress={() => handleNavigate('DigitalStamps', { sourceScreen: 'director_dashboard' })}>
+              <Text style={{ fontSize: 28, marginBottom: spacing.sm }}>✍️</Text>
+              <Text style={styles.setupSignatureText}>Set Up Your Digital Signature</Text>
+              <Text style={styles.setupSignatureSub}>Sign documents and certificates digitally</Text>
+            </TouchableOpacity>
+          </WidgetCard>
+        )}
 
         <GradientCard
           title="Recent Activity"
@@ -158,4 +211,13 @@ const styles = StyleSheet.create({
   activityContent: { flex: 1 },
   activityText: { fontSize: 14, fontWeight: '500', color: colors.text },
   activityTime: { fontSize: 12, color: colors.textLight, marginTop: 2 },
+
+  signatureCard: { alignItems: 'center', paddingVertical: spacing.md },
+  signatureImage: { width: '100%', height: 80, marginBottom: spacing.sm },
+  signatureSvgPlaceholder: { width: '100%', height: 60, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed', borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginBottom: spacing.sm },
+  signatureName: { fontSize: 16, fontWeight: '600', color: colors.text },
+  signatureTitle: { fontSize: 13, color: colors.textLight, marginTop: 2 },
+  setupSignatureBtn: { alignItems: 'center', paddingVertical: spacing.lg, backgroundColor: colors.background, borderRadius: 12, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed' },
+  setupSignatureText: { fontSize: 15, fontWeight: '600', color: colors.primary, marginBottom: 4 },
+  setupSignatureSub: { fontSize: 12, color: colors.textLight },
 });

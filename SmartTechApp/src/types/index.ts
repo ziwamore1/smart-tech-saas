@@ -9,6 +9,44 @@ export interface User {
   roles: string[];
   schoolId: string | null;
   school?: School | null;
+  institutionType?: string | null;
+}
+
+export const INSTITUTION_TYPES = {
+  PRIMARY_SCHOOL: 'PRIMARY_SCHOOL',
+  SECONDARY_SCHOOL: 'SECONDARY_SCHOOL',
+  ADVANCED_SECONDARY: 'ADVANCED_SECONDARY',
+  COLLEGE: 'COLLEGE',
+  UNIVERSITY: 'UNIVERSITY',
+} as const;
+
+export type InstitutionTypeCode = keyof typeof INSTITUTION_TYPES;
+
+export const INSTITUTION_TYPE_LABELS: Record<InstitutionTypeCode, string> = {
+  PRIMARY_SCHOOL: 'Primary School',
+  SECONDARY_SCHOOL: 'Secondary School',
+  ADVANCED_SECONDARY: 'Advanced Secondary',
+  COLLEGE: 'College',
+  UNIVERSITY: 'University',
+};
+
+export const INSTITUTION_TYPE_ROLES: Record<InstitutionTypeCode, string[]> = {
+  PRIMARY_SCHOOL: ['Head Teacher', 'Deputy Head', 'Primary Teacher', 'Parent', 'Learner'],
+  SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'HOD', 'Teacher', 'Class Teacher', 'Parent', 'Student'],
+  ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'HOD', 'Teacher', 'Class Teacher', 'Parent', 'Student'],
+  COLLEGE: ['Principal', 'Registrar', 'Lecturer', 'Student'],
+  UNIVERSITY: ['Vice Chancellor', 'Dean', 'Lecturer', 'Research Supervisor', 'Student'],
+};
+
+export function getRolesForType(institutionType: string | null | undefined): string[] {
+  if (!institutionType) return [];
+  return INSTITUTION_TYPE_ROLES[institutionType as InstitutionTypeCode] || [];
+}
+
+export function isRoleForType(role: string, institutionType: string | null | undefined): boolean {
+  if (!institutionType) return false;
+  const roles = getRolesForType(institutionType);
+  return roles.includes(role) || roles.some(r => r.toLowerCase() === role.toLowerCase());
 }
 
 export interface School {

@@ -1,4 +1,4 @@
-import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportCardService } from '../report-card/report-card.service';
 import { UnifiedMessagingService } from '../messaging/unified-messaging.service';
@@ -105,7 +105,35 @@ export class ParentService {
     });
 
     if (existingParent) {
-      throw new ForbiddenException('Parent with this email already exists');
+      if (dto.children && dto.children.length > 0) {
+        for (const child of dto.children) {
+          await this.prisma.parentStudent.upsert({
+            where: { parentId_studentId: { parentId: existingParent.id, studentId: child.studentId } },
+            create: { parentId: existingParent.id, studentId: child.studentId },
+            update: {},
+          });
+        }
+      }
+
+      const updatedParent = await this.prisma.parent.findUnique({
+        where: { id: existingParent.id },
+        include: { children: { include: { student: true } } },
+      });
+
+      return {
+        message: 'Existing parent found — children linked successfully',
+        data: {
+          id: updatedParent.id,
+          firstName: updatedParent.firstName,
+          lastName: updatedParent.lastName,
+          email: updatedParent.email,
+          phone: updatedParent.phone,
+          children: updatedParent.children.map(c => ({
+            studentId: c.studentId,
+            studentName: `${c.student.firstName} ${c.student.lastName}`,
+          })),
+        },
+      };
     }
 
     const temporaryPassword = dto.password || 'Parent123!';
@@ -293,5 +321,140 @@ export class ParentService {
       studentId,
       termId,
     );
+  }
+
+  async getAllChildrenResults(parentId: string) {
+    const children = await this.getChildren(parentId);
+
+    const results = await Promise.all(
+      children.map(async (child) => {
+        const childResults = await this.getChildResults(child.id);
+        return {
+          child: {
+            id: child.id,
+            firstName: child.firstName,
+            lastName: child.lastName,
+            admissionNumber: child.admissionNumber,
+            class: child.class,
+          },
+          results: childResults,
+        };
+      }),
+    );
+
+    const currentTerm = await this.prisma.term.findFirst({
+      where: {
+        isCurrent: true,
+        academicYear: { isCurrent: true },
+      },
+    });
+
+    return {
+      term: currentTerm?.name || null,
+      academicYear: currentTerm?.academicYearId || null,
+      children: results,
+    };
+  }
+
+  async linkChild(parentId: string, studentId: string) {
+    const parent = await this.prisma.parent.findUnique({ where: { id: parentId } });
+    if (!parent) throw new NotFoundException('Parent not found');
+
+    const student = await this.prisma.student.findUnique({ where: { id: studentId } });
+    if (!student) throw new NotFoundException('Student not found');
+
+    await this.prisma.parentStudent.upsert({
+      where: { parentId_studentId: { parentId, studentId } },
+      create: { parentId, studentId },
+      update: {},
+    });
+
+    return { message: 'Child linked successfully' };
+  }
+
+  async findAll(schoolId: string, search?: string) {
+    const where: any = { schoolId };
+    if (search) {
+      where.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search } },
+      ];
+    }
+
+    return this.prisma.parent.findMany({
+      where,
+      include: {
+        children: {
+          include: {
+            student: {
+              select: { id: true, firstName: true, lastName: true, admissionNumber: true },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async findOne(id: string) {
+    const parent = await this.prisma.parent.findUnique({
+      where: { id },
+      include: {
+        children: {
+          include: {
+            student: {
+              include: {
+                enrollments: {
+                  where: { status: 'ACTIVE' },
+                  include: { class: true, academicYear: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!parent) throw new NotFoundException('Parent not found');
+    return parent;
+  }
+
+  async getStats(schoolId: string) {
+    const [total, withMultiple] = await Promise.all([
+      this.prisma.parent.count({ where: { schoolId } }),
+      this.prisma.parent.count({
+        where: {
+          schoolId,
+          children: { some: {} },
+        },
+      }),
+    ]);
+
+    return { total, withLinkedChildren: withMultiple };
+  }
+
+  async unlinkChild(parentId: string, studentId: string) {
+    await this.prisma.parentStudent.deleteMany({
+      where: { parentId, studentId },
+    });
+    return { message: 'Child unlinked successfully' };
+  }
+
+  async update(id: string, data: { firstName?: string; lastName?: string; email?: string; phone?: string }) {
+    const parent = await this.prisma.parent.findUnique({ where: { id } });
+    if (!parent) throw new NotFoundException('Parent not found');
+
+    return this.prisma.parent.update({
+      where: { id },
+      data,
+      include: {
+        children: {
+          include: {
+            student: { select: { id: true, firstName: true, lastName: true, admissionNumber: true } },
+          },
+        },
+      },
+    });
   }
 }

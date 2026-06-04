@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { IntelligenceController } from './intelligence.controller';
 import { DescriptiveStatsService } from './services/descriptive-stats.service';
@@ -14,8 +15,11 @@ import { AdaptiveTestingService } from './services/adaptive-testing.service';
 import { LearningStyleAnalysisService } from './services/learning-style-analysis.service';
 import { ExamQualityAnalysisService } from './services/exam-quality-analysis.service';
 import { AiTutorService } from './services/ai-tutor.service';
+import { AiContextService } from './services/ai-context.service';
+import { SubjectEngineService } from './services/subject-engine.service';
 
 @Module({
+  imports: [ConfigModule],
   controllers: [IntelligenceController],
   providers: [
     PrismaService,
@@ -32,12 +36,16 @@ import { AiTutorService } from './services/ai-tutor.service';
     LearningStyleAnalysisService,
     ExamQualityAnalysisService,
     AiTutorService,
+    AiContextService,
+    SubjectEngineService,
   ],
   exports: [
     DescriptiveStatsService,
     TrendAnalysisService,
     DiagnosticAnalysisService,
     AiTutorService,
+    AiContextService,
+    SubjectEngineService,
   ],
 })
 export class IntelligenceModule {}

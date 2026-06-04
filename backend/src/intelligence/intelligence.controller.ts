@@ -359,17 +359,21 @@ export class IntelligenceController {
   @Post('ai-tutor/start')
   async startTutorSession(
     @Req() req: any,
-    @Body() body: { studentId: string; subjectId?: string; topic?: string },
+    @Body() body: { studentId: string; subjectId?: string; topic?: string; context?: Record<string, any> },
   ) {
-    return this.aiTutor.startSession(body.studentId, req.user.schoolId, { subjectId: body.subjectId, topic: body.topic });
+    return this.aiTutor.startSession(body.studentId, req.user.schoolId, {
+      subjectId: body.subjectId,
+      topic: body.topic,
+      context: body.context as any,
+    });
   }
 
   @Post('ai-tutor/message')
   async sendTutorMessage(
     @Req() req: any,
-    @Body() body: { sessionId: string; studentId: string; message: string },
+    @Body() body: { sessionId: string; studentId: string; message: string; context?: Record<string, any> },
   ) {
-    return this.aiTutor.sendMessage(body.sessionId, body.studentId, body.message, req.user.schoolId);
+    return this.aiTutor.sendMessage(body.sessionId, body.studentId, body.message, req.user.schoolId, body.context as any);
   }
 
   @Get('ai-tutor/history/:sessionId')
@@ -394,9 +398,9 @@ export class IntelligenceController {
   @Post('ai-tutor/ask')
   async askTutor(
     @Req() req: any,
-    @Body() body: { studentId: string; question: string; subjectId?: string },
+    @Body() body: { studentId: string; question: string; subjectId?: string; context?: Record<string, any> },
   ) {
-    return this.aiTutor.askQuestion(body.studentId, req.user.schoolId, body.question, body.subjectId);
+    return this.aiTutor.askQuestion(body.studentId, req.user.schoolId, body.question, body.subjectId, body.context as any);
   }
 
   @Get('ai-tutor/insights/:studentId')

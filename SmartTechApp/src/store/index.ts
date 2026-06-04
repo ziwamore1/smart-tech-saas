@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { mmkvStorage } from '../storage/mmkv';
-import { User, DashboardData, Notification } from '../types';
+import { User, DashboardData, Notification, INSTITUTION_TYPE_ROLES, InstitutionTypeCode } from '../types';
 import { apiService } from '../services/api';
 
 interface AuthState {
@@ -13,6 +13,17 @@ interface AuthState {
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
   clearError: () => void;
+}
+
+function extractInstitutionType(user: User): string | null {
+  if (user.institutionType) return user.institutionType;
+  const typeRoles = Object.entries(INSTITUTION_TYPE_ROLES) as [InstitutionTypeCode, string[]][];
+  for (const [typeCode, roles] of typeRoles) {
+    if (user.roles.some(r => roles.includes(r) || roles.some(tr => tr.toLowerCase() === r.toLowerCase()))) {
+      return typeCode;
+    }
+  }
+  return null;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -32,8 +43,12 @@ export const useAuthStore = create<AuthState>()(
             deviceToken,
             platform: 'android',
           });
+          const user = response.user;
+          if (!user.institutionType) {
+            user.institutionType = extractInstitutionType(user);
+          }
           set({
-            user: response.user,
+            user,
             isAuthenticated: true,
             isLoading: false,
           });

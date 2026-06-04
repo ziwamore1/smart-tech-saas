@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Req, UseGuards, Logger, Get } from '@nestjs/common';
+import { Controller, Post, Body, Req, UseGuards, Logger, Get, Inject } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterSchoolDto } from './dto/register-school.dto';
 import { LoginDto } from './dto/login.dto';
@@ -8,12 +8,19 @@ import { Roles } from './decorators/roles.decorator';
 import { RolesGuard } from './guards/roles.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { SuperAdminGuard } from './guards/super-admin.guard';
+import { InstitutionRegistrationService } from '../institution/institution-registration.service';
+import { InstitutionTypeService } from '../institution/institution-type.service';
+import { RegisterInstitutionDto } from '../institution/dto/institution-type.dto';
 
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private institutionRegistrationService: InstitutionRegistrationService,
+    private institutionTypeService: InstitutionTypeService,
+  ) {}
 
   @Post('register-super-admin')
   async registerSuperAdmin(@Body() body: RegisterSuperAdminDto) {
@@ -57,6 +64,16 @@ export class AuthController {
   async registerSchool(@Body() body: RegisterSchoolDto) {
     this.logger.log(`Register school request: ${JSON.stringify(body)}`);
     return this.authService.registerSchool(body);
+  }
+
+  @Get('institution-types')
+  async getInstitutionTypes() {
+    return this.institutionTypeService.getAllTypes();
+  }
+
+  @Post('register-institution')
+  async registerInstitution(@Body() body: RegisterInstitutionDto) {
+    return this.institutionRegistrationService.registerInstitution(body);
   }
 
   @Post('login')

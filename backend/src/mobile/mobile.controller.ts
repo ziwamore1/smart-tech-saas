@@ -125,15 +125,35 @@ export class MobileController {
   }
 
   @Post('ai-tutor/start')
-  async startAiTutorSession(@Req() req: any, @Body() body: { subjectId?: string; topic?: string; studentId?: string }) {
+  async startAiTutorSession(@Req() req: any, @Body() body: {
+    subjectId?: string;
+    topic?: string;
+    studentId?: string;
+    context?: {
+      role?: string;
+      screen?: string;
+      subject?: string;
+      topic?: string;
+    };
+  }) {
     const { id: userId, schoolId, roles } = req.user;
     return this.mobileService.startAiTutorSession(userId, schoolId, roles, body);
   }
 
   @Post('ai-tutor/message')
-  async sendAiTutorMessage(@Req() req: any, @Body() body: { sessionId: string; message: string }) {
+  async sendAiTutorMessage(@Req() req: any, @Body() body: {
+    sessionId: string;
+    message: string;
+    context?: {
+      role?: string;
+      screen?: string;
+      subject?: string;
+      topic?: string;
+      studentId?: string;
+    };
+  }) {
     const { id: userId, schoolId } = req.user;
-    return this.mobileService.sendAiTutorMessage(userId, schoolId, body.sessionId, body.message);
+    return this.mobileService.sendAiTutorMessage(userId, schoolId, body.sessionId, body.message, body.context);
   }
 
   @Get('ai-tutor/history/:sessionId')
@@ -149,9 +169,19 @@ export class MobileController {
   }
 
   @Post('ai-tutor/ask')
-  async askAiTutor(@Req() req: any, @Body() body: { question: string; subjectId?: string }) {
+  async askAiTutor(@Req() req: any, @Body() body: {
+    question: string;
+    subjectId?: string;
+    context?: {
+      role?: string;
+      screen?: string;
+      subject?: string;
+      topic?: string;
+      studentId?: string;
+    };
+  }) {
     const { id: userId, schoolId, roles } = req.user;
-    return this.mobileService.askAiTutor(userId, schoolId, roles, body.question, body.subjectId);
+    return this.mobileService.askAiTutor(userId, schoolId, roles, body.question, body.subjectId, body.context);
   }
 
   @Get('classes')

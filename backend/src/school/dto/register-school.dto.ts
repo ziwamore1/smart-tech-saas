@@ -6,4 +6,6 @@ export class RegisterSchoolDto {
   phone?: string;
 
   country?: string;
+
+  institutionType?: string;
 }

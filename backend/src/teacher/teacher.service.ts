@@ -50,6 +50,7 @@ export class TeacherService {
       yearsOfExperience,
       emergencyContact,
       emergencyPhone,
+      staffType,
       ...teacherData 
     } = data;
     
@@ -73,6 +74,12 @@ export class TeacherService {
         hireDate: teacherData.hireDate ? new Date(teacherData.hireDate) : null,
         department: teacherData.department || null,
         gender: teacherData.gender || null,
+        staffType: staffType || 'TEACHING',
+        qualification: qualification || null,
+        specialization: specialization || null,
+        yearsOfExperience: yearsOfExperience ? parseInt(yearsOfExperience) : null,
+        emergencyContact: emergencyContact || null,
+        emergencyPhone: emergencyPhone || null,
         school: {
           connect: { id: schoolId },
         },

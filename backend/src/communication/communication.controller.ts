@@ -9,9 +9,13 @@ import {
   Query,
   UseGuards,
   Request,
+  SetMetadata,
 } from '@nestjs/common';
 import { CommunicationService } from './communication.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
+export const IS_PUBLIC_KEY = 'isPublic';
+export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 
 @Controller('communications')
 @UseGuards(JwtAuthGuard)
@@ -155,6 +159,30 @@ export class CommunicationController {
       req.user.schoolId,
       'FACEBOOK',
     );
+  }
+
+  // YouTube OAuth 2.0
+
+  @Get('youtube/auth')
+  async getYouTubeAuthUrl(@Request() req: any) {
+    return this.communicationService.getYouTubeAuthUrl(req.user.schoolId);
+  }
+
+  @Get('youtube/callback')
+  @Public()
+  async handleYouTubeCallback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+  ) {
+    if (!code || !state) {
+      return { success: false, error: 'Missing code or state parameter' };
+    }
+    return this.communicationService.handleYouTubeCallback(state, code);
+  }
+
+  @Post('youtube/disconnect')
+  async disconnectYouTube(@Request() req: any) {
+    return this.communicationService.disconnectYouTube(req.user.schoolId);
   }
 
   @Get('platforms/youtube')

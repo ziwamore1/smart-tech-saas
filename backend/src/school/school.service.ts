@@ -5,6 +5,7 @@ import { UnifiedMessagingService } from '../messaging/unified-messaging.service'
 import { GradingSystemService } from '../grading-system/grading-system.service';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
+import { InstitutionProvisioningService } from '../institution/institution-provisioning.service';
 
 @Injectable()
 export class SchoolService {
@@ -15,14 +16,21 @@ export class SchoolService {
     private unifiedMessaging: UnifiedMessagingService,
     private configService: ConfigService,
     private gradingSystemService: GradingSystemService,
+    private provisioningService: InstitutionProvisioningService,
   ) {}
 
   async registerSchool(dto: RegisterSchoolDto) {
+    const institutionTypeCode = dto.institutionType || 'PRIMARY_SCHOOL';
+    const institutionType = await this.prisma.institutionType.findUnique({
+      where: { code: institutionTypeCode as any },
+    });
+
     const school = await this.prisma.school.create({
       data: {
         name: dto.schoolName,
         email: dto.email,
         phone: dto.phone,
+        institutionTypeId: institutionType?.id,
       },
     });
 
@@ -60,7 +68,11 @@ export class SchoolService {
       },
     });
 
-    await this.initializeSchool(school.id);
+    await this.initializeSchool(school.id, institutionTypeCode);
+
+    if (institutionType) {
+      await this.provisioningService.provisionInstitution(school.id, institutionTypeCode);
+    }
 
     const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
     const schoolUrl = `${frontendUrl}/login?school=${school.id}`;
@@ -86,7 +98,7 @@ export class SchoolService {
     };
   }
 
-  async initializeSchool(schoolId: string) {
+  async initializeSchool(schoolId: string, institutionTypeCode: string = 'PRIMARY_SCHOOL') {
     const academicYear = await this.prisma.academicYear.create({
       data: {
         name: '2026',
@@ -121,26 +133,16 @@ export class SchoolService {
       ],
     });
 
+    const typeLabel = this.getLabelForInstitutionType(institutionTypeCode);
     const levelType = await this.prisma.levelType.create({
       data: {
-        name: 'Grade',
+        name: typeLabel,
         schoolId: schoolId,
       },
     });
 
-    await this.prisma.class.createMany({
-      data: [
-        { name: 'Grade 1', order: 1, levelTypeId: levelType.id, schoolId: schoolId },
-        { name: 'Grade 2', order: 2, levelTypeId: levelType.id, schoolId: schoolId },
-        { name: 'Grade 3', order: 3, levelTypeId: levelType.id, schoolId: schoolId },
-        { name: 'Grade 4', order: 4, levelTypeId: levelType.id, schoolId: schoolId },
-        { name: 'Grade 5', order: 5, levelTypeId: levelType.id, schoolId: schoolId },
-        { name: 'Grade 6', order: 6, levelTypeId: levelType.id, schoolId: schoolId },
-        { name: 'Grade 7', order: 7, levelTypeId: levelType.id, schoolId: schoolId },
-        { name: 'Grade 8', order: 8, levelTypeId: levelType.id, schoolId: schoolId },
-        { name: 'Grade 9', order: 9, levelTypeId: levelType.id, schoolId: schoolId },
-      ],
-    });
+    const classes = this.getClassesForInstitutionType(institutionTypeCode, levelType.id, schoolId);
+    await this.prisma.class.createMany({ data: classes });
 
     await this.gradingSystemService.seedDefaultGradingSystems(schoolId);
 
@@ -155,7 +157,69 @@ export class SchoolService {
       },
     });
 
-    this.logger.log(`School ${schoolId} initialized with default data`);
+    this.logger.log(`School ${schoolId} initialized with ${institutionTypeCode} structure`);
+  }
+
+  private getLabelForInstitutionType(typeCode: string): string {
+    switch (typeCode) {
+      case 'PRIMARY_SCHOOL': return 'Grade';
+      case 'SECONDARY_SCHOOL': return 'Form';
+      case 'ADVANCED_SECONDARY': return 'Form';
+      case 'COLLEGE': return 'Year';
+      case 'UNIVERSITY': return 'Year';
+      default: return 'Grade';
+    }
+  }
+
+  private getClassesForInstitutionType(typeCode: string, levelTypeId: string, schoolId: string): any[] {
+    switch (typeCode) {
+      case 'PRIMARY_SCHOOL':
+        return [
+          { name: 'Grade 1', order: 1, levelTypeId, schoolId },
+          { name: 'Grade 2', order: 2, levelTypeId, schoolId },
+          { name: 'Grade 3', order: 3, levelTypeId, schoolId },
+          { name: 'Grade 4', order: 4, levelTypeId, schoolId },
+          { name: 'Grade 5', order: 5, levelTypeId, schoolId },
+          { name: 'Grade 6', order: 6, levelTypeId, schoolId },
+          { name: 'Grade 7', order: 7, levelTypeId, schoolId },
+        ];
+      case 'SECONDARY_SCHOOL':
+        return [
+          { name: 'Form 1', order: 1, levelTypeId, schoolId },
+          { name: 'Form 2', order: 2, levelTypeId, schoolId },
+          { name: 'Form 3', order: 3, levelTypeId, schoolId },
+          { name: 'Form 4', order: 4, levelTypeId, schoolId },
+          { name: 'Form 5', order: 5, levelTypeId, schoolId },
+        ];
+      case 'ADVANCED_SECONDARY':
+        return [
+          { name: 'Lower 6', order: 1, levelTypeId, schoolId },
+          { name: 'Upper 6', order: 2, levelTypeId, schoolId },
+        ];
+      case 'COLLEGE':
+        return [
+          { name: 'Year 1', order: 1, levelTypeId, schoolId },
+          { name: 'Year 2', order: 2, levelTypeId, schoolId },
+          { name: 'Year 3', order: 3, levelTypeId, schoolId },
+        ];
+      case 'UNIVERSITY':
+        return [
+          { name: 'Year 1', order: 1, levelTypeId, schoolId },
+          { name: 'Year 2', order: 2, levelTypeId, schoolId },
+          { name: 'Year 3', order: 3, levelTypeId, schoolId },
+          { name: 'Year 4', order: 4, levelTypeId, schoolId },
+        ];
+      default:
+        return [
+          { name: 'Grade 1', order: 1, levelTypeId, schoolId },
+          { name: 'Grade 2', order: 2, levelTypeId, schoolId },
+          { name: 'Grade 3', order: 3, levelTypeId, schoolId },
+          { name: 'Grade 4', order: 4, levelTypeId, schoolId },
+          { name: 'Grade 5', order: 5, levelTypeId, schoolId },
+          { name: 'Grade 6', order: 6, levelTypeId, schoolId },
+          { name: 'Grade 7', order: 7, levelTypeId, schoolId },
+        ];
+    }
   }
 
   async getProfile(schoolId?: string) {
@@ -178,6 +242,9 @@ export class SchoolService {
         subscriptionStatus: true,
         subscriptionTier: true,
         createdAt: true,
+        institutionType: {
+          select: { code: true, name: true },
+        },
       },
     });
     

@@ -88,6 +88,24 @@ export class StudentController {
     );
   }
 
+  @Post(':id/link-parent')
+  @Roles('Director')
+  linkParent(
+    @Param('id') id: string,
+    @Body() body: { parentId: string },
+  ) {
+    return this.service.linkStudentToParent(id, body.parentId);
+  }
+
+  @Post(':id/unlink-parent')
+  @Roles('Director')
+  unlinkParent(
+    @Param('id') id: string,
+    @Body() body: { parentId: string },
+  ) {
+    return this.service.unlinkStudentFromParent(id, body.parentId);
+  }
+
   @Post('promoteStudent')
   @Roles('Director')
   promoteStudent(
