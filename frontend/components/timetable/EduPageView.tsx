@@ -203,7 +203,7 @@ export default function EduPageView({
     retry: false,
   });
 
-  const effectiveTerm = termId || termData?.id;
+  const effectiveTerm = termId;
 
   const { data: fetchedData, isLoading: ttLoading, error } = useQuery<TimetableData>({
     queryKey: ["eduPageView", effectiveTerm, selectedEntity, viewMode],
