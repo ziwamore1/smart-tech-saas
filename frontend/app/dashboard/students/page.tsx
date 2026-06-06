@@ -912,7 +912,7 @@ export default function StudentsPage() {
               </div>
 
               <div className="max-h-60 overflow-y-auto border rounded-lg divide-y">
-                {parentsData?.length > 0 ? parentsData
+                {(parentsData?.length ?? 0) > 0 ? (parentsData ?? [])
                   .filter((p: any) => !(selectedStudent as any).parents?.some((sp: any) => sp.parentId === p.id))
                   .map((parent: any) => (
                     <div
