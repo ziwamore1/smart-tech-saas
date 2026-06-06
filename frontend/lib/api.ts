@@ -821,7 +821,7 @@ export const attendanceApi = {
   
   delete: (id: string) => api.delete(`/attendance/${id}`),
   
-  getStats: (params?: { classId?: string; startDate?: string; endDate?: string }) =>
+  getStats: (params?: { classId?: string; startDate?: string; endDate?: string; termId?: string }) =>
     api.get('/attendance/stats', { params }),
   
   getStudentSummary: (studentId: string, params?: { termId?: string }) =>
