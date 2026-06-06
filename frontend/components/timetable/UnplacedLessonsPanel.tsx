@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { timetableApi, subjectApi, teacherApi, classApi } from "@/lib/api";
-import { abbreviateSubject, abbreviateTeacher, abbreviateClassName } from "@/lib/abbreviations";
+import { abbreviateSubject, abbreviateClassName } from "@/lib/abbreviations";
 import TooltipWrap from "./TooltipWrap";
 import { getSubjectColor } from "@/config/subjectColors";
 import type { ClassMatrix, Lesson } from "@/types/timetable";
@@ -66,7 +66,7 @@ function DraggableLessonCard({
       {teacherName && (
         <TooltipWrap text={teacherName}>
           <span className="text-[9px] text-slate-400 truncate max-w-[40px] ml-auto">
-            {abbreviateTeacher(teacherName)}
+            {teacherName}
           </span>
         </TooltipWrap>
       )}
