@@ -81,8 +81,10 @@ export default function ClassListPage() {
     enabled: !!selectedClassId,
   });
 
+  type StudentRow = { id: string; admissionNumber: string; firstName: string; lastName: string; fullName: string; gender: string; dateOfBirth: string | null; age: number | null; status: string };
+
   const students = useMemo(() => {
-    if (!studentsData) return [];
+    if (!studentsData) return [] as StudentRow[];
     const raw = Array.isArray(studentsData) ? studentsData : (studentsData.students || []);
     return raw.map((s: any) => ({
       id: s.id || s.studentId,
@@ -101,7 +103,7 @@ export default function ClassListPage() {
     let list = students;
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      list = list.filter(s =>
+      list = list.filter((s: { fullName: string; admissionNumber: string }) =>
         s.fullName.toLowerCase().includes(term) ||
         s.admissionNumber.toLowerCase().includes(term)
       );
