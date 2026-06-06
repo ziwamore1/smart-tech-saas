@@ -83,8 +83,8 @@ export default function ClassListPage() {
 
   type StudentRow = { id: string; admissionNumber: string; firstName: string; lastName: string; fullName: string; gender: string; dateOfBirth: string | null; age: number | null; status: string };
 
-  const students = useMemo(() => {
-    if (!studentsData) return [] as StudentRow[];
+  const students = useMemo<StudentRow[]>(() => {
+    if (!studentsData) return [];
     const raw = Array.isArray(studentsData) ? studentsData : (studentsData.students || []);
     return raw.map((s: any) => ({
       id: s.id || s.studentId,
