@@ -44,11 +44,6 @@ export default function TimetableToolbar({
     }
   };
 
-  const handleExportPDF = () => {
-    alert("Export to PDF feature ready for integration");
-    setShowExportMenu(false);
-  };
-
   const handlePrint = () => {
     handleExportPDF();
   };
