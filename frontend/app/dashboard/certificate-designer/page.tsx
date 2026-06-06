@@ -189,16 +189,15 @@ export default function CertificateDesignerPage() {
       const file = e.target.files?.[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = (ev) => {
+      reader.onload = async (ev) => {
         const url = ev.target?.result as string;
-        fabric.Image.fromURL(url, (img) => {
-          const canvas = fabricRef.current;
-          if (!canvas) return;
-          img.set({ left: 50, top: 50, scaleX: 0.3, scaleY: 0.3, name: `img_${Date.now()}` });
-          canvas.add(img);
-          canvas.setActiveObject(img);
-          canvas.renderAll();
-        }, { crossOrigin: 'anonymous' });
+        const img = await fabric.Image.fromURL(url, { crossOrigin: 'anonymous' } as any);
+        const canvas = fabricRef.current;
+        if (!canvas) return;
+        img.set({ left: 50, top: 50, scaleX: 0.3, scaleY: 0.3, name: `img_${Date.now()}` });
+        canvas.add(img);
+        canvas.setActiveObject(img);
+        canvas.renderAll();
       };
       reader.readAsDataURL(file);
     };
