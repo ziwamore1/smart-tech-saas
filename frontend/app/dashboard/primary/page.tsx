@@ -138,7 +138,7 @@ export default function PrimaryDashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-center gap-3">
-            <Icon3D type="students" size={40} />
+            <Icon3D name="students" size={40} />
             <div>
               <p className="text-sm text-gray-500">Total Pupils</p>
               <p className="text-2xl font-bold text-gray-900">{stats?.totalStudents || 0}</p>
@@ -147,7 +147,7 @@ export default function PrimaryDashboardPage() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-center gap-3">
-            <Icon3D type="teachers" size={40} />
+            <Icon3D name="teachers" size={40} />
             <div>
               <p className="text-sm text-gray-500">Teachers</p>
               <p className="text-2xl font-bold text-gray-900">{stats?.totalTeachers || 0}</p>
@@ -156,7 +156,7 @@ export default function PrimaryDashboardPage() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-center gap-3">
-            <Icon3D type="classes" size={40} />
+            <Icon3D name="classes" size={40} />
             <div>
               <p className="text-sm text-gray-500">Classes</p>
               <p className="text-2xl font-bold text-gray-900">{stats?.totalClasses || 0}</p>
