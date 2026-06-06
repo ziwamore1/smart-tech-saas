@@ -219,7 +219,7 @@ export default function CertificateDesignerPage() {
   const exportCanvas = () => {
     const canvas = fabricRef.current;
     if (!canvas || !selectedId) return;
-    const json = JSON.stringify(canvas.toJSON(['name']));
+    const json = JSON.stringify(canvas.toJSON());
     certApi.update(selectedId, { layoutJson: JSON.parse(json) });
     setMessage({ type: 'success', text: 'Layout saved' });
   };
