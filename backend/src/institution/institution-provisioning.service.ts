@@ -82,19 +82,32 @@ export class InstitutionProvisioningService {
   }
 
   private async provisionSettings(schoolId: string, type: any) {
-    for (const setting of type.settings) {
-      const existing = await this.prisma.schoolSetting.findUnique({
-        where: { schoolId },
-      });
+    const settingsMap: Record<string, string> = {
+      grading_system: 'gradingSystem',
+      academic_structure: 'academicStructure',
+      terms_per_year: 'termsPerYear',
+      min_attendance_percentage: 'minAttendancePercentage',
+    };
 
-      if (existing) {
-        await this.prisma.schoolSetting.update({
-          where: { schoolId },
-          data: {
-            [setting.key]: setting.value,
-          } as any,
-        });
+    const data: any = { schoolId };
+    for (const setting of type.settings) {
+      const field = settingsMap[setting.key];
+      if (field) {
+        data[field] = setting.value;
       }
+    }
+
+    const existing = await this.prisma.schoolSetting.findUnique({
+      where: { schoolId },
+    });
+
+    if (existing) {
+      await this.prisma.schoolSetting.update({
+        where: { schoolId },
+        data,
+      });
+    } else {
+      await this.prisma.schoolSetting.create({ data });
     }
   }
 

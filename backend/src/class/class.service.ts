@@ -38,6 +38,7 @@ export class ClassService {
   }
 
   async findAll(schoolId: string) {
+    if (!schoolId) return [];
     const classes = await this.prisma.class.findMany({
       where: { schoolId },
       include: {

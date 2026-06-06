@@ -163,6 +163,14 @@ const DEFAULT_FEATURES: Omit<FeatureLockDto, 'isEnabled' | 'isLocked'>[] = [
   { key: 'primary.grade7', name: 'Grade 7 ECZ Management', description: 'ECZ exam registration, raw score conversion, and division computation', category: 'primary', minTier: 'PREMIUM' },
   { key: 'primary.benchmarking', name: 'Primary Benchmarking', description: 'Compare performance against national primary averages', category: 'primary', minTier: 'PREMIUM' },
   { key: 'primary.aiReports', name: 'AI Report Comments', description: 'AI-generated personalized report card comments', category: 'primary', minTier: 'PREMIUM' },
+
+  // ── Premium Staff Returns & HR Intelligence Hub ──
+  { key: 'PREMIUM_STAFF_RETURNS_HUB', name: 'Staff Returns & HR Intelligence Hub', description: 'Premium enterprise HR intelligence with staff returns, transfers, district reporting, and workforce analytics', category: 'premium-staff-records', minTier: 'PREMIUM' },
+  { key: 'premium.staff.returns', name: 'Staff Returns', description: 'Generate and manage district, provincial, and ministry staff returns', category: 'premium-staff-records', minTier: 'PREMIUM' },
+  { key: 'premium.staff.transfers', name: 'Staff Transfers', description: 'Inter-school, district, and province staff transfer management', category: 'premium-staff-records', minTier: 'PREMIUM' },
+  { key: 'premium.staff.analytics', name: 'Staff Workforce Analytics', description: 'Advanced HR intelligence, grade level analysis, and workforce planning', category: 'premium-staff-records', minTier: 'PREMIUM' },
+  { key: 'premium.staff.exports', name: 'Advanced Staff Exports', description: 'Dynamic Excel and PDF exports with district template support', category: 'premium-staff-records', minTier: 'PREMIUM' },
+  { key: 'premium.staff.district-reports', name: 'District Staff Reporting', description: 'District-level consolidated staff reporting and returns aggregation', category: 'premium-staff-records', minTier: 'PREMIUM' },
 ];
 
 @Injectable()

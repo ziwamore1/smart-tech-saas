@@ -35,7 +35,7 @@ export class ExamController {
 
   @Get()
   async getAll(@Request() req: any, @Query() filters: any) {
-    if (!req.user.schoolId) throw new NotFoundException('School ID required');
+    if (!req.user.schoolId) return [];
     return this.examService.getAll(req.user.schoolId, filters);
   }
 
@@ -232,6 +232,7 @@ export class ExamController {
   // ===== Question Bank =====
   @Get('bank/questions')
   async getBankQuestions(@Request() req: any, @Query() filters: any) {
+    if (!req.user.schoolId) return [];
     return this.questionBankService.getAll(req.user.schoolId, filters);
   }
 
@@ -261,6 +262,7 @@ export class ExamController {
 
   @Get('bank/categories')
   async getBankCategories(@Request() req: any, @Query('subjectId') subjectId?: string) {
+    if (!req.user.schoolId) return [];
     return this.questionBankService.getCategories(req.user.schoolId, subjectId);
   }
 
@@ -279,6 +281,7 @@ export class ExamController {
   // ===== Exam Templates =====
   @Get('templates')
   async getTemplates(@Request() req: any, @Query('subjectId') subjectId?: string) {
+    if (!req.user.schoolId) return [];
     return this.templateService.getAll(req.user.schoolId, subjectId);
   }
 
@@ -340,6 +343,7 @@ export class ExamController {
 
   @Get('uploaded/list')
   async getUploadedExams(@Request() req: any) {
+    if (!req.user.schoolId) return [];
     return this.uploadedExamService.getAll(req.user.schoolId);
   }
 

@@ -257,6 +257,8 @@ model School {
   assessmentAnalytics     AssessmentAnalytics[]
   remarks                 Remark[]
   longitudinalRecords     LongitudinalRecord[]
+  departments             Department[]
+  actingPositions         ActingPosition[]
   aiContextMemories       AiContextMemory[]
   aiRecommendations       AiRecommendation[]
   aiTopicMasteries        AiTopicMastery[]
@@ -450,6 +452,7 @@ model Class {
   teachingAssignments  TeachingAssignment[]
   timetables           Timetable[]
   uploadedExams        UploadedExam[]
+  actingPositions      ActingPosition[]
   assessmentConfigs    TermAssessmentConfiguration[]
   assessmentResults    StudentAssessmentResult[]
   assessmentBatches    AssessmentBatch[]
@@ -535,6 +538,7 @@ model Teacher {
   userId             String              @unique
   schoolId           String
   department         String?
+  departmentId       String?
   gender             String?
   staffType          String?             @default("TEACHING")
   qualification      String?
@@ -545,10 +549,59 @@ model Teacher {
   lessonRequirements LessonRequirement[]
   school             School              @relation(fields: [schoolId], references: [id])
   user               User                @relation(fields: [userId], references: [id])
+  departmentRel      Department?         @relation(fields: [departmentId], references: [id])
+  actingPositions    ActingPosition[]
   timetableSlots     TimetableSlot[]
 
   @@index([department])
   @@index([staffType])
+  @@index([departmentId])
+}
+
+model Department {
+  id          String   @id @default(uuid())
+  name        String
+  code        String?
+  category    String
+  schoolId    String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school    School           @relation(fields: [schoolId], references: [id])
+  teachers  Teacher[]
+  positions ActingPosition[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+  @@index([category])
+}
+
+model ActingPosition {
+  id           String      @id @default(uuid())
+  teacherId    String
+  schoolId     String
+  positionType String
+  departmentId String?
+  classId      String?
+  isPrimary    Boolean     @default(true)
+  isActive     Boolean     @default(true)
+  startDate    DateTime    @default(now())
+  endDate      DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  teacher    Teacher     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  class      Class?      @relation(fields: [classId], references: [id], onDelete: SetNull)
+  school     School      @relation(fields: [schoolId], references: [id])
+
+  @@index([teacherId])
+  @@index([schoolId])
+  @@index([positionType])
+  @@index([departmentId])
+  @@index([classId])
 }
 
 model Student {
@@ -843,6 +896,10 @@ model SchoolSetting {
   breakDuration    Int    @default(15)
   breaks           Json?
   periodDurations  Json?
+  gradingSystem    String @default("SECONDARY_ECZ")
+  academicStructure String @default("FORM_BASED")
+  termsPerYear     Int    @default(3)
+  minAttendancePercentage Int @default(80)
   school           School @relation(fields: [schoolId], references: [id])
 }
 
@@ -1008,20 +1065,20 @@ model AuditLog {
 }
 
 model DashboardConfig {
-  id                 String   @id @default(uuid())
-  schoolId           String   @unique
-  widgets            Json     @default("[]")
-  showStudentStats   Boolean  @default(true)
-  showTeacherStats   Boolean  @default(true)
-  showFeeStats       Boolean  @default(true)
-  showAttendance     Boolean  @default(true)
-  showNotices        Boolean  @default(true)
-  showTimetable      Boolean  @default(true)
-  themeColor         String   @default("#3B82F6")
-  accentColor        String   @default("#10B981")
-  dashboardLayout    String   @default("default")
-  enabledModules    Json?   @default("[]")
-  enabledDashboards Json?   @default("[]")
+  id                String   @id @default(uuid())
+  schoolId          String   @unique
+  widgets           Json     @default("[]")
+  showStudentStats  Boolean  @default(true)
+  showTeacherStats  Boolean  @default(true)
+  showFeeStats      Boolean  @default(true)
+  showAttendance    Boolean  @default(true)
+  showNotices       Boolean  @default(true)
+  showTimetable     Boolean  @default(true)
+  themeColor        String   @default("#3B82F6")
+  accentColor       String   @default("#10B981")
+  dashboardLayout   String   @default("default")
+  enabledModules    Json?    @default("[]")
+  enabledDashboards Json?    @default("[]")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   school            School   @relation(fields: [schoolId], references: [id])
@@ -1173,13 +1230,13 @@ model CommunicationLog {
 }
 
 model CommunicationSettings {
-  id                    String   @id @default(uuid())
-  schoolId              String   @unique
+  id                    String    @id @default(uuid())
+  schoolId              String    @unique
   smsProvider           String?
   smsApiKey             String?
   smsApiSecret          String?
   smsSenderId           String?
-  smsEnabled            Boolean  @default(false)
+  smsEnabled            Boolean   @default(false)
   smtpHost              String?
   smtpPort              Int?
   smtpUser              String?
@@ -1188,33 +1245,33 @@ model CommunicationSettings {
   smtpFromName          String?
   emailProvider         String?
   smtpApiKey            String?
-  emailEnabled          Boolean  @default(false)
+  emailEnabled          Boolean   @default(false)
   whatsappProvider      String?
   whatsappApiKey        String?
   whatsappApiSecret     String?
   whatsappPhoneId       String?
-  whatsappEnabled       Boolean  @default(false)
+  whatsappEnabled       Boolean   @default(false)
   facebookPageId        String?
   facebookAccessToken   String?
-  facebookEnabled       Boolean  @default(false)
+  facebookEnabled       Boolean   @default(false)
   youtubeChannelId      String?
   youtubeApiKey         String?
   youtubeAccessToken    String?
   youtubeRefreshToken   String?
   youtubeTokenExpiry    DateTime?
-  youtubeEnabled        Boolean  @default(false)
+  youtubeEnabled        Boolean   @default(false)
   linkedinPageId        String?
   linkedinAccessToken   String?
-  linkedinEnabled       Boolean  @default(false)
+  linkedinEnabled       Boolean   @default(false)
   pushProvider          String?
   fcmServerKey          String?
   vapidPublicKey        String?
   vapidPrivateKey       String?
-  pushEnabled           Boolean  @default(false)
-  communicationsEnabled Boolean  @default(true)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  school                School   @relation(fields: [schoolId], references: [id])
+  pushEnabled           Boolean   @default(false)
+  communicationsEnabled Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  school                School    @relation(fields: [schoolId], references: [id])
 }
 
 model CommunicationTemplate {
@@ -4013,4 +4070,320 @@ model SchoolCurriculum {
   @@unique([schoolId, curriculumVersionId])
   @@index([schoolId])
   @@index([curriculumVersionId])
+}
+
+// =============================================
+// PREMIUM STAFF RETURNS & HR INTELLIGENCE HUB
+// Fully isolated premium enterprise module
+// Dynamic Educational Staff Intelligence & Reporting Infrastructure
+// =============================================
+
+model StaffHrProfile {
+  id                        String    @id @default(uuid())
+  staffId                   String    @unique
+  schoolId                  String
+  employeeNumber            String?
+  province                  String?
+  district                  String?
+  station                   String?
+  teacherName               String?
+  gender                    String?
+  dateOfBirth               DateTime?
+  maritalStatus             String?
+  nrcNumber                 String?
+  tsNumber                  String?
+  aesNumber                 String?
+  substantivePosition       String?
+  substantiveScale          String?
+  actingPosition            String?
+  administration            String?
+  actingType                String?
+  dateOfFirstAppointment    DateTime?
+  dateOfPresentAppointment  DateTime?
+  dateOfActingAppointment   DateTime?
+  confirmed                 String?
+  expectedConfirmationDate  DateTime?
+  allowancesEntitled        String?
+  employmentStatus          String?   @default("ACTIVE")
+  employmentType            String?   @default("PERMANENT")
+  contractEffectiveDate     DateTime?
+  contractNormalised        String?
+  contractEnd               DateTime?
+  retirementDate            DateTime?
+  payrollPoint              String?
+  academicQualification     String?
+  professionalQualification String?
+  yearOfQualification       Int?
+  specialization            String?
+  nationality               String?
+  emailAddress              String?
+  phoneNumber               String?
+  currentPosition           String?
+  gradeLevel                String?
+  step                      Int?
+  taxId                     String?
+  pensionNumber             String?
+  bankName                  String?
+  bankBranch                String?
+  bankAccount               String?
+  socialSecurityNumber      String?
+  nextOfKin                 String?
+  nextOfKinContact          String?
+  nextOfKinRelationship     String?
+  dynamicFields             Json?     @default("{}")
+  lastSyncedAt              DateTime?
+  syncStatus                String    @default("PENDING")
+  syncHash                  String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  syncLogs          StaffSyncLog[]
+  transfers         StaffTransfer[]
+  qualifications    StaffQualification[]
+  employmentRecords StaffEmploymentRecord[]
+  positions         StaffPosition[]
+  allowances        StaffAllowance[]
+  contracts         StaffContract[]
+
+  @@index([schoolId])
+  @@index([employmentStatus])
+  @@index([gradeLevel])
+  @@index([district])
+  @@index([province])
+}
+
+model StaffSyncLog {
+  id           String         @id @default(uuid())
+  profileId    String
+  profile      StaffHrProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  syncType     String
+  source       String
+  changes      Json?
+  status       String         @default("SUCCESS")
+  errorMessage String?
+  syncedAt     DateTime       @default(now())
+
+  @@index([profileId])
+  @@index([syncedAt])
+  @@index([status])
+}
+
+model StaffEmploymentRecord {
+  id         String         @id @default(uuid())
+  profileId  String
+  profile    StaffHrProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  schoolId   String
+  schoolName String?
+  position   String
+  scale      String?
+  startDate  DateTime
+  endDate    DateTime?
+  isCurrent  Boolean        @default(false)
+  recordType String         @default("EMPLOYMENT")
+  notes      String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([profileId])
+  @@index([schoolId])
+}
+
+model StaffReturnTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  schoolId    String
+  returnType  String   @default("MONTHLY")
+  isActive    Boolean  @default(true)
+  isDefault   Boolean  @default(false)
+  category    String?  @default("DISTRICT")
+  config      Json?    @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  columns     StaffReturnColumn[]
+  submissions StaffReturnSubmission[]
+
+  @@index([schoolId])
+  @@index([returnType])
+}
+
+model StaffReturnColumn {
+  id              String              @id @default(uuid())
+  templateId      String
+  template        StaffReturnTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  columnName      String
+  columnLabel     String
+  columnOrder     Int
+  dataType        String              @default("string")
+  isRequired      Boolean             @default(false)
+  isVisible       Boolean             @default(true)
+  isEditable      Boolean             @default(true)
+  width           Int?                @default(120)
+  alignment       String?             @default("left")
+  fontStyle       String?             @default("normal")
+  backgroundColor String?
+  defaultValue    String?
+  options         Json?               @default("[]")
+  validationRules Json?               @default("{}")
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([templateId])
+  @@index([columnOrder])
+}
+
+model StaffReturnSubmission {
+  id           String              @id @default(uuid())
+  templateId   String
+  template     StaffReturnTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  schoolId     String
+  period       String
+  academicYear String?
+  term         String?
+  status       String              @default("DRAFT")
+  data         Json                @default("[]")
+  submittedAt  DateTime?
+  approvedAt   DateTime?
+  approvedBy   String?
+  generatedBy  String?
+  generatedAt  DateTime?
+  notes        String?
+  fileUrl      String?
+  fileVersion  Int                 @default(1)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  logs StaffAuditLog[]
+
+  @@index([templateId])
+  @@index([schoolId])
+  @@index([period])
+  @@index([status])
+}
+
+model StaffTransfer {
+  id             String         @id @default(uuid())
+  profileId      String
+  profile        StaffHrProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  transferType   String
+  fromSchoolId   String
+  toSchoolId     String
+  fromSchoolName String?
+  toSchoolName   String?
+  fromDistrict   String?
+  toDistrict     String?
+  fromProvince   String?
+  toProvince     String?
+  transferDate   DateTime
+  effectiveDate  DateTime
+  reason         String?
+  status         String         @default("PENDING")
+  approvedBy     String?
+  approvedAt     DateTime?
+  notes          String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([profileId])
+  @@index([fromSchoolId])
+  @@index([toSchoolId])
+  @@index([status])
+}
+
+model StaffQualification {
+  id                String         @id @default(uuid())
+  profileId         String
+  profile           StaffHrProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  qualificationType String
+  qualificationName String
+  institution       String?
+  yearObtained      Int?
+  grade             String?
+  documentUrl       String?
+  isVerified        Boolean        @default(false)
+  verifiedBy        String?
+  verifiedAt        DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([profileId])
+  @@index([qualificationType])
+}
+
+model StaffPosition {
+  id            String         @id @default(uuid())
+  profileId     String
+  profile       StaffHrProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  positionTitle String
+  positionType  String         @default("SUBSTANTIVE")
+  scale         String?
+  startDate     DateTime
+  endDate       DateTime?
+  isCurrent     Boolean        @default(true)
+  isActing      Boolean        @default(false)
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([profileId])
+  @@index([isCurrent])
+}
+
+model StaffAllowance {
+  id            String         @id @default(uuid())
+  profileId     String
+  profile       StaffHrProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  allowanceName String
+  allowanceType String
+  amount        Float?
+  currency      String?        @default("ZMW")
+  isActive      Boolean        @default(true)
+  startDate     DateTime?
+  endDate       DateTime?
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([profileId])
+}
+
+model StaffContract {
+  id           String         @id @default(uuid())
+  profileId    String
+  profile      StaffHrProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  contractType String
+  startDate    DateTime
+  endDate      DateTime?
+  isPermanent  Boolean        @default(false)
+  isCurrent    Boolean        @default(true)
+  documentUrl  String?
+  notes        String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([profileId])
+}
+
+model StaffAuditLog {
+  id              String                 @id @default(uuid())
+  submissionId    String?
+  submission      StaffReturnSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  profileId       String?
+  schoolId        String?
+  action          String
+  entityType      String
+  entityId        String?
+  performedBy     String?
+  performedByName String?
+  changes         Json?
+  metadata        Json?
+  ipAddress       String?
+  createdAt       DateTime               @default(now())
+
+  @@index([submissionId])
+  @@index([profileId])
+  @@index([schoolId])
+  @@index([action])
+  @@index([createdAt])
 }

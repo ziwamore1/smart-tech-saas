@@ -49,6 +49,7 @@ export class TermService {
   }
 
   async findAllBySchool(schoolId: string) {
+    if (!schoolId) return [];
     return this.prisma.term.findMany({
       where: {
         academicYear: { schoolId },

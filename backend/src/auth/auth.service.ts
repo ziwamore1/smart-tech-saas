@@ -485,6 +485,14 @@ export class AuthService {
     lastName: string,
     schoolId: string,
   ) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = await this.prisma.user.findFirst({
+      where: { email: normalizedEmail },
+    });
+    if (existing) {
+      throw new BadRequestException('Email already in use');
+    }
+
     const teacherRole = await this.prisma.role.findFirst({
       where: { name: 'Teacher' },
     });
@@ -497,7 +505,7 @@ export class AuthService {
 
     const user = await this.prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
         firstName,
         lastName,

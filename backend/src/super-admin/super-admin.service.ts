@@ -138,6 +138,7 @@ export class SuperAdminService {
             students: true,
             teachers: true,
             classes: true,
+            subjects: true,
           },
         },
       },
@@ -155,6 +156,20 @@ export class SuperAdminService {
     if (!school) {
       throw new NotFoundException('School not found');
     }
+
+    if (data.institutionType) {
+      const instType = await this.prisma.institutionType.findUnique({
+        where: { code: data.institutionType },
+      });
+      if (!instType) throw new NotFoundException('Institution type not found');
+      data.institutionTypeId = instType.id;
+      delete data.institutionType;
+
+      if (school.institutionTypeId !== instType.id) {
+        await this.provisioningService.provisionInstitution(schoolId, instType.code);
+      }
+    }
+
     return this.prisma.school.update({
       where: { id: schoolId },
       data,

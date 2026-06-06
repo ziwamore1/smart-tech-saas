@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { MobileService } from './mobile.service';
 import { AiTutorService } from '../intelligence/services/ai-tutor.service';
+import { StaffPositionService } from '../staff-position/staff-position.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('mobile')
@@ -24,6 +25,7 @@ export class MobileController {
   constructor(
     private mobileService: MobileService,
     private aiTutorService: AiTutorService,
+    private staffPositionService: StaffPositionService,
   ) {}
 
   @Get('dashboard')
@@ -248,5 +250,35 @@ export class MobileController {
   async markAllAttendance(@Req() req: any, @Body() body: { classId: string; date: string; status: string }) {
     const { schoolId } = req.user;
     return this.mobileService.markAllAttendance(schoolId, body.classId, body.date, body.status);
+  }
+
+  // ==================== STAFF POSITIONS (Mobile) ====================
+
+  @Get('staff-positions/departments')
+  async getMobileDepartments(@Req() req: any) {
+    return this.staffPositionService.getDepartments(req.user.schoolId);
+  }
+
+  @Get('staff-positions/hierarchy')
+  async getMobileHierarchy(@Req() req: any) {
+    return this.staffPositionService.getHierarchy(req.user.schoolId);
+  }
+
+  @Get('staff-positions/monitoring-chain')
+  async getMobileMonitoringChain(@Req() req: any) {
+    const { schoolId, id: userId } = req.user;
+    const teacher = await this.mobileService.getTeacherByUserId(userId);
+    if (!teacher) return { teacher: null, supervises: [], supervisedBy: [] };
+    return this.staffPositionService.getMonitoringChain(schoolId, teacher.id);
+  }
+
+  @Get('staff-positions/department/:departmentId/teachers')
+  async getMobileDepartmentTeachers(@Req() req: any, @Param('departmentId') departmentId: string) {
+    return this.staffPositionService.getDepartmentTeachers(req.user.schoolId, departmentId);
+  }
+
+  @Get('staff-positions/positions')
+  async getMobilePositions(@Req() req: any, @Query('positionType') positionType?: string) {
+    return this.staffPositionService.getSchoolPositions(req.user.schoolId, positionType);
   }
 }
