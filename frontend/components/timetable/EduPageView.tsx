@@ -301,7 +301,7 @@ export default function EduPageView({
 
   const breakAfterSet = useMemo(() => {
     if (!ts) return new Set<number>();
-    return new Set((ts.breaks || []).map((b) => b.afterPeriod));
+    return new Set((ts.breaks || []).map((b: { afterPeriod: number }) => b.afterPeriod));
   }, [ts?.breaks]);
 
   const classOptions = (classesData || []).map((c: any) => ({ id: c.id, name: c.name }));
