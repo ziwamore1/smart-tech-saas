@@ -438,7 +438,7 @@ export default function EduPageView({
             <tbody>
               {periods.map((period) => {
                 const hasBreak = breakAfterSet.has(period);
-                const brk = hasBreak ? (ts.breaks || []).find((b) => b.afterPeriod === period) : null;
+                const brk = hasBreak ? (ts.breaks || []).find((b: { afterPeriod: number }) => b.afterPeriod === period) : null;
                 return (
                   <React.Fragment key={period}>
                     <tr>
