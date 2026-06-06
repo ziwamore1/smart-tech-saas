@@ -17,17 +17,15 @@ export class FeatureLockController {
   constructor(private readonly featureLockService: FeatureLockService) {}
 
   @Get()
-  async findAll(): Promise<{ data: FeatureLockDto[] }> {
-    const features = await this.featureLockService.findAll();
-    return { data: features };
+  async findAll(): Promise<FeatureLockDto[]> {
+    return this.featureLockService.findAll();
   }
 
   @Get(':key')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SuperAdmin')
-  async findOne(@Param('key') key: string): Promise<{ data: FeatureLockDto }> {
-    const feature = await this.featureLockService.findOne(key);
-    return { data: feature };
+  async findOne(@Param('key') key: string): Promise<FeatureLockDto> {
+    return this.featureLockService.findOne(key);
   }
 
   @Patch(':key')
@@ -48,9 +46,8 @@ export class FeatureLockController {
         premium?: number;
       };
     },
-  ): Promise<{ data: FeatureLockDto }> {
-    const feature = await this.featureLockService.update(key, data);
-    return { data: feature };
+  ): Promise<FeatureLockDto> {
+    return this.featureLockService.update(key, data);
   }
 
   @Post('reset')
@@ -64,15 +61,12 @@ export class FeatureLockController {
   async getFeaturesForSchool(
     @Param('schoolId') schoolId: string,
   ): Promise<{
-    data: {
-      features: FeatureLockDto[];
-      tier: string;
-      lockedFeatures: string[];
-      disabledFeatures: string[];
-    };
+    features: FeatureLockDto[];
+    tier: string;
+    lockedFeatures: string[];
+    disabledFeatures: string[];
   }> {
-    const result = await this.featureLockService.getFeaturesForSchool(schoolId);
-    return { data: result };
+    return this.featureLockService.getFeaturesForSchool(schoolId);
   }
 }
 

@@ -36,10 +36,12 @@ export const TeacherDashboardScreen: React.FC = () => {
   };
 
   const stats = dashboard?.stats;
+  const isHod = user?.roles?.some((r) => r === 'HOD' || r === 'HEAD_OF_DEPARTMENT');
 
   const quickActions = [
     { icon: '🏫', label: 'Classes', screen: 'TeacherClasses', gradient: ['#1E3A8A', '#3B82F6'] as const },
     { icon: '✏️', label: 'Marks', screen: 'TeacherMarks', gradient: ['#0D9488', '#14B8A6'] as const },
+    ...(isHod ? [{ icon: '🏛️', label: 'My Department', screen: 'HODMonitoring', gradient: ['#8B5CF6', '#A78BFA'] as const }] : []),
     { icon: '📋', label: 'Exams', screen: 'ExamList', gradient: ['#EA580C', '#F97316'] as const },
     { icon: '🤖', label: 'AI Tutor', screen: 'AiTutor', gradient: ['#7C3AED', '#A78BFA'] as const, params: { sourceScreen: 'teacher_dashboard' } },
     { icon: '📊', label: 'Analytics', screen: 'Analytics', gradient: ['#D97706', '#F59E0B'] as const },

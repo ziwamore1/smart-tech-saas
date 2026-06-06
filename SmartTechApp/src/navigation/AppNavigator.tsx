@@ -42,6 +42,8 @@ import { DigitalStampScreen } from '../screens/stamps/DigitalStampScreen';
 import { PDFPreviewScreen } from '../screens/stamps/PDFPreviewScreen';
 import { QRVerificationScreen } from '../screens/stamps/QRVerificationScreen';
 import { ApprovalWorkflowScreen } from '../screens/stamps/ApprovalWorkflowScreen';
+import { DepartmentTeachersScreen } from '../screens/monitoring/DepartmentTeachersScreen';
+import HODMonitoringWrapper from '../screens/monitoring/HODMonitoringWrapper';
 import { AssessmentEntryScreen } from '../screens/assessment/AssessmentEntryScreen';
 import { AssessmentConfigScreen } from '../screens/assessment/AssessmentConfigScreen';
 import { PendingAssessmentsScreen } from '../screens/assessment/PendingAssessmentsScreen';
@@ -124,6 +126,7 @@ export function AppNavigator() {
 
             {(isTeacher || isClassTeacher) && <Stack.Screen name="TeacherClasses" component={TeacherClassesScreen} />}
             {(isTeacher || isClassTeacher) && <Stack.Screen name="TeacherMarks" component={TeacherMarksScreen} />}
+            <Stack.Screen name="HODMonitoring" component={HODMonitoringWrapper} />
 
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
@@ -137,6 +140,7 @@ export function AppNavigator() {
             <Stack.Screen name="CloudAssetLibrary" component={CloudAssetLibraryScreen} />
             <Stack.Screen name="DigitalSignature" component={DigitalSignatureScreen} />
             <Stack.Screen name="Collaboration" component={CollaborationScreen} />
+            <Stack.Screen name="DepartmentTeachers" component={DepartmentTeachersScreen} />
             <Stack.Screen name="ExamList" component={ExamListScreen} />
             <Stack.Screen name="ExamDetail" component={ExamDetailScreen} />
             <Stack.Screen name="ExamCreate" component={ExamCreateScreen} />

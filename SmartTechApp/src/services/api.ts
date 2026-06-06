@@ -1520,6 +1520,35 @@ class ApiService {
     const response = await this.client.get('/curriculum/tree', { params: { schoolId } });
     return response.data;
   }
+
+  // ========== STAFF POSITIONS & HIERARCHY ==========
+
+  async getDepartments() {
+    const response = await this.client.get('/mobile/staff-positions/departments');
+    return response.data;
+  }
+
+  async getStaffHierarchy() {
+    const response = await this.client.get('/mobile/staff-positions/hierarchy');
+    return response.data;
+  }
+
+  async getMyMonitoringChain() {
+    const response = await this.client.get('/mobile/staff-positions/monitoring-chain');
+    return response.data;
+  }
+
+  async getDepartmentTeachers(departmentId: string) {
+    const response = await this.client.get(`/mobile/staff-positions/department/${departmentId}/teachers`);
+    return response.data;
+  }
+
+  async getStaffPositions(positionType?: string) {
+    const response = await this.client.get('/mobile/staff-positions/positions', {
+      params: { positionType },
+    });
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

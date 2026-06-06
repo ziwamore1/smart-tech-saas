@@ -27,6 +27,7 @@ export class SubjectService {
   }
 
   async findAll(schoolId: string) {
+    if (!schoolId) return [];
     return this.prisma.subject.findMany({
       where: { schoolId },
       orderBy: { name: 'asc' },

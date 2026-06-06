@@ -5,12 +5,14 @@ const prisma = new PrismaClient();
 async function main() {
   const roles = [
     'Director',
+    'Deputy Director',
     'Head Teacher',
     'Deputy',
     'Accountant',
     'Secretary',
     'Teacher',
     'Class Teacher',
+    'HOD',
     'Student',
     'Parent',
     'SuperAdmin',

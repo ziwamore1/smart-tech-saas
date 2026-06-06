@@ -14,6 +14,24 @@ export class SchoolController {
     private prisma: PrismaService,
   ) {}
 
+  @Get('profile')
+  @UseGuards(JwtAuthGuard)
+  async getProfile(@Query('schoolId') schoolId?: string, @Req() req?: any) {
+    const targetSchoolId = schoolId || req?.user?.schoolId;
+    console.log(`[School Profile] Query: "${schoolId}", req.user.schoolId: "${req?.user?.schoolId}", resolved: "${targetSchoolId}"`);
+    const result = await this.schoolService.getProfile(targetSchoolId);
+    console.log(`[School Profile] Returning:`, JSON.stringify(result));
+    return result;
+  }
+
+  @Get('current')
+  @UseGuards(JwtAuthGuard)
+  async getCurrentSchool(@Req() req?: any) {
+    const schoolId = req?.user?.schoolId;
+    console.log(`[School Current] req.user.schoolId: ${schoolId}, full user:`, JSON.stringify(req?.user));
+    return this.schoolService.getProfile(schoolId);
+  }
+
   @Get()
   async findAll() {
     const schools = await this.prisma.school.findMany({
@@ -36,24 +54,6 @@ export class SchoolController {
   @Post('register')
   async registerSchool(@Body() dto: RegisterSchoolDto) {
     return this.schoolService.registerSchool(dto);
-  }
-
-  @Get('profile')
-  @UseGuards(JwtAuthGuard)
-  async getProfile(@Query('schoolId') schoolId?: string, @Req() req?: any) {
-    const targetSchoolId = schoolId || req?.user?.schoolId;
-    console.log(`[School Profile] Query: "${schoolId}", req.user.schoolId: "${req?.user?.schoolId}", resolved: "${targetSchoolId}"`);
-    const result = await this.schoolService.getProfile(targetSchoolId);
-    console.log(`[School Profile] Returning:`, JSON.stringify(result));
-    return result;
-  }
-
-  @Get('current')
-  @UseGuards(JwtAuthGuard)
-  async getCurrentSchool(@Req() req?: any) {
-    const schoolId = req?.user?.schoolId;
-    console.log(`[School Current] req.user.schoolId: ${schoolId}, full user:`, JSON.stringify(req?.user));
-    return this.schoolService.getProfile(schoolId);
   }
 
   @Get('debug')

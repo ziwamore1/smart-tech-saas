@@ -1,6 +1,7 @@
 import { Injectable, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UnifiedMessagingService } from '../messaging/unified-messaging.service';
+import { Teacher } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -24,7 +25,7 @@ export class TeacherService {
       orderBy: { user: { firstName: 'asc' } },
     });
     this.logger.log(`findAll returned ${teachers.length} teachers`);
-    return { data: teachers };
+    return teachers;
   }
 
   async findOne(id: string) {
@@ -73,6 +74,7 @@ export class TeacherService {
         employeeNo: teacherData.employeeId || teacherData.employeeNo || null,
         hireDate: teacherData.hireDate ? new Date(teacherData.hireDate) : null,
         department: teacherData.department || null,
+        departmentRel: teacherData.departmentId ? { connect: { id: teacherData.departmentId } } : undefined,
         gender: teacherData.gender || null,
         staffType: staffType || 'TEACHING',
         qualification: qualification || null,
@@ -106,14 +108,15 @@ export class TeacherService {
     });
 
     const plainPassword = password || 'Teacher123!';
+    const teacherWithUser = teacher as any;
     this.unifiedMessaging
       .sendTeacherWelcome(
         {
-          id: teacher.user.id,
-          email: teacher.user.email,
-          phone: teacher.user.phone || undefined,
-          firstName: teacher.user.firstName,
-          lastName: teacher.user.lastName,
+          id: teacherWithUser.user.id,
+          email: teacherWithUser.user.email,
+          phone: teacherWithUser.user.phone || undefined,
+          firstName: teacherWithUser.user.firstName,
+          lastName: teacherWithUser.user.lastName,
         },
         { username: email, password: plainPassword },
         school?.name || 'Your School',

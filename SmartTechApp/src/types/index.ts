@@ -634,3 +634,56 @@ export interface UploadedExam {
   createdById: string;
   createdAt: string;
 }
+
+// ========== STAFF POSITIONS & HIERARCHY ==========
+
+export interface Department {
+  id: string;
+  name: string;
+  code?: string;
+  category: string;
+  description?: string;
+  isActive: boolean;
+  _count?: { teachers: number; positions: number };
+}
+
+export interface StaffPosition {
+  id: string;
+  teacherId: string;
+  positionType: 'DIRECTOR' | 'DEPUTY_DIRECTOR' | 'HEAD_TEACHER' | 'DEPUTY' | 'HOD' | 'SUBJECT_TEACHER' | 'CLASS_TEACHER' | 'SENIOR_TEACHER' | 'ADMINISTRATOR' | 'LOWER_PRIMARY_SENIOR_TEACHER' | 'UPPER_PRIMARY_SENIOR_TEACHER';
+  departmentId?: string;
+  classId?: string;
+  isPrimary: boolean;
+  isActive: boolean;
+  teacher?: {
+    id: string;
+    employeeNo?: string;
+    user?: { id: string; firstName: string; lastName: string; email: string };
+  };
+  department?: Department;
+  class?: { id: string; name: string };
+}
+
+export interface HierarchyData {
+  director?: { id: string; teacher: any } | null;
+  deputyDirector?: { id: string; teacher: any }[];
+  headTeacher?: { id: string; teacher: any } | null;
+  deputies?: { id: string; teacher: any }[];
+  departments: {
+    department: Department;
+    hod: { id: string; teacher: any; positionType?: string } | null;
+    members: any[];
+  }[];
+  unassignedTeachers: any[];
+}
+
+export interface MonitoringChain {
+  teacher: {
+    id: string;
+    user?: { id: string; firstName: string; lastName: string; email: string };
+    departmentId?: string;
+  };
+  positions: { positionType: string; isPrimary: boolean }[];
+  supervises: { id: string; positionType: string; teacher: any; department?: Department }[];
+  supervisedBy: { id: string; positionType: string; teacher: any; department?: Department }[];
+}

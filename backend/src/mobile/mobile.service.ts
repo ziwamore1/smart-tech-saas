@@ -1155,4 +1155,11 @@ export class MobileService {
 
     return { message: `All marked as ${status}`, count: results.count };
   }
+
+  async getTeacherByUserId(userId: string) {
+    return this.prisma.teacher.findUnique({
+      where: { userId },
+      select: { id: true, departmentId: true, employeeNo: true },
+    });
+  }
 }

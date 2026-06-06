@@ -71,6 +71,9 @@ import { RankingModule } from './ranking-service/ranking.module';
 import { IdentityModule } from './identity-service/identity.module';
 import { CurriculumModule } from './curriculum-service/curriculum.module';
 import { InstitutionModule } from './institution/institution.module';
+import { StaffSyncEngineModule } from './shared/staff-sync-engine/staff-sync-engine.module';
+import { StaffRecordsModule } from './premium/staff-records-service/staff-records.module';
+import { StaffPositionModule } from './staff-position/staff-position.module';
 import { ProductionLogger } from './common/production-logger';
 
 @Module({
@@ -145,6 +148,9 @@ import { ProductionLogger } from './common/production-logger';
     RankingModule,
     IdentityModule,
     CurriculumModule,
+    StaffSyncEngineModule,
+    StaffRecordsModule,
+    StaffPositionModule,
     HealthModule,
     InstitutionModule,
   ],
