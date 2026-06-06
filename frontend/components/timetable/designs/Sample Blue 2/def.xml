@@ -1,0 +1,70 @@
+<>
+   <head version="10" name="SampleSchool" />
+   <PrintObject m_nTyp="0" m_text="" m_strBmp="" m_rect.left="71266" m_rect.top="237902" m_rect.right="944125" m_rect.bottom="884272" m_align="0" font="" m_bgColor="#FFFFFE" m_fontColor="#000C30" m_lineColor="#000000" m_lineTop="0" m_lineBottom="0" m_lineLeft="0" m_lineRight="0" m_lineMiddle="0" />
+   <PrintObject m_nTyp="1" m_text="" m_strBmp="picture1.emf" m_rect.left="78107" m_rect.top="23790" m_rect.right="193839" m_rect.bottom="179514" m_align="0">
+      <font ratio="0.050000" width="0" weight="100" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Verdana" />
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="" m_strBmp="biology3.png" m_rect.left="95496" m_rect.top="62902" m_rect.right="164765" m_rect.bottom="150805" m_align="0">
+      <font ratio="0.050000" width="0" weight="100" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Verdana" />
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="Fine countryside school" m_strBmp="" m_rect.left="224060" m_rect.top="26610" m_rect.right="953813" m_rect.bottom="124592" m_align="7">
+      <font ratio="-0.058710" width="0" weight="700" escapement="0" italic="1" underline="0" strikeout="0" pitchAndFamily="82" faceName="Georgia" />
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#333399</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="Flower street, Flowerstown" m_strBmp="" m_rect.left="282212" m_rect.top="121364" m_rect.right="782208" m_rect.bottom="221364" m_align="7">
+      <font ratio="-0.031855" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="82" faceName="Georgia" />
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#333399</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="{#1035:#1635}" m_strBmp="picture2.emf" m_rect.left="700113" m_rect.top="129835" m_rect.right="944409" m_rect.bottom="222979" m_align="0">
+      <font ratio="0.050000" width="0" weight="100" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Verdana" />
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#FFFFFF</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="" m_strBmp="picture4.emf" m_rect.left="87513" m_rect.top="257658" m_rect.right="161625" m_rect.bottom="882657" m_align="0">
+      <font ratio="0.050000" width="0" weight="100" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Verdana" />
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+   </PrintObject>
+</>

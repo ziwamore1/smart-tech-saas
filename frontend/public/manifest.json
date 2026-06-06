@@ -1,0 +1,14 @@
+{
+  "name": "Smart Tech Timetable",
+  "short_name": "Timetable",
+  "description": "School timetable viewer with offline support",
+  "start_url": "/timetable-viewer",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#ea6645",
+  "orientation": "any",
+  "icons": [],
+  "screenshots": [],
+  "categories": ["education", "productivity"],
+  "prefer_related_applications": false
+}

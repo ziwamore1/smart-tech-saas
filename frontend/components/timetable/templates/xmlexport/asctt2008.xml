@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<timetable importtype="database" options="groupstype1,decimalseparatordot" defaultexport="1" displayname="aSc Timetables 2008 XML" displaycountries="">
+   <days options="canadd,export:silent" columns="day,name,short"/>
+   <periods options="canadd,export:silent" columns="period,starttime,endtime"/>
+   <dayperiods options="canadd,export:silent" columns="day,period,starttime,endtime"/>
+   <teachers options="canadd,export:silent" columns="id,name,short,gender,color"/>
+   <classes options="canadd,export:silent" columns="id,name,short,classroomids,teacherid,grade"/>
+   <subjects options="canadd,export:silent" columns="id,name,short"/>
+   <classrooms options="canadd,export:silent" columns="id,name,short"/>
+   <students options="canadd,export:silent" columns="id,classid,name"/>
+   <groups options="canadd,export:silent" columns="id,classid,name,entireclass,divisiontag,studentcount"/>
+   <lessons options="canadd,export:silent" columns="id,subjectid,classids,groupids,studentids,teacherids,classroomids,periodspercard,periodsperweek,weeks"/>
+   <cards options="canadd,export:silent" columns="lessonid,day,period,classroomids"/>
+   <grades options="canadd,export:silent" columns="id,name,short,grade"/>
+</timetable>

@@ -1,0 +1,158 @@
+<>
+   <head version="20" name="A_Sample_School with Lessons table"/>
+   <PrintObject m_nTyp="1" m_text="" m_strBmp="picture2.emf" m_rect.left="25995" m_rect.top="532511" m_rect.right="782829" m_rect.bottom="1020387" m_align="0">
+      <font ratio="0.050000" width="0" weight="100" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Verdana"/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="0" m_text="" m_strBmp="" m_rect.left="22189" m_rect.top="173943" m_rect.right="982374" m_rect.bottom="515827" m_align="0" font="" m_bgColor="#FFFFFE" m_fontColor="#000C30" m_lineColor="#000000" m_lineTop="0" m_lineBottom="0" m_lineLeft="0" m_lineRight="0" m_lineMiddle="0" m_bAutoFont="-842150451" m_bOnTop="0"/>
+   <PrintObject m_nTyp="1" m_text="" m_strBmp="picture1.emf" m_rect.left="29030" m_rect.top="19831" m_rect.right="144761" m_rect.bottom="175555" m_align="0">
+      <font ratio="0.050000" width="0" weight="100" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Verdana"/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="" m_strBmp="biology3.png" m_rect.left="50521" m_rect.top="62902" m_rect.right="119789" m_rect.bottom="150805" m_align="0">
+      <font ratio="0.050000" width="0" weight="100" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Verdana"/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="Fine countryside school" m_strBmp="" m_rect.left="233887" m_rect.top="26610" m_rect.right="963640" m_rect.bottom="124592" m_align="7">
+      <font ratio="-0.056042" width="0" weight="700" escapement="0" italic="1" underline="0" strikeout="0" pitchAndFamily="82" faceName="Tempus Sans ITC"/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#333399</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="Flower street 45, 43RJ8 Flowerstown" m_strBmp="" m_rect.left="301109" m_rect.top="105530" m_rect.right="801105" m_rect.bottom="168238" m_align="7">
+      <font ratio="-0.031855" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="82" faceName="Tempus Sans ITC"/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#333399</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="{#1035:#1635}" m_strBmp="picture2.emf" m_rect.left="737763" m_rect.top="67334" m_rect.right="982058" m_rect.bottom="160478" m_align="0">
+      <font ratio="0.050000" width="0" weight="100" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Verdana"/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#FFFFFF</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="" m_strBmp="picture4.emf" m_rect.left="38572" m_rect.top="231389" m_rect.right="104928" m_rect.bottom="505299" m_align="0">
+      <font ratio="0.050000" width="0" weight="100" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Verdana"/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObjectLegend m_nTyp="3" m_text="" m_strBmp="" m_rect.left="74346" m_rect.top="551692" m_rect.right="726480" m_rect.bottom="940685" m_align="0">
+      <font ratio="-0.018067" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Verdana"/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bUseColors>1</m_bUseColors>
+      <m_bUsePictures>0</m_bUsePictures>
+      <m_LegendaType>8</m_LegendaType>
+      <m_nColumns>1</m_nColumns>
+      <m_bAutoFont>0</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+      <Reportdata m_bPrintFooter="1" m_bPrintHeader="1" m_nDrawBorders="0" m_nDrawMainBorder="1" m_ColorHeader="#000066" m_ColorFooter="#000066" m_ColorOdd="#E4EEFF" m_ColorEven="#FFFFFF" m_fontColorLegenda="#000066" m_fontColorHeader="#FFFFFF" m_fontColorFooter="#FFFFFF">
+         <columns>
+            <column nID="28000" nWidth="30" strUserHeaderName="{}" strUserFooterName=""/>
+            <column nID="28008" nWidth="16" strUserHeaderName="{}" strUserFooterName=""/>
+            <column nID="28001" nWidth="17" strUserHeaderName="{}" strUserFooterName=""/>
+            <column nID="28006" nWidth="23" strUserHeaderName="{}" strUserFooterName=""/>
+            <column nID="28004" nWidth="11" strUserHeaderName="{}" strUserFooterName="{sum}"/>
+         </columns>
+      </Reportdata>
+   </PrintObjectLegend>
+   <PrintObjectLegend m_nTyp="3" m_text="" m_strBmp="" m_rect.left="796175" m_rect.top="573382" m_rect.right="981292" m_rect.bottom="943394" m_align="0">
+      <font ratio="-0.013655" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Verdana"/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bUseColors>1</m_bUseColors>
+      <m_bUsePictures>0</m_bUsePictures>
+      <m_LegendaType>2</m_LegendaType>
+      <m_nColumns>1</m_nColumns>
+      <m_bAutoFont>1</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+      <Reportdata m_bPrintFooter="0" m_bPrintHeader="0" m_nDrawBorders="0" m_nDrawMainBorder="2" m_ColorHeader="#FFFFFF" m_ColorFooter="#FFFFFF" m_ColorOdd="#E4EEFF" m_ColorEven="#FFFFFF" m_fontColorLegenda="#000066" m_fontColorHeader="#000000" m_fontColorFooter="#000000">
+         <columns>
+            <column nID="3" nWidth="5" strUserHeaderName="{}" strUserFooterName=""/>
+            <column nID="2" nWidth="22" strUserHeaderName="{}" strUserFooterName=""/>
+            <column nID="1" nWidth="71" strUserHeaderName="{}" strUserFooterName=""/>
+         </columns>
+      </Reportdata>
+   </PrintObjectLegend>
+   <PrintObject m_nTyp="1" m_text="Classrooms:" m_strBmp="" m_rect.left="792218" m_rect.top="533569" m_rect.right="1292215" m_rect.bottom="564193" m_align="7">
+      <font ratio="-0.024583" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Verdana"/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+</>

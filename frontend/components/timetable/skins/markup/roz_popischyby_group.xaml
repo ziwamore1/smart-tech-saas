@@ -1,0 +1,107 @@
+<Page>
+<Page.Resources>
+	<Style x:Key="hyp" TargetType="Hyperlink">
+		<Style.Triggers>
+			<Trigger Property="IsMouseOver" Value="True">
+				<Trigger.Setters>
+					<Setter Property="TextDecorations" Value="Underline"/>
+					<Setter Property="Foreground" Value="#0928FF"/>
+				</Trigger.Setters>
+			</Trigger>
+		</Style.Triggers>
+		<Setter Property="Foreground" Value="#09286F"/>
+		<Setter Property="TextDecorations" Value=""/>
+
+
+	</Style>
+	<Style x:Key="hyp2" TargetType="Hyperlink">
+		<Style.Triggers>
+			<Trigger Property="IsMouseOver" Value="True">
+				<Trigger.Setters>
+					<Setter Property="Foreground" Value="#0928FF"/>
+				</Trigger.Setters>
+			</Trigger>
+		</Style.Triggers>
+		<Setter Property="TextDecorations" Value=""/>
+	</Style>
+
+	<LinearGradientBrush x:Key="FolderBrush" StartPoint="0, 0" EndPoint="1,0">
+		<GradientStop Color="#c2ffc2" Offset="0"/>
+		<GradientStop Color="#d3ffdf" Offset="0.5"/>
+		<GradientStop Color="#c2ffc2" Offset="1"/>
+	</LinearGradientBrush>
+</Page.Resources>
+
+<Grid>
+<Grid.ColumnDefinitions>
+<ColumnDefinition MinWidth="50"/>
+</Grid.ColumnDefinitions>
+<Grid.RowDefinitions>
+<RowDefinition Height='0'/>
+<RowDefinition MinHeight="50"/>
+<RowDefinition Height="38" MinHeight="38" />
+</Grid.RowDefinitions>
+
+<Border Grid.Row = "0" Grid.Column = "0" Padding='2' BorderThickness='0' BorderBrush='#767676' Background='#c2ffc2'>
+<StackPanel >
+</StackPanel>
+</Border>
+
+<Border Grid.Row = "1" Grid.Column = "0" Padding='2' BorderThickness='0' BorderBrush='#767676' Background='#c2ffc2'>
+<StackPanel>
+<TextBlock HorizontalAlignment='Center' Foreground="#09286F" Padding='8, 6, 8, 1'  TextWrapping="Wrap" FontWeight='Bold'>
+{#3326}
+</TextBlock>
+<!--{bugshere}-->
+
+<StackPanel HorizontalAlignment='Center' VerticalAlignment='Center'>
+
+<TextBlock HorizontalAlignment='Center' VerticalAlignment='Center'>
+<Hyperlink Style='{StaticResource hyp2}' Tag='ungroup_link'><Image Height="48" Width="48" VerticalAlignment='Center' Source='122'/></Hyperlink>
+</TextBlock>
+
+<TextBlock Padding='2, 0, 12, 0' HorizontalAlignment='Right' VerticalAlignment='Center'>
+<Hyperlink Style='{StaticResource hyp}' Tag='ungroup_link'>{#3325}</Hyperlink>
+</TextBlock>
+
+<!--
+<TextBlock HorizontalAlignment='Right' VerticalAlignment='Center'>
+<Hyperlink Style='{StaticResource hyp2}' Tag='group_link'><Image Height="48" Width="48" VerticalAlignment='Center' Source='123'/></Hyperlink>
+</TextBlock>
+
+<TextBlock Padding='2, 0, 8, 0'HorizontalAlignment='Right' VerticalAlignment='Center'>
+<Hyperlink Style='{StaticResource hyp}' Tag='group_link'>Zbalit</Hyperlink>
+</TextBlock>
+-->
+
+</StackPanel>
+
+
+
+</StackPanel>
+</Border>
+
+<Border Grid.Row = "2" Grid.Column = "0" Padding='2' BorderThickness='0' BorderBrush='#767676' Background='#c2ffc2'>
+<WrapPanel HorizontalAlignment='Right'>
+
+<!--<TextBlock HorizontalAlignment='Right' VerticalAlignment='Center'>
+<Hyperlink Style='{StaticResource hyp2}' Tag='settings_link'><Image VerticalAlignment='Center' Source='121'/></Hyperlink>
+</TextBlock>
+
+<TextBlock Padding='2, 0, 8, 0' HorizontalAlignment='Right' VerticalAlignment='Center'>
+<Hyperlink Style='{StaticResource hyp}' Tag='settings_link'>{#1680}</Hyperlink>
+</TextBlock>
+
+<TextBlock HorizontalAlignment='Right' VerticalAlignment='Center'>
+<Hyperlink Style='{StaticResource hyp2}' Tag='help_link'><Image VerticalAlignment='Center' Source='120'/></Hyperlink>
+</TextBlock>
+-->
+
+<TextBlock Padding='2, 0, 8, 0'HorizontalAlignment='Right' VerticalAlignment='Center'>
+<Hyperlink Style='{StaticResource hyp}' Tag='help_link'>{#3050}</Hyperlink>
+</TextBlock>
+
+</WrapPanel>
+</Border>
+</Grid>
+</Page>

@@ -1,0 +1,14 @@
+<timetable importtype="database" options="idprefix:MyApp">
+   <teachers options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,name,short">
+   </teachers>
+   <classes options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,name">
+   </classes>
+   <subjects options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,name,short">
+   </subjects>
+   <classrooms options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,name,short">
+   </classrooms>
+   <groupsubjects options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="classids,subjectid,periodsperweek,teacherids">
+   </groupsubjects>
+   <cards options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="day,period,classids,subjectid,teacherids">
+   </cards>
+</timetable>

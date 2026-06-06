@@ -1,0 +1,7 @@
+<Border Margin='3' Width='90'>
+<StackPanel>
+<Image VerticalAlignment='Center' Source='121'/></Hyperlink><TextBlock HorizontalAlignment='Center' TextWrapping="Wrap" Padding='7,7,3,2' FontFamily='Tahoma' FontSize='15' FontWeight='Bold' Foreground='#15428b'>{date}</TextBlock>
+
+</StackPanel>
+</Border>
+

@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="windows-1250"?>
+<>
+   <head version="20" name="internal_table_sk" rtl="0"/>
+   <PrintObject m_nTyp="1" m_text="" m_strBmp="" m_rect.left="79402" m_rect.top="123032" m_rect.right="595080" m_rect.bottom="136706" m_align="0">
+      <font ratio="0.050000" width="0" weight="0" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontheader/>
+      <fontfooter/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>8</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObjectLegend m_nTyp="3" m_text="" m_strBmp="" m_rect.left="720000" m_rect.top="215693" m_rect.right="974367" m_rect.bottom="846401" m_align="0">
+      <font ratio="0.017100" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontheader ratio="0.018000" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontfooter ratio="0.017000" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bUseColors>1</m_bUseColors>
+      <m_bUsePictures>0</m_bUsePictures>
+      <m_LegendaType>8</m_LegendaType>
+      <m_nColumns>1</m_nColumns>
+      <m_bAutoFont>0</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+      <Reportdata m_bPrintFooter="1" m_bPrintHeader="1" m_nDrawBorders="1" m_nDrawMainBorder="8" m_bSummaryBellow="1" m_bGroupBySubject="1" m_bMHodina="1" m_nHeaderHeight="10" m_nFooterHeight="4" m_nPadding00="2" m_nPadding01="36" m_nPadding10="3" m_nPadding11="6" m_nPadding20="4" m_nPadding21="10" m_ColorHeader="#FFFFFF" m_ColorFooter="#FFFFFF" m_ColorOdd="#FFFFFF" m_ColorEven="#FFFFFF" m_fontColorLegenda="#000000" m_fontColorHeader="#000000" m_fontColorFooter="#000000">
+         <columns>
+            <column nID="28000" nWidth="67" strUserHeaderName="Vyu�ovacie predmety" strUserFooterName="T��denn� po�et hod�n"/>
+            <column nID="28004" nWidth="32" strUserHeaderName="Po�et hod�n" strUserFooterName="{sum}"/>
+         </columns>
+      </Reportdata>
+   </PrintObjectLegend>
+   <PrintObject m_nTyp="0" m_text="" m_strBmp="" m_rect.left="21477" m_rect.top="215693" m_rect.right="720076" m_rect.bottom="846401" m_align="0" font="" fontheader="" fontfooter="" m_bgColor="#FFFFFE" m_fontColor="#000C30" m_lineColor="#000000" m_lineTop="0" m_lineBottom="0" m_lineLeft="0" m_lineRight="0" m_lineMiddle="0" m_bAutoFont="-842150451" m_bOnTop="0"/>
+   <PrintObject m_nTyp="1" m_text="N�zov �koly:   {#3148:#3205}" m_strBmp="" m_rect.left="22484" m_rect.top="95184" m_rect.right="752234" m_rect.bottom="129027" m_align="7">
+      <font ratio="0.016000" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontheader/>
+      <fontfooter/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000000</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="Vyu�ovac� jazyk:      {#1035:#3956}" m_strBmp="" m_rect.left="264047" m_rect.top="148891" m_rect.right="626047" m_rect.bottom="182151" m_align="7">
+      <font ratio="0.016000" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontheader/>
+      <fontfooter/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000000</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="Trieda:      {#1035:#1635}" m_strBmp="" m_rect.left="23579" m_rect.top="145790" m_rect.right="171078" m_rect.bottom="180643" m_align="7">
+      <font ratio="0.016000" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontheader/>
+      <fontfooter/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000000</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="�kolsk� rok:      {#3148:#1167}" m_strBmp="" m_rect.left="715464" m_rect.top="147030" m_rect.right="949175" m_rect.bottom="178655" m_align="7">
+      <font ratio="0.016000" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontheader/>
+      <fontfooter/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="Rozvrh hod�n" m_strBmp="" m_rect.left="236206" m_rect.top="34690" m_rect.right="736205" m_rect.bottom="96569" m_align="0">
+      <font ratio="0.030000" width="0" weight="700" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontheader/>
+      <fontfooter/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="{#1035:Tla�ivo - typ}" m_strBmp="" m_rect.left="20385" m_rect.top="940093" m_rect.right="298856" m_rect.bottom="960223" m_align="7">
+      <font ratio="0.016000" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontheader/>
+      <fontfooter/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="{#1035:Tla�ivo - n�zov}" m_strBmp="" m_rect.left="759875" m_rect.top="940093" m_rect.right="889875" m_rect.bottom="960223" m_align="7">
+      <font ratio="0.016000" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontheader/>
+      <fontfooter/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="triedny u�ite�" m_strBmp="" m_rect.left="365786" m_rect.top="897738" m_rect.right="513253" m_rect.bottom="919479" m_align="0">
+      <font ratio="0.016000" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontheader/>
+      <fontfooter/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>8</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="riadite� �koly" m_strBmp="" m_rect.left="725446" m_rect.top="894107" m_rect.right="889875" m_rect.bottom="919680" m_align="0">
+      <font ratio="0.016000" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontheader/>
+      <fontfooter/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>8</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="" m_strBmp="" m_rect.left="57734" m_rect.top="171235" m_rect.right="263075" m_rect.bottom="182286" m_align="0">
+      <font ratio="0.050000" width="0" weight="0" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontheader/>
+      <fontfooter/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>8</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="" m_strBmp="" m_rect.left="340128" m_rect.top="172851" m_rect.right="714110" m_rect.bottom="181885" m_align="0">
+      <font ratio="0.050000" width="0" weight="0" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontheader/>
+      <fontfooter/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>8</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="" m_strBmp="" m_rect.left="772487" m_rect.top="170632" m_rect.right="930647" m_rect.bottom="178659" m_align="0">
+      <font ratio="0.050000" width="0" weight="0" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontheader/>
+      <fontfooter/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>8</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+</>

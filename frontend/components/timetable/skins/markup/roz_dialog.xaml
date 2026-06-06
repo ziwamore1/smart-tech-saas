@@ -1,0 +1,32 @@
+<Page>
+<Grid>
+			<Grid.Background>
+				<LinearGradientBrush StartPoint="0, 0" EndPoint="1,0">
+		<GradientStop Color="#FFFFFFFF" Offset="0"/>
+		<GradientStop Color="#FFFFFFFF" Offset="0.5"/>
+		<GradientStop Color="#FFFFFFFF" Offset="1"/>
+				</LinearGradientBrush>
+			</Grid.Background>
+<Grid.ColumnDefinitions>
+<ColumnDefinition Width="50" MinWidth="50"/>
+<ColumnDefinition />
+</Grid.ColumnDefinitions>
+<Grid.RowDefinitions>
+<RowDefinition/>
+</Grid.RowDefinitions>
+
+<Border Grid.Row = "0" Grid.Column = "0" >
+	<StackPanel>
+		<Image VerticalAlignment='Center' Source='DialogImage'/>
+	</StackPanel>
+</Border>
+
+<Border Grid.Row = "0" Grid.Column = "1" Padding='2' BorderThickness='0'>
+	<StackPanel  VerticalAlignment='Center'TextBlock.FontFamily='Calibri' TextBlock.FontSize='19' >
+	
+ <TextBlock Padding='1, 2, 1, 3' Foreground="#000000" FontWeight='Bold'>DialogName</TextBlock>
+	</StackPanel>
+</Border>
+
+</Grid>
+</Page>

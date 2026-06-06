@@ -1,0 +1,95 @@
+/* Fix for super-admin pages - forces old classNames to work without Tailwind */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+  --bg-white: #fefcf9;
+  --bg-gray-50: #f5efe8;
+  --bg-gray-100: #f2ebe3;
+  --bg-blue-50: #eff6ff;
+  --bg-blue-100: #dbeafe;
+  --bg-green-100: #d1fae5;
+  --bg-red-100: #fee2e2;
+  --bg-yellow-100: #fef3c7;
+  --bg-purple-100: #f3e8ff;
+  --text-gray-900: #111827;
+  --text-gray-700: #374151;
+  --text-gray-600: #4b5563;
+  --text-gray-500: #6b7280;
+  --text-blue-600: #2563eb;
+  --text-blue-800: #1e40af;
+  --text-green-600: #059669;
+  --text-green-800: #065f46;
+  --text-red-600: #dc2626;
+  --text-red-800: #991b1b;
+  --border-gray-200: #e8ddd0;
+  --border-gray-300: #d1d5db;
+  --border-blue-200: #bfdbfe;
+  --border-green-200: #a7f3d0;
+  --border-red-200: #fecaca;
+  --border-yellow-200: #fde68a;
+  --border-purple-200: #e9d5ff;
+}
+
+button[class*="bg-blue-600"], button[class*="bg-blue-500"] { background: #3b82f6 !important; }
+button[class*="bg-green-500"], button[class*="bg-green-600"] { background: #10b981 !important; }
+button[class*="bg-red-500"], button[class*="bg-red-600"] { background: #ef4444 !important; }
+button[class*="bg-gray-500"], button[class*="bg-gray-400"] { background: #6b7280 !important; }
+
+.bg-white { background: var(--bg-white) !important; }
+.bg-gray-50 { background: var(--bg-gray-50) !important; }
+.bg-gray-100 { background: var(--bg-gray-100) !important; }
+.rounded-lg { border-radius: 12px !important; }
+.rounded-md { border-radius: 8px !important; }
+.shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important; }
+
+.text-gray-900 { color: var(--text-gray-900) !important; }
+.text-gray-700 { color: var(--text-gray-700) !important; }
+.text-gray-600 { color: var(--text-gray-600) !important; }
+.text-gray-500 { color: var(--text-gray-500) !important; }
+.text-blue-600 { color: var(--text-blue-600) !important; }
+.text-green-600 { color: var(--text-green-600) !important; }
+.text-red-600 { color: var(--text-red-600) !important; }
+
+.bg-blue-100 { background: var(--bg-blue-100) !important; }
+.bg-green-100 { background: var(--bg-green-100) !important; }
+.bg-red-100 { background: var(--bg-red-100) !important; }
+.bg-yellow-100 { background: var(--bg-yellow-100) !important; }
+.bg-purple-100 { background: var(--bg-purple-100) !important; }
+
+input, select, textarea {
+  border: 1px solid var(--border-gray-300);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+input:focus, select:focus { outline: none; border-color: #3b82f6; }
+
+table { border-collapse: collapse; width: 100%; }
+th { background: var(--bg-gray-50); padding: 12px 16px; text-align: left; font-weight: 600; font-size: 12px; color: var(--text-gray-500); text-transform: uppercase; border-bottom: 1px solid var(--border-gray-200); }
+td { padding: 12px 16px; border-bottom: 1px solid var(--bg-gray-100); font-size: 14px; }
+tr:hover { background: var(--bg-gray-50); }
+
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.gap-2 { gap: 8px; }
+.gap-4 { gap: 16px; }
+.grid { display: grid; }
+.p-4 { padding: 16px; }
+.p-6 { padding: 24px; }
+.py-2 { padding-top: 8px; padding-bottom: 8px; }
+.px-4 { padding-left: 16px; padding-right: 16px; }
+.mt-2 { margin-top: 8px; }
+.mt-4 { margin-top: 16px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-4 { margin-bottom: 16px; }
+.text-sm { font-size: 14px; }
+.text-lg { font-size: 18px; }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.w-full { width: 100%; }
+.cursor-pointer { cursor: pointer; }
+.disabled-opacity-50 { opacity: 0.5; cursor: not-allowed; }
