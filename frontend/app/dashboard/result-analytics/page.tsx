@@ -10,7 +10,7 @@ export default function ResultAnalyticsPage() {
   const { user } = useAuth();
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'at-risk' | 'rankings' | 'trends'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'at-risk' | 'rankings' | 'trends' | 'ecz'>('overview');
 
   const { data: classes } = useQuery({
     queryKey: ['classes'],
