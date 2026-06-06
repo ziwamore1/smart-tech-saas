@@ -102,12 +102,13 @@ export default function AttendancePanel({ slot, classId, date, onClose }: Attend
   }, [attendanceData]);
 
   const createBulkAttendance = useMutation({
-    mutationFn: (records: Array<{ studentId: string; status: AttendanceStatus; remarks?: string }>) =>
+    mutationFn: (records: Array<{ studentId: string; status: string; remarks?: string }>) =>
       attendanceApi.createByClass({
         classId,
         slotId: selectedSlot?.id,
         date: dateStr,
         records,
+        schoolId: '',
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
