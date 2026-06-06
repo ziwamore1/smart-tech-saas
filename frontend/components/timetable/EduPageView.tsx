@@ -260,6 +260,13 @@ export default function EduPageView({
     }
   }, [viewMode, classesData, teachersData, classData, selectedEntity]);
 
+  const { data: timeSettings, isLoading: tsLoading } = useQuery({
+    queryKey: ["time-settings"],
+    queryFn: async () => {
+      const res = await schoolApi.getTimeSettings();
+      return res.data?.data || res.data;
+    },
+  });
   const isLoading = tsLoading || ttLoading;
   const ts = timeSettings;
   const periodTimes = useMemo(() => ts ? computePeriodTimes(ts) : null, [ts]);
