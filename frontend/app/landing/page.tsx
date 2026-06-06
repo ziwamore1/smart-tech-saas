@@ -86,8 +86,9 @@ export default function LandingPage() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await galleryApi.getRecentEvents(10);
-        if (data && data.length > 0) {
+        const res = await galleryApi.getRecentEvents(10);
+        const data = res.data?.data || res.data || [];
+        if (data.length > 0) {
           setGalleryEvents(data);
         }
       } catch {
