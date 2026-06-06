@@ -149,7 +149,6 @@ export default function AssetsPage() {
             style={{
               padding: '8px 18px',
               borderRadius: '24px',
-              border: 'none',
               fontSize: '13px',
               fontWeight: 600,
               cursor: 'pointer',
