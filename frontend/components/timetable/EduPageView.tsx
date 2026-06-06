@@ -267,6 +267,13 @@ export default function EduPageView({
       return res.data?.data || res.data;
     },
   });
+  const { data: termData } = useQuery({
+    queryKey: ["current-term"],
+    queryFn: async () => {
+      const res = await timetableApi.getCurrentTerm();
+      return res.data?.data || res.data;
+    },
+  });
   const isLoading = tsLoading || ttLoading;
   const ts = timeSettings;
   const periodTimes = useMemo(() => ts ? computePeriodTimes(ts) : null, [ts]);
