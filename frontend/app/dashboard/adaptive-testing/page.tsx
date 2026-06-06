@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { intelligenceApi, classApi } from '@/lib/api';
 
+export const dynamic = 'force-dynamic';
+
 interface Question {
   id: string;
   questionText: string;
