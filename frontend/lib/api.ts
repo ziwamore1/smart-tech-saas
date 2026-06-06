@@ -1823,6 +1823,8 @@ export const premiumStaffRecordsApi = {
     api.post(`/premium/staff-records/templates/${templateId}/columns/reorder`, { columns }),
 
   // Submissions (Staff Returns)
+  getReturns: (templateId?: string) =>
+    api.get('/premium/staff-records/submissions', { params: { templateId } }),
   getSubmissions: (templateId?: string) =>
     api.get('/premium/staff-records/submissions', { params: { templateId } }),
   getSubmissionById: (id: string) => api.get(`/premium/staff-records/submissions/${id}`),
