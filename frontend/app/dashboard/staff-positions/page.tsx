@@ -8,6 +8,12 @@ import { staffPositionApi } from '@/lib/api';
 type AdminRole = 'Director' | 'SuperAdmin' | 'Head Teacher' | 'Deputy' | 'HOD';
 const ADMIN_ROLES: AdminRole[] = ['Director', 'SuperAdmin', 'Head Teacher', 'Deputy', 'HOD'];
 
+const getSupervisorLabel = (posType: string) => {
+  if (posType === 'LOWER_PRIMARY_SENIOR_TEACHER') return 'Lower Primary Senior Teacher';
+  if (posType === 'UPPER_PRIMARY_SENIOR_TEACHER') return 'Upper Primary Senior Teacher';
+  return 'HOD';
+};
+
 export default function StaffPositionsPage() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const router = useRouter();
@@ -317,12 +323,6 @@ function PositionsTab({ positions, departments, positionTypes, isDirector, onRef
     SENIOR_TEACHER: 'Senior Teacher', ADMINISTRATOR: 'Administrator',
     LOWER_PRIMARY_SENIOR_TEACHER: 'Lower Primary Senior Teacher',
     UPPER_PRIMARY_SENIOR_TEACHER: 'Upper Primary Senior Teacher',
-  };
-
-  const getSupervisorLabel = (posType: string) => {
-    if (posType === 'LOWER_PRIMARY_SENIOR_TEACHER') return 'Lower Primary Senior Teacher';
-    if (posType === 'UPPER_PRIMARY_SENIOR_TEACHER') return 'Upper Primary Senior Teacher';
-    return 'HOD';
   };
 
   const getTeacherName = (pos: any) => {
