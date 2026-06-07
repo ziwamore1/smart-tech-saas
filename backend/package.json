@@ -94,8 +94,6 @@
     "puppeteer": "^24.43.1",
     "puppeteer-core": "^24.43.1",
     "qrcode": "^1.5.4",
-    "react-beautiful-dnd": "^13.1.1",
-    "react-native-math-view": "^3.9.5",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "sanitize-html": "^2.17.4",
