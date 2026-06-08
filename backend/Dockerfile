@@ -3,9 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies (including devDependencies needed for build)
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --legacy-peer-deps
 
 # Copy source code
 COPY . .
@@ -18,9 +18,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install production dependencies
+# Install production dependencies only
 COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --omit=dev --legacy-peer-deps && npm cache clean --force
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
