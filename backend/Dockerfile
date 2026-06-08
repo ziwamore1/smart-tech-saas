@@ -3,6 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Install build dependencies for native modules (canvas, etc.)
+RUN apk add --no-cache python3 build-base cairo-dev pango-dev libjpeg-turbo-dev giflib-dev librsvg-dev pixman-dev
+
 # Install dependencies (including devDependencies needed for build)
 COPY package*.json ./
 RUN npm ci --legacy-peer-deps
@@ -17,6 +20,9 @@ RUN npm run build
 FROM node:20-alpine
 
 WORKDIR /app
+
+# Install build dependencies for native modules (canvas, etc.)
+RUN apk add --no-cache python3 build-base cairo-dev pango-dev libjpeg-turbo-dev giflib-dev librsvg-dev pixman-dev
 
 # Install production dependencies only
 COPY package*.json ./
