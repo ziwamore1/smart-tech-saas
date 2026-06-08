@@ -10,8 +10,11 @@ RUN apk add --no-cache python3 build-base cairo-dev pango-dev libjpeg-turbo-dev 
 COPY package*.json ./
 RUN npm ci --legacy-peer-deps
 
-# Copy source code
+# Copy source code (including prisma schema)
 COPY . .
+
+# Generate Prisma client from schema
+RUN npx prisma generate
 
 # Build the application
 RUN npm run build
