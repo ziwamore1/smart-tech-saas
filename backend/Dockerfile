@@ -1,6 +1,9 @@
 # Backend Dockerfile
 FROM node:20-alpine AS builder
 
+# Install native dependencies for canvas (node-gyp compilation)
+RUN apk add --no-cache python3 build-base cairo-dev pango-dev libjpeg-turbo-dev giflib-dev librsvg-dev pixman-dev
+
 WORKDIR /app
 
 # Install dependencies (including devDependencies needed for build)
@@ -15,6 +18,9 @@ RUN npm run build
 
 # Production stage
 FROM node:20-alpine
+
+# Install native dependencies for canvas (node-gyp compilation + runtime libs)
+RUN apk add --no-cache python3 build-base cairo-dev pango-dev libjpeg-turbo-dev giflib-dev librsvg-dev pixman-dev
 
 WORKDIR /app
 
