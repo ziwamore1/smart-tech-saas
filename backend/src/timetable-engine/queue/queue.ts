@@ -4,9 +4,15 @@ import { Lesson } from '../solver/fastCSPSolver';
 import { SlotIndex } from '../entities/cache';
 import { HybridConfig, PenaltyWeights } from '../solver/fastHybridSolver';
 
-const connection = new IORedis({
+const connection = new IORedis(process.env.REDIS_URL!, {
+  tls: {
+    rejectUnauthorized: false,
+  },
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
+  retryStrategy(times) {
+    return Math.min(times * 200, 2000);
+  },
 });
 
 export interface TimetableJobData {

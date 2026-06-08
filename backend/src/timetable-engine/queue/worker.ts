@@ -10,9 +10,15 @@ import { solveDistributed } from '../solver/parallelSolver';
 import { Lesson } from '../solver/fastCSPSolver';
 import { SlotIndex } from '../entities/cache';
 
-const connection = new IORedis({
+const connection = new IORedis(process.env.REDIS_URL!, {
+  tls: {
+    rejectUnauthorized: false,
+  },
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
+  retryStrategy(times) {
+    return Math.min(times * 200, 2000);
+  },
 });
 
 const numWorkers = Math.max(1, os.cpus().length - 1);
