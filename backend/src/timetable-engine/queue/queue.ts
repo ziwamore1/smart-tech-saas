@@ -11,7 +11,7 @@ const connection = new IORedis(process.env.REDIS_URL!, {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
   retryStrategy(times) {
-    return Math.min(times * 200, 2000);
+    return Math.min(times * 1000, 10000);
   },
 });
 
