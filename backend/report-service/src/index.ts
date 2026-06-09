@@ -116,7 +116,7 @@ async function checkRedis(): Promise<boolean> {
 
 async function main() {
   console.log('🚀 Starting SmartTech Report Service...');
-  console.log(`   Redis: ${config.redis.host}:${config.redis.port}`);
+  console.log(`   Redis: ${process.env.REDIS_URL || `${config.redis.host}:${config.redis.port}`}`);
   console.log(`   Queue: ${config.queue.name}`);
 
   const redisOk = await checkRedis();

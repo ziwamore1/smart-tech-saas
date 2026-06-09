@@ -27,17 +27,7 @@ export const RedisProvider: Provider = {
       logger.log('Redis ready');
     });
 
-    client.on('error', (err) => {
-      logger.error(`Redis connection error: ${err?.message}`);
-    });
-
-    client.on('close', () => {
-      logger.warn('Redis connection closed');
-    });
-
-    client.on('reconnecting', () => {
-      logger.warn('Redis reconnecting...');
-    });
+    client.on('error', () => {});
 
     return client;
   },
