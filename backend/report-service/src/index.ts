@@ -97,13 +97,10 @@ const server = http.createServer(async (req, res) => {
 });
 
 async function checkRedis(): Promise<boolean> {
-  const redis = new Redis({
-    host: config.redis.host,
-    port: config.redis.port,
-    retryStrategy: () => null,
-    maxRetriesPerRequest: 1,
-    lazyConnect: true,
-  });
+  const redisOptions: any = 'url' in config.redis
+    ? { url: config.redis.url, tls: config.redis.tls, retryStrategy: () => null, maxRetriesPerRequest: 1, lazyConnect: true }
+    : { host: config.redis.host, port: config.redis.port, retryStrategy: () => null, maxRetriesPerRequest: 1, lazyConnect: true };
+  const redis = new Redis(redisOptions);
 
   try {
     await redis.connect();

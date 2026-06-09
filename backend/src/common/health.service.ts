@@ -174,7 +174,7 @@ export class HealthService {
   }
 
   private async checkRedis(): Promise<HealthCheck> {
-    const redisHost = process.env.REDIS_HOST;
+    const redisHost = process.env.REDIS_HOST || process.env.REDIS_URL;
     if (!redisHost) {
       return {
         status: 'degraded',

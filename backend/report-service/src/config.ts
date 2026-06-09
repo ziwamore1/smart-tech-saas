@@ -3,8 +3,13 @@ import path from 'path';
 
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
+const redisUrl = process.env.REDIS_URL;
+
 export const config = {
-  redis: {
+  redis: redisUrl ? {
+    url: redisUrl,
+    tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
+  } : {
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT || '6379', 10),
   },
