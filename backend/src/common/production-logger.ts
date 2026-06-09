@@ -1,4 +1,4 @@
-import { Injectable, ConsoleLogger, LogLevel } from '@nestjs/common';
+import { Injectable, ConsoleLogger, LogLevel, ConsoleLoggerOptions } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -8,8 +8,8 @@ export class ProductionLogger extends ConsoleLogger {
   private logFile: string;
   private errorFile: string;
 
-  constructor(context?: string) {
-    super(context);
+  constructor(context?: string, options?: ConsoleLoggerOptions) {
+    super(context, { logLevels: ProductionLogger.getLogLevels(), ...options });
     this.logDir = path.join(process.cwd(), 'logs');
     this.logFile = path.join(this.logDir, `app-${new Date().toISOString().split('T')[0]}.log`);
     this.errorFile = path.join(this.logDir, `error-${new Date().toISOString().split('T')[0]}.log`);
