@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MinistryAdapterFactory } from '../ministry-gateway/adapters/adapter-factory';
 import { BlockchainService } from '../blockchain-service/blockchain.service';
+import Redis from 'ioredis';
+import { REDIS_CLIENT_TOKEN } from '../queues/queue-definitions';
 
 export interface HealthCheckResult {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -26,6 +28,7 @@ export class HealthService {
     private prisma: PrismaService,
     private ministryAdapterFactory: MinistryAdapterFactory,
     private blockchainService: BlockchainService,
+    @Inject(REDIS_CLIENT_TOKEN) private redis: Redis,
   ) {}
 
   async check(): Promise<HealthCheckResult> {
@@ -174,24 +177,19 @@ export class HealthService {
   }
 
   private async checkRedis(): Promise<HealthCheck> {
-    const redisHost = process.env.REDIS_HOST || process.env.REDIS_URL;
-    if (!redisHost) {
-      return {
-        status: 'degraded',
-        message: 'Redis not configured',
-      };
-    }
-
     try {
-      // If you have Redis client, check it here
+      const start = Date.now();
+      await this.redis.ping();
+      const latency = Date.now() - start;
       return {
         status: 'up',
-        message: 'Redis connected',
+        message: `Pong in ${latency}ms`,
+        latency,
       };
     } catch (error) {
       return {
         status: 'down',
-        message: `Redis connection failed: ${error.message}`,
+        message: `Redis ping failed: ${error.message}`,
       };
     }
   }

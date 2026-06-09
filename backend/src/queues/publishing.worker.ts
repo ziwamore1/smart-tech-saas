@@ -1,19 +1,22 @@
-import { Process, Processor } from '@nestjs/bull';
-import type { Job } from 'bull';
+import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Job } from 'bullmq';
 import { ReportCardService } from '../report-card/report-card.service';
 
 @Processor('publishing')
-export class PublishingWorker {
-  constructor(private reportCardService: ReportCardService) {}
+export class PublishingWorker extends WorkerHost {
+  constructor(private reportCardService: ReportCardService) {
+    super();
+  }
 
-  @Process('generate')
-  async generate(job: Job) {
-    const { schoolId, studentId, termId } = job.data;
+  async process(job: Job): Promise<void> {
+    if (job.name === 'generate') {
+      const { schoolId, studentId, termId } = job.data;
 
-    await this.reportCardService.generateReportCardPdf(
-      schoolId,
-      studentId,
-      termId,
-    );
+      await this.reportCardService.generateReportCardPdf(
+        schoolId,
+        studentId,
+        termId,
+      );
+    }
   }
 }

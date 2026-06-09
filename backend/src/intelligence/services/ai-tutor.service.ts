@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiContextService } from './ai-context.service';
+import { AiMemoryService } from './ai-memory.service';
 import { SubjectEngineService } from './subject-engine.service';
 import { buildSystemPrompt, buildUserPrompt, AiContext, Role } from './prompt-templates';
 
@@ -15,6 +16,7 @@ export class AiTutorService {
     private prisma: PrismaService,
     private config: ConfigService,
     private aiContext: AiContextService,
+    private aiMemory: AiMemoryService,
     private subjectEngine: SubjectEngineService,
   ) {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
@@ -46,6 +48,18 @@ export class AiTutorService {
       data: { sessionId: session.id, role: 'tutor', content: greeting },
     });
 
+    await this.aiMemory.update(studentId, {
+      subject: options?.subjectId,
+      topic: options?.topic,
+      role: context.role,
+      className: context.className,
+      grade: context.grade,
+      performanceSnapshot: context.currentPerformance
+        ? { average: context.currentPerformance.average, weakAreas: context.currentPerformance.weakAreas }
+        : undefined,
+      recentMessages: [{ role: 'tutor', content: greeting }],
+    }, session.id);
+
     return { sessionId: session.id, message: greeting };
   }
 
@@ -72,13 +86,19 @@ export class AiTutorService {
       data: { sessionId, role: 'student', content: message },
     });
 
+    const memory = await this.aiMemory.pushMessage(studentId, 'user', message, sessionId);
+    const previousMessages = memory.recentMessages.slice(-10).map(m => ({
+      role: m.role === 'tutor' ? 'assistant' : 'user',
+      content: m.content,
+    }));
+
     const fullContext = await this.buildFullContext(schoolId, {
       ...context,
       studentId,
       message,
-      previousMessages: session.messages.slice(-10).map(m => ({ role: m.role === 'student' ? 'user' : 'assistant', content: m.content })),
-      subject: context?.subject || session.subjectId || undefined,
-      topic: context?.topic || session.topic || undefined,
+      subject: context?.subject || session.subjectId || memory.subject || undefined,
+      topic: context?.topic || session.topic || memory.topic || undefined,
+      previousMessages,
     });
 
     const response = await this.generateLLMResponse(fullContext);
@@ -86,6 +106,8 @@ export class AiTutorService {
     await this.prisma.aiTutorMessage.create({
       data: { sessionId, role: 'tutor', content: response },
     });
+
+    await this.aiMemory.pushMessage(studentId, 'tutor', response, sessionId);
 
     return { response };
   }
