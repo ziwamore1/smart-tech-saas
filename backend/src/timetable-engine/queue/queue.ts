@@ -4,12 +4,13 @@ import { Lesson } from '../solver/fastCSPSolver';
 import { SlotIndex } from '../entities/cache';
 import { HybridConfig, PenaltyWeights } from '../solver/fastHybridSolver';
 
-const connection = new IORedis(process.env.REDIS_URL!, {
-  tls: {
-    rejectUnauthorized: false,
-  },
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+
+const connection = new IORedis(redisUrl, {
+  tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
+  lazyConnect: true,
   retryStrategy(times) {
     return Math.min(times * 1000, 10000);
   },
