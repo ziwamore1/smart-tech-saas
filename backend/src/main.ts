@@ -11,12 +11,13 @@ import { setupSecurity } from './common/security.middleware';
 import { ProductionLogger } from './common/production-logger';
 
 async function bootstrap() {
-  const logger = new ProductionLogger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ProductionLogger.getLogLevels(),
   });
 
-  app.useLogger(app.get(ProductionLogger));
+  const productionLogger = app.get(ProductionLogger);
+  productionLogger.setLogLevels(ProductionLogger.getLogLevels());
+  app.useLogger(productionLogger);
 
   setupSecurity(app);
 
@@ -57,9 +58,9 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3001;
   await app.listen(port, '0.0.0.0');
-  logger.log(`Application is running on: http://0.0.0.0:${port}/api/v1`);
-  logger.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  logger.log(`Version: ${process.env.npm_package_version || '2.0.0'}`);
+  productionLogger.log(`Application is running on: http://0.0.0.0:${port}/api/v1`);
+  productionLogger.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  productionLogger.log(`Version: ${process.env.npm_package_version || '2.0.0'}`);
 }
 
 bootstrap();
