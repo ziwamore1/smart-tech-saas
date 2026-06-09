@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bull';
+import { BullModule } from '@nestjs/bullmq';
 import { TimetableService } from './timetable.service';
 import { TimetableController } from './timetable.controller';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -11,9 +11,7 @@ import { TimetableProcessor } from './timetable.processor';
 
 @Module({
   imports: [PrismaModule,
-    BullModule.registerQueue({
-      name: 'timetable',
-    }),
+    BullModule.registerQueue({ name: 'timetable' }),
   ],
   controllers: [TimetableController],
   providers: [

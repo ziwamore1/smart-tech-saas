@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { BullModule } from '@nestjs/bull';
+import { BullModule } from '@nestjs/bullmq';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { NotificationModule } from './notification/notification.module';
@@ -87,7 +87,7 @@ import { ProductionLogger } from './common/production-logger';
           try {
             const url = new URL(redisUrl);
             return {
-              redis: {
+              connection: {
                 host: url.hostname,
                 port: parseInt(url.port || '6379', 10),
                 password: url.password ? decodeURIComponent(url.password) : undefined,
@@ -97,7 +97,7 @@ import { ProductionLogger } from './common/production-logger';
           } catch {}
         }
         return {
-          redis: {
+          connection: {
             host: process.env.REDIS_HOST || 'localhost',
             port: parseInt(process.env.REDIS_PORT || '6379', 10),
           },
