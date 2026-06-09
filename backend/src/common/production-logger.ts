@@ -75,7 +75,7 @@ export class ProductionLogger extends ConsoleLogger {
     const env = process.env.NODE_ENV || 'development';
 
     if (env === 'production') {
-      return ['error', 'warn', 'log'];
+      return ['error'];
     }
 
     return ['error', 'warn', 'log', 'debug', 'verbose'];

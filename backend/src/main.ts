@@ -14,7 +14,6 @@ async function bootstrap() {
   const logger = new ProductionLogger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ProductionLogger.getLogLevels(),
-    bufferLogs: true,
   });
 
   app.useLogger(app.get(ProductionLogger));
