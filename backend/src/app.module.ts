@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { BullModule } from '@nestjs/bull';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { NotificationModule } from './notification/notification.module';
@@ -79,6 +80,30 @@ import { ProductionLogger } from './common/production-logger';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    BullModule.forRootAsync({
+      useFactory: () => {
+        const redisUrl = process.env.REDIS_URL;
+        if (redisUrl) {
+          try {
+            const url = new URL(redisUrl);
+            return {
+              redis: {
+                host: url.hostname,
+                port: parseInt(url.port || '6379', 10),
+                password: url.password ? decodeURIComponent(url.password) : undefined,
+                tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
+              },
+            };
+          } catch {}
+        }
+        return {
+          redis: {
+            host: process.env.REDIS_HOST || 'localhost',
+            port: parseInt(process.env.REDIS_PORT || '6379', 10),
+          },
+        };
+      },
+    }),
     CommonModule,
     AuthModule,
     PrismaModule,
