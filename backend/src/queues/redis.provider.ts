@@ -13,6 +13,7 @@ export const RedisProvider: Provider = {
       tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
+      lazyConnect: true,
       retryStrategy(times) {
         return Math.min(times * 1000, 10000);
       },
@@ -27,6 +28,10 @@ export const RedisProvider: Provider = {
     });
 
     client.on('error', () => {});
+
+    client.connect().catch((err: Error) => {
+      logger.error(`Redis connection failed: ${err.message}`);
+    });
 
     return client;
   },
