@@ -41,9 +41,6 @@ RUN npx prisma generate
 # Create logs directory
 RUN mkdir -p logs
 
-# Create uploads directory
-RUN mkdir -p uploads
-
 # Expose port
 EXPOSE 3001
 
@@ -54,7 +51,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
 # Run as non-root user
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001 && \
-    chown -R nodejs:nodejs /app/logs /app/uploads
+    chown -R nodejs:nodejs /app/logs
 USER nodejs
 
 # Start the application
