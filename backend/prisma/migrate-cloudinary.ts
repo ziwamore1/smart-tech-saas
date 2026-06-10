@@ -129,7 +129,7 @@ async function migrate() {
   for (const p of parents) items.push({ model: 'parent', id: p.id, urlField: 'photoUrl', publicIdField: 'photoPublicId', url: p.photoUrl!, folder: 'users/parents' });
 
   // StudentPhotos
-  const studentPhotos = await prisma.studentPhoto.findMany({ where: { imageUrl: { not: null }, photoPublicId: null } });
+  const studentPhotos = await prisma.studentPhoto.findMany({ where: { photoPublicId: null } });
   for (const sp of studentPhotos) items.push({ model: 'studentPhoto', id: sp.id, urlField: 'imageUrl', publicIdField: 'photoPublicId', url: sp.imageUrl, folder: 'users/student-photos' });
 
   if (items.length === 0) {
