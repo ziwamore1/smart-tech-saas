@@ -175,14 +175,16 @@ export class StudentService {
     });
   }
 
-  async uploadPhoto(id: string, photoUrl: string, schoolId: string) {
+  async uploadPhoto(id: string, photoUrl: string, photoPublicId: string, schoolId: string): Promise<string | null> {
     const student = await this.prisma.student.findUnique({ where: { id } });
     if (!student) throw new NotFoundException('Student not found');
     if (student.schoolId !== schoolId) throw new ForbiddenException('Invalid student');
-    return this.prisma.student.update({
+    const oldPublicId = student.photoPublicId;
+    await this.prisma.student.update({
       where: { id },
-      data: { photoUrl },
+      data: { photoUrl, photoPublicId },
     });
+    return oldPublicId;
   }
 
   async delete(id: string) {

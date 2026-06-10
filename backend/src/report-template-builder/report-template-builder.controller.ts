@@ -316,12 +316,12 @@ export class ReportTemplateBuilderController {
     @Res() res: any,
   ) {
     const htmlResult = await this.renderCertificate(req, id, body);
-    const pdf = await this.rendererService.renderPdfFromHtml(req.user.schoolId, id, htmlResult.html);
+    const result = await this.rendererService.renderPdfFromHtml(req.user.schoolId, id, htmlResult.html);
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="certificate-${id}.pdf"`,
     });
-    res.send(pdf);
+    res.send(result.buffer);
   }
 
   @Post(':id/pdf')
@@ -332,12 +332,12 @@ export class ReportTemplateBuilderController {
     @Body('data') data?: any,
     @Res() res?: Response,
   ) {
-    const pdf = await this.rendererService.renderPdf(req.user.schoolId, id, data);
+    const result = await this.rendererService.renderPdf(req.user.schoolId, id, data);
     res!.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="report-${id}.pdf"`,
     });
-    res!.send(pdf);
+    res!.send(result.buffer);
   }
 
   // ===== AI Template Generator Routes =====

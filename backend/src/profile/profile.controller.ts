@@ -1,9 +1,8 @@
-import { Controller, Get, Put, Post, Delete, Body, UseGuards, Req, UseInterceptors, UploadedFile, Logger, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Put, Post, Delete, Body, UseGuards, Req, UseInterceptors, UploadedFile, Logger } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { v4 as uuidv4 } from 'uuid';
 import { ProfileService } from './profile.service';
+import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
+import { cloudinaryMemoryStorage, CLOUDINARY_FILE_FILTER } from '../cloudinary/multer-cloudinary';
 import { UpdateProfileDto, ChangePasswordDto } from './dto/profile.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -12,7 +11,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 export class ProfileController {
   private readonly logger = new Logger(ProfileController.name);
 
-  constructor(private profileService: ProfileService) {}
+  constructor(
+    private profileService: ProfileService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
 
   @Get()
   async getProfile(@Req() req: any) {
@@ -27,26 +29,18 @@ export class ProfileController {
   @Post('photo')
   @UseInterceptors(
     FileInterceptor('photo', {
-      storage: diskStorage({
-        destination: join(__dirname, '../../uploads/profiles'),
-        filename: (_req, file, cb) => {
-          const ext = extname(file.originalname).toLowerCase();
-          cb(null, `profile-${uuidv4()}${ext}`);
-        },
-      }),
+      storage: cloudinaryMemoryStorage(),
+      fileFilter: CLOUDINARY_FILE_FILTER,
       limits: { fileSize: 5 * 1024 * 1024 },
-      fileFilter: (_req, file, cb) => {
-        const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-        if (allowed.includes(file.mimetype)) {
-          cb(null, true);
-        } else {
-          cb(new BadRequestException('Only JPG, PNG, and WebP files are allowed'), false);
-        }
-      },
     }),
   )
   async uploadPhoto(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
-    return this.profileService.uploadPhoto(req.user.id, file);
+    const result = await this.cloudinary.upload(file, FOLDERS.users.students);
+    const oldPublicId = await this.profileService.uploadPhoto(req.user.id, result.secureUrl, result.publicId);
+    if (oldPublicId) {
+      await this.cloudinary.delete(oldPublicId).catch(() => {});
+    }
+    return { photoUrl: result.secureUrl, photoPublicId: result.publicId };
   }
 
   @Delete('photo')

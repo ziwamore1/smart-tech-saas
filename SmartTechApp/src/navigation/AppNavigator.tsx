@@ -22,6 +22,7 @@ import { TeacherClassesScreen } from '../screens/teacher/ClassesScreen';
 import { TeacherMarksScreen } from '../screens/teacher/MarksScreen';
 import { DirectorTabNavigator } from './DirectorTabNavigator';
 import { ClassTeacherTabNavigator } from './ClassTeacherTabNavigator';
+import { SuperAdminTabNavigator } from './SuperAdminTabNavigator';
 import { LearningStyleScreen } from '../screens/intelligence/LearningStyleScreen';
 import { AiTutorScreen } from '../screens/intelligence/AiTutorScreen';
 import { AnalyticsScreen } from '../screens/intelligence/AnalyticsScreen';
@@ -91,13 +92,15 @@ function useRoleCheck(user: any) {
           ? (hasRole('Vice Chancellor') || hasRole('Dean'))
           : false;
 
-  return { isStudent, isParent, isClassTeacher, isTeacher, isDirector, institutionType };
+  const isSuperAdmin = hasRole('SuperAdmin');
+
+  return { isStudent, isParent, isClassTeacher, isTeacher, isDirector, isSuperAdmin, institutionType };
 }
 
 export function AppNavigator() {
   const { isAuthenticated, user } = useAuthStore();
-  const { isStudent, isParent, isClassTeacher, isTeacher, isDirector, institutionType } = useRoleCheck(user);
-  const hasRoleDashboard = isStudent || isParent || isClassTeacher || isTeacher || isDirector;
+  const { isStudent, isParent, isClassTeacher, isTeacher, isDirector, isSuperAdmin, institutionType } = useRoleCheck(user);
+  const hasRoleDashboard = isStudent || isParent || isClassTeacher || isTeacher || isDirector || isSuperAdmin;
 
   return (
     <NavigationContainer>
@@ -111,6 +114,7 @@ export function AppNavigator() {
             {isClassTeacher && <Stack.Screen name="ClassTeacherTabNavigator" component={ClassTeacherTabNavigator} />}
             {isTeacher && <Stack.Screen name="TeacherDashboard" component={TeacherDashboardScreen} />}
             {isDirector && <Stack.Screen name="DirectorDashboard" component={DirectorTabNavigator} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminDashboard" component={SuperAdminTabNavigator} />}
             {!hasRoleDashboard && (
               <Stack.Screen name="StudentDashboard" component={StudentDashboardScreen} />
             )}

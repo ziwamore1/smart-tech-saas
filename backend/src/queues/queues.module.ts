@@ -5,6 +5,7 @@ import { RedisProvider } from './redis.provider';
 import { AnalyticsQueueService } from './analytics-queue.service';
 import { ExportQueueService } from './export-queue.service';
 import { AiReportQueueService } from './ai-report-queue.service';
+import { CloudinaryCleanupWorker } from './cloudinary-cleanup.worker';
 
 @Global()
 @Module({
@@ -15,6 +16,7 @@ import { AiReportQueueService } from './ai-report-queue.service';
     AnalyticsQueueService,
     ExportQueueService,
     AiReportQueueService,
+    CloudinaryCleanupWorker,
   ],
   exports: [
     RedisProvider,

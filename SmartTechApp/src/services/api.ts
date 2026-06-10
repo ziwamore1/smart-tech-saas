@@ -650,6 +650,38 @@ class ApiService {
     return response.data;
   }
 
+  // ===== Cloudinary Media =====
+
+  async uploadMedia(formData: FormData, onProgress?: (progress: number) => void) {
+    const response = await this.client.post('/media/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: onProgress ? (e) => {
+        if (e.total) onProgress(Math.round((e.loaded * 100) / e.total));
+      } : undefined,
+    });
+    return response.data;
+  }
+
+  async getMedia(params?: { folder?: string; page?: number; limit?: number }) {
+    const response = await this.client.get('/media', { params });
+    return response.data;
+  }
+
+  async deleteMedia(publicId: string) {
+    const response = await this.client.delete('/media', { data: { publicId } });
+    return response.data;
+  }
+
+  async getMediaStats() {
+    const response = await this.client.get('/media/stats');
+    return response.data;
+  }
+
+  async getMediaByUser(userId: string) {
+    const response = await this.client.get(`/media/user/${userId}`);
+    return response.data;
+  }
+
   async getAssetCategories() {
     const response = await this.client.get('/template-builder/cloud-assets/categories');
     return response.data;

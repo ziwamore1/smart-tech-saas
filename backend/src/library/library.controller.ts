@@ -13,11 +13,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import * as fs from 'fs';
 import { LibraryService } from './library.service';
-import { ConfigService } from '@nestjs/config';
+import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
+import { cloudinaryMemoryStorage, CLOUDINARY_FILE_FILTER } from '../cloudinary/multer-cloudinary';
 import { Roles } from '../auth/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -26,7 +26,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 export class LibraryController {
   constructor(
     private libraryService: LibraryService,
-    private configService: ConfigService,
+    private readonly cloudinary: CloudinaryService,
   ) {}
 
   @Get()
@@ -72,17 +72,9 @@ export class LibraryController {
   @Roles('Director')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads/library',
-        filename: (req, file, callback) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          callback(null, `doc-${uniqueSuffix}${extname(file.originalname)}`);
-        },
-      }),
-      fileFilter: (req, file, callback) => {
-        callback(null, true);
-      },
-      limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+      storage: cloudinaryMemoryStorage(),
+      fileFilter: CLOUDINARY_FILE_FILTER,
+      limits: { fileSize: 50 * 1024 * 1024 },
     }),
   )
   async uploadFile(
@@ -91,9 +83,8 @@ export class LibraryController {
     @Req() req: any,
   ) {
     const schoolId = req.user?.schoolId;
-    const baseUrl = this.configService.get('UPLOAD_BASE_URL') || '';
-    const fileUrl = `${baseUrl}/uploads/library/${file.filename}`;
-    return this.libraryService.uploadFile(id, fileUrl, file.size, schoolId);
+    const result = await this.cloudinary.upload(file, `${FOLDERS.system}/library`);
+    return this.libraryService.uploadFile(id, result.secureUrl, result.size, schoolId);
   }
 
   @Get(':id/download')

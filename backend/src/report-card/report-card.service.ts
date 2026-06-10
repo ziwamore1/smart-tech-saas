@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as puppeteer from 'puppeteer';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { ReportCardEngineService } from '../report-card-engine/report-card-engine.service';
+import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as handlebars from 'handlebars';
@@ -31,7 +32,21 @@ export class ReportCardService {
     private prisma: PrismaService,
     private analyticsService: AnalyticsService,
     private reportCardEngineService: ReportCardEngineService,
+    private cloudinary: CloudinaryService,
   ) {}
+
+  private async uploadToCloudinary(buffer: Buffer, publicId: string): Promise<{ url: string | null; publicId: string | null }> {
+    try {
+      const result = await this.cloudinary.uploadBuffer(buffer, {
+        folder: `${FOLDERS.system}/report-cards`,
+        publicId,
+        resourceType: 'image',
+      });
+      return { url: result.secureUrl, publicId: result.publicId };
+    } catch {
+      return { url: null, publicId: null };
+    }
+  }
 
   private async getBrowser() {
     const userDataDir = path.join(os.tmpdir(), `puppeteer_${crypto.randomBytes(8).toString('hex')}`);
@@ -246,7 +261,7 @@ export class ReportCardService {
     schoolId: string,
     studentId: string,
     termId: string,
-  ): Promise<Buffer> {
+  ): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {
     const report = await this.getReportCard(schoolId, studentId, termId);
 
     const school = await this.prisma.school.findUnique({
@@ -338,14 +353,16 @@ export class ReportCardService {
 
     await browser.close();
 
-    return Buffer.from(pdf);
+    const buffer = Buffer.from(pdf);
+    const { url, publicId } = await this.uploadToCloudinary(buffer, `report-card-${studentId}-${termId}`);
+    return { buffer, url, publicId };
   }
 
   async generateClassReportCardsPdf(
     schoolId: string,
     classId: string,
     termId: string,
-  ): Promise<Buffer> {
+  ): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {
     const term = await this.prisma.term.findUnique({
       where: { id: termId },
     });
@@ -472,13 +489,15 @@ export class ReportCardService {
 
     await browser.close();
 
-    return Buffer.from(pdf);
+    const buffer = Buffer.from(pdf);
+    const { url, publicId } = await this.uploadToCloudinary(buffer, `class-report-cards-${classId}-${termId}`);
+    return { buffer, url, publicId };
   }
 
   async generateStudentTranscript(
     schoolId: string,
     studentId: string,
-  ): Promise<Buffer> {
+  ): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {
     const student = await this.prisma.student.findUnique({
       where: { id: studentId },
     });
@@ -679,14 +698,16 @@ export class ReportCardService {
 
     await browser.close();
 
-    return Buffer.from(pdf);
+    const buffer = Buffer.from(pdf);
+    const { url, publicId } = await this.uploadToCloudinary(buffer, `transcript-${studentId}`);
+    return { buffer, url, publicId };
   }
 
   async generateCurriculumReportCardPdf(
     schoolId: string,
     studentId: string,
     termId: string,
-  ): Promise<Buffer> {
+  ): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {
     const engineData = await this.reportCardEngineService.generateReportCardData(
       studentId,
       termId,
@@ -752,14 +773,16 @@ export class ReportCardService {
     const pdf = await page.pdf({ format: 'A4', printBackground: true });
     await browser.close();
 
-    return Buffer.from(pdf);
+    const buffer = Buffer.from(pdf);
+    const { url, publicId } = await this.uploadToCloudinary(buffer, `curriculum-report-${studentId}-${termId}`);
+    return { buffer, url, publicId };
   }
 
   async generateClassCurriculumReportCardsPdf(
     schoolId: string,
     classId: string,
     termId: string,
-  ): Promise<Buffer> {
+  ): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {
     const term = await this.prisma.term.findUnique({ where: { id: termId } });
     if (!term) throw new Error('Invalid term');
 
@@ -830,6 +853,8 @@ export class ReportCardService {
     const pdf = await page.pdf({ format: 'A4', printBackground: true });
     await browser.close();
 
-    return Buffer.from(pdf);
+    const buffer = Buffer.from(pdf);
+    const { url, publicId } = await this.uploadToCloudinary(buffer, `class-curriculum-${classId}-${termId}`);
+    return { buffer, url, publicId };
   }
 }

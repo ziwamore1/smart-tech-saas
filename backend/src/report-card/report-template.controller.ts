@@ -12,9 +12,9 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { ReportTemplateService } from './report-template.service';
+import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
+import { cloudinaryMemoryStorage, CLOUDINARY_FILE_FILTER } from '../cloudinary/multer-cloudinary';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -22,7 +22,10 @@ import { Roles } from '../auth/decorators/roles.decorator';
 @Controller('report-templates')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ReportTemplateController {
-  constructor(private readonly reportTemplateService: ReportTemplateService) {}
+  constructor(
+    private readonly reportTemplateService: ReportTemplateService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
 
   @Get()
   @Roles('Director', 'Teacher')
@@ -68,71 +71,41 @@ export class ReportTemplateController {
   @Roles('Director')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads/report-templates',
-        filename: (req, file, callback) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          callback(null, `stamp-${uniqueSuffix}${extname(file.originalname)}`);
-        },
-      }),
-      fileFilter: (req, file, callback) => {
-        if (!file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
-          return callback(new Error('Only image files are allowed'), false);
-        }
-        callback(null, true);
-      },
+      storage: cloudinaryMemoryStorage(),
+      fileFilter: CLOUDINARY_FILE_FILTER,
       limits: { fileSize: 5 * 1024 * 1024 },
     }),
   )
   async uploadStamp(@Req() req, @Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
-    return this.reportTemplateService.uploadStamp(req.user.schoolId, id, file);
+    const result = await this.cloudinary.upload(file, FOLDERS.signatures);
+    return this.reportTemplateService.uploadStamp(req.user.schoolId, id, result.secureUrl);
   }
 
   @Post(':id/upload-signature')
   @Roles('Director')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads/report-templates',
-        filename: (req, file, callback) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          callback(null, `signature-${uniqueSuffix}${extname(file.originalname)}`);
-        },
-      }),
-      fileFilter: (req, file, callback) => {
-        if (!file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
-          return callback(new Error('Only image files are allowed'), false);
-        }
-        callback(null, true);
-      },
+      storage: cloudinaryMemoryStorage(),
+      fileFilter: CLOUDINARY_FILE_FILTER,
       limits: { fileSize: 2 * 1024 * 1024 },
     }),
   )
   async uploadSignature(@Req() req, @Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
-    return this.reportTemplateService.uploadSignature(req.user.schoolId, id, file);
+    const result = await this.cloudinary.upload(file, FOLDERS.signatures);
+    return this.reportTemplateService.uploadSignature(req.user.schoolId, id, result.secureUrl);
   }
 
   @Post(':id/upload-logo')
   @Roles('Director')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads/report-templates',
-        filename: (req, file, callback) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          callback(null, `logo-${uniqueSuffix}${extname(file.originalname)}`);
-        },
-      }),
-      fileFilter: (req, file, callback) => {
-        if (!file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
-          return callback(new Error('Only image files are allowed'), false);
-        }
-        callback(null, true);
-      },
+      storage: cloudinaryMemoryStorage(),
+      fileFilter: CLOUDINARY_FILE_FILTER,
       limits: { fileSize: 2 * 1024 * 1024 },
     }),
   )
   async uploadLogo(@Req() req, @Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
-    return this.reportTemplateService.uploadLogo(req.user.schoolId, id, file);
+    const result = await this.cloudinary.upload(file, FOLDERS.schools.logos);
+    return this.reportTemplateService.uploadLogo(req.user.schoolId, id, result.secureUrl);
   }
 }

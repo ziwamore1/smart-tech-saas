@@ -3,7 +3,6 @@ import * as bcrypt from 'bcrypt';
 import * as path from 'path';
 import * as fs from 'fs-extra';
 import { PrismaService } from '../prisma/prisma.service';
-import { ImageService } from '../common/services/image.service';
 import { UpdateProfileDto, ChangePasswordDto } from './dto/profile.dto';
 
 @Injectable()
@@ -12,7 +11,6 @@ export class ProfileService {
 
   constructor(
     private prisma: PrismaService,
-    private imageService: ImageService,
   ) {}
 
   async getProfile(userId: string) {
@@ -61,29 +59,18 @@ export class ProfileService {
     return user;
   }
 
-  async uploadPhoto(userId: string, file: Express.Multer.File) {
-    if (!file) throw new BadRequestException('No file provided');
+  async uploadPhoto(userId: string, photoUrl: string, photoPublicId: string): Promise<string | null> {
+    if (!photoUrl) throw new BadRequestException('No photo URL provided');
 
-    if (!this.imageService.validateMimeType(file.mimetype)) {
-      await fs.remove(file.path);
-      throw new BadRequestException('Only JPG, PNG, and WebP files are allowed');
-    }
-
-    const optimizedPath = await this.imageService.optimize(file.path, { width: 400, height: 400, quality: 85 });
-    const photoUrl = this.imageService.getPhotoUrl(optimizedPath);
-
-    const oldUser = await this.prisma.user.findUnique({ where: { id: userId }, select: { photoUrl: true } });
-    if (oldUser?.photoUrl) {
-      const oldPath = path.join(__dirname, '../..', oldUser.photoUrl);
-      await fs.remove(oldPath).catch(() => {});
-    }
+    const oldUser = await this.prisma.user.findUnique({ where: { id: userId }, select: { photoPublicId: true } });
+    const oldPublicId = oldUser?.photoPublicId || null;
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: { photoUrl },
+      data: { photoUrl, photoPublicId },
     });
 
-    return { photoUrl };
+    return oldPublicId;
   }
 
   async deletePhoto(userId: string) {
