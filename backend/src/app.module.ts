@@ -75,12 +75,14 @@ import { InstitutionModule } from './institution/institution.module';
 import { StaffSyncEngineModule } from './shared/staff-sync-engine/staff-sync-engine.module';
 import { StaffRecordsModule } from './premium/staff-records-service/staff-records.module';
 import { StaffPositionModule } from './staff-position/staff-position.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { ProductionLogger } from './common/production-logger';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     BullModule.forRootAsync({
+      imports: [],
       useFactory: () => {
         const redisUrl = process.env.REDIS_URL;
         if (redisUrl) {
@@ -178,6 +180,7 @@ import { ProductionLogger } from './common/production-logger';
     StaffPositionModule,
     HealthModule,
     InstitutionModule,
+    CloudinaryModule,
   ],
   providers: [ProductionLogger],
 })

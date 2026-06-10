@@ -9,10 +9,23 @@ import * as Device from 'expo-device';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import * as Sentry from '@sentry/react-native';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { Loading } from './src/components';
 import { apiService } from './src/services/api';
 import { useAuthStore } from './src/store';
+
+const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN || '';
+
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    environment: process.env.EXPO_PUBLIC_SENTRY_ENV || 'development',
+    tracesSampleRate: 0.2,
+    attachStacktrace: true,
+    enabled: true,
+  });
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,6 +50,11 @@ Notifications.setNotificationHandler({
 class ErrorBoundary extends Component<{children: React.ReactNode}, {error: Error | null}> {
   state = {error: null};
   static getDerivedStateFromError(error: Error) { return {error}; }
+  componentDidCatch(error: Error) {
+    if (SENTRY_DSN) {
+      Sentry.captureException(error);
+    }
+  }
   render() {
     if (this.state.error) {
       return (

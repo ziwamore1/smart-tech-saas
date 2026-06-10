@@ -1,0 +1,25 @@
+<?xml version="1.0"  encoding="utf-8"?>
+<timetable importtype="database" options="daynumbering1,idprefix:Oman" displayname="Oman XML" displaycountries="om" displayinmenu="0">
+	<days options="canadd,canremove,canupdate,silent" columns="name,short,day" >
+	</days>
+	<periods options="canadd,canremove,canupdate,silent" columns="period,starttime,endtime" >
+	</periods>
+	<grades options="canadd,canremove,canupdate,silent" columns="id,name,noofperiodsinweek" >
+	</grades>
+	<subjects options="canadd,canremove,canupdate,silent" columns="id,name,short" >
+	</subjects>
+	<teachers options="canadd,canremove,canupdate,silent" columns="id,name,short,gender,color" >
+	</teachers>
+	<classrooms options="canadd,canremove,canupdate,silent" columns="id,name,short,capacity" >
+	</classrooms>
+	<studentsubjects options="canadd,canremove,canupdate,silent" columns="subjectid,studentid,seminargroup" >
+	</studentsubjects>
+	<classes options="canadd,canremove,canupdate,silent" columns="id,name,short,teacherid,gradeid" >
+	</classes>
+	<students options="canadd,canremove,canupdate,silent" columns="id,name,classid" >
+	</students>
+	<cards options="canadd,canremove,canupdate,silent" columns="day,period,subjectid,teacherid,classroomid,classids,studentids,lessonid">
+	</cards>
+	<lessons options="canadd,canremove,canupdate,silent" columns="id,periodsperweek,subjectid,teacherid,classids,studentids,seminargroup,capacity">
+	</lessons>
+</timetable>

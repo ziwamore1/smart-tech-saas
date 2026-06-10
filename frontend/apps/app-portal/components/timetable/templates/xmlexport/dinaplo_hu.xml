@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="ISO-8859-2"?>
+<timetable importtype="database" options="groupstype1" displayname="Dina - NAPLO" displaycountries="hu,ro">
+   <teachers options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,name,short">
+   </teachers>
+   <classes options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,name,short">
+   </classes>
+   <subjects options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,name,short">
+   </subjects>
+   <classrooms options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,name,short">
+   </classrooms>
+   <groups options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,name,classid,entireclass">
+   </groups>
+   <lessons options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,subjectid,classids,groupids,studentids,teacherids,classroomids,periodspercard,periodsperweek,weeks">
+   </lessons>
+   <groupsubjects options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,classids,subjectid,periodsperweek,teacherids,groupids">
+   </groupsubjects>
+   <cards options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="day,period,classids,subjectid,teacherids,groupids,lessonid,durationperiods,weeks,classroomids">
+   </cards>
+</timetable>

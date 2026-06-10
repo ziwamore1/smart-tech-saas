@@ -19,7 +19,7 @@ export class ReportCardController {
   ) {
     const schoolId = req.user.schoolId;
 
-    const pdf = await this.reportCardService.generateClassReportCardsPdf(
+    const result = await this.reportCardService.generateClassReportCardsPdf(
       schoolId,
       classId,
       termId,
@@ -30,7 +30,7 @@ export class ReportCardController {
       'Content-Disposition': 'attachment; filename=class-report-cards.pdf',
     });
 
-    res.send(pdf);
+    res.send(result.buffer);
   }
 
   @Get('transcript/:studentId/pdf')
@@ -41,7 +41,7 @@ export class ReportCardController {
   ) {
     const schoolId = req.user.schoolId;
 
-    const pdf = await this.reportCardService.generateStudentTranscript(
+    const result = await this.reportCardService.generateStudentTranscript(
       schoolId,
       studentId,
     );
@@ -50,7 +50,7 @@ export class ReportCardController {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="transcript-${studentId}.pdf"`,
     });
-    res.send(pdf);
+    res.send(result.buffer);
   }
 
   @Get(':studentId/:termId')
@@ -76,7 +76,7 @@ export class ReportCardController {
   ) {
     const schoolId = req.user.schoolId;
 
-    const pdf = await this.reportCardService.generateReportCardPdf(
+    const result = await this.reportCardService.generateReportCardPdf(
       schoolId,
       studentId,
       termId,
@@ -86,7 +86,7 @@ export class ReportCardController {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="report-card-${studentId}-${termId}.pdf"`,
     });
-    res.send(pdf);
+    res.send(result.buffer);
   }
 
   @Get(':studentId/:termId/curriculum-pdf')
@@ -99,7 +99,7 @@ export class ReportCardController {
   ) {
     const schoolId = req.user.schoolId;
 
-    const pdf = await this.reportCardService.generateCurriculumReportCardPdf(
+    const result = await this.reportCardService.generateCurriculumReportCardPdf(
       schoolId,
       studentId,
       termId,
@@ -109,7 +109,7 @@ export class ReportCardController {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="curriculum-report-${studentId}-${termId}.pdf"`,
     });
-    res.send(pdf);
+    res.send(result.buffer);
   }
 
   @Get('class/:classId/term/:termId/curriculum-pdf')
@@ -122,7 +122,7 @@ export class ReportCardController {
   ) {
     const schoolId = req.user.schoolId;
 
-    const pdf = await this.reportCardService.generateClassCurriculumReportCardsPdf(
+    const result = await this.reportCardService.generateClassCurriculumReportCardsPdf(
       schoolId,
       classId,
       termId,
@@ -132,6 +132,6 @@ export class ReportCardController {
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'attachment; filename=class-curriculum-report-cards.pdf',
     });
-    res.send(pdf);
+    res.send(result.buffer);
   }
 }

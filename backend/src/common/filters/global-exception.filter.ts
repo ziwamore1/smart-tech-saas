@@ -24,8 +24,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     let errors: string[] | undefined;
 
     if (exception instanceof HttpException) {
-      status = exception.getStatus();
-      const exceptionResponse = exception.getResponse();
+      status = (exception as HttpException).getStatus();
+      const exceptionResponse = (exception as HttpException).getResponse();
 
       this.logger.error(
         `HttpException: ${status} - ${JSON.stringify(exceptionResponse)}`,
@@ -33,13 +33,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
         const resp = exceptionResponse as Record<string, unknown>;
-        message = (resp.message as string) || exception.message;
+        message = (resp.message as string) || (exception as Error).message;
         if (Array.isArray(resp.message)) {
           errors = resp.message;
           message = message || 'Validation error';
         }
       } else {
-        message = exception.message;
+        message = (exception as Error).message;
       }
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       status = HttpStatus.BAD_REQUEST;

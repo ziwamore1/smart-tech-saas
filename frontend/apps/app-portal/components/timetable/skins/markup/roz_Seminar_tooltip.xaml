@@ -1,0 +1,6 @@
+<Border Margin='-3'>
+<StackPanel>
+<TextBlock Padding='7,7,3,7' FontWeight='Bold' Background='#e3efff' Foreground='#15428b'>{Subject}</TextBlock>
+<TextBlock Padding='7,7,3,7' FontWeight='Bold' Background='#e3efff' Foreground='#15428b'>{Group}</TextBlock>
+</StackPanel>
+</Border>

@@ -59,7 +59,7 @@ export class TransformInterceptor<T> implements NestInterceptor<
             .message as string;
           response.data = data as T;
         } else {
-          response.data = data;
+          response.data = data as T;
         }
 
         return response;

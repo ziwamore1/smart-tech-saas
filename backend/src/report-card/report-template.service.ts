@@ -136,7 +136,7 @@ export class ReportTemplateService {
     });
   }
 
-  async uploadStamp(schoolId: string, id: string, file: Express.Multer.File) {
+  async uploadStamp(schoolId: string, id: string, stampUrl: string) {
     const template = await this.prisma.reportTemplate.findFirst({
       where: { id, schoolId },
     });
@@ -144,8 +144,6 @@ export class ReportTemplateService {
     if (!template) {
       throw new NotFoundException('Template not found');
     }
-
-    const stampUrl = `/uploads/report-templates/${file.filename}`;
 
     return this.prisma.reportTemplate.update({
       where: { id },
@@ -153,7 +151,7 @@ export class ReportTemplateService {
     });
   }
 
-  async uploadSignature(schoolId: string, id: string, file: Express.Multer.File) {
+  async uploadSignature(schoolId: string, id: string, signatureUrl: string) {
     const template = await this.prisma.reportTemplate.findFirst({
       where: { id, schoolId },
     });
@@ -161,8 +159,6 @@ export class ReportTemplateService {
     if (!template) {
       throw new NotFoundException('Template not found');
     }
-
-    const signatureUrl = `/uploads/report-templates/${file.filename}`;
 
     return this.prisma.reportTemplate.update({
       where: { id },
@@ -170,7 +166,7 @@ export class ReportTemplateService {
     });
   }
 
-  async uploadLogo(schoolId: string, id: string, file: Express.Multer.File) {
+  async uploadLogo(schoolId: string, id: string, logoUrl: string) {
     const template = await this.prisma.reportTemplate.findFirst({
       where: { id, schoolId },
     });
@@ -178,8 +174,6 @@ export class ReportTemplateService {
     if (!template) {
       throw new NotFoundException('Template not found');
     }
-
-    const logoUrl = `/uploads/report-templates/${file.filename}`;
 
     return this.prisma.reportTemplate.update({
       where: { id },

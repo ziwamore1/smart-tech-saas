@@ -46,6 +46,10 @@ export function CloudAssetLibraryScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [mediaTab, setMediaTab] = useState<'assets' | 'media'>('assets');
+  const [mediaItems, setMediaItems] = useState<any[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaStats, setMediaStats] = useState<any>(null);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -86,6 +90,18 @@ export function CloudAssetLibraryScreen({ navigation }: any) {
     setLoading(true);
     fetchAssets(selectedCategory, searchQuery);
   }, [selectedCategory, searchQuery, fetchAssets]);
+
+  const fetchMedia = useCallback(async () => {
+    try {
+      setMediaLoading(true);
+      const data = await apiService.getMedia({ limit: 50 });
+      setMediaItems(data?.data ?? data?.media ?? []);
+      const stats = await apiService.getMediaStats();
+      setMediaStats(stats?.data ?? stats);
+    } catch { /* ignore */ } finally {
+      setMediaLoading(false);
+    }
+  }, []);
 
   const handleUpload = async () => {
     try {
@@ -200,6 +216,52 @@ export function CloudAssetLibraryScreen({ navigation }: any) {
     }
   };
 
+  const renderMediaItem = ({ item }: { item: any }) => {
+    const format = item.format || item.mimeType?.split('/')[1] || item.publicId?.split('.').pop() || 'file';
+    const fileName = item.originalFilename || item.publicId || item.url?.split('/').pop() || 'file';
+
+    return (
+      <TouchableOpacity
+        style={styles.assetCard}
+        onLongPress={() => {
+          Alert.alert('Delete Media', `Delete "${fileName}"?`, [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await apiService.deleteMedia(item.publicId);
+                  setMediaItems((prev) => prev.filter((m: any) => m.publicId !== item.publicId));
+                } catch (err: any) {
+                  Alert.alert('Error', err?.message || 'Failed to delete media');
+                }
+              },
+            },
+          ]);
+        }}
+        onPress={() => {
+          if (item.url) Sharing.shareAsync(item.url).catch(() => {});
+        }}
+      >
+        <View style={styles.thumbnail}>
+          {item.thumbnailUrl || item.url ? (
+            <Text style={styles.thumbnailIcon}>📷</Text>
+          ) : (
+            <Text style={styles.thumbnailIcon}>📁</Text>
+          )}
+        </View>
+        <Text style={styles.assetName} numberOfLines={1}>{fileName}</Text>
+        <View style={styles.assetMeta}>
+          <View style={styles.typeBadge}>
+            <Text style={styles.typeBadgeText}>{format.toUpperCase()}</Text>
+          </View>
+          <Text style={styles.assetSize}>{formatFileSize(item.bytes)}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   const renderAsset = ({ item }: { item: TemplateAsset }) => {
     const icon = ASSET_TYPE_ICONS[item.type] || ASSET_TYPE_ICONS.other;
     const ext = item.metadata?.originalName?.split('.').pop()?.toUpperCase() || item.type.toUpperCase();
@@ -248,6 +310,22 @@ export function CloudAssetLibraryScreen({ navigation }: any) {
         <Text style={styles.title}>Asset Library</Text>
       </View>
 
+      {/* Tab switcher */}
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          style={[styles.tab, mediaTab === 'assets' && styles.tabActive]}
+          onPress={() => setMediaTab('assets')}
+        >
+          <Text style={[styles.tabText, mediaTab === 'assets' && styles.tabTextActive]}>Template Assets</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, mediaTab === 'media' && styles.tabActive]}
+          onPress={() => { setMediaTab('media'); fetchMedia(); }}
+        >
+          <Text style={[styles.tabText, mediaTab === 'media' && styles.tabTextActive]}>Cloudinary Media</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
@@ -284,24 +362,46 @@ export function CloudAssetLibraryScreen({ navigation }: any) {
         </ScrollView>
       </View>
 
-      <FlatList
-        data={assets}
-        renderItem={renderAsset}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        contentContainerStyle={styles.gridContent}
-        columnWrapperStyle={styles.columnWrapper}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
-        ListEmptyComponent={<Text style={styles.emptyText}>No assets found</Text>}
-      />
-
-      <TouchableOpacity style={styles.fab} onPress={handleUpload} disabled={uploading}>
-        {uploading ? (
-          <ActivityIndicator color={colors.white} />
-        ) : (
-          <Text style={styles.fabText}>+</Text>
-        )}
-      </TouchableOpacity>
+      {mediaTab === 'media' ? (
+        <>
+          {mediaStats && (
+            <View style={styles.statsRow}>
+              <Text style={styles.statsText}>📦 {mediaStats.totalCount ?? mediaStats.total ?? 0} files</Text>
+              <Text style={styles.statsText}>💾 {formatFileSize(mediaStats.totalBytes ?? mediaStats.totalSize ?? 0)}</Text>
+            </View>
+          )}
+          <FlatList
+            data={mediaItems}
+            renderItem={renderMediaItem}
+            keyExtractor={(item) => item.publicId || item.url}
+            numColumns={2}
+            contentContainerStyle={styles.gridContent}
+            columnWrapperStyle={styles.columnWrapper}
+            refreshControl={<RefreshControl refreshing={mediaLoading} onRefresh={fetchMedia} colors={[colors.primary]} />}
+            ListEmptyComponent={<Text style={styles.emptyText}>No media found</Text>}
+          />
+        </>
+      ) : (
+        <>
+          <FlatList
+            data={assets}
+            renderItem={renderAsset}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            contentContainerStyle={styles.gridContent}
+            columnWrapperStyle={styles.columnWrapper}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
+            ListEmptyComponent={<Text style={styles.emptyText}>No assets found</Text>}
+          />
+          <TouchableOpacity style={styles.fab} onPress={handleUpload} disabled={uploading}>
+            {uploading ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text style={styles.fabText}>+</Text>
+            )}
+          </TouchableOpacity>
+        </>
+      )}
     </SafeAreaView>
   );
 }
@@ -365,4 +465,11 @@ const styles = StyleSheet.create({
     ...shadows.lg,
   },
   fabText: { color: colors.white, fontSize: 28, fontWeight: '300', lineHeight: 30 },
+  tabRow: { flexDirection: 'row', backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
+  tab: { flex: 1, paddingVertical: spacing.sm, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabActive: { borderBottomColor: colors.primary },
+  tabText: { fontSize: 14, color: colors.textLight, fontWeight: '500' },
+  tabTextActive: { color: colors.primary, fontWeight: '600' },
+  statsRow: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: spacing.sm, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
+  statsText: { fontSize: 13, color: colors.text, fontWeight: '500' },
 });

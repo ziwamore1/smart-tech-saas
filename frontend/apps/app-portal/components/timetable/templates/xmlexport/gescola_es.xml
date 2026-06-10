@@ -1,0 +1,9 @@
+<timetable importtype="database" options="idprefix:Gescola,daynumbering1" displayname="Gescola" displaycountries="es">
+   <teachers options="export:disable,canadd,canremove,canupdate,primarytt" columns="id,name,short"></teachers>
+   <classes options="export:disable,canadd,canremove,canupdate,primarytt" columns="id,name,short"></classes>
+   <subjects options="export:disable,canadd,canremove,canupdate,primarytt" columns="id,name,short"></subjects>
+   <classrooms options="export:disable,canadd,canremove,canupdate,primarytt" columns="id,name,short,capacity"></classrooms>
+   <lessons options="export:disable,canadd,canremove,canupdate,primarytt" columns="classid,subjectid,teacherids,periodsperweek"></lessons>
+   <periods options="export:disable,canadd,canremove,canupdate,primarytt" columns="period,starttime,endtime"></periods>
+   <classtimetables options="import:disable,canadd,canremove,canupdate,primarytt,export:silent" columns="classid,day,period,teacherids,subjectids,classroomids"></classtimetables>
+</timetable>

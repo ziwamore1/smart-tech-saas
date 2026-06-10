@@ -1,0 +1,448 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<timetable ascttversion="2025.4.1" importtype="database" options="export:idprefix:%CHRID,import:idprefix:%TEMPID,groupstype1,decimalseparatordot,lessonsincludeclasseswithoutstudents,handlestudentsafterlessons" defaultexport="1" displayname="aSc Timetables 2012 XML" displaycountries="">
+   <periods options="canadd,export:silent" columns="period,name,short,starttime,endtime">
+      <period name="1" short="1" period="1" starttime="12:50" endtime="13:30"/>
+      <period name="2" short="2" period="2" starttime="13:30" endtime="14:10"/>
+      <period name="3" short="3" period="3" starttime="14:10" endtime="14:50"/>
+      <period name="4" short="4" period="4" starttime="14:50" endtime="15:30"/>
+      <period name="5" short="5" period="5" starttime="15:40" endtime="16:20"/>
+      <period name="6" short="6" period="6" starttime="16:20" endtime="17:00"/>
+      <period name="7" short="7" period="7" starttime="17:00" endtime="17:40"/>
+   </periods>
+   <breaks options="canadd,export:silent" columns="break,name,short,starttime,endtime">
+      <break name="BREAK TIME" short="B/T" break="5" starttime="15:30" endtime="15:40"/>
+   </breaks>
+   <daysdefs options="canadd,export:silent" columns="id,days,name,short">
+      <daysdef id="1AE045691D5E393B" name="Any day" short="X" days="10000,01000,00100,00010,00001"/>
+      <daysdef id="A4619B34E9CD7B70" name="Every day" short="E" days="11111"/>
+      <daysdef id="492DC95E74192915" name="Monday" short="Mo" days="10000"/>
+      <daysdef id="F42284CFAC03654A" name="Tuesday" short="Tu" days="01000"/>
+      <daysdef id="B4E007BD38820252" name="Wednesday" short="We" days="00100"/>
+      <daysdef id="BB61668B9DFB3A99" name="Thursday" short="Th" days="00010"/>
+      <daysdef id="D1110397AAFE6AF6" name="Friday" short="Fr" days="00001"/>
+   </daysdefs>
+   <weeksdefs options="canadd,export:silent" columns="id,weeks,name,short">
+      <weeksdef id="DAFB4732892BC3A7" name="All weeks" short="All" weeks="1"/>
+   </weeksdefs>
+   <termsdefs options="canadd,export:silent" columns="id,terms,name,short">
+      <termsdef id="57F88BA0CFAD02BE" name="Whole year" short="YR" terms="1"/>
+   </termsdefs>
+   <subjects options="canadd,export:silent" columns="id,name,short,partner_id">
+      <subject id="0B9216B24EB92712" name="ENGLISH LANGUAGE" short="ENG" partner_id=""/>
+      <subject id="DBB4D1A2A989E617" name="MATHEMATICS" short="MATHS" partner_id=""/>
+      <subject id="8062FD59BEF82BD6" name="BIOLOGY" short="BIO" partner_id=""/>
+      <subject id="E0713A512D68FDDE" name="CHEMISTRY" short="CHEM" partner_id=""/>
+      <subject id="94A7FD068C403CAE" name="PHYSICS" short="PHYS" partner_id=""/>
+      <subject id="679D3781C1EB05D2" name="CIVIC EDUCATION" short="CE" partner_id=""/>
+      <subject id="507262BE338BA8B9" name="RELIGIOUS EDUCATION" short="RE" partner_id=""/>
+      <subject id="09F506BD21542DEF" name="GEOGRAPHY" short="GEOG" partner_id=""/>
+      <subject id="051B8F8F590E05A4" name="HISTORY" short="HIS" partner_id=""/>
+      <subject id="95F00B79123C52EE" name="PRINCIPLES OF ACCOUNT" short="P/A" partner_id=""/>
+      <subject id="E659AAE84E42C715" name="COMMERCE" short="COM" partner_id=""/>
+      <subject id="A1225CF6FADAD1D5" name="ZAMBIAN LANGUAGE" short="Z/L" partner_id=""/>
+      <subject id="C2E51E2E64BBD3D6" name="FOOD AND NUTRITION / ART AND DESIGN" short="F.N/ART" partner_id=""/>
+      <subject id="2251EB051560348E" name="LITERATURE IN ENGLISH" short="LIT." partner_id=""/>
+      <subject id="AF7DA4F505819AC0" name="AGRICULTURAL SCIENCE" short="AGRIC." partner_id=""/>
+      <subject id="A6DD53BAA3B7B92A" name="INFORMATION AND COMMUNICATION TECHNOLOGY" short="ICT" partner_id=""/>
+      <subject id="9AFC8FD6D775D8B9" name="ART" short="A" partner_id=""/>
+      <subject id="1CD7D14168F8D98B" name="CHITONGA" short="C" partner_id=""/>
+      <subject id="1CA88DEA344AA2C7" name="FOOD &amp; NUTRITION" short="F/N" partner_id=""/>
+   </subjects>
+   <teachers options="canadd,export:silent" columns="id,name,short,gender,color,email,mobile,partner_id,firstname,lastname">
+      <teacher id="6AC165B71E4AE6DD" firstname="DIPHER" lastname="MULEYA" name="MULEYA DIPHER" short="MR MULEYA" gender="M" color="#00FF00" email="" mobile="" partner_id=""/>
+      <teacher id="4643DCEF25C6CEDF" firstname="" lastname="MRS NDHLOVU" name="MRS NDHLOVU" short="MRS NDHLOVU" gender="F" color="#0000FF" email="" mobile="" partner_id=""/>
+      <teacher id="4CC8DA74DCEED483" firstname="NANCY" lastname="SIAMAYUWA" name="SIAMAYUWA NANCY" short="MS SIAMAYUWA" gender="F" color="#009933" email="" mobile="" partner_id=""/>
+      <teacher id="0AB0F9C1235B43C2" firstname="MUNANGA" lastname="SICHONE" name="SICHONE MUNANGA" short="MR SICHONE" gender="M" color="#993333" email="" mobile="" partner_id=""/>
+      <teacher id="FC841634AA30E878" firstname="" lastname="MR MWEETWA" name="MR MWEETWA" short="MR MWEETWA" gender="F" color="#CCFFFF" email="" mobile="" partner_id=""/>
+      <teacher id="B1FF12BA802F67D3" firstname="" lastname="MS NDILA" name="MS NDILA" short="MS NDILA" gender="F" color="#33CC33" email="" mobile="" partner_id=""/>
+      <teacher id="30771F233CC26F3B" firstname="PRECIOUS" lastname="KAYOBA" name="KAYOBA PRECIOUS" short="MS KAYOBA" gender="F" color="#3333FF" email="" mobile="" partner_id=""/>
+      <teacher id="D27301ED8AB19C8F" firstname="MULEYA" lastname="SIKALONGO" name="SIKALONGO MULEYA" short="MR SIKALONGO" gender="M" color="#00CCFF" email="" mobile="" partner_id=""/>
+      <teacher id="5B151149C4FB13CB" firstname="" lastname="MS CHANGWE" name="MS CHANGWE" short="MS CHANGWE" gender="F" color="#00CC00" email="" mobile="" partner_id=""/>
+      <teacher id="D9AD47F14E2C919B" firstname="" lastname="MRS SIAJINDE" name="MRS SIAJINDE" short="MRS SIAJINDE" gender="F" color="#808080" email="" mobile="" partner_id=""/>
+      <teacher id="C5208D8161057CB9" firstname="" lastname="MRS MPAKISE" name="MRS MPAKISE" short="MRS MPAKISE" gender="F" color="#FFCCFF" email="" mobile="" partner_id=""/>
+      <teacher id="42E6CBF9FCC0771C" firstname="" lastname="MS SAKALA" name="MS SAKALA" short="MS SAKALA" gender="F" color="#FFFF66" email="" mobile="" partner_id=""/>
+      <teacher id="15C96C8173CB7D1B" firstname="CHESTER" lastname="MWIINGA" name="MWIINGA CHESTER" short="MR MWIINGA" gender="M" color="#FFCC66" email="" mobile="" partner_id=""/>
+      <teacher id="1F0151D8FB109FDB" firstname="MUNDIA" lastname="IMAKANDO" name="IMAKANDO MUNDIA" short="MR IMAKANDO" gender="M" color="#3399FF" email="" mobile="" partner_id=""/>
+      <teacher id="89E722D147F7296C" firstname="" lastname="MRS HAMUYUNI" name="MRS HAMUYUNI" short="MRS HAMUYUNI" gender="F" color="#66FFFF" email="" mobile="" partner_id=""/>
+      <teacher id="17F756063AA8490C" firstname="" lastname="MS SILISHEBO" name="MS SILISHEBO" short="MS SILISHEBO" gender="F" color="#DDFF97" email="" mobile="" partner_id=""/>
+      <teacher id="32F96C86480C5101" firstname="" lastname="MS NGOMA" name="MS NGOMA" short="MS NGOMA" gender="F" color="#669900" email="" mobile="" partner_id=""/>
+      <teacher id="9116B5F25D3FB2C7" firstname="" lastname="MRS MALEMBEKA" name="MRS MALEMBEKA" short="MRS MALEMBEKA" gender="F" color="#66FF66" email="" mobile="" partner_id=""/>
+      <teacher id="FE986B7A551863BC" firstname="" lastname="MS SILILO" name="MS SILILO" short="MS SILILO" gender="F" color="#FFFFCC" email="" mobile="" partner_id=""/>
+      <teacher id="1C2FEE66BE442BCE" firstname="" lastname="MRS MWANZA" name="MRS MWANZA" short="MRS MWANZA" gender="F" color="#99FF66" email="" mobile="" partner_id=""/>
+      <teacher id="6680DCA742EE5651" firstname="" lastname="MRS NCHIMUNYA" name="MRS NCHIMUNYA" short="MRS NCHIMUNYA" gender="F" color="#FFFFFF" email="" mobile="" partner_id=""/>
+      <teacher id="709E400BC9BCBA5A" firstname="" lastname="MRS MICHELO" name="MRS MICHELO" short="MRS MICHELO" gender="F" color="#FF00FF" email="" mobile="" partner_id=""/>
+      <teacher id="2402D549256CC69E" firstname="PAMELA" lastname="MUNYIKWA" name="MUNYIKWA PAMELA" short="MS MUNYIKWA" gender="F" color="#FF9966" email="" mobile="" partner_id=""/>
+      <teacher id="5B5718D14B289799" firstname="NKHANI" lastname="PHIRI" name="PHIRI NKHANI" short="MR PHIRI" gender="F" color="#00FFFF" email="" mobile="" partner_id=""/>
+      <teacher id="8F51E49E152F0072" firstname="" lastname="MS WACHATA" name="MS WACHATA" short="MS WACHATA" gender="F" color="#808000" email="" mobile="" partner_id=""/>
+      <teacher id="B76A0853350D64E1" firstname="RICHARD" lastname="HAMOONGA" name="HAMOONGA RICHARD" short="MR HAMOONGA" gender="M" color="#800080" email="" mobile="" partner_id=""/>
+      <teacher id="0257B6794EF27E88" firstname="ENOCK" lastname="KAMBEU" name="KAMBEU ENOCK" short="MR KAMBEU" gender="F" color="#008080" email="" mobile="" partner_id=""/>
+      <teacher id="3E2C06166143B913" firstname="YUSIKU" lastname="MUTUKWA" name="MUTUKWA YUSIKU" short="MR MUTUKWA" gender="M" color="#FF8080" email="" mobile="" partner_id=""/>
+      <teacher id="1DB488630E98D157" firstname="" lastname="MRS MAKANI" name="MRS MAKANI" short="MRS MAKANI" gender="F" color="#80FF80" email="" mobile="" partner_id=""/>
+      <teacher id="A45CC7358DF862EA" firstname="" lastname="MS HACHIKOMBOLA" name="MS HACHIKOMBOLA" short="MS HACHIKOMBOLA" gender="F" color="#8000FF" email="" mobile="" partner_id=""/>
+      <teacher id="30CE721656329D05" firstname="DILLAN" lastname="MUSHIBA" name="MUSHIBA DILLAN" short="MR MUSHIBA" gender="M" color="#0080FF" email="" mobile="" partner_id=""/>
+      <teacher id="70A782562CE85D3A" firstname="" lastname="MRS CHIMANGA" name="MRS CHIMANGA" short="MRS CHIMANGA" gender="F" color="#FF8000" email="" mobile="" partner_id=""/>
+      <teacher id="05C79345EBED6736" firstname="" lastname="MRS SIMPANDE" name="MRS SIMPANDE" short="MRS SIMPANDE" gender="F" color="#CC6600" email="" mobile="" partner_id=""/>
+      <teacher id="5376403F4AB4E6CB" firstname="" lastname="MRS MUNSAKA" name="MRS MUNSAKA" short="MRS MUNSAKA" gender="F" color="#00FF80" email="" mobile="" partner_id=""/>
+      <teacher id="61A44E9854791D2D" firstname="" lastname="MRS HAMUYUNI" name="MRS HAMUYUNI" short="MRS HAMUYUNI" gender="F" color="#FFC0C0" email="" mobile="" partner_id=""/>
+      <teacher id="ACBD3A3ABE7AD83F" firstname="MARY" lastname="KAMONGA" name="KAMONGA MARY" short="MS KAMONGA" gender="F" color="#00C0FF" email="" mobile="" partner_id=""/>
+   </teachers>
+   <buildings options="canadd,export:silent" columns="id,name,partner_id"/>
+   <classrooms options="canadd,export:silent" columns="id,name,short,capacity,buildingid,partner_id">
+      <classroom id="D7A680641CC712FA" name="FORM 1A" short="F" capacity="*" buildingid="" partner_id=""/>
+      <classroom id="B57D463B849E94E0" name="FORM 1B" short="F" capacity="*" buildingid="" partner_id=""/>
+      <classroom id="D092B585B8C5298A" name="FORM 1C" short="F" capacity="*" buildingid="" partner_id=""/>
+   </classrooms>
+   <grades options="canadd,export:silent" columns="grade,name,short">
+      <grade name="Grade 1" short="G 1" grade="1"/>
+      <grade name="Grade 2" short="G 2" grade="2"/>
+      <grade name="Grade 3" short="G 3" grade="3"/>
+      <grade name="Grade 4" short="G 4" grade="4"/>
+      <grade name="Grade 5" short="G 5" grade="5"/>
+      <grade name="Grade 6" short="G 6" grade="6"/>
+      <grade name="Grade 7" short="G 7" grade="7"/>
+      <grade name="Grade 8" short="G 8" grade="8"/>
+      <grade name="Grade 9" short="G 9" grade="9"/>
+      <grade name="Grade 10" short="G 10" grade="10"/>
+      <grade name="Grade 11" short="G 11" grade="11"/>
+      <grade name="Grade 12" short="G 12" grade="12"/>
+      <grade name="Grade 13" short="G 13" grade="13"/>
+      <grade name="Grade 14" short="G 14" grade="14"/>
+      <grade name="Grade 15" short="G 15" grade="15"/>
+      <grade name="Grade 16" short="G 16" grade="16"/>
+      <grade name="Grade 17" short="G 17" grade="17"/>
+      <grade name="Grade 18" short="G 18" grade="18"/>
+      <grade name="Grade 19" short="G 19" grade="19"/>
+      <grade name="Grade 20" short="G 20" grade="20"/>
+   </grades>
+   <classes options="canadd,export:silent" columns="id,name,short,classroomids,teacherid,grade,partner_id">
+      <class id="80E7F73A88812857" name="GRADE 10A" short="G10A" teacherid="" classroomids="" grade="10" partner_id=""/>
+      <class id="3053DF715DBB2B56" name="GRADE 10B" short="G10B" teacherid="" classroomids="" grade="10" partner_id=""/>
+      <class id="EEB4AC8C0127C77E" name="GRADE 10C" short="G10C" teacherid="" classroomids="" grade="10" partner_id=""/>
+      <class id="A835D96B5BBD9FF0" name="FORM 1A" short="FORM 1A" teacherid="" classroomids="" grade="8" partner_id=""/>
+      <class id="65279CC1DC94D349" name="FORM 1B" short="FORM 1B" teacherid="" classroomids="" grade="8" partner_id=""/>
+      <class id="31D37A7160BD71D3" name="FORM 1C" short="FORM 1C" teacherid="" classroomids="" grade="8" partner_id=""/>
+   </classes>
+   <groups options="canadd,export:silent" columns="id,classid,name,entireclass,divisiontag,studentcount,studentids">
+      <group id="AC422D6A8FE30F40" name="Entire class" classid="80E7F73A88812857" studentids="" entireclass="1" divisiontag="0" studentcount=""/>
+      <group id="6526597EA1E479EB" name="Group 1" classid="80E7F73A88812857" studentids="" entireclass="0" divisiontag="1" studentcount=""/>
+      <group id="7EA2678C4925A0A0" name="Group 2" classid="80E7F73A88812857" studentids="" entireclass="0" divisiontag="1" studentcount=""/>
+      <group id="4B1956F16F32C1EF" name="Boys" classid="80E7F73A88812857" studentids="" entireclass="0" divisiontag="2" studentcount=""/>
+      <group id="06AEE4B5A0542B6F" name="Girls" classid="80E7F73A88812857" studentids="" entireclass="0" divisiontag="2" studentcount=""/>
+      <group id="1C8E858CDF0A4BC4" name="Entire class" classid="3053DF715DBB2B56" studentids="" entireclass="1" divisiontag="0" studentcount=""/>
+      <group id="F415CEDD17EF1DDA" name="Group 1" classid="3053DF715DBB2B56" studentids="" entireclass="0" divisiontag="1" studentcount=""/>
+      <group id="77FF714F72D1F117" name="Group 2" classid="3053DF715DBB2B56" studentids="" entireclass="0" divisiontag="1" studentcount=""/>
+      <group id="8034983344508DD8" name="Boys" classid="3053DF715DBB2B56" studentids="" entireclass="0" divisiontag="2" studentcount=""/>
+      <group id="26BE66EC59247E66" name="Girls" classid="3053DF715DBB2B56" studentids="" entireclass="0" divisiontag="2" studentcount=""/>
+      <group id="F4036B443548B738" name="Entire class" classid="EEB4AC8C0127C77E" studentids="" entireclass="1" divisiontag="0" studentcount=""/>
+      <group id="5B1F2B09C79C1984" name="Group 1" classid="EEB4AC8C0127C77E" studentids="" entireclass="0" divisiontag="1" studentcount=""/>
+      <group id="F57246F7BB38A5BF" name="Group 2" classid="EEB4AC8C0127C77E" studentids="" entireclass="0" divisiontag="1" studentcount=""/>
+      <group id="B85585BC7042AB86" name="Boys" classid="EEB4AC8C0127C77E" studentids="" entireclass="0" divisiontag="2" studentcount=""/>
+      <group id="C33C824BAD562178" name="Girls" classid="EEB4AC8C0127C77E" studentids="" entireclass="0" divisiontag="2" studentcount=""/>
+      <group id="195063F9EC93FC08" name="Entire class" classid="A835D96B5BBD9FF0" studentids="" entireclass="1" divisiontag="0" studentcount=""/>
+      <group id="4F9B0900AA6CE7B2" name="Group 1" classid="A835D96B5BBD9FF0" studentids="" entireclass="0" divisiontag="1" studentcount=""/>
+      <group id="3723835486FE5C03" name="Group 2" classid="A835D96B5BBD9FF0" studentids="" entireclass="0" divisiontag="1" studentcount=""/>
+      <group id="3AEF4E54F594B290" name="Boys" classid="A835D96B5BBD9FF0" studentids="" entireclass="0" divisiontag="2" studentcount=""/>
+      <group id="C717219EB1DE692F" name="Girls" classid="A835D96B5BBD9FF0" studentids="" entireclass="0" divisiontag="2" studentcount=""/>
+      <group id="3356EAB280E0FE4A" name="Entire class" classid="65279CC1DC94D349" studentids="" entireclass="1" divisiontag="0" studentcount=""/>
+      <group id="B80B9CC45F2F4C60" name="Group 1" classid="65279CC1DC94D349" studentids="" entireclass="0" divisiontag="1" studentcount=""/>
+      <group id="325611F9015660B7" name="Group 2" classid="65279CC1DC94D349" studentids="" entireclass="0" divisiontag="1" studentcount=""/>
+      <group id="C34CF755931BD632" name="Boys" classid="65279CC1DC94D349" studentids="" entireclass="0" divisiontag="2" studentcount=""/>
+      <group id="3D6CAC070A165936" name="Girls" classid="65279CC1DC94D349" studentids="" entireclass="0" divisiontag="2" studentcount=""/>
+      <group id="B78A0BBF03C38CBA" name="Entire class" classid="31D37A7160BD71D3" studentids="" entireclass="1" divisiontag="0" studentcount=""/>
+      <group id="79B4235B0A7BA4AA" name="Group 1" classid="31D37A7160BD71D3" studentids="" entireclass="0" divisiontag="1" studentcount=""/>
+      <group id="1C227854EF772A9E" name="Group 2" classid="31D37A7160BD71D3" studentids="" entireclass="0" divisiontag="1" studentcount=""/>
+      <group id="9B64BB2CC7A9FFA6" name="Boys" classid="31D37A7160BD71D3" studentids="" entireclass="0" divisiontag="2" studentcount=""/>
+      <group id="2FCA5FB499BF60DB" name="Girls" classid="31D37A7160BD71D3" studentids="" entireclass="0" divisiontag="2" studentcount=""/>
+   </groups>
+   <students options="canadd,export:silent" columns="id,classid,name,number,email,mobile,partner_id,firstname,lastname"/>
+   <studentsubjects options="canadd,export:silent" columns="studentid,subjectid,seminargroup,importance,alternatefor"/>
+   <lessons options="canadd,export:silent" columns="id,subjectid,classids,groupids,teacherids,classroomids,periodspercard,periodsperweek,daysdefid,weeksdefid,termsdefid,seminargroup,capacity,partner_id">
+      <lesson id="F78442F0436845F7" classids="3053DF715DBB2B56" subjectid="679D3781C1EB05D2" periodspercard="2" periodsperweek="4.0" teacherids="FC841634AA30E878" classroomids="" groupids="1C8E858CDF0A4BC4" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="66747C01F2B63506" classids="80E7F73A88812857" subjectid="94A7FD068C403CAE" periodspercard="1" periodsperweek="1.0" teacherids="0AB0F9C1235B43C2" classroomids="" groupids="AC422D6A8FE30F40" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="8ADBD35A03406F77" classids="80E7F73A88812857" subjectid="94A7FD068C403CAE" periodspercard="2" periodsperweek="2.0" teacherids="0AB0F9C1235B43C2" classroomids="" groupids="AC422D6A8FE30F40" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="C5488D9AE385AAAE" classids="3053DF715DBB2B56" subjectid="94A7FD068C403CAE" periodspercard="1" periodsperweek="1.0" teacherids="0AB0F9C1235B43C2" classroomids="" groupids="1C8E858CDF0A4BC4" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="6BDD76FD8CDEF26E" classids="3053DF715DBB2B56" subjectid="94A7FD068C403CAE" periodspercard="2" periodsperweek="2.0" teacherids="0AB0F9C1235B43C2" classroomids="" groupids="1C8E858CDF0A4BC4" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="935D08A8C43535D1" classids="80E7F73A88812857" subjectid="8062FD59BEF82BD6" periodspercard="2" periodsperweek="4.0" teacherids="C5208D8161057CB9" classroomids="" groupids="AC422D6A8FE30F40" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="1DE2D8C900001173" classids="EEB4AC8C0127C77E" subjectid="94A7FD068C403CAE" periodspercard="2" periodsperweek="2.0" teacherids="0AB0F9C1235B43C2" classroomids="" groupids="F4036B443548B738" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="24CA6B5B21396C18" classids="EEB4AC8C0127C77E" subjectid="94A7FD068C403CAE" periodspercard="1" periodsperweek="1.0" teacherids="0AB0F9C1235B43C2" classroomids="" groupids="F4036B443548B738" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="39A3F35E8D82DDA2" classids="80E7F73A88812857" subjectid="DBB4D1A2A989E617" periodspercard="1" periodsperweek="1.0" teacherids="89E722D147F7296C" classroomids="" groupids="AC422D6A8FE30F40" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="D07F78A3DEF6EBEE" classids="80E7F73A88812857" subjectid="DBB4D1A2A989E617" periodspercard="2" periodsperweek="4.0" teacherids="89E722D147F7296C" classroomids="" groupids="AC422D6A8FE30F40" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="E4AA6B148087AC8C" classids="65279CC1DC94D349" subjectid="DBB4D1A2A989E617" periodspercard="1" periodsperweek="1.0" teacherids="17F756063AA8490C" classroomids="" groupids="3356EAB280E0FE4A" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="0F346696B0208D35" classids="65279CC1DC94D349" subjectid="DBB4D1A2A989E617" periodspercard="2" periodsperweek="4.0" teacherids="17F756063AA8490C" classroomids="" groupids="3356EAB280E0FE4A" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="580CCCBEE95BB0C1" classids="31D37A7160BD71D3" subjectid="DBB4D1A2A989E617" periodspercard="1" periodsperweek="1.0" teacherids="32F96C86480C5101" classroomids="" groupids="B78A0BBF03C38CBA" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="BFDE91F83027EE18" classids="31D37A7160BD71D3" subjectid="DBB4D1A2A989E617" periodspercard="2" periodsperweek="4.0" teacherids="32F96C86480C5101" classroomids="" groupids="B78A0BBF03C38CBA" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="29C8ADA559CF82B0" classids="3053DF715DBB2B56" subjectid="DBB4D1A2A989E617" periodspercard="1" periodsperweek="1.0" teacherids="9116B5F25D3FB2C7" classroomids="" groupids="1C8E858CDF0A4BC4" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="92F5343557ABA5DC" classids="3053DF715DBB2B56" subjectid="DBB4D1A2A989E617" periodspercard="2" periodsperweek="4.0" teacherids="9116B5F25D3FB2C7" classroomids="" groupids="1C8E858CDF0A4BC4" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="3C6E18E150CCE20F" classids="31D37A7160BD71D3" subjectid="A6DD53BAA3B7B92A" periodspercard="2" periodsperweek="4.0" teacherids="15C96C8173CB7D1B" classroomids="" groupids="B78A0BBF03C38CBA" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="1A64F104F2B0DBFC" classids="A835D96B5BBD9FF0" subjectid="A6DD53BAA3B7B92A" periodspercard="2" periodsperweek="4.0" teacherids="1F0151D8FB109FDB" classroomids="" groupids="195063F9EC93FC08" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="A759CA7F91574AB6" classids="65279CC1DC94D349" subjectid="A6DD53BAA3B7B92A" periodspercard="2" periodsperweek="4.0" teacherids="1F0151D8FB109FDB" classroomids="" groupids="3356EAB280E0FE4A" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="2E5AC86637A0001C" classids="80E7F73A88812857" subjectid="E0713A512D68FDDE" periodspercard="1" periodsperweek="1.0" teacherids="1C2FEE66BE442BCE" classroomids="" groupids="AC422D6A8FE30F40" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="8D1F1C1B3329A2EE" classids="80E7F73A88812857" subjectid="E0713A512D68FDDE" periodspercard="2" periodsperweek="2.0" teacherids="1C2FEE66BE442BCE" classroomids="" groupids="AC422D6A8FE30F40" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="C5AAFE6AF86D0D82" classids="3053DF715DBB2B56" subjectid="E0713A512D68FDDE" periodspercard="1" periodsperweek="1.0" teacherids="1C2FEE66BE442BCE" classroomids="" groupids="1C8E858CDF0A4BC4" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="6F947B99CFE62357" classids="3053DF715DBB2B56" subjectid="E0713A512D68FDDE" periodspercard="2" periodsperweek="2.0" teacherids="1C2FEE66BE442BCE" classroomids="" groupids="1C8E858CDF0A4BC4" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="3C3136EE5425F7CB" classids="EEB4AC8C0127C77E" subjectid="E0713A512D68FDDE" periodspercard="1" periodsperweek="1.0" teacherids="1C2FEE66BE442BCE" classroomids="" groupids="F4036B443548B738" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="29E7268BA4CF37A1" classids="EEB4AC8C0127C77E" subjectid="E0713A512D68FDDE" periodspercard="2" periodsperweek="2.0" teacherids="1C2FEE66BE442BCE" classroomids="" groupids="F4036B443548B738" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="A024C5397FFCD1C8" classids="3053DF715DBB2B56" subjectid="8062FD59BEF82BD6" periodspercard="2" periodsperweek="4.0" teacherids="4CC8DA74DCEED483" classroomids="" groupids="1C8E858CDF0A4BC4" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="E7C00C722529D6D4" classids="EEB4AC8C0127C77E" subjectid="8062FD59BEF82BD6" periodspercard="2" periodsperweek="4.0" teacherids="6680DCA742EE5651" classroomids="" groupids="F4036B443548B738" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="66F137617E0AF93F" classids="65279CC1DC94D349" subjectid="8062FD59BEF82BD6" periodspercard="1" periodsperweek="1.0" teacherids="709E400BC9BCBA5A" classroomids="" groupids="3356EAB280E0FE4A" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="38AE2B1B25C8DD74" classids="65279CC1DC94D349" subjectid="8062FD59BEF82BD6" periodspercard="2" periodsperweek="4.0" teacherids="709E400BC9BCBA5A" classroomids="" groupids="3356EAB280E0FE4A" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="FA86D11906D22843" classids="31D37A7160BD71D3" subjectid="8062FD59BEF82BD6" periodspercard="2" periodsperweek="4.0" teacherids="709E400BC9BCBA5A" classroomids="" groupids="B78A0BBF03C38CBA" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="F5F5C54F423EB6FE" classids="A835D96B5BBD9FF0" subjectid="8062FD59BEF82BD6" periodspercard="1" periodsperweek="1.0" teacherids="2402D549256CC69E" classroomids="" groupids="195063F9EC93FC08" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="66E7341786043759" classids="A835D96B5BBD9FF0" subjectid="8062FD59BEF82BD6" periodspercard="2" periodsperweek="4.0" teacherids="2402D549256CC69E" classroomids="" groupids="195063F9EC93FC08" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="D3F810113EFD2472" classids="3053DF715DBB2B56" subjectid="95F00B79123C52EE" periodspercard="2" periodsperweek="4.0" teacherids="5B5718D14B289799,30771F233CC26F3B" classroomids="" groupids="1C8E858CDF0A4BC4" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="F21FD2EEBF1FD337" classids="65279CC1DC94D349" subjectid="E659AAE84E42C715" periodspercard="2" periodsperweek="4.0" teacherids="5B5718D14B289799,D27301ED8AB19C8F" classroomids="" groupids="3356EAB280E0FE4A" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="42541CA2CA09F876" classids="65279CC1DC94D349" subjectid="95F00B79123C52EE" periodspercard="2" periodsperweek="4.0" teacherids="8F51E49E152F0072" classroomids="" groupids="3356EAB280E0FE4A" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="68B7154747718334" classids="A835D96B5BBD9FF0" subjectid="09F506BD21542DEF" periodspercard="2" periodsperweek="4.0" teacherids="B76A0853350D64E1" classroomids="" groupids="195063F9EC93FC08" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="697E158F8BEBC817" classids="A835D96B5BBD9FF0" subjectid="679D3781C1EB05D2" periodspercard="2" periodsperweek="4.0" teacherids="3E2C06166143B913" classroomids="" groupids="195063F9EC93FC08" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="62232344E76A2D47" classids="EEB4AC8C0127C77E" subjectid="679D3781C1EB05D2" periodspercard="2" periodsperweek="4.0" teacherids="1DB488630E98D157" classroomids="" groupids="F4036B443548B738" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="E62497C09C1D5219" classids="EEB4AC8C0127C77E" subjectid="507262BE338BA8B9" periodspercard="2" periodsperweek="2.0" teacherids="D9AD47F14E2C919B" classroomids="" groupids="F4036B443548B738" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="EB9FF96D8595601C" classids="EEB4AC8C0127C77E" subjectid="051B8F8F590E05A4" periodspercard="2" periodsperweek="4.0" teacherids="42E6CBF9FCC0771C" classroomids="" groupids="F4036B443548B738" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="CE4FC8FCC7170143" classids="31D37A7160BD71D3" subjectid="0B9216B24EB92712" periodspercard="2" periodsperweek="4.0" teacherids="A45CC7358DF862EA,0257B6794EF27E88" classroomids="" groupids="B78A0BBF03C38CBA" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="D0CEF7DB9BFFB3AE" classids="A835D96B5BBD9FF0" subjectid="0B9216B24EB92712" periodspercard="1" periodsperweek="1.0" teacherids="30CE721656329D05" classroomids="" groupids="195063F9EC93FC08" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="B0E8EDE2C3F90CFF" classids="A835D96B5BBD9FF0" subjectid="0B9216B24EB92712" periodspercard="2" periodsperweek="4.0" teacherids="30CE721656329D05" classroomids="" groupids="195063F9EC93FC08" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="0CCEA997E06758C0" classids="65279CC1DC94D349" subjectid="0B9216B24EB92712" periodspercard="1" periodsperweek="1.0" teacherids="70A782562CE85D3A" classroomids="" groupids="3356EAB280E0FE4A" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="2548545DCD9F629D" classids="65279CC1DC94D349" subjectid="0B9216B24EB92712" periodspercard="2" periodsperweek="4.0" teacherids="70A782562CE85D3A" classroomids="" groupids="3356EAB280E0FE4A" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="93AB0C098567DE3A" classids="3053DF715DBB2B56" subjectid="0B9216B24EB92712" periodspercard="2" periodsperweek="4.0" teacherids="05C79345EBED6736" classroomids="" groupids="1C8E858CDF0A4BC4" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="4E89F06961AAC6DC" classids="EEB4AC8C0127C77E" subjectid="0B9216B24EB92712" periodspercard="2" periodsperweek="4.0" teacherids="5376403F4AB4E6CB" classroomids="" groupids="F4036B443548B738" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="AA22B9B37DED057B" classids="A835D96B5BBD9FF0" subjectid="1CD7D14168F8D98B" periodspercard="2" periodsperweek="4.0" teacherids="6AC165B71E4AE6DD,4643DCEF25C6CEDF" classroomids="" groupids="195063F9EC93FC08" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="A1936653A948E36C" classids="31D37A7160BD71D3" subjectid="2251EB051560348E" periodspercard="2" periodsperweek="4.0" teacherids="5376403F4AB4E6CB" classroomids="" groupids="B78A0BBF03C38CBA" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="B79A7613405AE21E" classids="80E7F73A88812857" subjectid="09F506BD21542DEF" periodspercard="2" periodsperweek="4.0" teacherids="B1FF12BA802F67D3" classroomids="" groupids="AC422D6A8FE30F40" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="938060C8B30897D4" classids="80E7F73A88812857" subjectid="679D3781C1EB05D2" periodspercard="2" periodsperweek="4.0" teacherids="0257B6794EF27E88" classroomids="" groupids="AC422D6A8FE30F40" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="9E88D34BA3B3FEBC" classids="3053DF715DBB2B56" subjectid="E659AAE84E42C715" periodspercard="2" periodsperweek="4.0" teacherids="8F51E49E152F0072" classroomids="" groupids="1C8E858CDF0A4BC4" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="3D930EC7BBED65E4" classids="EEB4AC8C0127C77E" subjectid="1CA88DEA344AA2C7" periodspercard="3" periodsperweek="6.0" teacherids="FE986B7A551863BC" classroomids="" groupids="F4036B443548B738" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="5479B0C1B2006B98" classids="EEB4AC8C0127C77E" subjectid="DBB4D1A2A989E617" periodspercard="1" periodsperweek="1.0" teacherids="32F96C86480C5101" classroomids="" groupids="F4036B443548B738" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="E30B5D2EE41870AB" classids="EEB4AC8C0127C77E" subjectid="DBB4D1A2A989E617" periodspercard="2" periodsperweek="4.0" teacherids="32F96C86480C5101" classroomids="" groupids="F4036B443548B738" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="52DD4FA12FE34278" classids="A835D96B5BBD9FF0" subjectid="DBB4D1A2A989E617" periodspercard="1" periodsperweek="1.0" teacherids="61A44E9854791D2D" classroomids="" groupids="195063F9EC93FC08" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="120D57BAB4E657DC" classids="A835D96B5BBD9FF0" subjectid="DBB4D1A2A989E617" periodspercard="2" periodsperweek="4.0" teacherids="61A44E9854791D2D" classroomids="" groupids="195063F9EC93FC08" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="AB45835049662F32" classids="65279CC1DC94D349" subjectid="679D3781C1EB05D2" periodspercard="2" periodsperweek="4.0" teacherids="0257B6794EF27E88" classroomids="" groupids="3356EAB280E0FE4A" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="314609C86B1D38BA" classids="31D37A7160BD71D3" subjectid="9AFC8FD6D775D8B9" periodspercard="3" periodsperweek="6.0" teacherids="B1FF12BA802F67D3" classroomids="" groupids="B78A0BBF03C38CBA" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="3C6A6E47022C9142" classids="80E7F73A88812857" subjectid="1CD7D14168F8D98B" periodspercard="2" periodsperweek="4.0" teacherids="05C79345EBED6736" classroomids="" groupids="AC422D6A8FE30F40" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="A74E3C47D6003E23" classids="80E7F73A88812857" subjectid="0B9216B24EB92712" periodspercard="2" periodsperweek="2.0" teacherids="30CE721656329D05" classroomids="" groupids="AC422D6A8FE30F40" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="D607C4CDD74FB08C" classids="80E7F73A88812857" subjectid="0B9216B24EB92712" periodspercard="1" periodsperweek="2.0" teacherids="30CE721656329D05" classroomids="" groupids="AC422D6A8FE30F40" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="95DD2C33E3F05186" classids="80E7F73A88812857" subjectid="507262BE338BA8B9" periodspercard="2" periodsperweek="2.0" teacherids="5B151149C4FB13CB" classroomids="" groupids="AC422D6A8FE30F40" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="CC3285CC32FDCF65" classids="80E7F73A88812857" subjectid="507262BE338BA8B9" periodspercard="1" periodsperweek="2.0" teacherids="5B151149C4FB13CB" classroomids="" groupids="AC422D6A8FE30F40" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="9C11429AB230DA15" classids="3053DF715DBB2B56" subjectid="507262BE338BA8B9" periodspercard="1" periodsperweek="2.0" teacherids="D9AD47F14E2C919B" classroomids="" groupids="1C8E858CDF0A4BC4" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="BB2867881A9B65DB" classids="3053DF715DBB2B56" subjectid="507262BE338BA8B9" periodspercard="2" periodsperweek="2.0" teacherids="D9AD47F14E2C919B" classroomids="" groupids="1C8E858CDF0A4BC4" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="7DBD278BE57D2202" classids="A835D96B5BBD9FF0" subjectid="507262BE338BA8B9" periodspercard="1" periodsperweek="2.0" teacherids="5B151149C4FB13CB" classroomids="" groupids="195063F9EC93FC08" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="3B050EE1D160C6BD" classids="A835D96B5BBD9FF0" subjectid="507262BE338BA8B9" periodspercard="2" periodsperweek="2.0" teacherids="5B151149C4FB13CB" classroomids="" groupids="195063F9EC93FC08" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="27C8F6D8BEE3D8E9" classids="65279CC1DC94D349" subjectid="E659AAE84E42C715" periodspercard="1" periodsperweek="2.0" teacherids="8F51E49E152F0072" classroomids="" groupids="3356EAB280E0FE4A" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="3944127B4C12E848" classids="65279CC1DC94D349" subjectid="E659AAE84E42C715" periodspercard="2" periodsperweek="2.0" teacherids="8F51E49E152F0072" classroomids="" groupids="3356EAB280E0FE4A" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="F3FB2FACA9DCFBA8" classids="31D37A7160BD71D3" subjectid="679D3781C1EB05D2" periodspercard="1" periodsperweek="2.0" teacherids="ACBD3A3ABE7AD83F" classroomids="" groupids="B78A0BBF03C38CBA" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="9E8BC16BE7B769E8" classids="31D37A7160BD71D3" subjectid="679D3781C1EB05D2" periodspercard="2" periodsperweek="2.0" teacherids="ACBD3A3ABE7AD83F" classroomids="" groupids="B78A0BBF03C38CBA" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="E6C9035A60E4A2D2" classids="31D37A7160BD71D3" subjectid="1CD7D14168F8D98B" periodspercard="1" periodsperweek="2.0" teacherids="6AC165B71E4AE6DD" classroomids="" groupids="B78A0BBF03C38CBA" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+      <lesson id="74F2A8D024F6F3DF" classids="31D37A7160BD71D3" subjectid="1CD7D14168F8D98B" periodspercard="2" periodsperweek="2.0" teacherids="6AC165B71E4AE6DD" classroomids="" groupids="B78A0BBF03C38CBA" capacity="*" seminargroup="" termsdefid="57F88BA0CFAD02BE" weeksdefid="DAFB4732892BC3A7" daysdefid="1AE045691D5E393B" partner_id=""/>
+   </lessons>
+   <cards options="canadd,export:silent" columns="lessonid,period,days,weeks,terms,classroomids">
+      <card lessonid="F78442F0436845F7" classroomids="" period="6" weeks="1" terms="1" days="10000"/>
+      <card lessonid="F78442F0436845F7" classroomids="" period="7" weeks="1" terms="1" days="10000"/>
+      <card lessonid="F78442F0436845F7" classroomids="" period="6" weeks="1" terms="1" days="00010"/>
+      <card lessonid="F78442F0436845F7" classroomids="" period="7" weeks="1" terms="1" days="00010"/>
+      <card lessonid="66747C01F2B63506" classroomids="" period="5" weeks="1" terms="1" days="00010"/>
+      <card lessonid="8ADBD35A03406F77" classroomids="" period="1" weeks="1" terms="1" days="00001"/>
+      <card lessonid="8ADBD35A03406F77" classroomids="" period="2" weeks="1" terms="1" days="00001"/>
+      <card lessonid="C5488D9AE385AAAE" classroomids="" period="5" weeks="1" terms="1" days="10000"/>
+      <card lessonid="6BDD76FD8CDEF26E" classroomids="" period="3" weeks="1" terms="1" days="01000"/>
+      <card lessonid="6BDD76FD8CDEF26E" classroomids="" period="4" weeks="1" terms="1" days="01000"/>
+      <card lessonid="935D08A8C43535D1" classroomids="" period="3" weeks="1" terms="1" days="01000"/>
+      <card lessonid="935D08A8C43535D1" classroomids="" period="4" weeks="1" terms="1" days="01000"/>
+      <card lessonid="935D08A8C43535D1" classroomids="" period="3" weeks="1" terms="1" days="00010"/>
+      <card lessonid="935D08A8C43535D1" classroomids="" period="4" weeks="1" terms="1" days="00010"/>
+      <card lessonid="1DE2D8C900001173" classroomids="" period="1" weeks="1" terms="1" days="10000"/>
+      <card lessonid="1DE2D8C900001173" classroomids="" period="2" weeks="1" terms="1" days="10000"/>
+      <card lessonid="24CA6B5B21396C18" classroomids="" period="5" weeks="1" terms="1" days="01000"/>
+      <card lessonid="39A3F35E8D82DDA2" classroomids="" period="5" weeks="1" terms="1" days="10000"/>
+      <card lessonid="D07F78A3DEF6EBEE" classroomids="" period="1" weeks="1" terms="1" days="01000"/>
+      <card lessonid="D07F78A3DEF6EBEE" classroomids="" period="2" weeks="1" terms="1" days="01000"/>
+      <card lessonid="D07F78A3DEF6EBEE" classroomids="" period="1" weeks="1" terms="1" days="00100"/>
+      <card lessonid="D07F78A3DEF6EBEE" classroomids="" period="2" weeks="1" terms="1" days="00100"/>
+      <card lessonid="E4AA6B148087AC8C" classroomids="" period="7" weeks="1" terms="1" days="00001"/>
+      <card lessonid="0F346696B0208D35" classroomids="" period="5" weeks="1" terms="1" days="01000"/>
+      <card lessonid="0F346696B0208D35" classroomids="" period="6" weeks="1" terms="1" days="01000"/>
+      <card lessonid="0F346696B0208D35" classroomids="" period="1" weeks="1" terms="1" days="00100"/>
+      <card lessonid="0F346696B0208D35" classroomids="" period="2" weeks="1" terms="1" days="00100"/>
+      <card lessonid="580CCCBEE95BB0C1" classroomids="" period="7" weeks="1" terms="1" days="00100"/>
+      <card lessonid="BFDE91F83027EE18" classroomids="" period="1" weeks="1" terms="1" days="00010"/>
+      <card lessonid="BFDE91F83027EE18" classroomids="" period="2" weeks="1" terms="1" days="00010"/>
+      <card lessonid="BFDE91F83027EE18" classroomids="" period="3" weeks="1" terms="1" days="00001"/>
+      <card lessonid="BFDE91F83027EE18" classroomids="" period="4" weeks="1" terms="1" days="00001"/>
+      <card lessonid="29C8ADA559CF82B0" classroomids="" period="5" weeks="1" terms="1" days="00010"/>
+      <card lessonid="92F5343557ABA5DC" classroomids="" period="5" weeks="1" terms="1" days="01000"/>
+      <card lessonid="92F5343557ABA5DC" classroomids="" period="6" weeks="1" terms="1" days="01000"/>
+      <card lessonid="92F5343557ABA5DC" classroomids="" period="1" weeks="1" terms="1" days="10000"/>
+      <card lessonid="92F5343557ABA5DC" classroomids="" period="2" weeks="1" terms="1" days="10000"/>
+      <card lessonid="3C6E18E150CCE20F" classroomids="" period="3" weeks="1" terms="1" days="00100"/>
+      <card lessonid="3C6E18E150CCE20F" classroomids="" period="4" weeks="1" terms="1" days="00100"/>
+      <card lessonid="3C6E18E150CCE20F" classroomids="" period="2" weeks="1" terms="1" days="01000"/>
+      <card lessonid="3C6E18E150CCE20F" classroomids="" period="3" weeks="1" terms="1" days="01000"/>
+      <card lessonid="1A64F104F2B0DBFC" classroomids="" period="5" weeks="1" terms="1" days="10000"/>
+      <card lessonid="1A64F104F2B0DBFC" classroomids="" period="6" weeks="1" terms="1" days="10000"/>
+      <card lessonid="1A64F104F2B0DBFC" classroomids="" period="3" weeks="1" terms="1" days="00001"/>
+      <card lessonid="1A64F104F2B0DBFC" classroomids="" period="4" weeks="1" terms="1" days="00001"/>
+      <card lessonid="A759CA7F91574AB6" classroomids="" period="1" weeks="1" terms="1" days="10000"/>
+      <card lessonid="A759CA7F91574AB6" classroomids="" period="2" weeks="1" terms="1" days="10000"/>
+      <card lessonid="A759CA7F91574AB6" classroomids="" period="1" weeks="1" terms="1" days="00001"/>
+      <card lessonid="A759CA7F91574AB6" classroomids="" period="2" weeks="1" terms="1" days="00001"/>
+      <card lessonid="2E5AC86637A0001C" classroomids="" period="4" weeks="1" terms="1" days="10000"/>
+      <card lessonid="8D1F1C1B3329A2EE" classroomids="" period="1" weeks="1" terms="1" days="00010"/>
+      <card lessonid="8D1F1C1B3329A2EE" classroomids="" period="2" weeks="1" terms="1" days="00010"/>
+      <card lessonid="C5AAFE6AF86D0D82" classroomids="" period="5" weeks="1" terms="1" days="00001"/>
+      <card lessonid="6F947B99CFE62357" classroomids="" period="1" weeks="1" terms="1" days="00100"/>
+      <card lessonid="6F947B99CFE62357" classroomids="" period="2" weeks="1" terms="1" days="00100"/>
+      <card lessonid="3C3136EE5425F7CB" classroomids="" period="5" weeks="1" terms="1" days="10000"/>
+      <card lessonid="29E7268BA4CF37A1" classroomids="" period="3" weeks="1" terms="1" days="00001"/>
+      <card lessonid="29E7268BA4CF37A1" classroomids="" period="4" weeks="1" terms="1" days="00001"/>
+      <card lessonid="A024C5397FFCD1C8" classroomids="" period="1" weeks="1" terms="1" days="01000"/>
+      <card lessonid="A024C5397FFCD1C8" classroomids="" period="2" weeks="1" terms="1" days="01000"/>
+      <card lessonid="A024C5397FFCD1C8" classroomids="" period="3" weeks="1" terms="1" days="00001"/>
+      <card lessonid="A024C5397FFCD1C8" classroomids="" period="4" weeks="1" terms="1" days="00001"/>
+      <card lessonid="E7C00C722529D6D4" classroomids="" period="1" weeks="1" terms="1" days="00010"/>
+      <card lessonid="E7C00C722529D6D4" classroomids="" period="2" weeks="1" terms="1" days="00010"/>
+      <card lessonid="E7C00C722529D6D4" classroomids="" period="1" weeks="1" terms="1" days="00100"/>
+      <card lessonid="E7C00C722529D6D4" classroomids="" period="2" weeks="1" terms="1" days="00100"/>
+      <card lessonid="66F137617E0AF93F" classroomids="" period="5" weeks="1" terms="1" days="00010"/>
+      <card lessonid="38AE2B1B25C8DD74" classroomids="" period="3" weeks="1" terms="1" days="00100"/>
+      <card lessonid="38AE2B1B25C8DD74" classroomids="" period="4" weeks="1" terms="1" days="00100"/>
+      <card lessonid="38AE2B1B25C8DD74" classroomids="" period="3" weeks="1" terms="1" days="00001"/>
+      <card lessonid="38AE2B1B25C8DD74" classroomids="" period="4" weeks="1" terms="1" days="00001"/>
+      <card lessonid="FA86D11906D22843" classroomids="" period="1" weeks="1" terms="1" days="00100"/>
+      <card lessonid="FA86D11906D22843" classroomids="" period="2" weeks="1" terms="1" days="00100"/>
+      <card lessonid="FA86D11906D22843" classroomids="" period="3" weeks="1" terms="1" days="10000"/>
+      <card lessonid="FA86D11906D22843" classroomids="" period="4" weeks="1" terms="1" days="10000"/>
+      <card lessonid="F5F5C54F423EB6FE" classroomids="" period="5" weeks="1" terms="1" days="00100"/>
+      <card lessonid="66E7341786043759" classroomids="" period="1" weeks="1" terms="1" days="01000"/>
+      <card lessonid="66E7341786043759" classroomids="" period="2" weeks="1" terms="1" days="01000"/>
+      <card lessonid="66E7341786043759" classroomids="" period="1" weeks="1" terms="1" days="10000"/>
+      <card lessonid="66E7341786043759" classroomids="" period="2" weeks="1" terms="1" days="10000"/>
+      <card lessonid="D3F810113EFD2472" classroomids="" period="5" weeks="1" terms="1" days="00100"/>
+      <card lessonid="D3F810113EFD2472" classroomids="" period="6" weeks="1" terms="1" days="00100"/>
+      <card lessonid="D3F810113EFD2472" classroomids="" period="3" weeks="1" terms="1" days="00010"/>
+      <card lessonid="D3F810113EFD2472" classroomids="" period="4" weeks="1" terms="1" days="00010"/>
+      <card lessonid="F21FD2EEBF1FD337" classroomids="" period="5" weeks="1" terms="1" days="00001"/>
+      <card lessonid="F21FD2EEBF1FD337" classroomids="" period="6" weeks="1" terms="1" days="00001"/>
+      <card lessonid="F21FD2EEBF1FD337" classroomids="" period="1" weeks="1" terms="1" days="00010"/>
+      <card lessonid="F21FD2EEBF1FD337" classroomids="" period="2" weeks="1" terms="1" days="00010"/>
+      <card lessonid="42541CA2CA09F876" classroomids="" period="6" weeks="1" terms="1" days="00100"/>
+      <card lessonid="42541CA2CA09F876" classroomids="" period="7" weeks="1" terms="1" days="00100"/>
+      <card lessonid="42541CA2CA09F876" classroomids="" period="1" weeks="1" terms="1" days="01000"/>
+      <card lessonid="42541CA2CA09F876" classroomids="" period="2" weeks="1" terms="1" days="01000"/>
+      <card lessonid="68B7154747718334" classroomids="" period="1" weeks="1" terms="1" days="00010"/>
+      <card lessonid="68B7154747718334" classroomids="" period="2" weeks="1" terms="1" days="00010"/>
+      <card lessonid="68B7154747718334" classroomids="" period="5" weeks="1" terms="1" days="01000"/>
+      <card lessonid="68B7154747718334" classroomids="" period="6" weeks="1" terms="1" days="01000"/>
+      <card lessonid="697E158F8BEBC817" classroomids="" period="1" weeks="1" terms="1" days="00001"/>
+      <card lessonid="697E158F8BEBC817" classroomids="" period="2" weeks="1" terms="1" days="00001"/>
+      <card lessonid="697E158F8BEBC817" classroomids="" period="3" weeks="1" terms="1" days="01000"/>
+      <card lessonid="697E158F8BEBC817" classroomids="" period="4" weeks="1" terms="1" days="01000"/>
+      <card lessonid="62232344E76A2D47" classroomids="" period="1" weeks="1" terms="1" days="00001"/>
+      <card lessonid="62232344E76A2D47" classroomids="" period="2" weeks="1" terms="1" days="00001"/>
+      <card lessonid="62232344E76A2D47" classroomids="" period="1" weeks="1" terms="1" days="01000"/>
+      <card lessonid="62232344E76A2D47" classroomids="" period="2" weeks="1" terms="1" days="01000"/>
+      <card lessonid="E62497C09C1D5219" classroomids="" period="3" weeks="1" terms="1" days="00010"/>
+      <card lessonid="E62497C09C1D5219" classroomids="" period="4" weeks="1" terms="1" days="00010"/>
+      <card lessonid="EB9FF96D8595601C" classroomids="" period="3" weeks="1" terms="1" days="01000"/>
+      <card lessonid="EB9FF96D8595601C" classroomids="" period="4" weeks="1" terms="1" days="01000"/>
+      <card lessonid="EB9FF96D8595601C" classroomids="" period="6" weeks="1" terms="1" days="10000"/>
+      <card lessonid="EB9FF96D8595601C" classroomids="" period="7" weeks="1" terms="1" days="10000"/>
+      <card lessonid="CE4FC8FCC7170143" classroomids="" period="1" weeks="1" terms="1" days="10000"/>
+      <card lessonid="CE4FC8FCC7170143" classroomids="" period="2" weeks="1" terms="1" days="10000"/>
+      <card lessonid="CE4FC8FCC7170143" classroomids="" period="1" weeks="1" terms="1" days="00001"/>
+      <card lessonid="CE4FC8FCC7170143" classroomids="" period="2" weeks="1" terms="1" days="00001"/>
+      <card lessonid="D0CEF7DB9BFFB3AE" classroomids="" period="7" weeks="1" terms="1" days="00001"/>
+      <card lessonid="B0E8EDE2C3F90CFF" classroomids="" period="6" weeks="1" terms="1" days="00100"/>
+      <card lessonid="B0E8EDE2C3F90CFF" classroomids="" period="7" weeks="1" terms="1" days="00100"/>
+      <card lessonid="B0E8EDE2C3F90CFF" classroomids="" period="6" weeks="1" terms="1" days="00010"/>
+      <card lessonid="B0E8EDE2C3F90CFF" classroomids="" period="7" weeks="1" terms="1" days="00010"/>
+      <card lessonid="0CCEA997E06758C0" classroomids="" period="7" weeks="1" terms="1" days="01000"/>
+      <card lessonid="2548545DCD9F629D" classroomids="" period="6" weeks="1" terms="1" days="00010"/>
+      <card lessonid="2548545DCD9F629D" classroomids="" period="7" weeks="1" terms="1" days="00010"/>
+      <card lessonid="2548545DCD9F629D" classroomids="" period="5" weeks="1" terms="1" days="10000"/>
+      <card lessonid="2548545DCD9F629D" classroomids="" period="6" weeks="1" terms="1" days="10000"/>
+      <card lessonid="93AB0C098567DE3A" classroomids="" period="1" weeks="1" terms="1" days="00001"/>
+      <card lessonid="93AB0C098567DE3A" classroomids="" period="2" weeks="1" terms="1" days="00001"/>
+      <card lessonid="93AB0C098567DE3A" classroomids="" period="1" weeks="1" terms="1" days="00010"/>
+      <card lessonid="93AB0C098567DE3A" classroomids="" period="2" weeks="1" terms="1" days="00010"/>
+      <card lessonid="4E89F06961AAC6DC" classroomids="" period="6" weeks="1" terms="1" days="00010"/>
+      <card lessonid="4E89F06961AAC6DC" classroomids="" period="7" weeks="1" terms="1" days="00010"/>
+      <card lessonid="4E89F06961AAC6DC" classroomids="" period="6" weeks="1" terms="1" days="01000"/>
+      <card lessonid="4E89F06961AAC6DC" classroomids="" period="7" weeks="1" terms="1" days="01000"/>
+      <card lessonid="AA22B9B37DED057B" classroomids="" period="3" weeks="1" terms="1" days="00010"/>
+      <card lessonid="AA22B9B37DED057B" classroomids="" period="4" weeks="1" terms="1" days="00010"/>
+      <card lessonid="AA22B9B37DED057B" classroomids="" period="1" weeks="1" terms="1" days="00100"/>
+      <card lessonid="AA22B9B37DED057B" classroomids="" period="2" weeks="1" terms="1" days="00100"/>
+      <card lessonid="A1936653A948E36C" classroomids="" period="6" weeks="1" terms="1" days="00001"/>
+      <card lessonid="A1936653A948E36C" classroomids="" period="7" weeks="1" terms="1" days="00001"/>
+      <card lessonid="A1936653A948E36C" classroomids="" period="6" weeks="1" terms="1" days="10000"/>
+      <card lessonid="A1936653A948E36C" classroomids="" period="7" weeks="1" terms="1" days="10000"/>
+      <card lessonid="B79A7613405AE21E" classroomids="" period="6" weeks="1" terms="1" days="10000"/>
+      <card lessonid="B79A7613405AE21E" classroomids="" period="7" weeks="1" terms="1" days="10000"/>
+      <card lessonid="B79A7613405AE21E" classroomids="" period="6" weeks="1" terms="1" days="00001"/>
+      <card lessonid="B79A7613405AE21E" classroomids="" period="7" weeks="1" terms="1" days="00001"/>
+      <card lessonid="938060C8B30897D4" classroomids="" period="3" weeks="1" terms="1" days="00001"/>
+      <card lessonid="938060C8B30897D4" classroomids="" period="4" weeks="1" terms="1" days="00001"/>
+      <card lessonid="938060C8B30897D4" classroomids="" period="3" weeks="1" terms="1" days="00100"/>
+      <card lessonid="938060C8B30897D4" classroomids="" period="4" weeks="1" terms="1" days="00100"/>
+      <card lessonid="9E88D34BA3B3FEBC" classroomids="" period="3" weeks="1" terms="1" days="00100"/>
+      <card lessonid="9E88D34BA3B3FEBC" classroomids="" period="4" weeks="1" terms="1" days="00100"/>
+      <card lessonid="9E88D34BA3B3FEBC" classroomids="" period="6" weeks="1" terms="1" days="00001"/>
+      <card lessonid="9E88D34BA3B3FEBC" classroomids="" period="7" weeks="1" terms="1" days="00001"/>
+      <card lessonid="3D930EC7BBED65E4" classroomids="" period="5" weeks="1" terms="1" days="00001"/>
+      <card lessonid="3D930EC7BBED65E4" classroomids="" period="6" weeks="1" terms="1" days="00001"/>
+      <card lessonid="3D930EC7BBED65E4" classroomids="" period="7" weeks="1" terms="1" days="00001"/>
+      <card lessonid="3D930EC7BBED65E4" classroomids="" period="5" weeks="1" terms="1" days="00100"/>
+      <card lessonid="3D930EC7BBED65E4" classroomids="" period="6" weeks="1" terms="1" days="00100"/>
+      <card lessonid="3D930EC7BBED65E4" classroomids="" period="7" weeks="1" terms="1" days="00100"/>
+      <card lessonid="5479B0C1B2006B98" classroomids="" period="5" weeks="1" terms="1" days="00010"/>
+      <card lessonid="E30B5D2EE41870AB" classroomids="" period="3" weeks="1" terms="1" days="10000"/>
+      <card lessonid="E30B5D2EE41870AB" classroomids="" period="4" weeks="1" terms="1" days="10000"/>
+      <card lessonid="E30B5D2EE41870AB" classroomids="" period="3" weeks="1" terms="1" days="00100"/>
+      <card lessonid="E30B5D2EE41870AB" classroomids="" period="4" weeks="1" terms="1" days="00100"/>
+      <card lessonid="52DD4FA12FE34278" classroomids="" period="5" weeks="1" terms="1" days="00010"/>
+      <card lessonid="120D57BAB4E657DC" classroomids="" period="3" weeks="1" terms="1" days="10000"/>
+      <card lessonid="120D57BAB4E657DC" classroomids="" period="4" weeks="1" terms="1" days="10000"/>
+      <card lessonid="120D57BAB4E657DC" classroomids="" period="5" weeks="1" terms="1" days="00001"/>
+      <card lessonid="120D57BAB4E657DC" classroomids="" period="6" weeks="1" terms="1" days="00001"/>
+      <card lessonid="AB45835049662F32" classroomids="" period="3" weeks="1" terms="1" days="00010"/>
+      <card lessonid="AB45835049662F32" classroomids="" period="4" weeks="1" terms="1" days="00010"/>
+      <card lessonid="AB45835049662F32" classroomids="" period="3" weeks="1" terms="1" days="10000"/>
+      <card lessonid="AB45835049662F32" classroomids="" period="4" weeks="1" terms="1" days="10000"/>
+      <card lessonid="314609C86B1D38BA" classroomids="" period="5" weeks="1" terms="1" days="00010"/>
+      <card lessonid="314609C86B1D38BA" classroomids="" period="6" weeks="1" terms="1" days="00010"/>
+      <card lessonid="314609C86B1D38BA" classroomids="" period="7" weeks="1" terms="1" days="00010"/>
+      <card lessonid="314609C86B1D38BA" classroomids="" period="5" weeks="1" terms="1" days="01000"/>
+      <card lessonid="314609C86B1D38BA" classroomids="" period="6" weeks="1" terms="1" days="01000"/>
+      <card lessonid="314609C86B1D38BA" classroomids="" period="7" weeks="1" terms="1" days="01000"/>
+      <card lessonid="3C6A6E47022C9142" classroomids="" period="6" weeks="1" terms="1" days="01000"/>
+      <card lessonid="3C6A6E47022C9142" classroomids="" period="7" weeks="1" terms="1" days="01000"/>
+      <card lessonid="3C6A6E47022C9142" classroomids="" period="6" weeks="1" terms="1" days="00100"/>
+      <card lessonid="3C6A6E47022C9142" classroomids="" period="7" weeks="1" terms="1" days="00100"/>
+      <card lessonid="A74E3C47D6003E23" classroomids="" period="2" weeks="1" terms="1" days="10000"/>
+      <card lessonid="A74E3C47D6003E23" classroomids="" period="3" weeks="1" terms="1" days="10000"/>
+      <card lessonid="D607C4CDD74FB08C" classroomids="" period="5" weeks="1" terms="1" days="01000"/>
+      <card lessonid="D607C4CDD74FB08C" classroomids="" period="5" weeks="1" terms="1" days="00001"/>
+      <card lessonid="95DD2C33E3F05186" classroomids="" period="6" weeks="1" terms="1" days="00010"/>
+      <card lessonid="95DD2C33E3F05186" classroomids="" period="7" weeks="1" terms="1" days="00010"/>
+      <card lessonid="CC3285CC32FDCF65" classroomids="" period="1" weeks="1" terms="1" days="10000"/>
+      <card lessonid="CC3285CC32FDCF65" classroomids="" period="5" weeks="1" terms="1" days="00100"/>
+      <card lessonid="9C11429AB230DA15" classroomids="" period="7" weeks="1" terms="1" days="00100"/>
+      <card lessonid="9C11429AB230DA15" classroomids="" period="7" weeks="1" terms="1" days="01000"/>
+      <card lessonid="BB2867881A9B65DB" classroomids="" period="3" weeks="1" terms="1" days="10000"/>
+      <card lessonid="BB2867881A9B65DB" classroomids="" period="4" weeks="1" terms="1" days="10000"/>
+      <card lessonid="7DBD278BE57D2202" classroomids="" period="7" weeks="1" terms="1" days="01000"/>
+      <card lessonid="7DBD278BE57D2202" classroomids="" period="7" weeks="1" terms="1" days="10000"/>
+      <card lessonid="3B050EE1D160C6BD" classroomids="" period="3" weeks="1" terms="1" days="00100"/>
+      <card lessonid="3B050EE1D160C6BD" classroomids="" period="4" weeks="1" terms="1" days="00100"/>
+      <card lessonid="27C8F6D8BEE3D8E9" classroomids="" period="5" weeks="1" terms="1" days="00100"/>
+      <card lessonid="27C8F6D8BEE3D8E9" classroomids="" period="7" weeks="1" terms="1" days="10000"/>
+      <card lessonid="3944127B4C12E848" classroomids="" period="3" weeks="1" terms="1" days="01000"/>
+      <card lessonid="3944127B4C12E848" classroomids="" period="4" weeks="1" terms="1" days="01000"/>
+      <card lessonid="F3FB2FACA9DCFBA8" classroomids="" period="1" weeks="1" terms="1" days="01000"/>
+      <card lessonid="F3FB2FACA9DCFBA8" classroomids="" period="5" weeks="1" terms="1" days="10000"/>
+      <card lessonid="9E8BC16BE7B769E8" classroomids="" period="3" weeks="1" terms="1" days="00010"/>
+      <card lessonid="9E8BC16BE7B769E8" classroomids="" period="4" weeks="1" terms="1" days="00010"/>
+      <card lessonid="E6C9035A60E4A2D2" classroomids="" period="5" weeks="1" terms="1" days="00001"/>
+      <card lessonid="E6C9035A60E4A2D2" classroomids="" period="4" weeks="1" terms="1" days="01000"/>
+      <card lessonid="74F2A8D024F6F3DF" classroomids="" period="5" weeks="1" terms="1" days="00100"/>
+      <card lessonid="74F2A8D024F6F3DF" classroomids="" period="6" weeks="1" terms="1" days="00100"/>
+   </cards>
+   <classroomsupervisions options="canadd,export:silent" columns="classroomid,teacherid,day,week,term,period,break"/>
+</timetable>

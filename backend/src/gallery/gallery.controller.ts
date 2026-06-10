@@ -12,17 +12,16 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { GalleryService } from './gallery.service';
-import { ConfigService } from '@nestjs/config';
+import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
+import { cloudinaryMemoryStorage, CLOUDINARY_FILE_FILTER } from '../cloudinary/multer-cloudinary';
 import { Roles } from '../auth/roles.decorator';
 
 @Controller('gallery')
 export class GalleryController {
   constructor(
     private galleryService: GalleryService,
-    private configService: ConfigService,
+    private readonly cloudinary: CloudinaryService,
   ) {}
 
   @Get('public/recent')
@@ -65,20 +64,9 @@ export class GalleryController {
   @Roles('Director')
   @UseInterceptors(
     FileInterceptor('photo', {
-      storage: diskStorage({
-        destination: './uploads/gallery',
-        filename: (req, file, callback) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          callback(null, `photo-${uniqueSuffix}${extname(file.originalname)}`);
-        },
-      }),
-      fileFilter: (req, file, callback) => {
-        if (!file.mimetype.match(/^image\//)) {
-          return callback(new Error('Only image files are allowed'), false);
-        }
-        callback(null, true);
-      },
-      limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+      storage: cloudinaryMemoryStorage(),
+      fileFilter: CLOUDINARY_FILE_FILTER,
+      limits: { fileSize: 10 * 1024 * 1024 },
     }),
   )
   async uploadPhoto(
@@ -87,9 +75,8 @@ export class GalleryController {
     @Req() req: any,
   ) {
     const schoolId = req.user?.schoolId;
-    const baseUrl = this.configService.get('UPLOAD_BASE_URL') || '';
-    const photoUrl = `${baseUrl}/uploads/gallery/${file.filename}`;
-    return this.galleryService.uploadPhoto(id, photoUrl, undefined, schoolId);
+    const result = await this.cloudinary.upload(file, `${FOLDERS.system}/gallery`);
+    return this.galleryService.uploadPhoto(id, result.secureUrl, undefined, schoolId);
   }
 
   @Delete(':galleryId/photo/:photoId')

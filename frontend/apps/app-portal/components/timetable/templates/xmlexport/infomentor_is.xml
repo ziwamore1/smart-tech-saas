@@ -1,0 +1,17 @@
+<timetable importtype="database" options="export:idprefix:%CHRID,import:idprefix:%TEMPID,groupstype1,decimalseparatordot,lessonsincludeclasseswithoutstudents,handlestudentsafterlessons" displayname="InfoMentor" displaycountries="is">
+   <periods options="canadd,export:silent" columns="period,name,short,starttime,endtime"/>
+   <custombells options="canadd,export:silent" columns="classids,day,period,break,starttime,endtime"/>
+   <daysdefs options="canadd,export:silent" columns="id,days,name,short"/>
+   <weeksdefs options="canadd,export:silent" columns="id,weeks,name,short"/>
+   <termsdefs options="canadd,export:silent" columns="id,terms,name,short"/>
+   <subjects options="canadd,export:silent" columns="id,name,short,partner_id"/>
+   <teachers options="canadd,export:silent" columns="id,name,short,gender,color,email,mobile,partner_id,firstname,lastname"/>
+   <classrooms options="canadd,export:silent" columns="id,name,short,capacity,partner_id"/>
+   <grades options="canadd,export:silent" columns="grade,name,short"/>
+   <classes options="canadd,export:silent" columns="id,name,short,classroomids,teacherid,grade,partner_id"/>
+   <groups options="canadd,export:silent" columns="id,classid,name,entireclass,divisiontag,studentcount,studentids"/>
+   <students options="canadd,export:silent" columns="id,classid,name,number,email,mobile,partner_id,firstname,lastname"/>
+   <studentsubjects options="canadd,export:silent" columns="studentid,subjectid,seminargroup,importance,alternatefor"/>
+   <lessons options="canadd,export:silent" columns="id,subjectid,classids,groupids,teacherids,classroomids,periodspercard,periodsperweek,daysdefid,weeksdefid,termsdefid,seminargroup,capacity,partner_id"/>
+   <cards options="canadd,export:silent" columns="lessonid,period,days,weeks,terms,classroomids"/>
+</timetable>

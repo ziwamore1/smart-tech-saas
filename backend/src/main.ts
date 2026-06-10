@@ -4,13 +4,21 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import compression from 'compression';
+import * as Sentry from '@sentry/node';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { SentryFilter } from './common/sentry.filter';
+import { SentryInterceptor } from './common/sentry.interceptor';
+import { isSentryEnabled, getSentryConfig } from './common/sentry.config';
 import { setupSecurity } from './common/security.middleware';
 import { ProductionLogger } from './common/production-logger';
 
 async function bootstrap() {
+  if (isSentryEnabled()) {
+    Sentry.init(getSentryConfig());
+  }
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ProductionLogger.getLogLevels(),
   });
@@ -53,8 +61,8 @@ async function bootstrap() {
     }),
   );
 
-  app.useGlobalFilters(new GlobalExceptionFilter());
-  app.useGlobalInterceptors(new TransformInterceptor());
+  app.useGlobalFilters(new GlobalExceptionFilter(), new SentryFilter());
+  app.useGlobalInterceptors(new TransformInterceptor(), new SentryInterceptor());
 
   const port = process.env.PORT || 3001;
   await app.listen(port, '0.0.0.0');

@@ -1,8 +1,7 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
-import * as path from 'path';
-import * as fs from 'fs-extra';
 import { PrismaService } from '../prisma/prisma.service';
-import { ImageService } from '../common/services/image.service';
+import * as path from 'path';
+import * as fs from 'fs';
 
 @Injectable()
 export class StudentPhotoService {
@@ -10,35 +9,27 @@ export class StudentPhotoService {
 
   constructor(
     private prisma: PrismaService,
-    private imageService: ImageService,
   ) {}
 
-  async uploadStudentPhoto(studentId: string, uploadedById: string, file: Express.Multer.File, schoolId: string) {
-    if (!file) throw new BadRequestException('No file provided');
-    if (!this.imageService.validateMimeType(file.mimetype)) {
-      await fs.remove(file.path).catch(() => {});
-      throw new BadRequestException('Only JPG, PNG, and WebP files are allowed');
-    }
+  async uploadStudentPhoto(studentId: string, uploadedById: string, imageUrl: string, imagePublicId: string, schoolId: string): Promise<{ id: string; studentId: string; imageUrl: string; thumbnailUrl: string; oldPublicId: string | null }> {
+    if (!imageUrl) throw new BadRequestException('No image URL provided');
 
     const student = await this.prisma.student.findUnique({ where: { id: studentId } });
     if (!student || student.schoolId !== schoolId) {
-      await fs.remove(file.path).catch(() => {});
       throw new NotFoundException('Student not found');
     }
 
-    const optimizedPath = await this.imageService.cropToPassport(file.path);
-    const thumbnailPath = await this.imageService.createThumbnail(optimizedPath, 80);
+    const oldPublicId = student.photoPublicId;
 
-    const imageUrl = this.imageService.getPhotoUrl(optimizedPath);
-    const thumbnailUrl = this.imageService.getPhotoUrl(thumbnailPath);
+    const thumbnailUrl = imageUrl;
 
     const photo = await this.prisma.studentPhoto.create({
-      data: { studentId, imageUrl, thumbnailUrl, uploadedById },
+      data: { studentId, imageUrl, thumbnailUrl, uploadedById, photoPublicId: imagePublicId },
     });
 
     await this.prisma.student.update({
       where: { id: studentId },
-      data: { photoUrl: imageUrl },
+      data: { photoUrl: imageUrl, photoPublicId: imagePublicId },
     });
 
     return {
@@ -46,6 +37,7 @@ export class StudentPhotoService {
       studentId,
       imageUrl,
       thumbnailUrl,
+      oldPublicId,
     };
   }
 
@@ -88,11 +80,13 @@ export class StudentPhotoService {
     });
 
     for (const p of photos) {
-      const imagePath = path.join(__dirname, '../../', p.imageUrl.replace(/^\//, ''));
-      await fs.remove(imagePath).catch(() => {});
+      if (p.imageUrl) {
+        const imagePath = path.join(__dirname, '../../', p.imageUrl.replace(/^\//, ''));
+        try { await fs.promises.unlink(imagePath); } catch {}
+      }
       if (p.thumbnailUrl) {
         const thumbPath = path.join(__dirname, '../../', p.thumbnailUrl.replace(/^\//, ''));
-        await fs.remove(thumbPath).catch(() => {});
+        try { await fs.promises.unlink(thumbPath); } catch {}
       }
     }
 

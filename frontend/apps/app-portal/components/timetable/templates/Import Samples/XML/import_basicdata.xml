@@ -1,0 +1,21 @@
+<timetable importtype="database" options="idprefix:MyApp">
+   <teachers options="" columns="id,name,short">
+      <teacher id="1" name="Bacova" short="Bc"/>
+      <teacher id="2" name="Belicova" short="Bl"/>
+      <teacher id="3" name="Benkova" short="Be"/>
+   </teachers>
+   <classes options="" columns="id,name">
+      <class id="1" name="5.A" short="5.A"/>
+      <class id="2" name="5.B" short="5.B"/>
+   </classes>
+   <subjects options="" columns="id,name,short">
+      <subject id="1" name="Mathematics" short="Ma"/>
+      <subject id="2" name="History" short="Hi"/>
+      <subject id="3" name="Biology" short="Bi"/>
+      <subject id="4" name="Spanish language" short="Sp"/>
+   </subjects>
+   <classrooms options="" columns="id,name,short">
+      <classroom id="1" name="Room 106" short="106"/>
+      <classroom id="2" name="Room 107" short="107"/>
+   </classrooms>
+</timetable>

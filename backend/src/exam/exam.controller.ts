@@ -3,9 +3,9 @@ import {
   UseGuards, Request, UseInterceptors, UploadedFile, NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { ExamService } from './exam.service';
+import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
+import { cloudinaryMemoryStorage, CLOUDINARY_FILE_FILTER } from '../cloudinary/multer-cloudinary';
 import { ExamMarkingService } from './exam-marking.service';
 import { ExamTemplateService } from './exam-template.service';
 import { QuestionBankService } from './question-bank.service';
@@ -23,6 +23,7 @@ export class ExamController {
     private templateService: ExamTemplateService,
     private questionBankService: QuestionBankService,
     private uploadedExamService: UploadedExamService,
+    private readonly cloudinary: CloudinaryService,
   ) {}
 
   // ===== CRUD =====
@@ -108,31 +109,18 @@ export class ExamController {
   @Post(':id/upload-question')
   @Roles('TEACHER', 'DIRECTOR')
   @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: './uploads/exams',
-      filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        cb(null, `question-${uniqueSuffix}${extname(file.originalname)}`);
-      },
-    }),
-    fileFilter: (req, file, cb) => {
-      if (file.originalname.endsWith('.docx') || file.originalname.endsWith('.doc') || file.mimetype.startsWith('image/')) {
-        cb(null, true);
-      } else {
-        cb(new Error('Only Word documents and images are allowed'), false);
-      }
-    },
+    storage: cloudinaryMemoryStorage(),
+    fileFilter: CLOUDINARY_FILE_FILTER,
     limits: { fileSize: 50 * 1024 * 1024 },
   }))
   async uploadQuestionFile(@Param('id') id: string, @UploadedFile() file: Express.Multer.File, @Body() body: any) {
-    const baseUrl = process.env.UPLOAD_BASE_URL || '';
-    const fileUrl = `${baseUrl}/uploads/exams/${file.filename}`;
+    const result = await this.cloudinary.upload(file, FOLDERS.examinations);
     return this.examService.addQuestion(id, {
       question: body.question,
       questionType: body.questionType || 'FILE_UPLOAD',
       correctAnswer: body.correctAnswer,
       score: parseFloat(body.score) || 10,
-      attachmentUrl: fileUrl,
+      attachmentUrl: result.secureUrl,
     });
   }
 
@@ -318,24 +306,18 @@ export class ExamController {
   @Post('upload')
   @Roles('TEACHER', 'DIRECTOR')
   @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: './uploads/exams',
-      filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        cb(null, `uploaded-${uniqueSuffix}${extname(file.originalname)}`);
-      },
-    }),
+    storage: cloudinaryMemoryStorage(),
+    fileFilter: CLOUDINARY_FILE_FILTER,
     limits: { fileSize: 100 * 1024 * 1024 },
   }))
   async uploadExam(@UploadedFile() file: Express.Multer.File, @Body() data: any, @Request() req: any) {
-    const baseUrl = process.env.UPLOAD_BASE_URL || '';
-    const fileUrl = `${baseUrl}/uploads/exams/${file.filename}`;
+    const result = await this.cloudinary.upload(file, FOLDERS.examinations);
     return this.uploadedExamService.create({
       ...data,
-      fileUrl,
+      fileUrl: result.secureUrl,
       fileName: file.originalname,
-      fileType: extname(file.originalname).toLowerCase().replace('.', ''),
-      fileSize: file.size,
+      fileType: result.format || file.originalname.split('.').pop()?.toLowerCase() || 'unknown',
+      fileSize: result.size,
       schoolId: req.user.schoolId,
       createdById: req.user.id,
     });
@@ -367,19 +349,13 @@ export class ExamController {
   @Post('uploaded/:id/answer-script')
   @Roles('TEACHER', 'DIRECTOR')
   @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: './uploads/exams/scripts',
-      filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        cb(null, `script-${uniqueSuffix}${extname(file.originalname)}`);
-      },
-    }),
+    storage: cloudinaryMemoryStorage(),
+    fileFilter: CLOUDINARY_FILE_FILTER,
     limits: { fileSize: 100 * 1024 * 1024 },
   }))
   async uploadAnswerScript(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
-    const baseUrl = process.env.UPLOAD_BASE_URL || '';
-    const fileUrl = `${baseUrl}/uploads/exams/scripts/${file.filename}`;
-    return this.uploadedExamService.attachAnswerScript(id, fileUrl);
+    const result = await this.cloudinary.upload(file, FOLDERS.examinations);
+    return this.uploadedExamService.attachAnswerScript(id, result.secureUrl);
   }
 
   @Post('uploaded/:id/parse')

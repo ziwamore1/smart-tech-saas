@@ -1,0 +1,16 @@
+<timetable importtype="database" options="groupstype1" displayname="aScAgenda" displaycountries="sk" displayinmenu="0">
+   <teachers options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,name,firstname,lastname,short,gender,email,mobile">
+   </teachers>
+   <classes options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,name,short,teacherid,classroomids">
+   </classes>
+   <subjects options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,name,short">
+   </subjects>
+   <classrooms options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,name,short">
+   </classrooms>
+   <groupsubjects options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,classids,subjectid,teacherids">
+   </groupsubjects>
+   <students options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="id,firstname,lastname,gender,classid,email,mobile">
+   </students>
+   <lessons options="import:disable,canadd,canremove,canupdate,primarytt,silent" columns="subjectid,classids,teacherid,studentids">
+   </lessons>
+</timetable>

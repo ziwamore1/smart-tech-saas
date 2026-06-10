@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<>
+   <head version="20" name="aSc Handwritten" rtl="0"/>
+   <PrintObject m_nTyp="0" m_text="" m_strBmp="" m_rect.left="0" m_rect.top="109243" m_rect.right="1000000" m_rect.bottom="977309" m_align="0" font="" fontheader="" fontfooter="" m_bgColor="#FFFFFE" m_fontColor="#000C30" m_lineColor="#000000" m_lineTop="0" m_lineBottom="0" m_lineLeft="0" m_lineRight="0" m_lineMiddle="0" m_bAutoFont="-842150451" m_bOnTop="0"/>
+   <PrintObject m_nTyp="1" m_text="{#1635}" m_strBmp="" m_rect.left="216026" m_rect.top="0" m_rect.right="720721" m_rect.bottom="90000" m_align="0">
+      <font ratio="0.074700" width="0" weight="400" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="66" faceName="Brush Script MT"/>
+      <fontheader/>
+      <fontfooter/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000080</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <PrintObject m_nTyp="1" m_text="{#3148:#4055}" m_strBmp="" m_rect.left="0" m_rect.top="0" m_rect.right="153213" m_rect.bottom="86134" m_align="0">
+      <font ratio="0.050000" width="0" weight="100" escapement="0" italic="0" underline="0" strikeout="0" pitchAndFamily="34" faceName="Arial"/>
+      <fontheader/>
+      <fontfooter/>
+      <m_bgColor>#FFFFFE</m_bgColor>
+      <m_fontColor>#000C30</m_fontColor>
+      <m_lineColor>#000000</m_lineColor>
+      <m_lineTop>0</m_lineTop>
+      <m_lineBottom>0</m_lineBottom>
+      <m_lineLeft>0</m_lineLeft>
+      <m_lineRight>0</m_lineRight>
+      <m_lineMiddle>0</m_lineMiddle>
+      <m_bAutoFont>-842150451</m_bAutoFont>
+      <m_bOnTop>0</m_bOnTop>
+   </PrintObject>
+   <TimeTableSettings m_nFarbaLeftOnlyTriangle="0" m_nFarbaLeftOnly="0" m_nFarba1="0" m_nFarba2="0" m_bPrintFarebne="0" m_nSirkaCiaryLesson="1" m_nSirkaCiaryOkraj="1" m_nSirkaCiaryDen="1" m_strFont="Brush Script MT">
+      <m_ColorRectRowHeader m_nPaddingLeft="0" m_nPaddingRight="0" m_nPaddingTop="0" m_nPaddingBottom="0" m_bTlacitPozadie="1" m_rgbBackColor1="#FFFFFF" m_rgbBackColor2="#FFFFFF" m_rgbColorFont="#000080" m_strPicture=""/>
+      <m_ColorRectColumnHeader m_nPaddingLeft="0" m_nPaddingRight="0" m_nPaddingTop="0" m_nPaddingBottom="0" m_bTlacitPozadie="1" m_rgbBackColor1="#FFFFFF" m_rgbBackColor2="#FFFFFF" m_rgbColorFont="#000080" m_strPicture=""/>
+      <m_ColorRectCard m_nPaddingLeft="0" m_nPaddingRight="0" m_nPaddingTop="0" m_nPaddingBottom="0" m_bTlacitPozadie="0" m_rgbBackColor1="#FFFFFF" m_rgbBackColor2="#FFFFFF" m_rgbColorFont="#000080" m_strPicture=""/>
+      <m_ColorRectBreak m_nPaddingLeft="0" m_nPaddingRight="0" m_nPaddingTop="0" m_nPaddingBottom="0" m_bTlacitPozadie="1" m_rgbBackColor1="#FFFFFF" m_rgbBackColor2="#FFFFFF" m_rgbColorFont="#000080" m_strPicture=""/>
+      <m_ColorRectVnutro m_nPaddingLeft="0" m_nPaddingRight="0" m_nPaddingTop="0" m_nPaddingBottom="0" m_bTlacitPozadie="1" m_rgbBackColor1="#FFFFFF" m_rgbBackColor2="#FFFFFF" m_rgbColorFont="#000000" m_strPicture=""/>
+      <m_rgbColorCiara>#000080</m_rgbColorCiara>
+   </TimeTableSettings>
+</>

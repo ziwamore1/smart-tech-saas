@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DigitalStampService } from './digital-stamp.service';
+import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
 import * as puppeteer from 'puppeteer';
 import * as handlebars from 'handlebars';
 import * as fs from 'fs';
@@ -13,13 +14,14 @@ export class TemplateRendererService {
   constructor(
     private prisma: PrismaService,
     private digitalStampService: DigitalStampService,
+    private cloudinary: CloudinaryService,
   ) {}
 
   async getSchool(schoolId: string) {
     return this.prisma.school.findUnique({ where: { id: schoolId } });
   }
 
-  async renderPdfFromHtml(schoolId: string, templateId: string, html: string): Promise<Buffer> {
+  async renderPdfFromHtml(schoolId: string, templateId: string, html: string): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {
     const template = await this.prisma.reportTemplate.findFirst({
       where: { id: templateId, schoolId },
     });
@@ -33,7 +35,17 @@ export class TemplateRendererService {
       printBackground: true,
     });
     await browser.close();
-    return Buffer.from(pdf);
+    const buffer = Buffer.from(pdf);
+    try {
+      const result = await this.cloudinary.uploadBuffer(buffer, {
+        folder: `${FOLDERS.system}/render-templates`,
+        publicId: `render-${templateId}-${Date.now()}`,
+        resourceType: 'image',
+      });
+      return { buffer, url: result.secureUrl, publicId: result.publicId };
+    } catch {
+      return { buffer, url: null, publicId: null };
+    }
   }
 
   private async getBrowser() {
@@ -939,7 +951,7 @@ export class TemplateRendererService {
     </div>`;
   }
 
-  async renderPdf(schoolId: string, templateId: string, data?: any): Promise<Buffer> {
+  async renderPdf(schoolId: string, templateId: string, data?: any): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {
     const html = await this.renderPreview(schoolId, templateId, data);
 
     const template = await this.prisma.reportTemplate.findFirst({
@@ -965,6 +977,16 @@ export class TemplateRendererService {
     });
 
     await browser.close();
-    return Buffer.from(pdf);
+    const buffer = Buffer.from(pdf);
+    try {
+      const result = await this.cloudinary.uploadBuffer(buffer, {
+        folder: `${FOLDERS.system}/render-templates`,
+        publicId: `render-${templateId}-${Date.now()}`,
+        resourceType: 'image',
+      });
+      return { buffer, url: result.secureUrl, publicId: result.publicId };
+    } catch {
+      return { buffer, url: null, publicId: null };
+    }
   }
 }

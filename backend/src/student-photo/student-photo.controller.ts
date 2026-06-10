@@ -1,9 +1,8 @@
 import { Controller, Post, Get, Delete, Param, Req, UseGuards, UseInterceptors, UploadedFile, UploadedFiles, BadRequestException, Logger } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { v4 as uuidv4 } from 'uuid';
 import { StudentPhotoService } from './student-photo.service';
+import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
+import { cloudinaryMemoryStorage, CLOUDINARY_FILE_FILTER } from '../cloudinary/multer-cloudinary';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('student-photo')
@@ -11,24 +10,17 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 export class StudentPhotoController {
   private readonly logger = new Logger(StudentPhotoController.name);
 
-  constructor(private studentPhotoService: StudentPhotoService) {}
+  constructor(
+    private studentPhotoService: StudentPhotoService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
 
   @Post('upload/:studentId')
   @UseInterceptors(
     FileInterceptor('photo', {
-      storage: diskStorage({
-        destination: join(__dirname, '../../uploads/students'),
-        filename: (_req, file, cb) => {
-          const ext = extname(file.originalname).toLowerCase();
-          cb(null, `student-${uuidv4()}${ext}`);
-        },
-      }),
+      storage: cloudinaryMemoryStorage(),
+      fileFilter: CLOUDINARY_FILE_FILTER,
       limits: { fileSize: 5 * 1024 * 1024 },
-      fileFilter: (_req, file, cb) => {
-        const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-        if (allowed.includes(file.mimetype)) cb(null, true);
-        else cb(new BadRequestException('Only JPG, PNG, and WebP files are allowed'), false);
-      },
     }),
   )
   async uploadStudentPhoto(
@@ -36,19 +28,19 @@ export class StudentPhotoController {
     @Req() req: any,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.studentPhotoService.uploadStudentPhoto(studentId, req.user.id, file, req.user.schoolId);
+    const result = await this.cloudinary.upload(file, FOLDERS.users.students);
+    const { oldPublicId, ...data } = await this.studentPhotoService.uploadStudentPhoto(studentId, req.user.id, result.secureUrl, result.publicId, req.user.schoolId);
+    if (oldPublicId) {
+      await this.cloudinary.delete(oldPublicId).catch(() => {});
+    }
+    return data;
   }
 
   @Post('bulk-upload')
   @UseInterceptors(
     FilesInterceptor('photos', 50, {
-      storage: diskStorage({
-        destination: join(__dirname, '../../uploads/students'),
-        filename: (_req, file, cb) => {
-          const ext = extname(file.originalname).toLowerCase();
-          cb(null, `student-${uuidv4()}${ext}`);
-        },
-      }),
+      storage: cloudinaryMemoryStorage(),
+      fileFilter: CLOUDINARY_FILE_FILTER,
       limits: { fileSize: 5 * 1024 * 1024 },
     }),
   )
@@ -62,7 +54,11 @@ export class StudentPhotoController {
     for (const file of files) {
       try {
         const studentId = (file as any).fieldname;
-        const result = await this.studentPhotoService.uploadStudentPhoto(studentId, req.user.id, file, req.user.schoolId);
+        const cloudResult = await this.cloudinary.upload(file, FOLDERS.users.students);
+        const { oldPublicId, ...result } = await this.studentPhotoService.uploadStudentPhoto(studentId, req.user.id, cloudResult.secureUrl, cloudResult.publicId, req.user.schoolId);
+        if (oldPublicId) {
+          await this.cloudinary.delete(oldPublicId).catch(() => {});
+        }
         results.push({ success: true, studentId, ...result });
       } catch (err: any) {
         results.push({ success: false, studentId: (file as any).fieldname, error: err.message });
