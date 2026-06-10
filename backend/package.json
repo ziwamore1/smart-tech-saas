@@ -21,7 +21,8 @@
                     "prisma:generate":  "node ./node_modules/prisma/build/index.js generate",
                     "prisma:migrate":  "prisma migrate dev",
                     "prisma:push":  "prisma db push",
-                    "seed:learning-areas":  "npx ts-node prisma/seed-learning-areas.ts"
+"seed:learning-areas": "npx ts-node prisma/seed-learning-areas.ts",
+"migrate:cloudinary": "npx tsx prisma/migrate-cloudinary.ts"
                 },
     "dependencies":  {
                          "@nestjs/bull":  "^11.0.4",
