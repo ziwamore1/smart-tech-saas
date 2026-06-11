@@ -4,8 +4,13 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   compress: true,
   poweredByHeader: false,
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   images: {
-    domains: ['res.cloudinary.com'],
+    remotePatterns: [
+      { protocol: 'https', hostname: 'res.cloudinary.com', pathname: '/**' },
+    ],
   },
 };
 

@@ -1,27 +1,65 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #1e3a8a;
-  --color-primary-light: #3b82f6;
-  --color-accent: #f59e0b;
-  --color-accent-dark: #d97706;
-  --color-gray-50: #f9fafb;
-  --color-gray-100: #f3f4f6;
-  --color-gray-200: #e5e7eb;
-  --color-gray-300: #d1d5db;
-  --color-gray-400: #9ca3af;
-  --color-gray-500: #6b7280;
-  --color-gray-600: #4b5563;
-  --color-gray-700: #374151;
-  --color-gray-800: #1f2937;
-  --color-gray-900: #111827;
+  --color-primary: #0F4C81;
+  --color-primary-dark: #0B3A63;
+  --color-primary-light: #1A6BB5;
+  --color-secondary: #00AEEF;
+  --color-secondary-dark: #0095CC;
+  --color-accent: #00C896;
+  --color-accent-dark: #00A87E;
+  --color-surface: #F8FAFC;
+  --color-dark: #0B1220;
+  --color-dark-light: #152032;
+  --color-text: #111827;
+  --color-text-secondary: #4B5563;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-float-delayed: float 6s ease-in-out 2s infinite;
+  --animate-pulse-slow: pulse 4s ease-in-out infinite;
+  --animate-spin-slow: spin 20s linear infinite;
+  --animate-shimmer: shimmer 2s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
 }
 
 @layer base {
-  html {
-    scroll-behavior: smooth;
-  }
-  body {
-    @apply bg-white text-gray-800 antialiased;
-  }
+  html { scroll-behavior: smooth; }
+  body { @apply bg-surface text-text antialiased; }
+}
+
+@utility container-main {
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+@utility gradient-primary {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+}
+
+@utility gradient-hero {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 50%, var(--color-dark) 100%);
+}
+
+@utility gradient-dark {
+  background: linear-gradient(180deg, var(--color-dark) 0%, var(--color-dark-light) 100%);
+}
+
+@utility gradient-text {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
