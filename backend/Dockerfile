@@ -41,8 +41,7 @@ RUN npx prisma generate
 # Create logs directory
 RUN mkdir -p logs
 
-# Expose port
-EXPOSE 3001
+# Port auto-detected by Railway via PORT env var
 
 # Run as non-root user
 RUN addgroup -g 1001 -S nodejs && \
