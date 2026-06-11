@@ -27,13 +27,6 @@ async function bootstrap() {
   productionLogger.setLogLevels(ProductionLogger.getLogLevels());
   app.useLogger(productionLogger);
 
-  setupSecurity(app);
-
-  app.use((req: any, _res: any, next: any) => {
-    global.request = req;
-    next();
-  });
-
   app.enableCors({
     origin: [
       'http://localhost:3000',
@@ -44,6 +37,13 @@ async function bootstrap() {
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
+  });
+
+  setupSecurity(app);
+
+  app.use((req: any, _res: any, next: any) => {
+    global.request = req;
+    next();
   });
 
   app.use(compression());
