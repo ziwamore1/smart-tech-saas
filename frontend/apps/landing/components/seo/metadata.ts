@@ -4,6 +4,8 @@ export const siteConfig = {
   url: 'https://www.smarttechsaas.com',
   appUrl: 'https://app.smarttechsaas.com',
   apiUrl: 'https://api.smarttechsaas.com',
+  email: 'support@smarttechsaas.com',
+  phone: '+260 978805917',
   description:
     'AI-powered school management platform for modern education. Manage students, teachers, attendance, examinations, results, communication, AI learning, and school operations from a single intelligent platform.',
   keywords: [
@@ -37,6 +39,7 @@ export const organizationSchema = {
   contactPoint: {
     '@type': 'ContactPoint',
     email: 'support@smarttechsaas.com',
+    telephone: '+260978805917',
     contactType: 'customer support',
   },
   sameAs: [
