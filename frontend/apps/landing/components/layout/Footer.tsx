@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Mail, MapPin, Linkedin, Twitter, Facebook } from 'lucide-react';
+import { Mail, Phone, MapPin, Linkedin, Twitter, Facebook } from 'lucide-react';
 
 const footerLinks = {
   product: [
@@ -16,6 +16,7 @@ const footerLinks = {
   ],
   support: [
     { label: 'support@smarttechsaas.com', href: 'mailto:support@smarttechsaas.com' },
+    { label: '+260 978805917', href: 'tel:+260978805917' },
     { label: 'Help Center', href: '/faq' },
     { label: 'Book a Demo', href: '/demo' },
   ],
@@ -78,6 +79,7 @@ export default function Footer() {
                 <li key={link.href}>
                   <a href={link.href} className="text-sm text-gray-400 hover:text-secondary transition-colors flex items-center gap-2">
                     {link.href.startsWith('mailto') && <Mail className="w-3.5 h-3.5 shrink-0" />}
+                    {link.href.startsWith('tel') && <Phone className="w-3.5 h-3.5 shrink-0" />}
                     {link.label}
                   </a>
                 </li>
