@@ -6,8 +6,10 @@ export class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
-    if (!process.env.EMAIL_PASSWORD) {
-      console.warn('[EmailService] EMAIL_PASSWORD is not set — emails will fail');
+    const pass = process.env.EMAIL_PASSWORD || process.env.ZOHO_SMTP_PASSWORD || '';
+
+    if (!pass) {
+      console.warn('[EmailService] EMAIL_PASSWORD / ZOHO_SMTP_PASSWORD is not set — emails will fail');
     }
 
     this.transporter = nodemailer.createTransport({
@@ -17,7 +19,7 @@ export class EmailService {
       requireTLS: true,
       auth: {
         user: 'noreply@smarttechsaas.com',
-        pass: process.env.EMAIL_PASSWORD || '',
+        pass,
       },
       connectionTimeout: 10000,
       greetingTimeout: 10000,
