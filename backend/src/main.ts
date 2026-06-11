@@ -21,6 +21,7 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3002',
   'https://app.smarttechsaas.com',
   'https://www.smarttechsaas.com',
+  'https://smart-tech-saas-production.up.railway.app',
 ];
 
 function corsMiddleware(req: Request, res: Response, next: NextFunction) {
