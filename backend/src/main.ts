@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { join } from 'path';
 import compression from 'compression';
 import * as Sentry from '@sentry/node';
@@ -87,4 +87,15 @@ async function bootstrap() {
   productionLogger.log(`Version: ${process.env.npm_package_version || '2.0.0'}`);
 }
 
-bootstrap();
+process.on('unhandledRejection', (reason) => {
+  console.error('UNHANDLED REJECTION:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err);
+});
+
+bootstrap().catch((err) => {
+  console.error('BOOTSTRAP FAILED:', err);
+  process.exit(1);
+});
