@@ -19,6 +19,10 @@ export class SentryFilter extends BaseExceptionFilter {
         Sentry.captureException(exception);
       }
     }
-    super.catch(exception, host);
+    try {
+      super.catch(exception, host);
+    } catch {
+      // ignore if response already handled
+    }
   }
 }

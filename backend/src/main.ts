@@ -58,6 +58,8 @@ async function bootstrap() {
   productionLogger.setLogLevels(ProductionLogger.getLogLevels());
   app.useLogger(productionLogger);
 
+  app.set('trust proxy', 1);
+
   app.use(corsMiddleware);
   setupSecurity(app);
 
