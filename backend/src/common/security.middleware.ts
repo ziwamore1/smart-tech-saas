@@ -3,7 +3,12 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 
 export function setupSecurity(app: INestApplication) {
-  app.use(helmet());
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      contentSecurityPolicy: false,
+    }),
+  );
 
   app.use(
     rateLimit({
