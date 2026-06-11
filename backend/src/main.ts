@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { Request, Response, NextFunction } from 'express';
 import { join } from 'path';
 import compression from 'compression';
 import * as Sentry from '@sentry/node';
@@ -13,6 +14,31 @@ import { SentryInterceptor } from './common/sentry.interceptor';
 import { isSentryEnabled, getSentryConfig } from './common/sentry.config';
 import { setupSecurity } from './common/security.middleware';
 import { ProductionLogger } from './common/production-logger';
+
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'https://app.smarttechsaas.com',
+  'https://www.smarttechsaas.com',
+];
+
+function corsMiddleware(req: Request, res: Response, next: NextFunction) {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
+  next();
+}
 
 async function bootstrap() {
   if (isSentryEnabled()) {
@@ -27,18 +53,7 @@ async function bootstrap() {
   productionLogger.setLogLevels(ProductionLogger.getLogLevels());
   app.useLogger(productionLogger);
 
-  app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:3002',
-      'https://app.smarttechsaas.com',
-      'https://www.smarttechsaas.com',
-    ],
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    credentials: true,
-  });
-
+  app.use(corsMiddleware);
   setupSecurity(app);
 
   app.use((req: any, _res: any, next: any) => {
