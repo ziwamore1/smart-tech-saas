@@ -3,15 +3,27 @@ import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class EmailService {
-  private transporter = nodemailer.createTransport({
-    host: 'smtp.zoho.com',
-    port: 465,
-    secure: true,
-    auth: {
-      user: 'noreply@smarttechsaas.com',
-      pass: process.env.EMAIL_PASSWORD,
-    },
-  });
+  private transporter: nodemailer.Transporter;
+
+  constructor() {
+    if (!process.env.EMAIL_PASSWORD) {
+      console.warn('[EmailService] EMAIL_PASSWORD is not set — emails will fail');
+    }
+
+    this.transporter = nodemailer.createTransport({
+      host: 'smtp.zoho.com',
+      port: 587,
+      secure: false,
+      requireTLS: true,
+      auth: {
+        user: 'noreply@smarttechsaas.com',
+        pass: process.env.EMAIL_PASSWORD || '',
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    });
+  }
 
   async sendMail(to: string, subject: string, html: string) {
     return this.transporter.sendMail({
