@@ -40,6 +40,7 @@ async function bootstrap() {
       'http://localhost:3001',
       'http://localhost:3002',
       'https://app.smarttechsaas.com',
+      'https://www.smarttechsaas.com',
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
