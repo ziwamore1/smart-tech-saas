@@ -664,7 +664,7 @@ model StudentPhoto {
   photoPublicId  String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  student        Student  @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student        Student  @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   uploadedBy     User     @relation(fields: [uploadedById], references: [id])
 
   @@index([studentId])
@@ -1390,7 +1390,7 @@ model ReportTemplate {
   updatedAt             DateTime               @updatedAt
   school                School                 @relation(fields: [schoolId], references: [id])
   category              TemplateCategory?      @relation(fields: [categoryId], references: [id])
-  parent                ReportTemplate?        @relation("TemplateVersions", fields: [parentId], references: [id])
+  parent                ReportTemplate?        @relation("TemplateVersions", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   versions              ReportTemplate[]       @relation("TemplateVersions")
   components            TemplateComponent[]
   certificate           CertificateTemplate?
@@ -1440,7 +1440,7 @@ model TemplateComponent {
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
   template    ReportTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  parent      TemplateComponent?  @relation("ComponentChildren", fields: [parentId], references: [id])
+  parent      TemplateComponent?  @relation("ComponentChildren", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   children    TemplateComponent[] @relation("ComponentChildren")
 
   @@index([templateId])
@@ -1922,7 +1922,7 @@ model QuestionBankCategory {
   subjectId   String
   schoolId    String
   parentId    String?
-  parent      QuestionBankCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  parent      QuestionBankCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   children    QuestionBankCategory[] @relation("CategoryTree")
   questions   QuestionBank[]
   createdAt   DateTime               @default(now())
@@ -2132,8 +2132,8 @@ model LearningArea {
   subjectId String
   schoolId  String
   scores    CompetencyScore[]
-  school    School            @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  subject   Subject           @relation(fields: [subjectId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  school    School            @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  subject   Subject           @relation(fields: [subjectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([name, subjectId, schoolId])
   @@index([subjectId])
@@ -2147,10 +2147,10 @@ model CompetencyScore {
   schoolId       String
   score          Float
   createdAt      DateTime     @default(now())
-  learningArea   LearningArea @relation(fields: [learningAreaId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  school         School       @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  term           Term         @relation(fields: [termId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  learningArea   LearningArea @relation(fields: [learningAreaId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  school         School       @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  term           Term         @relation(fields: [termId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([studentId, learningAreaId, termId])
   @@index([studentId])
@@ -2166,7 +2166,7 @@ model Intervention {
   schoolId    String
   isActive    Boolean               @default(true)
   createdAt   DateTime              @default(now())
-  school      School                @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  school      School                @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   assignments StudentIntervention[]
 
   @@index([schoolId])
@@ -2183,9 +2183,9 @@ model StudentIntervention {
   outcomeScore   Float?
   notes          String?
   schoolId       String
-  intervention   Intervention         @relation(fields: [interventionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  school         School               @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  student        Student              @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  intervention   Intervention         @relation(fields: [interventionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  school         School               @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  student        Student              @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([studentId, interventionId, assignedAt])
   @@index([studentId])
@@ -2203,8 +2203,8 @@ model BehavioralRecord {
   recordedById String?
   schoolId     String
   createdAt    DateTime         @default(now())
-  school       School           @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  student      Student          @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  school       School           @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  student      Student          @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([studentId])
   @@index([recordDate])
@@ -2223,9 +2223,9 @@ model StudentGrowthRecord {
   status     GrowthStatus @default(STABLE)
   snapshot   Json?
   createdAt  DateTime     @default(now())
-  school     School       @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  student    Student      @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  term       Term         @relation(fields: [termId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  school     School       @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  student    Student      @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  term       Term         @relation(fields: [termId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([studentId, termId])
   @@index([studentId])
@@ -2247,7 +2247,7 @@ model NationalBenchmark {
   source     String?
   metadata   Json?
   createdAt  DateTime @default(now())
-  subject    Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  subject    Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([subjectId, year, termName])
   @@index([subjectId])
@@ -2266,9 +2266,9 @@ model AiTutorSession {
   updatedAt         DateTime           @default(now()) @updatedAt
   feedback          AiTutorFeedback?
   messages          AiTutorMessage[]
-  school            School             @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  student           Student?           @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  user              User?              @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  school            School             @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  student           Student?           @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user              User?              @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   aiContextMemories AiContextMemory[]
   aiRecommendations AiRecommendation[]
 
@@ -2284,7 +2284,7 @@ model AiTutorMessage {
   content   String
   metadata  Json?
   createdAt DateTime       @default(now())
-  session   AiTutorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  session   AiTutorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([sessionId])
 }
@@ -2296,7 +2296,7 @@ model AiTutorFeedback {
   helpful   Boolean?
   comment   String?
   createdAt DateTime       @default(now())
-  session   AiTutorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  session   AiTutorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 }
 
 model LearningStyleProfile {
@@ -2311,8 +2311,8 @@ model LearningStyleProfile {
   schoolId         String
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @default(now()) @updatedAt
-  school           School    @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  student          Student   @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  school           School    @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  student          Student   @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([schoolId])
 }
@@ -2329,9 +2329,9 @@ model AdaptiveTestSession {
   status          AdaptiveTestStatus     @default(IN_PROGRESS)
   schoolId        String
   responses       AdaptiveTestResponse[]
-  school          School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  student         Student                @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  subject         Subject                @relation(fields: [subjectId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  school          School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  student         Student                @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  subject         Subject                @relation(fields: [subjectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([studentId])
   @@index([schoolId])
@@ -2349,7 +2349,7 @@ model AdaptiveTestResponse {
   discrimination Float               @default(0.3)
   guessed        Boolean             @default(false)
   responseTime   Int?
-  session        AdaptiveTestSession @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  session        AdaptiveTestSession @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([sessionId])
 }
@@ -3398,9 +3398,9 @@ model AiContextMemory {
   weakness     String?
   schoolId     String
   createdAt    DateTime        @default(now())
-  school       School          @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  student      Student         @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  session      AiTutorSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  school       School          @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  student      Student         @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  session      AiTutorSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([studentId])
   @@index([schoolId])
@@ -3418,9 +3418,9 @@ model AiRecommendation {
   isApplied   Boolean         @default(false)
   schoolId    String
   createdAt   DateTime        @default(now())
-  school      School          @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  student     Student         @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  session     AiTutorSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  school      School          @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  student     Student         @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  session     AiTutorSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([studentId])
   @@index([schoolId])
@@ -3437,8 +3437,8 @@ model AiTopicMastery {
   lastAssessed DateTime @default(now())
   schoolId     String
   createdAt    DateTime @default(now())
-  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([studentId, subjectId, topic])
   @@index([studentId])
