@@ -1,9 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import * as dns from 'dns';
 
 @Injectable()
 export class EmailService {
   private transporter: nodemailer.Transporter;
+  private readonly SMTP_HOSTS = [
+    { host: 'smtp.zoho.com', port: 587, secure: false },
+    { host: 'smtp.zoho.com', port: 465, secure: true },
+    { host: 'smtp.zoho.com.au', port: 587, secure: false },
+    { host: 'smtppro.zoho.com', port: 587, secure: false },
+  ];
 
   constructor() {
     const pass = process.env.EMAIL_PASSWORD || process.env.ZOHO_SMTP_PASSWORD || '';
@@ -11,6 +18,14 @@ export class EmailService {
     if (!pass) {
       console.warn('[EmailService] EMAIL_PASSWORD / ZOHO_SMTP_PASSWORD is not set — emails will fail');
     }
+
+    dns.resolve4('smtp.zoho.com', (err, addresses) => {
+      if (err) {
+        console.error('[EmailService] DNS resolution failed for smtp.zoho.com:', err.code);
+      } else {
+        console.log(`[EmailService] smtp.zoho.com resolves to: ${addresses.join(', ')}`);
+      }
+    });
 
     this.transporter = nodemailer.createTransport({
       host: 'smtp.zoho.com',
@@ -21,9 +36,10 @@ export class EmailService {
         user: 'noreply@smarttechsaas.com',
         pass,
       },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 15000,
+      connectionTimeout: 20000,
+      greetingTimeout: 20000,
+      socketTimeout: 20000,
+      tls: { rejectUnauthorized: false },
     });
   }
 
