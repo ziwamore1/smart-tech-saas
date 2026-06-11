@@ -41,13 +41,18 @@ function corsMiddleware(req: Request, res: Response, next: NextFunction) {
 }
 
 async function bootstrap() {
+  const t0 = Date.now();
+  console.log('[bootstrap] starting');
+
   if (isSentryEnabled()) {
     Sentry.init(getSentryConfig());
   }
 
+  console.log('[bootstrap] creating NestFactory...');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ProductionLogger.getLogLevels(),
   });
+  console.log(`[bootstrap] NestFactory.create completed in ${Date.now() - t0}ms`);
 
   const productionLogger = app.get(ProductionLogger);
   productionLogger.setLogLevels(ProductionLogger.getLogLevels());
@@ -81,11 +86,27 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor(), new SentryInterceptor());
 
   const port = process.env.PORT || 3001;
+  console.log(`[bootstrap] listening on port ${port}...`);
   await app.listen(port, '0.0.0.0');
+  console.log(`[bootstrap] app.listen completed`);
   productionLogger.log(`Application is running on: http://0.0.0.0:${port}/api/v1`);
   productionLogger.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   productionLogger.log(`Version: ${process.env.npm_package_version || '2.0.0'}`);
 }
+
+const STARTUP_TIMEOUT = 120_000;
+const startupTimer = setTimeout(() => {
+  console.error(`[bootstrap] TIMEOUT after ${STARTUP_TIMEOUT}ms — app failed to start`);
+  process.exit(1);
+}, STARTUP_TIMEOUT);
+
+bootstrap()
+  .then(() => clearTimeout(startupTimer))
+  .catch((err) => {
+    clearTimeout(startupTimer);
+    console.error('BOOTSTRAP FAILED:', err);
+    process.exit(1);
+  });
 
 process.on('unhandledRejection', (reason) => {
   console.error('UNHANDLED REJECTION:', reason);
@@ -93,9 +114,4 @@ process.on('unhandledRejection', (reason) => {
 
 process.on('uncaughtException', (err) => {
   console.error('UNCAUGHT EXCEPTION:', err);
-});
-
-bootstrap().catch((err) => {
-  console.error('BOOTSTRAP FAILED:', err);
-  process.exit(1);
 });
