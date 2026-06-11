@@ -75,6 +75,7 @@ import { InstitutionModule } from './institution/institution.module';
 import { StaffSyncEngineModule } from './shared/staff-sync-engine/staff-sync-engine.module';
 import { StaffRecordsModule } from './premium/staff-records-service/staff-records.module';
 import { StaffPositionModule } from './staff-position/staff-position.module';
+import { ContactModule } from './contact/contact.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { ProductionLogger } from './common/production-logger';
 
@@ -180,6 +181,7 @@ import { ProductionLogger } from './common/production-logger';
     StaffPositionModule,
     HealthModule,
     InstitutionModule,
+    ContactModule,
     CloudinaryModule,
   ],
   providers: [ProductionLogger],
