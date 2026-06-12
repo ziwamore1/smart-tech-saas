@@ -4,6 +4,7 @@ import { MinistryAdapterFactory } from '../ministry-gateway/adapters/adapter-fac
 import { BlockchainService } from '../blockchain-service/blockchain.service';
 import Redis from 'ioredis';
 import { REDIS_CLIENT_TOKEN } from '../queues/queue-definitions';
+import { Pool } from 'pg';
 
 export interface HealthCheckResult {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -95,8 +96,11 @@ export class HealthService {
 
   private async checkDatabase(): Promise<HealthCheck> {
     const start = Date.now();
+    let pool;
     try {
-      await this.prisma.$queryRawUnsafe('SELECT 1');
+      const directUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
+      pool = new Pool({ connectionString: directUrl, max: 1, connectionTimeoutMillis: 5000 });
+      await pool.query('SELECT 1');
       const latency = Date.now() - start;
       return {
         status: latency > 1000 ? 'degraded' : 'up',
@@ -108,6 +112,8 @@ export class HealthService {
         status: 'down',
         message: `Database connection failed: ${error.message}`,
       };
+    } finally {
+      if (pool) await pool.end().catch(() => {});
     }
   }
 
