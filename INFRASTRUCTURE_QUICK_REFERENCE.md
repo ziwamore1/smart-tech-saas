@@ -17,10 +17,10 @@ Nginx (SSL Termination, Reverse Proxy, Rate Limiting)
 │  :3000     │  :3001     │  Smart Contracts  │
 └────────────┴─────┬──────┴─────────┬─────────┘
                    │                │
-              ┌────▼────┐      ┌────▼────┐
-              │PostgreSQL│      │ Ministry│
-              │  Redis   │      │  APIs   │
-              └─────────┘      └─────────┘
+               ┌────▼────┐      ┌────▼────┐
+               │PostgreSQL│      │ Ministry│
+               │ (Queues) │      │  APIs   │
+               └─────────┘      └─────────┘
 ```
 
 ---

@@ -18,6 +18,7 @@ const connection = new IORedis(redisUrl, {
   enableReadyCheck: false,
   lazyConnect: true,
   retryStrategy: () => null,
+  enableOfflineQueue: false,
   connectTimeout: 5000,
   commandTimeout: 5000,
 });
@@ -71,8 +72,8 @@ const createSolverWorker = (workerId: number) => {
     {
       connection,
       concurrency: 2,
-      drainDelay: 30000,
-      stalledInterval: 120000,
+      drainDelay: 60000,
+      stalledInterval: 300000,
     }
   );
 

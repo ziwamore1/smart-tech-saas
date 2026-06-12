@@ -2,7 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { ReportCardService } from '../report-card/report-card.service';
 
-@Processor('publishing', { drainDelay: 30000, stalledInterval: 120000 })
+@Processor('publishing', { drainDelay: 60000, stalledInterval: 300000 })
 export class PublishingWorker extends WorkerHost {
   constructor(private reportCardService: ReportCardService) {
     super();

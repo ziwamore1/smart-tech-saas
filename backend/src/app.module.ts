@@ -48,6 +48,7 @@ import { LessonPlanModule } from './lesson-plan/lesson-plan.module';
 import { IntelligenceModule } from './intelligence/intelligence.module';
 import { ReportQueueModule } from './report-queue/report-queue.module';
 import { QueuesModule } from './queues/queues.module';
+import { PgQueuesModule } from './queues/pg-queues.module';
 import { ReportTemplateBuilderModule } from './report-template-builder/report-template-builder.module';
 import { ProfileModule } from './profile/profile.module';
 import { StudentPhotoModule } from './student-photo/student-photo.module';
@@ -61,7 +62,6 @@ import { QrModule } from './qr-service/qr.module';
 import { CertificateValidationModule } from './certificate-validation-service/certificate-validation.module';
 import { VerificationModule } from './verification-service/verification.module';
 import { ApprovalModule } from './approval-service/approval.module';
-import { HealthModule } from './common/health.module';
 import { BeemModule } from './beem/beem.module';
 import { AssessmentEngineModule } from './assessment-engine/assessment-engine.module';
 import { GradingEngineModule } from './grading-engine/grading-engine.module';
@@ -77,39 +77,23 @@ import { StaffRecordsModule } from './premium/staff-records-service/staff-record
 import { StaffPositionModule } from './staff-position/staff-position.module';
 import { ContactModule } from './contact/contact.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { HealthModule } from './common/health.module';
 import { ProductionLogger } from './common/production-logger';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    BullModule.forRootAsync({
-      useFactory: () => {
-        const redisUrl = process.env.REDIS_URL;
-        if (redisUrl) {
-          try {
-            const url = new URL(redisUrl);
-            return {
-              connection: {
-                host: url.hostname,
-                port: parseInt(url.port || '6379', 10),
-                password: url.password ? decodeURIComponent(url.password) : undefined,
-                tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
-                retryStrategy: () => null,
-                lazyConnect: true,
-                maxRetriesPerRequest: null,
-                enableOfflineQueue: false,
-                connectTimeout: 5000,
-                commandTimeout: 5000,
-              },
-            };
-          } catch {
-            console.error('[BullModule] Invalid REDIS_URL');
-          }
-        }
-        return {
+    ...(() => {
+      const redisUrl = process.env.REDIS_URL;
+      if (!redisUrl) return [];
+      try {
+        const url = new URL(redisUrl);
+        return [BullModule.forRoot({
           connection: {
-            host: '127.0.0.1',
-            port: 6379,
+            host: url.hostname,
+            port: parseInt(url.port || '6379', 10),
+            password: url.password ? decodeURIComponent(url.password) : undefined,
+            tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
             retryStrategy: () => null,
             lazyConnect: true,
             maxRetriesPerRequest: null,
@@ -117,9 +101,12 @@ import { ProductionLogger } from './common/production-logger';
             connectTimeout: 5000,
             commandTimeout: 5000,
           },
-        };
-      },
-    }),
+        })];
+      } catch {
+        console.error('[BullModule] Invalid REDIS_URL');
+        return [];
+      }
+    })(),
     CommonModule,
     AuthModule,
     PrismaModule,
@@ -168,6 +155,7 @@ import { ProductionLogger } from './common/production-logger';
     IntelligenceModule,
     ReportQueueModule,
     QueuesModule,
+    PgQueuesModule,
     ReportTemplateBuilderModule,
     ProfileModule,
     StudentPhotoModule,

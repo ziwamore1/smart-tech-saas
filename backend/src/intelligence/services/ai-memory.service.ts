@@ -23,23 +23,42 @@ const MAX_RECENT = 10;
 @Injectable()
 export class AiMemoryService {
   private readonly logger = new Logger(AiMemoryService.name);
+  private readonly localCache = new Map<string, ConversationMemory>();
+  private redisAvailable = true;
 
   constructor(
-    @Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis,
-  ) {}
+    @Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis | null,
+  ) {
+    if (redis) {
+      redis.on('error', () => { this.redisAvailable = false; });
+      redis.on('ready', () => { this.redisAvailable = true; });
+      redis.on('connect', () => { this.redisAvailable = true; });
+    } else {
+      this.redisAvailable = false;
+    }
+  }
 
   private key(studentId: string, sessionId?: string): string {
     return `${KEY_PREFIX}${studentId}${sessionId ? `:${sessionId}` : ''}`;
   }
 
   async getOrCreate(studentId: string, sessionId?: string): Promise<ConversationMemory> {
-    const raw = await this.redis.get(this.key(studentId, sessionId));
-    if (raw) {
-      try {
-        return JSON.parse(raw) as ConversationMemory;
-      } catch {
-        return this.defaultMemory();
+    if (!this.redisAvailable) {
+      const cached = this.localCache.get(this.key(studentId, sessionId));
+      return cached ? { ...cached } : this.defaultMemory();
+    }
+
+    try {
+      const raw = await this.redis!.get(this.key(studentId, sessionId));
+      if (raw) {
+        const parsed = JSON.parse(raw) as ConversationMemory;
+        this.localCache.set(this.key(studentId, sessionId), parsed);
+        return parsed;
       }
+    } catch {
+      this.redisAvailable = false;
+      const cached = this.localCache.get(this.key(studentId, sessionId));
+      if (cached) return { ...cached };
     }
     return this.defaultMemory();
   }
@@ -63,7 +82,16 @@ export class AiMemoryService {
       ].slice(-MAX_RECENT);
     }
 
-    await this.redis.setex(this.key(studentId, sessionId), TTL_SECONDS, JSON.stringify(updated));
+    this.localCache.set(this.key(studentId, sessionId), { ...updated });
+
+    if (this.redisAvailable) {
+      try {
+        await this.redis!.setex(this.key(studentId, sessionId), TTL_SECONDS, JSON.stringify(updated));
+      } catch {
+        this.redisAvailable = false;
+      }
+    }
+
     return updated;
   }
 
@@ -79,7 +107,15 @@ export class AiMemoryService {
   }
 
   async clear(studentId: string, sessionId?: string): Promise<void> {
-    await this.redis.del(this.key(studentId, sessionId));
+    this.localCache.delete(this.key(studentId, sessionId));
+
+    if (this.redisAvailable) {
+      try {
+        await this.redis!.del(this.key(studentId, sessionId));
+      } catch {
+        this.redisAvailable = false;
+      }
+    }
   }
 
   private defaultMemory(): ConversationMemory {

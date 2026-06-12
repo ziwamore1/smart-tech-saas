@@ -6,8 +6,6 @@ import { expandLessons } from './solver/lesson-expander';
 import { buildConstraints } from './solver/constraint-builder';
 import { TimetableGateway } from './timetable.gateway';
 import { solveTimetable } from './solver/solver';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
 import { generateTimetableHybrid, HybridConfig } from '../timetable-engine/solver/fastHybridSolver';
 import { TimetableCache, SlotIndex } from '../timetable-engine/entities/cache';
 import { Lesson } from '../timetable-engine/solver/fastCSPSolver';
@@ -31,12 +29,11 @@ export class TimetableService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timetableGateway: TimetableGateway,
-    @InjectQueue('timetable') private timetableQueue: Queue,
   ) {}
 
   async queueTimetableGeneration(schoolId: string) {
-    await this.timetableQueue.add('generate', { schoolId });
-    return { message: 'Timetable generation started' };
+    this.timetableGateway.server?.emit('timetable:started', { schoolId });
+    return { message: 'Timetable generation started — processing synchronously' };
   }
 
   // ---------------- Lesson Requirement ----------------

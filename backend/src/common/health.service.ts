@@ -1,9 +1,7 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MinistryAdapterFactory } from '../ministry-gateway/adapters/adapter-factory';
 import { BlockchainService } from '../blockchain-service/blockchain.service';
-import Redis from 'ioredis';
-import { REDIS_CLIENT_TOKEN } from '../queues/queue-definitions';
 import { Pool } from 'pg';
 
 export interface HealthCheckResult {
@@ -29,25 +27,16 @@ export class HealthService {
     private prisma: PrismaService,
     private ministryAdapterFactory: MinistryAdapterFactory,
     private blockchainService: BlockchainService,
-    @Inject(REDIS_CLIENT_TOKEN) private redis: Redis,
   ) {}
 
   async check(): Promise<HealthCheckResult> {
     const checks: Record<string, HealthCheck> = {};
 
-    // Database check
     checks.database = await this.checkDatabase();
-
-    // Ministry adapters check
     checks.ministry = await this.checkMinistryAdapters();
-
-    // Blockchain check
     checks.blockchain = await this.checkBlockchain();
-
-    // Memory check
     checks.memory = this.checkMemory();
 
-    // Determine overall status
     const allStatuses = Object.values(checks).map(c => c.status);
     let status: HealthCheckResult['status'] = 'healthy';
 
@@ -74,7 +63,6 @@ export class HealthService {
     checks.blockchain = await this.checkBlockchain();
     checks.memory = this.checkMemory();
     checks.disk = this.checkDisk();
-    checks.redis = await this.checkRedis();
 
     const allStatuses = Object.values(checks).map(c => c.status);
     let status: HealthCheckResult['status'] = 'healthy';
@@ -175,33 +163,9 @@ export class HealthService {
   }
 
   private checkDisk(): HealthCheck {
-    // In production, you'd use fs.statfs or similar
     return {
       status: 'up',
       message: 'Disk check not implemented',
     };
-  }
-
-  private async checkRedis(): Promise<HealthCheck> {
-    try {
-      const start = Date.now();
-      await Promise.race([
-        this.redis.ping(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Redis ping timed out after 5s')), 5000),
-        ),
-      ]);
-      const latency = Date.now() - start;
-      return {
-        status: 'up',
-        message: `Pong in ${latency}ms`,
-        latency,
-      };
-    } catch (error) {
-      return {
-        status: 'down',
-        message: `Redis ping failed: ${error.message}`,
-      };
-    }
   }
 }

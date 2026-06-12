@@ -12,6 +12,7 @@ const connection = new IORedis(redisUrl, {
   enableReadyCheck: false,
   lazyConnect: true,
   retryStrategy: () => null,
+  enableOfflineQueue: false,
   connectTimeout: 5000,
   commandTimeout: 5000,
 });
