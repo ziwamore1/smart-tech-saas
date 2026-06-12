@@ -3,7 +3,7 @@ import IORedis from 'ioredis';
 
 const redisUrl = process.env.REDIS_URL || '';
 const connection = redisUrl.startsWith('rediss://')
-  ? new IORedis(redisUrl, { maxRetriesPerRequest: null, lazyConnect: true, enableReadyCheck: false, connectTimeout: 5000, commandTimeout: 5000 })
+  ? new IORedis(redisUrl, { maxRetriesPerRequest: null, lazyConnect: true, enableReadyCheck: false, retryStrategy: () => null, enableOfflineQueue: false, connectTimeout: 5000, commandTimeout: 5000 })
   : undefined;
 
 export const publishingQueue = connection

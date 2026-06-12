@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Queue, Job } from 'bullmq';
 import Redis from 'ioredis';
 import { REDIS_CLIENT_TOKEN, QUEUE_DEFAULT_OPTIONS, QueueName } from './queue-definitions';
@@ -7,14 +7,24 @@ import { REDIS_CLIENT_TOKEN, QUEUE_DEFAULT_OPTIONS, QueueName } from './queue-de
 export class QueuesService {
   private readonly logger = new Logger(QueuesService.name);
   private readonly queues = new Map<string, Queue>();
+  private readonly redisAvailable: boolean;
 
-  constructor(@Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis) {}
+  constructor(@Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis | null) {
+    this.redisAvailable = !!redis;
+    if (!this.redisAvailable) {
+      this.logger.warn('Redis unavailable — BullMQ queues disabled');
+    }
+  }
 
   getQueue(name: string): Queue {
+    if (!this.redisAvailable) {
+      throw new Error(`Redis unavailable — cannot access queue '${name}'`);
+    }
+
     if (!this.queues.has(name)) {
       const defaultOpts = QUEUE_DEFAULT_OPTIONS[name as QueueName];
       const queue = new Queue(name, {
-        connection: this.redis,
+        connection: this.redis!,
         defaultJobOptions: defaultOpts || {
           attempts: 3,
           backoff: { type: 'exponential', delay: 2000 },
@@ -34,7 +44,11 @@ export class QueuesService {
     jobName: string,
     data: Record<string, any>,
     opts?: { jobId?: string; priority?: number; delay?: number },
-  ): Promise<Job> {
+  ): Promise<Job | null> {
+    if (!this.redisAvailable) {
+      this.logger.warn(`Redis unavailable — skipping addJob to '${queueName}'`);
+      return null;
+    }
     const queue = this.getQueue(queueName);
     const job = await queue.add(jobName, data, {
       jobId: opts?.jobId,
@@ -45,12 +59,14 @@ export class QueuesService {
     return job;
   }
 
-  async getJob(queueName: string, jobId: string): Promise<Job | undefined> {
+  async getJob(queueName: string, jobId: string): Promise<Job | undefined | null> {
+    if (!this.redisAvailable) return null;
     const queue = this.getQueue(queueName);
     return queue.getJob(jobId);
   }
 
   async getJobStatus(queueName: string, jobId: string) {
+    if (!this.redisAvailable) return null;
     const queue = this.getQueue(queueName);
     const job = await queue.getJob(jobId);
     if (!job) return null;
@@ -71,6 +87,7 @@ export class QueuesService {
   }
 
   async getQueueStats(queueName: string) {
+    if (!this.redisAvailable) return null;
     const queue = this.getQueue(queueName);
     const [waiting, active, completed, failed, delayed, paused] = await Promise.all([
       queue.getWaitingCount(),
@@ -85,9 +102,10 @@ export class QueuesService {
   }
 
   async getAllQueueStats() {
+    if (!this.redisAvailable) return [];
     const names = this.getRegisteredQueueNames();
     const stats = await Promise.all(names.map((name) => this.getQueueStats(name)));
-    return stats;
+    return stats.filter(Boolean);
   }
 
   getRegisteredQueueNames(): string[] {
@@ -95,18 +113,21 @@ export class QueuesService {
   }
 
   async pauseQueue(queueName: string) {
+    if (!this.redisAvailable) throw new Error('Redis unavailable');
     const queue = this.getQueue(queueName);
     await queue.pause();
     this.logger.log(`Queue '${queueName}' paused`);
   }
 
   async resumeQueue(queueName: string) {
+    if (!this.redisAvailable) throw new Error('Redis unavailable');
     const queue = this.getQueue(queueName);
     await queue.resume();
     this.logger.log(`Queue '${queueName}' resumed`);
   }
 
   async cleanQueue(queueName: string, hours = 24) {
+    if (!this.redisAvailable) throw new Error('Redis unavailable');
     const queue = this.getQueue(queueName);
     const timestamp = hours * 60 * 60 * 1000;
     await queue.clean(timestamp, 100, 'completed');
@@ -115,12 +136,14 @@ export class QueuesService {
   }
 
   async drainQueue(queueName: string) {
+    if (!this.redisAvailable) throw new Error('Redis unavailable');
     const queue = this.getQueue(queueName);
     await queue.drain();
     this.logger.log(`Queue '${queueName}' drained`);
   }
 
   async getFailedJobs(queueName: string, start = 0, end = 20) {
+    if (!this.redisAvailable) return [];
     const queue = this.getQueue(queueName);
     const jobs = await queue.getJobs(['failed'], start, end);
     return Promise.all(
@@ -137,6 +160,7 @@ export class QueuesService {
   }
 
   async retryJob(queueName: string, jobId: string) {
+    if (!this.redisAvailable) throw new Error('Redis unavailable');
     const queue = this.getQueue(queueName);
     const job = await queue.getJob(jobId);
     if (!job) throw new Error(`Job ${jobId} not found in queue '${queueName}'`);
@@ -145,6 +169,7 @@ export class QueuesService {
   }
 
   async removeJob(queueName: string, jobId: string) {
+    if (!this.redisAvailable) throw new Error('Redis unavailable');
     const queue = this.getQueue(queueName);
     const job = await queue.getJob(jobId);
     if (!job) throw new Error(`Job ${jobId} not found in queue '${queueName}'`);

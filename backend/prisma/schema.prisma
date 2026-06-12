@@ -6,7 +6,6 @@ datasource db {
   provider          = "postgresql"
   url               = env("DATABASE_URL")
   directUrl         = env("DIRECT_URL")
-  connectionLimit   = 1
 }
 
 model SystemUser {
@@ -1720,11 +1719,13 @@ model Notification {
   data      Json?
   isRead    Boolean  @default(false)
   type      String   @default("general")
+  role      String?
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([isRead])
+  @@index([role])
   @@index([createdAt])
 }
 
@@ -4422,4 +4423,52 @@ model Media {
   @@index([publicId])
   @@index([uploadedBy])
   @@index([createdAt])
+}
+
+model EmailQueue {
+  id          String    @id @default(uuid())
+  recipient   String
+  subject     String
+  body        String
+  status      String    @default("pending")
+  attempts    Int       @default(0)
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  error       String?
+  createdAt   DateTime  @default(now())
+
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model SmsQueue {
+  id          String    @id @default(uuid())
+  phoneNumber String
+  message     String
+  provider    String    @default("beem")
+  status      String    @default("pending")
+  attempts    Int       @default(0)
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  error       String?
+  createdAt   DateTime  @default(now())
+
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model WhatsAppQueue {
+  id           String    @id @default(uuid())
+  phoneNumber  String
+  message      String
+  templateName String?
+  status       String    @default("pending")
+  attempts     Int       @default(0)
+  scheduledAt  DateTime?
+  sentAt       DateTime?
+  error        String?
+  createdAt    DateTime  @default(now())
+
+  @@index([status])
+  @@index([scheduledAt])
 }

@@ -2,7 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
-@Processor('cloudinary-cleanup', { drainDelay: 30000, stalledInterval: 120000 })
+@Processor('cloudinary-cleanup', { drainDelay: 60000, stalledInterval: 300000 })
 export class CloudinaryCleanupWorker extends WorkerHost {
   constructor(private cloudinary: CloudinaryService) {
     super();

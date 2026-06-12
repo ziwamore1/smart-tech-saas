@@ -42,10 +42,7 @@ sudo apt install -y nodejs
 # PostgreSQL (v14+)
 sudo apt install -y postgresql postgresql-contrib
 
-# Redis
-sudo apt install -y redis-server
-
-# Nginx
+# Nginx (Redis is no longer required — all queue functionality uses PostgreSQL)
 sudo apt install -y nginx
 
 # Certbot
@@ -131,7 +128,16 @@ SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
 
-# SMS (Optional)
+# Beem SMS/WhatsApp (Optional)
+BEEM_API_KEY=your_api_key
+BEEM_SECRET_KEY=your_secret_key
+BEEM_SENDER_NAME=SMARTECH
+BEEM_ENABLED=true
+
+# Redis (Optional — only needed for BullMQ background queues)
+REDIS_URL=rediss://default:password@host:6379
+
+# SMS (Optional — legacy)
 TWILIO_ACCOUNT_SID=your_sid
 TWILIO_AUTH_TOKEN=your_token
 TWILIO_PHONE_NUMBER=+1234567890
