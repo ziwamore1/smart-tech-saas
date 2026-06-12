@@ -61,6 +61,8 @@ async function bootstrap() {
 
   app.set('trust proxy', 1);
 
+  app.setGlobalPrefix('api/v1');
+
   app.use(corsMiddleware);
   setupSecurity(app);
 
@@ -71,7 +73,6 @@ async function bootstrap() {
 
   app.use(compression());
 
-  app.setGlobalPrefix('api/v1');
   app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads/' });
 
   app.useGlobalPipes(
@@ -88,16 +89,6 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter(), new SentryFilter());
   app.useGlobalInterceptors(new TransformInterceptor(), new SentryInterceptor());
 
-  app.use((_req: Request, res: Response) => {
-    if (!res.headersSent) {
-      res.status(404).json({
-        statusCode: 404,
-        message: 'Route not found',
-        timestamp: new Date().toISOString(),
-      });
-    }
-  });
-
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     if (!res.headersSent) {
@@ -105,6 +96,16 @@ async function bootstrap() {
         statusCode: 500,
         message: 'Internal server error',
         error: err?.message || 'Unknown error',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  expressApp.use((_req: Request, res: Response) => {
+    if (!res.headersSent) {
+      res.status(404).json({
+        statusCode: 404,
+        message: 'Route not found',
         timestamp: new Date().toISOString(),
       });
     }
