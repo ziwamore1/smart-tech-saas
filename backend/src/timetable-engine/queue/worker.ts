@@ -17,9 +17,7 @@ const connection = new IORedis(redisUrl, {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
   lazyConnect: true,
-  retryStrategy(times) {
-    return Math.min(times * 1000, 10000);
-  },
+  retryStrategy: () => null,
 });
 
 const numWorkers = Math.max(1, os.cpus().length - 1);

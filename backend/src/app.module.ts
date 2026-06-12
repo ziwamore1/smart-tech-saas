@@ -83,7 +83,6 @@ import { ProductionLogger } from './common/production-logger';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     BullModule.forRootAsync({
-      imports: [],
       useFactory: () => {
         const redisUrl = process.env.REDIS_URL;
         if (redisUrl) {
@@ -95,14 +94,24 @@ import { ProductionLogger } from './common/production-logger';
                 port: parseInt(url.port || '6379', 10),
                 password: url.password ? decodeURIComponent(url.password) : undefined,
                 tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
+                retryStrategy: () => null,
+                lazyConnect: true,
+                maxRetriesPerRequest: null,
+                enableOfflineQueue: false,
               },
             };
-          } catch {}
+          } catch {
+            console.error('[BullModule] Invalid REDIS_URL');
+          }
         }
         return {
           connection: {
-            host: process.env.REDIS_HOST || 'localhost',
-            port: parseInt(process.env.REDIS_PORT || '6379', 10),
+            host: '127.0.0.1',
+            port: 6379,
+            retryStrategy: () => null,
+            lazyConnect: true,
+            maxRetriesPerRequest: null,
+            enableOfflineQueue: false,
           },
         };
       },
