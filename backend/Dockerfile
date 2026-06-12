@@ -3,7 +3,7 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies for native modules (canvas, etc.) and OpenSSL for Prisma engine
+# Install build dependencies for native modules (canvas, etc.)
 RUN apk add --no-cache python3 build-base cairo-dev pango-dev libjpeg-turbo-dev giflib-dev librsvg-dev pixman-dev openssl
 
 # Install dependencies (including devDependencies needed for build)
@@ -17,16 +17,23 @@ COPY . .
 # Generate Prisma client from schema (OpenSSL 3 detection)
 RUN npx prisma generate
 
-# Build the application — large dependency tree requires 4GB+
-RUN node --max-old-space-size=4096 ./node_modules/@nestjs/cli/bin/nest.js build
+# Build the application (swc builder — low memory, ~10x faster than tsc)
+RUN node --max-old-space-size=1024 ./node_modules/@nestjs/cli/bin/nest.js build && \
+    echo "=== BUILD SUCCESS ===" && \
+    test -f /app/dist/main.js && \
+    echo "=== DIST VERIFIED ===" || \
+    (echo "=== BUILD FAILED ===" && ls -la /app/ && exit 1)
 
 # Production stage
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install build dependencies for native modules (canvas, etc.) and OpenSSL for Prisma engine
-RUN apk add --no-cache --virtual .build-deps python3 build-base cairo-dev pango-dev libjpeg-turbo-dev giflib-dev librsvg-dev pixman-dev openssl
+# Install build dependencies for native modules (canvas, etc.)
+RUN apk add --no-cache --virtual .build-deps python3 build-base cairo-dev pango-dev libjpeg-turbo-dev giflib-dev librsvg-dev pixman-dev
+
+# Install OpenSSL for Prisma engine — NOT in .build-deps so it persists after cleanup
+RUN apk add --no-cache openssl
 
 # Copy package.json and install ALL deps (including dev, needed for build at runtime if start command rebuilds)
 COPY package*.json ./
