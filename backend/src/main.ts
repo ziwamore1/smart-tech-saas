@@ -90,13 +90,17 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor(), new SentryInterceptor());
 
   const port = process.env.PORT || 3001;
-  console.log(`[bootstrap] listening on port ${port}...`);
-  await app.listen(port, '0.0.0.0');
-  console.log(`[bootstrap] app.listen completed`);
 
+  // Initialize NestJS first — mounts all controllers on the Express Router
+  await app.init();
+  console.log(`[bootstrap] app.init completed in ${Date.now() - t0}ms`);
+
+  // 404/error handlers must be added AFTER app.init() so they sit BELOW
+  // the NestJS Router in the Express middleware stack.
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     if (!res.headersSent) {
+      console.error('[errorHandler]', err?.message || 'Unknown error');
       res.status(500).json({
         statusCode: 500,
         message: 'Internal server error',
@@ -115,6 +119,10 @@ async function bootstrap() {
       });
     }
   });
+
+  console.log(`[bootstrap] listening on port ${port}...`);
+  await app.listen(port, '0.0.0.0');
+  console.log(`[bootstrap] app.listen completed in ${Date.now() - t0}ms`);
   productionLogger.log(`Application is running on: http://0.0.0.0:${port}/api/v1`);
   productionLogger.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   productionLogger.log(`Version: ${process.env.npm_package_version || '2.0.0'}`);
