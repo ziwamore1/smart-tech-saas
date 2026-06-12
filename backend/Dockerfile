@@ -11,6 +11,7 @@ COPY package*.json ./
 RUN npm ci --legacy-peer-deps
 
 # Copy source code (including prisma schema)
+# .dockerignore excludes node_modules to avoid overwriting Alpine builds
 COPY . .
 
 # Generate Prisma client from schema (OpenSSL 3 detection)
