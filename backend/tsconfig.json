@@ -20,14 +20,20 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "prisma/**/*"],
   "exclude": [
-    "node_modules", 
-    "dist", 
-    "test", 
+    "node_modules",
+    "dist",
+    "test",
     "**/*spec.ts",
     "src/ui-library",
     "src/timetable-engine/ui",
     "src/timetable-engine/onboarding"
-  ]
+  ],
+  "ts-node": {
+    "transpileOnly": true,
+    "compilerOptions": {
+      "module": "commonjs"
+    }
+  }
 }
