@@ -71,6 +71,8 @@ const createSolverWorker = (workerId: number) => {
     {
       connection,
       concurrency: 2,
+      drainDelay: 30000,
+      stalledInterval: 120000,
     }
   );
 
