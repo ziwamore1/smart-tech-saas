@@ -98,6 +98,8 @@ import { ProductionLogger } from './common/production-logger';
                 lazyConnect: true,
                 maxRetriesPerRequest: null,
                 enableOfflineQueue: false,
+                connectTimeout: 5000,
+                commandTimeout: 5000,
               },
             };
           } catch {
@@ -112,6 +114,8 @@ import { ProductionLogger } from './common/production-logger';
             lazyConnect: true,
             maxRetriesPerRequest: null,
             enableOfflineQueue: false,
+            connectTimeout: 5000,
+            commandTimeout: 5000,
           },
         };
       },
