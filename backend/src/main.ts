@@ -89,6 +89,11 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter(), new SentryFilter());
   app.useGlobalInterceptors(new TransformInterceptor(), new SentryInterceptor());
 
+  const port = process.env.PORT || 3001;
+  console.log(`[bootstrap] listening on port ${port}...`);
+  await app.listen(port, '0.0.0.0');
+  console.log(`[bootstrap] app.listen completed`);
+
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     if (!res.headersSent) {
@@ -110,11 +115,6 @@ async function bootstrap() {
       });
     }
   });
-
-  const port = process.env.PORT || 3001;
-  console.log(`[bootstrap] listening on port ${port}...`);
-  await app.listen(port, '0.0.0.0');
-  console.log(`[bootstrap] app.listen completed`);
   productionLogger.log(`Application is running on: http://0.0.0.0:${port}/api/v1`);
   productionLogger.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   productionLogger.log(`Version: ${process.env.npm_package_version || '2.0.0'}`);
