@@ -88,6 +88,28 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter(), new SentryFilter());
   app.useGlobalInterceptors(new TransformInterceptor(), new SentryInterceptor());
 
+  app.use((_req: Request, res: Response) => {
+    if (!res.headersSent) {
+      res.status(404).json({
+        statusCode: 404,
+        message: 'Route not found',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    if (!res.headersSent) {
+      res.status(500).json({
+        statusCode: 500,
+        message: 'Internal server error',
+        error: err?.message || 'Unknown error',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
   const port = process.env.PORT || 3001;
   console.log(`[bootstrap] listening on port ${port}...`);
   await app.listen(port, '0.0.0.0');

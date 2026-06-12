@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authApi } from '@/lib/api';
+import styles from './auth.module.css';
 
 export default function SuperAdminRegisterPage() {
   const router = useRouter();
@@ -64,26 +65,27 @@ export default function SuperAdminRegisterPage() {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <Link href="/" className="auth-logo">
-            <div className="logo-icon">ST</div>
-            <span>Smart Tech SaaS</span>
+    <div className={styles.container}>
+      <div className={styles.card}>
+        <div className={styles.header}>
+          <Link href="/" className={styles.logo}>
+            <div className={styles.logoIcon}>ST</div>
+            <span className={styles.logoText}>Smart Tech SaaS</span>
           </Link>
-          <h1>System Owner Registration</h1>
-          <p>Create your system owner account to manage schools</p>
+          <h1 className={styles.heading}>System Owner Registration</h1>
+          <p className={styles.subtitle}>Create your system owner account to manage schools</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="auth-form">
-          {error && <div className="error-message">{error}</div>}
+        <form onSubmit={handleSubmit} className={styles.form}>
+          {error && <div className={styles.error}>{error}</div>}
 
-          <div className="form-group">
-            <label htmlFor="fullName">Full Name</label>
+          <div className={styles.field}>
+            <label htmlFor="fullName" className={styles.label}>Full Name</label>
             <input
               type="text"
               id="fullName"
               name="fullName"
+              className={styles.input}
               value={formData.fullName}
               onChange={handleChange}
               placeholder="Enter your full name"
@@ -91,12 +93,13 @@ export default function SuperAdminRegisterPage() {
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="email">Email Address</label>
+          <div className={styles.field}>
+            <label htmlFor="email" className={styles.label}>Email Address</label>
             <input
               type="email"
               id="email"
               name="email"
+              className={styles.input}
               value={formData.email}
               onChange={handleChange}
               placeholder="Enter your email"
@@ -104,12 +107,13 @@ export default function SuperAdminRegisterPage() {
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="phone">Phone Number</label>
+          <div className={styles.field}>
+            <label htmlFor="phone" className={styles.label}>Phone Number</label>
             <input
               type="tel"
               id="phone"
               name="phone"
+              className={styles.input}
               value={formData.phone}
               onChange={handleChange}
               placeholder="+260 97X XXX XXX"
@@ -117,12 +121,13 @@ export default function SuperAdminRegisterPage() {
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
+          <div className={styles.field}>
+            <label htmlFor="password" className={styles.label}>Password</label>
             <input
               type="password"
               id="password"
               name="password"
+              className={styles.input}
               value={formData.password}
               onChange={handleChange}
               placeholder="Min. 8 characters"
@@ -131,12 +136,13 @@ export default function SuperAdminRegisterPage() {
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm Password</label>
+          <div className={styles.field}>
+            <label htmlFor="confirmPassword" className={styles.label}>Confirm Password</label>
             <input
               type="password"
               id="confirmPassword"
               name="confirmPassword"
+              className={styles.input}
               value={formData.confirmPassword}
               onChange={handleChange}
               placeholder="Confirm your password"
@@ -144,143 +150,18 @@ export default function SuperAdminRegisterPage() {
             />
           </div>
 
-          <button type="submit" className="auth-button" disabled={loading}>
+          <button type="submit" className={styles.button} disabled={loading}>
             {loading ? 'Creating Account...' : 'Create System Owner Account'}
           </button>
         </form>
 
-        <div className="auth-footer">
+        <div className={styles.footer}>
           <p>
             Already have an account?{' '}
             <Link href="/login">Sign in here</Link>
           </p>
         </div>
       </div>
-
-      <style jsx>{`
-        .auth-container {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          padding: 20px;
-        }
-        .auth-card {
-          background: #fefcf9;
-          border-radius: 16px;
-          padding: 40px;
-          width: 100%;
-          max-width: 450px;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-        }
-        .auth-header {
-          text-align: center;
-          margin-bottom: 32px;
-        }
-        .auth-logo {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 12px;
-          margin-bottom: 24px;
-          text-decoration: none;
-          color: #1e3a8a;
-        }
-        .logo-icon {
-          width: 40px;
-          height: 40px;
-          background: #1e3a8a;
-          color: white;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: bold;
-          font-size: 16px;
-        }
-        .auth-logo span {
-          font-size: 20px;
-          font-weight: 600;
-        }
-        .auth-header h1 {
-          font-size: 24px;
-          color: #1f2937;
-          margin-bottom: 8px;
-        }
-        .auth-header p {
-          color: #6b7280;
-          font-size: 14px;
-        }
-        .auth-form {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-        .error-message {
-          background: #fef2f2;
-          border: 1px solid #fca5a5;
-          color: #dc2626;
-          padding: 12px;
-          border-radius: 8px;
-          font-size: 14px;
-          text-align: center;
-        }
-        .form-group {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .form-group label {
-          font-size: 14px;
-          font-weight: 500;
-          color: #374151;
-        }
-        .form-group input {
-          padding: 12px 16px;
-          border: 1px solid #d1d5db;
-          border-radius: 8px;
-          font-size: 16px;
-          transition: border-color 0.2s;
-        }
-        .form-group input:focus {
-          outline: none;
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-        .auth-button {
-          background: #1e3a8a;
-          color: white;
-          padding: 14px;
-          border: none;
-          border-radius: 8px;
-          font-size: 16px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: background 0.2s;
-        }
-        .auth-button:hover:not(:disabled) {
-          background: #1e40af;
-        }
-        .auth-button:disabled {
-          background: #93c5fd;
-          cursor: not-allowed;
-        }
-        .auth-footer {
-          margin-top: 24px;
-          text-align: center;
-          color: #6b7280;
-          font-size: 14px;
-        }
-        .auth-footer a {
-          color: #3b82f6;
-          text-decoration: none;
-          font-weight: 500;
-        }
-        .auth-footer a:hover {
-          text-decoration: underline;
-        }
-      `}</style>
     </div>
   );
 }

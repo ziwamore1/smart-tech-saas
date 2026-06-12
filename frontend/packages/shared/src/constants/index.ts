@@ -1,6 +1,6 @@
 export const APP_URL = 'https://app.smarttechsaas.com'
 export const LANDING_URL = 'https://www.smarttechsaas.com'
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1'
 export const COMPANY_NAME = 'Smart Tech SaaS'
 export const SUPPORT_EMAIL = 'support@smarttechsaas.com'
 
