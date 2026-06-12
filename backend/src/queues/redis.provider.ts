@@ -14,9 +14,7 @@ export const RedisProvider: Provider = {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
       lazyConnect: true,
-      retryStrategy(times) {
-        return Math.min(times * 1000, 10000);
-      },
+      retryStrategy: () => null,
     });
 
     client.on('connect', () => {
