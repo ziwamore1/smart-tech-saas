@@ -50,4 +50,4 @@ RUN addgroup -g 1001 -S nodejs && \
 USER nodejs
 
 # Start the application
-CMD ["node", "dist/main.js"]
+CMD ["node", "--max-old-space-size=8192", "dist/main.js"]
