@@ -1,20 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
-import * as sgMail from '@sendgrid/mail';
+
+const SENDGRID_API = 'https://api.sendgrid.com/v3/mail/send';
 
 @Injectable()
 export class EmailService {
   private transporter: nodemailer.Transporter | null = null;
-  private useSendgrid = false;
+  private sgApiKey = '';
   private useSmtp = false;
 
   constructor() {
-    const sgApiKey = process.env.SENDGRID_API_KEY || '';
+    this.sgApiKey = process.env.SENDGRID_API_KEY || '';
     const smtpPass = process.env.EMAIL_PASSWORD || process.env.ZOHO_SMTP_PASSWORD || '';
 
-    if (sgApiKey) {
-      sgMail.setApiKey(sgApiKey);
-      this.useSendgrid = true;
+    if (this.sgApiKey) {
       console.log('[EmailService] using SendGrid HTTP API');
     }
 
@@ -36,17 +35,31 @@ export class EmailService {
       this.useSmtp = true;
     }
 
-    if (!sgApiKey && !smtpPass) {
+    if (!this.sgApiKey && !smtpPass) {
       console.warn('[EmailService] no email credentials configured (SENDGRID_API_KEY or EMAIL_PASSWORD)');
     }
   }
 
   async sendMail(to: string, subject: string, html: string) {
-    const from = { name: 'Smart Tech', email: 'noreply@smarttechsaas.com' };
-
-    if (this.useSendgrid) {
+    if (this.sgApiKey) {
       try {
-        await sgMail.send({ to, from, subject, html });
+        const res = await fetch(SENDGRID_API, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.sgApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            personalizations: [{ to: [{ email: to }] }],
+            from: { email: 'noreply@smarttechsaas.com', name: 'Smart Tech' },
+            subject,
+            content: [{ type: 'text/html', value: html }],
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.text();
+          throw new Error(`SendGrid API ${res.status}: ${body}`);
+        }
         return;
       } catch (err) {
         console.error('[EmailService] SendGrid failed, trying SMTP fallback:', (err as Error).message);
