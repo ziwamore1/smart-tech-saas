@@ -1,56 +1,46 @@
-# Backend Dockerfile
+# Backend Dockerfile — build context is repo root, backend/ contains the app
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies for native modules (canvas, etc.) and OpenSSL for Prisma engine
 RUN apk add --no-cache python3 build-base cairo-dev pango-dev libjpeg-turbo-dev giflib-dev librsvg-dev pixman-dev openssl
 
-# Install dependencies (including devDependencies needed for build)
-COPY package*.json ./
+# Copy backend package files and install deps
+COPY backend/package*.json ./
 RUN npm ci --legacy-peer-deps
 
-# Copy source code (including prisma schema)
-COPY . .
+# Copy entire backend source
+COPY backend/ ./
 
-# Generate Prisma client from schema (OpenSSL 3 detection)
+# Generate Prisma client and build
 RUN npx prisma generate
-
-# Build the application — large dependency tree requires 4GB+
-RUN node --max-old-space-size=4096 ./node_modules/@nestjs/cli/bin/nest.js build
+RUN node --max-old-space-size=4096 node_modules/@nestjs/cli/bin/nest.js build
 
 # Production stage
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install build dependencies for native modules (canvas, etc.) and OpenSSL for Prisma engine
 RUN apk add --no-cache --virtual .build-deps python3 build-base cairo-dev pango-dev libjpeg-turbo-dev giflib-dev librsvg-dev pixman-dev openssl
 
-# Copy package.json and install ALL deps (including dev, needed for build at runtime if start command rebuilds)
-COPY package*.json ./
+# Copy and install ALL deps (dev deps included to support npm run build if needed)
+COPY backend/package*.json ./
 RUN npm ci --legacy-peer-deps && npm cache clean --force
 
-# Copy built application from builder
+# Copy built app and prisma schema from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 
-# Remove build-only deps to shrink image
 RUN apk del .build-deps
 
-# Generate Prisma client from schema (OpenSSL 3 detection)
+# Generate Prisma client
 RUN npx prisma generate
 
-# Create logs directory
 RUN mkdir -p logs
 
-# Port auto-detected by Railway via PORT env var
-
-# Run as non-root user
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001 && \
     chown -R nodejs:nodejs /app/logs
 USER nodejs
 
-# Start the application
 CMD ["node", "dist/main.js"]
