@@ -8,13 +8,17 @@ export class EmailService {
   private transporter: nodemailer.Transporter | null = null;
   private sgApiKey = '';
   private useSmtp = false;
+  private fromEmail: string;
+  private fromName: string;
 
   constructor() {
     this.sgApiKey = process.env.SENDGRID_API_KEY || '';
+    this.fromEmail = process.env.SENDGRID_FROM_EMAIL || 'support@smarttechsaas.com';
+    this.fromName = process.env.SENDGRID_FROM_NAME || 'Smart Tech';
     const smtpPass = process.env.EMAIL_PASSWORD || process.env.ZOHO_SMTP_PASSWORD || '';
 
     if (this.sgApiKey) {
-      console.log('[EmailService] using SendGrid HTTP API');
+      console.log(`[EmailService] using SendGrid HTTP API (from: ${this.fromEmail})`);
     }
 
     if (smtpPass) {
@@ -51,7 +55,8 @@ export class EmailService {
           },
           body: JSON.stringify({
             personalizations: [{ to: [{ email: to }] }],
-            from: { email: 'noreply@smarttechsaas.com', name: 'Smart Tech' },
+            from: { email: this.fromEmail, name: this.fromName },
+            reply_to: { email: 'support@smarttechsaas.com' },
             subject,
             content: [{ type: 'text/html', value: html }],
           }),
