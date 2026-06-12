@@ -99,7 +99,7 @@ export class HealthService {
     let pool;
     try {
       const directUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
-      pool = new Pool({ connectionString: directUrl, max: 1, connectionTimeoutMillis: 5000 });
+      pool = new Pool({ connectionString: directUrl, max: 1, connectionTimeoutMillis: 5000, family: 4 });
       await pool.query('SELECT 1');
       const latency = Date.now() - start;
       return {
