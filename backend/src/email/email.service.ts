@@ -1,55 +1,64 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
-import * as dns from 'dns';
+import * as sgMail from '@sendgrid/mail';
 
 @Injectable()
 export class EmailService {
-  private transporter: nodemailer.Transporter;
-  private readonly SMTP_HOSTS = [
-    { host: 'smtp.zoho.com', port: 587, secure: false },
-    { host: 'smtp.zoho.com', port: 465, secure: true },
-    { host: 'smtp.zoho.com.au', port: 587, secure: false },
-    { host: 'smtppro.zoho.com', port: 587, secure: false },
-  ];
+  private transporter: nodemailer.Transporter | null = null;
+  private useSendgrid = false;
+  private useSmtp = false;
 
   constructor() {
-    const pass = process.env.EMAIL_PASSWORD || process.env.ZOHO_SMTP_PASSWORD || '';
+    const sgApiKey = process.env.SENDGRID_API_KEY || '';
+    const smtpPass = process.env.EMAIL_PASSWORD || process.env.ZOHO_SMTP_PASSWORD || '';
 
-    if (!pass) {
-      console.warn('[EmailService] EMAIL_PASSWORD / ZOHO_SMTP_PASSWORD is not set — emails will fail');
+    if (sgApiKey) {
+      sgMail.setApiKey(sgApiKey);
+      this.useSendgrid = true;
+      console.log('[EmailService] using SendGrid HTTP API');
     }
 
-    dns.resolve4('smtp.zoho.com', (err, addresses) => {
-      if (err) {
-        console.error('[EmailService] DNS resolution failed for smtp.zoho.com:', err.code);
-      } else {
-        console.log(`[EmailService] smtp.zoho.com resolves to: ${addresses.join(', ')}`);
-      }
-    });
+    if (smtpPass) {
+      this.transporter = nodemailer.createTransport({
+        host: 'smtp.zoho.com',
+        port: 587,
+        secure: false,
+        requireTLS: true,
+        auth: {
+          user: 'noreply@smarttechsaas.com',
+          pass: smtpPass,
+        },
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 15000,
+        tls: { rejectUnauthorized: false },
+      });
+      this.useSmtp = true;
+    }
 
-    this.transporter = nodemailer.createTransport({
-      host: 'smtp.zoho.com',
-      port: 587,
-      secure: false,
-      requireTLS: true,
-      auth: {
-        user: 'noreply@smarttechsaas.com',
-        pass,
-      },
-      connectionTimeout: 20000,
-      greetingTimeout: 20000,
-      socketTimeout: 20000,
-      tls: { rejectUnauthorized: false },
-    });
+    if (!sgApiKey && !smtpPass) {
+      console.warn('[EmailService] no email credentials configured (SENDGRID_API_KEY or EMAIL_PASSWORD)');
+    }
   }
 
   async sendMail(to: string, subject: string, html: string) {
-    return this.transporter.sendMail({
-      from: '"Smart Tech" <noreply@smarttechsaas.com>',
-      to,
-      subject,
-      html,
-    });
+    const from = { name: 'Smart Tech', email: 'noreply@smarttechsaas.com' };
+
+    if (this.useSendgrid) {
+      try {
+        await sgMail.send({ to, from, subject, html });
+        return;
+      } catch (err) {
+        console.error('[EmailService] SendGrid failed, trying SMTP fallback:', (err as Error).message);
+      }
+    }
+
+    if (this.useSmtp && this.transporter) {
+      await this.transporter.sendMail({ from: '"Smart Tech" <noreply@smarttechsaas.com>', to, subject, html });
+      return;
+    }
+
+    throw new Error('No email provider configured');
   }
 
   async sendOtpEmail(to: string, otp: string) {
