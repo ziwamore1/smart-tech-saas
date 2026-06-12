@@ -16,8 +16,8 @@ COPY . .
 # Generate Prisma client from schema (OpenSSL 3 detection)
 RUN npx prisma generate
 
-# Build the application with reduced memory for Railway
-RUN node --max-old-space-size=2048 ./node_modules/@nestjs/cli/bin/nest.js build
+# Build the application — large dependency tree requires 4GB+
+RUN node --max-old-space-size=4096 ./node_modules/@nestjs/cli/bin/nest.js build
 
 # Production stage
 FROM node:20-alpine
