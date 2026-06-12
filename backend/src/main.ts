@@ -95,30 +95,42 @@ async function bootstrap() {
   await app.init();
   console.log(`[bootstrap] app.init completed in ${Date.now() - t0}ms`);
 
-  // 404/error handlers must be added AFTER app.init() so they sit BELOW
-  // the NestJS Router in the Express middleware stack.
+  // Inject fallback handler directly into the NestJS Router's internal stack.
+  // Express 5 does not have a default 404 handler, and the NestJS Router (an
+  // Express Router instance) may not call next() for unmatched routes in all
+  // configurations.  By adding a catch-all middleware on the Router itself we
+  // guarantee it runs when no NestJS controller matches.
   const expressApp = app.getHttpAdapter().getInstance();
-  expressApp.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    if (!res.headersSent) {
-      console.error('[errorHandler]', err?.message || 'Unknown error');
-      res.status(500).json({
-        statusCode: 500,
-        message: 'Internal server error',
-        error: err?.message || 'Unknown error',
-        timestamp: new Date().toISOString(),
-      });
+  if (expressApp._router?.stack) {
+    for (const layer of expressApp._router.stack) {
+      if (layer.name === 'router' && typeof layer.handle?.use === 'function') {
+        layer.handle.use(
+          (err: any, _req: Request, res: Response, _next: NextFunction) => {
+            if (!res.headersSent) {
+              console.error('[routerErrorHandler]', err?.message || 'Unknown error');
+              res.status(500).json({
+                statusCode: 500,
+                message: 'Internal server error',
+                error: err?.message || 'Unknown error',
+                timestamp: new Date().toISOString(),
+              });
+            }
+          },
+        );
+        layer.handle.use((_req: Request, res: Response) => {
+          if (!res.headersSent) {
+            res.status(404).json({
+              statusCode: 404,
+              message: 'Route not found',
+              timestamp: new Date().toISOString(),
+            });
+          }
+        });
+        console.log('[bootstrap] injected fallback handlers into NestJS Router');
+        break;
+      }
     }
-  });
-
-  expressApp.use((_req: Request, res: Response) => {
-    if (!res.headersSent) {
-      res.status(404).json({
-        statusCode: 404,
-        message: 'Route not found',
-        timestamp: new Date().toISOString(),
-      });
-    }
-  });
+  }
 
   console.log(`[bootstrap] listening on port ${port}...`);
   await app.listen(port, '0.0.0.0');
