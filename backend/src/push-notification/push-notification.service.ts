@@ -65,6 +65,7 @@ export class PushNotificationService {
   async sendToUser(
     userId: string,
     payload: PushNotificationPayload,
+    role?: string,
   ): Promise<boolean> {
     const deviceTokens = await this.prisma.deviceToken.findMany({
       where: {
@@ -75,16 +76,16 @@ export class PushNotificationService {
 
     if (deviceTokens.length === 0) {
       this.logger.warn(`No device tokens found for user: ${userId}`);
-      return false;
     }
 
-    const notification = await this.prisma.notification.create({
+    await this.prisma.notification.create({
       data: {
         userId,
         title: payload.title,
         body: payload.body,
         data: payload.data || {},
         type: payload.data?.type || 'general',
+        role: role || null,
       },
     });
 
@@ -92,16 +93,39 @@ export class PushNotificationService {
       await this.sendToDevice(device.token, payload);
     }
 
-    return true;
+    return deviceTokens.length > 0;
   }
 
   async sendToUsers(
     userIds: string[],
     payload: PushNotificationPayload,
+    role?: string,
   ): Promise<void> {
     for (const userId of userIds) {
-      await this.sendToUser(userId, payload);
+      await this.sendToUser(userId, payload, role);
     }
+  }
+
+  async sendByRole(
+    roleName: string,
+    payload: PushNotificationPayload,
+    schoolId?: string,
+  ): Promise<number> {
+    const where: any = {
+      userRoles: { some: { role: { name: roleName } } },
+    };
+    if (schoolId) where.schoolId = schoolId;
+
+    const users = await this.prisma.user.findMany({
+      where,
+      select: { id: true },
+    });
+
+    for (const user of users) {
+      await this.sendToUser(user.id, payload, roleName);
+    }
+
+    return users.length;
   }
 
   async sendToSchool(
@@ -133,7 +157,8 @@ export class PushNotificationService {
     }
 
     for (const user of users) {
-      await this.sendToUser(user.id, payload);
+      const role = roles?.length === 1 ? roles[0] : undefined;
+      await this.sendToUser(user.id, payload, role);
     }
   }
 
