@@ -12,6 +12,8 @@ const connection = new IORedis(redisUrl, {
   enableReadyCheck: false,
   lazyConnect: true,
   retryStrategy: () => null,
+  connectTimeout: 5000,
+  commandTimeout: 5000,
 });
 
 export interface TimetableJobData {

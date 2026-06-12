@@ -18,6 +18,8 @@ const connection = new IORedis(redisUrl, {
   enableReadyCheck: false,
   lazyConnect: true,
   retryStrategy: () => null,
+  connectTimeout: 5000,
+  commandTimeout: 5000,
 });
 
 const numWorkers = Math.max(1, os.cpus().length - 1);

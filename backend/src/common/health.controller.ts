@@ -18,7 +18,12 @@ export class HealthController {
   @Get('redis')
   async checkRedis() {
     try {
-      await this.redis.ping();
+      await Promise.race([
+        this.redis.ping(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Redis ping timed out')), 5000),
+        ),
+      ]);
       return { status: 'ok', redis: 'connected' };
     } catch {
       return { status: 'error', redis: 'disconnected' };

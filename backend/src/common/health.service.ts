@@ -185,7 +185,12 @@ export class HealthService {
   private async checkRedis(): Promise<HealthCheck> {
     try {
       const start = Date.now();
-      await this.redis.ping();
+      await Promise.race([
+        this.redis.ping(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Redis ping timed out after 5s')), 5000),
+        ),
+      ]);
       const latency = Date.now() - start;
       return {
         status: 'up',
