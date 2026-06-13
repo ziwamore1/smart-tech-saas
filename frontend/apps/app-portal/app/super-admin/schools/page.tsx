@@ -29,7 +29,8 @@ export default function SchoolsPage() {
     try {
       setLoading(true);
       const response = await superAdminApi.getSchools(status || undefined);
-      setSchools(response.data?.data || response.data || []);
+      const body = response.data?.statusCode ? response.data.data : response.data;
+      setSchools(body?.data || body || []);
     } catch (error) {
       console.error('Failed to load schools:', error);
     } finally {

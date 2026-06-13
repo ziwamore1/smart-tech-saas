@@ -32,7 +32,12 @@ api.interceptors.request.use(
 );
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.data?.statusCode && response.data?.timestamp) {
+      response.data = response.data.data ?? response.data;
+    }
+    return response;
+  },
   (error) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       const url = error.config?.url || '';
