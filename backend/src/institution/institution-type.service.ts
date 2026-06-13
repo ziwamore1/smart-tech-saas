@@ -1,14 +1,24 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CacheService } from '../common/services/cache.service';
+
+const TYPES_CACHE_KEY = 'institution:all-types';
+const TYPES_CACHE_TTL = 600_000;
 
 @Injectable()
 export class InstitutionTypeService {
   private readonly logger = new Logger(InstitutionTypeService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cacheService: CacheService,
+  ) {}
 
   async getAllTypes() {
-    return this.prisma.institutionType.findMany({
+    const cached = this.cacheService.get(TYPES_CACHE_KEY);
+    if (cached) return cached;
+
+    const types = await this.prisma.institutionType.findMany({
       where: { isActive: true },
       include: {
         _count: {
@@ -23,6 +33,9 @@ export class InstitutionTypeService {
       },
       orderBy: { name: 'asc' },
     });
+
+    this.cacheService.set(TYPES_CACHE_KEY, types, TYPES_CACHE_TTL);
+    return types;
   }
 
   async getTypeByCode(code: string) {

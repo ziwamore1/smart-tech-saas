@@ -32,8 +32,18 @@ export class SuperAdminController {
   }
 
   @Get('schools')
-  async getAllSchools(@Query('status') status?: string) {
-    return this.superAdminService.getAllSchools(status);
+  async getAllSchools(
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.superAdminService.getAllSchools(
+      status,
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 50,
+      search,
+    );
   }
 
   @Post('schools')

@@ -11,6 +11,10 @@ import { UnifiedMessagingService } from '../messaging/unified-messaging.service'
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 import { InstitutionProvisioningService } from '../institution/institution-provisioning.service';
+import { CacheService } from '../common/services/cache.service';
+
+const STATS_CACHE_TTL = 300_000;
+const STATS_CACHE_KEY = 'super-admin:system-stats';
 
 @Injectable()
 export class SuperAdminService {
@@ -22,29 +26,54 @@ export class SuperAdminService {
     private communicationService: CommunicationService,
     private unifiedMessaging: UnifiedMessagingService,
     private provisioningService: InstitutionProvisioningService,
+    private cacheService: CacheService,
   ) {}
 
-  async getAllSchools(status?: string) {
+  async getAllSchools(status?: string, page = 1, limit = 50, search?: string) {
     const where: any = {};
     if (status) {
       where.subscriptionStatus = status;
     }
-    return this.prisma.school.findMany({
-      where,
-      include: {
-        institutionType: {
-          select: { code: true, name: true },
-        },
-        _count: {
-          select: {
-            users: true,
-            students: true,
-            teachers: true,
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { registrationNumber: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    const skip = (page - 1) * limit;
+
+    const [schools, total] = await this.prisma.$transaction([
+      this.prisma.school.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          institutionType: {
+            select: { code: true, name: true },
+          },
+          _count: {
+            select: {
+              users: true,
+              students: true,
+              teachers: true,
+            },
           },
         },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.school.count({ where }),
+    ]);
+
+    return {
+      data: schools,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
-      orderBy: { createdAt: 'desc' },
-    });
+    };
   }
 
   async createSchool(data: {
@@ -454,144 +483,173 @@ Email: ${director.email}
   }
 
   async getSystemStats() {
-    const totalSchools = await this.prisma.school.count();
-    const activeSchools = await this.prisma.school.count({
-      where: { isActive: true },
-    });
-    const totalStudents = await this.prisma.student.count();
-    const totalTeachers = await this.prisma.teacher.count();
-    const totalUsers = await this.prisma.user.count();
+    const cached = this.cacheService.get<any>(STATS_CACHE_KEY);
+    if (cached) {
+      this.logger.log('Returning cached system stats');
+      return cached;
+    }
 
-    // Primary school metrics
-    const primarySchoolIds = (
-      await this.prisma.schoolEducationLevel.findMany({
+    this.logger.log('Computing system stats (uncached)');
+
+    const [
+      totalSchools,
+      activeSchools,
+      totalStudents,
+      totalTeachers,
+      totalUsers,
+      educationLevels,
+      schoolsByStatus,
+      recentSchools,
+      totalTemplates,
+      totalMarketplace,
+      totalAssets,
+      totalSignatures,
+      totalStamps,
+      totalBrandPresets,
+      totalCertificates,
+      totalAISuggestions,
+      templatesByType,
+      templatesByStatus,
+      stampsByType,
+      assetsByType,
+      recentTemplates,
+    ] = await this.prisma.$transaction([
+      this.prisma.school.count(),
+      this.prisma.school.count({ where: { isActive: true } }),
+      this.prisma.student.count(),
+      this.prisma.teacher.count(),
+      this.prisma.user.count(),
+      this.prisma.schoolEducationLevel.findMany({
         where: {
           educationLevel: { code: { in: ['PRIMARY', 'ECE'] } },
           isActive: true,
         },
         select: { schoolId: true },
-      })
-    ).map((sel) => sel.schoolId);
-    const uniquePrimarySchoolIds = [...new Set(primarySchoolIds)];
+      }),
+      this.prisma.school.groupBy({
+        by: ['subscriptionStatus'],
+        _count: { subscriptionStatus: true },
+      }),
+      this.prisma.school.findMany({
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          subscriptionStatus: true,
+          isActive: true,
+          createdAt: true,
+          _count: { select: { students: true, teachers: true } },
+        },
+      }),
+      this.prisma.reportTemplate.count(),
+      this.prisma.templateMarketplace.count(),
+      this.prisma.templateAsset.count(),
+      this.prisma.digitalSignature.count(),
+      this.prisma.digitalStamp.count(),
+      this.prisma.brandPreset.count(),
+      this.prisma.certificateTemplate.count(),
+      this.prisma.aITemplateSuggestion.count(),
+      this.prisma.reportTemplate.groupBy({
+        by: ['templateType'],
+        _count: { templateType: true },
+      }),
+      this.prisma.reportTemplate.groupBy({
+        by: ['status'],
+        _count: { status: true },
+      }),
+      this.prisma.digitalStamp.groupBy({
+        by: ['type'],
+        _count: { type: true },
+      }),
+      this.prisma.templateAsset.groupBy({
+        by: ['type'],
+        _count: { type: true },
+      }),
+      this.prisma.reportTemplate.findMany({
+        take: 5,
+        orderBy: { updatedAt: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          templateType: true,
+          status: true,
+          updatedAt: true,
+          schoolId: true,
+        },
+      }),
+    ]);
+
+    const uniquePrimarySchoolIds = [...new Set(educationLevels.map((sel) => sel.schoolId))];
     const totalPrimarySchools = uniquePrimarySchoolIds.length;
 
-    const primaryStudents = await this.prisma.student.count({
-      where: { schoolId: { in: uniquePrimarySchoolIds } },
-    });
-    const primaryTeachers = await this.prisma.teacher.count({
-      where: { schoolId: { in: uniquePrimarySchoolIds } },
-    });
-    const primaryTeachingStaff = await this.prisma.teacher.count({
-      where: {
-        schoolId: { in: uniquePrimarySchoolIds },
-        staffType: 'TEACHING',
-      },
-    });
-    const primaryNonTeachingStaff = await this.prisma.teacher.count({
-      where: {
-        schoolId: { in: uniquePrimarySchoolIds },
-        staffType: 'NON_TEACHING',
-      },
-    });
+    const [primaryStudents, primaryTeachers, primaryTeachingStaff, primaryNonTeachingStaff] =
+      uniquePrimarySchoolIds.length > 0
+        ? await this.prisma.$transaction([
+            this.prisma.student.count({
+              where: { schoolId: { in: uniquePrimarySchoolIds } },
+            }),
+            this.prisma.teacher.count({
+              where: { schoolId: { in: uniquePrimarySchoolIds } },
+            }),
+            this.prisma.teacher.count({
+              where: { schoolId: { in: uniquePrimarySchoolIds }, staffType: 'TEACHING' },
+            }),
+            this.prisma.teacher.count({
+              where: { schoolId: { in: uniquePrimarySchoolIds }, staffType: 'NON_TEACHING' },
+            }),
+          ])
+        : [0, 0, 0, 0];
 
-    // Enrollment pipeline: Grade 1-7 across primary schools
-    const primaryGradeNumbers = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
-    const enrollmentPipeline: { grade: string; count: number }[] = [];
-    for (const gradeName of primaryGradeNumbers) {
-      const matchingClasses = await this.prisma.class.findMany({
+    let enrollmentPipeline: { grade: string; count: number }[] = [];
+    if (uniquePrimarySchoolIds.length > 0) {
+      const primaryGradeNumbers = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
+
+      const allClasses = await this.prisma.class.findMany({
         where: {
           schoolId: { in: uniquePrimarySchoolIds },
-          name: { contains: gradeName, mode: 'insensitive' },
+          OR: primaryGradeNumbers.map((g) => ({ name: { contains: g, mode: 'insensitive' as const } })),
         },
-        select: { id: true },
+        select: { id: true, name: true },
       });
-      const classIds = matchingClasses.map((c) => c.id);
-      const count = classIds.length > 0
-        ? await this.prisma.enrollment.count({
-            where: { classId: { in: classIds }, status: 'ACTIVE' },
+
+      const allClassIds = allClasses.map((c) => c.id);
+      const enrollmentsByClassId = allClassIds.length > 0
+        ? await this.prisma.enrollment.groupBy({
+            by: ['classId'],
+            where: { classId: { in: allClassIds }, status: 'ACTIVE' },
+            _count: { classId: true },
           })
-        : 0;
-      enrollmentPipeline.push({ grade: gradeName, count });
+        : [];
+
+      const enrollmentMap = new Map(enrollmentsByClassId.map((e) => [e.classId, e._count.classId]));
+
+      enrollmentPipeline = primaryGradeNumbers.map((gradeName) => {
+        const matchingClassIds = allClasses
+          .filter((c) => c.name.toLowerCase().includes(gradeName.toLowerCase()))
+          .map((c) => c.id);
+        const count = matchingClassIds.reduce((sum, cid) => sum + (enrollmentMap.get(cid) || 0), 0);
+        return { grade: gradeName, count };
+      });
     }
 
-    // Recent primary schools
-    const recentPrimarySchools = await this.prisma.school.findMany({
-      where: { id: { in: uniquePrimarySchoolIds } },
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        name: true,
-        subscriptionStatus: true,
-        isActive: true,
-        createdAt: true,
-        _count: { select: { students: true, teachers: true } },
-      },
-    });
+    const recentPrimarySchools = uniquePrimarySchoolIds.length > 0
+      ? await this.prisma.school.findMany({
+          where: { id: { in: uniquePrimarySchoolIds } },
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            name: true,
+            subscriptionStatus: true,
+            isActive: true,
+            createdAt: true,
+            _count: { select: { students: true, teachers: true } },
+          },
+        })
+      : [];
 
-    const schoolsByStatus = await this.prisma.school.groupBy({
-      by: ['subscriptionStatus'],
-      _count: { subscriptionStatus: true },
-    });
-
-    const recentSchools = await this.prisma.school.findMany({
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        name: true,
-        subscriptionStatus: true,
-        isActive: true,
-        createdAt: true,
-        _count: {
-          select: { students: true, teachers: true },
-        },
-      },
-    });
-
-    const totalTemplates = await this.prisma.reportTemplate.count();
-    const totalMarketplace = await this.prisma.templateMarketplace.count();
-    const totalAssets = await this.prisma.templateAsset.count();
-    const totalSignatures = await this.prisma.digitalSignature.count();
-    const totalStamps = await this.prisma.digitalStamp.count();
-    const totalBrandPresets = await this.prisma.brandPreset.count();
-    const totalCertificates = await this.prisma.certificateTemplate.count();
-    const totalAISuggestions = await this.prisma.aITemplateSuggestion.count();
-
-    const templatesByType = await this.prisma.reportTemplate.groupBy({
-      by: ['templateType'],
-      _count: { templateType: true },
-    });
-
-    const templatesByStatus = await this.prisma.reportTemplate.groupBy({
-      by: ['status'],
-      _count: { status: true },
-    });
-
-    const stampsByType = await this.prisma.digitalStamp.groupBy({
-      by: ['type'],
-      _count: { type: true },
-    });
-
-    const assetsByType = await this.prisma.templateAsset.groupBy({
-      by: ['type'],
-      _count: { type: true },
-    });
-
-    const recentTemplates = await this.prisma.reportTemplate.findMany({
-      take: 5,
-      orderBy: { updatedAt: 'desc' },
-      select: {
-        id: true,
-        name: true,
-        templateType: true,
-        status: true,
-        updatedAt: true,
-        schoolId: true,
-      },
-    });
-
-    return {
+    const result = {
       totalSchools,
       activeSchools,
       inactiveSchools: totalSchools - activeSchools,
@@ -613,7 +671,6 @@ Email: ${director.email}
       stampsByType,
       assetsByType,
       recentTemplates,
-      // Primary school stats
       totalPrimarySchools,
       primaryStudents,
       primaryTeachers,
@@ -622,6 +679,9 @@ Email: ${director.email}
       enrollmentPipeline,
       recentPrimarySchools,
     };
+
+    this.cacheService.set(STATS_CACHE_KEY, result, STATS_CACHE_TTL);
+    return result;
   }
 
   async createSuperAdmin(
