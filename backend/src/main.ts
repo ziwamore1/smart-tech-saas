@@ -15,32 +15,6 @@ import { isSentryEnabled, getSentryConfig } from './common/sentry.config';
 import { setupSecurity } from './common/security.middleware';
 import { ProductionLogger } from './common/production-logger';
 
-const ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://localhost:3002',
-  'https://app.smarttechsaas.com',
-  'https://www.smarttechsaas.com',
-  'https://smart-tech-saas-production.up.railway.app',
-];
-
-function corsMiddleware(req: Request, res: Response, next: NextFunction) {
-  const origin = req.headers.origin;
-  if (origin && ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept');
-
-  if (req.method === 'OPTIONS') {
-    res.status(204).end();
-    return;
-  }
-
-  next();
-}
-
 async function bootstrap() {
   const t0 = Date.now();
   console.log('[bootstrap] starting');
@@ -63,7 +37,19 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
 
-  app.use(corsMiddleware);
+  app.enableCors({
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3002',
+      'https://app.smarttechsaas.com',
+      'https://www.smarttechsaas.com',
+      'https://smart-tech-saas-production.up.railway.app',
+    ],
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  });
   setupSecurity(app);
 
   app.use((req: any, _res: any, next: any) => {
