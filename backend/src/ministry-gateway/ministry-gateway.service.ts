@@ -202,6 +202,12 @@ export class MinistryGatewayService {
     }
   }
 
+  async getAllVerifications(): Promise<any[]> {
+    return this.prisma.ministryVerification.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async getDocumentMinistryVerification(documentId: string): Promise<any> {
     return this.prisma.ministryVerification.findFirst({
       where: { documentId },

@@ -266,6 +266,12 @@ export class BlockchainService {
     });
   }
 
+  async getAllCertificates(): Promise<any[]> {
+    return this.prisma.blockchainCertificate.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async getTotalRegistered(network: string = 'POLYGON_AMOY'): Promise<number> {
     if (!this.CONTRACT_ADDRESS || !this.PRIVATE_KEY || this.PRIVATE_KEY.startsWith('0x000')) {
       return this.prisma.blockchainCertificate.count();

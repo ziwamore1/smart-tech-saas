@@ -7,7 +7,8 @@ import Link from 'next/link';
 
 const gradPurple = 'linear-gradient(135deg, #8b5cf6, #7c3aed)';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/api\/v1\/?$/, '');
+const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('auth_token')}` });
 
 export default function BlockchainPage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -26,11 +27,9 @@ export default function BlockchainPage() {
 
   const loadCertificates = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/v1/blockchain/all`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
+      const res = await fetch(`${API_BASE}/api/v1/blockchain/all`, { headers: authHeaders() });
       const data = await res.json();
-      setCertificates(data.certificates || []);
+      setCertificates(data?.data?.certificates || data?.certificates || []);
     } catch (error) {
       console.error('Failed to load blockchain certs:', error);
     } finally {

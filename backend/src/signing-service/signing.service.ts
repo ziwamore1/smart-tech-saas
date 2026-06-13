@@ -195,6 +195,12 @@ export class SigningService {
     return result.count > 0;
   }
 
+  async getAllDocuments(): Promise<any[]> {
+    return this.prisma.documentSignature.findMany({
+      orderBy: { signedAt: 'desc' },
+    });
+  }
+
   async getDocumentSignatures(documentId: string): Promise<any[]> {
     return this.prisma.documentSignature.findMany({
       where: { documentId },

@@ -7,7 +7,8 @@ import Link from 'next/link';
 
 const gradGreen = 'linear-gradient(135deg, #10b981, #059669)';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/api\/v1\/?$/, '');
+const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('auth_token')}` });
 
 export default function MinistryPage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -27,10 +28,10 @@ export default function MinistryPage() {
   const loadVerifications = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/v1/ministry/school/all`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: authHeaders(),
       });
       const data = await res.json();
-      setVerifications(data.verifications || []);
+      setVerifications(data?.data?.verifications || data?.verifications || []);
     } catch (error) {
       console.error('Failed to load ministry verifications:', error);
     } finally {

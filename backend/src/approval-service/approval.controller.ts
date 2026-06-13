@@ -82,6 +82,16 @@ export class ApprovalController {
     };
   }
 
+  @Get('school/all')
+  async getAllWorkflows() {
+    const workflows = await this.approvalService.getAllWorkflows();
+
+    return {
+      success: true,
+      workflows,
+    };
+  }
+
   @Get('school/:schoolId')
   async getSchoolWorkflows(@Param('schoolId') schoolId: string, @Req() req: any) {
     const { status } = req.query;

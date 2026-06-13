@@ -50,6 +50,16 @@ export class BlockchainController {
     };
   }
 
+  @Get('all')
+  async getAllCertificates() {
+    const certificates = await this.blockchainService.getAllCertificates();
+
+    return {
+      success: true,
+      certificates,
+    };
+  }
+
   @Get('school/:schoolId')
   async getSchoolCertificates(@Param('schoolId') schoolId: string) {
     const certificates = await this.blockchainService.getAllBlockchainCertificates(schoolId);

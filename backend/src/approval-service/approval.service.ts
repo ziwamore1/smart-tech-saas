@@ -262,6 +262,25 @@ export class ApprovalService {
     });
   }
 
+  async getAllWorkflows() {
+    return this.prisma.approvalWorkflow.findMany({
+      include: {
+        steps: {
+          orderBy: { order: 'asc' },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async getDocumentWorkflows(documentId: string) {
     return this.prisma.approvalWorkflow.findMany({
       where: { documentId },

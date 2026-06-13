@@ -7,7 +7,8 @@ import Link from 'next/link';
 
 const gradAmber = 'linear-gradient(135deg, #f59e0b, #d97706)';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/api\/v1\/?$/, '');
+const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('auth_token')}` });
 
 export default function ApprovalsPage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -26,11 +27,9 @@ export default function ApprovalsPage() {
 
   const loadWorkflows = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/v1/approval/school/all`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
+      const res = await fetch(`${API_BASE}/api/v1/approval/school/all`, { headers: authHeaders() });
       const data = await res.json();
-      setWorkflows(data.workflows || []);
+      setWorkflows(data?.data?.workflows || data?.workflows || []);
     } catch (error) {
       console.error('Failed to load workflows:', error);
     } finally {

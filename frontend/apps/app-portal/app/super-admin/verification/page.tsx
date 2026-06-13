@@ -12,7 +12,7 @@ const gradOrange = 'linear-gradient(135deg, #ea6645, #f59e0b)';
 const gradTeal = 'linear-gradient(135deg, #0d9488, #0f766e)';
 const gradIndigo = 'linear-gradient(135deg, #6366f1, #4f46e5)';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/api\/v1\/?$/, '');
 
 export default function VerificationDashboardPage() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -41,23 +41,24 @@ export default function VerificationDashboardPage() {
 
       const [signaturesRes, blockchainRes, approvalsRes] = await Promise.all([
         fetch(`${API_BASE}/api/v1/signing/document/all`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
         }).catch(() => null),
         fetch(`${API_BASE}/api/v1/blockchain/all`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
         }).catch(() => null),
         fetch(`${API_BASE}/api/v1/approval/school/all`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
         }).catch(() => null),
       ]);
 
-      const signatures = signaturesRes?.ok ? await signaturesRes.json() : { signatures: [] };
-      const blockchain = blockchainRes?.ok ? await blockchainRes.json() : { certificates: [] };
-      const approvals = approvalsRes?.ok ? await approvalsRes.json() : { workflows: [] };
+      const signatures = signaturesRes?.ok ? await signaturesRes.json() : {};
+      const blockchain = blockchainRes?.ok ? await blockchainRes.json() : {};
+      const approvals = approvalsRes?.ok ? await approvalsRes.json() : {};
 
-      const sigList = signatures.signatures || [];
-      const bcList = blockchain.certificates || [];
-      const appList = approvals.workflows || [];
+      const unwrap = (body: any, key: string) => body?.data?.[key] || body?.[key] || [];
+      const sigList = unwrap(signatures, 'signatures');
+      const bcList = unwrap(blockchain, 'certificates');
+      const appList = unwrap(approvals, 'workflows');
 
       setStats({
         totalSignatures: sigList.length,

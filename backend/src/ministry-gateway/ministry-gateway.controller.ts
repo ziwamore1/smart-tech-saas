@@ -43,6 +43,16 @@ export class MinistryGatewayController {
     };
   }
 
+  @Get('school/all')
+  async getAllVerifications() {
+    const verifications = await this.ministryGatewayService.getAllVerifications();
+
+    return {
+      success: true,
+      verifications,
+    };
+  }
+
   @Get('school/:schoolId')
   async getSchoolVerifications(@Param('schoolId') schoolId: string, @Query('status') status?: string) {
     const verifications = await this.ministryGatewayService.getSchoolVerifications(schoolId, status);

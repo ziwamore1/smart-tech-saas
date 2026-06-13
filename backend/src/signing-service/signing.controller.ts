@@ -55,6 +55,16 @@ export class SigningController {
     };
   }
 
+  @Get('document/all')
+  async getAllDocuments() {
+    const signatures = await this.signingService.getAllDocuments();
+
+    return {
+      success: true,
+      signatures,
+    };
+  }
+
   @Get('document/:documentId')
   async getDocumentSignatures(@Param('documentId') documentId: string) {
     const signatures = await this.signingService.getDocumentSignatures(documentId);

@@ -8,7 +8,8 @@ import Link from 'next/link';
 const gradBlue = 'linear-gradient(135deg, #3b82f6, #2563eb)';
 const gradRed = 'linear-gradient(135deg, #ef4444, #dc2626)';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/api\/v1\/?$/, '');
+const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('auth_token')}` });
 
 export default function SignaturesPage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -29,10 +30,10 @@ export default function SignaturesPage() {
   const loadSignatures = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/v1/signing/document/all`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: authHeaders(),
       });
       const data = await res.json();
-      setSignatures(data.signatures || []);
+      setSignatures(data?.data?.signatures || data?.signatures || []);
     } catch (error) {
       console.error('Failed to load signatures:', error);
     } finally {
@@ -46,7 +47,7 @@ export default function SignaturesPage() {
       await fetch(`${API_BASE}/api/v1/signing/revoke/${token}`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          ...authHeaders(),
           'Content-Type': 'application/json',
         },
       });
