@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 import { 
   Feature, 
   SubscriptionTier, 
@@ -41,11 +42,18 @@ interface FeatureLockProviderProps {
 }
 
 export function FeatureLockProvider({ children, schoolId }: FeatureLockProviderProps) {
+  const { isAuthenticated } = useAuth();
   const [features, setFeatures] = useState<Feature[]>(DEFAULT_FEATURES);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchFeatures = useCallback(async () => {
+    if (!isAuthenticated) {
+      setFeatures(DEFAULT_FEATURES);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     try {
       setLoading(true);
       const response = await api.get('/feature-locks');
@@ -63,7 +71,7 @@ export function FeatureLockProvider({ children, schoolId }: FeatureLockProviderP
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     fetchFeatures();
