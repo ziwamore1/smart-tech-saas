@@ -169,7 +169,12 @@ export default function SettingsPage() {
   const saveCommunication = async () => {
     setSaving(true);
     try {
-      await superAdminApi.updateSetting('messaging_sandbox_mode', commSettings.messagingSandboxMode);
+      await Promise.all([
+        superAdminApi.updateSetting('messaging_sandbox_mode', commSettings.messagingSandboxMode),
+        superAdminApi.updateSetting('beem_enabled', commSettings.beemEnabled),
+        superAdminApi.updateSetting('beem_api_key', commSettings.beemApiKey, false),
+        superAdminApi.updateSetting('beem_sender_name', commSettings.beemSenderName),
+      ]);
       setMessage({ type: 'success', text: 'Settings saved successfully!' });
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {
@@ -682,6 +687,7 @@ export default function SettingsPage() {
 
       {activeTab === 'communication' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Sandbox Mode */}
           <div style={{ background: '#fefcf9', borderRadius: '16px', border: '1px solid #f3f4f6', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
             <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#1f2937', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <i className="fa fa-flask" style={{ color: '#14b8a6' }}></i> Sandbox Mode
@@ -714,9 +720,76 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* Beem Africa SMS/WhatsApp Settings */}
           <div style={{ background: '#fefcf9', borderRadius: '16px', border: '1px solid #f3f4f6', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
             <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#1f2937', margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <i className="fa fa-server" style={{ color: '#3b82f6' }}></i> Configured Providers
+              <i className="fa fa-comment" style={{ color: '#d97706' }}></i> Beem Africa (SMS / WhatsApp)
+            </h2>
+            <div style={{ display: 'grid', gap: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: '#f9fafb', borderRadius: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '40px', height: '40px', background: commSettings.beemEnabled === 'true' ? '#d1fae5' : '#fef2f2', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <i className="fa fa-power-off" style={{ color: commSettings.beemEnabled === 'true' ? '#059669' : '#dc2626', fontSize: '18px' }}></i>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>Enable Beem Africa</div>
+                    <div style={{ fontSize: '12px', color: commSettings.beemEnabled === 'true' ? '#059669' : '#dc2626' }}>
+                      {commSettings.beemEnabled === 'true' ? 'Enabled' : 'Disabled'}
+                    </div>
+                  </div>
+                </div>
+                <label style={{ position: 'relative', display: 'inline-block', width: '48px', height: '26px' }}>
+                  <input
+                    type="checkbox"
+                    checked={commSettings.beemEnabled === 'true'}
+                    onChange={(e) => setCommSettings({ ...commSettings, beemEnabled: e.target.checked ? 'true' : 'false' })}
+                    style={{ opacity: 0, width: 0, height: 0 }}
+                  />
+                  <span style={{
+                    position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: commSettings.beemEnabled === 'true' ? '#10b981' : '#d1d5db',
+                    borderRadius: '26px', transition: '0.3s',
+                  }}>
+                    <span style={{
+                      position: 'absolute', height: '20px', width: '20px', borderRadius: '50%',
+                      backgroundColor: 'white', top: '3px',
+                      left: commSettings.beemEnabled === 'true' ? '25px' : '3px',
+                      transition: '0.3s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                    }} />
+                  </span>
+                </label>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px', display: 'block' }}>API Key</label>
+                <input
+                  type="password"
+                  value={commSettings.beemApiKey}
+                  onChange={(e) => setCommSettings({ ...commSettings, beemApiKey: e.target.value })}
+                  className="input-field"
+                  placeholder="Enter Beem API key"
+                  style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px', display: 'block' }}>Sender Name</label>
+                <input
+                  type="text"
+                  value={commSettings.beemSenderName}
+                  onChange={(e) => setCommSettings({ ...commSettings, beemSenderName: e.target.value })}
+                  className="input-field"
+                  placeholder="SmartTech"
+                  style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Provider Status */}
+          <div style={{ background: '#fefcf9', borderRadius: '16px', border: '1px solid #f3f4f6', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#1f2937', margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <i className="fa fa-server" style={{ color: '#3b82f6' }}></i> Provider Status
             </h2>
             <div style={{ display: 'grid', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: commSettings.sendgridConfigured || commSettings.zohoConfigured ? '#f0fdf4' : '#fef2f2', borderRadius: '10px' }}>
@@ -742,7 +815,7 @@ export default function SettingsPage() {
                   <div>
                     <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>SMS (Beem Africa)</div>
                     <div style={{ fontSize: '12px', color: commSettings.beemEnabled === 'true' ? '#059669' : '#dc2626' }}>
-                      {commSettings.beemEnabled === 'true' ? 'Configured' : 'Not configured'} {commSettings.beemSenderName ? `- Sender: ${commSettings.beemSenderName}` : ''}
+                      {commSettings.beemEnabled === 'true' ? 'Enabled' : 'Disabled'} {commSettings.beemSenderName ? `- Sender: ${commSettings.beemSenderName}` : ''}
                     </div>
                   </div>
                 </div>
@@ -757,7 +830,7 @@ export default function SettingsPage() {
                   <div>
                     <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>WhatsApp (Beem Africa)</div>
                     <div style={{ fontSize: '12px', color: commSettings.beemEnabled === 'true' ? '#059669' : '#dc2626' }}>
-                      {commSettings.beemEnabled === 'true' ? 'Configured' : 'Not configured'}
+                      {commSettings.beemEnabled === 'true' ? 'Enabled' : 'Disabled'}
                     </div>
                   </div>
                 </div>

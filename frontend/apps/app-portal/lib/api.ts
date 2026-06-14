@@ -7,6 +7,7 @@ if (!API_BASE_URL.endsWith('/api/v1') && !API_BASE_URL.endsWith('/api/v1/')) {
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -1963,7 +1964,7 @@ export const systemCommunicationApi = {
     api.get('/system-communications/delivery-logs', { params }),
 
   // YouTube
-  getYouTube: () => api.get('/system-communications/youtube'),
+  getYouTube: (signal?: AbortSignal) => api.get('/system-communications/youtube', { signal }),
   saveYouTube: (data: any) => api.post('/system-communications/youtube', data),
   syncYouTube: () => api.post('/system-communications/youtube/sync'),
   disconnectYouTube: () => api.delete('/system-communications/youtube'),

@@ -32,7 +32,10 @@ export default function YouTubePage() {
   const loadYouTube = async () => {
     try {
       setLoading(true);
-      const res = await systemCommunicationApi.getYouTube();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const res = await systemCommunicationApi.getYouTube(controller.signal);
+      clearTimeout(timeout);
       const body = res.data?.statusCode ? res.data.data : res.data;
       if (body) {
         setChannelData({
