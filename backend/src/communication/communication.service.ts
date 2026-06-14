@@ -1408,8 +1408,10 @@ export class CommunicationService {
           emailEnabled: true, 
           whatsappEnabled: true,
           emailProvider: 'zoho',
-          smtpApiKey: this.sendgridApiKey,
-          smtpFromEmail: this.sendgridFromEmail,
+          smtpHost: 'smtp.zoho.com',
+          smtpPort: 587,
+          smtpUser: 'noreply@smarttechsaas.com',
+          smtpFromEmail: 'noreply@smarttechsaas.com',
         },
       });
     }
@@ -1432,6 +1434,20 @@ export class CommunicationService {
         },
       });
       this.logger.log('[Email] Using Zoho SMTP (SendGrid as backup)');
+    }
+
+    if (!settings.smtpPassword) {
+      try {
+        const setting = await this.prisma.systemSetting.findUnique({ where: { key: 'smtp_password' } });
+        const pass = setting?.value || '';
+        if (pass) {
+          settings.smtpPassword = pass;
+          await this.prisma.communicationSettings.update({
+            where: { schoolId: 'system' },
+            data: { smtpPassword: pass },
+          });
+        }
+      } catch {}
     }
 
     try {
