@@ -17,8 +17,12 @@ export class EmailService {
     this.fromName = process.env.SENDGRID_FROM_NAME || 'Smart Tech';
     const smtpPass = process.env.EMAIL_PASSWORD || process.env.ZOHO_SMTP_PASSWORD || '';
 
+    if (smtpPass) {
+      console.log(`[EmailService] using Zoho SMTP (from: noreply@smarttechsaas.com)`);
+    }
+
     if (this.sgApiKey) {
-      console.log(`[EmailService] using SendGrid HTTP API (from: ${this.fromEmail})`);
+      console.log(`[EmailService] SendGrid API available as fallback (from: ${this.fromEmail})`);
     }
 
     if (smtpPass) {
@@ -45,6 +49,15 @@ export class EmailService {
   }
 
   async sendMail(to: string, subject: string, html: string) {
+    if (this.useSmtp && this.transporter) {
+      try {
+        await this.transporter.sendMail({ from: '"Smart Tech" <noreply@smarttechsaas.com>', to, subject, html });
+        return;
+      } catch (err) {
+        console.error('[EmailService] Zoho SMTP failed, trying SendGrid fallback:', (err as Error).message);
+      }
+    }
+
     if (this.sgApiKey) {
       try {
         const res = await fetch(SENDGRID_API, {
@@ -67,13 +80,8 @@ export class EmailService {
         }
         return;
       } catch (err) {
-        console.error('[EmailService] SendGrid failed, trying SMTP fallback:', (err as Error).message);
+        console.error('[EmailService] SendGrid fallback also failed:', (err as Error).message);
       }
-    }
-
-    if (this.useSmtp && this.transporter) {
-      await this.transporter.sendMail({ from: '"Smart Tech" <noreply@smarttechsaas.com>', to, subject, html });
-      return;
     }
 
     throw new Error('No email provider configured');
