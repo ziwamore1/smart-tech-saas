@@ -246,7 +246,7 @@ export class NotificationService {
   }
 
   private async sendSMS(phone: string, message: string): Promise<void> {
-    if (this.beemService.isConfigured()) {
+    if (await this.beemService.isConfigured()) {
       try {
         const result = await this.beemService.sendSms(phone, message);
         if (result.success) {
@@ -268,7 +268,7 @@ export class NotificationService {
   }
 
   async sendWhatsApp(phone: string, message: string): Promise<void> {
-    if (this.beemService.isConfigured()) {
+    if (await this.beemService.isConfigured()) {
       try {
         const result = await this.beemService.sendWhatsApp(phone, message);
         if (result.success) {

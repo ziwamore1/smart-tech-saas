@@ -594,6 +594,12 @@ async function main() {
 
   const systemSettings = [
     { key: 'messaging_sandbox_mode', value: 'true', isPublic: false },
+    { key: 'beem_enabled', value: 'true', isPublic: false },
+    { key: 'beem_sender_name', value: 'SmartTech', isPublic: false },
+    { key: 'system_name', value: 'Smart Tech SaaS', isPublic: false },
+    { key: 'session_timeout', value: '60', isPublic: false },
+    { key: 'max_login_attempts', value: '5', isPublic: false },
+    { key: 'password_min_length', value: '8', isPublic: false },
   ];
 
   for (const setting of systemSettings) {

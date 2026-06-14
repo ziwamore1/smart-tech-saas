@@ -268,7 +268,7 @@ export class UnifiedMessagingService {
       return { success: true, channel: 'SMS', messageId: 'sandbox_sms_id' };
     }
 
-    if (!this.beemService.isConfigured()) {
+    if (!(await this.beemService.isConfigured())) {
       this.logger.warn(`[SMS] Beem not configured. Would send to: ${normalizedPhone}`);
       await this.logMessage(null, 'SMS', 'SENT', undefined, normalizedPhone, undefined, message, 'sandbox_sms_id');
       return { success: true, channel: 'SMS', messageId: 'sandbox_sms_id' };
@@ -298,7 +298,7 @@ export class UnifiedMessagingService {
   async sendWhatsApp(phoneNumber: string, message: string): Promise<MessagingResult> {
     const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
 
-    if (!this.beemService.isConfigured()) {
+    if (!(await this.beemService.isConfigured())) {
       const errorMessage = 'Beem WhatsApp not configured';
       this.logger.error(`[WhatsApp] ${errorMessage}`);
       await this.logMessage(null, 'WHATSAPP', 'FAILED', undefined, normalizedPhone, undefined, message, undefined, errorMessage);

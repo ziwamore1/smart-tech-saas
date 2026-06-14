@@ -38,7 +38,6 @@ export default function SettingsPage() {
   });
 
   const [securitySettings, setSecuritySettings] = useState({
-    jwtSecret: '',
     sessionTimeout: '60',
     maxLoginAttempts: '5',
     passwordMinLength: '8',
@@ -75,6 +74,25 @@ export default function SettingsPage() {
         const s = allSettings.find((x: any) => x.key === key);
         return s ? String(s.value) : def;
       };
+      setGeneralSettings({
+        systemName: getVal('system_name', 'Smart Tech SaaS'),
+        supportEmail: getVal('support_email', ''),
+        supportPhone: getVal('support_phone', ''),
+        address: getVal('system_address', ''),
+      });
+      setEmailSettings({
+        smtpHost: getVal('smtp_host', ''),
+        smtpPort: getVal('smtp_port', '587'),
+        smtpUser: getVal('smtp_user', ''),
+        smtpPassword: getVal('smtp_password', ''),
+        fromEmail: getVal('from_email', ''),
+        fromName: getVal('from_name', ''),
+      });
+      setSecuritySettings({
+        sessionTimeout: getVal('session_timeout', '60'),
+        maxLoginAttempts: getVal('max_login_attempts', '5'),
+        passwordMinLength: getVal('password_min_length', '8'),
+      });
       setCommSettings({
         messagingSandboxMode: getVal('messaging_sandbox_mode', 'true'),
         beemEnabled: getVal('beem_enabled', 'true'),
@@ -90,16 +108,73 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSave = async (key: string, value: any) => {
+  const saveGeneral = async () => {
+    setSaving(true);
     try {
-      setSaving(true);
-      await superAdminApi.updateSetting(key, value);
+      await Promise.all([
+        superAdminApi.updateSetting('system_name', generalSettings.systemName),
+        superAdminApi.updateSetting('support_email', generalSettings.supportEmail),
+        superAdminApi.updateSetting('support_phone', generalSettings.supportPhone),
+        superAdminApi.updateSetting('system_address', generalSettings.address),
+      ]);
       setMessage({ type: 'success', text: 'Settings saved successfully!' });
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {
-      console.error('Failed to save settings:', error);
       setMessage({ type: 'error', text: 'Failed to save settings' });
+      setTimeout(() => setMessage(null), 5000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveEmail = async () => {
+    setSaving(true);
+    try {
+      await Promise.all([
+        superAdminApi.updateSetting('smtp_host', emailSettings.smtpHost),
+        superAdminApi.updateSetting('smtp_port', emailSettings.smtpPort),
+        superAdminApi.updateSetting('smtp_user', emailSettings.smtpUser),
+        superAdminApi.updateSetting('smtp_password', emailSettings.smtpPassword, false),
+        superAdminApi.updateSetting('from_email', emailSettings.fromEmail),
+        superAdminApi.updateSetting('from_name', emailSettings.fromName),
+      ]);
+      setMessage({ type: 'success', text: 'Settings saved successfully!' });
       setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to save settings' });
+      setTimeout(() => setMessage(null), 5000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveSecurity = async () => {
+    setSaving(true);
+    try {
+      await Promise.all([
+        superAdminApi.updateSetting('session_timeout', securitySettings.sessionTimeout),
+        superAdminApi.updateSetting('max_login_attempts', securitySettings.maxLoginAttempts),
+        superAdminApi.updateSetting('password_min_length', securitySettings.passwordMinLength),
+      ]);
+      setMessage({ type: 'success', text: 'Settings saved successfully!' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to save settings' });
+      setTimeout(() => setMessage(null), 5000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveCommunication = async () => {
+    setSaving(true);
+    try {
+      await superAdminApi.updateSetting('messaging_sandbox_mode', commSettings.messagingSandboxMode);
+      setMessage({ type: 'success', text: 'Settings saved successfully!' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to save settings' });
+      setTimeout(() => setMessage(null), 5000);
     } finally {
       setSaving(false);
     }
@@ -311,7 +386,7 @@ export default function SettingsPage() {
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
             <button
-              onClick={() => handleSave('general', generalSettings)}
+              onClick={saveGeneral}
               disabled={saving}
               style={{
                 padding: '12px 24px',
@@ -417,7 +492,7 @@ export default function SettingsPage() {
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
             <button
-              onClick={() => handleSave('email', emailSettings)}
+              onClick={saveEmail}
               disabled={saving}
               style={{
                 padding: '12px 24px',
@@ -487,7 +562,7 @@ export default function SettingsPage() {
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
             <button
-              onClick={() => handleSave('security', securitySettings)}
+              onClick={saveSecurity}
               disabled={saving}
               style={{
                 padding: '12px 24px',
@@ -693,7 +768,7 @@ export default function SettingsPage() {
 
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
-              onClick={() => handleSave('messaging_sandbox_mode', commSettings.messagingSandboxMode)}
+              onClick={saveCommunication}
               disabled={saving}
               style={{
                 padding: '12px 24px',

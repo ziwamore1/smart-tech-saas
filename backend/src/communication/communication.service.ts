@@ -1037,7 +1037,7 @@ export class CommunicationService {
   }
 
   private async simulateSMSApi(settings: any, phone: string, message: string) {
-    if (this.beemService.isConfigured()) {
+    if (await this.beemService.isConfigured()) {
       try {
         const result = await this.beemService.sendSms(phone, message);
         if (result.success) {
@@ -1132,7 +1132,7 @@ export class CommunicationService {
     phone: string,
     message: string,
   ) {
-    if (this.beemService.isConfigured()) {
+    if (await this.beemService.isConfigured()) {
       try {
         const result = await this.beemService.sendWhatsApp(phone, message);
         if (result.success) {

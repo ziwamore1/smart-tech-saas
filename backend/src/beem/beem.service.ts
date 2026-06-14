@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma/prisma.service';
 
 export interface BeemSmsResult {
   success: boolean;
@@ -29,7 +30,10 @@ export class BeemService {
   private readonly senderName: string;
   private readonly enabled: boolean;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private prisma: PrismaService,
+  ) {
     this.apiKey = this.configService.get<string>('BEEM_API_KEY', '');
     this.secretKey = this.configService.get<string>('BEEM_SECRET_KEY', '');
     this.senderName = this.configService.get<string>('BEEM_SENDER_NAME', 'SmartTech');
@@ -44,15 +48,34 @@ export class BeemService {
     }
   }
 
-  private getAuthHeader(): string {
-    const credentials = Buffer.from(`${this.apiKey}:${this.secretKey}`).toString('base64');
-    return `Basic ${credentials}`;
+  private async resolveCredentials(channel?: string): Promise<{ apiKey: string; secretKey: string }> {
+    if (this.apiKey && this.secretKey) {
+      return { apiKey: this.apiKey, secretKey: this.secretKey };
+    }
+    try {
+      const provider = await this.prisma.systemProvider.findFirst({
+        where: { channel: channel || 'SMS', isDefault: true },
+        select: { apiKey: true, apiSecret: true },
+      });
+      if (provider?.apiKey && provider?.apiSecret) {
+        return { apiKey: provider.apiKey, secretKey: provider.apiSecret };
+      }
+    } catch {
+      // DB not available, fall back to env vars (even if empty)
+    }
+    return { apiKey: this.apiKey, secretKey: this.secretKey };
   }
 
-  private async request<T>(url: string, body: any, method: 'POST' | 'GET' = 'POST'): Promise<T> {
+  private async getAuthHeader(channel?: string): Promise<string> {
+    const creds = await this.resolveCredentials(channel);
+    const raw = `${creds.apiKey}:${creds.secretKey}`;
+    return `Basic ${Buffer.from(raw).toString('base64')}`;
+  }
+
+  private async request<T>(url: string, body: any, method: 'POST' | 'GET' = 'POST', channel?: string): Promise<T> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': this.getAuthHeader(),
+      'Authorization': await this.getAuthHeader(channel),
     };
 
     const options: RequestInit = { method, headers };
@@ -89,6 +112,8 @@ export class BeemService {
           message,
           recipients: [{ recipient_id: Date.now().toString(), dest_addr: normalizedTo }],
         },
+        'POST',
+        'SMS',
       );
 
       if (result.success || result.code === 200 || result.code === 0) {
@@ -130,6 +155,8 @@ export class BeemService {
           message,
           recipients: formattedRecipients,
         },
+        'POST',
+        'SMS',
       );
 
       if (result.success || result.code === 200 || result.code === 0) {
@@ -167,6 +194,8 @@ export class BeemService {
           message_type: 'text',
           text: message,
         },
+        'POST',
+        'WHATSAPP',
       );
 
       if (result.success || result.code === 200 || result.code === 0 || result.code === 201) {
@@ -194,6 +223,7 @@ export class BeemService {
         'https://apisms.beem.africa/public/v1/vendors/balance',
         null,
         'GET',
+        'SMS',
       );
 
       if (result.success) {
@@ -211,8 +241,17 @@ export class BeemService {
     }
   }
 
-  isConfigured(): boolean {
-    return this.enabled && !!this.apiKey && !!this.secretKey;
+  async isConfigured(): Promise<boolean> {
+    if (this.enabled && this.apiKey && this.secretKey) return true;
+    try {
+      const provider = await this.prisma.systemProvider.findFirst({
+        where: { channel: { in: ['SMS', 'WHATSAPP'] }, isDefault: true },
+        select: { apiKey: true, apiSecret: true },
+      });
+      return this.enabled && !!(provider?.apiKey && provider?.apiSecret);
+    } catch {
+      return false;
+    }
   }
 
   getConfigStatus(): { enabled: boolean; hasApiKey: boolean; hasSecretKey: boolean } {

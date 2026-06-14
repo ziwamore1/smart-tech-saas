@@ -227,13 +227,14 @@ export class SystemCommunicationsService {
 
     let result: { success: boolean; message: string };
 
-    switch (provider.type.toUpperCase()) {
+    switch (provider.channel?.toUpperCase()) {
       case 'SMTP':
       case 'EMAIL':
         result = await this.testSmtpConnection(provider);
         break;
       case 'SMS':
       case 'WHATSAPP':
+      case 'PUSH':
         result = await this.testApiConnection(provider);
         break;
       default:
@@ -318,35 +319,32 @@ export class SystemCommunicationsService {
 
   private async testApiConnection(provider: any): Promise<{ success: boolean; message: string }> {
     try {
-      if (provider.type.toUpperCase() === 'SMS' && this.beemService.isConfigured()) {
-        const result = await this.beemService.getBalance();
-        if (result.success) {
-          return {
-            success: true,
-            message: `API connection successful. Balance: ${result.currency} ${result.balance}`,
-          };
-        }
-        return {
-          success: false,
-          message: `API connection failed: ${result.error}`,
-        };
+      const apiKey = provider.apiKey || '';
+      const apiSecret = provider.apiSecret || '';
+      if (!apiKey || !apiSecret) {
+        return { success: false, message: 'API credentials not configured. Save API Key and API Secret first.' };
       }
 
       const response = await fetch('https://apisms.beem.africa/public/v1/vendors/balance', {
         method: 'GET',
         headers: {
-          Authorization: `Basic ${Buffer.from(`${provider.apiKey || ''}:${provider.apiSecret || ''}`).toString('base64')}`,
+          Authorization: `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString('base64')}`,
           'Content-Type': 'application/json',
         },
       });
 
       if (response.ok) {
-        return { success: true, message: 'API connection successful' };
+        const data = await response.json();
+        return {
+          success: true,
+          message: `API connection successful. Balance: ${data.currency || ''} ${data.balance || ''}`.trim(),
+        };
       }
 
+      const errorText = await response.text();
       return {
         success: false,
-        message: `API connection failed with status ${response.status}`,
+        message: `API connection failed (${response.status}): ${errorText}`,
       };
     } catch (error: any) {
       this.logger.error(`[API Test] Connection failed: ${error.message}`);
@@ -1231,7 +1229,7 @@ export class SystemCommunicationsService {
 
     const beemStatus = providers.find(
       (p) => p.type === 'SMS' && p.name.toLowerCase().includes('beem'),
-    )?.status || (this.beemService.isConfigured() ? 'Connected' : 'Not Configured');
+    )?.status || ((await this.beemService.isConfigured()) ? 'Connected' : 'Not Configured');
 
     const connectedCount = providers.filter((p) => p.status === 'Connected').length;
     const errorCount = providers.filter((p) => p.status === 'Connection Error').length;
