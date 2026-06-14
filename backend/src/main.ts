@@ -2,7 +2,6 @@ import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import type { Request, Response, NextFunction } from 'express';
 import { join } from 'path';
 import compression from 'compression';
 import * as Sentry from '@sentry/node';
@@ -23,24 +22,6 @@ const ALLOWED_ORIGINS = [
   'https://www.smarttechsaas.com',
   'https://smart-tech-saas-production.up.railway.app',
 ];
-
-function corsMiddleware(req: Request, res: Response, next: NextFunction) {
-  const origin = req.headers.origin;
-
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept');
-
-  if (req.method === 'OPTIONS') {
-    res.status(204).end();
-    return;
-  }
-
-  next();
-}
 
 async function bootstrap() {
   const t0 = Date.now();
@@ -64,7 +45,12 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
 
-  app.use(corsMiddleware);
+  app.enableCors({
+    origin: ALLOWED_ORIGINS,
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  });
   setupSecurity(app);
 
   app.use((req: any, _res: any, next: any) => {
