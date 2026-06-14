@@ -305,6 +305,12 @@ export class UnifiedMessagingService {
       return { success: false, channel: 'WHATSAPP', error: errorMessage };
     }
 
+    if (await this.checkSandboxMode()) {
+      this.logger.log(`[WhatsApp] Sandbox mode - Would send to: ${normalizedPhone}, Message: ${message.substring(0, 50)}...`);
+      await this.logMessage(null, 'WHATSAPP', 'SENT', undefined, normalizedPhone, undefined, message, 'sandbox_whatsapp_id');
+      return { success: true, channel: 'WHATSAPP', messageId: 'sandbox_whatsapp_id' };
+    }
+
     try {
       const result = await this.retryOperation(
         () => this.beemService.sendWhatsApp(normalizedPhone, message),
