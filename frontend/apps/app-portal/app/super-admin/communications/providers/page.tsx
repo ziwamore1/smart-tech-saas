@@ -109,7 +109,7 @@ export default function ProvidersPage() {
 
   const openAdd = () => {
     setEditingProvider({
-      id: '', name: '', type: 'EMAIL', channel: 'SMTP', status: 'Not Configured',
+      id: '', name: '', type: 'EMAIL', channel: 'EMAIL', status: 'Not Configured',
     });
     setSaveError(null);
     setShowModal(true);
@@ -358,10 +358,12 @@ export default function ProvidersPage() {
 
               <div>
                 <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px', display: 'block' }}>Channel</label>
-                <select name="channel" defaultValue={editingProvider?.channel || 'SMTP'} style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', background: '#fefcf9' }}>
-                  <option value="SMTP">SMTP</option>
-                  <option value="API">API</option>
-                  <option value="HTTP">HTTP</option>
+                <select name="channel" defaultValue={editingProvider?.channel || 'EMAIL'} style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', background: '#fefcf9' }}>
+                  <option value="EMAIL">Email</option>
+                  <option value="SMS">SMS</option>
+                  <option value="WHATSAPP">WhatsApp</option>
+                  <option value="PUSH">Push</option>
+                  <option value="SOCIAL">Social</option>
                 </select>
               </div>
 
@@ -404,7 +406,7 @@ export default function ProvidersPage() {
                   </div>
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 500, color: '#6b7280', marginBottom: '4px', display: 'block' }}>API Secret</label>
-                    <input type="password" name="apiSecret" placeholder="Leave blank to keep current" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} />
+                    <input type="password" name="apiSecret" defaultValue={editingProvider?.apiSecret || ''} placeholder="Leave blank to keep current" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} />
                   </div>
                 </div>
               </div>

@@ -43,10 +43,10 @@ export default function YouTubePage() {
           totalVideos: body.videoCount ?? body.totalVideos ?? 0,
         });
       } else {
-        setChannelData(null);
+        setChannelData(fallbackChannelData);
       }
     } catch {
-      setChannelData(null);
+      setChannelData(fallbackChannelData);
     } finally {
       setLoading(false);
     }
