@@ -270,10 +270,12 @@ export class SystemCommunicationsService {
 
   private async testSmtpConnection(provider: any): Promise<{ success: boolean; message: string }> {
     try {
+      const port = provider.port || 587;
       const transporter = nodemailer.createTransport({
         host: provider.host || 'smtp.zoho.com',
-        port: provider.port || 465,
-        secure: (provider.port || 465) === 465,
+        port,
+        secure: port === 465,
+        requireTLS: port !== 465,
         auth: {
           user: provider.username || provider.senderEmail,
           pass: provider.password,
