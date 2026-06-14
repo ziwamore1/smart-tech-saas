@@ -269,45 +269,51 @@ export class SystemCommunicationsService {
   }
 
   private async testSmtpConnection(provider: any): Promise<{ success: boolean; message: string }> {
-    try {
-      const port = provider.port || 587;
-      const transporter = nodemailer.createTransport({
-        host: provider.host || 'smtp.zoho.com',
-        port,
-        secure: port === 465,
-        requireTLS: port !== 465,
-        auth: {
-          user: provider.username || provider.senderEmail,
-          pass: provider.password,
-        },
-        connectionTimeout: 15000,
-        greetingTimeout: 15000,
-        socketTimeout: 15000,
-        tls: { rejectUnauthorized: false },
-      });
+    const portsToTry = provider.port
+      ? [provider.port, provider.port === 465 ? 587 : 465]
+      : [587, 465];
 
-      await transporter.verify();
+    for (const port of portsToTry) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: provider.host || 'smtp.zoho.com',
+          port,
+          secure: port === 465,
+          requireTLS: port !== 465,
+          auth: {
+            user: provider.username || provider.senderEmail,
+            pass: provider.password,
+          },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 10000,
+          tls: { rejectUnauthorized: false },
+        });
 
-      const testTo = provider.senderEmail || 'test@smarttechsaas.com';
-      const info = await transporter.sendMail({
-        from: `"${provider.senderName || 'System Communications'}" <${provider.senderEmail || 'noreply@smarttechsaas.com'}>`,
-        to: testTo,
-        subject: 'SMTP Connection Test - Smart Tech SaaS',
-        html: '<h3>SMTP Test Successful</h3><p>This is an automated test message from the System Communications Center.</p><p>If you received this, your SMTP configuration is working correctly.</p>',
-      });
+        await transporter.verify();
 
-      this.logger.log(`[SMTP Test] Connection successful, messageId: ${info.messageId}`);
-      return {
-        success: true,
-        message: `SMTP connection successful. Test email sent to ${testTo}.`,
-      };
-    } catch (error: any) {
-      this.logger.error(`[SMTP Test] Connection failed: ${error.message}`);
-      return {
-        success: false,
-        message: `SMTP connection failed: ${error.message}`,
-      };
+        const testTo = provider.senderEmail || 'test@smarttechsaas.com';
+        const info = await transporter.sendMail({
+          from: `"${provider.senderName || 'System Communications'}" <${provider.senderEmail || 'noreply@smarttechsaas.com'}>`,
+          to: testTo,
+          subject: 'SMTP Connection Test - Smart Tech SaaS',
+          html: '<h3>SMTP Test Successful</h3><p>This is an automated test message from the System Communications Center.</p><p>If you received this, your SMTP configuration is working correctly.</p>',
+        });
+
+        this.logger.log(`[SMTP Test] Connection successful on port ${port}, messageId: ${info.messageId}`);
+        return {
+          success: true,
+          message: `SMTP connection successful on port ${port}. Test email sent to ${testTo}.`,
+        };
+      } catch (error: any) {
+        this.logger.warn(`[SMTP Test] Port ${port} failed: ${error.message}, trying next port...`);
+      }
     }
+
+    return {
+      success: false,
+      message: 'SMTP connection failed on both ports 587 and 465. Check firewall or network settings.',
+    };
   }
 
   private async testApiConnection(provider: any): Promise<{ success: boolean; message: string }> {
