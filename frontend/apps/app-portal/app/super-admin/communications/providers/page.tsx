@@ -78,6 +78,7 @@ export default function ProvidersPage() {
   const [testing, setTesting] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ id: string; success: boolean; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     loadProviders();
@@ -102,6 +103,7 @@ export default function ProvidersPage() {
 
   const openEdit = (provider: Provider) => {
     setEditingProvider(provider);
+    setSaveError(null);
     setShowModal(true);
   };
 
@@ -109,6 +111,7 @@ export default function ProvidersPage() {
     setEditingProvider({
       id: '', name: '', type: 'EMAIL', channel: 'SMTP', status: 'Not Configured',
     });
+    setSaveError(null);
     setShowModal(true);
   };
 
@@ -131,6 +134,7 @@ export default function ProvidersPage() {
 
   const handleSave = async (formData: any) => {
     setSaving(true);
+    setSaveError(null);
     try {
       if (editingProvider?.id) {
         await systemCommunicationApi.updateProvider(editingProvider.id, formData);
@@ -139,7 +143,9 @@ export default function ProvidersPage() {
       }
       setShowModal(false);
       await loadProviders();
-    } catch {}
+    } catch (err: any) {
+      setSaveError(err?.response?.data?.message || err?.message || 'Failed to save provider');
+    }
     setSaving(false);
   };
 
@@ -323,7 +329,7 @@ export default function ProvidersPage() {
                 <i className="fa fa-server" style={{ color: '#3b82f6' }}></i>
                 {editingProvider?.id ? 'Edit Provider' : 'Add Provider'}
               </h2>
-              <button onClick={() => setShowModal(false)} style={{ width: '32px', height: '32px', border: 'none', background: '#f3f4f6', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={() => { setShowModal(false); setSaveError(null); }} style={{ width: '32px', height: '32px', border: 'none', background: '#f3f4f6', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <i className="fa fa-times" style={{ fontSize: '14px', color: '#6b7280' }}></i>
               </button>
             </div>
@@ -398,8 +404,15 @@ export default function ProvidersPage() {
                 </div>
               </div>
 
+              {saveError && (
+                <div style={{ padding: '12px 14px', background: '#fef2f2', borderRadius: '10px', border: '1px solid #fecaca', color: '#991b1b', fontSize: '13px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <i className="fa fa-exclamation-circle" style={{ fontSize: '14px' }}></i>
+                  {saveError}
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '8px', paddingTop: '16px', borderTop: '1px solid #e8ddd0' }}>
-                <button type="button" onClick={() => setShowModal(false)} style={{ padding: '12px 20px', background: '#f3f4f6', color: '#6b7280', borderRadius: '10px', border: 'none', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
+                <button type="button" onClick={() => { setShowModal(false); setSaveError(null); }} style={{ padding: '12px 20px', background: '#f3f4f6', color: '#6b7280', borderRadius: '10px', border: 'none', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
                   Cancel
                 </button>
                 <button type="submit" disabled={saving} style={{ padding: '12px 24px', background: saving ? '#93c5fd' : 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'white', borderRadius: '10px', border: 'none', fontSize: '14px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', boxShadow: '0 4px 12px rgba(59,130,246,0.3)' }}>

@@ -1920,9 +1920,9 @@ export const systemCommunicationApi = {
   getProviders: () => api.get('/system-communications/providers'),
   getProvider: (id: string) => api.get(`/system-communications/providers/${id}`),
   createProvider: (data: any) => api.post('/system-communications/providers', data),
-  updateProvider: (id: string, data: any) => api.patch(`/system-communications/providers/${id}`, data),
+  updateProvider: (id: string, data: any) => api.put(`/system-communications/providers/${id}`, data),
   deleteProvider: (id: string) => api.delete(`/system-communications/providers/${id}`),
-  setDefaultProvider: (id: string) => api.post(`/system-communications/providers/${id}/default`),
+  setDefaultProvider: (id: string) => api.post(`/system-communications/providers/${id}/set-default`),
   testProvider: (id: string) => api.post(`/system-communications/providers/${id}/test`),
 
   // Broadcasts
