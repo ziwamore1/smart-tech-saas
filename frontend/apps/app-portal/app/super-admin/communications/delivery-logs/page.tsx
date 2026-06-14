@@ -84,7 +84,7 @@ export default function DeliveryLogsPage() {
         if (search) params.search = search;
         const res = await systemCommunicationApi.getDeliveryLogs(params);
         const body = res.data?.statusCode ? res.data.data : res.data;
-        setLogs(body || []);
+        setLogs(body?.logs || []);
       } catch {
         setLogs(fallbackLogs);
       } finally {

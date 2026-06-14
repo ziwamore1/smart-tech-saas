@@ -58,7 +58,7 @@ export default function BroadcastPage() {
     try {
       const res = await systemCommunicationApi.getBroadcasts();
       const body = res.data?.statusCode ? res.data.data : res.data;
-      setBroadcasts(Array.isArray(body) ? body : []);
+      setBroadcasts(Array.isArray(body) ? body : (body?.broadcasts || []));
     } catch {
       setBroadcasts([]);
     } finally {

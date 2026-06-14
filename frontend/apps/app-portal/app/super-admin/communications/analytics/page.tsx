@@ -50,11 +50,11 @@ export default function AnalyticsPage() {
         const res = await systemCommunicationApi.getAnalytics({ from: dateFrom, to: dateTo });
         const body = res.data?.statusCode ? res.data.data : res.data;
         if (body) {
-          if (body.email || body.sms || body.whatsapp || body.push) {
-            setStats(body);
+          if (body.channels?.email || body.channels?.sms || body.channels?.whatsapp || body.channels?.pushNotification) {
+            setStats(body.channels);
           }
-          if (body.dailyTrend) {
-            setDaily(body.dailyTrend);
+          if (body.trends) {
+            setDaily(body.trends);
           }
           if (body.distribution) {
             setDistribution(body.distribution);

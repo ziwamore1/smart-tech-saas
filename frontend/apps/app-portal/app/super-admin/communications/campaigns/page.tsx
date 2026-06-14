@@ -61,7 +61,7 @@ export default function CampaignsPage() {
       setLoading(true);
       const res = await systemCommunicationApi.getCampaigns();
       const body = res.data?.statusCode ? res.data.data : res.data;
-      setCampaigns(Array.isArray(body) ? body : []);
+      setCampaigns(Array.isArray(body) ? body : (body?.campaigns || []));
     } catch {
       setCampaigns([]);
     } finally {

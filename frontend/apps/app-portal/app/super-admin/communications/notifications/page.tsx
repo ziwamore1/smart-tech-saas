@@ -24,7 +24,7 @@ export default function NotificationsPage() {
       try {
         const res = await systemCommunicationApi.getNotifications();
         const body = res.data?.statusCode ? res.data.data : res.data;
-        setNotifications(body || []);
+        setNotifications(body?.notifications || []);
       } catch {
         // Keep empty state on error
       } finally {
