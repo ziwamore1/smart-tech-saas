@@ -1905,3 +1905,70 @@ export const staffPositionApi = {
     api.get(`/staff-positions/monitoring-chain/${teacherId}`),
   getPositionTypes: () => api.get('/staff-positions/position-types'),
 };
+
+// ==========================================
+// SYSTEM COMMUNICATIONS API (SuperAdmin)
+// ==========================================
+
+export const systemCommunicationApi = {
+  // Dashboard
+  getDashboard: () => api.get('/system-communications/dashboard'),
+  getStats: (params?: { from?: string; to?: string }) =>
+    api.get('/system-communications/stats', { params }),
+
+  // Providers
+  getProviders: () => api.get('/system-communications/providers'),
+  getProvider: (id: string) => api.get(`/system-communications/providers/${id}`),
+  createProvider: (data: any) => api.post('/system-communications/providers', data),
+  updateProvider: (id: string, data: any) => api.patch(`/system-communications/providers/${id}`, data),
+  deleteProvider: (id: string) => api.delete(`/system-communications/providers/${id}`),
+  setDefaultProvider: (id: string) => api.post(`/system-communications/providers/${id}/default`),
+  testProvider: (id: string) => api.post(`/system-communications/providers/${id}/test`),
+
+  // Broadcasts
+  getBroadcasts: () => api.get('/system-communications/broadcasts'),
+  getBroadcast: (id: string) => api.get(`/system-communications/broadcasts/${id}`),
+  createBroadcast: (data: any) => api.post('/system-communications/broadcasts', data),
+  deleteBroadcast: (id: string) => api.delete(`/system-communications/broadcasts/${id}`),
+
+  // Campaigns
+  getCampaigns: () => api.get('/system-communications/campaigns'),
+  getCampaign: (id: string) => api.get(`/system-communications/campaigns/${id}`),
+  createCampaign: (data: any) => api.post('/system-communications/campaigns', data),
+  updateCampaign: (id: string, data: any) => api.patch(`/system-communications/campaigns/${id}`, data),
+  deleteCampaign: (id: string) => api.delete(`/system-communications/campaigns/${id}`),
+  launchCampaign: (id: string) => api.post(`/system-communications/campaigns/${id}/launch`),
+  pauseCampaign: (id: string) => api.post(`/system-communications/campaigns/${id}/pause`),
+
+  // Templates
+  getTemplates: () => api.get('/system-communications/templates'),
+  getTemplate: (id: string) => api.get(`/system-communications/templates/${id}`),
+  createTemplate: (data: any) => api.post('/system-communications/templates', data),
+  updateTemplate: (id: string, data: any) => api.patch(`/system-communications/templates/${id}`, data),
+  deleteTemplate: (id: string) => api.delete(`/system-communications/templates/${id}`),
+
+  // Notifications
+  getNotifications: () => api.get('/system-communications/notifications'),
+  createNotification: (data: any) => api.post('/system-communications/notifications', data),
+  updateNotification: (id: string, data: any) => api.patch(`/system-communications/notifications/${id}`, data),
+  deleteNotification: (id: string) => api.delete(`/system-communications/notifications/${id}`),
+  triggerNotification: (data: any) => api.post('/system-communications/notifications/trigger', data),
+
+  // Analytics
+  getAnalytics: (params?: { from?: string; to?: string }) =>
+    api.get('/system-communications/analytics', { params }),
+
+  // Delivery Logs
+  getDeliveryLogs: (params?: { type?: string; status?: string; search?: string; page?: number; limit?: number }) =>
+    api.get('/system-communications/delivery-logs', { params }),
+
+  // YouTube
+  getYouTube: () => api.get('/system-communications/youtube'),
+  saveYouTube: (data: any) => api.post('/system-communications/youtube', data),
+  syncYouTube: () => api.post('/system-communications/youtube/sync'),
+  disconnectYouTube: () => api.delete('/system-communications/youtube'),
+
+  // Scheduled
+  getScheduled: () => api.get('/system-communications/scheduled'),
+  cancelScheduled: (id: string) => api.post(`/system-communications/scheduled/${id}/cancel`),
+};
