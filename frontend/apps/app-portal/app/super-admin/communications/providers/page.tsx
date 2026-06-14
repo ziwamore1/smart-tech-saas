@@ -136,10 +136,15 @@ export default function ProvidersPage() {
     setSaving(true);
     setSaveError(null);
     try {
+      const payload = { ...formData };
+      if (payload.port) payload.port = Number(payload.port);
+      if (!payload.password) delete payload.password;
+      if (!payload.apiKey) delete payload.apiKey;
+      if (!payload.apiSecret) delete payload.apiSecret;
       if (editingProvider?.id) {
-        await systemCommunicationApi.updateProvider(editingProvider.id, formData);
+        await systemCommunicationApi.updateProvider(editingProvider.id, payload);
       } else {
-        await systemCommunicationApi.createProvider(formData);
+        await systemCommunicationApi.createProvider(payload);
       }
       setShowModal(false);
       await loadProviders();
