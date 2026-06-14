@@ -53,7 +53,7 @@ export default function AnalyticsPage() {
           if (body.channels?.email || body.channels?.sms || body.channels?.whatsapp || body.channels?.pushNotification) {
             setStats(body.channels);
           }
-          if (body.trends) {
+          if (body.trends && body.trends.length > 0 && 'email' in body.trends[0]) {
             setDaily(body.trends);
           }
           if (body.distribution) {

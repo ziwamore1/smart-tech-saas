@@ -1041,7 +1041,7 @@ export class SystemCommunicationsService {
         email: emailStats,
         sms: smsStats,
         whatsapp: whatsappStats,
-        pushNotification: pushStats,
+        push: pushStats,
       },
       trends,
     };
