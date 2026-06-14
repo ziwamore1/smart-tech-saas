@@ -9,8 +9,8 @@ export class CloudAssetService {
   constructor(private prisma: PrismaService) {}
 
   async getAssets(schoolId: string | null, type?: string, search?: string) {
-    if (!schoolId) return [];
-    const where: any = { schoolId };
+    const where: any = {};
+    if (schoolId) where.schoolId = schoolId;
     if (type) where.type = type;
     if (search) where.name = { contains: search, mode: 'insensitive' };
     return this.prisma.templateAsset.findMany({ where, orderBy: { createdAt: 'desc' } });

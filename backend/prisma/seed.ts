@@ -588,6 +588,22 @@ async function main() {
     }
   }
 
+  // =============================================
+  // SYSTEM SETTINGS
+  // =============================================
+
+  const systemSettings = [
+    { key: 'messaging_sandbox_mode', value: 'true', isPublic: false },
+  ];
+
+  for (const setting of systemSettings) {
+    await prisma.systemSetting.upsert({
+      where: { key: setting.key },
+      update: { value: setting.value, isPublic: setting.isPublic },
+      create: { key: setting.key, value: setting.value, isPublic: setting.isPublic },
+    });
+  }
+
   console.log('Institution type engine seeded successfully!');
 }
 

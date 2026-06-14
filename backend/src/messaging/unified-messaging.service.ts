@@ -109,7 +109,8 @@ Smart Tech Team`,
 @Injectable()
 export class UnifiedMessagingService {
   private readonly logger = new Logger(UnifiedMessagingService.name);
-  private readonly sandboxMode: boolean;
+  private readonly envSandboxMode: boolean;
+  private sandboxModeCache: boolean | null = null;
   private readonly retryAttempts: number;
   private readonly retryDelay: number;
   private sendgridApiKey: string;
@@ -121,7 +122,7 @@ export class UnifiedMessagingService {
     private configService: ConfigService,
     private beemService: BeemService,
   ) {
-    this.sandboxMode = this.configService.get<string>('MESSAGING_SANDBOX_MODE', 'true') === 'true';
+    this.envSandboxMode = this.configService.get<string>('MESSAGING_SANDBOX_MODE', 'true') === 'true';
     this.retryAttempts = parseInt(this.configService.get<string>('MESSAGING_RETRY_ATTEMPTS', '3'), 10);
     this.retryDelay = parseInt(this.configService.get<string>('MESSAGING_RETRY_DELAY_MS', '5000'), 10);
     this.sendgridApiKey = this.configService.get<string>('SENDGRID_API_KEY', '');
@@ -132,6 +133,21 @@ export class UnifiedMessagingService {
       sgMail.setApiKey(this.sendgridApiKey);
       this.logger.log('[SendGrid] API initialized');
     }
+  }
+
+  private async checkSandboxMode(): Promise<boolean> {
+    if (this.sandboxModeCache !== null) return this.sandboxModeCache;
+    try {
+      const setting = await this.prisma.systemSetting.findUnique({
+        where: { key: 'messaging_sandbox_mode' },
+      });
+      if (setting) {
+        this.sandboxModeCache = setting.value === 'true' || setting.value === '1';
+        return this.sandboxModeCache;
+      }
+    } catch {}
+    this.sandboxModeCache = this.envSandboxMode;
+    return this.sandboxModeCache;
   }
 
   private normalizePhoneNumber(phone: string): string {
@@ -213,7 +229,7 @@ export class UnifiedMessagingService {
         html: message.replace(/\n/g, '<br>'),
       };
 
-      if (this.sandboxMode) {
+      if (await this.checkSandboxMode()) {
         this.logger.log(`[Email] Sandbox mode - Would send to: ${to}, Subject: ${subject}`);
         await this.logMessage(null, 'EMAIL', 'SENT', to, undefined, subject, message, 'sandbox_email_id');
         return { success: true, channel: 'EMAIL', messageId: 'sandbox_email_id' };
@@ -246,7 +262,7 @@ export class UnifiedMessagingService {
   async sendSMS(phoneNumber: string, message: string): Promise<MessagingResult> {
     const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
 
-    if (this.sandboxMode) {
+    if (await this.checkSandboxMode()) {
       this.logger.log(`[SMS] Sandbox mode - Would send to: ${normalizedPhone}, Message: ${message.substring(0, 50)}...`);
       await this.logMessage(null, 'SMS', 'SENT', undefined, normalizedPhone, undefined, message, 'sandbox_sms_id');
       return { success: true, channel: 'SMS', messageId: 'sandbox_sms_id' };
