@@ -1401,39 +1401,43 @@ export class CommunicationService {
       where: { schoolId: 'system' },
     });
 
+    const zohoDefaults = {
+      smtpHost: 'smtp.zoho.com',
+      smtpPort: 587,
+      smtpUser: 'noreply@smarttechsaas.com',
+      smtpFromEmail: 'noreply@smarttechsaas.com',
+      emailProvider: 'zoho',
+    };
+
     if (!settings) {
       settings = await this.prisma.communicationSettings.create({
-        data: { 
-          schoolId: 'system', 
-          emailEnabled: true, 
+        data: {
+          schoolId: 'system',
+          emailEnabled: true,
           whatsappEnabled: true,
-          emailProvider: 'zoho',
-          smtpHost: 'smtp.zoho.com',
-          smtpPort: 587,
-          smtpUser: 'noreply@smarttechsaas.com',
-          smtpFromEmail: 'noreply@smarttechsaas.com',
+          ...zohoDefaults,
         },
       });
+    } else {
+      const s = settings as Record<string, any>;
+      const needsUpdate: Record<string, any> = {};
+      for (const [key, val] of Object.entries(zohoDefaults)) {
+        if (!s[key] || s[key] !== val) {
+          s[key] = val;
+          needsUpdate[key] = val;
+        }
+      }
+      if (Object.keys(needsUpdate).length > 0) {
+        await this.prisma.communicationSettings.update({
+          where: { schoolId: 'system' },
+          data: needsUpdate,
+        });
+      }
     }
 
     if (!settings.emailEnabled) {
       this.logger.warn('[Email] Email not enabled');
       return { success: false, error: 'Email not enabled' };
-    }
-
-    if (this.sendgridApiKey && (!settings.smtpApiKey || settings.smtpApiKey !== this.sendgridApiKey)) {
-      settings.smtpApiKey = this.sendgridApiKey;
-      settings.emailProvider = 'zoho';
-      settings.smtpFromEmail = this.sendgridFromEmail;
-      await this.prisma.communicationSettings.update({
-        where: { schoolId: 'system' },
-        data: {
-          smtpApiKey: this.sendgridApiKey,
-          emailProvider: 'zoho',
-          smtpFromEmail: this.sendgridFromEmail,
-        },
-      });
-      this.logger.log('[Email] Using Zoho SMTP (SendGrid as backup)');
     }
 
     if (!settings.smtpPassword) {
