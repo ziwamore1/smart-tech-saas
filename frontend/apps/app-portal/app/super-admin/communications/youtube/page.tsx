@@ -25,6 +25,7 @@ export default function YouTubePage() {
   const [showDisconnect, setShowDisconnect] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [channelUrl, setChannelUrl] = useState('');
   const [channelName, setChannelName] = useState('');
   const [apiKey, setApiKey] = useState('');
@@ -37,19 +38,20 @@ export default function YouTubePage() {
       const res = await systemCommunicationApi.getYouTube(controller.signal);
       clearTimeout(timeout);
       const body = res.data?.statusCode ? res.data.data : res.data;
-      if (body) {
+      if (body?.configured || body?.channelId) {
         setChannelData({
           ...fallbackChannelData,
           ...body,
+          configured: true,
           subscribers: body.subscriberCount ?? body.subscribers ?? 0,
           totalViews: body.viewCount ?? body.totalViews ?? 0,
           totalVideos: body.videoCount ?? body.totalVideos ?? 0,
         });
       } else {
-        setChannelData(fallbackChannelData);
+        setChannelData(null);
       }
     } catch {
-      setChannelData(fallbackChannelData);
+      setChannelData(null);
     } finally {
       setLoading(false);
     }
@@ -76,7 +78,10 @@ export default function YouTubePage() {
   const handleConnect = async () => {
     try {
       setConnecting(true);
-      await systemCommunicationApi.saveYouTube({ channelUrl, channelName, apiKey });
+      const payload: any = { channelUrl, channelName };
+      if (apiKey) payload.apiKey = apiKey;
+      await systemCommunicationApi.saveYouTube(payload);
+      setEditing(false);
       await loadYouTube();
     } catch (err) {
       console.error('Connect failed', err);
@@ -214,8 +219,52 @@ export default function YouTubePage() {
           >
             <i className="fa fa-unlink"></i> Disconnect
           </button>
+          <button
+            onClick={() => {
+              setChannelUrl(channelData?.url || '');
+              setChannelName(channelData?.name || '');
+              setApiKey('');
+              setEditing(true);
+            }}
+            style={{ padding: '10px 18px', background: '#fef3c7', color: '#92400e', borderRadius: '8px', border: 'none', fontSize: '14px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <i className="fa fa-cog"></i> Settings
+          </button>
         </div>
       </div>
+
+      {/* Edit Config Inline */}
+      {editing && (
+        <div style={{ background: '#fefcf9', borderRadius: '16px', padding: '24px', border: '1px solid #fbbf24', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#1f2937', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <i className="fa fa-cog" style={{ color: '#d97706' }}></i> Edit Channel Configuration
+          </h2>
+          <div style={{ display: 'grid', gap: '16px', maxWidth: '500px' }}>
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px', display: 'block' }}>Channel URL</label>
+              <input type="text" value={channelUrl} onChange={(e) => setChannelUrl(e.target.value)} placeholder="https://youtube.com/@yourchannel" className="input-field" style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px', display: 'block' }}>Channel Name</label>
+              <input type="text" value={channelName} onChange={(e) => setChannelName(e.target.value)} placeholder="Smart Tech Zambia" className="input-field" style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px', display: 'block' }}>API Key</label>
+              <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="Leave blank to keep existing key" className="input-field" style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+              <p style={{ fontSize: '12px', color: '#9ca3af', margin: '4px 0 0' }}>Leave blank to keep the existing API key</p>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '8px' }}>
+              <button onClick={() => setEditing(false)} style={{ padding: '10px 18px', background: '#f3f4f6', color: '#6b7280', borderRadius: '8px', border: 'none', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleConnect} disabled={connecting} style={{
+                padding: '10px 18px', background: connecting ? '#fca5a5' : 'linear-gradient(135deg, #ef4444, #dc2626)', color: 'white', borderRadius: '8px', border: 'none', fontSize: '14px', fontWeight: 600, cursor: connecting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+              }}>
+                <i className={`fa ${connecting ? 'fa-spinner fa-spin' : 'fa-save'}`}></i>
+                {connecting ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Channel Info */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: '#fefcf9', borderRadius: '16px', padding: '24px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
