@@ -41,12 +41,28 @@ export default function CommunicationsDashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const flattenDashboard = (body: any) => {
+    if (!body) return fallbackStats;
+    return {
+      totalProviders: body.providers?.total ?? 0,
+      activeProviders: body.providers?.connected ?? 0,
+      totalBroadcasts: body.broadcasts?.total ?? 0,
+      messagesSentToday: body.messageStats?.sent ?? 0,
+      zohoStatus: body.providers?.zohoStatus ?? 'Not Configured',
+      zohoSender: body.providers?.zohoSender ?? '-',
+      zohoLastTest: body.providers?.zohoLastTest ?? new Date().toISOString(),
+      beemBalance: body.providers?.beemBalance ?? 0,
+      beemSentToday: body.providers?.beemSentToday ?? 0,
+      beemDeliveryRate: body.providers?.beemDeliveryRate ?? 0,
+    };
+  };
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
         const res = await systemCommunicationApi.getDashboard();
         const body = res.data?.statusCode ? res.data.data : res.data;
-        setStats(body || fallbackStats);
+        setStats(flattenDashboard(body));
       } catch {
         setStats(fallbackStats);
       } finally {
@@ -132,7 +148,7 @@ export default function CommunicationsDashboardPage() {
         <div className="stat-card" style={{ background: '#fefcf9', borderRadius: '16px', padding: '20px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, right: 0, width: '80px', height: '80px', background: 'rgba(234,102,69,0.1)', borderBottomLeftRadius: '40px' }}></div>
           <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px' }}>Messages Sent Today</p>
-          <p style={{ fontSize: '32px', fontWeight: 700, color: '#1f2937', margin: '0' }}>{s.messagesSentToday.toLocaleString()}</p>
+          <p style={{ fontSize: '32px', fontWeight: 700, color: '#1f2937', margin: '0' }}>{(s.messagesSentToday ?? 0).toLocaleString()}</p>
           <span style={{ fontSize: '11px', color: '#ea6645', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px' }}>
             <i className="fa fa-check-circle"></i> Across all channels
           </span>
@@ -191,7 +207,7 @@ export default function CommunicationsDashboardPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
             <div style={{ textAlign: 'center', padding: '12px', background: '#f0fdf4', borderRadius: '10px' }}>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#16a34a' }}>{s.beemBalance.toFixed(2)}</div>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#16a34a' }}>{(s.beemBalance ?? 0).toFixed(2)}</div>
               <div style={{ fontSize: '11px', color: '#166534' }}>SMS Balance</div>
             </div>
             <div style={{ textAlign: 'center', padding: '12px', background: '#eff6ff', borderRadius: '10px' }}>

@@ -7,6 +7,7 @@ import { useAuthStore } from '../store';
 import { SuperAdminDashboardScreen } from '../screens/super-admin/DashboardScreen';
 import { SuperAdminMediaScreen } from '../screens/super-admin/MediaScreen';
 import { SuperAdminMonitoringScreen } from '../screens/super-admin/MonitoringScreen';
+import { SuperAdminCommunicationsScreen } from '../screens/super-admin/CommunicationsScreen';
 import { SuperAdminSchoolsScreen } from '../screens/super-admin/SchoolsScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
 import { colors, spacing, borderRadius, shadows } from '../theme';
@@ -27,6 +28,7 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'SuperAdminHome', label: 'Dashboard', icon: '📊', component: SuperAdminDashboardScreen, institutionTypes: null as any },
   { name: 'SuperAdminMedia', label: 'Media', icon: '🖼️', component: SuperAdminMediaScreen, institutionTypes: null as any },
   { name: 'SuperAdminMonitoring', label: 'Monitoring', icon: '📡', component: SuperAdminMonitoringScreen, institutionTypes: null as any },
+  { name: 'SuperAdminCommunications', label: 'Communications', icon: '📡', component: SuperAdminCommunicationsScreen, institutionTypes: null as any },
   { name: 'SuperAdminSchools', label: 'Schools', icon: '🏫', component: SuperAdminSchoolsScreen, institutionTypes: null as any },
   { name: 'SuperAdminProfile', label: 'Profile', icon: '👤', component: ProfileScreen, institutionTypes: null as any },
 ];

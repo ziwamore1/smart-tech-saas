@@ -1581,6 +1581,176 @@ class ApiService {
     });
     return response.data;
   }
+
+  // ===== System Communications API (SuperAdmin) =====
+
+  async getSystemCommunicationsDashboard() {
+    const response = await this.client.get('/system-communications/dashboard');
+    return response.data;
+  }
+
+  async getSystemProviders() {
+    const response = await this.client.get('/system-communications/providers');
+    return response.data;
+  }
+
+  async addSystemProvider(data: {
+    name: string; type: string; credentials: string;
+    isDefault?: boolean; priority?: number;
+  }) {
+    const response = await this.client.post('/system-communications/providers', data);
+    return response.data;
+  }
+
+  async updateSystemProvider(id: string, data: any) {
+    const response = await this.client.patch(`/system-communications/providers/${id}`, data);
+    return response.data;
+  }
+
+  async deleteSystemProvider(id: string) {
+    const response = await this.client.delete(`/system-communications/providers/${id}`);
+    return response.data;
+  }
+
+  async testSystemProviderConnection(id: string) {
+    const response = await this.client.post(`/system-communications/providers/${id}/test`);
+    return response.data;
+  }
+
+  async getSystemTemplates() {
+    const response = await this.client.get('/system-communications/templates');
+    return response.data;
+  }
+
+  async createSystemTemplate(data: {
+    name: string; type: string; scope: string;
+    category?: string; subject?: string; body: string;
+    variables?: string[];
+  }) {
+    const response = await this.client.post('/system-communications/templates', data);
+    return response.data;
+  }
+
+  async updateSystemTemplate(id: string, data: any) {
+    const response = await this.client.patch(`/system-communications/templates/${id}`, data);
+    return response.data;
+  }
+
+  async deleteSystemTemplate(id: string) {
+    const response = await this.client.delete(`/system-communications/templates/${id}`);
+    return response.data;
+  }
+
+  async getSystemBroadcasts() {
+    const response = await this.client.get('/system-communications/broadcasts');
+    return response.data;
+  }
+
+  async createSystemBroadcast(data: {
+    title: string; message: string; type: string;
+    scheduledAt?: string; targetAudience?: string;
+  }) {
+    const response = await this.client.post('/system-communications/broadcasts', data);
+    return response.data;
+  }
+
+  async launchSystemBroadcast(id: string) {
+    const response = await this.client.post(`/system-communications/broadcasts/${id}/launch`);
+    return response.data;
+  }
+
+  async getSystemCampaigns() {
+    const response = await this.client.get('/system-communications/campaigns');
+    return response.data;
+  }
+
+  async createSystemCampaign(data: {
+    name: string; type: string; templateId?: string;
+    scheduledAt?: string; targetFilters?: any;
+  }) {
+    const response = await this.client.post('/system-communications/campaigns', data);
+    return response.data;
+  }
+
+  async launchSystemCampaign(id: string) {
+    const response = await this.client.post(`/system-communications/campaigns/${id}/launch`);
+    return response.data;
+  }
+
+  async pauseSystemCampaign(id: string) {
+    const response = await this.client.post(`/system-communications/campaigns/${id}/pause`);
+    return response.data;
+  }
+
+  async deleteSystemCampaign(id: string) {
+    const response = await this.client.delete(`/system-communications/campaigns/${id}`);
+    return response.data;
+  }
+
+  async getSystemNotifications(params?: { status?: string; limit?: number; offset?: number }) {
+    const response = await this.client.get('/system-communications/notifications', { params });
+    return response.data;
+  }
+
+  async getSystemNotificationStats() {
+    const response = await this.client.get('/system-communications/notifications/stats');
+    return response.data;
+  }
+
+  async getSystemAnalytics(params?: { from?: string; to?: string; groupBy?: string }) {
+    const response = await this.client.get('/system-communications/analytics', { params });
+    return response.data;
+  }
+
+  async getSystemDeliveryLogs(params?: { status?: string; provider?: string; limit?: number; offset?: number }) {
+    const response = await this.client.get('/system-communications/delivery-logs', { params });
+    return response.data;
+  }
+
+  async getSystemScheduledMessages() {
+    const response = await this.client.get('/system-communications/scheduled');
+    return response.data;
+  }
+
+  async cancelSystemScheduledMessage(id: string) {
+    const response = await this.client.post(`/system-communications/scheduled/${id}/cancel`);
+    return response.data;
+  }
+
+  async getSystemYouTubeChannels() {
+    const response = await this.client.get('/system-communications/youtube');
+    return response.data;
+  }
+
+  async addSystemYouTubeChannel(data: { name: string; channelId: string; description?: string }) {
+    const response = await this.client.post('/system-communications/youtube', data);
+    return response.data;
+  }
+
+  async updateSystemYouTubeChannel(id: string, data: any) {
+    const response = await this.client.patch(`/system-communications/youtube/${id}`, data);
+    return response.data;
+  }
+
+  async deleteSystemYouTubeChannel(id: string) {
+    const response = await this.client.delete(`/system-communications/youtube/${id}`);
+    return response.data;
+  }
+
+  async getSystemCommunicationStats(params?: { from?: string; to?: string }) {
+    const response = await this.client.get('/system-communications/stats', { params });
+    return response.data;
+  }
+
+  async getSystemProviderStatus() {
+    const response = await this.client.get('/system-communications/status');
+    return response.data;
+  }
+
+  async getSystemBeemDashboard() {
+    const response = await this.client.get('/system-communications/beem');
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();
