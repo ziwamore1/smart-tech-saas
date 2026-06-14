@@ -1295,6 +1295,8 @@ model CommunicationTemplate {
   message   String
   schoolId  String
   isDefault Boolean  @default(false)
+  scope     String   @default("school")
+  category  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   school    School   @relation(fields: [schoolId], references: [id])
@@ -1302,6 +1304,100 @@ model CommunicationTemplate {
   @@unique([name, schoolId])
   @@index([schoolId])
   @@index([type])
+  @@index([scope])
+}
+
+model SystemProvider {
+  id            String   @id @default(uuid())
+  name          String
+  type          String
+  channel       String
+  host          String?
+  port          Int?
+  username      String?
+  password      String?
+  apiKey        String?
+  apiSecret     String?
+  senderEmail   String?
+  senderName    String?
+  status        String   @default("Not Configured")
+  lastTestedAt  DateTime?
+  isDefault     Boolean  @default(false)
+  config        Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([name, channel])
+  @@index([type])
+  @@index([channel])
+  @@index([status])
+}
+
+model Broadcast {
+  id            String   @id @default(uuid())
+  title         String
+  message       String
+  channels      String[]
+  targetType    String
+  targetIds     String[]
+  status        String   @default("DRAFT")
+  scheduledAt   DateTime?
+  sentAt        DateTime?
+  completedAt   DateTime?
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([createdAt])
+}
+
+model Campaign {
+  id            String       @id @default(uuid())
+  name          String
+  description   String?
+  type          String
+  channels      String[]
+  targetType    String
+  targetIds     String[]
+  templateId    String?
+  status        String       @default("DRAFT")
+  scheduledAt   DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  sentCount     Int          @default(0)
+  openedCount   Int          @default(0)
+  clickedCount  Int          @default(0)
+  failedCount   Int          @default(0)
+  createdById   String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model YouTubeChannel {
+  id               String   @id @default(uuid())
+  channelUrl       String?
+  channelName      String?
+  channelId        String?
+  apiKey           String?
+  accessToken      String?
+  refreshToken     String?
+  tokenExpiry      DateTime?
+  subscriberCount  Int      @default(0)
+  viewCount        Int      @default(0)
+  videoCount       Int      @default(0)
+  isConnected      Boolean  @default(false)
+  lastSyncedAt     DateTime?
+  schoolId         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([schoolId])
 }
 
 model Conversation {

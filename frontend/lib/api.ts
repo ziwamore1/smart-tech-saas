@@ -646,6 +646,57 @@ export const communicationApi = {
     api.post('/communications/alerts/sms', data),
 };
 
+export const systemCommunicationApi = {
+  getDashboard: () => api.get('/system-communications/dashboard'),
+  getStatus: () => api.get('/system-communications/status'),
+  checkStatus: () => api.post('/system-communications/status/check'),
+
+  getProviders: () => api.get('/system-communications/providers'),
+  getProvider: (id: string) => api.get(`/system-communications/providers/${id}`),
+  createProvider: (data: any) => api.post('/system-communications/providers', data),
+  updateProvider: (id: string, data: any) => api.put(`/system-communications/providers/${id}`, data),
+  deleteProvider: (id: string) => api.delete(`/system-communications/providers/${id}`),
+  testProvider: (id: string) => api.post(`/system-communications/providers/${id}/test`),
+  setDefaultProvider: (id: string) => api.post(`/system-communications/providers/${id}/set-default`),
+
+  getBroadcasts: () => api.get('/system-communications/broadcasts'),
+  getBroadcast: (id: string) => api.get(`/system-communications/broadcasts/${id}`),
+  createBroadcast: (data: any) => api.post('/system-communications/broadcasts', data),
+  updateBroadcast: (id: string, data: any) => api.put(`/system-communications/broadcasts/${id}`, data),
+  deleteBroadcast: (id: string) => api.delete(`/system-communications/broadcasts/${id}`),
+  sendBroadcast: (id: string) => api.post(`/system-communications/broadcasts/${id}/send`),
+  scheduleBroadcast: (id: string) => api.post(`/system-communications/broadcasts/${id}/schedule`),
+
+  getCampaigns: () => api.get('/system-communications/campaigns'),
+  getCampaign: (id: string) => api.get(`/system-communications/campaigns/${id}`),
+  createCampaign: (data: any) => api.post('/system-communications/campaigns', data),
+  updateCampaign: (id: string, data: any) => api.put(`/system-communications/campaigns/${id}`, data),
+  deleteCampaign: (id: string) => api.delete(`/system-communications/campaigns/${id}`),
+  launchCampaign: (id: string) => api.post(`/system-communications/campaigns/${id}/launch`),
+  pauseCampaign: (id: string) => api.post(`/system-communications/campaigns/${id}/pause`),
+
+  getTemplates: () => api.get('/system-communications/templates'),
+  createTemplate: (data: any) => api.post('/system-communications/templates', data),
+  updateTemplate: (id: string, data: any) => api.put(`/system-communications/templates/${id}`, data),
+  deleteTemplate: (id: string) => api.delete(`/system-communications/templates/${id}`),
+
+  getNotifications: () => api.get('/system-communications/notifications'),
+  triggerNotification: (data: any) => api.post('/system-communications/notifications', data),
+
+  getYouTube: () => api.get('/system-communications/youtube'),
+  saveYouTube: (data: any) => api.post('/system-communications/youtube', data),
+  syncYouTube: () => api.post('/system-communications/youtube/sync'),
+  disconnectYouTube: () => api.delete('/system-communications/youtube'),
+
+  getAnalytics: (params?: any) => api.get('/system-communications/analytics', { params }),
+  getDeliveryLogs: (params?: any) => api.get('/system-communications/delivery-logs', { params }),
+
+  getBeemDashboard: () => api.get('/system-communications/beem/dashboard'),
+
+  getScheduled: () => api.get('/system-communications/scheduled'),
+  cancelScheduled: (id: string) => api.post(`/system-communications/scheduled/${id}/cancel`),
+};
+
 export const enrollmentApi = {
   getByStudent: (studentId: string) => api.get(`/enrollments/student/${studentId}`),
   getByClass: (classId: string) => api.get(`/enrollments/class/${classId}`),

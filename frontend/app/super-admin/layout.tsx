@@ -88,6 +88,12 @@ const superAdminNav = [
     color: '#14b8a6'
   },
   { 
+    name: 'Communications Hub', 
+    href: '/super-admin/communications', 
+    icon: 'fa-bullhorn',
+    color: '#0ea5e9'
+  },
+  { 
     name: 'Audit Logs', 
     href: '/super-admin/audit-logs', 
     icon: 'fa-history',
@@ -136,7 +142,7 @@ const superAdminNav = [
     color: '#64748b'
   },
   { 
-    name: 'Templates', 
+    name: 'Templates',
     href: '/super-admin/templates', 
     icon: 'fa-file-alt',
     color: '#f97316'

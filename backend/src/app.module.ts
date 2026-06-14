@@ -30,6 +30,7 @@ import { SuperAdminModule } from './super-admin/super-admin.module';
 import { RoleModule } from './role/role.module';
 import { PaymentModule } from './payment/payment.module';
 import { CommunicationModule } from './communication/communication.module';
+import { SystemCommunicationsModule } from './system-communications/system-communications.module';
 import { EmailModule } from './email/email.module';
 import { FeatureLockModule } from './feature-lock/feature-lock.module';
 import { GradingSystemModule } from './grading-system/grading-system.module';
@@ -137,6 +138,7 @@ import { ProductionLogger } from './common/production-logger';
     RoleModule,
     PaymentModule,
     CommunicationModule,
+    SystemCommunicationsModule,
     EmailModule,
     FeatureLockModule,
     GradingSystemModule,

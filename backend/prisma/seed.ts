@@ -604,7 +604,70 @@ async function main() {
     });
   }
 
+  // =============================================
+  // SYSTEM COMMUNICATION PROVIDERS
+  // =============================================
+
+  const systemProviders = [
+    {
+      name: 'Zoho Mail',
+      type: 'SMTP',
+      channel: 'EMAIL',
+      host: 'smtp.zoho.com',
+      port: 465,
+      username: 'SmartTech',
+      password: 'your_zoho_app_password',
+      senderEmail: 'noreply@smarttechsaas.com',
+      senderName: 'Smart Tech',
+      status: 'Connected',
+      isDefault: true,
+      config: { secure: true, requireTLS: true },
+    },
+    {
+      name: 'SendGrid',
+      type: 'API',
+      channel: 'EMAIL',
+      apiKey: 'your_sendgrid_api_key',
+      senderEmail: 'noreply@smarttechsaas.com',
+      senderName: 'Smart Tech',
+      status: 'Connected',
+      isDefault: false,
+      config: { rateLimit: 100, monthlyLimit: 50000 },
+    },
+    {
+      name: 'Beem Africa SMS',
+      type: 'API',
+      channel: 'SMS',
+      apiKey: 'your_beem_api_key',
+      apiSecret: 'your_beem_api_secret',
+      senderName: 'SmartTech',
+      status: 'Connected',
+      isDefault: true,
+      config: { twoWay: true, deliveryReports: true },
+    },
+    {
+      name: 'Beem Africa WhatsApp',
+      type: 'API',
+      channel: 'WHATSAPP',
+      apiKey: 'your_beem_api_key',
+      apiSecret: 'your_beem_api_secret',
+      senderName: 'SmartTech',
+      status: 'Connected',
+      isDefault: true,
+      config: { templateBased: true, rateLimit: 250 },
+    },
+  ];
+
+  for (const provider of systemProviders) {
+    await prisma.systemProvider.upsert({
+      where: { name_channel: { name: provider.name, channel: provider.channel } },
+      update: provider,
+      create: provider,
+    });
+  }
+
   console.log('Institution type engine seeded successfully!');
+  console.log('System communication providers seeded successfully!');
 }
 
 main()
