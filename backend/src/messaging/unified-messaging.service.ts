@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { BeemService } from '../beem/beem.service';
-import sgMail from '@sendgrid/mail';
+import { EmailService } from '../email/email.service';
 
 interface UserInfo {
   id?: string;
@@ -113,26 +113,16 @@ export class UnifiedMessagingService {
   private sandboxModeCache: boolean | null = null;
   private readonly retryAttempts: number;
   private readonly retryDelay: number;
-  private sendgridApiKey: string;
-  private sendgridFromEmail: string;
-  private sendgridFromName: string;
 
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
     private beemService: BeemService,
+    private emailService: EmailService,
   ) {
-    this.envSandboxMode = this.configService.get<string>('MESSAGING_SANDBOX_MODE', 'true') === 'true';
+    this.envSandboxMode = this.configService.get<string>('MESSAGING_SANDBOX_MODE', 'false') === 'true';
     this.retryAttempts = parseInt(this.configService.get<string>('MESSAGING_RETRY_ATTEMPTS', '3'), 10);
     this.retryDelay = parseInt(this.configService.get<string>('MESSAGING_RETRY_DELAY_MS', '5000'), 10);
-    this.sendgridApiKey = this.configService.get<string>('SENDGRID_API_KEY', '');
-    this.sendgridFromEmail = this.configService.get<string>('SENDGRID_FROM_EMAIL', 'noreply@smarttechsaas.com');
-    this.sendgridFromName = this.configService.get<string>('SENDGRID_FROM_NAME', 'Smart Tech');
-
-    if (this.sendgridApiKey && this.sendgridApiKey !== 'your_sendgrid_api_key') {
-      sgMail.setApiKey(this.sendgridApiKey);
-      this.logger.log('[SendGrid] API initialized');
-    }
   }
 
   private async checkSandboxMode(): Promise<boolean> {
@@ -211,50 +201,23 @@ export class UnifiedMessagingService {
   }
 
   async sendEmail(to: string, subject: string, message: string): Promise<MessagingResult> {
+    if (await this.checkSandboxMode()) {
+      this.logger.log(`[Email] Sandbox mode - Would send to: ${to}, Subject: ${subject}`);
+      await this.logMessage(null, 'EMAIL', 'SENT', to, undefined, subject, message, 'sandbox_email_id');
+      return { success: true, channel: 'EMAIL', messageId: 'sandbox_email_id' };
+    }
+
     try {
-      if (!this.sendgridApiKey || this.sendgridApiKey === 'your_sendgrid_api_key') {
-        this.logger.warn(`[Email] SendGrid not configured. Would send to: ${to}`);
-        await this.logMessage(null, 'EMAIL', 'SENT', to, undefined, subject, message, 'sandbox_email_id');
-        return { success: true, channel: 'EMAIL', messageId: 'sandbox_email_id' };
-      }
-
-      const msg = {
-        to,
-        from: {
-          email: this.sendgridFromEmail,
-          name: this.sendgridFromName,
-        },
-        subject,
-        text: message,
-        html: message.replace(/\n/g, '<br>'),
-      };
-
-      if (await this.checkSandboxMode()) {
-        this.logger.log(`[Email] Sandbox mode - Would send to: ${to}, Subject: ${subject}`);
-        await this.logMessage(null, 'EMAIL', 'SENT', to, undefined, subject, message, 'sandbox_email_id');
-        return { success: true, channel: 'EMAIL', messageId: 'sandbox_email_id' };
-      }
-
-      const result = await this.retryOperation(
-        async () => {
-          const [response] = await sgMail.send(msg);
-          return response;
-        },
-        `Email to ${to}`,
-      );
-
-      const messageId = result.headers['x-message-id'] || result.headers['message-id'] || `sg_${Date.now()}`;
-      this.logger.log(`[Email] Sent to ${to}, MessageId: ${messageId}`);
-
+      const html = message.replace(/\n/g, '<br>');
+      await this.emailService.sendMail(to, subject, html);
+      const messageId = `zoho_${Date.now()}`;
+      this.logger.log(`[Email] Sent to ${to} via EmailService`);
       await this.logMessage(null, 'EMAIL', 'SENT', to, undefined, subject, message, messageId);
-
       return { success: true, channel: 'EMAIL', messageId };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`[Email] Failed to send to ${to}: ${errorMessage}`);
-
       await this.logMessage(null, 'EMAIL', 'FAILED', to, undefined, subject, message, undefined, errorMessage);
-
       return { success: false, channel: 'EMAIL', error: errorMessage };
     }
   }
