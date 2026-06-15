@@ -142,6 +142,12 @@ const superAdminNav = [
     color: '#64748b'
   },
   { 
+    name: 'Academic Templates', 
+    href: '/super-admin/academic-templates', 
+    icon: 'fa-layer-group',
+    color: '#ea6645'
+  },
+  { 
     name: 'Templates', 
     href: '/super-admin/templates', 
     icon: 'fa-file-alt',
@@ -176,6 +182,12 @@ const superAdminNav = [
     href: '/super-admin/monitoring', 
     icon: 'fa-chart-line',
     color: '#10b981'
+  },
+  { 
+    name: 'Primary Monitoring', 
+    href: '/super-admin/primary-monitoring', 
+    icon: 'fa-child',
+    color: '#059669'
   },
   { 
     name: 'Signatures', 

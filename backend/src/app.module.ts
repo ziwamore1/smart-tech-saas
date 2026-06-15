@@ -67,6 +67,7 @@ import { BeemModule } from './beem/beem.module';
 import { AssessmentEngineModule } from './assessment-engine/assessment-engine.module';
 import { GradingEngineModule } from './grading-engine/grading-engine.module';
 import { ResultAnalyticsModule } from './result-analytics/result-analytics.module';
+import { ResultsManagementModule } from './results-management/results-management.module';
 import { SyncEngineModule } from './sync-engine/sync-engine.module';
 import { ReportCardEngineModule } from './report-card-engine/report-card-engine.module';
 import { RankingModule } from './ranking-service/ranking.module';
@@ -174,6 +175,7 @@ import { ProductionLogger } from './common/production-logger';
     AssessmentEngineModule,
     GradingEngineModule,
     ResultAnalyticsModule,
+    ResultsManagementModule,
     SyncEngineModule,
     ReportCardEngineModule,
     RankingModule,

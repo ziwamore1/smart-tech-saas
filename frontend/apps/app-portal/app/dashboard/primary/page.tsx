@@ -1,62 +1,15 @@
 'use client';
 
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { schoolApi, attendanceApi, termApi } from '@/lib/api';
+import { schoolApi, attendanceApi, termApi, academicYearApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useFeatureLock } from '@/lib/feature-lock-context';
 import { TIER_ORDER, SubscriptionTier } from '@/types/subscription';
 import Icon3D from '@/components/Icon3D';
 
-function UpgradePrompt({ feature, requiredTier, currentTier }: { feature: string; requiredTier: string; currentTier: string }) {
-  return (
-    <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
-      <div className="text-4xl mb-3">🔒</div>
-      <h3 className="text-lg font-semibold text-amber-800 mb-2">Upgrade Required</h3>
-      <p className="text-amber-700 text-sm mb-1">
-        <span className="font-medium">{feature}</span> requires <span className="font-bold uppercase">{requiredTier}</span> plan.
-      </p>
-      <p className="text-amber-600 text-xs">
-        Your current plan: <span className="font-bold uppercase">{currentTier}</span>
-      </p>
-      <Link
-        href="/dashboard/subscription"
-        className="mt-4 inline-block px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700"
-      >
-        Upgrade Plan
-      </Link>
-    </div>
-  );
-}
-
-function FeatureGate({ featureKey, requiredTier, currentTier, children }: { featureKey: string; requiredTier: SubscriptionTier; currentTier: SubscriptionTier; children: React.ReactNode }) {
-  const { hasAccess } = useFeatureLock();
-  const tierOk = TIER_ORDER[currentTier] >= TIER_ORDER[requiredTier];
-
-  if (!tierOk || !hasAccess(featureKey)) {
-    const featureNames: Record<string, string> = {
-      'primary.reportCards': 'Curriculum Report Cards',
-      'primary.curriculum': 'Curriculum Configuration',
-      'primary.parents': 'Parent Portal',
-      'primary.staff': 'Staff Management',
-      'primary.analytics': 'Primary Analytics',
-      'primary.ece': 'ECE Module',
-      'primary.grade7': 'Grade 7 ECZ Management',
-      'primary.benchmarking': 'Primary Benchmarking',
-      'primary.aiReports': 'AI Report Comments',
-    };
-    return (
-      <UpgradePrompt
-        feature={featureNames[featureKey] || featureKey}
-        requiredTier={requiredTier}
-        currentTier={currentTier}
-      />
-    );
-  }
-
-  return <>{children}</>;
-}
+const GRADE_LABELS = ['Pre', '1', '2', '3', '4', '5', '6', '7'];
+const GRADE_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#0891b2', '#ea6645', '#7c3aed'];
 
 export default function PrimaryDashboardPage() {
   const { user } = useAuth();
@@ -79,6 +32,13 @@ export default function PrimaryDashboardPage() {
     queryFn: () => termApi.getCurrent().then(res => res.data?.data || res.data),
   });
 
+  const { data: academicYears } = useQuery({
+    queryKey: ['academic-years'],
+    queryFn: () => academicYearApi.getAll().then(res => res.data?.data || res.data || []),
+  });
+
+  const currentAcademicYear = Array.isArray(academicYears) ? academicYears.find((y: any) => y.isCurrent) : null;
+
   const { data: attendanceStats } = useQuery({
     queryKey: ['attendance-stats', currentTerm?.id],
     queryFn: () => attendanceApi.getStats({ termId: currentTerm?.id }).then(res => res.data?.data || res.data),
@@ -88,50 +48,109 @@ export default function PrimaryDashboardPage() {
   const stats = statsData;
   const studentsByClass = stats?.studentsByClass || [];
 
-  const basicLinks = [
-    { key: 'primary.attendance', href: '/dashboard/attendance-register', icon: 'fa-clipboard-check', color: '#059669', desc: 'Mark daily attendance by class', tier: 'BASIC' as SubscriptionTier },
-    { key: 'primary.students', href: '/dashboard/students', icon: 'fa-user-graduate', color: '#3b82f6', desc: 'Manage pupil records', tier: 'BASIC' as SubscriptionTier },
-    { key: 'primary.classes', href: '/dashboard/classes', icon: 'fa-school', color: '#8b5cf6', desc: 'View class lists and assignments', tier: 'BASIC' as SubscriptionTier },
-    { key: 'primary.results', href: '/dashboard/assessments', icon: 'fa-pencil-alt', color: '#d97706', desc: 'Record continuous assessment scores', tier: 'BASIC' as SubscriptionTier },
-  ];
+  const totalPupils = stats?.totalStudents || 0;
+  const totalTeachers = stats?.totalTeachers || 0;
+  const totalClasses = stats?.totalClasses || 0;
+  const totalMale = stats?.totalMale || studentsByClass.reduce((s: number, c: any) => s + (c.male || 0), 0);
+  const totalFemale = stats?.totalFemale || studentsByClass.reduce((s: number, c: any) => s + (c.female || 0), 0);
+  const genderParity = totalFemale > 0 ? (totalMale / totalFemale).toFixed(2) : '—';
 
-  const standardLinks = [
-    { key: 'primary.reportCards', href: '/dashboard/report-cards', icon: 'fa-file-alt', color: '#ec4899', desc: 'Generate curriculum report cards', tier: 'STANDARD' as SubscriptionTier },
-    { key: 'primary.curriculum', href: '/dashboard/curriculum', icon: 'fa-book-open', color: '#0891b2', desc: 'Configure curriculum and scoring', tier: 'STANDARD' as SubscriptionTier },
-    { key: 'primary.staff', href: '/dashboard/teachers', icon: 'fa-chalkboard-teacher', color: '#10b981', desc: 'Manage teaching & non-teaching staff', tier: 'STANDARD' as SubscriptionTier },
-    { key: 'primary.parents', href: '/dashboard/parents', icon: 'fa-user-friends', color: '#ec4899', desc: 'Parent registration and linking', tier: 'STANDARD' as SubscriptionTier },
-  ];
+  const gradeEnrollment = GRADE_LABELS.map((label, i) => {
+    const match = studentsByClass.find((c: any) => {
+      const cn = (c.className || c.class || '').toString();
+      return cn.includes(`Grade ${label}`) || cn.includes(`grade ${label}`);
+    });
+    return {
+      grade: `Grade ${label}`,
+      count: match?.count || match?.students || 0,
+      color: GRADE_COLORS[i],
+    };
+  });
 
-  const premiumLinks = [
-    { key: 'primary.grade7', href: '/dashboard/curriculum/exam-structures', icon: 'fa-graduation-cap', color: '#7c3aed', desc: 'Grade 7 ECZ exam management', tier: 'PREMIUM' as SubscriptionTier },
-    { key: 'primary.ece', href: '/dashboard/curriculum/education-levels', icon: 'fa-baby', color: '#f59e0b', desc: 'ECE-specific assessments and tracking', tier: 'STANDARD' as SubscriptionTier },
-  ];
+  const totalEnrolled = gradeEnrollment.reduce((s: number, g: any) => s + g.count, 0);
+
+  const eceActive = hasAccess('primary.ece');
+  const grade7Active = hasAccess('primary.grade7');
 
   const tierNames: Record<SubscriptionTier, string> = { BASIC: 'Basic', STANDARD: 'Standard', PREMIUM: 'Premium' };
 
+  const basicActions = [
+    { key: 'primary.students', name: 'New Pupil Registration', href: '/dashboard/primary/students', icon: 'fa-user-plus', color: '#3b82f6', desc: 'Register new pupil (intake or transfer)' },
+    { key: 'primary.classes', name: 'Assign Class Teacher', href: '/dashboard/primary/classes', icon: 'fa-chalkboard-teacher', color: '#10b981', desc: 'Assign teachers to Grade 1–7 classes' },
+    { key: 'primary.attendance', name: 'Record Attendance', href: '/dashboard/attendance-register', icon: 'fa-clipboard-check', color: '#059669', desc: 'Mark daily class attendance' },
+    { key: 'primary.results', name: 'Enter Scores', href: '/dashboard/assessment-entry', icon: 'fa-pencil-alt', color: '#d97706', desc: 'Continuous assessment scores' },
+    { key: 'primary.classes', name: 'Manage Subjects', href: '/dashboard/primary/subjects', icon: 'fa-book', color: '#f59e0b', desc: 'Primary subject allocation' },
+    { key: 'primary.dashboard', name: 'School Settings', href: '/dashboard/settings', icon: 'fa-cog', color: '#64748b', desc: 'Academic years, terms & grading' },
+  ];
+
+  const standardActions = [
+    { key: 'primary.staff', name: 'Staff Records', href: '/dashboard/staff-records', icon: 'fa-id-card', color: '#0891b2', desc: 'Teaching & non-teaching staff' },
+    { key: 'primary.reportCards', name: 'Generate Reports', href: '/dashboard/report-cards', icon: 'fa-file-alt', color: '#ec4899', desc: 'Primary curriculum report cards' },
+    { key: 'primary.analytics', name: 'View Analytics', href: '/dashboard/analytics', icon: 'fa-chart-bar', color: '#a855f7', desc: 'Pupil performance analytics' },
+    { key: 'primary.curriculum', name: 'Manage Subjects', href: '/dashboard/primary/subjects', icon: 'fa-book', color: '#f59e0b', desc: 'Primary subject allocation' },
+    { key: 'primary.curriculum', name: 'School Library', href: '/dashboard/library', icon: 'fa-book-open', color: '#0d9488', desc: 'Textbooks, syllabi & resources' },
+    { key: 'primary.curriculum', name: 'Photo Gallery', href: '/dashboard/gallery', icon: 'fa-images', color: '#db2777', desc: 'School event photos & albums' },
+    { key: 'primary.staff', name: 'Fees Management', href: '/dashboard/fees', icon: 'fa-money-bill-wave', color: '#22c55e', desc: 'Fee structures & collections' },
+  ];
+
+  const premiumActions = [
+    { key: 'primary.grade7', name: 'Grade 7 ECZ', href: '/dashboard/primary/grade7', icon: 'fa-graduation-cap', color: '#7c3aed', desc: 'ECZ exam management & preparation' },
+    { key: 'primary.benchmarking', name: 'Benchmarking', href: '/dashboard/benchmarking', icon: 'fa-trophy', color: '#f59e0b', desc: 'Compare performance against national averages' },
+    { key: 'primary.aiReports', name: 'AI Report Comments', href: '/dashboard/template-personalization', icon: 'fa-robot', color: '#14b8a6', desc: 'AI-generated report card comments' },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Primary School Dashboard</h1>
-          <p className="text-gray-500 mt-1">
-            {currentTerm ? `Current Term: ${currentTerm.name} — ${currentTerm.academicYear?.name || ''}` : ''}
-          </p>
+      <div style={{
+        background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+        borderRadius: '12px',
+        padding: '24px',
+        marginBottom: '24px',
+        color: 'white'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>
+              {schoolProfile?.name || 'Primary School'}
+            </h1>
+            <span style={{
+              fontSize: '12px', fontWeight: 600, background: 'rgba(255,255,255,0.2)',
+              padding: '4px 12px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.3)'
+            }}>
+              Primary School
+            </span>
+            <span className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase ${
+              currentTier === 'PREMIUM' ? 'bg-purple-700/30 text-purple-100' :
+              currentTier === 'STANDARD' ? 'bg-blue-700/30 text-blue-100' :
+              'bg-gray-700/30 text-gray-100'
+            }`}>
+              {currentTier} Plan
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/subscription"
+              className="px-3 py-1.5 bg-white/20 text-white rounded-lg text-xs font-medium hover:bg-white/30"
+            >
+              Manage Plan
+            </Link>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase ${
-            currentTier === 'PREMIUM' ? 'bg-purple-100 text-purple-700' :
-            currentTier === 'STANDARD' ? 'bg-blue-100 text-blue-700' :
-            'bg-gray-100 text-gray-700'
-          }`}>
-            {tierNames[currentTier]} Plan
-          </span>
-          <Link
-            href="/dashboard/subscription"
-            className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-200"
-          >
-            Manage Plan
-          </Link>
+        <p style={{ fontSize: '14px', opacity: 0.9, margin: '8px 0 0' }}>
+          <i className="fa fa-child" style={{ marginRight: '6px' }}></i>
+          Grade 1–7 — ECZ Grade 7 National Assessment
+        </p>
+        <div style={{ display: 'flex', gap: '20px', marginTop: '8px', flexWrap: 'wrap' }}>
+          {currentTerm && (
+            <p style={{ fontSize: '13px', opacity: 0.8, margin: 0 }}>
+              <i className="fa fa-calendar" style={{ marginRight: '6px' }}></i>
+              Current Term: {currentTerm.name} {currentAcademicYear ? `(${currentAcademicYear.name})` : ''}
+            </p>
+          )}
+          <p style={{ fontSize: '13px', opacity: 0.8, margin: 0 }}>
+            <i className="fa fa-user-graduate" style={{ marginRight: '6px' }}></i>
+            {totalEnrolled} pupils enrolled
+          </p>
         </div>
       </div>
 
@@ -141,8 +160,13 @@ export default function PrimaryDashboardPage() {
             <Icon3D name="students" size={40} />
             <div>
               <p className="text-sm text-gray-500">Total Pupils</p>
-              <p className="text-2xl font-bold text-gray-900">{stats?.totalStudents || 0}</p>
+              <p className="text-2xl font-bold text-gray-900">{totalPupils}</p>
             </div>
+          </div>
+          <div className="mt-2 flex gap-3 text-xs text-gray-500">
+            <span>♂ {totalMale}</span>
+            <span>♀ {totalFemale}</span>
+            <span className="text-emerald-600">Ratio {genderParity}</span>
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
@@ -150,8 +174,11 @@ export default function PrimaryDashboardPage() {
             <Icon3D name="teachers" size={40} />
             <div>
               <p className="text-sm text-gray-500">Teachers</p>
-              <p className="text-2xl font-bold text-gray-900">{stats?.totalTeachers || 0}</p>
+              <p className="text-2xl font-bold text-gray-900">{totalTeachers}</p>
             </div>
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            Pupil–teacher ratio: {totalTeachers > 0 ? Math.round(totalPupils / totalTeachers) : '—'}
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
@@ -159,8 +186,11 @@ export default function PrimaryDashboardPage() {
             <Icon3D name="classes" size={40} />
             <div>
               <p className="text-sm text-gray-500">Classes</p>
-              <p className="text-2xl font-bold text-gray-900">{stats?.totalClasses || 0}</p>
+              <p className="text-2xl font-bold text-gray-900">{totalClasses}</p>
             </div>
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            Grades {gradeEnrollment.filter(g => g.count > 0).map(g => g.grade.replace('Grade ', '')).join(', ') || 'None'}
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
@@ -171,11 +201,145 @@ export default function PrimaryDashboardPage() {
             <div>
               <p className="text-sm text-gray-500">Attendance Rate</p>
               <p className="text-2xl font-bold text-gray-900">
-                {attendanceStats?.averageRate
-                  ? `${Math.round(attendanceStats.averageRate * 100)}%`
-                  : '—'}
+                {attendanceStats?.averageRate ? `${Math.round(attendanceStats.averageRate * 100)}%` : '—'}
               </p>
             </div>
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            {currentTerm ? `Current term` : 'No active term'}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <i className="fas fa-calendar-alt text-emerald-600" />
+            <span className="text-sm text-gray-600">
+              <span className="font-medium text-gray-900">Academic Year:</span>{' '}
+              {currentAcademicYear?.name || 'Not set'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <i className="fas fa-calendar-check text-emerald-600" />
+            <span className="text-sm text-gray-600">
+              <span className="font-medium text-gray-900">Current Term:</span>{' '}
+              {currentTerm?.name || 'Not set'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <i className="fas fa-users text-emerald-600" />
+            <span className="text-sm text-gray-600">
+              <span className="font-medium text-gray-900">Pupil–Teacher Ratio:</span>{' '}
+              {totalTeachers > 0 ? `${Math.round(totalPupils / totalTeachers)}:1` : '—'}
+            </span>
+          </div>
+        </div>
+        <Link
+          href="/dashboard/settings"
+          className="text-sm text-emerald-600 font-medium hover:text-emerald-700 flex items-center gap-1"
+        >
+          <i className="fas fa-cog" />
+          Manage Academic Year & Terms
+        </Link>
+      </div>
+
+      <div className={`grid grid-cols-1 ${TIER_ORDER[currentTier] >= TIER_ORDER.STANDARD ? 'lg:grid-cols-3' : ''} gap-6`}>
+        {TIER_ORDER[currentTier] >= TIER_ORDER.STANDARD ? (
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Enrollment Pipeline</h2>
+              <div className="flex items-end gap-2 h-48">
+                {gradeEnrollment.map((g, i) => {
+                  const maxCount = Math.max(...gradeEnrollment.map(x => x.count), 1);
+                  const height = Math.max((g.count / maxCount) * 100, g.count > 0 ? 8 : 0);
+                  return (
+                    <div key={g.grade} className="flex-1 flex flex-col items-center gap-1">
+                      <span className="text-xs font-medium text-gray-500">{g.count}</span>
+                      <div
+                        className="w-full rounded-t-md transition-all duration-500 hover:opacity-80"
+                        style={{
+                          height: `${height}%`,
+                          backgroundColor: g.color,
+                          minHeight: g.count > 0 ? '8px' : '0',
+                        }}
+                        title={`${g.grade}: ${g.count} pupils`}
+                      />
+                      <span className="text-xs text-gray-600 font-medium">{g.grade.replace('Grade ', '')}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 text-center">
+            <i className="fas fa-chart-bar text-gray-300 text-3xl mb-2" />
+            <p className="text-sm text-gray-400 font-medium">Enrollment Pipeline</p>
+            <p className="text-xs text-gray-400 mt-1">Upgrade to Standard or enable Analytics to view enrollment trends.</p>
+            <Link href="/dashboard/subscription" className="mt-3 inline-block text-xs text-blue-600 font-medium hover:text-blue-800">
+              Upgrade Plan →
+            </Link>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          {eceActive && TIER_ORDER[currentTier] >= TIER_ORDER.STANDARD && (
+            <div className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl border border-pink-200 p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-pink-100 flex items-center justify-center text-pink-600">
+                  <i className="fas fa-baby" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">ECE Module</h3>
+                  <p className="text-xs text-gray-500">Early Childhood Education</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">
+                Pre-school learning areas, developmental milestones, and assessment tracking.
+              </p>
+              <Link href="/dashboard/primary/ece" className="text-sm text-pink-600 font-medium hover:text-pink-700">
+                Open ECE Module →
+              </Link>
+            </div>
+          )}
+
+          {grade7Active && TIER_ORDER[currentTier] >= TIER_ORDER.PREMIUM && (
+            <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl border border-purple-200 p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">
+                  <i className="fas fa-graduation-cap" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Grade 7 ECZ</h3>
+                  <p className="text-xs text-gray-500">National Examination Preparation</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">
+                Mock exams, selection predictions, and exam readiness tracking.
+              </p>
+              <Link href="/dashboard/primary/grade7" className="text-sm text-purple-600 font-medium hover:text-purple-700">
+                Open Grade 7 ECZ →
+              </Link>
+            </div>
+          )}
+
+          <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600">
+                <i className="fas fa-book-open" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Curriculum</h3>
+                <p className="text-xs text-gray-500">Zambian Primary Syllabus</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-3">
+              Literacy, Numeracy, Science, Social Studies, and more across Grades 1–7.
+            </p>
+            <Link href="/dashboard/primary/curriculum" className="text-sm text-emerald-600 font-medium hover:text-emerald-700">
+              View Curriculum →
+            </Link>
           </div>
         </div>
       </div>
@@ -189,17 +353,17 @@ export default function PrimaryDashboardPage() {
               <span className="text-xs font-bold uppercase text-green-700 bg-green-100 px-2 py-0.5 rounded">Basic</span>
               <span className="text-xs text-gray-400">— Available on all plans</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {basicLinks.map((link) => (
-                <Link key={link.href} href={link.href}>
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-gray-200 transition-all cursor-pointer group">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {basicActions.map((action) => (
+                <Link key={action.href} href={action.href}>
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-gray-200 transition-all cursor-pointer group h-full">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-lg shrink-0" style={{ backgroundColor: link.color }}>
-                        <i className={`fas ${link.icon}`} />
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-lg shrink-0" style={{ backgroundColor: action.color }}>
+                        <i className={`fas ${action.icon}`} />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors text-sm">{link.desc.split(' ')[0]} {link.desc.split(' ').slice(1).join(' ')}</h3>
-                        <p className="text-xs text-gray-500 mt-0.5">{link.desc}</p>
+                        <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors text-sm">{action.name}</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">{action.desc}</p>
                       </div>
                     </div>
                   </div>
@@ -215,22 +379,37 @@ export default function PrimaryDashboardPage() {
               <span className="text-xs font-bold uppercase text-blue-700 bg-blue-100 px-2 py-0.5 rounded">Standard</span>
               <span className="text-xs text-gray-400">— Advanced features</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {standardLinks.map((link) => (
-                <Link key={link.href} href={link.href}>
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-gray-200 transition-all cursor-pointer group">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {standardActions.map((action) => {
+                const locked = !hasAccess(action.key);
+                return locked ? (
+                  <div key={action.href} className="bg-gray-50 rounded-xl border border-gray-200 p-4 opacity-60 cursor-not-allowed h-full">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-lg shrink-0" style={{ backgroundColor: link.color }}>
-                        <i className={`fas ${link.icon}`} />
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-400 text-lg shrink-0" style={{ backgroundColor: '#e5e7eb' }}>
+                        <i className="fas fa-lock" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors text-sm">{link.desc.split(' ')[0]} {link.desc.split(' ').slice(1).join(' ')}</h3>
-                        <p className="text-xs text-gray-500 mt-0.5">{link.desc}</p>
+                        <h3 className="font-semibold text-gray-400 text-sm">{action.name}</h3>
+                        <p className="text-xs text-gray-400 mt-0.5">Upgrade or enable in settings</p>
                       </div>
                     </div>
                   </div>
-                </Link>
-              ))}
+                ) : (
+                  <Link key={action.href} href={action.href}>
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-gray-200 transition-all cursor-pointer group h-full">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-lg shrink-0" style={{ backgroundColor: action.color }}>
+                          <i className={`fas ${action.icon}`} />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors text-sm">{action.name}</h3>
+                          <p className="text-xs text-gray-500 mt-0.5">{action.desc}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         ) : (
@@ -238,15 +417,15 @@ export default function PrimaryDashboardPage() {
             <div className="flex items-center gap-2 mb-3">
               <span className="text-xs font-bold uppercase text-gray-400 bg-gray-100 px-2 py-0.5 rounded">Standard (Locked)</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {standardLinks.map((link) => (
-                <div key={link.href} className="bg-gray-50 rounded-xl border border-gray-200 p-4 opacity-60 cursor-not-allowed">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {standardActions.map((action) => (
+                <div key={action.href} className="bg-gray-50 rounded-xl border border-gray-200 p-4 opacity-60 cursor-not-allowed h-full">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-400 text-lg shrink-0" style={{ backgroundColor: '#e5e7eb' }}>
                       <i className="fas fa-lock" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-400 text-sm">{link.desc.split(' ')[0]} {link.desc.split(' ').slice(1).join(' ')}</h3>
+                      <h3 className="font-semibold text-gray-400 text-sm">{action.name}</h3>
                       <p className="text-xs text-gray-400 mt-0.5">Upgrade to Standard</p>
                     </div>
                   </div>
@@ -262,22 +441,37 @@ export default function PrimaryDashboardPage() {
               <span className="text-xs font-bold uppercase text-purple-700 bg-purple-100 px-2 py-0.5 rounded">Premium</span>
               <span className="text-xs text-gray-400">— Exclusive features</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {premiumLinks.map((link) => (
-                <Link key={link.href} href={link.href}>
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-gray-200 transition-all cursor-pointer group">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {premiumActions.map((action) => {
+                const locked = !hasAccess(action.key);
+                return locked ? (
+                  <div key={action.href} className="bg-gray-50 rounded-xl border border-gray-200 p-4 opacity-60 cursor-not-allowed h-full">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-lg shrink-0" style={{ backgroundColor: link.color }}>
-                        <i className={`fas ${link.icon}`} />
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-400 text-lg shrink-0" style={{ backgroundColor: '#e5e7eb' }}>
+                        <i className="fas fa-lock" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors text-sm">{link.desc.split(' ')[0]} {link.desc.split(' ').slice(1).join(' ')}</h3>
-                        <p className="text-xs text-gray-500 mt-0.5">{link.desc}</p>
+                        <h3 className="font-semibold text-gray-400 text-sm">{action.name}</h3>
+                        <p className="text-xs text-gray-400 mt-0.5">Upgrade or enable in settings</p>
                       </div>
                     </div>
                   </div>
-                </Link>
-              ))}
+                ) : (
+                  <Link key={action.href} href={action.href}>
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-gray-200 transition-all cursor-pointer group h-full">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-lg shrink-0" style={{ backgroundColor: action.color }}>
+                          <i className={`fas ${action.icon}`} />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors text-sm">{action.name}</h3>
+                          <p className="text-xs text-gray-500 mt-0.5">{action.desc}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         ) : (
@@ -285,15 +479,15 @@ export default function PrimaryDashboardPage() {
             <div className="flex items-center gap-2 mb-3">
               <span className="text-xs font-bold uppercase text-gray-400 bg-gray-100 px-2 py-0.5 rounded">Premium (Locked)</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {premiumLinks.map((link) => (
-                <div key={link.href} className="bg-gray-50 rounded-xl border border-gray-200 p-4 opacity-60 cursor-not-allowed">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {premiumActions.map((action) => (
+                <div key={action.href} className="bg-gray-50 rounded-xl border border-gray-200 p-4 opacity-60 cursor-not-allowed h-full">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-400 text-lg shrink-0" style={{ backgroundColor: '#e5e7eb' }}>
                       <i className="fas fa-lock" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-400 text-sm">{link.desc.split(' ')[0]} {link.desc.split(' ').slice(1).join(' ')}</h3>
+                      <h3 className="font-semibold text-gray-400 text-sm">{action.name}</h3>
                       <p className="text-xs text-gray-400 mt-0.5">Upgrade to Premium</p>
                     </div>
                   </div>
@@ -325,43 +519,99 @@ export default function PrimaryDashboardPage() {
         </div>
       </div>
 
-      <FeatureGate featureKey="primary.analytics" requiredTier="STANDARD" currentTier={currentTier}>
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Classes Overview</h2>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-            {studentsByClass.length > 0 ? (
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 uppercase">Class</th>
-                    <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 uppercase">Students</th>
-                    <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 uppercase">Male</th>
-                    <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 uppercase">Female</th>
-                    <th className="text-right px-6 py-3 text-sm font-medium text-gray-500 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {studentsByClass.map((item: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 font-medium text-gray-900">{item.className || item._id || item.class}</td>
-                      <td className="px-6 py-4">{item.count || item.students || 0}</td>
-                      <td className="px-6 py-4 text-gray-500">{item.male || 0}</td>
-                      <td className="px-6 py-4 text-gray-500">{item.female || 0}</td>
-                      <td className="px-6 py-4 text-right">
-                        <Link href="/dashboard/attendance-register" className="text-blue-600 hover:text-blue-800 text-sm">
-                          Take Attendance
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="p-12 text-center text-gray-500">No class data available.</div>
-            )}
-          </div>
+      {TIER_ORDER[currentTier] >= TIER_ORDER.STANDARD && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Link href="/dashboard/library">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md hover:border-gray-200 transition-all h-full">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-xl bg-teal-100 flex items-center justify-center text-teal-600 text-xl">
+                  <i className="fas fa-book-open" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">School Library</h3>
+                  <p className="text-xs text-gray-500">Textbooks, syllabi & resources</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">
+                Access digital textbooks, syllabus documents, teacher guides, past papers, and lesson notes for the Zambian Primary Curriculum.
+              </p>
+              <span className="mt-3 inline-block text-sm text-teal-600 font-medium">Browse Library →</span>
+            </div>
+          </Link>
+          <Link href="/dashboard/gallery">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md hover:border-gray-200 transition-all h-full">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-xl bg-pink-100 flex items-center justify-center text-pink-600 text-xl">
+                  <i className="fas fa-images" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Photo Gallery</h3>
+                  <p className="text-xs text-gray-500">School event photos & albums</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">
+                Upload and view photos from school events, sports days, graduation ceremonies, and classroom activities.
+              </p>
+              <span className="mt-3 inline-block text-sm text-pink-600 font-medium">Open Gallery →</span>
+            </div>
+          </Link>
         </div>
-      </FeatureGate>
+      )}
+
+      {TIER_ORDER[currentTier] >= TIER_ORDER.STANDARD && hasAccess('primary.analytics') ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-gray-900">Classes Overview</h2>
+            <Link href="/dashboard/primary/classes" className="text-sm text-emerald-600 font-medium hover:text-emerald-700">
+              Manage Classes →
+            </Link>
+          </div>
+          {studentsByClass.length > 0 ? (
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 uppercase">Class</th>
+                  <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 uppercase">Pupils</th>
+                  <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 uppercase">Male</th>
+                  <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 uppercase">Female</th>
+                  <th className="text-right px-6 py-3 text-sm font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {studentsByClass.map((item: any, idx: number) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 font-medium text-gray-900">{item.className || item._id || item.class}</td>
+                    <td className="px-6 py-4">{item.count || item.students || 0}</td>
+                    <td className="px-6 py-4 text-gray-500">{item.male || 0}</td>
+                    <td className="px-6 py-4 text-gray-500">{item.female || 0}</td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex gap-2 justify-end">
+                        <Link href="/dashboard/attendance-register" className="text-blue-600 hover:text-blue-800 text-sm">
+                          Attendance
+                        </Link>
+                        <Link href="/dashboard/assessment-entry" className="text-emerald-600 hover:text-emerald-800 text-sm">
+                          Scores
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="p-12 text-center text-gray-500">No class data available.</div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center">
+          <i className="fas fa-table text-gray-300 text-3xl mb-2" />
+          <p className="text-sm text-gray-400 font-medium">Classes Overview</p>
+          <p className="text-xs text-gray-400 mt-1">Upgrade to Standard or enable Analytics to view class performance data.</p>
+          <Link href="/dashboard/subscription" className="mt-3 inline-block text-xs text-blue-600 font-medium hover:text-blue-800">
+            Upgrade Plan →
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

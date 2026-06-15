@@ -3,9 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider          = "postgresql"
-  url               = env("DATABASE_URL")
-  directUrl         = env("DIRECT_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model SystemUser {
@@ -287,6 +287,8 @@ model School {
   selectedGrade7Results   Grade7Result[]             @relation("SelectedSchool")
   schoolEducationLevels   SchoolEducationLevel[]
   schoolCurricula         SchoolCurriculum[]
+  resultSheets            ResultSheet[]
+  resultAuditLogs         ResultAuditLog[]
 
   @@index([institutionTypeId])
   @@index([isActive])
@@ -339,6 +341,7 @@ model Term {
   classGradingPolicies ClassGradingPolicy[]
   longitudinalRecords  LongitudinalRecord[]
   grade7Results        Grade7Result[]
+  resultSheets         ResultSheet[]
 
   @@index([academicYearId])
   @@index([isCurrent])
@@ -464,6 +467,7 @@ model Class {
   assessmentResults    StudentAssessmentResult[]
   assessmentBatches    AssessmentBatch[]
   computedResults      ComputedResult[]
+  resultSheets         ResultSheet[]
   classGradingPolicies ClassGradingPolicy[]
   termSummaries        TermSummary[]
   longitudinalRecords  LongitudinalRecord[]
@@ -588,18 +592,18 @@ model Department {
 }
 
 model ActingPosition {
-  id           String      @id @default(uuid())
+  id           String    @id @default(uuid())
   teacherId    String
   schoolId     String
   positionType String
   departmentId String?
   classId      String?
-  isPrimary    Boolean     @default(true)
-  isActive     Boolean     @default(true)
-  startDate    DateTime    @default(now())
+  isPrimary    Boolean   @default(true)
+  isActive     Boolean   @default(true)
+  startDate    DateTime  @default(now())
   endDate      DateTime?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   teacher    Teacher     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
@@ -656,16 +660,16 @@ model Student {
 }
 
 model StudentPhoto {
-  id             String   @id @default(uuid())
-  studentId      String
-  imageUrl       String
-  thumbnailUrl   String?
-  uploadedById   String
-  photoPublicId  String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  student        Student  @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  uploadedBy     User     @relation(fields: [uploadedById], references: [id])
+  id            String   @id @default(uuid())
+  studentId     String
+  imageUrl      String
+  thumbnailUrl  String?
+  uploadedById  String
+  photoPublicId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  uploadedBy    User     @relation(fields: [uploadedById], references: [id])
 
   @@index([studentId])
   @@index([uploadedById])
@@ -755,19 +759,93 @@ model ResultPublication {
   @@unique([classId, termId])
 }
 
+model ResultSheet {
+  id             String            @id @default(uuid())
+  schoolId       String
+  classId        String
+  termId         String
+  examType       String            @default("END_TERM")
+  academicYearId String
+  title          String?
+  description    String?
+  status         ResultSheetStatus @default(DRAFT)
+  totalStudents  Int               @default(0)
+  enteredCount   Int               @default(0)
+  verifiedCount  Int               @default(0)
+  publishedAt    DateTime?
+  lockedAt       DateTime?
+  lockedBy       String?
+  createdBy      String
+  submittedBy    String?
+  submittedAt    DateTime?
+  verifiedBy     String?
+  verifiedAt     DateTime?
+  metadata       Json?             @default("{}")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  school         School            @relation(fields: [schoolId], references: [id])
+  class          Class             @relation(fields: [classId], references: [id])
+  term           Term              @relation(fields: [termId], references: [id])
+
+  @@unique([classId, termId, examType])
+  @@index([schoolId])
+  @@index([classId])
+  @@index([termId])
+  @@index([status])
+  @@index([examType])
+}
+
+model ResultAuditLog {
+  id              String   @id @default(uuid())
+  schoolId        String
+  action          String // ENTERED, EDITED, SUBMITTED, VERIFIED, PUBLISHED, LOCKED, UNLOCKED, BULK_UPLOAD
+  entityType      String // RESULT_SHEET, STUDENT_RESULT, COMPUTED_RESULT, ASSESSMENT_RESULT
+  entityId        String
+  studentId       String?
+  subjectId       String?
+  classId         String?
+  termId          String?
+  oldValue        Json?
+  newValue        Json?
+  performedBy     String
+  performedByRole String?
+  deviceInfo      String?
+  ipAddress       String?
+  metadata        Json?    @default("{}")
+  createdAt       DateTime @default(now())
+  school          School   @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
+  @@index([entityType, entityId])
+  @@index([studentId])
+  @@index([classId])
+  @@index([termId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([performedBy])
+}
+
+enum ResultSheetStatus {
+  DRAFT
+  SUBMITTED
+  VERIFIED
+  PUBLISHED
+  LOCKED
+}
+
 model Parent {
-  id        String          @id @default(uuid())
-  firstName String
-  lastName  String
-  phone     String?
-  email     String          @unique
-  password  String
-  photoUrl  String?
+  id            String          @id @default(uuid())
+  firstName     String
+  lastName      String
+  phone         String?
+  email         String          @unique
+  password      String
+  photoUrl      String?
   photoPublicId String?
-  schoolId  String
-  createdAt DateTime        @default(now())
-  school    School          @relation(fields: [schoolId], references: [id])
-  children  ParentStudent[]
+  schoolId      String
+  createdAt     DateTime        @default(now())
+  school        School          @relation(fields: [schoolId], references: [id])
+  children      ParentStudent[]
 
   @@index([schoolId])
 }
@@ -899,21 +977,21 @@ model BreakPeriod {
 }
 
 model SchoolSetting {
-  id               String @id @default(uuid())
-  schoolId         String @unique
-  startTime        String @default("07:30")
-  periodDuration   Int    @default(40)
-  periodsPerDay    Int    @default(7)
-  daysPerWeek      Int    @default(5)
-  breakAfterPeriod Int    @default(3)
-  breakDuration    Int    @default(15)
-  breaks           Json?
-  periodDurations  Json?
-  gradingSystem    String @default("SECONDARY_ECZ")
-  academicStructure String @default("FORM_BASED")
-  termsPerYear     Int    @default(3)
-  minAttendancePercentage Int @default(80)
-  school           School @relation(fields: [schoolId], references: [id])
+  id                      String @id @default(uuid())
+  schoolId                String @unique
+  startTime               String @default("07:30")
+  periodDuration          Int    @default(40)
+  periodsPerDay           Int    @default(7)
+  daysPerWeek             Int    @default(5)
+  breakAfterPeriod        Int    @default(3)
+  breakDuration           Int    @default(15)
+  breaks                  Json?
+  periodDurations         Json?
+  gradingSystem           String @default("SECONDARY_ECZ")
+  academicStructure       String @default("FORM_BASED")
+  termsPerYear            Int    @default(3)
+  minAttendancePercentage Int    @default(80)
+  school                  School @relation(fields: [schoolId], references: [id])
 }
 
 model TimetableAuditLog {
@@ -1308,24 +1386,24 @@ model CommunicationTemplate {
 }
 
 model SystemProvider {
-  id            String   @id @default(uuid())
-  name          String
-  type          String
-  channel       String
-  host          String?
-  port          Int?
-  username      String?
-  password      String?
-  apiKey        String?
-  apiSecret     String?
-  senderEmail   String?
-  senderName    String?
-  status        String   @default("Not Configured")
-  lastTestedAt  DateTime?
-  isDefault     Boolean  @default(false)
-  config        Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String    @id @default(uuid())
+  name         String
+  type         String
+  channel      String
+  host         String?
+  port         Int?
+  username     String?
+  password     String?
+  apiKey       String?
+  apiSecret    String?
+  senderEmail  String?
+  senderName   String?
+  status       String    @default("Not Configured")
+  lastTestedAt DateTime?
+  isDefault    Boolean   @default(false)
+  config       Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@unique([name, channel])
   @@index([type])
@@ -1334,19 +1412,19 @@ model SystemProvider {
 }
 
 model Broadcast {
-  id            String   @id @default(uuid())
-  title         String
-  message       String
-  channels      String[]
-  targetType    String
-  targetIds     String[]
-  status        String   @default("DRAFT")
-  scheduledAt   DateTime?
-  sentAt        DateTime?
-  completedAt   DateTime?
-  createdById   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String    @id @default(uuid())
+  title       String
+  message     String
+  channels    String[]
+  targetType  String
+  targetIds   String[]
+  status      String    @default("DRAFT")
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  completedAt DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([status])
   @@index([scheduledAt])
@@ -1354,25 +1432,25 @@ model Broadcast {
 }
 
 model Campaign {
-  id            String       @id @default(uuid())
-  name          String
-  description   String?
-  type          String
-  channels      String[]
-  targetType    String
-  targetIds     String[]
-  templateId    String?
-  status        String       @default("DRAFT")
-  scheduledAt   DateTime?
-  startedAt     DateTime?
-  completedAt   DateTime?
-  sentCount     Int          @default(0)
-  openedCount   Int          @default(0)
-  clickedCount  Int          @default(0)
-  failedCount   Int          @default(0)
-  createdById   String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id           String    @id @default(uuid())
+  name         String
+  description  String?
+  type         String
+  channels     String[]
+  targetType   String
+  targetIds    String[]
+  templateId   String?
+  status       String    @default("DRAFT")
+  scheduledAt  DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  sentCount    Int       @default(0)
+  openedCount  Int       @default(0)
+  clickedCount Int       @default(0)
+  failedCount  Int       @default(0)
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([status])
   @@index([type])
@@ -1380,22 +1458,22 @@ model Campaign {
 }
 
 model YouTubeChannel {
-  id               String   @id @default(uuid())
-  channelUrl       String?
-  channelName      String?
-  channelId        String?
-  apiKey           String?
-  accessToken      String?
-  refreshToken     String?
-  tokenExpiry      DateTime?
-  subscriberCount  Int      @default(0)
-  viewCount        Int      @default(0)
-  videoCount       Int      @default(0)
-  isConnected      Boolean  @default(false)
-  lastSyncedAt     DateTime?
-  schoolId         String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String    @id @default(uuid())
+  channelUrl      String?
+  channelName     String?
+  channelId       String?
+  apiKey          String?
+  accessToken     String?
+  refreshToken    String?
+  tokenExpiry     DateTime?
+  subscriberCount Int       @default(0)
+  viewCount       Int       @default(0)
+  videoCount      Int       @default(0)
+  isConnected     Boolean   @default(false)
+  lastSyncedAt    DateTime?
+  schoolId        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([schoolId])
 }
@@ -1446,8 +1524,9 @@ model FeatureLock {
 model ReportTemplate {
   id                    String                 @id @default(uuid())
   name                  String
+  description           String?
   isDefault             Boolean                @default(false)
-  schoolId              String
+  schoolId              String?
   headerText            String?
   footerText            String?
   logoUrl               String?
@@ -1484,7 +1563,7 @@ model ReportTemplate {
   metadata              Json?                  @default("{}")
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
-  school                School                 @relation(fields: [schoolId], references: [id])
+  school                School?                @relation(fields: [schoolId], references: [id])
   category              TemplateCategory?      @relation(fields: [categoryId], references: [id])
   parent                ReportTemplate?        @relation("TemplateVersions", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   versions              ReportTemplate[]       @relation("TemplateVersions")
@@ -1503,16 +1582,18 @@ model ReportTemplate {
 }
 
 model TemplateCategory {
-  id          String           @id @default(uuid())
-  name        String
-  slug        String
-  description String?
-  icon        String?
-  schoolId    String
-  sortOrder   Int              @default(0)
-  createdAt   DateTime         @default(now())
-  school      School           @relation(fields: [schoolId], references: [id])
-  templates   ReportTemplate[]
+  id             String           @id @default(uuid())
+  name           String
+  slug           String
+  description    String?
+  icon           String?
+  educationLevel String?          @default("general")
+  isSystem       Boolean          @default(false)
+  schoolId       String?
+  sortOrder      Int              @default(0)
+  createdAt      DateTime         @default(now())
+  school         School?          @relation(fields: [schoolId], references: [id])
+  templates      ReportTemplate[]
 
   @@unique([slug, schoolId])
   @@index([schoolId])
@@ -1638,6 +1719,8 @@ enum ComponentType {
   ATTENDANCE_CHART
   STUDENT_PROFILE_CARD
   TEACHER_REMARKS
+  HEAD_TEACHER_REMARKS
+  PROMOTION_STATUS
   AI_NARRATIVE
   RECOMMENDATIONS
   STRENGTHS_WEAKNESSES
@@ -1657,6 +1740,7 @@ enum ComponentType {
   AWARD_TEXT
   CUSTOM_TEXT
   DYNAMIC_PLACEHOLDER
+  BORDER
 }
 
 enum CertificateType {
@@ -2632,7 +2716,7 @@ enum MessageStatus {
 model TemplateMarketplace {
   id          String         @id @default(uuid())
   templateId  String         @unique
-  schoolId    String
+  schoolId    String?
   title       String
   description String?
   category    String?
@@ -2646,7 +2730,7 @@ model TemplateMarketplace {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   template    ReportTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  school      School         @relation(fields: [schoolId], references: [id])
+  school      School?        @relation(fields: [schoolId], references: [id])
 
   @@index([category])
   @@index([featured])

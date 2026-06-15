@@ -82,8 +82,64 @@ const regularNav: NavItem[] = [
   { 
     name: 'Primary Dashboard', 
     href: '/dashboard/primary', 
-    icon: 'fa-child',
+    icon: 'fa-th-large',
     color: '#059669',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['PRIMARY_SCHOOL']
+  },
+  { 
+    name: 'Pupil Registration', 
+    href: '/dashboard/primary/students', 
+    icon: 'fa-user-graduate',
+    color: '#3b82f6',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['PRIMARY_SCHOOL']
+  },
+  { 
+    name: 'Primary Staff', 
+    href: '/dashboard/primary/teachers', 
+    icon: 'fa-chalkboard-teacher',
+    color: '#10b981',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['PRIMARY_SCHOOL']
+  },
+  { 
+    name: 'Primary Classes', 
+    href: '/dashboard/primary/classes', 
+    icon: 'fa-school',
+    color: '#8b5cf6',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['PRIMARY_SCHOOL']
+  },
+  { 
+    name: 'Primary Subjects', 
+    href: '/dashboard/primary/subjects', 
+    icon: 'fa-book',
+    color: '#f59e0b',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['PRIMARY_SCHOOL']
+  },
+  { 
+    name: 'Primary Curriculum', 
+    href: '/dashboard/primary/curriculum', 
+    icon: 'fa-book-open',
+    color: '#0891b2',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['PRIMARY_SCHOOL']
+  },
+  { 
+    name: 'ECE Module', 
+    href: '/dashboard/primary/ece', 
+    icon: 'fa-baby',
+    color: '#ec4899',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['PRIMARY_SCHOOL']
+  },
+  { 
+    name: 'Grade 7 ECZ', 
+    href: '/dashboard/primary/grade7', 
+    icon: 'fa-graduation-cap',
+    color: '#7c3aed',
     typeRoles: ROLE_MAP.admin,
     institutionTypes: ['PRIMARY_SCHOOL']
   },
@@ -224,6 +280,14 @@ const regularNav: NavItem[] = [
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
+    name: 'Results Management', 
+    href: '/dashboard/results-management', 
+    icon: 'fa-file-alt',
+    color: '#ea6645',
+    typeRoles: ROLE_MAP.teaching,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
+  },
+  { 
     name: 'Results Analytics', 
     href: '/dashboard/result-analytics', 
     icon: 'fa-chart-line',
@@ -238,6 +302,14 @@ const regularNav: NavItem[] = [
     color: '#0891b2',
     typeRoles: ROLE_MAP.teaching,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
+  },
+  { 
+    name: 'Template Personalization', 
+    href: '/dashboard/template-personalization', 
+    icon: 'fa-palette',
+    color: '#ea6645',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
   { 
     name: 'Grading Policies', 

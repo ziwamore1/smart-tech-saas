@@ -215,14 +215,50 @@ export const ParentPrimaryDashboardScreen: React.FC = () => {
             {/* Grade 7 Section */}
             {selectedChild.levelType?.includes('Grade 7') && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Grade 7 ECZ Preparation</Text>
+                <Text style={styles.sectionTitle}>🎯 Grade 7 ECZ Preparation</Text>
                 <View style={styles.gzCard}>
-                  <Text style={styles.gzIcon}>🎯</Text>
                   <View style={styles.gzInfo}>
-                    <Text style={styles.gzTitle}>ECZ Examinations</Text>
+                    <Text style={styles.gzTitle}>ECZ National Examinations</Text>
                     <Text style={styles.gzDesc}>
                       {selectedChild.subjects ? `${selectedChild.subjects} subjects enrolled` : 'Track your child\'s progress'}
                     </Text>
+                  </View>
+                  <TouchableOpacity style={styles.gzBtn} onPress={() => Alert.alert('Coming Soon', 'Detailed ECZ preparation view')}>
+                    <Text style={styles.gzBtnText}>View Prep →</Text>
+                  </TouchableOpacity>
+                </View>
+                {selectedChild.averageScore != null && (
+                  <View style={styles.gzBar}>
+                    <View style={[styles.gzBarFill, {
+                      width: `${Math.min(selectedChild.averageScore, 100)}%`,
+                      backgroundColor: selectedChild.averageScore >= 75 ? '#10B981' : selectedChild.averageScore >= 50 ? '#F59E0B' : '#EF4444',
+                    }]} />
+                    <Text style={styles.gzBarLabel}>Overall: {Math.round(selectedChild.averageScore)}%</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* ECE Section */}
+            {(selectedChild.levelType?.includes('Pre') || selectedChild.levelType?.includes('ECE') || selectedChild.className?.toLowerCase().includes('pre')) && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>🧸 Early Childhood Education</Text>
+                <View style={styles.eceCard}>
+                  <View style={styles.eceRow}>
+                    <Text style={styles.eceIcon}>📖</Text>
+                    <Text style={styles.eceText}>Language & Literacy Development</Text>
+                  </View>
+                  <View style={styles.eceRow}>
+                    <Text style={styles.eceIcon}>🔢</Text>
+                    <Text style={styles.eceText}>Early Numeracy Skills</Text>
+                  </View>
+                  <View style={styles.eceRow}>
+                    <Text style={styles.eceIcon}>🎨</Text>
+                    <Text style={styles.eceText}>Creative & Psychomotor Development</Text>
+                  </View>
+                  <View style={styles.eceRow}>
+                    <Text style={styles.eceIcon}>🤝</Text>
+                    <Text style={styles.eceText}>Social & Emotional Growth</Text>
                   </View>
                 </View>
               </View>
@@ -306,4 +342,13 @@ const styles = StyleSheet.create({
   actionCard: { flex: 1, backgroundColor: colors.white, padding: spacing.md, borderRadius: borderRadius.lg, alignItems: 'center', ...shadows.sm },
   actionIcon: { fontSize: 24, marginBottom: 6 },
   actionLabel: { fontSize: 12, fontWeight: '600', color: colors.text },
+  gzBar: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  gzBarFill: { height: 8, borderRadius: 4, flex: 1 },
+  gzBarLabel: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
+  gzBtn: { backgroundColor: '#EA580C', paddingHorizontal: 14, paddingVertical: 8, borderRadius: borderRadius.md },
+  gzBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  eceCard: { backgroundColor: '#FFF7ED', padding: spacing.md, borderRadius: borderRadius.lg, borderWidth: 1, borderColor: '#FFEDD5' },
+  eceRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
+  eceIcon: { fontSize: 18 },
+  eceText: { fontSize: 14, fontWeight: '500', color: '#9A3412' },
 });

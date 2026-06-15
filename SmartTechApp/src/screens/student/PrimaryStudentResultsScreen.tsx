@@ -187,6 +187,42 @@ export const PrimaryStudentResultsScreen: React.FC = () => {
           </View>
         )}
 
+        {/* Grade 7 ECZ Section */}
+        {dashboard?.currentLevelType?.includes('Grade 7') && (
+          <View style={styles.gzSection}>
+            <View style={styles.gzHeader}>
+              <Text style={styles.gzIcon}>🎯</Text>
+              <View style={styles.gzInfo}>
+                <Text style={styles.gzTitle}>Grade 7 ECZ Preparation</Text>
+                <Text style={styles.gzSub}>National Examination Track</Text>
+              </View>
+            </View>
+            <View style={styles.gzStats}>
+              <View style={styles.gzStat}>
+                <Text style={styles.gzStatValue}>{subjects.filter(s => (s.finalPercentage ?? 0) >= 40).length}/{subjects.length}</Text>
+                <Text style={styles.gzStatLabel}>Passing</Text>
+              </View>
+              <View style={styles.gzStat}>
+                <Text style={styles.gzStatValue}>{average.toFixed(0)}%</Text>
+                <Text style={styles.gzStatLabel}>Overall</Text>
+              </View>
+            </View>
+            {average >= 0 && (
+              <View style={styles.gzBar}>
+                <View style={[styles.gzBarFill, {
+                  width: `${Math.min(average, 100)}%`,
+                  backgroundColor: average >= 75 ? '#10B981' : average >= 50 ? '#F59E0B' : '#EF4444',
+                }]} />
+              </View>
+            )}
+            <Text style={styles.gzDesc}>
+              {average >= 75 ? 'Keep it up! You\'re well prepared.' :
+               average >= 50 ? 'Good progress. Focus on weaker subjects.' :
+               'Needs improvement. Review and practice more.'}
+            </Text>
+          </View>
+        )}
+
         {subjects.length === 0 && (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>📚</Text>
@@ -236,4 +272,17 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingVertical: 60 },
   emptyIcon: { fontSize: 48, marginBottom: spacing.md },
   emptyText: { fontSize: 16, color: colors.textLight, textAlign: 'center', lineHeight: 22 },
+  gzSection: { backgroundColor: '#FFF7ED', padding: spacing.md, borderRadius: borderRadius.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: '#FFEDD5' },
+  gzHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  gzIcon: { fontSize: 28 },
+  gzInfo: { flex: 1 },
+  gzTitle: { fontSize: 16, fontWeight: '700', color: '#9A3412' },
+  gzSub: { fontSize: 12, color: '#C2410C', marginTop: 2 },
+  gzStats: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  gzStat: { flex: 1, backgroundColor: '#FFF7ED', padding: 10, borderRadius: borderRadius.md, alignItems: 'center', borderWidth: 1, borderColor: '#FFEDD5' },
+  gzStatValue: { fontSize: 20, fontWeight: '700', color: '#9A3412' },
+  gzStatLabel: { fontSize: 11, color: '#C2410C', marginTop: 2 },
+  gzBar: { height: 8, backgroundColor: '#FFEDD5', borderRadius: 4, overflow: 'hidden' },
+  gzBarFill: { height: '100%', borderRadius: 4 },
+  gzDesc: { fontSize: 12, color: '#9A3412', marginTop: 8, textAlign: 'center', fontWeight: '500' },
 });

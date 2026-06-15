@@ -1231,6 +1231,23 @@ export const templateBuilderApi = {
   getStats: () => api.get('/template-builder/stats'),
 };
 
+export const academicTemplateApi = {
+  getCategories: () => api.get('/super-admin/academic-templates/categories'),
+  createCategory: (data: any) => api.post('/super-admin/academic-templates/categories', data),
+  updateCategory: (id: string, data: any) => api.patch(`/super-admin/academic-templates/categories/${id}`, data),
+  deleteCategory: (id: string) => api.delete(`/super-admin/academic-templates/categories/${id}`),
+  getTemplates: (params?: { categoryId?: string; educationLevel?: string; type?: string }) =>
+    api.get('/super-admin/academic-templates', { params }),
+  getTemplate: (id: string) => api.get(`/super-admin/academic-templates/${id}`),
+  createTemplate: (data: any) => api.post('/super-admin/academic-templates', data),
+  updateTemplate: (id: string, data: any) => api.patch(`/super-admin/academic-templates/${id}`, data),
+  deleteTemplate: (id: string) => api.delete(`/super-admin/academic-templates/${id}`),
+  duplicateTemplate: (id: string) => api.post(`/super-admin/academic-templates/${id}/duplicate`),
+  seedDefaults: () => api.post('/super-admin/academic-templates/seed-defaults'),
+  getOverview: () => api.get('/super-admin/academic-templates/stats/overview'),
+  generateAiRemarks: (data: any) => api.post('/super-admin/academic-templates/ai-remarks/generate', data),
+};
+
 export const stampApi = {
   getStamps: (params?: { type?: string }) =>
     api.get('/template-builder/stamps', { params }),
@@ -1972,4 +1989,32 @@ export const systemCommunicationApi = {
   // Scheduled
   getScheduled: () => api.get('/system-communications/scheduled'),
   cancelScheduled: (id: string) => api.post(`/system-communications/scheduled/${id}/cancel`),
+};
+
+export const resultsManagementApi = {
+  // Result Sheets
+  getSheets: (params?: { status?: string; classId?: string; termId?: string; examType?: string }) =>
+    api.get('/results-management/sheets', { params }),
+  getSheet: (id: string) => api.get(`/results-management/sheets/${id}`),
+  createSheet: (data: { classId: string; termId: string; academicYearId: string; examType?: string; title?: string; description?: string }) =>
+    api.post('/results-management/sheets', data),
+  getSheetStudents: (id: string) => api.get(`/results-management/sheets/${id}/students`),
+  getSheetSubjects: (id: string) => api.get(`/results-management/sheets/${id}/subjects`),
+
+  // Workflow Actions
+  submitSheet: (id: string) => api.post(`/results-management/sheets/${id}/submit`),
+  verifySheet: (id: string) => api.post(`/results-management/sheets/${id}/verify`),
+  publishSheet: (id: string) => api.post(`/results-management/sheets/${id}/publish`),
+  lockSheet: (id: string) => api.post(`/results-management/sheets/${id}/lock`),
+  unlockSheet: (id: string) => api.post(`/results-management/sheets/${id}/unlock`),
+
+  // Rankings & Analysis
+  getRankings: (id: string, type?: string) =>
+    api.get(`/results-management/sheets/${id}/rankings`, { params: { type } }),
+  getAnalysis: (id: string) => api.get(`/results-management/sheets/${id}/analysis`),
+  getMarkSchedule: (id: string) => api.get(`/results-management/sheets/${id}/mark-schedule`),
+
+  // Audit
+  getAuditLogs: (params?: { schoolId?: string; entityType?: string; entityId?: string; action?: string; classId?: string; termId?: string }) =>
+    api.get('/results-management/audit-logs', { params }),
 };

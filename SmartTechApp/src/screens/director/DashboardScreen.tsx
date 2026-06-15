@@ -19,6 +19,7 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
   const { dashboard, isLoadingDashboard, fetchDashboard } = useAppStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [signature, setSignature] = useState<any>(null);
+  const isPrimarySchool = user?.institutionType === 'PRIMARY_SCHOOL';
 
   useEffect(() => { fetchDashboard(); }, []);
 
@@ -69,7 +70,14 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
     }
   };
 
+  const primaryActions = [
+    { icon: '🎓', label: 'Grade 7 ECZ', screen: 'Grade7', gradient: ['#7C3AED', '#A78BFA'] as const },
+    { icon: '🧸', label: 'ECE Module', screen: 'Curriculum', gradient: ['#EC4899', '#F472B6'] as const, params: { focus: 'ece' } },
+    { icon: '👶', label: 'Pre Intake', screen: 'DirectorStudents', gradient: ['#F59E0B', '#FBBF24'] as const, params: { filter: 'pre-school' } },
+  ];
+
   const quickActions = [
+    ...(isPrimarySchool ? primaryActions : []),
     { icon: '📋', label: 'Exams', screen: 'ExamList', gradient: ['#1E3A8A', '#3B82F6'] as const },
     { icon: '📄', label: 'Templates', screen: 'TemplateMarketplace', gradient: ['#0D9488', '#14B8A6'] as const },
     { icon: '📊', label: 'Analytics', screen: 'Analytics', gradient: ['#7C3AED', '#A78BFA'] as const },
@@ -163,6 +171,40 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
           </WidgetCard>
         )}
 
+        {isPrimarySchool && (
+          <>
+            <WidgetCard title="Primary School Overview" action={{ label: 'Grade 7', onPress: () => handleNavigate('Grade7') }}>
+              <View style={styles.primaryStatsRow}>
+                <View style={styles.primaryStatItem}>
+                  <Text style={styles.perfValue}>{stats?.totalChildren || 0}</Text>
+                  <Text style={styles.perfLabel}>Pupils</Text>
+                </View>
+                <View style={styles.perfDivider} />
+                <View style={styles.primaryStatItem}>
+                  <Text style={styles.perfValue}>{stats?.totalClasses || 0}</Text>
+                  <Text style={styles.perfLabel}>Classes</Text>
+                </View>
+                <View style={styles.perfDivider} />
+                <View style={styles.primaryStatItem}>
+                  <Text style={[styles.perfValue, { color: '#7C3AED' }]}>Gr 7</Text>
+                  <Text style={styles.perfLabel}>ECZ Prep</Text>
+                </View>
+              </View>
+            </WidgetCard>
+
+            <WidgetCard title="Enrollment Pipeline" action={{ label: 'View All', onPress: () => handleNavigate('DirectorStudents') }}>
+              <View style={styles.pipelineRow}>
+                {['Pre', '1', '2', '3', '4', '5', '6', '7'].map((g) => (
+                  <View key={g} style={styles.pipelineGrade}>
+                    <Text style={styles.pipelineGradeLabel}>{g}</Text>
+                    <Text style={styles.pipelineGradeBar}>—</Text>
+                  </View>
+                ))}
+              </View>
+            </WidgetCard>
+          </>
+        )}
+
         <GradientCard
           title="Recent Activity"
           subtitle="Latest school updates"
@@ -220,4 +262,10 @@ const styles = StyleSheet.create({
   setupSignatureBtn: { alignItems: 'center', paddingVertical: spacing.lg, backgroundColor: colors.background, borderRadius: 12, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed' },
   setupSignatureText: { fontSize: 15, fontWeight: '600', color: colors.primary, marginBottom: 4 },
   setupSignatureSub: { fontSize: 12, color: colors.textLight },
+  primaryStatsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingVertical: spacing.md },
+  primaryStatItem: { alignItems: 'center' },
+  pipelineRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm },
+  pipelineGrade: { alignItems: 'center', flex: 1 },
+  pipelineGradeLabel: { fontSize: 12, fontWeight: '700', color: '#6B7280', marginBottom: 4 },
+  pipelineGradeBar: { fontSize: 10, color: '#D1D5DB' },
 });
