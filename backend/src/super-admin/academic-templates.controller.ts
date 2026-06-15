@@ -79,9 +79,26 @@ export class AcademicTemplatesController {
     return this.service.duplicateTemplate(id);
   }
 
+  @Post(':id/publish-to-marketplace')
+  async publishToMarketplace(@Param('id') id: string, @Body() data: {
+    title?: string; description?: string; category?: string; tags?: string[]; featured?: boolean;
+  }) {
+    return this.service.publishToMarketplace(id, data);
+  }
+
+  @Post(':id/assign-to-schools')
+  async assignToSchools(@Param('id') id: string, @Body() data: { schoolIds?: string[] }) {
+    return this.service.assignToSchools(id, data?.schoolIds);
+  }
+
   @Post('seed-defaults')
   async seedDefaults() {
     return this.service.seedDefaults();
+  }
+
+  @Post('seed-marketplace')
+  async seedMarketplace() {
+    return this.service.seedMarketplace();
   }
 
   @Get('stats/overview')

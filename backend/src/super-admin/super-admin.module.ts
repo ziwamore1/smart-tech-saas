@@ -8,9 +8,10 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { MessagingModule } from '../messaging/messaging.module';
 import { CommunicationModule } from '../communication/communication.module';
 import { InstitutionModule } from '../institution/institution.module';
+import { ReportTemplateBuilderModule } from '../report-template-builder/report-template-builder.module';
 
 @Module({
-  imports: [PrismaModule, MessagingModule, CommunicationModule, InstitutionModule],
+  imports: [PrismaModule, MessagingModule, CommunicationModule, InstitutionModule, ReportTemplateBuilderModule],
   controllers: [SuperAdminController, SuperAdminSetupController, AcademicTemplatesController],
   providers: [SuperAdminService, AcademicTemplatesService],
   exports: [SuperAdminService, AcademicTemplatesService],

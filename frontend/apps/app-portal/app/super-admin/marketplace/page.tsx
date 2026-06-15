@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { templateBuilderApi } from '@/lib/api';
+import { templateBuilderApi, api } from '@/lib/api';
 
 const gradOrange = 'linear-gradient(135deg, #ea6645, #f59e0b)';
 const gradPurple = 'linear-gradient(135deg, #8b5cf6, #7c3aed)';
@@ -28,6 +28,7 @@ export default function MarketplacePage() {
   const router = useRouter();
   const [templates, setTemplates] = useState<MarketplaceTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
   const [search, setSearch] = useState('');
   const [featuredOnly, setFeaturedOnly] = useState(false);
 
@@ -99,6 +100,31 @@ export default function MarketplacePage() {
           </h1>
           <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 0 56px' }}>Explore and manage marketplace templates</p>
         </div>
+        <button
+          onClick={async () => {
+            try {
+              setSeeding(true);
+              const res = await templateBuilderApi.getMarketplaceTemplates();
+              const res2 = await api.post('/super-admin/academic-templates/seed-marketplace');
+              alert('System templates published to marketplace!');
+              loadTemplates();
+            } catch (err) {
+              console.error('Seed failed:', err);
+            } finally {
+              setSeeding(false);
+            }
+          }}
+          disabled={seeding}
+          style={{
+            padding: '10px 20px', background: gradGreen, color: 'white', border: 'none',
+            borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: '8px',
+            opacity: seeding ? 0.7 : 1,
+          }}
+        >
+          <i className={`fa ${seeding ? 'fa-spinner fa-spin' : 'fa-cloud-upload-alt'}`}></i>
+          {seeding ? 'Publishing...' : 'Publish All System Templates'}
+        </button>
       </div>
 
       {/* Search and Filter */}
@@ -209,7 +235,7 @@ export default function MarketplacePage() {
                 </div>
               </div>
               <button
-                onClick={() => router.push(`/super-admin/marketplace/${template.id}`)}
+                onClick={() => router.push(`/super-admin/academic-templates/${template.template?.id || template.id}`)}
                 style={{
                   width: '100%',
                   padding: '10px 16px',

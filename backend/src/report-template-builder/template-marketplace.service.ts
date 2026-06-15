@@ -35,6 +35,18 @@ export class TemplateMarketplaceService {
     });
   }
 
+  async publishSystemTemplate(templateId: string, data: {
+    title: string; description?: string; category?: string; tags?: string[]; price?: number; previewUrl?: string; featured?: boolean;
+  }) {
+    const t = await this.prisma.reportTemplate.findFirst({ where: { id: templateId, isDefault: true } });
+    if (!t) throw new NotFoundException('System template not found');
+    return this.prisma.templateMarketplace.upsert({
+      where: { templateId },
+      create: { templateId, schoolId: null, ...data, tags: data.tags || [] },
+      update: data,
+    });
+  }
+
   async downloadTemplate(schoolId: string, marketplaceId: string) {
     const item = await this.prisma.templateMarketplace.findUnique({ where: { id: marketplaceId }, include: { template: true } });
     if (!item) throw new NotFoundException('Marketplace item not found');

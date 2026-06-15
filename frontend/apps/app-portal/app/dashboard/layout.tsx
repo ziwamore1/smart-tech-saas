@@ -280,6 +280,14 @@ const regularNav: NavItem[] = [
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
+    name: 'Assessment Defs', 
+    href: '/dashboard/assessments/definitions', 
+    icon: 'fa-layer-group',
+    color: '#0891b2',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
+  },
+  { 
     name: 'Results Management', 
     href: '/dashboard/results-management', 
     icon: 'fa-file-alt',

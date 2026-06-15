@@ -32,7 +32,7 @@ export class GradingEngineService {
     const policy = await this.getActiveGradingPolicy(classId, subjectId, termId, schoolId);
 
     if (!policy) {
-      return this.getDefaultGrade(percentage);
+      return this.getDefaultGradeForSchool(percentage, schoolId);
     }
 
     const scale = await this.prisma.gradingScale.findFirst({
@@ -44,7 +44,7 @@ export class GradingEngineService {
       orderBy: { sortOrder: 'asc' },
     });
 
-    return scale?.grade || this.getDefaultGrade(percentage);
+    return scale?.grade || this.getDefaultGradeForSchool(percentage, schoolId);
   }
 
   async computeGradeFull(
@@ -57,11 +57,11 @@ export class GradingEngineService {
     const policy = await this.getActiveGradingPolicy(classId, subjectId, termId, schoolId);
 
     if (!policy) {
-      const defaultGrade = this.getDefaultGrade(percentage);
+      const defaultGrade = this.getDefaultGradeForSchool(percentage, schoolId);
       return {
         grade: defaultGrade,
-        remark: this.getDefaultRemark(percentage),
-        points: this.getDefaultPoints(percentage),
+        remark: this.getDefaultRemarkForSchool(percentage, schoolId),
+        points: this.getDefaultPointsForSchool(percentage, schoolId),
       };
     }
 
@@ -74,8 +74,8 @@ export class GradingEngineService {
     });
 
     return {
-      grade: scale?.grade || this.getDefaultGrade(percentage),
-      remark: scale?.remark || this.getDefaultRemark(percentage),
+      grade: scale?.grade || this.getDefaultGradeForSchool(percentage, schoolId),
+      remark: scale?.remark || this.getDefaultRemarkForSchool(percentage, schoolId),
       points: scale?.points ?? undefined,
       gpa: scale?.gpa ?? undefined,
     };
@@ -271,6 +271,10 @@ export class GradingEngineService {
       return null;
     }
 
+    const institutionType = await this.getSchoolInstitutionType(schoolId);
+    const isPrimary = institutionType === 'PRIMARY_SCHOOL';
+    const passThreshold = isPrimary ? 35 : 50;
+
     const classId = computedResults[0].classId;
     const classSize = await this.prisma.enrollment.count({
       where: { classId, status: 'ACTIVE' },
@@ -278,7 +282,7 @@ export class GradingEngineService {
 
     const subjectsPassed = computedResults.filter(r => {
       const percentage = r.finalPercentage ?? 0;
-      return percentage >= 50;
+      return percentage >= passThreshold;
     }).length;
 
     const subjectsFailed = computedResults.length - subjectsPassed;
@@ -394,6 +398,91 @@ export class GradingEngineService {
     });
   }
 
+  async getGradingPolicyById(id: string) {
+    return this.prisma.gradingPolicy.findUnique({
+      where: { id },
+      include: {
+        scales: { orderBy: { sortOrder: 'asc' } },
+        classPolicies: {
+          include: {
+            class: { select: { id: true, name: true, code: true } },
+            subject: { select: { id: true, name: true, code: true } },
+            term: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+  }
+
+  async getClassTermReport(classId: string, termId: string, schoolId: string) {
+    const computedResults = await this.prisma.computedResult.findMany({
+      where: { classId, termId, schoolId, status: 'COMPUTED' },
+      include: {
+        student: {
+          select: { id: true, firstName: true, lastName: true, studentNumber: true },
+        },
+        subject: {
+          select: { id: true, name: true, code: true },
+        },
+      },
+      orderBy: [
+        { student: { lastName: 'asc' } },
+        { subject: { name: 'asc' } },
+      ],
+    });
+
+    const enrollments = await this.prisma.enrollment.count({
+      where: { classId, status: 'ACTIVE' },
+    });
+
+    const subjectAverages: Record<string, { count: number; total: number; name: string }> = {};
+    for (const r of computedResults) {
+      if (r.finalPercentage != null) {
+        if (!subjectAverages[r.subjectId]) {
+          subjectAverages[r.subjectId] = { count: 0, total: 0, name: r.subject.name };
+        }
+        subjectAverages[r.subjectId].count++;
+        subjectAverages[r.subjectId].total += r.finalPercentage;
+      }
+    }
+
+    const subjectSummary = Object.entries(subjectAverages).map(([id, data]) => ({
+      subjectId: id,
+      subjectName: data.name,
+      averagePercentage: parseFloat((data.total / data.count).toFixed(2)),
+      studentCount: data.count,
+    }));
+
+    const classAverage = computedResults.length > 0
+      ? parseFloat((computedResults.reduce((s, r) => s + (r.finalPercentage ?? 0), 0) / computedResults.length).toFixed(2))
+      : null;
+
+    return {
+      classId,
+      termId,
+      totalStudents: enrollments,
+      studentsWithResults: computedResults.length
+        ? [...new Set(computedResults.map(r => r.studentId))].length
+        : 0,
+      classAverage,
+      subjectSummary,
+      results: computedResults.map(r => ({
+        studentId: r.studentId,
+        studentName: `${r.student.firstName} ${r.student.lastName}`,
+        studentNumber: r.student.studentNumber,
+        subjectId: r.subjectId,
+        subjectName: r.subject.name,
+        totalRawScore: r.totalRawScore,
+        finalPercentage: r.finalPercentage,
+        finalGrade: r.finalGrade,
+        finalRemark: r.finalRemark,
+        points: r.points,
+        classRank: r.classRank,
+        subjectRank: r.subjectRank,
+      })),
+    };
+  }
+
   async assignGradingPolicy(data: {
     classId: string;
     subjectId?: string;
@@ -459,6 +548,62 @@ export class GradingEngineService {
     });
   }
 
+  async createPrimaryLowerPolicy(schoolId: string) {
+    return this.createGradingPolicy(schoolId, {
+      name: 'Primary Lower (Grades 1-4) - Competency Based',
+      code: 'PRIMARY_LOWER',
+      type: 'COMPETENCY',
+      isDefault: false,
+      scales: [
+        { minScore: 80, maxScore: 100, grade: 'A', remark: 'Outstanding', points: 5, gpa: 4.0, sortOrder: 1 },
+        { minScore: 65, maxScore: 79, grade: 'B', remark: 'Very Good', points: 4, gpa: 3.5, sortOrder: 2 },
+        { minScore: 50, maxScore: 64, grade: 'C', remark: 'Good', points: 3, gpa: 3.0, sortOrder: 3 },
+        { minScore: 35, maxScore: 49, grade: 'D', remark: 'Needs Improvement', points: 2, gpa: 2.0, sortOrder: 4 },
+        { minScore: 0, maxScore: 34, grade: 'E', remark: 'Below Expectation', points: 1, gpa: 1.0, sortOrder: 5 },
+      ],
+    });
+  }
+
+  async createPrimaryUpperPolicy(schoolId: string) {
+    return this.createGradingPolicy(schoolId, {
+      name: 'Primary Upper (Grades 5-6) - Standard',
+      code: 'PRIMARY_UPPER',
+      type: 'PERCENTAGE',
+      isDefault: false,
+      scales: [
+        { minScore: 80, maxScore: 100, grade: 'A', remark: 'Excellent', points: 5, gpa: 4.0, sortOrder: 1 },
+        { minScore: 65, maxScore: 79, grade: 'B', remark: 'Very Good', points: 4, gpa: 3.5, sortOrder: 2 },
+        { minScore: 50, maxScore: 64, grade: 'C', remark: 'Good', points: 3, gpa: 3.0, sortOrder: 3 },
+        { minScore: 35, maxScore: 49, grade: 'D', remark: 'Pass', points: 2, gpa: 2.0, sortOrder: 4 },
+        { minScore: 0, maxScore: 34, grade: 'F', remark: 'Fail', points: 1, gpa: 0, sortOrder: 5 },
+      ],
+    });
+  }
+
+  async createPrimaryDefaultPolicy(schoolId: string) {
+    return this.createGradingPolicy(schoolId, {
+      name: 'Primary School Default Grading',
+      code: 'PRIMARY_DEFAULT',
+      type: 'PERCENTAGE',
+      isDefault: true,
+      scales: [
+        { minScore: 80, maxScore: 100, grade: 'A', remark: 'Excellent', points: 5, gpa: 4.0, sortOrder: 1 },
+        { minScore: 65, maxScore: 79, grade: 'B', remark: 'Very Good', points: 4, gpa: 3.5, sortOrder: 2 },
+        { minScore: 50, maxScore: 64, grade: 'C', remark: 'Good', points: 3, gpa: 3.0, sortOrder: 3 },
+        { minScore: 35, maxScore: 49, grade: 'D', remark: 'Pass', points: 2, gpa: 2.0, sortOrder: 4 },
+        { minScore: 0, maxScore: 34, grade: 'F', remark: 'Fail', points: 1, gpa: 0, sortOrder: 5 },
+      ],
+    });
+  }
+
+  async getSchoolInstitutionType(schoolId: string): Promise<string | null> {
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      include: { institutionType: { select: { code: true } } },
+    });
+    return school?.institutionType?.code ?? null;
+  }
+
   async createEczZambiaPolicy(schoolId: string) {
     return this.createGradingPolicy(schoolId, {
       name: 'ECZ Zambia Grading System',
@@ -512,6 +657,52 @@ export class GradingEngineService {
         { minScore: 0, maxScore: 39, grade: 'F', remark: 'Fail', points: 0, sortOrder: 6 },
       ],
     });
+  }
+
+  private institutionTypeCache = new Map<string, string | null>();
+
+  private async getCachedInstitutionType(schoolId: string): Promise<string | null> {
+    if (!this.institutionTypeCache.has(schoolId)) {
+      const type = await this.getSchoolInstitutionType(schoolId);
+      this.institutionTypeCache.set(schoolId, type);
+    }
+    return this.institutionTypeCache.get(schoolId);
+  }
+
+  async getDefaultGradeForSchool(percentage: number, schoolId: string): Promise<string> {
+    const institutionType = await this.getCachedInstitutionType(schoolId);
+    if (institutionType === 'PRIMARY_SCHOOL') {
+      if (percentage >= 80) return 'A';
+      if (percentage >= 65) return 'B';
+      if (percentage >= 50) return 'C';
+      if (percentage >= 35) return 'D';
+      return 'E';
+    }
+    return this.getDefaultGrade(percentage);
+  }
+
+  async getDefaultRemarkForSchool(percentage: number, schoolId: string): Promise<string> {
+    const institutionType = await this.getCachedInstitutionType(schoolId);
+    if (institutionType === 'PRIMARY_SCHOOL') {
+      if (percentage >= 80) return 'Excellent';
+      if (percentage >= 65) return 'Very Good';
+      if (percentage >= 50) return 'Good';
+      if (percentage >= 35) return 'Pass';
+      return 'Below Expectation';
+    }
+    return this.getDefaultRemark(percentage);
+  }
+
+  async getDefaultPointsForSchool(percentage: number, schoolId: string): Promise<number> {
+    const institutionType = await this.getCachedInstitutionType(schoolId);
+    if (institutionType === 'PRIMARY_SCHOOL') {
+      if (percentage >= 80) return 5;
+      if (percentage >= 65) return 4;
+      if (percentage >= 50) return 3;
+      if (percentage >= 35) return 2;
+      return 1;
+    }
+    return this.getDefaultPoints(percentage);
   }
 
   private getDefaultGrade(percentage: number): string {

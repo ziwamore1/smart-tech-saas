@@ -12,6 +12,7 @@ const primaryNavItems = [
   { name: 'Curriculum', href: '/dashboard/primary/curriculum', icon: 'fa-book-open', color: '#0891b2' },
   { name: 'ECE Module', href: '/dashboard/primary/ece', icon: 'fa-baby', color: '#ec4899' },
   { name: 'Grade 7 ECZ', href: '/dashboard/primary/grade7', icon: 'fa-graduation-cap', color: '#7c3aed' },
+  { name: 'Grading', href: '/dashboard/primary/grading', icon: 'fa-chart-line', color: '#f97316' },
   { name: 'Library', href: '/dashboard/library', icon: 'fa-book-open', color: '#0d9488' },
   { name: 'Gallery', href: '/dashboard/gallery', icon: 'fa-images', color: '#db2777' },
   { name: 'Settings', href: '/dashboard/settings', icon: 'fa-cog', color: '#64748b' },

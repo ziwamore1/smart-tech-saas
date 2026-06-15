@@ -43,6 +43,12 @@ export default function TemplateDetailPage() {
   const router = useRouter();
   const [template, setTemplate] = useState<Template | null>(null);
   const [loading, setLoading] = useState(true);
+  const [publishing, setPublishing] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [marketplaceStatus, setMarketplaceStatus] = useState<{ published: boolean; downloads: number; likes: number } | null>(null);
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [publishData, setPublishData] = useState({ title: '', description: '', category: '', featured: false });
+  const [assignResult, setAssignResult] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'preview' | 'components' | 'settings' | 'certificate'>('preview');
 
   useEffect(() => {
@@ -56,8 +62,24 @@ export default function TemplateDetailPage() {
   const loadTemplate = async () => {
     try {
       setLoading(true);
-      const res = await api.get(`/super-admin/academic-templates/${params.id}`);
-      setTemplate(res.data?.data || res.data);
+      const [tplRes, marketRes] = await Promise.all([
+        api.get(`/super-admin/academic-templates/${params.id}`),
+        api.get('/template-builder/marketplace'),
+      ]);
+      const tpl = tplRes.data?.data || tplRes.data;
+      setTemplate(tpl);
+
+      const marketItems = marketRes.data?.data || marketRes.data || [];
+      const found = marketItems.find((m: any) => m.templateId === params.id);
+      if (found) {
+        setMarketplaceStatus({ published: true, downloads: found.downloads || 0, likes: found.likes || 0 });
+        setPublishData({
+          title: found.title || tpl.name,
+          description: found.description || tpl.description || '',
+          category: found.category || '',
+          featured: found.featured || false,
+        });
+      }
     } catch (err) {
       console.error('Failed to load template:', err);
     } finally {
@@ -112,6 +134,35 @@ export default function TemplateDetailPage() {
     }
   };
 
+  const handlePublishToMarketplace = async () => {
+    try {
+      setPublishing(true);
+      await api.post(`/super-admin/academic-templates/${params.id}/publish-to-marketplace`, publishData);
+      alert('Template published to marketplace!');
+      setShowPublishModal(false);
+      setMarketplaceStatus({ published: true, downloads: 0, likes: 0 });
+    } catch (err) {
+      console.error('Publish failed:', err);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const handleAssignToAllSchools = async () => {
+    if (!window.confirm('Assign this template to ALL active schools? This may create many copies.')) return;
+    try {
+      setAssigning(true);
+      const res = await api.post(`/super-admin/academic-templates/${params.id}/assign-to-schools`, {});
+      const result = res.data?.data || res.data;
+      setAssignResult(result);
+      alert(`Template assigned to ${result.created} schools (${result.skipped} already had it)`);
+    } catch (err) {
+      console.error('Assign failed:', err);
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   const getComponentIcon = (type: string) => {
     const icons: Record<string, string> = {
       HEADER: 'align-left', SCHOOL_LOGO: 'image', SCHOOL_NAME: 'building',
@@ -163,7 +214,19 @@ export default function TemplateDetailPage() {
           <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#1f2937', margin: '0 0 4px' }}>{template.name}</h1>
           <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>{template.description || 'No description'}</p>
         </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {marketplaceStatus?.published && (
+            <div style={{ padding: '6px 14px', background: '#d1fae5', borderRadius: '8px', fontSize: '12px', fontWeight: 600, color: '#065f46', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <i className="fa fa-check-circle"></i>
+              In Marketplace · {marketplaceStatus.downloads} downloads
+            </div>
+          )}
+          <button onClick={() => setShowPublishModal(true)} style={{ padding: '10px 18px', background: gradPurple, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <i className="fa fa-store"></i> {marketplaceStatus?.published ? 'Update Marketplace' : 'Publish to Marketplace'}
+          </button>
+          <button onClick={handleAssignToAllSchools} disabled={assigning} style={{ padding: '10px 18px', background: gradBlue, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', opacity: assigning ? 0.7 : 1 }}>
+            <i className={`fa ${assigning ? 'fa-spinner fa-spin' : 'fa-share-alt'}`}></i> {assigning ? 'Assigning...' : 'Assign to All Schools'}
+          </button>
           <button onClick={handleDuplicate} style={{ padding: '10px 18px', background: '#fefcf9', border: '1px solid #e8ddd0', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <i className="fa fa-copy"></i> Duplicate
           </button>
@@ -513,6 +576,66 @@ export default function TemplateDetailPage() {
               <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>This template does not have certificate settings</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Publish to Marketplace Modal */}
+      {showPublishModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowPublishModal(false)}>
+          <div style={{ background: '#fefcf9', borderRadius: '16px', padding: '28px', width: '480px', maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1f2937', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '36px', height: '36px', background: gradPurple, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className="fa fa-store" style={{ fontSize: '16px', color: 'white' }}></i>
+                </div>
+                {marketplaceStatus?.published ? 'Update Marketplace Listing' : 'Publish to Marketplace'}
+              </h3>
+              <button onClick={() => setShowPublishModal(false)} style={{ width: '32px', height: '32px', border: 'none', background: '#f3f4f6', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', color: '#6b7280' }}>
+                <i className="fa fa-times"></i>
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>Title *</label>
+                <input type="text" value={publishData.title} onChange={e => setPublishData(p => ({ ...p, title: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', background: '#fefcf9', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>Description</label>
+                <textarea value={publishData.description} onChange={e => setPublishData(p => ({ ...p, description: e.target.value }))} rows={3}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', background: '#fefcf9', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>Category</label>
+                <input type="text" value={publishData.category} onChange={e => setPublishData(p => ({ ...p, category: e.target.value }))}
+                  placeholder="e.g., Report Cards, Certificates"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', background: '#fefcf9', boxSizing: 'border-box' }} />
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: '#374151' }}>
+                <div
+                  onClick={() => setPublishData(p => ({ ...p, featured: !p.featured }))}
+                  style={{
+                    width: '20px', height: '20px', borderRadius: '6px',
+                    border: publishData.featured ? 'none' : '2px solid #d1d5db',
+                    background: publishData.featured ? gradOrange : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  {publishData.featured && <i className="fa fa-check" style={{ fontSize: '11px', color: 'white' }}></i>}
+                </div>
+                Feature this template
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowPublishModal(false)} style={{ padding: '10px 24px', background: '#fefcf9', border: '1px solid #d1d5db', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
+                Cancel
+              </button>
+              <button onClick={handlePublishToMarketplace} disabled={publishing || !publishData.title} style={{ padding: '10px 24px', background: gradPurple, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', opacity: (publishing || !publishData.title) ? 0.7 : 1 }}>
+                <i className={`fa ${publishing ? 'fa-spinner fa-spin' : 'fa-cloud-upload-alt'}`}></i>
+                {publishing ? 'Publishing...' : (marketplaceStatus?.published ? 'Update Listing' : 'Publish')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

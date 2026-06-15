@@ -1244,8 +1244,15 @@ export const academicTemplateApi = {
   deleteTemplate: (id: string) => api.delete(`/super-admin/academic-templates/${id}`),
   duplicateTemplate: (id: string) => api.post(`/super-admin/academic-templates/${id}/duplicate`),
   seedDefaults: () => api.post('/super-admin/academic-templates/seed-defaults'),
+  seedMarketplace: () => api.post('/super-admin/academic-templates/seed-marketplace'),
   getOverview: () => api.get('/super-admin/academic-templates/stats/overview'),
   generateAiRemarks: (data: any) => api.post('/super-admin/academic-templates/ai-remarks/generate', data),
+
+  publishToMarketplace: (id: string, data?: { title?: string; description?: string; category?: string; tags?: string[]; featured?: boolean }) =>
+    api.post(`/super-admin/academic-templates/${id}/publish-to-marketplace`, data || {}),
+
+  assignToSchools: (id: string, schoolIds?: string[]) =>
+    api.post(`/super-admin/academic-templates/${id}/assign-to-schools`, { schoolIds }),
 };
 
 export const stampApi = {
@@ -1989,6 +1996,35 @@ export const systemCommunicationApi = {
   // Scheduled
   getScheduled: () => api.get('/system-communications/scheduled'),
   cancelScheduled: (id: string) => api.post(`/system-communications/scheduled/${id}/cancel`),
+};
+
+export const primaryGradingApi = {
+  getPolicies: () => api.get('/primary/grading/policies'),
+  getPolicy: (id: string) => api.get(`/primary/grading/policies/${id}`),
+  assignPolicy: (data: { classId: string; subjectId?: string; termId?: string; policyId: string }) =>
+    api.post('/primary/grading/assign', data),
+  getClassReport: (classId: string, termId: string) =>
+    api.get(`/primary/grading/report/${classId}/${termId}`),
+};
+
+export const grade7EczApi = {
+  getClasses: () => api.get('/grade7-ecz/classes'),
+  createMockExam: (data: { classId: string; termId: string; subjectId: string; title: string; paperType: 'SP1' | 'SP2' | 'MOCK'; duration: number; totalScore: number; instructions?: string; questions?: any[] }) =>
+    api.post('/grade7-ecz/mock-exam', data),
+  getMockExams: (classId?: string) => api.get('/grade7-ecz/mock-exams', { params: { classId } }),
+  getMockExamResults: (id: string) => api.get(`/grade7-ecz/mock-exams/${id}/results`),
+  enterScore: (data: { examId: string; studentId: string; score: number; totalScore?: number }) =>
+    api.post('/grade7-ecz/enter-score', data),
+  enterBulkScores: (data: { examId: string; scores: Array<{ studentId: string; score: number }> }) =>
+    api.post('/grade7-ecz/enter-bulk-scores', data),
+  computeGrade7: (classId: string, termId: string) =>
+    api.post(`/grade7-ecz/compute/${classId}/${termId}`),
+  getResults: (classId: string, termId: string) =>
+    api.get(`/grade7-ecz/results/${classId}/${termId}`),
+  rankResults: (schoolId: string, termId: string) =>
+    api.post(`/grade7-ecz/rank/${schoolId}/${termId}`),
+  getPrediction: (classId: string, termId: string) =>
+    api.get(`/grade7-ecz/prediction/${classId}/${termId}`),
 };
 
 export const resultsManagementApi = {

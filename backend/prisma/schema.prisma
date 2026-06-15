@@ -2657,6 +2657,9 @@ enum ExamType {
   PRACTICAL
   OBJECTIVE
   STRUCTURED
+  MOCK
+  SP1
+  SP2
 }
 
 enum ExamSectionType {
@@ -3240,7 +3243,7 @@ model GradingPolicy {
   id            String               @id @default(uuid())
   schoolId      String
   name          String
-  code          String               @unique
+  code          String
   description   String?
   type          GradingPolicyType    @default(PERCENTAGE)
   isDefault     Boolean              @default(false)
@@ -3252,6 +3255,7 @@ model GradingPolicy {
   scales        GradingScale[]
   classPolicies ClassGradingPolicy[]
 
+  @@unique([schoolId, code])
   @@index([schoolId])
   @@index([type])
   @@index([active])

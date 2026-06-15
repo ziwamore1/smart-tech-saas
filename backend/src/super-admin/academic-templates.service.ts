@@ -4,10 +4,14 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { TemplateMarketplaceService } from '../report-template-builder/template-marketplace.service';
 
 @Injectable()
 export class AcademicTemplatesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private marketplaceService: TemplateMarketplaceService,
+  ) {}
 
   async getCategories() {
     return this.prisma.templateCategory.findMany({
@@ -216,6 +220,150 @@ export class AcademicTemplatesService {
       }),
     ]);
     return { categories, totalTemplates, byType, byCategory };
+  }
+
+  async publishToMarketplace(id: string, data: {
+    title?: string; description?: string; category?: string; tags?: string[]; featured?: boolean;
+  }) {
+    const t = await this.prisma.reportTemplate.findFirst({ where: { id, isDefault: true } });
+    if (!t) throw new NotFoundException('System template not found');
+    return this.marketplaceService.publishSystemTemplate(id, {
+      title: data.title || t.name,
+      description: data.description || t.description || '',
+      category: data.category,
+      tags: data.tags || [],
+      featured: data.featured || false,
+    });
+  }
+
+  async assignToSchools(id: string, schoolIds?: string[]) {
+    const t = await this.prisma.reportTemplate.findFirst({
+      where: { id, isDefault: true },
+      include: { components: true, certificate: true },
+    });
+    if (!t) throw new NotFoundException('System template not found');
+
+    const targetSchools = schoolIds
+      ? await this.prisma.school.findMany({ where: { id: { in: schoolIds }, isActive: true } })
+      : await this.prisma.school.findMany({ where: { isActive: true } });
+
+    if (targetSchools.length === 0) throw new BadRequestException('No active schools found');
+
+    const results: { schoolId: string; schoolName: string; templateId: string; status: string }[] = [];
+
+    for (const school of targetSchools) {
+      // Check if this template already exists for this school
+      const existing = await this.prisma.reportTemplate.findFirst({
+        where: { schoolId: school.id, name: t.name, isDefault: false },
+      });
+      if (existing) {
+        results.push({ schoolId: school.id, schoolName: school.name, templateId: existing.id, status: 'already_exists' });
+        continue;
+      }
+
+      const copy = await this.prisma.reportTemplate.create({
+        data: {
+          name: t.name,
+          description: t.description,
+          schoolId: school.id,
+          templateType: t.templateType,
+          categoryId: t.categoryId,
+          pageSize: t.pageSize,
+          orientation: t.orientation,
+          primaryColor: t.primaryColor,
+          secondaryColor: t.secondaryColor,
+          fontFamily: t.fontFamily,
+          fontSize: t.fontSize,
+          status: 'PUBLISHED',
+          version: 1,
+          includeLogo: t.includeLogo,
+          includeStamp: t.includeStamp,
+          includeSignature: t.includeSignature,
+          remarksEnabled: t.remarksEnabled,
+          layoutJson: t.layoutJson as any,
+          metadata: t.metadata as any,
+        },
+      });
+
+      for (const c of t.components) {
+        await this.prisma.templateComponent.create({
+          data: {
+            templateId: copy.id, type: c.type, label: c.label,
+            content: c.content as any, styles: c.styles as any,
+            position: c.position as any, size: c.size as any,
+            settings: c.settings as any, placeholder: c.placeholder,
+            isRequired: c.isRequired, sortOrder: c.sortOrder,
+          },
+        });
+      }
+
+      if (t.certificate) {
+        const cert = t.certificate;
+        await this.prisma.certificateTemplate.create({
+          data: {
+            templateId: copy.id,
+            certificateType: cert.certificateType,
+            borderStyle: cert.borderStyle,
+            borderColor: cert.borderColor,
+            showQrCode: cert.showQrCode,
+            autoNumbering: cert.autoNumbering,
+            nextNumber: 1,
+            signature1Label: cert.signature1Label,
+            signature1Name: cert.signature1Name,
+            signature2Label: cert.signature2Label,
+            signature2Name: cert.signature2Name,
+            awardText: cert.awardText,
+            showBadge: cert.showBadge,
+            badgeStyle: cert.badgeStyle,
+            showWatermark: cert.showWatermark,
+          },
+        });
+      }
+
+      results.push({ schoolId: school.id, schoolName: school.name, templateId: copy.id, status: 'created' });
+    }
+
+    return { total: targetSchools.length, created: results.filter(r => r.status === 'created').length, skipped: results.filter(r => r.status === 'already_exists').length, results };
+  }
+
+  async seedMarketplace() {
+    const templates = await this.prisma.reportTemplate.findMany({
+      where: { isDefault: true, schoolId: null },
+    });
+
+    let published = 0;
+    let skipped = 0;
+
+    for (const t of templates) {
+      const existing = await this.prisma.templateMarketplace.findUnique({
+        where: { templateId: t.id },
+      });
+
+      if (existing) {
+        skipped++;
+        continue;
+      }
+
+      const categorySlug = t.categoryId
+        ? (await this.prisma.templateCategory.findUnique({ where: { id: t.categoryId } }))?.slug
+        : null;
+
+      await this.prisma.templateMarketplace.create({
+        data: {
+          templateId: t.id,
+          schoolId: null,
+          title: t.name,
+          description: t.description || '',
+          category: categorySlug || 'Report Cards',
+          tags: [t.templateType],
+          featured: false,
+        },
+      });
+
+      published++;
+    }
+
+    return { published, skipped, total: templates.length };
   }
 
   async generateAiRemarks(data: {
