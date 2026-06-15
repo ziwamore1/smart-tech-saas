@@ -116,11 +116,9 @@ export default function NewSchoolPage() {
         });
         const createdDirector = directorResponse.data?.data || directorResponse.data;
         
-        try {
-          await superAdminApi.sendSchoolLink(createdSchool.id, createdDirector.id, 'email');
-        } catch (emailErr) {
+        superAdminApi.sendSchoolLink(createdSchool.id, createdDirector.id, 'email').catch((emailErr) => {
           console.error('Failed to send login email:', emailErr);
-        }
+        });
       }
       
       setStep(3);
