@@ -17,6 +17,8 @@ export class CommunicationService {
   private readonly sendgridApiKey: string;
   private readonly sendgridFromEmail: string;
   private readonly zohoTransporter: any;
+  private readonly mailjetApiKey: string;
+  private readonly mailjetSecretKey: string;
 
   constructor(
     private prisma: PrismaService,
@@ -37,9 +39,16 @@ export class CommunicationService {
       },
     });
 
+    this.mailjetApiKey = this.configService.get<string>('MAILJET_API_KEY', '');
+    this.mailjetSecretKey = this.configService.get<string>('MAILJET_SECRET_KEY', '');
+
     if (this.sendgridApiKey) {
       mail.setApiKey(this.sendgridApiKey);
       this.logger.log('[SendGrid] API initialized');
+    }
+
+    if (this.mailjetApiKey && this.mailjetSecretKey) {
+      this.logger.log('[MailJet] API initialized');
     }
   }
 
@@ -1078,6 +1087,37 @@ export class CommunicationService {
         return { success: true, messageId: info.messageId };
       } catch (error) {
         this.logger.warn(`[Zoho Email] Failed: ${error.message}`);
+      }
+    }
+
+    if (this.mailjetApiKey && this.mailjetSecretKey) {
+      try {
+        const auth = Buffer.from(`${this.mailjetApiKey}:${this.mailjetSecretKey}`).toString('base64');
+        const res = await fetch('https://api.mailjet.com/v3.1/send', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            Messages: [
+              {
+                From: { Email: this.sendgridFromEmail, Name: 'Smart Tech' },
+                To: [{ Email: to }],
+                Subject: subject,
+                HTMLPart: body,
+              },
+            ],
+          }),
+        });
+        if (res.ok) {
+          this.logger.log(`[MailJet Email] Sent to ${to}`);
+          return { success: true, messageId: `mj_${Date.now()}` };
+        }
+        const errBody = await res.text();
+        this.logger.warn(`[MailJet Email] Failed (${res.status}): ${errBody}`);
+      } catch (error) {
+        this.logger.warn(`[MailJet Email] Failed: ${error.message}`);
       }
     }
 
