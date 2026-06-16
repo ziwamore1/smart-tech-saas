@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
 const SENDGRID_API = 'https://api.sendgrid.com/v3/mail/send';
+const MAILJET_API = 'https://api.mailjet.com/v3.1/send';
 
 @Injectable()
 export class EmailService {
@@ -10,6 +11,8 @@ export class EmailService {
   private useSmtp = false;
   private fromEmail: string;
   private fromName: string;
+  private mailjetApiKey = '';
+  private mailjetSecretKey = '';
 
   constructor() {
     this.sgApiKey = process.env.SENDGRID_API_KEY || '';
@@ -21,8 +24,15 @@ export class EmailService {
       console.log(`[EmailService] using Zoho SMTP (from: noreply@smarttechsaas.com)`);
     }
 
+    this.mailjetApiKey = process.env.MAILJET_API_KEY || '';
+    this.mailjetSecretKey = process.env.MAILJET_SECRET_KEY || '';
+
     if (this.sgApiKey) {
       console.log(`[EmailService] SendGrid API available as fallback (from: ${this.fromEmail})`);
+    }
+
+    if (this.mailjetApiKey && this.mailjetSecretKey) {
+      console.log(`[EmailService] MailJet API available as fallback (from: ${this.fromEmail})`);
     }
 
     if (smtpPass) {
@@ -43,8 +53,8 @@ export class EmailService {
       this.useSmtp = true;
     }
 
-    if (!this.sgApiKey && !smtpPass) {
-      console.warn('[EmailService] no email credentials configured (SENDGRID_API_KEY or EMAIL_PASSWORD)');
+    if (!this.sgApiKey && !smtpPass && !this.mailjetApiKey) {
+      console.warn('[EmailService] no email credentials configured (SENDGRID_API_KEY, EMAIL_PASSWORD, or MAILJET_API_KEY)');
     }
   }
 
@@ -80,7 +90,37 @@ export class EmailService {
         }
         return;
       } catch (err) {
-        console.error('[EmailService] SendGrid fallback also failed:', (err as Error).message);
+        console.error('[EmailService] SendGrid fallback failed, trying MailJet:', (err as Error).message);
+      }
+    }
+
+    if (this.mailjetApiKey && this.mailjetSecretKey) {
+      try {
+        const auth = Buffer.from(`${this.mailjetApiKey}:${this.mailjetSecretKey}`).toString('base64');
+        const res = await fetch(MAILJET_API, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            Messages: [
+              {
+                From: { Email: this.fromEmail, Name: this.fromName },
+                To: [{ Email: to }],
+                Subject: subject,
+                HTMLPart: html,
+              },
+            ],
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.text();
+          throw new Error(`MailJet API ${res.status}: ${body}`);
+        }
+        return;
+      } catch (err) {
+        console.error('[EmailService] MailJet fallback also failed:', (err as Error).message);
       }
     }
 
