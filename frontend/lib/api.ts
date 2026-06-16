@@ -1058,8 +1058,24 @@ export const galleryApi = {
   getByEvent: (eventId: string) => api.get(`/gallery?eventId=${eventId}`),
 };
 
+export interface LessonPlanSection {
+  id: string;
+  type: string;
+  title: string;
+  content: string;
+  order: number;
+  config?: Record<string, any>;
+}
+
+export interface LessonPlanConfig {
+  defaultSectionTypes?: string[];
+  customSections?: boolean;
+  allowReordering?: boolean;
+  showSectionTitles?: boolean;
+}
+
 export const lessonPlansApi = {
-  getAll: (filters?: { classId?: string; subjectId?: string; status?: string }) => 
+  getAll: (filters?: { classId?: string; subjectId?: string; status?: string; search?: string; tag?: string; weekStart?: string; weekEnd?: string }) => 
     api.get('/lesson-plans', { params: filters }),
   
   getById: (id: string) => api.get(`/lesson-plans/${id}`),
@@ -1079,6 +1095,10 @@ export const lessonPlansApi = {
     procedures?: string;
     assessment?: string;
     notes?: string;
+    content?: LessonPlanSection[];
+    config?: LessonPlanConfig;
+    tags?: string[];
+    attachments?: any[];
     status?: string;
   }) => api.post('/lesson-plans', data),
   
@@ -1094,6 +1114,10 @@ export const lessonPlansApi = {
     procedures?: string;
     assessment?: string;
     notes?: string;
+    content?: LessonPlanSection[];
+    config?: LessonPlanConfig;
+    tags?: string[];
+    attachments?: any[];
     status?: string;
   }) => api.patch(`/lesson-plans/${id}`, data),
   

@@ -1,18 +1,12 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Body,
-  Param,
-  Query,
-  Req,
-  UseGuards,
+  Controller, Get, Post, Patch, Delete, Body, Param, Query, Req, UseGuards, ValidationPipe,
 } from '@nestjs/common';
 import { LessonPlanService } from './lesson-plan.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
+import { CreateLessonPlanDto } from './dto/create-lesson-plan.dto';
+import { UpdateLessonPlanDto } from './dto/update-lesson-plan.dto';
+import { LessonPlanQueryDto } from './dto/lesson-plan-query.dto';
 
 @Controller('lesson-plans')
 @UseGuards(JwtAuthGuard)
@@ -20,9 +14,9 @@ export class LessonPlanController {
   constructor(private lessonPlanService: LessonPlanService) {}
 
   @Get()
-  async findAll(@Req() req: any, @Query('classId') classId?: string, @Query('subjectId') subjectId?: string, @Query('status') status?: string) {
+  async findAll(@Req() req: any, @Query() query: LessonPlanQueryDto) {
     const schoolId = req.user?.schoolId;
-    return this.lessonPlanService.findAll(schoolId, { classId, subjectId, status });
+    return this.lessonPlanService.findAll(schoolId, query);
   }
 
   @Get('weekly')
@@ -40,14 +34,14 @@ export class LessonPlanController {
 
   @Post()
   @Roles('Director', 'Teacher')
-  async create(@Body() body: any, @Req() req: any) {
+  async create(@Body(new ValidationPipe({ transform: true })) body: CreateLessonPlanDto, @Req() req: any) {
     const schoolId = req.user?.schoolId;
     const userId = req.user?.id;
     return this.lessonPlanService.create(body, schoolId, userId);
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+  async update(@Param('id') id: string, @Body(new ValidationPipe({ transform: true, skipMissingProperties: true })) body: UpdateLessonPlanDto, @Req() req: any) {
     const schoolId = req.user?.schoolId;
     return this.lessonPlanService.update(id, body, schoolId);
   }

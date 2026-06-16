@@ -1548,6 +1548,62 @@ class ApiService {
     return response.data;
   }
 
+  // ===== Grade7 ECZ Engine (new module) =====
+
+  async getGrade7Classes() {
+    const response = await this.client.get('/grade7-ecz/classes');
+    return response.data;
+  }
+
+  async createMockExam(data: {
+    classId: string; termId: string; subjectId: string; title: string;
+    paperType: 'SP1' | 'SP2' | 'MOCK'; duration: number; totalScore: number;
+    instructions?: string; questions?: any[];
+  }) {
+    const response = await this.client.post('/grade7-ecz/mock-exam', data);
+    return response.data;
+  }
+
+  async getMockExams(classId?: string) {
+    const response = await this.client.get('/grade7-ecz/mock-exams', { params: { classId } });
+    return response.data;
+  }
+
+  async getMockExamResults(id: string) {
+    const response = await this.client.get(`/grade7-ecz/mock-exams/${id}/results`);
+    return response.data;
+  }
+
+  async enterGrade7Score(data: { examId: string; studentId: string; score: number; totalScore?: number }) {
+    const response = await this.client.post('/grade7-ecz/enter-score', data);
+    return response.data;
+  }
+
+  async enterBulkGrade7Scores(data: { examId: string; scores: Array<{ studentId: string; score: number }> }) {
+    const response = await this.client.post('/grade7-ecz/enter-bulk-scores', data);
+    return response.data;
+  }
+
+  async computeGrade7Results(classId: string, termId: string) {
+    const response = await this.client.post(`/grade7-ecz/compute/${classId}/${termId}`);
+    return response.data;
+  }
+
+  async getGrade7ComputedResults(classId: string, termId: string) {
+    const response = await this.client.get(`/grade7-ecz/results/${classId}/${termId}`);
+    return response.data;
+  }
+
+  async rankGrade7Results(schoolId: string, termId: string) {
+    const response = await this.client.post(`/grade7-ecz/rank/${schoolId}/${termId}`);
+    return response.data;
+  }
+
+  async getGrade7Prediction(classId: string, termId: string) {
+    const response = await this.client.get(`/grade7-ecz/prediction/${classId}/${termId}`);
+    return response.data;
+  }
+
   async getCurriculumTree(schoolId?: string) {
     const response = await this.client.get('/curriculum/tree', { params: { schoolId } });
     return response.data;

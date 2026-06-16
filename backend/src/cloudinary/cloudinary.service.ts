@@ -11,6 +11,7 @@ export const FOLDERS = {
   users: { students: `${BASE_FOLDER}/users/students`, teachers: `${BASE_FOLDER}/users/teachers`, parents: `${BASE_FOLDER}/users/parents`, directors: `${BASE_FOLDER}/users/directors`, superadmins: `${BASE_FOLDER}/users/superadmins` },
   assignments: `${BASE_FOLDER}/assignments`,
   homework: `${BASE_FOLDER}/homework`,
+  lessonPlans: `${BASE_FOLDER}/lesson-plans`,
   projects: `${BASE_FOLDER}/projects`,
   examinations: `${BASE_FOLDER}/examinations`,
   reportCards: `${BASE_FOLDER}/report-cards`,

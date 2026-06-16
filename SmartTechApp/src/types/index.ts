@@ -687,3 +687,108 @@ export interface MonitoringChain {
   supervises: { id: string; positionType: string; teacher: any; department?: Department }[];
   supervisedBy: { id: string; positionType: string; teacher: any; department?: Department }[];
 }
+
+// ====== Grade7 ECZ Types ======
+
+export interface Grade7Class {
+  id: string;
+  name: string;
+  studentCount: number;
+  teacherName?: string;
+}
+
+export interface Grade7MockExam {
+  id: string;
+  classId: string;
+  termId: string;
+  subjectId: string;
+  title: string;
+  paperType: 'SP1' | 'SP2' | 'MOCK';
+  duration: number;
+  totalScore: number;
+  instructions?: string;
+  questions?: any[];
+  subject?: { id: string; name: string; code?: string };
+  class?: { id: string; name: string };
+  term?: { id: string; name: string };
+  attempts?: Grade7ExamAttempt[];
+  _count?: { attempts: number };
+  createdAt: string;
+}
+
+export interface Grade7ExamAttempt {
+  id: string;
+  examId: string;
+  studentId: string;
+  score: number;
+  totalScore: number;
+  percentage: number;
+  paper: string;
+  student?: { id: string; firstName: string; lastName: string; admissionNo?: string };
+}
+
+export interface Grade7ScoreEntry {
+  examId: string;
+  studentId: string;
+  score: number;
+  totalScore?: number;
+}
+
+export interface Grade7BulkScoreEntry {
+  examId: string;
+  scores: Array<{ studentId: string; score: number }>;
+}
+
+export interface Grade7Result {
+  id: string;
+  studentId: string;
+  classId: string;
+  termId: string;
+  sp1Score?: number;
+  sp2Score?: number;
+  mockScore?: number;
+  combinedScore?: number;
+  division?: string;
+  divisionCode?: number;
+  isEligible: boolean;
+  rank?: number;
+  student?: { id: string; firstName: string; lastName: string; admissionNo?: string };
+}
+
+export interface Grade7DivisionBreakdown {
+  division: string;
+  count: number;
+  percentage: number;
+  students: Grade7Result[];
+}
+
+export interface Grade7Ranking {
+  studentId: string;
+  studentName: string;
+  admissionNo?: string;
+  combinedScore: number;
+  division: string;
+  divisionCode: number;
+  rank: number;
+  totalStudents: number;
+}
+
+export interface SelectionPrediction {
+  studentId: string;
+  studentName: string;
+  admissionNo?: string;
+  combinedScore: number;
+  division: string;
+  predictedSchool?: string;
+  predictedProgram?: string;
+  confidence: number;
+  cutoffScore?: number;
+}
+
+export interface Grade7ComputedResults {
+  classId: string;
+  termId: string;
+  results: Grade7Result[];
+  breakdown: Grade7DivisionBreakdown[];
+  totalStudents: number;
+}

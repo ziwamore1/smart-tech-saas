@@ -20,9 +20,16 @@ interface LessonPlan {
   procedures?: string;
   assessment?: string;
   notes?: string;
+  content?: any[];
+  config?: any;
+  tags?: string[];
   status: 'draft' | 'pending' | 'approved' | 'completed';
   createdAt: string;
   updatedAt: string;
+}
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '').trim();
 }
 
 interface Class {
@@ -61,9 +68,11 @@ export default function LessonPlansPage() {
     procedures: '',
     assessment: '',
     notes: '',
+    tags: [] as string[],
     status: 'draft',
   });
   const [newObjective, setNewObjective] = useState('');
+  const [newTagInput, setNewTagInput] = useState('');
 
   const [filters, setFilters] = useState({
     classId: '',
@@ -105,7 +114,7 @@ export default function LessonPlansPage() {
     if (!newPlan.title.trim() || !newPlan.classId || !newPlan.subjectId) return;
     
     try {
-      const response = await lessonPlansApi.create(newPlan);
+      const response = await lessonPlansApi.create({ ...newPlan, tags: newPlan.tags });
       setPlans([...plans, response.data]);
       setShowAddModal(false);
       setNewPlan({
@@ -120,6 +129,7 @@ export default function LessonPlansPage() {
         procedures: '',
         assessment: '',
         notes: '',
+        tags: [],
         status: 'draft',
       });
     } catch (error) {
@@ -145,6 +155,32 @@ export default function LessonPlansPage() {
     } catch (error) {
       console.error('Failed to update status:', error);
     }
+  };
+
+  const getPreviewText = (plan: LessonPlan): string => {
+    if (plan.content && Array.isArray(plan.content) && plan.content.length > 0) {
+      const firstContent = plan.content.find((s: any) => s.content && stripHtml(s.content).length > 0);
+      if (firstContent) {
+        const text = stripHtml(firstContent.content);
+        return text.length > 120 ? text.slice(0, 120) + '...' : text;
+      }
+    }
+    if (plan.description) {
+      return plan.description.length > 120 ? plan.description.slice(0, 120) + '...' : plan.description;
+    }
+    return '';
+  };
+
+  const addTag = () => {
+    const tag = newTagInput.trim();
+    if (tag && !newPlan.tags.includes(tag)) {
+      setNewPlan({ ...newPlan, tags: [...newPlan.tags, tag] });
+    }
+    setNewTagInput('');
+  };
+
+  const removeTag = (index: number) => {
+    setNewPlan({ ...newPlan, tags: newPlan.tags.filter((_, i) => i !== index) });
   };
 
   const addObjective = () => {
@@ -272,8 +308,15 @@ export default function LessonPlansPage() {
               </div>
               
               <h3 style={{ fontWeight: '700', color: '#111827', marginBottom: '8px', fontSize: '16px' }}>{plan.title}</h3>
-              {plan.description && (
-                <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px' }}>{plan.description}</p>
+              {getPreviewText(plan) && (
+                <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px', lineHeight: 1.4 }}>{getPreviewText(plan)}</p>
+              )}
+              {plan.tags && plan.tags.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '10px' }}>
+                  {plan.tags.map((tag, i) => (
+                    <span key={i} style={{ padding: '2px 8px', background: '#EEF2FF', color: '#4F46E5', borderRadius: '12px', fontSize: '11px', fontWeight: 500 }}>{tag}</span>
+                  ))}
+                </div>
               )}
               
               <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#9ca3af', marginBottom: '12px', flexWrap: 'wrap' }}>
@@ -322,6 +365,13 @@ export default function LessonPlansPage() {
               )}
               
               <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                <button
+                  onClick={() => router.push(`/dashboard/lesson-plans/${plan.id}/edit`)}
+                  style={{ padding: '10px 12px', background: '#EEF2FF', color: '#4F46E5', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: '1px solid #C7D2FE' }}
+                  title="Open rich editor"
+                >
+                  <i className="fa fa-pencil-square-o mr-2"></i> Edit
+                </button>
                 <button
                   onClick={() => setExpandedPlan(isExpanded ? null : plan.id)}
                   style={{ flex: '1', padding: '10px 12px', background: '#f59e0b10', color: '#d97706', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: '1px solid #fde68a' }}
@@ -520,6 +570,33 @@ export default function LessonPlansPage() {
                   rows={2}
                   placeholder="Additional notes..."
                 />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>Tags</label>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                  <input
+                    type="text"
+                    value={newTagInput}
+                    onChange={(e) => setNewTagInput(e.target.value)}
+                    placeholder="Add a tag..."
+                    onKeyPress={(e) => e.key === 'Enter' && addTag()}
+                    style={{ flex: 1 }}
+                  />
+                  <button onClick={addTag} style={{ padding: '12px 16px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                    <i className="fa fa-plus"></i>
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {newPlan.tags.map((tag, i) => (
+                    <span key={i} style={{ padding: '4px 12px', background: '#EEF2FF', color: '#4F46E5', borderRadius: '20px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {tag}
+                      <button onClick={() => removeTag(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4F46E5', padding: 0 }}>
+                        <i className="fa fa-times"></i>
+                      </button>
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
             

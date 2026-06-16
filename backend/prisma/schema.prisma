@@ -2291,6 +2291,9 @@ model LessonPlan {
   procedures  String?
   assessment  String?
   notes       String?
+  content     Json?    @default("[]")
+  config      Json?    @default("{}")
+  tags        String[]
   attachments Json?    @default("[]")
   status      String   @default("draft")
   schoolId    String
