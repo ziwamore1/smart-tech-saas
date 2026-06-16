@@ -20,6 +20,7 @@ function LoginForm() {
 
   const registered = searchParams.get('registered');
   const successMessage = searchParams.get('message');
+  const schoolId = searchParams.get('school');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +28,7 @@ function LoginForm() {
     setIsLoading(true);
 
     try {
-      await login(email, password, loginAsSuperAdmin);
+      await login(email, password, loginAsSuperAdmin, schoolId || undefined);
       
       if (loginAsSuperAdmin) {
         router.push('/super-admin');

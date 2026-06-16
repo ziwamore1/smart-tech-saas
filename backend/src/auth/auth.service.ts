@@ -312,8 +312,8 @@ export class AuthService {
     };
   }
 
-  async login(email: string, password: string) {
-    this.logger.log(`Login attempt for email: "${email}"`);
+  async login(email: string, password: string, schoolId?: string) {
+    this.logger.log(`Login attempt for email: "${email}"${schoolId ? `, URL schoolId: ${schoolId}` : ''}`);
 
     const user = await this.prisma.user.findFirst({
       where: {
@@ -356,18 +356,35 @@ export class AuthService {
 
     const institutionType = user.school?.institutionType?.code || null;
 
+    let effectiveSchoolId = resolvedSchoolId;
+    let effectiveInstitutionType = institutionType;
+
+    if (schoolId) {
+      const schoolFromUrl = await this.prisma.school.findUnique({
+        where: { id: schoolId },
+        include: { institutionType: true },
+      });
+      if (schoolFromUrl?.institutionType) {
+        effectiveSchoolId = schoolId;
+        effectiveInstitutionType = schoolFromUrl.institutionType.code;
+        this.logger.log(`Overriding school context from URL param: schoolId=${schoolId}, type=${effectiveInstitutionType}`);
+      } else {
+        this.logger.warn(`SchoolId from URL '${schoolId}' not found or has no type; using user's default school context`);
+      }
+    }
+
     const payload = {
       sub: user.id,
-      schoolId: resolvedSchoolId,
-      institutionType,
+      schoolId: effectiveSchoolId,
+      institutionType: effectiveInstitutionType,
       roles,
       type: 'user',
     };
 
     this.logger.log(
-      `Login successful for ${email}, roles: ${roles.join(', ')}, schoolId: ${payload.schoolId}, type: ${institutionType}`,
+      `Login successful for ${email}, roles: ${roles.join(', ')}, schoolId: ${payload.schoolId}, type: ${effectiveInstitutionType}`,
     );
-    this.logger.log(`User data - schoolId in DB: ${user.schoolId}, resolved: ${resolvedSchoolId}`);
+    this.logger.log(`User data - schoolId in DB: ${user.schoolId}, resolved: ${resolvedSchoolId}, effective: ${effectiveSchoolId}`);
 
     return {
       message: 'Login successful',
@@ -379,8 +396,8 @@ export class AuthService {
         lastName: user.lastName,
         roles,
         primaryRole,
-        schoolId: resolvedSchoolId,
-        institutionType,
+        schoolId: effectiveSchoolId,
+        institutionType: effectiveInstitutionType,
       },
     };
   }

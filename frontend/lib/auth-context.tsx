@@ -25,7 +25,7 @@ interface AuthContextType {
   isDirector: boolean;
   isTeacher: boolean;
   isClassTeacher: boolean;
-  login: (email: string, password: string, isSuperAdmin?: boolean) => Promise<void>;
+  login: (email: string, password: string, isSuperAdmin?: boolean, schoolId?: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -65,11 +65,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string, isSuperAdmin: boolean = false) => {
+  const login = async (email: string, password: string, isSuperAdmin: boolean = false, schoolId?: string) => {
     try {
       const response = isSuperAdmin 
         ? await authApi.superAdminLogin(email, password)
-        : await authApi.login(email, password);
+        : await authApi.login(email, password, schoolId);
       
       const responseData = response.data?.data || response.data;
       const access_token = responseData?.access_token;

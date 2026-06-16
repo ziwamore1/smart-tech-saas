@@ -84,8 +84,8 @@ api.interceptors.response.use(
 );
 
 export const authApi = {
-  login: (email: string, password: string) =>
-    api.post('/auth/login', { email, password }),
+  login: (email: string, password: string, schoolId?: string) =>
+    api.post('/auth/login', { email, password, schoolId }),
   
   superAdminLogin: (email: string, password: string) =>
     api.post('/auth/super-admin/login', { email, password }),

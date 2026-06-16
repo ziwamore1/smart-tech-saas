@@ -79,9 +79,9 @@ export class AuthController {
   @Post('login')
   async login(@Body() body: LoginDto) {
     this.logger.log(
-      `Login request - email: ${body.email}, password length: ${body.password?.length}`,
+      `Login request - email: ${body.email}, password length: ${body.password?.length}, schoolId: ${body.schoolId || 'not provided'}`,
     );
-    return this.authService.login(body.email, body.password);
+    return this.authService.login(body.email, body.password, body.schoolId);
   }
 
   @Post('mobile-login')
