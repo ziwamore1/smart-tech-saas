@@ -114,11 +114,20 @@ export class EmailService {
             ],
           }),
         });
-        if (!res.ok) {
-          const body = await res.text();
-          throw new Error(`MailJet API ${res.status}: ${body}`);
+        const text = await res.text();
+        let result: any;
+        try { result = JSON.parse(text); } catch { result = null; }
+        const msg = result?.Messages?.[0];
+        if (msg?.Status === 'success') {
+          console.log(`[EmailService] MailJet sent to ${to} (ID: ${msg.To?.[0]?.MessageID || 'N/A'})`);
+          return;
         }
-        return;
+        const errors = msg?.Errors?.map((e: any) => e.ErrorMessage).join('; ') || text;
+        console.warn(`[EmailService] MailJet returned status "${msg?.Status || 'unknown'}": ${errors}`);
+        if (msg?.Status === 'error' && msg?.Errors?.some((e: any) => e.ErrorMessage?.toLowerCase().includes('sender'))) {
+          console.warn('[EmailService] ** The sender email needs to be verified at https://app.mailjet.com/account/sender');
+        }
+        throw new Error(`MailJet: ${errors}`);
       } catch (err) {
         console.error('[EmailService] MailJet fallback also failed:', (err as Error).message);
       }

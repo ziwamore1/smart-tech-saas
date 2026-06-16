@@ -1110,12 +1110,19 @@ export class CommunicationService {
             ],
           }),
         });
-        if (res.ok) {
-          this.logger.log(`[MailJet Email] Sent to ${to}`);
-          return { success: true, messageId: `mj_${Date.now()}` };
+        const text = await res.text();
+        let result: any;
+        try { result = JSON.parse(text); } catch { result = null; }
+        const msg = result?.Messages?.[0];
+        if (msg?.Status === 'success') {
+          this.logger.log(`[MailJet Email] Sent to ${to} (ID: ${msg.To?.[0]?.MessageID || 'N/A'})`);
+          return { success: true, messageId: msg.To?.[0]?.MessageID || `mj_${Date.now()}` };
         }
-        const errBody = await res.text();
-        this.logger.warn(`[MailJet Email] Failed (${res.status}): ${errBody}`);
+        const errors = msg?.Errors?.map((e: any) => e.ErrorMessage).join('; ') || text;
+        this.logger.warn(`[MailJet Email] Status "${msg?.Status || 'unknown'}": ${errors}`);
+        if (msg?.Status === 'error' && msg?.Errors?.some((e: any) => e.ErrorMessage?.toLowerCase().includes('sender'))) {
+          this.logger.warn('[MailJet] ** Sender email must be verified at https://app.mailjet.com/account/sender');
+        }
       } catch (error) {
         this.logger.warn(`[MailJet Email] Failed: ${error.message}`);
       }
