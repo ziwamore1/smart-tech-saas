@@ -115,23 +115,8 @@ export default function LessonPlansPage() {
     
     try {
       const response = await lessonPlansApi.create({ ...newPlan, tags: newPlan.tags });
-      setPlans([...plans, response.data]);
       setShowAddModal(false);
-      setNewPlan({
-        title: '',
-        description: '',
-        classId: '',
-        subjectId: '',
-        weekStart: '',
-        weekEnd: '',
-        objectives: [],
-        materials: '',
-        procedures: '',
-        assessment: '',
-        notes: '',
-        tags: [],
-        status: 'draft',
-      });
+      router.push(`/dashboard/lesson-plans/${response.data.id}/edit`);
     } catch (error) {
       console.error('Failed to create lesson plan:', error);
     }
@@ -368,9 +353,9 @@ export default function LessonPlansPage() {
                 <button
                   onClick={() => router.push(`/dashboard/lesson-plans/${plan.id}/edit`)}
                   style={{ padding: '10px 12px', background: '#EEF2FF', color: '#4F46E5', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: '1px solid #C7D2FE' }}
-                  title="Open rich editor"
+                  title="Open rich editor with WYSIWYG, math equations, tables, and images"
                 >
-                  <i className="fa fa-pencil-square-o mr-2"></i> Edit
+                  <i className="fa fa-pencil-square-o mr-2"></i> Full Editor
                 </button>
                 <button
                   onClick={() => setExpandedPlan(isExpanded ? null : plan.id)}

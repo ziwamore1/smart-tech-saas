@@ -74,38 +74,49 @@ export default function SecondaryDashboardPage() {
 
   return (
     <div>
-      <div className="bg-gradient-to-r from-blue-800 to-blue-600 rounded-xl p-6 mb-6 text-white">
-        <div className="flex items-start justify-between flex-wrap gap-4">
+      <div style={{
+        background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)',
+        borderRadius: '12px', padding: '24px', marginBottom: '24px', color: 'white'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
           <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-bold m-0 drop-shadow-sm">{schoolProfile?.name || 'Secondary School'}</h1>
-              <span className="text-xs font-semibold bg-white/20 px-3 py-1 rounded-full border border-white/30 shadow-sm">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+              <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>{schoolProfile?.name || 'Secondary School'}</h1>
+              <span style={{
+                fontSize: '12px', fontWeight: 600, background: 'rgba(255,255,255,0.2)',
+                padding: '4px 12px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.3)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              }}>
                 Secondary School
               </span>
             </div>
-            <p className="text-sm text-blue-100 mb-1">
-              <i className="fa fa-graduation-cap mr-1.5" />
+            <p style={{ fontSize: '14px', color: '#bfdbfe', margin: '0 0 4px' }}>
+              <i className="fa fa-graduation-cap" style={{ marginRight: '6px' }} />
               Form (1–6) — ECZ Form 5 + GCE
             </p>
             {currentTerm && (
-              <p className="text-xs text-blue-200">
-                <i className="fa fa-calendar mr-1.5" />
+              <p style={{ fontSize: '13px', color: '#93c5fd', margin: 0 }}>
+                <i className="fa fa-calendar" style={{ marginRight: '6px' }} />
                 Current Term: {currentTerm.name}
               </p>
             )}
           </div>
-          <div className="text-right">
-            <span className={`inline-block text-xs font-bold uppercase px-3 py-1 rounded-full shadow-sm ${
-              currentTier === 'BASIC' ? 'bg-gray-700 text-white ring-1 ring-white/20' :
-              currentTier === 'STANDARD' ? 'bg-amber-500 text-white ring-1 ring-white/20' :
-              'bg-purple-700 text-white ring-1 ring-white/20'
-            }`}>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{
+              display: 'inline-block', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase',
+              padding: '4px 12px', borderRadius: '999px', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              ...(currentTier === 'BASIC' ? { background: '#374151', color: 'white', border: '1px solid rgba(255,255,255,0.2)' } :
+                 currentTier === 'STANDARD' ? { background: '#f59e0b', color: 'white', border: '1px solid rgba(255,255,255,0.2)' } :
+                 { background: '#7e22ce', color: 'white', border: '1px solid rgba(255,255,255,0.2)' }),
+            }}>
               {tierNames[currentTier]} Plan
             </span>
-            <div className="mt-2">
+            <div style={{ marginTop: '8px' }}>
               <Link
                 href="/dashboard/subscription"
-                className="text-xs text-blue-200 hover:text-white underline underline-offset-2"
+                style={{ fontSize: '13px', color: '#93c5fd', textDecoration: 'underline', textUnderlineOffset: '2px' }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
+                onMouseLeave={(e) => e.currentTarget.style.color = '#93c5fd'}
               >
                 {currentTier === 'PREMIUM' ? 'Manage Subscription →' : 'Upgrade Plan →'}
               </Link>

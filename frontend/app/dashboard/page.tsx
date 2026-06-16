@@ -731,44 +731,40 @@ export default function DashboardPage() {
             <i className="fa fa-layer-group" style={{ color: '#059669', marginRight: '8px' }}></i>
             {INSTITUTION_TYPE_LABELS[school.institutionType as InstitutionTypeCode]} Modules
           </h3>
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '8px'
-          }}>
-            {INSTITUTION_TYPE_FEATURES[school.institutionType as InstitutionTypeCode]?.keyModules.map((mod: string) => (
-              <span
-                key={mod}
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  padding: '6px 14px',
-                  borderRadius: '20px',
-                  background: '#f0fdf4',
-                  color: '#16a34a',
-                  border: '1px solid #dcfce7'
-                }}
-              >
-                {mod}
-              </span>
-            ))}
-            <Link
-              href={`/dashboard/${(typeof school.institutionType === 'string' ? school.institutionType : school.institutionType?.code || '').toLowerCase().replace(/_/g, '-')}`}
-              style={{
-                fontSize: '12px',
-                fontWeight: 500,
-                padding: '6px 14px',
-                borderRadius: '20px',
-                background: '#fefcf9',
-                color: '#059669',
-                border: '1px solid #059669',
-                textDecoration: 'none'
-              }}
-            >
-              <i className="fa fa-external-link-alt" style={{ marginRight: '4px' }}></i>
-              Open {INSTITUTION_TYPE_LABELS[school.institutionType as InstitutionTypeCode]} Dashboard
-            </Link>
-          </div>
+          {(() => {
+            const typeCode = typeof school.institutionType === 'string' ? school.institutionType : school.institutionType?.code || '';
+            const typeColors: Record<string, { bg: string; text: string; border: string }> = {
+              PRIMARY_SCHOOL: { bg: '#f0fdf4', text: '#16a34a', border: '#dcfce7' },
+              SECONDARY_SCHOOL: { bg: '#eff6ff', text: '#2563eb', border: '#bfdbfe' },
+              ADVANCED_SECONDARY: { bg: '#f5f3ff', text: '#7c3aed', border: '#ddd6fe' },
+              COLLEGE: { bg: '#fff7ed', text: '#ea580c', border: '#fed7aa' },
+              UNIVERSITY: { bg: '#fdf2f8', text: '#db2777', border: '#fbcfe8' },
+            };
+            const colors = typeColors[typeCode] || typeColors.PRIMARY_SCHOOL;
+            return (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {INSTITUTION_TYPE_FEATURES[typeCode as InstitutionTypeCode]?.keyModules.map((mod: string) => (
+                  <span key={mod} style={{
+                    fontSize: '12px', fontWeight: 500, padding: '6px 14px',
+                    borderRadius: '20px', background: colors.bg, color: colors.text, border: `1px solid ${colors.border}`,
+                  }}>
+                    {mod}
+                  </span>
+                ))}
+                <Link
+                  href={`/dashboard/${typeCode.toLowerCase().replace(/_/g, '-')}`}
+                  style={{
+                    fontSize: '12px', fontWeight: 500, padding: '6px 14px',
+                    borderRadius: '20px', background: '#fefcf9', color: colors.text,
+                    border: `1px solid ${colors.text}`, textDecoration: 'none',
+                  }}
+                >
+                  <i className="fa fa-external-link-alt" style={{ marginRight: '4px' }}></i>
+                  Open {INSTITUTION_TYPE_LABELS[typeCode as InstitutionTypeCode]} Dashboard
+                </Link>
+              </div>
+            );
+          })()}
         </div>
       )}
 
