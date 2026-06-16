@@ -30,12 +30,12 @@ interface NotificationResult {
 const APP_DOWNLOAD_URL = 'https://play.google.com/store/apps/details?id=com.smarttech.app';
 
 const templates = {
-  directorWelcome: (data: { username: string; password: string; schoolName: string; schoolUrl: string }) =>
+  directorWelcome: (data: { username: string; password: string; schoolName: string; schoolUrl: string; schoolType?: string }) =>
     `Welcome to Smart_Tech!
 
 You have been registered as a School Director.
 
-School: ${data.schoolName}
+School: ${data.schoolName}${data.schoolType ? ` (${data.schoolType})` : ''}
 
 Login Details:
 Username: ${data.username}
@@ -353,13 +353,14 @@ export class UnifiedMessagingService {
   async sendDirectorWelcome(
     user: UserInfo,
     credentials: { username: string; password: string },
-    school: { name: string; url: string },
+    school: { name: string; url: string; type?: string },
   ): Promise<NotificationResult> {
     const message = templates.directorWelcome({
       username: credentials.username,
       password: credentials.password,
       schoolName: school.name,
       schoolUrl: school.url,
+      schoolType: school.type,
     });
 
     return this.sendNotification(user, message, {

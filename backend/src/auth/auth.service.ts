@@ -116,12 +116,22 @@ export class AuthService {
   async createSchool(data: CreateSchoolDto, superAdminId: string) {
     this.logger.log(`SuperAdmin ${superAdminId} creating school: ${data.schoolName}`);
 
+    const institutionTypeCode = data.schoolType || 'PRIMARY_SCHOOL';
+    const institutionType = await this.prisma.institutionType.findUnique({
+      where: { code: institutionTypeCode as any },
+    });
+
+    if (!institutionType) {
+      throw new BadRequestException(`Institution type '${institutionTypeCode}' not found. Please run seed script.`);
+    }
+
     const school = await this.prisma.school.create({
       data: {
         name: data.schoolName,
         address: data.address,
         email: data.email,
         phone: data.phone,
+        institutionTypeId: institutionType.id,
         subscriptionStatus: 'trial',
       },
     });
@@ -135,6 +145,7 @@ export class AuthService {
         name: school.name,
         email: school.email,
         phone: school.phone,
+        institutionType: institutionTypeCode,
       },
     };
   }
@@ -144,10 +155,17 @@ export class AuthService {
 
     const school = await this.prisma.school.findUnique({
       where: { id: data.schoolId },
+      include: { institutionType: true },
     });
 
     if (!school) {
       throw new BadRequestException('School not found');
+    }
+
+    if (!school.institutionType) {
+      throw new BadRequestException(
+        `School '${school.name}' has no institution type assigned. Please ensure the school was created with a valid institution type.`,
+      );
     }
 
     const existingUser = await this.prisma.user.findFirst({
@@ -213,6 +231,7 @@ export class AuthService {
         email: user.email,
         phone: user.phone,
         schoolId: user.schoolId,
+        institutionType: school.institutionType.code,
       },
       credentialsSent: true,
     };

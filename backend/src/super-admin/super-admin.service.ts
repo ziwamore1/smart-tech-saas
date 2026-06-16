@@ -256,9 +256,15 @@ export class SuperAdminService {
   ) {
     const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
+      include: { institutionType: true },
     });
     if (!school) {
       throw new NotFoundException('School not found');
+    }
+    if (!school.institutionType) {
+      throw new BadRequestException(
+        `School '${school.name}' has no institution type assigned. Please ensure the school was created with a valid institution type.`,
+      );
     }
 
     const normalizedEmail = data.email.trim().toLowerCase();
@@ -308,7 +314,7 @@ export class SuperAdminService {
           lastName: user.lastName,
         },
         { username: normalizedEmail, password: data.password },
-        { name: school.name, url: `${this.configService.get<string>('FRONTEND_URL')}/login?school=${schoolId}` },
+        { name: school.name, url: `${this.configService.get<string>('FRONTEND_URL')}/login?school=${schoolId}`, type: school.institutionType.code },
       )
       .catch((err) => this.logger.error('Failed to send director welcome message:', err));
 
@@ -317,6 +323,7 @@ export class SuperAdminService {
       email: user.email,
       schoolId,
       schoolName: school.name,
+      institutionType: school.institutionType.code,
       message: 'Director account created successfully',
     };
   }

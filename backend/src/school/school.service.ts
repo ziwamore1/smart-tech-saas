@@ -25,12 +25,16 @@ export class SchoolService {
       where: { code: institutionTypeCode as any },
     });
 
+    if (!institutionType) {
+      throw new Error(`Institution type '${institutionTypeCode}' not found. Please run seed script.`);
+    }
+
     const school = await this.prisma.school.create({
       data: {
         name: dto.schoolName,
         email: dto.email,
         phone: dto.phone,
-        institutionTypeId: institutionType?.id,
+        institutionTypeId: institutionType.id,
       },
     });
 
@@ -70,9 +74,7 @@ export class SchoolService {
 
     await this.initializeSchool(school.id, institutionTypeCode);
 
-    if (institutionType) {
-      await this.provisioningService.provisionInstitution(school.id, institutionTypeCode);
-    }
+    await this.provisioningService.provisionInstitution(school.id, institutionTypeCode);
 
     const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
     const schoolUrl = `${frontendUrl}/login?school=${school.id}`;
@@ -86,7 +88,7 @@ export class SchoolService {
           lastName: director.lastName,
         },
         { username: dto.email, password: temporaryPassword },
-        { name: school.name, url: schoolUrl },
+        { name: school.name, url: schoolUrl, type: institutionType.code },
       )
       .catch((err) => this.logger.error('Failed to send director welcome message:', err));
 
