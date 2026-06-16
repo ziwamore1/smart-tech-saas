@@ -78,8 +78,8 @@ export default function SecondaryDashboardPage() {
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-bold m-0">{schoolProfile?.name || 'Secondary School'}</h1>
-              <span className="text-xs font-semibold bg-white/20 px-3 py-1 rounded-full border border-white/30">
+              <h1 className="text-2xl font-bold m-0 drop-shadow-sm">{schoolProfile?.name || 'Secondary School'}</h1>
+              <span className="text-xs font-semibold bg-white/20 px-3 py-1 rounded-full border border-white/30 shadow-sm">
                 Secondary School
               </span>
             </div>
@@ -95,10 +95,10 @@ export default function SecondaryDashboardPage() {
             )}
           </div>
           <div className="text-right">
-            <span className={`inline-block text-xs font-bold uppercase px-3 py-1 rounded-full ${
-              currentTier === 'BASIC' ? 'bg-gray-600 text-white' :
-              currentTier === 'STANDARD' ? 'bg-blue-500 text-white' :
-              'bg-purple-500 text-white'
+            <span className={`inline-block text-xs font-bold uppercase px-3 py-1 rounded-full shadow-sm ${
+              currentTier === 'BASIC' ? 'bg-gray-700 text-white ring-1 ring-white/20' :
+              currentTier === 'STANDARD' ? 'bg-amber-500 text-white ring-1 ring-white/20' :
+              'bg-purple-700 text-white ring-1 ring-white/20'
             }`}>
               {tierNames[currentTier]} Plan
             </span>

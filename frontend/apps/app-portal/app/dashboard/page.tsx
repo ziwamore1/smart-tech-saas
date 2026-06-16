@@ -753,7 +753,7 @@ export default function DashboardPage() {
               </span>
             ))}
             <Link
-              href={`/dashboard/${school.institutionType.toLowerCase().replace(/_/g, '-')}`}
+              href={`/dashboard/${(typeof school.institutionType === 'string' ? school.institutionType : school.institutionType?.code || '').toLowerCase().replace(/_/g, '-')}`}
               style={{
                 fontSize: '12px',
                 fontWeight: 500,

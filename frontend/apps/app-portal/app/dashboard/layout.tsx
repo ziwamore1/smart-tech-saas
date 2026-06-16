@@ -372,7 +372,7 @@ const regularNav: NavItem[] = [
     href: '/dashboard/lesson-plans', 
     icon: 'fa-clipboard-list',
     color: '#f59e0b',
-    typeRoles: ROLE_MAP.teachingStaff,
+    typeRoles: ROLE_MAP.teaching,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
