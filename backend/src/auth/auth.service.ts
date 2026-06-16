@@ -190,6 +190,8 @@ export class AuthService {
       },
     });
 
+    const directorSchoolUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?school=${data.schoolId}`;
+
     await this.notificationService.sendCredentials({
       recipientName: data.fullName,
       email: data.email,
@@ -198,7 +200,7 @@ export class AuthService {
       password: tempPassword,
       role: 'Director',
       schoolName: school.name,
-      schoolUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login`,
+      schoolUrl: directorSchoolUrl,
       appDownloadUrl: process.env.APP_DOWNLOAD_URL || 'https://play.google.com/store/apps',
     });
 
@@ -264,6 +266,8 @@ export class AuthService {
       where: { id: schoolId },
     });
 
+    const teacherSchoolUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?school=${schoolId}`;
+
     await this.notificationService.sendCredentials({
       recipientName: data.fullName,
       email: data.email,
@@ -272,7 +276,7 @@ export class AuthService {
       password: tempPassword,
       role: 'Teacher',
       schoolName: school?.name,
-      schoolUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login`,
+      schoolUrl: teacherSchoolUrl,
       appDownloadUrl: process.env.APP_DOWNLOAD_URL || 'https://play.google.com/store/apps',
     });
 

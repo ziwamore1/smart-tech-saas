@@ -114,6 +114,8 @@ export class IdentityService {
     });
 
     const school = user.schoolId ? await this.prisma.school.findUnique({ where: { id: user.schoolId } }) : null;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const schoolUrl = school ? `${frontendUrl}/login?school=${school.id}` : `${frontendUrl}/login`;
 
     const deliveryResult = await this.credentialDeliveryService.deliverCredentials({
       userId,
@@ -125,6 +127,7 @@ export class IdentityService {
       recipientName: `${user.firstName} ${user.lastName}`,
       role,
       schoolName: school?.name,
+      schoolUrl,
       channel,
     });
 

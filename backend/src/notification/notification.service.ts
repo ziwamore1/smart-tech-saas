@@ -93,6 +93,7 @@ export class NotificationService {
     if (data.phone) {
       const message = this.buildCredentialMessage(data);
       await this.sendSMS(data.phone, message);
+      await this.sendWhatsApp(data.phone, message).catch(() => {});
     }
   }
 
