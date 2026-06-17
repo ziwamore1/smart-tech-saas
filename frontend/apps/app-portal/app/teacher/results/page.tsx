@@ -1,18 +1,49 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { teacherApi, resultApi, classApi, termApi, subjectApi, assessmentApi, studentApi } from '@/lib/api';
+import { socket } from '@/lib/socket';
+
+const PASS_THRESHOLD = 50;
+
+function getGradeColor(score: number) {
+  if (score >= 75) return 'bg-green-100 text-green-800';
+  if (score >= PASS_THRESHOLD) return 'bg-blue-100 text-blue-800';
+  return 'bg-red-100 text-red-800';
+}
+
+function getGrade(score: number) {
+  if (score >= 75) return 'A';
+  if (score >= PASS_THRESHOLD) return 'C';
+  return 'F';
+}
+
+type EntryMode = 'single' | 'multi' | 'class';
 
 export default function TeacherResultsPage() {
   const { user, isClassTeacher } = useAuth();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const schoolId = user?.schoolId;
+    if (!schoolId) return;
+    const eventName = `result:updated:${schoolId}`;
+    const handler = () => {
+      queryClient.invalidateQueries({ queryKey: ['results'] });
+      queryClient.invalidateQueries({ queryKey: ['class-students'] });
+    };
+    socket.on(eventName, handler);
+    return () => { socket.off(eventName, handler); };
+  }, [user?.schoolId, queryClient]);
+
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('all');
   const [selectedAssessmentType, setSelectedAssessmentType] = useState('');
+  const [entryMode, setEntryMode] = useState<EntryMode>('single');
   const [scores, setScores] = useState<Record<string, number>>({});
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isBulkEntry, setIsBulkEntry] = useState(false);
@@ -65,22 +96,36 @@ export default function TeacherResultsPage() {
 
   const { data: assessmentTypes } = useQuery({
     queryKey: ['assessment-types', selectedSubject, selectedTerm],
-    queryFn: () => selectedSubject && selectedTerm 
+    queryFn: () => selectedSubject && selectedTerm
       ? assessmentApi.getTypes({ subjectId: selectedSubject, termId: selectedTerm }).then(res => res.data)
       : Promise.resolve([]),
     enabled: !!selectedSubject && !!selectedTerm,
   });
 
+  const { data: classSubjectsData } = useQuery({
+    queryKey: ['class-subjects-teacher', selectedClass],
+    queryFn: async () => {
+      if (!selectedClass) return [];
+      const r = await fetch(`/api/v1/class-subjects/class/${selectedClass}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+      const json = await r.json();
+      return json?.data || json || [];
+    },
+    enabled: !!selectedClass,
+  });
+
   const teacher = teacherData?.data || teacherData;
   const assignedClass = teacher?.classTeacherOf;
   const teachingSubjects = teacher?.subjects || [];
+  const classSubjects = Array.isArray(classSubjectsData) ? classSubjectsData : [];
 
   const { data: studentsData } = useQuery({
     queryKey: ['class-students', selectedClass],
-    queryFn: () => selectedClass 
+    queryFn: () => selectedClass
       ? studentApi.getAll({ limit: 100 }).then(res => {
           const students = res.data?.data || res.data?.students || [];
-          return students.filter((s: any) => 
+          return students.filter((s: any) =>
             s.enrollments?.some((e: any) => e.classId === selectedClass && e.isActive)
           );
         })
@@ -93,7 +138,7 @@ export default function TeacherResultsPage() {
     queryFn: () => selectedClass && selectedTerm && selectedSubject
       ? resultApi.getAll({ classId: selectedClass, termId: selectedTerm, subjectId: selectedSubject }).then(res => res.data)
       : Promise.resolve([]),
-    enabled: !!selectedClass && !!selectedTerm && !!selectedSubject,
+    enabled: !!selectedClass && !!selectedTerm && (entryMode === 'single' || selectedSubject !== 'all'),
   }) as any;
 
   const enterScoreMutation = useMutation({
@@ -124,25 +169,15 @@ export default function TeacherResultsPage() {
   });
 
   const bulkEnterScoresMutation = useMutation({
-    mutationFn: (scoreList: Array<{ studentId: string; score: number }>) => {
-      if (selectedAssessmentType) {
-        return assessmentApi.enterBulkScores(
-          scoreList.map(s => ({
-            studentId: s.studentId,
-            assessmentTypeId: selectedAssessmentType,
-            score: s.score,
-          }))
-        );
-      }
-      return resultApi.createBulk(
+    mutationFn: (scoreList: Array<{ studentId: string; subjectId: string; score: number }>) =>
+      resultApi.createBulk(
         scoreList.map(s => ({
           studentId: s.studentId,
-          subjectId: selectedSubject,
+          subjectId: s.subjectId,
           termId: selectedTerm,
           score: s.score,
         }))
-      );
-    },
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['results'] });
       setScores({});
@@ -169,36 +204,31 @@ export default function TeacherResultsPage() {
   });
 
   const students = studentsData || [];
+  const existingResultsArray: any[] = existingResults || [];
   const existingResultsMap: Map<string, any> = new Map(
-    (existingResults || []).map((r: any) => [r.studentId, r])
+    existingResultsArray.map((r: any) => [r.studentId, r])
   );
+
+  // Determine which subjects to show based on entry mode
+  const displaySubjects = entryMode === 'class'
+    ? classSubjects
+    : selectedSubject === 'all'
+      ? teachingSubjects
+      : teachingSubjects.filter((s: any) => s.id === selectedSubject || s.subjectId === selectedSubject);
 
   const handleSaveAll = () => {
     const scoreList = Object.entries(scores)
       .filter(([, score]) => score > 0)
-      .map(([studentId, score]) => ({ studentId, score }));
-    
+      .map(([key, score]) => {
+        const [studentId, subjectId] = key.split('|');
+        return { studentId, subjectId, score };
+      });
     if (scoreList.length === 0) {
       setMessage({ type: 'error', text: 'Please enter at least one score' });
       setTimeout(() => setMessage(null), 3000);
       return;
     }
     bulkEnterScoresMutation.mutate(scoreList);
-  };
-
-  const getGradeColor = (score: number) => {
-    if (score >= 75) return 'bg-green-100 text-green-800';
-    if (score >= 60) return 'bg-blue-100 text-blue-800';
-    if (score >= 50) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-red-100 text-red-800';
-  };
-
-  const getGrade = (score: number) => {
-    if (score >= 75) return 'A';
-    if (score >= 60) return 'B';
-    if (score >= 50) return 'C';
-    if (score >= 40) return 'D';
-    return 'F';
   };
 
   const currentTerm = terms?.find((t: any) => t.isCurrent);
@@ -211,21 +241,55 @@ export default function TeacherResultsPage() {
           <span>/</span>
           <span>Results</span>
         </div>
-        <h1 className="text-3xl font-bold text-gray-900">Enter Results</h1>
-        <p className="text-gray-600 mt-1">
-          Enter and manage student results for your subjects
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Enter Results</h1>
+            <p className="text-gray-600 mt-1">Enter and manage student results</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setEntryMode('single'); setSelectedSubject('all'); }}
+              className={`px-3 py-2 text-sm rounded-lg font-medium transition-colors ${entryMode === 'single' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            >
+              <i className="fa fa-edit mr-1"></i> Single Subject
+            </button>
+            {teachingSubjects.length > 1 && (
+              <button
+                onClick={() => { setEntryMode('multi'); setSelectedSubject('all'); }}
+                className={`px-3 py-2 text-sm rounded-lg font-medium transition-colors ${entryMode === 'multi' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+              >
+                <i className="fa fa-layer-group mr-1"></i> Multi Subject
+              </button>
+            )}
+            {isClassTeacher && (
+              <button
+                onClick={() => { setEntryMode('class'); setSelectedSubject('all'); }}
+                className={`px-3 py-2 text-sm rounded-lg font-medium transition-colors ${entryMode === 'class' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+              >
+                <i className="fa fa-users mr-1"></i> Class Bulk
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {message && (
         <div className={`mb-4 px-4 py-3 rounded-lg ${
-          message.type === 'success' 
-            ? 'bg-green-50 text-green-700 border border-green-200' 
+          message.type === 'success'
+            ? 'bg-green-50 text-green-700 border border-green-200'
             : 'bg-red-50 text-red-700 border border-red-200'
         }`}>
           {message.text}
         </div>
       )}
+
+      {/* Entry Mode Description */}
+      <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+        <i className="fa fa-info-circle mr-2"></i>
+        {entryMode === 'single' && 'Mode A: Single Subject — You can enter marks for one subject at a time. Select a subject below.'}
+        {entryMode === 'multi' && `Mode B: Multi Subject — You teach ${teachingSubjects.length} subjects. All your subjects are shown.`}
+        {entryMode === 'class' && `Mode C: Class Teacher Bulk — ${classSubjects.length} subjects loaded for your class. Enter all at once.`}
+      </div>
 
       <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
         <h2 className="text-lg font-semibold mb-4">Select Parameters</h2>
@@ -264,20 +328,29 @@ export default function TeacherResultsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Subject *</label>
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg"
-            >
-              <option value="">Select Subject</option>
-              {teachingSubjects.map((subject: any) => (
-                <option key={subject.id} value={subject.id}>{subject.name}</option>
-              ))}
-              {subjects?.map((subject: any) => (
-                <option key={subject.id} value={subject.id}>{subject.name}</option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Subject {entryMode === 'class' ? `(All ${classSubjects.length} subjects)` : '*'}
+            </label>
+            {entryMode === 'class' ? (
+              <div className="w-full px-3 py-2 border rounded-lg bg-gray-50 text-gray-600">
+                <i className="fa fa-check-circle text-green-600 mr-2"></i>
+                All class subjects loaded
+              </div>
+            ) : (
+              <select
+                value={selectedSubject}
+                onChange={(e) => setSelectedSubject(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg"
+              >
+                <option value="all">All My Subjects</option>
+                {teachingSubjects.map((subject: any) => (
+                  <option key={subject.id} value={subject.id}>{subject.name}</option>
+                ))}
+                {subjects?.map((subject: any) => (
+                  <option key={subject.id} value={subject.id}>{subject.name}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div>
@@ -295,26 +368,30 @@ export default function TeacherResultsPage() {
           </div>
         </div>
 
-        {(selectedAssessmentType || isBulkEntry) && (
-          <div className="mt-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={isBulkEntry}
-                onChange={(e) => setIsBulkEntry(e.target.checked)}
-                className="rounded"
-              />
-              <span className="text-sm font-medium">Bulk Entry Mode (Save All at Once)</span>
-            </label>
-          </div>
-        )}
+        <div className="mt-4 flex items-center gap-4">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={isBulkEntry}
+              onChange={(e) => setIsBulkEntry(e.target.checked)}
+              className="rounded"
+            />
+            <span className="text-sm font-medium">Bulk Entry Mode (Save All at Once)</span>
+          </label>
+        </div>
       </div>
 
-      {selectedClass && selectedTerm && selectedSubject && (
+      {(selectedClass && selectedTerm && (entryMode === 'class' || (selectedSubject !== ''))) && (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="p-4 border-b flex justify-between items-center">
             <h2 className="text-lg font-semibold">
-              Enter Scores - {subjects?.find((s: any) => s.id === selectedSubject)?.name}
+              {entryMode === 'class' ? (
+                <span>Class Results — All Subjects</span>
+              ) : selectedSubject === 'all' ? (
+                <span>Multi Subject Entry — {teachingSubjects.length} subjects</span>
+              ) : (
+                <span>Enter Scores — {subjects?.find((s: any) => s.id === selectedSubject)?.name}</span>
+              )}
             </h2>
             <div className="flex gap-2">
               {assessmentTypes?.length > 0 && selectedSubject && (
@@ -332,7 +409,7 @@ export default function TeacherResultsPage() {
                   disabled={bulkEnterScoresMutation.isPending}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
                 >
-                  Save All Scores
+                  Save All Scores ({Object.keys(scores).length})
                 </button>
               )}
             </div>
@@ -346,89 +423,67 @@ export default function TeacherResultsPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50 sticky top-0">
                   <tr>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">#</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">Admission #</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">Student Name</th>
-                    <th className="text-center py-3 px-4 font-medium text-gray-700">Current Score</th>
-                    <th className="text-center py-3 px-4 font-medium text-gray-700">Grade</th>
-                    <th className="text-center py-3 px-4 font-medium text-gray-700">
-                      {isBulkEntry ? 'Enter Score' : 'Action'}
-                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700 sticky left-0 bg-gray-50 z-10">#</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700 sticky left-0 bg-gray-50 z-10" style={{ left: '40px' }}>Admission #</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700 sticky left-0 bg-gray-50 z-10" style={{ left: '140px' }}>Student Name</th>
+                    {displaySubjects.map((subj: any) => (
+                      <th key={subj.id || subj.subjectId} className="text-center py-3 px-4 font-medium text-gray-700 min-w-[90px]">
+                        {subj.name || subj.subject?.name || 'Subject'}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {students.map((student: any, index: number) => {
-                    const existing: any = existingResultsMap.get(student.id);
-                    const currentScore = scores[student.id] ?? existing?.score ?? 0;
-                    
-                    return (
-                      <tr key={student.id} className="border-t hover:bg-gray-50">
-                        <td className="py-3 px-4 text-gray-500">{index + 1}</td>
-                        <td className="py-3 px-4 font-mono text-sm">{student.admissionNumber}</td>
-                        <td className="py-3 px-4 font-medium">
-                          {student.firstName} {student.lastName}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {existing ? (
-                            <span className="font-semibold">{existing.score?.toFixed(1) || '-'}</span>
-                          ) : (
-                            <span className="text-gray-400">Not entered</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {currentScore > 0 ? (
-                            <span className={`px-2 py-1 rounded text-sm font-medium ${getGradeColor(currentScore)}`}>
-                              {getGrade(currentScore)}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {isBulkEntry ? (
+                  {students.map((student: any, index: number) => (
+                    <tr key={student.id} className="border-t hover:bg-gray-50">
+                      <td className="py-3 px-4 text-gray-500 sticky left-0 bg-white z-10">{index + 1}</td>
+                      <td className="py-3 px-4 font-mono text-sm sticky left-0 bg-white z-10" style={{ left: '40px' }}>{student.admissionNumber}</td>
+                      <td className="py-3 px-4 font-medium sticky left-0 bg-white z-10" style={{ left: '140px' }}>
+                        {student.firstName} {student.lastName}
+                      </td>
+                      {displaySubjects.map((subj: any) => {
+                        const subjId = subj.id || subj.subjectId || subj.subject?.id;
+                        const existing: any = existingResultsMap.get(`${student.id}-${subjId}`);
+                        const scoreKey = `${student.id}|${subjId}`;
+                        const currentScore = scores[scoreKey] ?? existing?.score ?? 0;
+                        const isMissing = !scores[scoreKey] && !existing?.score;
+
+                        return (
+                          <td key={scoreKey} className={`py-2 px-3 text-center ${isMissing ? 'bg-yellow-50' : ''}`}>
+                            {currentScore > 0 && !isMissing && (
+                              <div className="mb-1">
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getGradeColor(currentScore)}`}>
+                                  {getGrade(currentScore)}
+                                </span>
+                              </div>
+                            )}
                             <input
                               type="number"
                               min="0"
                               max="100"
-                              value={scores[student.id] ?? ''}
-                              onChange={(e) => setScores({
-                                ...scores,
-                                [student.id]: Number(e.target.value),
-                              })}
-                              className="w-20 px-2 py-1 border rounded text-center"
+                              step="0.5"
+                              value={scores[scoreKey] ?? (existing?.score ?? '')}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setScores(prev => ({
+                                  ...prev,
+                                  [scoreKey]: val ? Number(val) : 0,
+                                }));
+                              }}
+                              className={`w-16 px-1.5 py-1 border rounded text-center text-sm ${
+                                !isMissing && existing?.score < PASS_THRESHOLD
+                                  ? 'border-red-300 bg-red-50'
+                                  : isMissing ? 'border-yellow-300 bg-yellow-50' : ''
+                              }`}
                               placeholder="0-100"
                             />
-                          ) : (
-                            <div className="flex items-center justify-center gap-2">
-                              <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                id={`score-${student.id}`}
-                                className="w-20 px-2 py-1 border rounded text-center"
-                                placeholder="0-100"
-                              />
-                              <button
-                                onClick={() => {
-                                  const input = document.getElementById(`score-${student.id}`) as HTMLInputElement;
-                                  const score = Number(input.value);
-                                  if (score >= 0 && score <= 100) {
-                                    enterScoreMutation.mutate({ studentId: student.id, score });
-                                    input.value = '';
-                                  }
-                                }}
-                                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                              >
-                                Save
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -436,7 +491,7 @@ export default function TeacherResultsPage() {
         </div>
       )}
 
-      {teachingSubjects.length === 0 && (
+      {teachingSubjects.length === 0 && entryMode !== 'class' && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
           <span className="text-4xl">⚠️</span>
           <h3 className="text-lg font-semibold mt-4">No Subjects Assigned</h3>

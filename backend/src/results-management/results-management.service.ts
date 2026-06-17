@@ -6,6 +6,7 @@ import { ResultAnalyticsService } from '../result-analytics/result-analytics.ser
 import { ReportCardEngineService } from '../report-card-engine/report-card-engine.service';
 import { AssessmentEngineService } from '../assessment-engine/assessment-engine.service';
 import { Prisma } from '@prisma/client';
+import * as XLSX from 'xlsx';
 
 @Injectable()
 export class ResultsManagementService {
@@ -692,6 +693,419 @@ export class ResultsManagementService {
         code: cs.subject.code,
       })),
       students: schedule,
+    };
+  }
+
+  async generateMarkScheduleHtml(sheetId: string, schoolId: string): Promise<string> {
+    const sheet = await this.prisma.resultSheet.findUnique({
+      where: { id: sheetId },
+      include: {
+        class: { include: { classTeacher: { select: { firstName: true, lastName: true } } } },
+        term: { include: { academicYear: { select: { name: true } } } },
+      },
+    });
+    if (!sheet) throw new NotFoundException('Result sheet not found');
+
+    const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+    const schedule = await this.getMarkSchedule(sheetId);
+
+    const subjects = schedule.subjects || [];
+    const students = schedule.students || [];
+
+    const passThreshold = 50;
+
+    const rows = students.map((s: any) => {
+      const subjectCells = subjects.map((sub: any) => {
+        const subResult = s.subjects?.find((sr: any) => sr.subjectId === sub.id);
+        const pct = subResult?.finalPercentage;
+        const passed = pct != null && pct >= passThreshold;
+        const grade = subResult?.finalGrade || '-';
+        const points = subResult?.points != null ? subResult.points : '-';
+        return `<td style="text-align:center;padding:6px 8px;border:1px solid #e8ddd0;${pct == null ? 'background:#fffbeb;' : !passed ? 'background:#fef2f2;' : ''}">
+          ${pct != null ? `<div style="font-weight:600;font-size:14px;color:${passed ? '#059669' : '#dc2626'}">${pct.toFixed(1)}%</div>
+          <div style="font-size:11px;color:#6b7280">${grade} | ${points} pts</div>` : '<span style="color:#d1d5db">-</span>'}
+        </td>`;
+      });
+
+      const validSubjects = s.subjects?.filter((sr: any) => sr.finalPercentage != null) || [];
+      const avg = validSubjects.length > 0
+        ? validSubjects.reduce((sum: number, sr: any) => sum + sr.finalPercentage, 0) / validSubjects.length
+        : null;
+
+      return `<tr>
+        <td style="padding:6px 12px;border:1px solid #e8ddd0;font-weight:600">${s.student?.firstName || ''} ${s.student?.lastName || ''}</td>
+        <td style="padding:6px 12px;border:1px solid #e8ddd0;color:#6b7280;font-size:12px">${s.student?.admissionNumber || '-'}</td>
+        <td style="padding:6px 12px;border:1px solid #e8ddd0;color:#6b7280;font-size:12px">${s.student?.gender || '-'}</td>
+        ${subjectCells.join('')}
+        <td style="text-align:center;padding:6px 12px;border:1px solid #e8ddd0;font-weight:600;${avg != null && avg >= passThreshold ? 'color:#059669' : avg != null ? 'color:#dc2626' : 'color:#d1d5db'}">
+          ${avg != null ? `${avg.toFixed(1)}%` : '-'}
+        </td>
+        <td style="text-align:center;padding:6px 12px;border:1px solid #e8ddd0;font-weight:600">${s.totalPoints || 0}</td>
+      </tr>`;
+    }).join('');
+
+    const subjectHeaders = subjects.map((sub: any) =>
+      `<th style="text-align:center;padding:10px 8px;background:#5f4b3a;color:white;font-size:11px;text-transform:uppercase;border:1px solid #7a6b5a;min-width:80px">${sub.name}</th>`
+    ).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mark Schedule - ${sheet.class?.name || ''}</title>
+  <style>
+    @page { margin: 20mm; size: A4 landscape; }
+    * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
+    body { margin: 0; padding: 20px; color: #1f2937; }
+    .header { text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 3px solid #5f4b3a; }
+    .header h1 { margin: 0; font-size: 22px; color: #5f4b3a; }
+    .header .school-name { font-size: 18px; font-weight: 700; }
+    .header .details { font-size: 13px; color: #6b7280; margin-top: 6px; }
+    .header .details span { margin: 0 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { background: #5f4b3a; color: white; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; border: 1px solid #7a6b5a; position: sticky; top: 0; }
+    td { padding: 8px 12px; border: 1px solid #e8ddd0; }
+    tr:nth-child(even) { background: #faf7f4; }
+    tr:hover { background: #f5efe8; }
+    .signatures { margin-top: 40px; display: flex; justify-content: space-between; }
+    .signatures .sig { text-align: center; }
+    .signatures .sig .line { width: 200px; border-top: 1px solid #1f2937; margin-top: 40px; padding-top: 8px; font-size: 12px; color: #6b7280; }
+    .print-btn { position: fixed; top: 20px; right: 20px; padding: 10px 24px; background: #5f4b3a; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; z-index: 100; }
+    @media print { .print-btn { display: none; } body { padding: 0; } }
+    .footer { text-align: center; margin-top: 20px; font-size: 11px; color: #9ca3af; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+    .badge-pass { background: #d1fae5; color: #059669; }
+    .badge-fail { background: #fee2e2; color: #dc2626; }
+  </style>
+</head>
+<body>
+  <button class="print-btn" onclick="window.print()"><i class="fa fa-print"></i> Print / PDF</button>
+
+  <div class="header">
+    <div class="school-name">${school?.name || 'School Name'}</div>
+    <div class="details">
+      <span>Academic Year: ${sheet.term?.academicYear?.name || ''}</span>
+      <span>Term: ${sheet.term?.name || ''}</span>
+      <span>Class: ${sheet.class?.name || ''}</span>
+      <span>Exam: ${sheet.examType || 'END_TERM'}</span>
+      <span>Generated: ${new Date().toLocaleDateString()}</span>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="min-width:160px;position:sticky;left:0;z-index:2">Student Name</th>
+        <th style="min-width:100px">Admission No.</th>
+        <th style="min-width:60px">Gender</th>
+        ${subjectHeaders}
+        <th style="min-width:70px">Average</th>
+        <th style="min-width:60px">Total Pts</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+    </tbody>
+  </table>
+
+  <div class="signatures">
+    <div class="sig">
+      <div class="line">Class Teacher: ${sheet.class?.classTeacher ? `${sheet.class.classTeacher.firstName} ${sheet.class.classTeacher.lastName}` : '________________'}</div>
+    </div>
+    <div class="sig">
+      <div class="line">Director: ${school?.name ? `${school.name} Director` : '________________'}</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>Smart Tech SaaS - Results Management System | Confidential</p>
+  </div>
+
+  <script>
+    window.onload = function() { if (window.location.search.includes('print=true')) window.print(); };
+  </script>
+</body>
+</html>`;
+
+    return html;
+  }
+
+  async generateMarkSchedulePdf(sheetId: string, schoolId: string): Promise<Buffer> {
+    const html = await this.generateMarkScheduleHtml(sheetId, schoolId);
+    try {
+      const puppeteer = require('puppeteer');
+      const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+      const pdf = await page.pdf({
+        format: 'A4',
+        landscape: true,
+        printBackground: true,
+        margin: { top: '15mm', right: '15mm', bottom: '15mm', left: '15mm' },
+      });
+      await browser.close();
+      return Buffer.from(pdf);
+    } catch {
+      // Fallback: return HTML as buffer if puppeteer not available
+      return Buffer.from(html, 'utf-8');
+    }
+  }
+
+  async previewExcelUpload(
+    schoolId: string,
+    termId: string,
+    classId: string,
+    file: Express.Multer.File,
+  ) {
+    const term = await this.prisma.term.findUnique({
+      where: { id: termId },
+      include: { academicYear: true },
+    });
+
+    if (!term || term.academicYear.schoolId !== schoolId) {
+      throw new BadRequestException('Invalid term');
+    }
+
+    const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+
+    if (rows.length === 0) {
+      throw new BadRequestException('Excel file is empty');
+    }
+
+    const subjects = await this.prisma.subject.findMany({
+      where: { schoolId },
+    });
+    const subjectMap = new Map(
+      subjects.map((s) => [s.name.toLowerCase(), { id: s.id, name: s.name }]),
+    );
+
+    const students = await this.prisma.student.findMany({
+      where: { schoolId },
+      select: { id: true, admissionNumber: true, firstName: true, lastName: true },
+    });
+    const studentMap = new Map(
+      students.map((s) => [s.admissionNumber?.toLowerCase(), s]),
+    );
+
+    const entries: any[] = [];
+    const errors: any[] = [];
+    let rowNum = 0;
+
+    for (const row of rows) {
+      rowNum++;
+      const admissionNumber = String(row['AdmissionNumber'] || '').trim();
+      if (!admissionNumber) {
+        errors.push({ row: rowNum, message: 'Missing AdmissionNumber' });
+        continue;
+      }
+
+      const student = studentMap.get(admissionNumber.toLowerCase());
+      if (!student) {
+        errors.push({ row: rowNum, message: `Student not found: ${admissionNumber}` });
+        continue;
+      }
+
+      const entry: any = {
+        rowNumber: rowNum,
+        admissionNumber,
+        firstName: row['FirstName'] || student.firstName,
+        lastName: row['LastName'] || student.lastName,
+        studentId: student.id,
+        scores: {},
+      };
+
+      for (const column in row) {
+        const colLower = column.toLowerCase();
+        if (['admissionnumber', 'firstname', 'lastname', 'class'].includes(colLower)) continue;
+
+        const subject = subjectMap.get(colLower);
+        if (!subject) {
+          errors.push({ row: rowNum, message: `Unknown column: ${column}` });
+          continue;
+        }
+
+        const val = row[column];
+        const score = Number(val);
+        if (val !== undefined && val !== '' && val !== null) {
+          if (isNaN(score) || score < 0 || score > 100) {
+            errors.push({ row: rowNum, message: `Invalid score '${val}' in ${column} (must be 0-100)` });
+          } else {
+            entry.scores[subject.id] = { subjectName: subject.name, score };
+          }
+        }
+      }
+      entries.push(entry);
+    }
+
+    return { entries, errors, totalRows: rows.length, validRows: entries.length };
+  }
+
+  async importExcelResults(
+    userId: string,
+    schoolId: string,
+    termId: string,
+    classId: string,
+    examType: string,
+    file: Express.Multer.File,
+  ) {
+    const term = await this.prisma.term.findUnique({
+      where: { id: termId },
+      include: { academicYear: true },
+    });
+
+    if (!term || term.academicYear.schoolId !== schoolId) {
+      throw new BadRequestException('Invalid term');
+    }
+
+    if (term.resultsLocked) {
+      throw new BadRequestException('Results are locked for this term');
+    }
+
+    const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+
+    if (rows.length === 0) {
+      throw new BadRequestException('Excel file is empty');
+    }
+
+    const subjects = await this.prisma.subject.findMany({
+      where: { schoolId },
+    });
+    const subjectMap = new Map(
+      subjects.map((s) => [s.name.toLowerCase(), s.id]),
+    );
+
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+
+    // Get or create the result sheet
+    const currentAcYear = term.academicYearId;
+    let resultSheet = await this.prisma.resultSheet.findFirst({
+      where: { classId, termId, examType },
+    });
+
+    if (!resultSheet) {
+      const enrollmentCount = await this.prisma.enrollment.count({
+        where: { classId, academicYearId: currentAcYear, status: 'ACTIVE' },
+      });
+      resultSheet = await this.prisma.resultSheet.create({
+        data: {
+          schoolId,
+          classId,
+          termId,
+          academicYearId: currentAcYear,
+          examType,
+          createdBy: userId,
+          totalStudents: enrollmentCount,
+        },
+      });
+    }
+
+    for (const row of rows) {
+      const admissionNumber = String(row['AdmissionNumber'] || '').trim();
+      if (!admissionNumber) {
+        skipped++;
+        continue;
+      }
+
+      const student = await this.prisma.student.findFirst({
+        where: { admissionNumber, schoolId },
+      });
+
+      if (!student) {
+        errors.push(`Student not found: ${admissionNumber}`);
+        skipped++;
+        continue;
+      }
+
+      const enrollment = await this.prisma.enrollment.findFirst({
+        where: {
+          studentId: student.id,
+          academicYearId: currentAcYear,
+          status: 'ACTIVE',
+        },
+      });
+
+      for (const column in row) {
+        const colLower = column.toLowerCase();
+        if (['admissionnumber', 'firstname', 'lastname', 'class'].includes(colLower)) continue;
+
+        const subjectId = subjectMap.get(colLower);
+        if (!subjectId) continue;
+
+        const val = row[column];
+        if (val === undefined || val === '' || val === null) continue;
+
+        const score = Number(val);
+        if (isNaN(score) || score < 0 || score > 100) {
+          errors.push(`Invalid score for ${admissionNumber} in ${column}`);
+          continue;
+        }
+
+        const gradeResult = await this.gradingEngine.computeGradeFull(
+          score, enrollment?.classId || classId, subjectId, termId, schoolId,
+        );
+
+        const existing = await this.prisma.result.findFirst({
+          where: { studentId: student.id, subjectId, termId },
+        });
+
+        if (existing) {
+          await this.prisma.result.update({
+            where: { id: existing.id },
+            data: {
+              score,
+              grade: gradeResult.grade,
+              remark: gradeResult.remark,
+              teacherId: userId,
+            },
+          });
+          updated++;
+        } else {
+          await this.prisma.result.create({
+            data: {
+              studentId: student.id,
+              subjectId,
+              termId,
+              schoolId,
+              teacherId: userId,
+              score,
+              grade: gradeResult.grade,
+              remark: gradeResult.remark,
+            },
+          });
+          created++;
+        }
+      }
+    }
+
+    // Audit log
+    await this.prisma.resultAuditLog.create({
+      data: {
+        schoolId,
+        action: 'IMPORTED',
+        entityType: 'RESULT_SHEET',
+        entityId: resultSheet.id,
+        classId,
+        termId,
+        performedBy: userId,
+        metadata: { created, updated, skipped, errors: errors.length },
+      },
+    });
+
+    return {
+      created,
+      updated,
+      skipped,
+      errors: errors.length > 0 ? errors : undefined,
+      totalRows: rows.length,
     };
   }
 

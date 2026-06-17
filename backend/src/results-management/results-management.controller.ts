@@ -7,9 +7,14 @@ import {
   Body,
   UseGuards,
   Request,
+  UploadedFile,
+  UseInterceptors,
+  Res,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { Response } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ResultsManagementService } from './results-management.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -143,6 +148,68 @@ export class ResultsManagementController {
   async getMarkSchedule(@Param('id') id: string) {
     const data = await this.resultsManagement.getMarkSchedule(id);
     return { data, message: 'Mark schedule retrieved successfully' };
+  }
+
+  @Get('sheets/:id/mark-schedule/html')
+  @Roles('DIRECTOR', 'TEACHER', 'CLASS_TEACHER')
+  async getMarkScheduleHtml(@Param('id') id: string, @Request() req, @Res() res: Response) {
+    const html = await this.resultsManagement.generateMarkScheduleHtml(id, req.user.schoolId);
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  }
+
+  @Get('sheets/:id/mark-schedule/pdf')
+  @Roles('DIRECTOR', 'TEACHER', 'CLASS_TEACHER')
+  async getMarkSchedulePdf(@Param('id') id: string, @Request() req, @Res() res: Response) {
+    const pdfBuffer = await this.resultsManagement.generateMarkSchedulePdf(id, req.user.schoolId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="mark-schedule-${id.slice(0, 8)}.pdf"`);
+    res.send(pdfBuffer);
+  }
+
+  @Post('sheets/preview')
+  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @UseInterceptors(FileInterceptor('file'))
+  async previewExcelUpload(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('termId') termId: string,
+    @Body('classId') classId: string,
+    @Request() req,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Excel file is required');
+    }
+    const data = await this.resultsManagement.previewExcelUpload(
+      req.user.schoolId,
+      termId,
+      classId,
+      file,
+    );
+    return { data, message: 'File preview generated successfully' };
+  }
+
+  @Post('sheets/import')
+  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @UseInterceptors(FileInterceptor('file'))
+  async importExcelResults(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('termId') termId: string,
+    @Body('classId') classId: string,
+    @Body('examType') examType: string,
+    @Request() req,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Excel file is required');
+    }
+    const data = await this.resultsManagement.importExcelResults(
+      req.user.id,
+      req.user.schoolId,
+      termId,
+      classId,
+      examType || 'Exam',
+      file,
+    );
+    return { data, message: 'Results imported successfully' };
   }
 
   @Get('audit-logs')

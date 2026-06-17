@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { GradingEngineService } from '../grading-engine/grading-engine.service';
+import { SocketGateway } from '../messaging/socket.gateway';
 
 export interface CreateAssessmentDefinitionDto {
   name: string;
@@ -67,6 +68,7 @@ export class AssessmentEngineService {
   constructor(
     private prisma: PrismaService,
     private gradingEngine: GradingEngineService,
+    private socketGateway: SocketGateway,
   ) {}
 
   async createAssessmentDefinition(schoolId: string, data: CreateAssessmentDefinitionDto) {
@@ -274,6 +276,186 @@ export class AssessmentEngineService {
     });
   }
 
+  private async syncComputedResult(
+    classId: string,
+    subjectId: string,
+    termId: string,
+    schoolId: string,
+  ) {
+    const configs = await this.prisma.termAssessmentConfiguration.findMany({
+      where: { classId, subjectId, termId },
+    });
+
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { classId, academicYear: { terms: { some: { id: termId } } }, status: 'ACTIVE' },
+      select: { studentId: true },
+    });
+
+    for (const enrollment of enrollments) {
+      const results = await this.prisma.studentAssessmentResult.findMany({
+        where: {
+          studentId: enrollment.studentId,
+          subjectId,
+          termId,
+          classId,
+          rawScore: { not: null },
+        },
+      });
+
+      if (configs.length === 0) {
+        if (results.length > 0) {
+          const totalRaw = results.reduce((s, r) => s + (r.rawScore ?? 0), 0);
+          const totalMax = results.reduce((s, r) => s + (r.maxScore ?? 100), 0);
+          const pct = totalMax > 0 ? parseFloat(((totalRaw / totalMax) * 100).toFixed(2)) : null;
+          const grade = pct != null
+            ? await this.gradingEngine.computeGrade(pct, classId, subjectId, termId, schoolId)
+            : null;
+
+          await this.prisma.computedResult.upsert({
+            where: {
+              studentId_subjectId_termId: {
+                studentId: enrollment.studentId,
+                subjectId,
+                termId,
+              },
+            },
+            update: { totalRawScore: totalRaw, finalPercentage: pct, finalGrade: grade, status: 'COMPUTED', computedAt: new Date() },
+            create: {
+              studentId: enrollment.studentId,
+              subjectId, termId, classId, schoolId,
+              totalRawScore: totalRaw, finalPercentage: pct, finalGrade: grade, status: 'COMPUTED', computedAt: new Date(),
+            },
+          });
+        }
+        continue;
+      }
+
+      let totalWeighted = 0;
+      let totalWeight = 0;
+
+      for (const config of configs) {
+        const result = results.find(r => r.assessmentDefId === config.assessmentDefId);
+        if (result?.rawScore != null) {
+          const pct = (result.rawScore / (config.maxScore || 100)) * 100;
+          totalWeighted += pct * (config.weightPercentage / 100);
+          totalWeight += config.weightPercentage;
+        }
+      }
+
+      const finalPct = totalWeight > 0
+        ? parseFloat(((totalWeighted / totalWeight) * 100).toFixed(2))
+        : null;
+
+      const finalGrade = finalPct != null
+        ? await this.gradingEngine.computeGrade(finalPct, classId, subjectId, termId, schoolId)
+        : null;
+
+      const allFilled = configs.every(c => results.some(r => r.assessmentDefId === c.assessmentDefId && r.rawScore != null));
+
+      await this.prisma.computedResult.upsert({
+        where: {
+          studentId_subjectId_termId: {
+            studentId: enrollment.studentId,
+            subjectId,
+            termId,
+          },
+        },
+        update: {
+          totalRawScore: results.reduce((s, r) => s + (r.rawScore ?? 0), 0),
+          totalWeightedScore: totalWeighted,
+          finalPercentage: finalPct,
+          finalGrade,
+          status: allFilled ? 'COMPUTED' : 'PENDING',
+          computedAt: allFilled ? new Date() : null,
+        },
+        create: {
+          studentId: enrollment.studentId,
+          subjectId, termId, classId, schoolId,
+          totalRawScore: results.reduce((s, r) => s + (r.rawScore ?? 0), 0),
+          totalWeightedScore: totalWeighted,
+          finalPercentage: finalPct,
+          finalGrade,
+          status: allFilled ? 'COMPUTED' : 'PENDING',
+          computedAt: allFilled ? new Date() : null,
+        },
+      });
+    }
+  }
+
+  private async syncResultSheet(
+    schoolId: string,
+    classId: string,
+    termId: string,
+    userId: string,
+  ) {
+    const term = await this.prisma.term.findUnique({
+      where: { id: termId },
+      include: { academicYear: true },
+    });
+    if (!term) return;
+
+    const sheet = await this.prisma.resultSheet.upsert({
+      where: {
+        classId_termId_examType: {
+          classId,
+          termId,
+          examType: 'END_TERM',
+        },
+      },
+      update: {},
+      create: {
+        schoolId,
+        classId,
+        termId,
+        academicYearId: term.academicYearId,
+        examType: 'END_TERM',
+        createdBy: userId || 'SYSTEM',
+        status: 'DRAFT',
+        totalStudents: 0,
+      },
+    });
+
+    const totalStudents = await this.prisma.enrollment.count({
+      where: { classId, academicYearId: term.academicYearId, status: 'ACTIVE' },
+    });
+
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: { classId },
+      select: { subjectId: true },
+    });
+
+    const scoredStudents = new Set<string>();
+    for (const cs of classSubjects) {
+      const results = await this.prisma.studentAssessmentResult.findMany({
+        where: { classId, subjectId: cs.subjectId, termId, rawScore: { not: null } },
+        select: { studentId: true },
+      });
+      results.forEach(r => scoredStudents.add(r.studentId));
+    }
+
+    await this.prisma.resultSheet.update({
+      where: { id: sheet.id },
+      data: { totalStudents },
+    });
+
+    try {
+      await this.prisma.resultAuditLog.create({
+        data: {
+          schoolId,
+          action: 'SCORES_UPDATED',
+          entityType: 'RESULT_SHEET',
+          entityId: sheet.id,
+          classId,
+          termId,
+          performedBy: userId || 'SYSTEM',
+          metadata: { scoredStudents: scoredStudents.size, totalStudents },
+        },
+      });
+    } catch { }
+
+    return sheet;
+  }
+
   async bulkEnterScores(schoolId: string, data: BulkScoreEntryDto) {
     const { classId, subjectId, termId, assessmentDefId, maxScore, scores, enteredBy } = data;
 
@@ -390,6 +572,26 @@ export class AssessmentEngineService {
 
     this.logger.log(`Bulk entered ${results.length} scores for batch ${batch.id}`);
 
+    // Sync computed results and result sheet for real-time web analytics
+    await this.syncComputedResult(classId, subjectId, termId, schoolId).catch(e =>
+      this.logger.error(`syncComputedResult failed: ${e.message}`),
+    );
+    const sheet = await this.syncResultSheet(schoolId, classId, termId, enteredBy).catch(e => {
+      this.logger.error(`syncResultSheet failed: ${e.message}`);
+      return null;
+    });
+
+    // Emit real-time WebSocket event
+    this.socketGateway.server?.emit(`result:updated:${schoolId}`, {
+      classId,
+      subjectId,
+      termId,
+      batchId: batch.id,
+      sheetId: sheet?.id,
+      enteredCount: results.filter(r => r.rawScore !== null).length,
+      timestamp: new Date(),
+    });
+
     return {
       batch,
       results,
@@ -438,7 +640,7 @@ export class AssessmentEngineService {
       ? await this.gradingEngine.computeGrade(weightedScore, data.classId, data.subjectId, data.termId, schoolId)
       : null;
 
-    return this.prisma.studentAssessmentResult.upsert({
+    const result = await this.prisma.studentAssessmentResult.upsert({
       where: {
         studentId_subjectId_termId_assessmentDefId: {
           studentId: data.studentId,
@@ -473,6 +675,25 @@ export class AssessmentEngineService {
         status: 'DRAFT',
       },
     });
+
+    // Sync computed results and result sheet for real-time web analytics
+    await this.syncComputedResult(data.classId, data.subjectId, data.termId, schoolId).catch(e =>
+      this.logger.error(`syncComputedResult failed: ${e.message}`),
+    );
+    await this.syncResultSheet(schoolId, data.classId, data.termId, data.enteredBy).catch(e => {
+      this.logger.error(`syncResultSheet failed: ${e.message}`);
+    });
+
+    // Emit real-time WebSocket event
+    this.socketGateway.server?.emit(`result:updated:${schoolId}`, {
+      classId: data.classId,
+      subjectId: data.subjectId,
+      termId: data.termId,
+      studentId: data.studentId,
+      timestamp: new Date(),
+    });
+
+    return result;
   }
 
   async getStudentResults(studentId: string, termId?: string) {

@@ -355,12 +355,15 @@ export class ResultService {
   ) {
     this.logger.log(`generateResultTemplate: teacherId=${teacherId}, schoolId=${schoolId}, termId=${termId}, classId=${classId}`);
 
-    const term = await this.prisma.term.findUnique({
-      where: { id: termId },
-    });
+    const [school, term] = await Promise.all([
+      this.prisma.school.findUnique({ where: { id: schoolId } }),
+      this.prisma.term.findUnique({
+        where: { id: termId },
+        include: { academicYear: true },
+      }),
+    ]);
 
     if (!term) {
-      this.logger.warn('Term not found');
       throw new NotFoundException('Term not found');
     }
 
@@ -368,127 +371,186 @@ export class ResultService {
       throw new ForbiddenException('Results for this term have been finalized');
     }
 
-    let assignments = await this.prisma.teachingAssignment.findMany({
-      where: {
-        teacherId,
-        schoolId,
-        academicYearId: term.academicYearId,
-      },
-      include: {
-        subject: true,
-        class: true,
-      },
-    });
-
-    this.logger.log(`Found ${assignments.length} teaching assignments`);
+    let className = '';
+    let classEntity: any = null;
 
     if (classId) {
-      assignments = assignments.filter((a) => a.classId === classId);
-      this.logger.log(`After filtering by classId: ${assignments.length} assignments`);
+      classEntity = await this.prisma.class.findUnique({
+        where: { id: classId },
+      });
+      if (!classEntity) throw new NotFoundException('Class not found');
+      className = classEntity.name;
+    }
+
+    let assignments = await this.prisma.teachingAssignment.findMany({
+      where: {
+        ...(teacherId ? { teacherId } : {}),
+        schoolId,
+        academicYearId: term.academicYearId,
+        ...(classId ? { classId } : {}),
+      },
+      include: { subject: true, class: true },
+    });
+
+    if (assignments.length === 0 && classId) {
+      assignments = await this.prisma.teachingAssignment.findMany({
+        where: { classId, academicYearId: term.academicYearId },
+        include: { subject: true, class: true },
+      });
     }
 
     if (assignments.length === 0) {
-      this.logger.log('No assignments found, checking if classId provided');
-      if (classId) {
-        const classEntity = await this.prisma.class.findUnique({
-          where: { id: classId },
-        });
-
-        if (!classEntity) {
-          throw new NotFoundException('Class not found');
-        }
-
-        this.logger.log(`Class found: ${classEntity.name}`);
-
-        const teachingAssignments = await this.prisma.teachingAssignment.findMany({
-          where: {
-            classId,
-            academicYearId: term.academicYearId,
-          },
-          include: { subject: true },
-        });
-
-        const enrollments = await this.prisma.enrollment.findMany({
-          where: {
-            classId,
-            academicYearId: term.academicYearId,
-            status: 'ACTIVE',
-          },
-          include: { student: true, class: true },
-          orderBy: { student: { firstName: 'asc' } },
-        });
-
-        const subjects = [...new Set(teachingAssignments.map((a) => a.subject.name))];
-
-        const rows = enrollments.map((e) => {
-          const row: any = {
-            AdmissionNumber: e.student.admissionNumber,
-            FirstName: e.student.firstName,
-            LastName: e.student.lastName,
-            Class: e.class.name,
-          };
-          (subjects as string[]).forEach((subject) => {
-            row[subject] = '';
-          });
-          return row;
-        });
-
-        return this.createExcelBuffer(rows);
-      }
-
-      throw new ForbiddenException('No teaching assignments for this term. Please contact administrator.');
+      throw new ForbiddenException('No teaching assignments found');
     }
 
-    const uniqueClassIds = [...new Set(assignments.map((a) => a.classId))];
-    const uniqueSubjects = [...new Set(assignments.map((a) => a.subject.name))];
+    const subjectNames = [...new Set(assignments.map((a) => a.subject.name))];
 
     const enrollments = await this.prisma.enrollment.findMany({
       where: {
-        classId: { in: uniqueClassIds },
+        ...(classId ? { classId } : { classId: { in: [...new Set(assignments.map((a) => a.classId))] } }),
         academicYearId: term.academicYearId,
         status: 'ACTIVE',
       },
-      include: {
-        student: true,
-        class: true,
-      },
-      orderBy: [
-        { class: { order: 'asc' } },
-        { student: { firstName: 'asc' } },
-      ],
+      include: { student: true, class: true },
+      orderBy: { student: { firstName: 'asc' } },
     });
 
-    const rows = enrollments.map((e) => {
-      const row: any = {
-        AdmissionNumber: e.student.admissionNumber,
-        FirstName: e.student.firstName,
-        LastName: e.student.lastName,
-        Class: e.class.name,
-      };
-
-      (uniqueSubjects as string[]).forEach((subject) => {
-        row[subject] = '';
-      });
-
-      return row;
+    return this.createExcelTemplate({
+      school,
+      term,
+      classId,
+      className,
+      subjectNames,
+      enrollments,
     });
-
-    return this.createExcelBuffer(rows);
   }
 
-  private createExcelBuffer(rows: any[]) {
-    const worksheet = XLSX.utils.json_to_sheet(rows);
+  private createExcelTemplate(data: {
+    school: any;
+    term: any;
+    classId?: string;
+    className: string;
+    subjectNames: string[];
+    enrollments: any[];
+  }) {
+    const { school, term, className, subjectNames, enrollments } = data;
+    const wsName = 'Results';
+    const wb = XLSX.utils.book_new();
+    const wsData: any[][] = [];
 
-    XLSX.utils.book_append_sheet(
-      XLSX.utils.book_new(),
-      worksheet,
-      'Results',
-    );
+    const headerStyle = {
+      font: { bold: true, color: { rgb: 'FFFFFF' }, size: 11 },
+      fill: { fgColor: { rgb: '5F4B3A' } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: {
+        top: { style: 'thin', color: { rgb: 'D4C5B0' } },
+        bottom: { style: 'thin', color: { rgb: 'D4C5B0' } },
+        left: { style: 'thin', color: { rgb: 'D4C5B0' } },
+        right: { style: 'thin', color: { rgb: 'D4C5B0' } },
+      },
+    };
 
-    return XLSX.write(
-      { Sheets: { Results: worksheet }, SheetNames: ['Results'] },
-      { type: 'buffer', bookType: 'xlsx' },
-    );
+    const subHeaderStyle = {
+      font: { bold: true, color: { rgb: '5F4B3A' }, size: 10 },
+      alignment: { horizontal: 'left', vertical: 'center' },
+    };
+
+    const dataStyle = {
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: 'E8DDD0' } },
+        bottom: { style: 'thin', color: { rgb: 'E8DDD0' } },
+        left: { style: 'thin', color: { rgb: 'E8DDD0' } },
+        right: { style: 'thin', color: { rgb: 'E8DDD0' } },
+      },
+    };
+
+    // Row 1: School name header
+    wsData.push([school?.name || 'School Name', null, null, null, null, null, null, null]);
+
+    // Row 2: School details
+    const detailsStr = [
+      `Academic Year: ${term.academicYear?.name || ''}`,
+      `Term: ${term.name || ''}`,
+      `Class: ${className || 'All Classes'}`,
+      `Generated: ${new Date().toLocaleDateString()}`,
+    ].join('  |  ');
+    wsData.push([detailsStr, null, null, null, null, null, null, null]);
+
+    // Row 3: Empty
+    wsData.push([]);
+
+    // Row 4: Instructions
+    wsData.push(['INSTRUCTIONS: Fill in scores (0-100) for each student and subject. Do not modify student names or admission numbers.', null, null, null, null, null, null, null]);
+
+    // Row 5: Empty
+    wsData.push([]);
+
+    // Row 6: Column headers
+    const headers = ['AdmissionNumber', 'FirstName', 'LastName', 'Class', ...subjectNames];
+    wsData.push(headers);
+
+    // Data rows
+    for (const e of enrollments) {
+      const row = [
+        e.student.admissionNumber || '',
+        e.student.firstName || '',
+        e.student.lastName || '',
+        e.class?.name || className || '',
+        ...subjectNames.map(() => ''),
+      ];
+      wsData.push(row);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Column widths
+    ws['!cols'] = [
+      { wch: 18 },  // AdmissionNumber
+      { wch: 15 },  // FirstName
+      { wch: 15 },  // LastName
+      { wch: 12 },  // Class
+      ...subjectNames.map(() => ({ wch: 14 })),
+    ];
+
+    // Merge school name header
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 3 + subjectNames.length } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 3 + subjectNames.length } },
+      { s: { r: 3, c: 0 }, e: { r: 3, c: 3 + subjectNames.length } },
+    ];
+
+    // Apply styles via xlsx-style-compatible approach
+    // For the header row (row index 5, 0-based = the header column row)
+    const headerRow = 5;
+    for (let c = 0; c < headers.length; c++) {
+      const cellRef = XLSX.utils.encode_cell({ r: headerRow, c });
+      if (ws[cellRef]) {
+        ws[cellRef].s = { ...headerStyle };
+      }
+    }
+
+    // Style data cells
+    for (let r = headerRow + 1; r < wsData.length; r++) {
+      for (let c = 0; c < headers.length; c++) {
+        const cellRef = XLSX.utils.encode_cell({ r, c });
+        if (ws[cellRef]) {
+          const style: any = { ...dataStyle };
+          if (c >= 4) {
+            // Subject score cells - numeric
+            style.numFmt = '0.0';
+          }
+          ws[cellRef].s = style;
+        }
+      }
+    }
+
+    // Freeze panes below header (freeze row 5 + 1 = row 6)
+    ws['!freeze'] = { xSplit: 3, ySplit: headerRow + 1 };
+
+    XLSX.utils.book_append_sheet(wb, ws, wsName);
+
+    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
   }
 
   async uploadExcelResults(

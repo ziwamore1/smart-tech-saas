@@ -1,6 +1,8 @@
 import { Injectable, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UnifiedMessagingService } from '../messaging/unified-messaging.service';
+import { SocketGateway } from '../messaging/socket.gateway';
+import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { Teacher } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
@@ -11,6 +13,8 @@ export class TeacherService {
   constructor(
     private prisma: PrismaService,
     private unifiedMessaging: UnifiedMessagingService,
+    private socketGateway: SocketGateway,
+    private gradingEngine: GradingEngineService,
   ) {}
 
   async findAll(schoolId?: string) {
@@ -273,7 +277,7 @@ export class TeacherService {
     schoolId: string;
     score: number;
   }) {
-    return this.prisma.result.upsert({
+    const result = await this.prisma.result.upsert({
       where: {
         studentId_subjectId_termId: {
           studentId: data.studentId,
@@ -293,6 +297,57 @@ export class TeacherService {
         score: data.score,
       },
     });
+
+    // Sync ComputedResult for real-time analytics
+    const gradeResult = await this.gradingEngine.computeGradeFull(
+      data.score, null, data.subjectId, data.termId, data.schoolId,
+    ).catch(() => null);
+
+    await this.prisma.computedResult.upsert({
+      where: {
+        studentId_subjectId_termId: {
+          studentId: data.studentId,
+          subjectId: data.subjectId,
+          termId: data.termId,
+        },
+      },
+      update: {
+        totalRawScore: data.score,
+        finalPercentage: data.score,
+        finalGrade: gradeResult?.grade ?? null,
+        finalRemark: gradeResult?.remark ?? null,
+        points: gradeResult?.points ?? null,
+        gpa: gradeResult?.gpa ?? null,
+        status: 'COMPUTED',
+        computedAt: new Date(),
+      },
+      create: {
+        studentId: data.studentId,
+        subjectId: data.subjectId,
+        termId: data.termId,
+        classId: '',
+        schoolId: data.schoolId,
+        totalRawScore: data.score,
+        finalPercentage: data.score,
+        finalGrade: gradeResult?.grade ?? null,
+        finalRemark: gradeResult?.remark ?? null,
+        points: gradeResult?.points ?? null,
+        gpa: gradeResult?.gpa ?? null,
+        status: 'COMPUTED',
+        computedAt: new Date(),
+      },
+    }).catch(() => {});
+
+    // Emit real-time WebSocket event
+    this.socketGateway.server?.emit(`result:updated:${data.schoolId}`, {
+      studentId: data.studentId,
+      subjectId: data.subjectId,
+      termId: data.termId,
+      score: data.score,
+      timestamp: new Date(),
+    });
+
+    return result;
   }
   async enterBulkScores(data: {
     teacherId: string;
@@ -366,6 +421,57 @@ export class TeacherService {
 
     // 5️⃣ Execute transaction
     const results = await this.prisma.$transaction(operations);
+
+    // Sync ComputedResults for real-time analytics
+    for (const s of scores) {
+      const gradeResult = await this.gradingEngine.computeGradeFull(
+        s.score, null, subjectId, termId, schoolId,
+      ).catch(() => null);
+
+      await this.prisma.computedResult.upsert({
+        where: {
+          studentId_subjectId_termId: {
+            studentId: s.studentId,
+            subjectId,
+            termId,
+          },
+        },
+        update: {
+          totalRawScore: s.score,
+          finalPercentage: s.score,
+          finalGrade: gradeResult?.grade ?? null,
+          finalRemark: gradeResult?.remark ?? null,
+          points: gradeResult?.points ?? null,
+          gpa: gradeResult?.gpa ?? null,
+          status: 'COMPUTED',
+          computedAt: new Date(),
+        },
+        create: {
+          studentId: s.studentId,
+          subjectId,
+          termId,
+          classId: classId || '',
+          schoolId,
+          totalRawScore: s.score,
+          finalPercentage: s.score,
+          finalGrade: gradeResult?.grade ?? null,
+          finalRemark: gradeResult?.remark ?? null,
+          points: gradeResult?.points ?? null,
+          gpa: gradeResult?.gpa ?? null,
+          status: 'COMPUTED',
+          computedAt: new Date(),
+        },
+      }).catch(() => {});
+    }
+
+    // Emit real-time WebSocket event
+    this.socketGateway.server?.emit(`result:updated:${schoolId}`, {
+      classId,
+      subjectId,
+      termId,
+      processedCount: results.length,
+      timestamp: new Date(),
+    });
 
     return {
       message: 'Bulk scores saved successfully',
