@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "e6f16c19-f239-4047-ac8d-ad8f1e43e52f"
+      }
+    },
+    "android": {
+      "package": "com.ziwamore.smarttechfrontend"
+    }
+  }
+}

@@ -81,7 +81,7 @@ npx expo start --host lan
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `API_BASE_URL` | `http://192.168.43.134:3001/api/v1` | Backend API endpoint |
+| `API_BASE_URL` | `https://api.smarttechsaas.com/api/v1` | Backend API endpoint |
 | `APP_NAME` | `SmartTech` | Display app name |
 | `APP_VERSION` | `1.0.0` | App version |
 

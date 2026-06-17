@@ -17,7 +17,7 @@ import {
 } from '../types';
 
 const extra = Constants.expoConfig?.extra || {};
-const API_BASE_URL = extra.apiBaseUrl || 'http://192.168.43.134:3001/api/v1';
+const API_BASE_URL = extra.apiBaseUrl || 'https://api.smarttechsaas.com/api/v1';
 export const BASE_URL = API_BASE_URL.replace('/api/v1', '');
 
 export function resolveImageUrl(url?: string | null): string | undefined {
