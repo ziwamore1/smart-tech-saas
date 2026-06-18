@@ -20,7 +20,8 @@ export const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const { login, isLoading } = useAuthStore();
+  const [showSuperAdmin, setShowSuperAdmin] = useState(false);
+  const { login, superAdminLogin, isLoading } = useAuthStore();
 
   useEffect(() => {
     setLogoUrl(`${BASE_URL}/uploads/logo.png`);
@@ -36,6 +37,18 @@ export const LoginScreen: React.FC = () => {
       await login(email.trim(), password, deviceToken);
     } catch (err: any) {
       Alert.alert('Login Failed', err.response?.data?.message || 'Invalid credentials');
+    }
+  };
+
+  const handleSuperAdminLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please enter email and password');
+      return;
+    }
+    try {
+      await superAdminLogin(email.trim(), password);
+    } catch (err: any) {
+      Alert.alert('Login Failed', err.response?.data?.message || 'Invalid SuperAdmin credentials');
     }
   };
 
@@ -126,14 +139,24 @@ export const LoginScreen: React.FC = () => {
                 </View>
               </View>
 
-              <TouchableOpacity onPress={handleLogin} disabled={isLoading} activeOpacity={0.8} style={{ marginTop: spacing.md }}>
-                <LinearGradient colors={['#F59E0B', '#D97706'] as const} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.loginBtn}>
-                  <Text style={styles.loginBtnText}>{isLoading ? 'Signing in...' : 'Sign In'}</Text>
+              {showSuperAdmin && (
+                <View style={styles.saBadge}>
+                  <Text style={styles.saBadgeText}>SuperAdmin Access</Text>
+                </View>
+              )}
+
+              <TouchableOpacity onPress={showSuperAdmin ? handleSuperAdminLogin : handleLogin} disabled={isLoading} activeOpacity={0.8} style={{ marginTop: spacing.md }}>
+                <LinearGradient colors={showSuperAdmin ? ['#DC2626', '#B91C1C'] as const : ['#F59E0B', '#D97706'] as const} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.loginBtn}>
+                  <Text style={styles.loginBtnText}>{isLoading ? 'Signing in...' : showSuperAdmin ? 'SuperAdmin Sign In' : 'Sign In'}</Text>
                 </LinearGradient>
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => setShowForgotPassword(true)} style={{ marginTop: spacing.md }}>
                 <Text style={styles.forgotPassword}>Forgot Password?</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => setShowSuperAdmin(!showSuperAdmin)} style={styles.clearSessionBtn}>
+                <Text style={styles.saToggle}>{showSuperAdmin ? 'Back to School Login' : 'System Owner Login'}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity onPress={handleClearSession} style={styles.clearSessionBtn}>
@@ -232,6 +255,9 @@ const styles = StyleSheet.create({
   forgotPassword: { textAlign: 'center', color: colors.textLight, fontSize: 14, fontWeight: '500', marginTop: spacing.lg },
   clearSessionBtn: { marginTop: spacing.sm, paddingVertical: spacing.sm, alignItems: 'center' },
   clearSessionText: { fontSize: 12, color: colors.primaryLight, fontWeight: '500' },
+  saToggle: { fontSize: 13, color: '#DC2626', fontWeight: '600', letterSpacing: 0.3 },
+  saBadge: { backgroundColor: '#FEE2E2', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 12, alignSelf: 'center', marginBottom: spacing.sm },
+  saBadgeText: { fontSize: 12, fontWeight: '700', color: '#DC2626' },
 
   bottomSection: { alignItems: 'center', marginTop: spacing.xl, gap: spacing.md },
   featureRow: { flexDirection: 'row', alignItems: 'center' },

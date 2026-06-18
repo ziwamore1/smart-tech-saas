@@ -17,7 +17,7 @@ import { ParentDashboardScreen } from '../screens/parent/DashboardScreen';
 import { ParentPrimaryDashboardScreen } from '../screens/parent/ParentPrimaryDashboardScreen';
 import { ParentChildrenScreen } from '../screens/parent/ChildrenScreen';
 import { ParentChildResultsScreen } from '../screens/parent/ChildResultsScreen';
-import { TeacherDashboardScreen } from '../screens/teacher/DashboardScreen';
+import { TeacherTabNavigator } from './TeacherTabNavigator';
 import { TeacherClassesScreen } from '../screens/teacher/ClassesScreen';
 import { TeacherMarksScreen } from '../screens/teacher/MarksScreen';
 import { DirectorTabNavigator } from './DirectorTabNavigator';
@@ -74,25 +74,23 @@ function useRoleCheck(user: any) {
   const isSecParent = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && hasRole('Parent');
   const isParent = isPrimaryParent || isSecParent;
 
-  const isPrimaryTeacher = institutionType === 'PRIMARY_SCHOOL' && (hasRole('Head Teacher') || hasRole('Deputy Head') || hasRole('Primary Teacher'));
-  const isSecTeacher = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && (hasRole('Director') || hasRole('Deputy Director') || hasRole('HOD') || hasRole('Teacher') || hasRole('Class Teacher'));
-  const isCollegeTeacher = institutionType === 'COLLEGE' && (hasRole('Principal') || hasRole('Lecturer'));
-  const isUniTeacher = institutionType === 'UNIVERSITY' && (hasRole('Vice Chancellor') || hasRole('Dean') || hasRole('Lecturer') || hasRole('Research Supervisor'));
-  const isTeacher = isPrimaryTeacher || isSecTeacher || isCollegeTeacher || isUniTeacher;
+  // SuperAdmin is checked first via separate login endpoint
+  const isSuperAdmin = hasRole('SuperAdmin') || hasRole('SUPER_ADMIN');
+
+  // Director/Deputy Director have their own dashboard - do NOT include in isTeacher
+  const isPrimaryDirector = institutionType === 'PRIMARY_SCHOOL' && (hasRole('Head Teacher') || hasRole('Deputy Head'));
+  const isSecDirector = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && (hasRole('Director') || hasRole('Deputy Director'));
+  const isCollegeDirector = institutionType === 'COLLEGE' && (hasRole('Principal') || hasRole('Registrar'));
+  const isUniDirector = institutionType === 'UNIVERSITY' && (hasRole('Vice Chancellor') || hasRole('Dean'));
+  const isDirector = isPrimaryDirector || isSecDirector || isCollegeDirector || isUniDirector;
 
   const isClassTeacher = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && hasRole('Class Teacher');
 
-  const isDirector = institutionType === 'PRIMARY_SCHOOL'
-    ? (hasRole('Head Teacher') || hasRole('Deputy Head'))
-    : institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY'
-      ? (hasRole('Director') || hasRole('Deputy Director'))
-      : institutionType === 'COLLEGE'
-        ? (hasRole('Principal') || hasRole('Registrar'))
-        : institutionType === 'UNIVERSITY'
-          ? (hasRole('Vice Chancellor') || hasRole('Dean'))
-          : false;
-
-  const isSuperAdmin = hasRole('SuperAdmin');
+  const isPrimaryTeacher = institutionType === 'PRIMARY_SCHOOL' && (hasRole('Primary Teacher'));
+  const isSecTeacher = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && (hasRole('HOD') || hasRole('Teacher') || hasRole('Class Teacher'));
+  const isCollegeTeacher = institutionType === 'COLLEGE' && (hasRole('Lecturer'));
+  const isUniTeacher = institutionType === 'UNIVERSITY' && (hasRole('Lecturer') || hasRole('Research Supervisor'));
+  const isTeacher = isPrimaryTeacher || isSecTeacher || isCollegeTeacher || isUniTeacher;
 
   return { isStudent, isParent, isClassTeacher, isTeacher, isDirector, isSuperAdmin, institutionType };
 }
@@ -109,12 +107,13 @@ export function AppNavigator() {
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : (
           <>
-            {isStudent && <Stack.Screen name="StudentDashboard" component={StudentDashboardScreen} />}
-            {isParent && <Stack.Screen name="ParentDashboard" component={ParentDashboardScreen} />}
-            {isClassTeacher && <Stack.Screen name="ClassTeacherTabNavigator" component={ClassTeacherTabNavigator} />}
-            {isTeacher && <Stack.Screen name="TeacherDashboard" component={TeacherDashboardScreen} />}
-            {isDirector && <Stack.Screen name="DirectorDashboard" component={DirectorTabNavigator} />}
+            {/* Highest priority roles first - check SuperAdmin/director before teacher */}
             {isSuperAdmin && <Stack.Screen name="SuperAdminDashboard" component={SuperAdminTabNavigator} />}
+            {isDirector && <Stack.Screen name="DirectorDashboard" component={DirectorTabNavigator} />}
+            {isTeacher && <Stack.Screen name="TeacherDashboard" component={TeacherTabNavigator} />}
+            {isClassTeacher && <Stack.Screen name="ClassTeacherTabNavigator" component={ClassTeacherTabNavigator} />}
+            {isParent && <Stack.Screen name="ParentDashboard" component={ParentDashboardScreen} />}
+            {isStudent && <Stack.Screen name="StudentDashboard" component={StudentDashboardScreen} />}
             {!hasRoleDashboard && (
               <Stack.Screen name="StudentDashboard" component={StudentDashboardScreen} />
             )}

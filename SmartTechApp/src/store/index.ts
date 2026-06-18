@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { mmkvStorage } from '../storage/mmkv';
-import { User, DashboardData, Notification, INSTITUTION_TYPE_ROLES, InstitutionTypeCode } from '../types';
+import { User, DashboardData, Notification, INSTITUTION_TYPE_ROLES, InstitutionTypeCode, SuperAdminLoginResponse } from '../types';
 import { apiService } from '../services/api';
 
 interface AuthState {
@@ -10,6 +10,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   login: (email: string, password: string, deviceToken?: string) => Promise<void>;
+  superAdminLogin: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
   clearError: () => void;
@@ -54,6 +55,33 @@ export const useAuthStore = create<AuthState>()(
           });
         } catch (error: any) {
           const message = error.response?.data?.message || 'Login failed';
+          set({ error: message, isLoading: false });
+          throw error;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      superAdminLogin: async (email: string, password: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response: SuperAdminLoginResponse = await apiService.superAdminLogin({ email, password });
+          const saUser: User = {
+            id: response.user.id,
+            email: response.user.email,
+            firstName: response.user.fullName || response.user.email,
+            lastName: '',
+            roles: ['SuperAdmin'],
+            schoolId: null,
+            institutionType: null,
+          };
+          set({
+            user: saUser,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+        } catch (error: any) {
+          const message = error.response?.data?.message || 'SuperAdmin login failed';
           set({ error: message, isLoading: false });
           throw error;
         } finally {

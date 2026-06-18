@@ -70,6 +70,17 @@ export interface MobileLoginRequest {
   platform?: string;
 }
 
+export interface SuperAdminLoginResponse {
+  message: string;
+  access_token: string;
+  user: {
+    id: string;
+    email: string;
+    fullName: string;
+    role: string;
+  };
+}
+
 export interface DashboardData {
   currentTerm: {
     id: string;

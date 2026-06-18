@@ -77,6 +77,18 @@ class ApiService {
     this.token = token;
   }
 
+  async superAdminLogin(data: { email: string; password: string }): Promise<SuperAdminLoginResponse> {
+    const response = await this.client.post<SuperAdminLoginResponse>('/auth/super-admin/login', data);
+    this.token = response.data.access_token;
+    AsyncStorage.setItem('access_token', response.data.access_token).catch((e) =>
+      console.warn('Failed to persist access token:', e),
+    );
+    AsyncStorage.setItem('user', JSON.stringify(response.data.user)).catch((e) =>
+      console.warn('Failed to persist user:', e),
+    );
+    return response.data;
+  }
+
   async login(data: MobileLoginRequest): Promise<LoginResponse> {
     const response = await this.client.post<LoginResponse>('/auth/mobile-login', data);
     this.token = response.data.access_token;
