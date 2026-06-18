@@ -23,6 +23,8 @@ import { TeacherMarksScreen } from '../screens/teacher/MarksScreen';
 import { DirectorTabNavigator } from './DirectorTabNavigator';
 import { ClassTeacherTabNavigator } from './ClassTeacherTabNavigator';
 import { SuperAdminTabNavigator } from './SuperAdminTabNavigator';
+import { ParentTabNavigator } from './ParentTabNavigator';
+import { StudentTabNavigator } from './StudentTabNavigator';
 import { LearningStyleScreen } from '../screens/intelligence/LearningStyleScreen';
 import { AiTutorScreen } from '../screens/intelligence/AiTutorScreen';
 import { AnalyticsScreen } from '../screens/intelligence/AnalyticsScreen';
@@ -112,8 +114,8 @@ export function AppNavigator() {
             {isDirector && <Stack.Screen name="DirectorDashboard" component={DirectorTabNavigator} />}
             {isTeacher && <Stack.Screen name="TeacherDashboard" component={TeacherTabNavigator} />}
             {isClassTeacher && <Stack.Screen name="ClassTeacherTabNavigator" component={ClassTeacherTabNavigator} />}
-            {isParent && <Stack.Screen name="ParentDashboard" component={ParentDashboardScreen} />}
-            {isStudent && <Stack.Screen name="StudentDashboard" component={StudentDashboardScreen} />}
+            {isParent && <Stack.Screen name="ParentDashboard" component={ParentTabNavigator} />}
+            {isStudent && <Stack.Screen name="StudentDashboard" component={StudentTabNavigator} />}
             {!hasRoleDashboard && (
               <Stack.Screen name="StudentDashboard" component={StudentDashboardScreen} />
             )}

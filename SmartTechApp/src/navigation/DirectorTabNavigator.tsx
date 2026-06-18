@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, BackHandler, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -56,7 +56,8 @@ const allDrawerScreens: DrawerScreen[] = [
 ];
 
 export const DirectorTabNavigator: React.FC = () => {
-  const institutionType = useAuthStore((state) => state.user?.institutionType);
+  const { user, logout } = useAuthStore();
+  const institutionType = user?.institutionType;
   const drawerScreens = allDrawerScreens.filter((s) => !s.institutionTypes || (institutionType && s.institutionTypes.includes(institutionType)));
 
   const drawerScreenNames = useMemo(() => drawerScreens.map(s => s.name), [drawerScreens]);
@@ -157,9 +158,19 @@ export const DirectorTabNavigator: React.FC = () => {
       <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
         <SafeAreaView style={styles.drawerContent} edges={['top', 'bottom']}>
           <View style={styles.drawerHeader}>
-            <Text style={styles.drawerLogo}>🎓</Text>
+            <Image source={require('../../assets/icon.png')} style={styles.drawerLogoImage} resizeMode="contain" />
             <Text style={styles.drawerTitle}>SmartTech</Text>
-            <Text style={styles.drawerSubtitle}>Director Portal</Text>
+            <Text style={styles.drawerSubtitle}>{user?.school?.name || 'Director Portal'}</Text>
+            <View style={styles.divider} />
+            <View style={styles.profileSection}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {user ? `${(user.firstName||'')[0]}${(user.lastName||'')[0]}` : 'D'}
+                </Text>
+              </View>
+              <Text style={styles.profileName}>{user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Director'}</Text>
+              <Text style={styles.profileRole}>{(user?.roles||[]).join(', ')}</Text>
+            </View>
           </View>
 
           <ScrollView style={styles.drawerNav} showsVerticalScrollIndicator={false}>
@@ -176,6 +187,10 @@ export const DirectorTabNavigator: React.FC = () => {
           </ScrollView>
 
           <View style={styles.drawerFooter}>
+            <TouchableOpacity style={styles.logoutBtn} onPress={() => { Alert.alert('Sign Out', 'Are you sure?', [{text:'Cancel',style:'cancel'},{text:'Sign Out',style:'destructive', onPress:() => logout()}]); }}>
+              <Text style={styles.logoutIcon}>🚪</Text>
+              <Text style={styles.logoutText}>Sign Out</Text>
+            </TouchableOpacity>
             <Text style={styles.footerText}>SmartTech v1.0.0</Text>
           </View>
         </SafeAreaView>
@@ -190,15 +205,24 @@ const styles = StyleSheet.create({
   drawer: { position: 'absolute', left: 0, top: 0, bottom: 0, width: DRAWER_WIDTH, backgroundColor: colors.white, zIndex: 100, ...shadows.lg },
   drawerContent: { flex: 1 },
   drawerHeader: { padding: spacing.lg, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border },
-  drawerLogo: { fontSize: 40, marginBottom: spacing.sm },
+  drawerLogoImage: { width: 48, height: 48, borderRadius: 12, marginBottom: spacing.sm },
   drawerTitle: { fontSize: 20, fontWeight: '800', color: colors.primary },
   drawerSubtitle: { fontSize: 12, color: colors.textLight, marginTop: 2 },
+  divider: { height: 1, backgroundColor: colors.border, width: '80%', marginVertical: spacing.sm },
+  profileSection: { alignItems: 'center', marginTop: spacing.xs },
+  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  avatarText: { fontSize: 18, fontWeight: '700', color: colors.white },
+  profileName: { fontSize: 14, fontWeight: '600', color: colors.text },
+  profileRole: { fontSize: 11, color: colors.textLight, marginTop: 1, textAlign: 'center' },
   drawerNav: { flex: 1, paddingVertical: spacing.sm },
   navItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
   navItemActive: { backgroundColor: colors.infoLight, borderRightWidth: 3, borderRightColor: colors.primary },
   navIcon: { fontSize: 20, marginRight: spacing.md, width: 28, textAlign: 'center' },
   navLabel: { fontSize: 15, fontWeight: '500', color: colors.textSecondary },
   navLabelActive: { color: colors.primary, fontWeight: '700' },
-  drawerFooter: { padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, alignItems: 'center' },
-  footerText: { fontSize: 11, color: colors.textMuted },
+  drawerFooter: { padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, marginBottom: spacing.sm },
+  logoutIcon: { fontSize: 18, marginRight: spacing.md },
+  logoutText: { fontSize: 15, fontWeight: '500', color: colors.danger },
+  footerText: { fontSize: 11, color: colors.textMuted, textAlign: 'center' },
 });
