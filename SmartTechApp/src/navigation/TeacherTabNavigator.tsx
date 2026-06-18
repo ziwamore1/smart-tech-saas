@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, BackHandler, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, BackHandler, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -140,6 +140,10 @@ export const TeacherTabNavigator: React.FC = () => {
     return <Component />;
   };
 
+  const schoolLogo = user?.school?.logo
+    ? { uri: user.school.logo }
+    : require('../../assets/icon.png');
+  const schoolName = user?.school?.name || 'SmartTech';
   const initials = user
     ? `${(user.firstName || '')[0] || ''}${(user.lastName || '')[0] || ''}`.toUpperCase()
     : 'T';
@@ -164,6 +168,11 @@ export const TeacherTabNavigator: React.FC = () => {
       <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
         <SafeAreaView style={styles.drawerContent} edges={['top', 'bottom']}>
           <View style={styles.drawerHeader}>
+            <View style={styles.brandSection}>
+              <Image source={schoolLogo} style={styles.schoolLogo} resizeMode="contain" />
+              <Text style={styles.schoolName}>{schoolName}</Text>
+            </View>
+            <View style={styles.divider} />
             <View style={styles.profileSection}>
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>{initials}</Text>
@@ -216,6 +225,10 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.primary,
   },
+  brandSection: { alignItems: 'center', marginBottom: spacing.sm },
+  schoolLogo: { width: 48, height: 48, borderRadius: 12, marginBottom: spacing.xs },
+  schoolName: { fontSize: 14, fontWeight: '700', color: colors.white },
+  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: spacing.sm },
   profileSection: { alignItems: 'center' },
   avatar: {
     width: 64,

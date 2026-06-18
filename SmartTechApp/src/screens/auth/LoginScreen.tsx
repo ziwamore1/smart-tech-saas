@@ -19,6 +19,7 @@ export const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showSuperAdmin, setShowSuperAdmin] = useState(false);
   const { login, superAdminLogin, isLoading } = useAuthStore();
@@ -88,20 +89,19 @@ export const LoginScreen: React.FC = () => {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
           <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
             <View style={styles.topSection}>
-              {logoUrl ? (
+              {logoUrl && !logoError ? (
                 <Image
                   source={{ uri: logoUrl }}
                   style={styles.logoImage}
                   resizeMode="contain"
+                  onError={() => setLogoError(true)}
                 />
               ) : (
-                <View style={styles.shieldOuter}>
-                  <View style={styles.shieldLogo}>
-                    <View style={styles.shieldInner}>
-                      <Text style={styles.shieldIcon}>🎓</Text>
-                    </View>
-                  </View>
-                </View>
+                <Image
+                  source={require('../../../assets/icon.png')}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
               )}
               <Text style={styles.title}>SmartTech</Text>
               <Text style={styles.subtitle}>Welcome to your school intelligence platform</Text>
