@@ -4,6 +4,9 @@ import {
   Alert, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import * as Print from 'expo-print';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { apiService } from '../../services/api';
 import { useAuthStore, useAppStore } from '../../store';
@@ -49,6 +52,8 @@ export const PrimaryClassTeacherScreen: React.FC = () => {
   const [maxScore, setMaxScore] = useState('100');
   const [scores, setScores] = useState<Record<string, string>>({});
   const [submittingResults, setSubmittingResults] = useState(false);
+  const [submittedResults, setSubmittedResults] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => { loadInitialData(); }, []);
 
@@ -179,12 +184,74 @@ export const PrimaryClassTeacherScreen: React.FC = () => {
         scores: scoresArray,
       });
       Alert.alert('Done', 'Results submitted successfully');
-      const reset: Record<string, string> = {};
-      students.forEach(s => { reset[s.id] = ''; });
-      setScores(reset);
+      setSubmittedResults(true);
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.message || 'Failed to submit results');
     } finally { setSubmittingResults(false); }
+  };
+
+  const resetResults = () => {
+    setSubmittedResults(false);
+    const reset: Record<string, string> = {};
+    students.forEach(s => { reset[s.id] = ''; });
+    setScores(reset);
+  };
+
+  const generateHtmlReport = (): string => {
+    const date = new Date().toLocaleDateString();
+    const term = dashboard?.currentTerm?.name || 'Current Term';
+    const school = dashboard?.school?.name || 'SmartTech School';
+    const className = selectedClass?.name || 'Class';
+    const subjectName = selectedSubject?.name || 'Subject';
+    const assessmentName = selectedAssessment?.name || selectedAssessment?.assessmentDef?.name || 'Assessment';
+
+    let rows = students.map((s) => {
+      const raw = scores[s.id];
+      const score = raw ? parseFloat(raw) : null;
+      const pct = score != null && maxScore ? Math.round((score / parseFloat(maxScore)) * 100) : null;
+      const bgColor = pct != null && pct >= 75 ? '#d1fae5' : pct != null && pct >= 50 ? '#fef3c7' : pct != null ? '#fee2e2' : '#f3f4f6';
+      const textColor = pct != null && pct >= 75 ? '#059669' : pct != null && pct >= 50 ? '#d97706' : pct != null ? '#dc2626' : '#9ca3af';
+      return `<tr><td style="padding:10px;border-bottom:1px solid #e5e7eb">${s.firstName} ${s.lastName}</td><td style="padding:10px;border-bottom:1px solid #e5e7eb">${s.admissionNumber || '—'}</td><td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:center"><span style="background:${bgColor};color:${textColor};padding:3px 10px;border-radius:6px;font-weight:700">${score != null ? score + '/' + maxScore + ' (' + pct + '%)' : '—'}</span></td></tr>`;
+    }).join('');
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:24px;color:#333}h1{color:#1e40af;margin:0}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#1e40af;color:#fff;padding:10px;text-align:left;font-size:12px}tr:nth-child(even){background:#f9fafb}.footer{margin-top:24px;padding-top:16px;border-top:2px solid #e5e7eb;text-align:center;font-size:12px;color:#6b7280}.header{display:flex;align-items:center;gap:12px;margin-bottom:16px}.logo{width:48px;height:48px}</style></head><body><div class="header"><img class="logo" src="https://api.smarttechsaas.com/uploads/logo.png" alt="Logo" onerror="this.style.display='none'"/><div><h1>${school}</h1></div></div><p><strong>Class:</strong> ${className}<br><strong>Subject:</strong> ${subjectName}<br><strong>Assessment:</strong> ${assessmentName}<br><strong>Term:</strong> ${term}<br><strong>Date:</strong> ${date}</p><table><thead><tr><th>Student</th><th>Admission</th><th>Score</th></tr></thead><tbody>${rows}</tbody></table><div class="footer"><p>This is a computer-generated assessment report.</p><p>SmartTech School Management System</p></div></body></html>`;
+  };
+
+  const generateTextReport = (): string => {
+    const date = new Date().toLocaleDateString();
+    const term = dashboard?.currentTerm?.name || 'Current Term';
+    const school = dashboard?.school?.name || 'SmartTech School';
+    const className = selectedClass?.name || 'Class';
+    const subjectName = selectedSubject?.name || 'Subject';
+    let content = `${school} - Assessment Results\nClass: ${className}\nSubject: ${subjectName}\nTerm: ${term}\nDate: ${date}\n${'='.repeat(40)}\n\n`;
+    students.forEach((s) => {
+      const raw = scores[s.id];
+      const score = raw ? parseFloat(raw) : null;
+      content += `${s.firstName} ${s.lastName} (${s.admissionNumber || '—'}): ${score != null ? score + '/' + maxScore : '—'}\n`;
+    });
+    return content;
+  };
+
+  const handleShareResults = async () => {
+    if (students.length === 0) { Alert.alert('No Data', 'No data to share'); return; }
+    try {
+      setActionLoading(true);
+      const uri = FileSystem.documentDirectory + `${selectedClass?.name || 'Class'}_Assessment_Results.txt`;
+      await FileSystem.writeAsStringAsync(uri, generateTextReport(), { encoding: FileSystem.EncodingType.UTF8 });
+      await Sharing.shareAsync(uri, { mimeType: 'text/plain', dialogTitle: 'Share Assessment Results', UTI: 'public.plain-text' });
+    } catch (e: any) {
+      if (e?.message !== 'User did not share') Alert.alert('Error', 'Failed to share');
+    } finally { setActionLoading(false); }
+  };
+
+  const handlePrintReport = async () => {
+    if (students.length === 0) { Alert.alert('No Data', 'No data to print'); return; }
+    try {
+      setActionLoading(true);
+      await Print.printAsync({ html: generateHtmlReport() });
+    } catch (e: any) {
+      if (e?.message !== 'User did not share') Alert.alert('Error', 'Failed to print');
+    } finally { setActionLoading(false); }
   };
 
   const onRefresh = useCallback(async () => {
@@ -342,67 +409,107 @@ export const PrimaryClassTeacherScreen: React.FC = () => {
         {/* RESULTS TAB */}
         {activeTab === 'results' && (
           <>
-            <View style={styles.resultSelectors}>
-              <Text style={styles.selectorLabel}>Subject</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorRow}>
-                {subjects.map((subj: any) => (
-                  <TouchableOpacity
-                    key={subj.id}
-                    style={[styles.selectorChip, selectedSubject?.id === subj.id && styles.selectorChipActive]}
-                    onPress={() => handleSubjectChange(subj)}
-                  >
-                    <Text style={[styles.selectorChipText, selectedSubject?.id === subj.id && styles.selectorChipTextActive]}>{subj.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-
-            {selectedSubject && (
+            {!submittedResults ? (
               <>
                 <View style={styles.resultSelectors}>
-                  <Text style={styles.selectorLabel}>Assessment</Text>
+                  <Text style={styles.selectorLabel}>Subject</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorRow}>
-                    {assessments.map((a: any) => (
+                    {subjects.map((subj: any) => (
                       <TouchableOpacity
-                        key={a.id || a.assessmentDefId}
-                        style={[styles.selectorChip, selectedAssessment?.id === a.id && styles.selectorChipActive]}
-                        onPress={() => setSelectedAssessment(a)}
+                        key={subj.id}
+                        style={[styles.selectorChip, selectedSubject?.id === subj.id && styles.selectorChipActive]}
+                        onPress={() => handleSubjectChange(subj)}
                       >
-                        <Text style={[styles.selectorChipText, selectedAssessment?.id === a.id && styles.selectorChipTextActive]}>{a.name || a.assessmentDef?.name || a.code}</Text>
+                        <Text style={[styles.selectorChipText, selectedSubject?.id === subj.id && styles.selectorChipTextActive]}>{subj.name}</Text>
                       </TouchableOpacity>
                     ))}
-                    {assessments.length === 0 && <Text style={styles.noDataText}>No assessments configured for this subject</Text>}
                   </ScrollView>
                 </View>
 
-                <View style={styles.maxScoreRow}>
-                  <Text style={styles.selectorLabel}>Max Score</Text>
-                  <TextInput style={styles.maxScoreInput} value={maxScore} onChangeText={setMaxScore} keyboardType="numeric" />
-                </View>
+                {selectedSubject && (
+                  <>
+                    <View style={styles.resultSelectors}>
+                      <Text style={styles.selectorLabel}>Assessment</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorRow}>
+                        {assessments.map((a: any) => (
+                          <TouchableOpacity
+                            key={a.id || a.assessmentDefId}
+                            style={[styles.selectorChip, selectedAssessment?.id === a.id && styles.selectorChipActive]}
+                            onPress={() => setSelectedAssessment(a)}
+                          >
+                            <Text style={[styles.selectorChipText, selectedAssessment?.id === a.id && styles.selectorChipTextActive]}>{a.name || a.assessmentDef?.name || a.code}</Text>
+                          </TouchableOpacity>
+                        ))}
+                        {assessments.length === 0 && <Text style={styles.noDataText}>No assessments configured for this subject</Text>}
+                      </ScrollView>
+                    </View>
+
+                    <View style={styles.maxScoreRow}>
+                      <Text style={styles.selectorLabel}>Max Score</Text>
+                      <TextInput style={styles.maxScoreInput} value={maxScore} onChangeText={setMaxScore} keyboardType="numeric" />
+                    </View>
+                  </>
+                )}
+
+                {selectedSubject && students.map((s) => (
+                  <View key={s.id} style={styles.scoreRow}>
+                    <View style={styles.scoreInfo}>
+                      <Text style={styles.scoreName}>{s.firstName} {s.lastName}</Text>
+                      <Text style={styles.scoreAdm}>{s.admissionNumber}</Text>
+                    </View>
+                    <TextInput
+                      style={styles.scoreInput}
+                      value={scores[s.id] || ''}
+                      onChangeText={(v) => setScores(prev => ({ ...prev, [s.id]: v }))}
+                      placeholder="0"
+                      keyboardType="numeric"
+                      placeholderTextColor="#D1D5DB"
+                    />
+                  </View>
+                ))}
+
+                {selectedSubject && (
+                  <TouchableOpacity style={styles.submitBtn} onPress={submitResults} disabled={submittingResults}>
+                    <Text style={styles.submitText}>{submittingResults ? 'Submitting...' : `Submit ${Object.values(scores).filter(v => v.trim()).length} Scores`}</Text>
+                  </TouchableOpacity>
+                )}
               </>
-            )}
-
-            {selectedSubject && students.map((s) => (
-              <View key={s.id} style={styles.scoreRow}>
-                <View style={styles.scoreInfo}>
-                  <Text style={styles.scoreName}>{s.firstName} {s.lastName}</Text>
-                  <Text style={styles.scoreAdm}>{s.admissionNumber}</Text>
+            ) : (
+              <>
+                <View style={styles.submittedHeader}>
+                  <Text style={styles.submittedTitle}>Assessment Results</Text>
+                  <Text style={styles.submittedSub}>{selectedSubject?.name} — {selectedAssessment?.name || selectedAssessment?.assessmentDef?.name}</Text>
                 </View>
-                <TextInput
-                  style={styles.scoreInput}
-                  value={scores[s.id] || ''}
-                  onChangeText={(v) => setScores(prev => ({ ...prev, [s.id]: v }))}
-                  placeholder="0"
-                  keyboardType="numeric"
-                  placeholderTextColor="#D1D5DB"
-                />
-              </View>
-            ))}
-
-            {selectedSubject && (
-              <TouchableOpacity style={styles.submitBtn} onPress={submitResults} disabled={submittingResults}>
-                <Text style={styles.submitText}>{submittingResults ? 'Submitting...' : `Submit ${Object.values(scores).filter(v => v.trim()).length} Scores`}</Text>
-              </TouchableOpacity>
+                <View style={styles.actions}>
+                  <TouchableOpacity style={styles.actionBtn} onPress={handleShareResults} disabled={actionLoading}>
+                    <Text style={styles.actionBtnText}>📤 Share</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.actionBtn, styles.actionBtnSecondary]} onPress={handlePrintReport} disabled={actionLoading}>
+                    <Text style={styles.actionBtnTextSecondary}>🖨 Print</Text>
+                  </TouchableOpacity>
+                </View>
+                {students.map((s) => {
+                  const raw = scores[s.id];
+                  const score = raw ? parseFloat(raw) : null;
+                  const pct = score != null && maxScore ? Math.round((score / parseFloat(maxScore)) * 100) : null;
+                  const bgColor = pct != null && pct >= 75 ? '#d1fae5' : pct != null && pct >= 50 ? '#fef3c7' : pct != null ? '#fee2e2' : '#f3f4f6';
+                  const textColor = pct != null && pct >= 75 ? '#059669' : pct != null && pct >= 50 ? '#d97706' : pct != null ? '#dc2626' : '#9ca3af';
+                  return (
+                    <View key={s.id} style={styles.scoreRow}>
+                      <View style={styles.scoreInfo}>
+                        <Text style={styles.scoreName}>{s.firstName} {s.lastName}</Text>
+                        <Text style={styles.scoreAdm}>{s.admissionNumber}</Text>
+                      </View>
+                      <View style={[styles.scoreBadge, { backgroundColor: bgColor }]}>
+                        <Text style={[styles.scoreBadgeText, { color: textColor }]}>{score != null ? `${score}/${maxScore}` : '—'}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+                <TouchableOpacity style={styles.backBtn} onPress={resetResults}>
+                  <Text style={styles.backBtnText}>← Enter More Scores</Text>
+                </TouchableOpacity>
+              </>
             )}
           </>
         )}
@@ -478,4 +585,16 @@ const styles = StyleSheet.create({
   scoreInput: { backgroundColor: '#F9FAFB', borderRadius: borderRadius.md, paddingHorizontal: 12, paddingVertical: 6, fontSize: 15, fontWeight: '600', borderWidth: 1, borderColor: colors.border, width: 64, textAlign: 'center' },
   submitBtn: { backgroundColor: colors.primary, paddingVertical: 14, borderRadius: borderRadius.lg, alignItems: 'center', marginTop: 16 },
   submitText: { color: colors.white, fontSize: 16, fontWeight: '700' },
+  submittedHeader: { marginBottom: spacing.sm },
+  submittedTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
+  submittedSub: { fontSize: 13, color: colors.textLight, marginTop: 2 },
+  actions: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  actionBtn: { backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.md },
+  actionBtnSecondary: { backgroundColor: colors.secondary },
+  actionBtnText: { color: colors.white, fontSize: 13, fontWeight: '600' },
+  actionBtnTextSecondary: { color: colors.white, fontSize: 13, fontWeight: '600' },
+  scoreBadge: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 8 },
+  scoreBadgeText: { fontSize: 16, fontWeight: '700' },
+  backBtn: { paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.sm },
+  backBtnText: { fontSize: 15, fontWeight: '600', color: colors.primary },
 });
