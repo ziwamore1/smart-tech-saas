@@ -14,6 +14,7 @@ import {
   AutoMarkResult,
   ExamStats,
   UploadedExam,
+  SuperAdminLoginResponse,
 } from '../types';
 
 const extra = Constants.expoConfig?.extra || {};
