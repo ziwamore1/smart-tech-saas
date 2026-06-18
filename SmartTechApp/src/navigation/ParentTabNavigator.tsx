@@ -159,6 +159,6 @@ const styles = StyleSheet.create({
   drawerFooter: { padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border },
   logoutBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, marginBottom: spacing.sm },
   logoutIcon: { fontSize: 18, marginRight: spacing.md },
-  logoutText: { fontSize: 15, fontWeight: '500', color: colors.danger },
+  logoutText: { fontSize: 15, fontWeight: '500', color: colors.error },
   footerText: { fontSize: 11, color: colors.textMuted, textAlign: 'center' },
 });
