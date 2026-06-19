@@ -97,7 +97,7 @@ export const SuperAdminMonitoringScreen: React.FC<SuperAdminMonitoringProps> = (
   };
 
   const getUsageColor = () => {
-    if (usagePercent > 90) return colors.danger;
+    if (usagePercent > 90) return colors.error;
     if (usagePercent > 70) return colors.warning;
     return colors.success;
   };
@@ -114,7 +114,7 @@ export const SuperAdminMonitoringScreen: React.FC<SuperAdminMonitoringProps> = (
         <WidgetCard title="Cloudinary Status">
           <View style={styles.healthCardContent}>
             <View style={styles.healthRow}>
-              <View style={[styles.statusDot, { backgroundColor: cloudinaryStatus === 'connected' ? colors.success : colors.danger }]} />
+              <View style={[styles.statusDot, { backgroundColor: cloudinaryStatus === 'connected' ? colors.success : colors.error }]} />
               <View style={styles.healthInfo}>
                 <Text style={styles.healthLabel}>Connection</Text>
                 <Text style={styles.healthValue}>{cloudinaryStatus === 'connected' ? 'Connected' : 'Disconnected'}</Text>
@@ -134,7 +134,7 @@ export const SuperAdminMonitoringScreen: React.FC<SuperAdminMonitoringProps> = (
 
         <WidgetCard title="Redis Status">
           <View style={styles.healthRow}>
-            <View style={[styles.statusDot, { backgroundColor: redisAlive ? colors.success : colors.danger }]} />
+            <View style={[styles.statusDot, { backgroundColor: redisAlive ? colors.success : colors.error }]} />
             <View style={styles.healthInfo}>
               <Text style={styles.healthLabel}>Ping</Text>
               <Text style={styles.healthValue}>{redisAlive ? 'Alive' : 'Unreachable'}</Text>
@@ -144,7 +144,7 @@ export const SuperAdminMonitoringScreen: React.FC<SuperAdminMonitoringProps> = (
 
         <WidgetCard title="Database Status">
           <View style={styles.healthRow}>
-            <View style={[styles.statusDot, { backgroundColor: dbStatus === 'connected' ? colors.success : colors.danger }]} />
+            <View style={[styles.statusDot, { backgroundColor: dbStatus === 'connected' ? colors.success : colors.error }]} />
             <View style={styles.healthInfo}>
               <Text style={styles.healthLabel}>Connection</Text>
               <Text style={styles.healthValue}>{dbStatus === 'connected' ? 'Connected' : 'Disconnected'}</Text>
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   uploadDate: { fontSize: 11, color: colors.textLight, marginTop: 2 },
   uploadSize: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   noUploads: { textAlign: 'center', color: colors.textLight, fontSize: 13, paddingVertical: spacing.md },
-  cleanupBtn: { backgroundColor: colors.danger, borderRadius: borderRadius.lg, paddingVertical: spacing.md, alignItems: 'center', marginBottom: spacing.md, ...shadows.card },
+  cleanupBtn: { backgroundColor: colors.error, borderRadius: borderRadius.lg, paddingVertical: spacing.md, alignItems: 'center', marginBottom: spacing.md, ...shadows.card },
   cleanupBtnDisabled: { opacity: 0.6 },
   cleanupBtnText: { color: colors.white, fontSize: 15, fontWeight: '700' },
 });

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { staffPositionApi } from '@/lib/api';
+import { ReadOnlyBanner } from '@/components/permissions/ReadOnlyBanner';
 
 type AdminRole = 'Director' | 'SuperAdmin' | 'Head Teacher' | 'Deputy' | 'HOD';
 const ADMIN_ROLES: AdminRole[] = ['Director', 'SuperAdmin', 'Head Teacher', 'Deputy', 'HOD'];
@@ -70,6 +71,7 @@ export default function StaffPositionsPage() {
 
   return (
     <div style={{ padding: '24px 32px' }}>
+      <ReadOnlyBanner managePermission="staff.manage" />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>

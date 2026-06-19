@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { assessmentEngineApi, classApi, subjectApi, termApi } from '@/lib/api';
 import { toast } from 'sonner';
+import { ReadOnlyBanner } from '@/components/permissions/ReadOnlyBanner';
 
 export default function AssessmentConfigPage() {
   const queryClient = useQueryClient();
@@ -116,6 +117,7 @@ export default function AssessmentConfigPage() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyBanner managePermission="assessments.manage" />
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Assessment Configuration</h1>
         <p className="text-gray-500 mt-1">Configure assessment types and weightings per class, subject, and term.</p>

@@ -19,6 +19,8 @@ import { Grade7Screen } from '../screens/director/Grade7Screen';
 import { CurriculumScreen } from '../screens/director/CurriculumScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
 import { colors, spacing, borderRadius, shadows } from '../theme';
+import { usePermissions } from '../utils/usePermissions';
+import { Permission } from '../utils/permissions';
 
 const { width } = Dimensions.get('window');
 const DRAWER_WIDTH = 280;
@@ -30,21 +32,21 @@ interface DrawerScreen {
   component?: React.FC<any>;
   stackScreen?: string;
   institutionTypes?: string[];
+  requiredPermission?: Permission;
 }
 
 const allDrawerScreens: DrawerScreen[] = [
   { name: 'DirectorHome', label: 'Dashboard', icon: '🏠', component: DirectorDashboardScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
   { name: 'DirectorClasses', label: 'Classes', icon: '🏫', component: DirectorClassesScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
-  { name: 'DirectorStudents', label: 'Students', icon: '👨‍🎓', component: DirectorStudentsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
-  { name: 'DirectorStaff', label: 'Staff', icon: '👥', component: DirectorStaffScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
+  { name: 'DirectorStudents', label: 'Students', icon: '👨‍🎓', component: DirectorStudentsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'], requiredPermission: 'students.manage' },
+  { name: 'DirectorStaff', label: 'Staff', icon: '👥', component: DirectorStaffScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'], requiredPermission: 'staff.manage' },
   { name: 'DirectorMonitoring', label: 'Departments', icon: '🏛️', component: MonitoringDashboardScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorLibrary', label: 'Library', icon: '📚', component: DirectorLibraryScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorTimetable', label: 'Timetable', icon: '📅', component: DirectorTimetableScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
   { name: 'DirectorCommunication', label: 'Communication', icon: '💬', component: DirectorCommunicationScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
-  { name: 'DirectorUsers', label: 'Users', icon: '👤', component: DirectorUsersScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
-  { name: 'DirectorExams', label: 'Exams', icon: '📋', stackScreen: 'ExamList', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
-  { name: 'DirectorTemplates', label: 'Templates', icon: '📄', stackScreen: 'TemplateMarketplace', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
-  { name: 'DirectorAnalytics', label: 'Analytics', icon: '📊', stackScreen: 'Analytics', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
+  { name: 'DirectorUsers', label: 'Users', icon: '👤', component: DirectorUsersScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'], requiredPermission: 'users.manage' },
+  { name: 'DirectorExams', label: 'Exams', icon: '📋', stackScreen: 'ExamList', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'], requiredPermission: 'exams.manage' },
+  { name: 'DirectorTemplates', label: 'Templates', icon: '📄', stackScreen: 'TemplateMarketplace', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'], requiredPermission: 'template-personalization.manage' },
   { name: 'DirectorAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
   { name: 'DirectorReports', label: 'Reports', icon: '📈', component: DirectorReportsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorStamps', label: 'Digital Stamps', icon: '🔏', stackScreen: 'DigitalStamps', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
@@ -57,8 +59,13 @@ const allDrawerScreens: DrawerScreen[] = [
 
 export const DirectorTabNavigator: React.FC = () => {
   const { user, logout } = useAuthStore();
+  const { can: hasPermission, isRestricted } = usePermissions();
   const institutionType = user?.institutionType;
-  const drawerScreens = allDrawerScreens.filter((s) => !s.institutionTypes || (institutionType && s.institutionTypes.includes(institutionType)));
+  const drawerScreens = allDrawerScreens.filter((s) => {
+    if (s.institutionTypes && institutionType && !s.institutionTypes.includes(institutionType)) return false;
+    if (isRestricted && s.requiredPermission && !hasPermission(s.requiredPermission)) return false;
+    return true;
+  });
 
   const drawerScreenNames = useMemo(() => drawerScreens.map(s => s.name), [drawerScreens]);
   const stackScreenMap = useMemo(() => drawerScreens.filter(s => s.stackScreen).reduce((acc, s) => {
@@ -170,6 +177,11 @@ export const DirectorTabNavigator: React.FC = () => {
               </View>
               <Text style={styles.profileName}>{user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Director'}</Text>
               <Text style={styles.profileRole}>{(user?.roles||[]).join(', ')}</Text>
+              {isRestricted && (
+                <View style={styles.restrictedBadge}>
+                  <Text style={styles.restrictedBadgeText}>🔒 Restricted Access</Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -225,4 +237,6 @@ const styles = StyleSheet.create({
   logoutIcon: { fontSize: 18, marginRight: spacing.md },
   logoutText: { fontSize: 15, fontWeight: '500', color: colors.error },
   footerText: { fontSize: 11, color: colors.textMuted, textAlign: 'center' },
+  restrictedBadge: { backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, marginTop: 6 },
+  restrictedBadgeText: { fontSize: 10, color: '#92400E', fontWeight: '600' },
 });

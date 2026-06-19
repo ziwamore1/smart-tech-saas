@@ -23,6 +23,7 @@ import { TeacherMarksScreen } from '../screens/teacher/MarksScreen';
 import { DirectorTabNavigator } from './DirectorTabNavigator';
 import { ClassTeacherTabNavigator } from './ClassTeacherTabNavigator';
 import { SuperAdminTabNavigator } from './SuperAdminTabNavigator';
+import { SupervisorTabNavigator } from './SupervisorTabNavigator';
 import { ParentTabNavigator } from './ParentTabNavigator';
 import { StudentTabNavigator } from './StudentTabNavigator';
 import { LearningStyleScreen } from '../screens/intelligence/LearningStyleScreen';
@@ -46,6 +47,7 @@ import { PDFPreviewScreen } from '../screens/stamps/PDFPreviewScreen';
 import { QRVerificationScreen } from '../screens/stamps/QRVerificationScreen';
 import { ApprovalWorkflowScreen } from '../screens/stamps/ApprovalWorkflowScreen';
 import { DepartmentTeachersScreen } from '../screens/monitoring/DepartmentTeachersScreen';
+import { TeacherAssessmentDetailScreen } from '../screens/monitoring/TeacherAssessmentDetailScreen';
 import HODMonitoringWrapper from '../screens/monitoring/HODMonitoringWrapper';
 import { AssessmentEntryScreen } from '../screens/assessment/AssessmentEntryScreen';
 import { AssessmentConfigScreen } from '../screens/assessment/AssessmentConfigScreen';
@@ -57,6 +59,7 @@ import { AccountRecoveryScreen } from '../screens/security/AccountRecoveryScreen
 import { OtpScreen } from '../screens/security/OtpScreen';
 import { SessionManagementScreen } from '../screens/security/SessionManagementScreen';
 import { INSTITUTION_TYPE_ROLES, InstitutionTypeCode, isRoleForType } from '../types';
+import { usePermissions } from '../utils/usePermissions';
 
 const Stack = createNativeStackNavigator();
 
@@ -89,18 +92,21 @@ function useRoleCheck(user: any) {
   const isClassTeacher = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && hasRole('Class Teacher');
 
   const isPrimaryTeacher = institutionType === 'PRIMARY_SCHOOL' && (hasRole('Primary Teacher'));
-  const isSecTeacher = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && (hasRole('HOD') || hasRole('Teacher') || hasRole('Class Teacher'));
+  const isSecTeacher = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && (hasRole('Teacher') || hasRole('Class Teacher'));
   const isCollegeTeacher = institutionType === 'COLLEGE' && (hasRole('Lecturer'));
   const isUniTeacher = institutionType === 'UNIVERSITY' && (hasRole('Lecturer') || hasRole('Research Supervisor'));
   const isTeacher = isPrimaryTeacher || isSecTeacher || isCollegeTeacher || isUniTeacher;
 
-  return { isStudent, isParent, isClassTeacher, isTeacher, isDirector, isSuperAdmin, institutionType };
+  const isHodSupervisor = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && hasRole('HOD');
+
+  return { isStudent, isParent, isClassTeacher, isTeacher, isDirector, isSuperAdmin, isHodSupervisor, institutionType };
 }
 
 export function AppNavigator() {
   const { isAuthenticated, user } = useAuthStore();
-  const { isStudent, isParent, isClassTeacher, isTeacher, isDirector, isSuperAdmin, institutionType } = useRoleCheck(user);
-  const hasRoleDashboard = isStudent || isParent || isClassTeacher || isTeacher || isDirector || isSuperAdmin;
+  const { isStudent, isParent, isClassTeacher, isTeacher, isDirector, isSuperAdmin, isHodSupervisor, institutionType } = useRoleCheck(user);
+  const hasRoleDashboard = isStudent || isParent || isClassTeacher || isTeacher || isDirector || isSuperAdmin || isHodSupervisor;
+  const { can } = usePermissions();
 
   return (
     <NavigationContainer>
@@ -112,6 +118,7 @@ export function AppNavigator() {
             {/* Highest priority roles first - check SuperAdmin/director before teacher */}
             {isSuperAdmin && <Stack.Screen name="SuperAdminDashboard" component={SuperAdminTabNavigator} />}
             {isDirector && <Stack.Screen name="DirectorDashboard" component={DirectorTabNavigator} />}
+            {isHodSupervisor && <Stack.Screen name="SupervisorDashboard" component={SupervisorTabNavigator} />}
             {isTeacher && <Stack.Screen name="TeacherDashboard" component={TeacherTabNavigator} />}
             {isClassTeacher && <Stack.Screen name="ClassTeacherTabNavigator" component={ClassTeacherTabNavigator} />}
             {isParent && <Stack.Screen name="ParentDashboard" component={ParentTabNavigator} />}
@@ -138,24 +145,25 @@ export function AppNavigator() {
             <Stack.Screen name="LearningStyle" component={LearningStyleScreen} />
             <Stack.Screen name="AiTutor" component={AiTutorScreen} />
             <Stack.Screen name="Analytics" component={AnalyticsScreen} />
-            <Stack.Screen name="DocumentEditor" component={DocumentEditorScreen} />
-            <Stack.Screen name="TemplateMarketplace" component={TemplateMarketplaceScreen} />
-            <Stack.Screen name="AITemplateGenerator" component={AITemplateGeneratorScreen} />
-            <Stack.Screen name="BrandingPresets" component={BrandingPresetsScreen} />
-            <Stack.Screen name="CloudAssetLibrary" component={CloudAssetLibraryScreen} />
-            <Stack.Screen name="DigitalSignature" component={DigitalSignatureScreen} />
-            <Stack.Screen name="Collaboration" component={CollaborationScreen} />
-            <Stack.Screen name="DepartmentTeachers" component={DepartmentTeachersScreen} />
+            {can('template-personalization.manage') && <Stack.Screen name="DocumentEditor" component={DocumentEditorScreen} />}
+            {can('template-personalization.manage') && <Stack.Screen name="TemplateMarketplace" component={TemplateMarketplaceScreen} />}
+            {can('template-personalization.manage') && <Stack.Screen name="AITemplateGenerator" component={AITemplateGeneratorScreen} />}
+            {can('template-personalization.manage') && <Stack.Screen name="BrandingPresets" component={BrandingPresetsScreen} />}
+            {can('template-personalization.manage') && <Stack.Screen name="CloudAssetLibrary" component={CloudAssetLibraryScreen} />}
+            {can('stamps.manage') && <Stack.Screen name="DigitalSignature" component={DigitalSignatureScreen} />}
+            {can('communications.manage') && <Stack.Screen name="Collaboration" component={CollaborationScreen} />}
+            {isHodSupervisor && <Stack.Screen name="DepartmentTeachers" component={DepartmentTeachersScreen} />}
+            <Stack.Screen name="TeacherAssessmentDetail" component={TeacherAssessmentDetailScreen} />
             <Stack.Screen name="ExamList" component={ExamListScreen} />
             <Stack.Screen name="ExamDetail" component={ExamDetailScreen} />
-            <Stack.Screen name="ExamCreate" component={ExamCreateScreen} />
+            {can('exams.manage') && <Stack.Screen name="ExamCreate" component={ExamCreateScreen} />}
             <Stack.Screen name="ExamTaking" component={ExamTakingScreen} />
             <Stack.Screen name="ExamResults" component={ExamResultsScreen} />
-            <Stack.Screen name="ExamAnalytics" component={ExamAnalyticsScreen} />
-            <Stack.Screen name="DigitalStamps" component={DigitalStampScreen} />
-            <Stack.Screen name="PDFPreview" component={PDFPreviewScreen} />
-            <Stack.Screen name="QRVerification" component={QRVerificationScreen} />
-            <Stack.Screen name="ApprovalWorkflow" component={ApprovalWorkflowScreen} />
+            {can('exams.manage') && <Stack.Screen name="ExamAnalytics" component={ExamAnalyticsScreen} />}
+            {can('stamps.manage') && <Stack.Screen name="DigitalStamps" component={DigitalStampScreen} />}
+            {can('stamps.manage') && <Stack.Screen name="PDFPreview" component={PDFPreviewScreen} />}
+            {can('stamps.manage') && <Stack.Screen name="QRVerification" component={QRVerificationScreen} />}
+            {can('stamps.manage') && <Stack.Screen name="ApprovalWorkflow" component={ApprovalWorkflowScreen} />}
 
             {/* Assessment Screens */}
             {(isTeacher || isClassTeacher) && <Stack.Screen name="PendingAssessments" component={PendingAssessmentsScreen} />}

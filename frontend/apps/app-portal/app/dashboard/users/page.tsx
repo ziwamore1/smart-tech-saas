@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, roleApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { ReadOnlyBanner } from '@/components/permissions/ReadOnlyBanner';
 
 interface User {
   id: string;
@@ -210,6 +211,7 @@ const handleAssignRoleInline = (userId: string, roleName: string) => {
 
 return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100">
+      <ReadOnlyBanner managePermission="users.manage" />
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="mb-6 flex justify-between items-center">
           <div>

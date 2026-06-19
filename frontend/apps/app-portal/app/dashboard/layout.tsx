@@ -288,6 +288,48 @@ const regularNav: NavItem[] = [
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
+    name: 'Assessment Oversight', 
+    href: '/dashboard/assessment-oversight', 
+    icon: 'fa-eye',
+    color: '#7c3aed',
+    typeRoles: {
+      PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head'],
+      SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'HOD'],
+      ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'HOD'],
+      COLLEGE: ['Principal', 'Registrar'],
+      UNIVERSITY: ['Vice Chancellor', 'Dean'],
+    },
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
+  },
+  { 
+    name: 'Teacher Performance', 
+    href: '/dashboard/teacher-performance', 
+    icon: 'fa-chart-bar',
+    color: '#0891b2',
+    typeRoles: {
+      PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head'],
+      SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'HOD'],
+      ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'HOD'],
+      COLLEGE: ['Principal', 'Registrar'],
+      UNIVERSITY: ['Vice Chancellor', 'Dean'],
+    },
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
+  },
+  { 
+    name: 'Role Permissions', 
+    href: '/dashboard/permissions', 
+    icon: 'fa-shield-alt',
+    color: '#6366f1',
+    typeRoles: {
+      PRIMARY_SCHOOL: ['Director', 'Head Teacher'],
+      SECONDARY_SCHOOL: ['Director', 'Deputy Director'],
+      ADVANCED_SECONDARY: ['Director', 'Deputy Director'],
+      COLLEGE: ['Principal'],
+      UNIVERSITY: ['Vice Chancellor'],
+    },
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
+  },
+  { 
     name: 'Results Management', 
     href: '/dashboard/results-management', 
     icon: 'fa-file-alt',

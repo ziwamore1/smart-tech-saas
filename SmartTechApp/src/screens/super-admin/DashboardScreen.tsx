@@ -78,21 +78,21 @@ export const SuperAdminDashboardScreen: React.FC<SuperAdminDashboardProps> = ({ 
         <WidgetCard title="System Health">
           <View style={styles.healthRow}>
             <View style={styles.healthItem}>
-              <View style={[styles.statusDot, { backgroundColor: redisStatus === 'connected' ? colors.success : colors.danger }]} />
+              <View style={[styles.statusDot, { backgroundColor: redisStatus === 'connected' ? colors.success : colors.error }]} />
               <View style={styles.healthInfo}>
                 <Text style={styles.healthLabel}>Redis</Text>
                 <Text style={styles.healthValue}>{redisStatus === 'connected' ? 'Connected' : 'Disconnected'}</Text>
               </View>
             </View>
             <View style={styles.healthItem}>
-              <View style={[styles.statusDot, { backgroundColor: cloudinaryStatus === 'connected' ? colors.success : colors.danger }]} />
+              <View style={[styles.statusDot, { backgroundColor: cloudinaryStatus === 'connected' ? colors.success : colors.error }]} />
               <View style={styles.healthInfo}>
                 <Text style={styles.healthLabel}>Cloudinary</Text>
                 <Text style={styles.healthValue}>{typeof storageUsed === 'string' ? storageUsed : `${storageUsed} used`}</Text>
               </View>
             </View>
             <View style={styles.healthItem}>
-              <View style={[styles.statusDot, { backgroundColor: apiStatus === 'healthy' ? colors.success : colors.danger }]} />
+              <View style={[styles.statusDot, { backgroundColor: apiStatus === 'healthy' ? colors.success : colors.error }]} />
               <View style={styles.healthInfo}>
                 <Text style={styles.healthLabel}>API</Text>
                 <Text style={styles.healthValue}>{apiStatus === 'healthy' ? 'Healthy' : 'Degraded'}</Text>

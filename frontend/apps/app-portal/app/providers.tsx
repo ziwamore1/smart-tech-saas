@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ReactNode, useState } from "react"
 import { AuthProvider } from "@/lib/auth-context"
 import { FeatureLockProvider } from "@/lib/feature-lock-context"
+import { PermissionProvider } from "@/lib/permission-context"
 
 export default function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -21,7 +22,9 @@ export default function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={client}>
       <AuthProvider>
         <FeatureLockProvider>
-          {children}
+          <PermissionProvider>
+            {children}
+          </PermissionProvider>
         </FeatureLockProvider>
       </AuthProvider>
     </QueryClientProvider>

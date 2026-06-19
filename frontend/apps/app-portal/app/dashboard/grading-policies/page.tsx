@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { gradingEngineApi } from '@/lib/api';
 import { toast } from 'sonner';
+import { ReadOnlyBanner } from '@/components/permissions/ReadOnlyBanner';
 
 export default function GradingPoliciesPage() {
   const queryClient = useQueryClient();
@@ -88,6 +89,7 @@ export default function GradingPoliciesPage() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyBanner managePermission="grading-policies.manage" />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Grading Policies</h1>

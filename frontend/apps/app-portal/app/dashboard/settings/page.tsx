@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { schoolApi, termApi, academicYearApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { ReadOnlyBanner } from '@/components/permissions/ReadOnlyBanner';
 
 type SettingsTab = 'school' | 'academic' | 'terms' | 'grading' | 'appearance' | 'notifications';
 
@@ -204,6 +205,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyBanner managePermission="settings.edit" />
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Settings</h1>

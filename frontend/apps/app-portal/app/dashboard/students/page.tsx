@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { studentApi, classApi, termApi, enrollmentApi, academicYearApi, parentApi, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { ReadOnlyBanner } from '@/components/permissions/ReadOnlyBanner';
 
 const gradBlue = 'linear-gradient(135deg, #3b82f6, #2563eb)';
 const gradGreen = 'linear-gradient(135deg, #10b981, #059669)';
@@ -272,6 +273,7 @@ export default function StudentsPage() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyBanner managePermission="students.manage" />
       {message && (
         <div className={`px-4 py-3 rounded-lg ${
           message.type === 'success' 
