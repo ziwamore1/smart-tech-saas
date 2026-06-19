@@ -17,6 +17,8 @@ import { DirectorCommunicationScreen } from '../screens/director/CommunicationSc
 import { DirectorUsersScreen } from '../screens/director/UsersScreen';
 import { Grade7Screen } from '../screens/director/Grade7Screen';
 import { CurriculumScreen } from '../screens/director/CurriculumScreen';
+import { ECEScreen } from '../screens/director/ECEScreen';
+import { PrimaryGradingScreen } from '../screens/director/PrimaryGradingScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
 import { colors, spacing, borderRadius, shadows } from '../theme';
 import { usePermissions } from '../utils/usePermissions';
@@ -52,6 +54,8 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'DirectorStamps', label: 'Digital Stamps', icon: '🔏', stackScreen: 'DigitalStamps', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorApprovals', label: 'Approvals', icon: '✅', stackScreen: 'ApprovalWorkflow', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorGrade7', label: 'Grade 7 ECZ', icon: '🎓', component: Grade7Screen, institutionTypes: ['PRIMARY_SCHOOL'] },
+  { name: 'DirectorECE', label: 'ECE Module', icon: '👶', component: ECEScreen, institutionTypes: ['PRIMARY_SCHOOL'] },
+  { name: 'DirectorPrimaryGrading', label: 'Primary Grading', icon: '📊', component: PrimaryGradingScreen, institutionTypes: ['PRIMARY_SCHOOL'] },
   { name: 'DirectorCurriculum', label: 'Curriculum', icon: '📖', component: CurriculumScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorSettings', label: 'Settings', icon: '⚙️', component: DirectorSettingsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
   { name: 'DirectorProfile', label: 'Profile', icon: '👤', component: ProfileScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
