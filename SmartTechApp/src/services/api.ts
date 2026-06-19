@@ -42,7 +42,7 @@ class ApiService {
     });
 
     this.client.interceptors.request.use(async (config) => {
-      if (config.url?.includes('/auth/mobile-login') || config.url?.includes('/auth/login') || config.url?.includes('/auth/register') || config.url?.includes('/auth/forgot-password') || config.url?.includes('/auth/reset-password')) {
+      if (config.url?.includes('/auth/mobile-login') || config.url?.includes('/auth/login') || config.url?.includes('/auth/register') || config.url?.includes('/auth/forgot-password') || config.url?.includes('/auth/reset-password') || config.url?.includes('/auth/super-admin/login')) {
         return config;
       }
       if (!this.token) {

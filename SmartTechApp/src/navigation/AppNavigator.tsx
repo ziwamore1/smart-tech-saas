@@ -8,6 +8,7 @@ import { NotificationsScreen } from '../screens/common/NotificationsScreen';
 import { QRScannerScreen } from '../screens/common/QRScannerScreen';
 import { VerificationResultScreen } from '../screens/common/VerificationResultScreen';
 import { ManualVerificationScreen } from '../screens/common/ManualVerificationScreen';
+import { UserGuideScreen } from '../screens/common/UserGuideScreen';
 import { StudentDashboardScreen } from '../screens/student/DashboardScreen';
 import { PrimaryStudentResultsScreen } from '../screens/student/PrimaryStudentResultsScreen';
 import { StudentResultsScreen } from '../screens/student/ResultsScreen';
@@ -83,7 +84,7 @@ function useRoleCheck(user: any) {
   const isSuperAdmin = hasRole('SuperAdmin') || hasRole('SUPER_ADMIN');
 
   // Director/Deputy Director have their own dashboard - do NOT include in isTeacher
-  const isPrimaryDirector = institutionType === 'PRIMARY_SCHOOL' && (hasRole('Head Teacher') || hasRole('Deputy Head'));
+  const isPrimaryDirector = institutionType === 'PRIMARY_SCHOOL' && (hasRole('Head Teacher') || hasRole('Deputy Head') || hasRole('Director'));
   const isSecDirector = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && (hasRole('Director') || hasRole('Deputy Director'));
   const isCollegeDirector = institutionType === 'COLLEGE' && (hasRole('Principal') || hasRole('Registrar'));
   const isUniDirector = institutionType === 'UNIVERSITY' && (hasRole('Vice Chancellor') || hasRole('Dean'));
@@ -142,6 +143,7 @@ export function AppNavigator() {
 
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="UserGuide" component={UserGuideScreen} />
             <Stack.Screen name="LearningStyle" component={LearningStyleScreen} />
             <Stack.Screen name="AiTutor" component={AiTutorScreen} />
             <Stack.Screen name="Analytics" component={AnalyticsScreen} />

@@ -77,7 +77,7 @@ export const DirectorSettingsScreen: React.FC<DirectorSettingsProps> = ({ onTogg
       items: [
         { icon: '❓', label: 'Help & FAQ', action: () => {} },
         { icon: '📝', label: 'Send Feedback', action: () => {} },
-        { icon: '📖', label: 'User Guide', action: () => {} },
+        { icon: '📖', label: 'User Guide', action: () => handleNav('UserGuide') },
       ],
     },
   ];
@@ -99,7 +99,7 @@ export const DirectorSettingsScreen: React.FC<DirectorSettingsProps> = ({ onTogg
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{user?.firstName} {user?.lastName}</Text>
             <Text style={styles.profileEmail}>{user?.email}</Text>
-            <Text style={styles.profileRole}>Director</Text>
+            <Text style={styles.profileRole}>{(user?.roles||[]).join(', ') || 'Director'}</Text>
           </View>
         </View>
 
