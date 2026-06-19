@@ -12,12 +12,16 @@
       "resizeMode": "contain",
       "backgroundColor": "#1E3A8A"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.smarttech.school",
       "infoPlist": {
-        "NSAppTransportSecurity": { "NSAllowsArbitraryLoads": true }
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       }
     },
     "android": {
@@ -27,14 +31,21 @@
       },
       "package": "com.smarttech.school",
       "googleServicesFile": "./google-services.json",
-      "useNextNotificationsApi": true,
       "softwareKeyboardLayoutMode": "pan",
       "intentFilters": [
         {
           "action": "VIEW",
           "autoVerify": true,
-          "data": [{ "scheme": "smarttech", "host": "*" }],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "data": [
+            {
+              "scheme": "smarttech",
+              "host": "*"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -48,7 +59,8 @@
           "icon": "./assets/notification-icon.png",
           "color": "#1E3A8A"
         }
-      ]
+      ],
+      "@sentry/react-native"
     ],
     "owner": "smart-tech-saas-system-1",
     "extra": {
