@@ -85,7 +85,7 @@ function useRoleCheck(user: any) {
 
   // Director/Deputy Director have their own dashboard - do NOT include in isTeacher
   const isPrimaryDirector = institutionType === 'PRIMARY_SCHOOL' && (hasRole('Head Teacher') || hasRole('Deputy Head') || hasRole('Director'));
-  const isSecDirector = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && (hasRole('Director') || hasRole('Deputy Director'));
+  const isSecDirector = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && (hasRole('Head Teacher') || hasRole('Deputy Head') || hasRole('Director') || hasRole('Deputy Director'));
   const isCollegeDirector = institutionType === 'COLLEGE' && (hasRole('Principal') || hasRole('Registrar'));
   const isUniDirector = institutionType === 'UNIVERSITY' && (hasRole('Vice Chancellor') || hasRole('Dean'));
   const isDirector = isPrimaryDirector || isSecDirector || isCollegeDirector || isUniDirector;
