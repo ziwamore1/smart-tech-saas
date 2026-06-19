@@ -96,6 +96,9 @@ class ApiService {
     if (response.data?.user?.photoUrl) {
       response.data.user.photoUrl = resolveImageUrl(response.data.user.photoUrl) || response.data.user.photoUrl;
     }
+    if (response.data?.user?.school?.logo) {
+      response.data.user.school.logo = resolveImageUrl(response.data.user.school.logo) || response.data.user.school.logo;
+    }
     AsyncStorage.setItem('access_token', response.data.access_token).catch((e) =>
       console.warn('Failed to persist access token:', e),
     );

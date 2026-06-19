@@ -135,7 +135,7 @@ export const SuperAdminTabNavigator: React.FC = () => {
       <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
         <SafeAreaView style={styles.drawerContent} edges={['top', 'bottom']}>
           <View style={styles.drawerHeader}>
-            <Image source={require('../../assets/icon.png')} style={styles.drawerLogoImage} resizeMode="contain" />
+            <Image source={user?.school?.logo ? { uri: user.school.logo } : require('../../assets/icon.png')} style={styles.drawerLogoImage} resizeMode="contain" />
             <Text style={styles.drawerTitle}>SmartTech</Text>
             <Text style={styles.drawerSubtitle}>Super Admin Portal</Text>
             <View style={styles.divider} />

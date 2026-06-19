@@ -169,9 +169,9 @@ export const DirectorTabNavigator: React.FC = () => {
       <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
         <SafeAreaView style={styles.drawerContent} edges={['top', 'bottom']}>
           <View style={styles.drawerHeader}>
-            <Image source={require('../../assets/icon.png')} style={styles.drawerLogoImage} resizeMode="contain" />
-            <Text style={styles.drawerTitle}>SmartTech</Text>
-            <Text style={styles.drawerSubtitle}>{user?.school?.name || 'Director Portal'}</Text>
+            <Image source={user?.school?.logo ? { uri: user.school.logo } : require('../../assets/icon.png')} style={styles.drawerLogoImage} resizeMode="contain" />
+            <Text style={styles.drawerTitle}>{user?.school?.name || 'SmartTech'}</Text>
+            <Text style={styles.drawerSubtitle}>Director Portal</Text>
             <View style={styles.divider} />
             <View style={styles.profileSection}>
               <View style={styles.avatar}>
