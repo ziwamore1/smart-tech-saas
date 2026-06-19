@@ -59,7 +59,6 @@
     },
     "runtimeVersion": "1.0.0",
     "updates": {
-      "url": "https://u.expo.dev/smarttech-app",
       "enabled": false,
       "fallbackToCacheTimeout": 0
     },
