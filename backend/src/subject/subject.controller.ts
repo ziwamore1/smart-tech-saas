@@ -22,13 +22,13 @@ export class SubjectController {
   }
 
   @Get()
-  @Roles('Director')
+  @Roles('Director', 'Deputy Director', 'HOD', 'Teacher', 'Class Teacher')
   async findAll(@Req() req: any) {
     return this.service.findAll(req.user.schoolId);
   }
 
   @Get(':id')
-  @Roles('Director')
+  @Roles('Director', 'Deputy Director', 'HOD', 'Teacher', 'Class Teacher')
   async findOne(@Param('id') id: string) {
     return this.service.findOne(id);
   }
