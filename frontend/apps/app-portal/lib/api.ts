@@ -2078,3 +2078,63 @@ export const resultsManagementApi = {
   getAuditLogs: (params?: { schoolId?: string; entityType?: string; entityId?: string; action?: string; classId?: string; termId?: string }) =>
     api.get('/results-management/audit-logs', { params }),
 };
+
+// ===================== CURRICULUM INTELLIGENCE ENGINE (CIE) =====================
+
+export const curriculumIntelligenceApi = {
+  // Elements of Construct
+  getEocs: (subjectId: string) => api.get(`/curriculum-intelligence/subjects/${subjectId}/elements-of-construct`),
+  createEoc: (data: { name: string; code?: string; description?: string; sortOrder?: number; subjectId: string; construct?: string; schoolId?: string }) =>
+    api.post('/curriculum-intelligence/elements-of-construct', data),
+  updateEoc: (id: string, data: any) => api.patch(`/curriculum-intelligence/elements-of-construct/${id}`, data),
+  deleteEoc: (id: string) => api.delete(`/curriculum-intelligence/elements-of-construct/${id}`),
+
+  // Topics
+  getTopics: (subjectId?: string) => api.get('/curriculum-intelligence/topics', { params: { subjectId } }),
+  createTopic: (data: any) => api.post('/curriculum-intelligence/topics', data),
+  updateTopic: (id: string, data: any) => api.patch(`/curriculum-intelligence/topics/${id}`, data),
+  deleteTopic: (id: string) => api.delete(`/curriculum-intelligence/topics/${id}`),
+
+  // Subtopics
+  getSubtopics: (topicId: string) => api.get(`/curriculum-intelligence/topics/${topicId}/subtopics`),
+  createSubtopic: (data: { name: string; code?: string; description?: string; sortOrder?: number; topicId: string; schoolId?: string }) =>
+    api.post('/curriculum-intelligence/subtopics', data),
+  updateSubtopic: (id: string, data: any) => api.patch(`/curriculum-intelligence/subtopics/${id}`, data),
+  deleteSubtopic: (id: string) => api.delete(`/curriculum-intelligence/subtopics/${id}`),
+
+  // Competencies
+  getCompetencies: (params?: { subjectId?: string; topicId?: string; eocId?: string }) =>
+    api.get('/curriculum-intelligence/competencies', { params }),
+  createCompetency: (data: { name: string; code?: string; description?: string; category?: string; bloomLevel?: string; topicId?: string; subtopicId?: string; subjectId?: string; eocId?: string; schoolId?: string }) =>
+    api.post('/curriculum-intelligence/competencies', data),
+  updateCompetency: (id: string, data: any) => api.patch(`/curriculum-intelligence/competencies/${id}`, data),
+  deleteCompetency: (id: string) => api.delete(`/curriculum-intelligence/competencies/${id}`),
+
+  // Subjects tree
+  getSubjectTree: (subjectId: string) => api.get(`/curriculum-intelligence/subjects/${subjectId}/tree`),
+
+  // Assessment Objectives
+  getAssessmentObjectives: (subjectId: string) => api.get(`/curriculum-intelligence/subjects/${subjectId}/assessment-objectives`),
+
+  // Syllabus Documents
+  getSyllabusDocuments: (schoolId?: string) => api.get('/curriculum-intelligence/syllabus-documents', { params: { schoolId } }),
+
+  // SBA Tasks
+  getSbaTasks: (subjectId?: string) => api.get('/curriculum-intelligence/sba/tasks', { params: { subjectId } }),
+  createSbaTask: (data: { title: string; description?: string; taskNumber: number; subjectId: string; academicStageId?: string; termId?: string; maxMarks?: number; weight?: number; competencyId?: string; eocId?: string; dueDate?: string; schoolId?: string }) =>
+    api.post('/curriculum-intelligence/sba/tasks', data),
+  updateSbaTask: (id: string, data: any) => api.patch(`/curriculum-intelligence/sba/tasks/${id}`, data),
+  deleteSbaTask: (id: string) => api.delete(`/curriculum-intelligence/sba/tasks/${id}`),
+  generateSbaTemplate: (subjectId: string) => api.get(`/curriculum-intelligence/sba/templates/${subjectId}`),
+
+  // Lesson Plans
+  getLessonPlans: (subjectId?: string) => api.get('/curriculum-intelligence/lesson-plans', { params: { subjectId } }),
+
+  // Curriculum Coverage
+  getCoverage: (params?: { classId?: string; subjectId?: string }) =>
+    api.get('/curriculum-intelligence/coverage', { params }),
+
+  // Analytics
+  getComplianceAnalytics: (params?: { schoolId?: string; subjectId?: string; classId?: string }) =>
+    api.get('/curriculum-intelligence/analytics/compliance', { params }),
+};

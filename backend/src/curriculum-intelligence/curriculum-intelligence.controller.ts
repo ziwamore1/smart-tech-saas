@@ -295,6 +295,18 @@ export class CurriculumIntelligenceController {
     return this.sbaManagement.getSbaTasks({ subjectId, academicStageId });
   }
 
+  @Patch('sba/tasks/:id')
+  @UseGuards(AuthGuard('jwt'))
+  updateSbaTask(@Param('id') id: string, @Body() body: any) {
+    return this.sbaManagement.updateSbaTask(id, body);
+  }
+
+  @Delete('sba/tasks/:id')
+  @UseGuards(AuthGuard('jwt'))
+  deleteSbaTask(@Param('id') id: string) {
+    return this.sbaManagement.deleteSbaTask(id);
+  }
+
   @Get('sba/templates/:subjectId')
   @UseGuards(AuthGuard('jwt'))
   generateSbaTemplate(@Param('subjectId') subjectId: string, @Query('academicStageId') academicStageId?: string) {

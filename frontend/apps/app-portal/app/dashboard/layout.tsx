@@ -232,6 +232,38 @@ const regularNav: NavItem[] = [
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
+    name: 'Elements of Construct', 
+    href: '/dashboard/elements-of-construct', 
+    icon: 'fa-puzzle-piece',
+    color: '#8b5cf6',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
+  },
+  { 
+    name: 'Topics & Subtopics', 
+    href: '/dashboard/topics', 
+    icon: 'fa-sitemap',
+    color: '#06b6d4',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
+  },
+  { 
+    name: 'Competencies', 
+    href: '/dashboard/competencies', 
+    icon: 'fa-bullseye',
+    color: '#f97316',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
+  },
+  { 
+    name: 'SBA Tasks', 
+    href: '/dashboard/sba-tasks', 
+    icon: 'fa-tasks',
+    color: '#22c55e',
+    typeRoles: ROLE_MAP.teaching,
+    institutionTypes: ['SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
+  },
+  { 
     name: 'Timetable', 
     href: '/timetable', 
     icon: 'fa-calendar-alt',

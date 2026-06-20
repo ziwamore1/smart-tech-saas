@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { intelligenceApi } from '@/lib/api';
+import { intelligenceApi, subjectApi } from '@/lib/api';
 import { classApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
@@ -23,8 +23,9 @@ export default function AiTutorPage() {
   const context = useMemo(() => ({
     role: user?.roles?.[0]?.toLowerCase().replace(' ', '_') || 'student',
     screen: 'ai_tutor',
-    subject: selectedSubject || undefined,
-  }), [user, selectedSubject]);
+    subject: selectedSubject ? subjects.find((s: any) => s.id === selectedSubject)?.name || undefined : undefined,
+    subjectId: selectedSubject || undefined,
+  }), [user, selectedSubject, subjects]);
 
   const { data: classes } = useQuery({
     queryKey: ['classes'],
@@ -34,6 +35,20 @@ export default function AiTutorPage() {
       return Array.isArray(d) ? d : [];
     },
   });
+
+  const { data: subjectsResponse } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: async () => {
+      const res = await subjectApi.getAll();
+      const d = res.data?.data || res.data;
+      return Array.isArray(d) ? d : [];
+    },
+  });
+  const subjects = useMemo(() => {
+    const raw = Array.isArray(subjectsResponse?.data) ? subjectsResponse.data :
+      Array.isArray(subjectsResponse) ? subjectsResponse : [];
+    return raw;
+  }, [subjectsResponse]);
 
   const { data: students } = useQuery({
     queryKey: ['class-students', selectedStudent],
@@ -126,10 +141,9 @@ export default function AiTutorPage() {
               className="w-full px-3 py-2 border rounded-lg"
             >
               <option value="">General</option>
-              <option value="mathematics">Mathematics</option>
-              <option value="english">English</option>
-              <option value="science">Science</option>
-              <option value="social-studies">Social Studies</option>
+              {subjects.map((s: any) => (
+                <option key={s.id} value={s.id}>{s.name} ({s.code || ''})</option>
+              ))}
             </select>
           </div>
           <div className="flex items-end">

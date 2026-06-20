@@ -31,6 +31,20 @@ export class SbaManagementService {
     });
   }
 
+  async updateSbaTask(id: string, data: any) {
+    return this.prisma.sbaTask.update({
+      where: { id },
+      data: {
+        ...data,
+        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
+      },
+    });
+  }
+
+  async deleteSbaTask(id: string) {
+    return this.prisma.sbaTask.delete({ where: { id } });
+  }
+
   async generateSbaTemplate(subjectId: string, academicStageId?: string) {
     const subject = await this.prisma.subject.findUnique({
       where: { id: subjectId },

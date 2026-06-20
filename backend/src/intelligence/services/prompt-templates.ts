@@ -4,6 +4,7 @@ export interface AiContext {
   role: Role;
   screen?: string;
   subject?: string;
+  subjectId?: string;
   topic?: string;
   name?: string;
   userId?: string;
@@ -40,6 +41,19 @@ export interface AiContext {
   schoolStats?: { totalStudents: number; totalTeachers: number; totalClasses: number };
   message?: string;
   previousMessages?: Array<{ role: string; content: string }>;
+  curriculumContext?: {
+    subjectName: string;
+    subjectCode: string;
+    elementsOfConstruct: { name: string; competencies: string[] }[];
+    assessmentObjectives: { name: string; weight: number | null }[];
+    topics: { name: string; subtopics: string[]; competencies: string[]; outcomes: string[] }[];
+    currentTopic?: {
+      name: string;
+      subtopics: { name: string; description: string | null }[];
+      competencies: { name: string; description: string | null; bloomLevel: string | null }[];
+      outcomes: { name: string; bloomLevel: string | null }[];
+    } | null;
+  } | null;
 }
 
 export function buildSystemPrompt(context: AiContext): string {
@@ -147,11 +161,25 @@ YOUR ROLE:
     ? `\n\nCURRENT SUBJECT: ${context.subject}${context.topic ? `\nCURRENT TOPIC: ${context.topic}` : ''}\nProvide subject-specific guidance tailored to ${context.subject}.`
     : '';
 
+  const curriculumPrompt = context.curriculumContext
+    ? `\n\n=== CURRICULUM REFERENCE ===\nSubject: ${context.curriculumContext.subjectName} (${context.curriculumContext.subjectCode})
+Elements of Construct (what students are assessed on): ${context.curriculumContext.elementsOfConstruct.map(e => e.name).join(', ')}
+${context.curriculumContext.assessmentObjectives.length ? `Assessment Weightings: ${context.curriculumContext.assessmentObjectives.map(a => `${a.name} (${a.weight ?? 'N/A'}%)`).join(', ')}` : ''}
+Topics Covered: ${context.curriculumContext.topics.map(t => t.name).join(', ')}
+${context.curriculumContext.currentTopic ? `
+=== CURRENT TOPIC: ${context.curriculumContext.currentTopic.name} ===
+Subtopics: ${context.curriculumContext.currentTopic.subtopics.map(s => s.name).join(', ')}
+Competencies to Master: ${context.curriculumContext.currentTopic.competencies.map(c => `${c.name} [${c.bloomLevel || 'N/A'}]`).join(', ')}
+Learning Outcomes: ${context.curriculumContext.currentTopic.outcomes.map(o => o.name).join(', ')}
+BASE ALL RESPONSES ON THIS CURRICULUM. Use the constructs, competencies, and outcomes above to structure your teaching. Refer to specific elements of construct by name when explaining concepts.` : ''}
+IMPORTANT: Always align your responses with the official curriculum above. Reference specific elements of construct, competencies, and learning outcomes. Never teach outside this curriculum unless the student explicitly asks.`
+    : '';
+
   const screenPrompt = context.screen
     ? `\n\nCURRENT SCREEN/MODULE: ${context.screen}\nTailor your response to what the user is currently viewing.`
     : '';
 
-  return `${basePrompt}\n\n${rolePrompts[role]}${subjectPrompt}${screenPrompt}`;
+  return `${basePrompt}\n\n${rolePrompts[role]}${subjectPrompt}${curriculumPrompt}${screenPrompt}`;
 }
 
 export function buildUserPrompt(context: AiContext): string {
@@ -175,6 +203,9 @@ export function buildUserPrompt(context: AiContext): string {
     if (weakCompetencies.length > 0) {
       parts.push(`[Weak competencies: ${weakCompetencies.join('; ')}]`);
     }
+  }
+  if (context.curriculumContext?.currentTopic) {
+    parts.push(`[On topic: ${context.curriculumContext.currentTopic.name}]`);
   }
 
   const contextPrefix = parts.length > 0 ? `Context: ${parts.join(' ')}\n\n` : '';

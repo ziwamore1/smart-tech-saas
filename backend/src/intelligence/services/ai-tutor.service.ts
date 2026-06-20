@@ -41,7 +41,11 @@ export class AiTutorService {
       },
     });
 
-    const context = await this.buildFullContext(schoolId, options?.context);
+    const context = await this.buildFullContext(schoolId, {
+      ...options?.context,
+      subjectId: options?.subjectId || options?.context?.subjectId,
+      topic: options?.topic || options?.context?.topic,
+    });
     const greeting = await this.generateGreeting(context, options);
 
     await this.prisma.aiTutorMessage.create({
@@ -97,6 +101,7 @@ export class AiTutorService {
       studentId,
       message,
       subject: context?.subject || session.subjectId || memory.subject || undefined,
+      subjectId: context?.subjectId || session.subjectId || undefined,
       topic: context?.topic || session.topic || memory.topic || undefined,
       previousMessages,
     });
@@ -123,7 +128,8 @@ export class AiTutorService {
       const genericCtx: AiContext = {
         role: 'student',
         message: question,
-        subject: subjectId,
+        subject: context?.subject || subjectId,
+        subjectId: context?.subjectId || subjectId,
       };
       const response = await this.generateLLMResponse(genericCtx);
       return { response, isGeneral: true };
@@ -250,6 +256,7 @@ export class AiTutorService {
     const context: AiContext = {
       role: partial?.role || 'student',
       subject: partial?.subject,
+      subjectId: partial?.subjectId,
       topic: partial?.topic,
       screen: partial?.screen,
       message: partial?.message,
@@ -294,7 +301,71 @@ export class AiTutorService {
       }
     }
 
+    // Fetch curriculum context when subjectId is available
+    const subjectId = partial?.subjectId || context.subjectId;
+    if (subjectId && schoolId) {
+      try {
+        context.curriculumContext = await this.fetchCurriculumContext(schoolId, subjectId, partial?.topic);
+      } catch (err) {
+        this.logger.warn(`Failed to fetch curriculum context for subject ${subjectId}: ${err}`);
+      }
+    }
+
     return context;
+  }
+
+  private async fetchCurriculumContext(schoolId: string, subjectId: string, topicId?: string) {
+    const subject = await this.prisma.subject.findUnique({
+      where: { id: subjectId },
+      include: {
+        topics: {
+          include: { subtopics: true, competencies: true, learningOutcomes: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    });
+
+    if (!subject) return null;
+
+    const eocs = await this.prisma.elementOfConstruct.findMany({
+      where: { subjectId },
+      include: { competencies: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    const assessmentObjectives = await this.prisma.assessmentObjective.findMany({
+      where: { subjectId },
+    });
+
+    let currentTopic = null;
+    if (topicId) {
+      currentTopic = await this.prisma.topic.findUnique({
+        where: { id: topicId },
+        include: { subtopics: true, competencies: true, learningOutcomes: true },
+      });
+    }
+
+    return {
+      subjectName: subject.name,
+      subjectCode: subject.code || '',
+      elementsOfConstruct: eocs.map(e => ({
+        name: e.name,
+        competencies: e.competencies.map(c => c.name),
+      })),
+      assessmentObjectives: assessmentObjectives.map(a => ({ name: a.name, weight: a.weight })),
+      topics: subject.topics.map(t => ({
+        name: t.name,
+        subtopics: t.subtopics.map(s => s.name),
+        competencies: t.competencies.map(c => c.name),
+        outcomes: t.learningOutcomes.map(o => o.name),
+      })),
+      currentTopic: currentTopic ? {
+        name: currentTopic.name,
+        subtopics: currentTopic.subtopics.map(s => ({ name: s.name, description: s.description })),
+        competencies: currentTopic.competencies.map(c => ({ name: c.name, description: c.description, bloomLevel: c.bloomLevel })),
+        outcomes: currentTopic.learningOutcomes.map(o => ({ name: o.name, bloomLevel: o.bloomLevel })),
+      } : null,
+    };
   }
 
   private async generateLLMResponse(context: AiContext): Promise<string> {
