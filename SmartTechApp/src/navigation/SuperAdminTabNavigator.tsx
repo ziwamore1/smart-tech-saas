@@ -9,6 +9,10 @@ import { SuperAdminMediaScreen } from '../screens/super-admin/MediaScreen';
 import { SuperAdminMonitoringScreen } from '../screens/super-admin/MonitoringScreen';
 import { SuperAdminCommunicationsScreen } from '../screens/super-admin/CommunicationsScreen';
 import { SuperAdminSchoolsScreen } from '../screens/super-admin/SchoolsScreen';
+import { SuperAdminSubscriptionPlansScreen } from '../screens/super-admin/SubscriptionPlansScreen';
+import { SuperAdminInstitutionTypesScreen } from '../screens/super-admin/InstitutionTypesScreen';
+import { SuperAdminAuditLogsScreen } from '../screens/super-admin/AuditLogsScreen';
+import { SuperAdminSettingsScreen } from '../screens/super-admin/SettingsScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
 import { colors, spacing, borderRadius, shadows } from '../theme';
 
@@ -30,6 +34,10 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'SuperAdminMonitoring', label: 'Monitoring', icon: '📡', component: SuperAdminMonitoringScreen, institutionTypes: null as any },
   { name: 'SuperAdminCommunications', label: 'Communications', icon: '📡', component: SuperAdminCommunicationsScreen, institutionTypes: null as any },
   { name: 'SuperAdminSchools', label: 'Schools', icon: '🏫', component: SuperAdminSchoolsScreen, institutionTypes: null as any },
+  { name: 'SuperAdminSubscriptionPlans', label: 'Subscription Plans', icon: '💳', component: SuperAdminSubscriptionPlansScreen, institutionTypes: null as any },
+  { name: 'SuperAdminInstitutionTypes', label: 'Institution Types', icon: '🏛️', component: SuperAdminInstitutionTypesScreen, institutionTypes: null as any },
+  { name: 'SuperAdminAuditLogs', label: 'Audit Logs', icon: '📋', component: SuperAdminAuditLogsScreen, institutionTypes: null as any },
+  { name: 'SuperAdminSettings', label: 'Settings', icon: '⚙️', component: SuperAdminSettingsScreen, institutionTypes: null as any },
   { name: 'SuperAdminProfile', label: 'Profile', icon: '👤', component: ProfileScreen, institutionTypes: null as any },
 ];
 

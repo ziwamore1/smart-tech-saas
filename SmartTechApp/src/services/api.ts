@@ -1823,6 +1823,124 @@ class ApiService {
     const response = await this.client.get('/system-communications/beem');
     return response.data;
   }
+
+  // ===== SuperAdmin Schools API =====
+
+  async getSuperAdminSchools(params?: { status?: string; page?: number; limit?: number; search?: string }) {
+    const response = await this.client.get('/super-admin/schools', { params });
+    return response.data;
+  }
+
+  async getSuperAdminSchoolById(id: string) {
+    const response = await this.client.get(`/super-admin/schools/${id}`);
+    return response.data;
+  }
+
+  async createSuperAdminSchool(data: any) {
+    const response = await this.client.post('/super-admin/schools', data);
+    return response.data;
+  }
+
+  async updateSuperAdminSchool(id: string, data: any) {
+    const response = await this.client.patch(`/super-admin/schools/${id}`, data);
+    return response.data;
+  }
+
+  async activateSuperAdminSchool(id: string) {
+    const response = await this.client.post(`/super-admin/schools/${id}/activate`);
+    return response.data;
+  }
+
+  async deactivateSuperAdminSchool(id: string) {
+    const response = await this.client.post(`/super-admin/schools/${id}/deactivate`);
+    return response.data;
+  }
+
+  async deleteSuperAdminSchool(id: string) {
+    const response = await this.client.delete(`/super-admin/schools/${id}`);
+    return response.data;
+  }
+
+  async updateSuperAdminSchoolSubscription(id: string, data: { status?: string; trialEndDate?: string }) {
+    const response = await this.client.put(`/super-admin/schools/${id}/subscription`, data);
+    return response.data;
+  }
+
+  async getSuperAdminSchoolDirectors(schoolId: string) {
+    const response = await this.client.get(`/super-admin/schools/${schoolId}/directors`);
+    return response.data;
+  }
+
+  async createSuperAdminSchoolDirector(schoolId: string, data: any) {
+    const response = await this.client.post(`/super-admin/schools/${schoolId}/directors`, data);
+    return response.data;
+  }
+
+  async sendSchoolDirectorLoginLink(schoolId: string, directorId: string, method?: string) {
+    const response = await this.client.post(`/super-admin/schools/${schoolId}/directors/${directorId}/send-link`, { method });
+    return response.data;
+  }
+
+  async getSuperAdminSchoolUsers(schoolId: string) {
+    const response = await this.client.get(`/super-admin/schools/${schoolId}/users`);
+    return response.data;
+  }
+
+  // ===== SuperAdmin Stats & Settings =====
+
+  async getSuperAdminStats() {
+    const response = await this.client.get('/super-admin/stats');
+    return response.data;
+  }
+
+  async getSuperAdminSettings() {
+    const response = await this.client.get('/super-admin/settings');
+    return response.data;
+  }
+
+  async getSuperAdminPublicSettings() {
+    const response = await this.client.get('/super-admin/settings/public');
+    return response.data;
+  }
+
+  async updateSuperAdminSetting(key: string, value: any, isPublic?: boolean) {
+    const response = await this.client.put('/super-admin/settings', { key, value, isPublic });
+    return response.data;
+  }
+
+  async getSuperAdminAuditLogs(params?: { schoolId?: string; limit?: number }) {
+    const response = await this.client.get('/super-admin/audit-logs', { params });
+    return response.data;
+  }
+
+  // ===== Subscription Plans API =====
+
+  async getSubscriptionPlans() {
+    const response = await this.client.get('/subscription/plans');
+    return response.data;
+  }
+
+  async createSubscriptionPlan(data: any) {
+    const response = await this.client.post('/subscription/plans', data);
+    return response.data;
+  }
+
+  async updateSubscriptionPlan(id: string, data: any) {
+    const response = await this.client.patch(`/subscription/plans/${id}`, data);
+    return response.data;
+  }
+
+  async deleteSubscriptionPlan(id: string) {
+    const response = await this.client.delete(`/subscription/plans/${id}`);
+    return response.data;
+  }
+
+  // ===== SuperAdmin Institution Types API =====
+
+  async getSuperAdminInstitutionTypes() {
+    const response = await this.client.get('/super-admin/institution-types');
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

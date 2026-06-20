@@ -35,7 +35,7 @@ export const ClassTeacherCommunicationScreen: React.FC = () => {
     try {
       setLoading(true);
       const data = await apiService.getCommunications({ limit: 50 });
-      setCommunications(data || []);
+      setCommunications(data?.communications || data || []);
     } catch (err) {
       console.log('Failed to fetch communications', err);
       setCommunications([]);

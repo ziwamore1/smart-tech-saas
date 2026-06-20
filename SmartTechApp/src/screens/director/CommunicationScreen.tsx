@@ -51,7 +51,7 @@ export const DirectorCommunicationScreen: React.FC<DirectorCommunicationProps> =
     try {
       setLoading(true);
       const data = await apiService.getCommunications();
-      setMessages(data || []);
+      setMessages(data?.communications || data || []);
     } catch (err) {
       console.log('Failed to fetch communications', err);
       setMessages([]);

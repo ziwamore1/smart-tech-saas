@@ -179,6 +179,14 @@ export function AppNavigator() {
             <Stack.Screen name="OtpVerification" component={OtpScreen} />
             <Stack.Screen name="SessionManagement" component={SessionManagementScreen} />
 
+            {/* SuperAdmin Screens */}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminSchoolDetail" component={require('../screens/super-admin/SchoolDetailScreen').SuperAdminSchoolDetailScreen} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminCreateSchool" component={require('../screens/super-admin/CreateSchoolScreen').SuperAdminCreateSchoolScreen} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminSubscriptionPlans" component={require('../screens/super-admin/SubscriptionPlansScreen').SuperAdminSubscriptionPlansScreen} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminInstitutionTypes" component={require('../screens/super-admin/InstitutionTypesScreen').SuperAdminInstitutionTypesScreen} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminAuditLogs" component={require('../screens/super-admin/AuditLogsScreen').SuperAdminAuditLogsScreen} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminSettings" component={require('../screens/super-admin/SettingsScreen').SuperAdminSettingsScreen} />}
+
             {/* Verification Screens */}
             <Stack.Screen name="QRScanner" component={QRScannerScreen} />
             <Stack.Screen name="VerificationResult" component={VerificationResultScreen} />
