@@ -13,6 +13,7 @@ import { SuperAdminSubscriptionPlansScreen } from '../screens/super-admin/Subscr
 import { SuperAdminInstitutionTypesScreen } from '../screens/super-admin/InstitutionTypesScreen';
 import { SuperAdminAuditLogsScreen } from '../screens/super-admin/AuditLogsScreen';
 import { SuperAdminSettingsScreen } from '../screens/super-admin/SettingsScreen';
+import { SuperAdminCurriculumCenterScreen } from '../screens/super-admin/CurriculumCenterScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
 import { colors, spacing, borderRadius, shadows } from '../theme';
 
@@ -37,6 +38,7 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'SuperAdminSubscriptionPlans', label: 'Subscription Plans', icon: '💳', component: SuperAdminSubscriptionPlansScreen, institutionTypes: null as any },
   { name: 'SuperAdminInstitutionTypes', label: 'Institution Types', icon: '🏛️', component: SuperAdminInstitutionTypesScreen, institutionTypes: null as any },
   { name: 'SuperAdminAuditLogs', label: 'Audit Logs', icon: '📋', component: SuperAdminAuditLogsScreen, institutionTypes: null as any },
+  { name: 'SuperAdminCurriculumCenter', label: 'Curriculum Center', icon: '📚', component: SuperAdminCurriculumCenterScreen, institutionTypes: null as any },
   { name: 'SuperAdminSettings', label: 'Settings', icon: '⚙️', component: SuperAdminSettingsScreen, institutionTypes: null as any },
   { name: 'SuperAdminProfile', label: 'Profile', icon: '👤', component: ProfileScreen, institutionTypes: null as any },
 ];

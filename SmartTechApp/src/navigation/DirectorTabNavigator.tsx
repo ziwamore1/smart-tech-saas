@@ -17,6 +17,7 @@ import { DirectorCommunicationScreen } from '../screens/director/CommunicationSc
 import { DirectorUsersScreen } from '../screens/director/UsersScreen';
 import { Grade7Screen } from '../screens/director/Grade7Screen';
 import { CurriculumScreen } from '../screens/director/CurriculumScreen';
+import { DirectorCurriculumScreen } from '../screens/director/CurriculumComplianceScreen';
 import { ECEScreen } from '../screens/director/ECEScreen';
 import { PrimaryGradingScreen } from '../screens/director/PrimaryGradingScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
@@ -57,6 +58,7 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'DirectorECE', label: 'ECE Module', icon: '👶', component: ECEScreen, institutionTypes: ['PRIMARY_SCHOOL'] },
   { name: 'DirectorPrimaryGrading', label: 'Primary Grading', icon: '📊', component: PrimaryGradingScreen, institutionTypes: ['PRIMARY_SCHOOL'] },
   { name: 'DirectorCurriculum', label: 'Curriculum', icon: '📖', component: CurriculumScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
+  { name: 'DirectorCurriculumCompliance', label: 'Compliance', icon: '📊', component: DirectorCurriculumScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorSettings', label: 'Settings', icon: '⚙️', component: DirectorSettingsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
   { name: 'DirectorProfile', label: 'Profile', icon: '👤', component: ProfileScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
 ];

@@ -1941,6 +1941,133 @@ class ApiService {
     const response = await this.client.get('/super-admin/institution-types');
     return response.data;
   }
+
+  // ===== Curriculum Intelligence Engine API =====
+
+  async getTopics(subjectId?: string, academicStageId?: string) {
+    const response = await this.client.get('/curriculum-intelligence/topics', { params: { subjectId, academicStageId } });
+    return response.data;
+  }
+
+  async getTopic(id: string) {
+    const response = await this.client.get(`/curriculum-intelligence/topics/${id}`);
+    return response.data;
+  }
+
+  async createTopic(data: { name: string; subjectId: string; code?: string; description?: string; academicStageId?: string }) {
+    const response = await this.client.post('/curriculum-intelligence/topics', data);
+    return response.data;
+  }
+
+  async getSubtopics(topicId: string) {
+    const response = await this.client.get(`/curriculum-intelligence/topics/${topicId}/subtopics`);
+    return response.data;
+  }
+
+  async createSubtopic(data: { name: string; topicId: string; code?: string; description?: string }) {
+    const response = await this.client.post('/curriculum-intelligence/subtopics', data);
+    return response.data;
+  }
+
+  async getCompetencies(subjectId?: string, topicId?: string, eocId?: string) {
+    const response = await this.client.get('/curriculum-intelligence/competencies', { params: { subjectId, topicId, eocId } });
+    return response.data;
+  }
+
+  async createCompetency(data: { name: string; subjectId?: string; topicId?: string; bloomLevel?: string; category?: string; eocId?: string }) {
+    const response = await this.client.post('/curriculum-intelligence/competencies', data);
+    return response.data;
+  }
+
+  async getElementsOfConstruct(subjectId: string) {
+    const response = await this.client.get(`/curriculum-intelligence/subjects/${subjectId}/elements-of-construct`);
+    return response.data;
+  }
+
+  async createElementOfConstruct(data: { name: string; subjectId: string; construct?: string; sortOrder?: number }) {
+    const response = await this.client.post('/curriculum-intelligence/elements-of-construct', data);
+    return response.data;
+  }
+
+  async getLearningOutcomes(subjectId?: string, topicId?: string) {
+    const response = await this.client.get('/curriculum-intelligence/learning-outcomes', { params: { subjectId, topicId } });
+    return response.data;
+  }
+
+  async createLearningOutcome(data: { name: string; subjectId?: string; topicId?: string; bloomLevel?: string }) {
+    const response = await this.client.post('/curriculum-intelligence/learning-outcomes', data);
+    return response.data;
+  }
+
+  async getSubjectTree(subjectId: string) {
+    const response = await this.client.get(`/curriculum-intelligence/subjects/${subjectId}/tree`);
+    return response.data;
+  }
+
+  async getCurriculumContext(schoolId: string, subjectId: string, topicId?: string) {
+    const response = await this.client.get(`/curriculum-intelligence/ai-context/${schoolId}/${subjectId}/${topicId || ''}`);
+    return response.data;
+  }
+
+  async generateExamQuestions(data: { subjectId: string; questionType: string; count?: number; topicId?: string; bloomLevel?: string; totalMarks?: number }) {
+    const response = await this.client.post('/curriculum-intelligence/generate/questions', data);
+    return response.data;
+  }
+
+  async generateExamPaper(data: { subjectId: string; academicStageId: string; totalMarks?: number }) {
+    const response = await this.client.post('/curriculum-intelligence/generate/exam-paper', data);
+    return response.data;
+  }
+
+  async getSbaTasks(subjectId?: string) {
+    const response = await this.client.get('/curriculum-intelligence/sba/tasks', { params: { subjectId } });
+    return response.data;
+  }
+
+  async createSbaTask(data: { title: string; taskNumber: number; subjectId: string; maxMarks?: number; weight?: number; termId?: string }) {
+    const response = await this.client.post('/curriculum-intelligence/sba/tasks', data);
+    return response.data;
+  }
+
+  async generateSbaTemplate(subjectId: string) {
+    const response = await this.client.get(`/curriculum-intelligence/sba/templates/${subjectId}`);
+    return response.data;
+  }
+
+  async createLessonPlan(data: { title: string; subjectId: string; topicId?: string; classId?: string; duration?: number; weekNumber?: number }) {
+    const response = await this.client.post('/curriculum-intelligence/lesson-plans', data);
+    return response.data;
+  }
+
+  async generateLessonPlan(data: { subjectId: string; topicId: string; classId?: string; duration?: number }) {
+    const response = await this.client.post('/curriculum-intelligence/lesson-plans/generate', data);
+    return response.data;
+  }
+
+  async getLessonPlans(teacherId?: string, subjectId?: string, classId?: string) {
+    const response = await this.client.get('/curriculum-intelligence/lesson-plans', { params: { teacherId, subjectId, classId } });
+    return response.data;
+  }
+
+  async markCurriculumCoverage(data: { classId: string; subjectId: string; topicId: string; percentage?: number; notes?: string }) {
+    const response = await this.client.post('/curriculum-intelligence/coverage', data);
+    return response.data;
+  }
+
+  async getCoverageReport(classId: string, subjectId: string, termId?: string) {
+    const response = await this.client.get(`/curriculum-intelligence/coverage/report/${classId}/${subjectId}`, { params: { termId } });
+    return response.data;
+  }
+
+  async getCurriculumCompliance(schoolId: string) {
+    const response = await this.client.get(`/curriculum-intelligence/analytics/curriculum-compliance/${schoolId}`);
+    return response.data;
+  }
+
+  async getSubjectAnalytics(subjectId: string, schoolId?: string, classId?: string) {
+    const response = await this.client.get(`/curriculum-intelligence/analytics/subject/${subjectId}`, { params: { schoolId, classId } });
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

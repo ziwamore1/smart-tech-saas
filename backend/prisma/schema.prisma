@@ -153,142 +153,154 @@ model InstitutionSetting {
 }
 
 model School {
-  id                      String                     @id @default(uuid())
-  institutionTypeId       String?
-  institutionType         InstitutionType?           @relation(fields: [institutionTypeId], references: [id])
-  name                    String
-  registrationNumber      String?                    @unique
-  phone                   String?
-  email                   String?
-  address                 String?
-  district                String?
-  province                String?
-  capacity                Int?
-  minEntryScore           Float?
-  subscriptionStatus      String                     @default("trial")
-  trialEndsAt             DateTime?
-  createdAt               DateTime                   @default(now())
-  isActive                Boolean                    @default(true)
-  logoUrl                 String?
-  logoPublicId            String?
-  bannerUrl               String?
-  bannerPublicId          String?
-  website                 String?
-  SchoolStamp             String?
-  stampPublicId           String?
-  directorSignature       String?
-  signaturePublicId       String?
-  logo                    String?
-  motto                   String?
-  primaryColor            String?
-  subscriptionEndDate     DateTime?
-  subscriptionStartDate   DateTime?
-  subscriptionTier        String                     @default("basic")
-  academicYears           AcademicYear[]
-  adaptiveTestSessions    AdaptiveTestSession[]
-  aiTutorSessions         AiTutorSession[]
-  assessmentScores        AssessmentScore[]
-  assessments             AssessmentType[]
-  attendances             Attendance[]
-  auditLogs               AuditLog[]
-  behavioralRecords       BehavioralRecord[]
-  breakPeriods            BreakPeriod[]
-  calendarSyncs           CalendarSync[]
-  classes                 Class[]
-  classSubjects           ClassSubject[]
-  classrooms              Classroom[]
-  communications          Communication[]
-  communicationSettings   CommunicationSettings?
-  communicationTemplates  CommunicationTemplate[]
-  competencyScores        CompetencyScore[]
-  conversations           Conversation[]
-  dashboardConfigs        DashboardConfig?
-  enrollments             Enrollment[]
-  exams                   Exam[]
-  FeeCategory             FeeCategory[]
-  FeePayment              FeePayment[]
-  galleries               Gallery[]
-  gradingSystems          GradingSystem[]
-  homeworks               Homework[]
-  interventions           Intervention[]
-  learningAreas           LearningArea[]
-  learningStyleProfiles   LearningStyleProfile[]
-  lessonPlans             LessonPlan[]
-  lessonRequirements      LessonRequirement[]
-  levelTypes              LevelType[]
-  libraries               Library[]
-  NoticeBoard             NoticeBoard[]
-  parents                 Parent[]
-  readingSessions         ReadingSession[]
-  reportTemplates         ReportTemplate[]
-  results                 Result[]
-  setting                 SchoolSetting?
-  schoolUsers             SchoolUser[]
-  students                Student[]
-  studentGrowthRecords    StudentGrowthRecord[]
-  studentInterventions    StudentIntervention[]
-  subjects                Subject[]
-  subscription            Subscription?
-  teachers                Teacher[]
-  teacherAbsences         TeacherAbsence[]
-  teachingAssignments     TeachingAssignment[]
-  timetables              Timetable[]
-  timetableConstraint     TimetableConstraint?
-  users                   User[]
-  templateCategories      TemplateCategory[]
-  templateAssets          TemplateAsset[]
-  marketplaceEntries      TemplateMarketplace[]
-  brandPresets            BrandPreset[]
-  digitalSignatures       DigitalSignature[]
-  collaborationSessions   CollaborationSession[]
-  editorSnapshots         EditorSnapshot[]
-  aiTemplateSuggestions   AITemplateSuggestion[]
-  digitalStamps           DigitalStamp[]
-  stampVerifications      StampVerification[]
-  uploadedExams           UploadedExam[]
-  questionBankCategories  QuestionBankCategory[]
-  questionBankQuestions   QuestionBank[]
-  examTemplates           ExamTemplate[]
-  documentStamps          DocumentStamp[]
-  approvalRequests        ApprovalRequest[]
-  approvalWorkflows       ApprovalWorkflow[]
-  documentSignatures      DocumentSignature[]
-  ministryVerifications   MinistryVerification[]
-  assessmentDefinitions   AssessmentDefinition[]
-  assessmentBatches       AssessmentBatch[]
-  gradingPolicies         GradingPolicy[]
-  classGradingPolicies    ClassGradingPolicy[]
-  computedResults         ComputedResult[]
-  termSummaries           TermSummary[]
-  assessmentAnalytics     AssessmentAnalytics[]
-  remarks                 Remark[]
-  longitudinalRecords     LongitudinalRecord[]
-  departments             Department[]
-  actingPositions         ActingPosition[]
-  aiContextMemories       AiContextMemory[]
-  aiRecommendations       AiRecommendation[]
-  aiTopicMasteries        AiTopicMastery[]
-  educationLevels         EducationLevel[]
-  curricula               CurriculumVersion[]
-  stages                  AcademicStage[]
-  subjectGroups           SubjectGroup[]
-  subjectGroupSubjects    SubjectGroupSubject[]
-  subjectCombinationRules SubjectCombinationRule[]
-  conversionRules         SubjectConversionRule[]
-  divisionRules           DivisionRule[]
-  performanceCategories   PerformanceCategory[]
-  examStructures          ExamStructure[]
-  examComponents          ExamComponent[]
-  bestSubjectRules        BestSubjectSelectionRule[]
-  certificationRules      CertificationRule[]
-  promotionRules          PromotionRule[]
-  pathwayRules            PathwayRule[]
-  grade7Results           Grade7Result[]
-  selectedGrade7Results   Grade7Result[]             @relation("SelectedSchool")
-  schoolEducationLevels   SchoolEducationLevel[]
-  schoolCurricula         SchoolCurriculum[]
-  resultSheets            ResultSheet[]
-  resultAuditLogs         ResultAuditLog[]
+  id                           String                         @id @default(uuid())
+  institutionTypeId            String?
+  institutionType              InstitutionType?               @relation(fields: [institutionTypeId], references: [id])
+  name                         String
+  registrationNumber           String?                        @unique
+  phone                        String?
+  email                        String?
+  address                      String?
+  district                     String?
+  province                     String?
+  capacity                     Int?
+  minEntryScore                Float?
+  subscriptionStatus           String                         @default("trial")
+  trialEndsAt                  DateTime?
+  createdAt                    DateTime                       @default(now())
+  isActive                     Boolean                        @default(true)
+  logoUrl                      String?
+  logoPublicId                 String?
+  bannerUrl                    String?
+  bannerPublicId               String?
+  website                      String?
+  SchoolStamp                  String?
+  stampPublicId                String?
+  directorSignature            String?
+  signaturePublicId            String?
+  logo                         String?
+  motto                        String?
+  primaryColor                 String?
+  subscriptionEndDate          DateTime?
+  subscriptionStartDate        DateTime?
+  subscriptionTier             String                         @default("basic")
+  academicYears                AcademicYear[]
+  adaptiveTestSessions         AdaptiveTestSession[]
+  aiTutorSessions              AiTutorSession[]
+  assessmentScores             AssessmentScore[]
+  assessments                  AssessmentType[]
+  attendances                  Attendance[]
+  auditLogs                    AuditLog[]
+  behavioralRecords            BehavioralRecord[]
+  breakPeriods                 BreakPeriod[]
+  calendarSyncs                CalendarSync[]
+  classes                      Class[]
+  classSubjects                ClassSubject[]
+  classrooms                   Classroom[]
+  communications               Communication[]
+  communicationSettings        CommunicationSettings?
+  communicationTemplates       CommunicationTemplate[]
+  competencyScores             CompetencyScore[]
+  conversations                Conversation[]
+  dashboardConfigs             DashboardConfig?
+  enrollments                  Enrollment[]
+  exams                        Exam[]
+  FeeCategory                  FeeCategory[]
+  FeePayment                   FeePayment[]
+  galleries                    Gallery[]
+  gradingSystems               GradingSystem[]
+  homeworks                    Homework[]
+  interventions                Intervention[]
+  learningAreas                LearningArea[]
+  learningStyleProfiles        LearningStyleProfile[]
+  lessonPlans                  LessonPlan[]
+  lessonRequirements           LessonRequirement[]
+  levelTypes                   LevelType[]
+  libraries                    Library[]
+  NoticeBoard                  NoticeBoard[]
+  parents                      Parent[]
+  readingSessions              ReadingSession[]
+  reportTemplates              ReportTemplate[]
+  results                      Result[]
+  setting                      SchoolSetting?
+  schoolUsers                  SchoolUser[]
+  students                     Student[]
+  studentGrowthRecords         StudentGrowthRecord[]
+  studentInterventions         StudentIntervention[]
+  subjects                     Subject[]
+  subscription                 Subscription?
+  teachers                     Teacher[]
+  teacherAbsences              TeacherAbsence[]
+  teachingAssignments          TeachingAssignment[]
+  timetables                   Timetable[]
+  timetableConstraint          TimetableConstraint?
+  users                        User[]
+  templateCategories           TemplateCategory[]
+  templateAssets               TemplateAsset[]
+  marketplaceEntries           TemplateMarketplace[]
+  brandPresets                 BrandPreset[]
+  digitalSignatures            DigitalSignature[]
+  collaborationSessions        CollaborationSession[]
+  editorSnapshots              EditorSnapshot[]
+  aiTemplateSuggestions        AITemplateSuggestion[]
+  digitalStamps                DigitalStamp[]
+  stampVerifications           StampVerification[]
+  uploadedExams                UploadedExam[]
+  questionBankCategories       QuestionBankCategory[]
+  questionBankQuestions        QuestionBank[]
+  examTemplates                ExamTemplate[]
+  documentStamps               DocumentStamp[]
+  approvalRequests             ApprovalRequest[]
+  approvalWorkflows            ApprovalWorkflow[]
+  documentSignatures           DocumentSignature[]
+  ministryVerifications        MinistryVerification[]
+  assessmentDefinitions        AssessmentDefinition[]
+  assessmentBatches            AssessmentBatch[]
+  gradingPolicies              GradingPolicy[]
+  classGradingPolicies         ClassGradingPolicy[]
+  computedResults              ComputedResult[]
+  termSummaries                TermSummary[]
+  assessmentAnalytics          AssessmentAnalytics[]
+  remarks                      Remark[]
+  longitudinalRecords          LongitudinalRecord[]
+  departments                  Department[]
+  actingPositions              ActingPosition[]
+  aiContextMemories            AiContextMemory[]
+  aiRecommendations            AiRecommendation[]
+  aiTopicMasteries             AiTopicMastery[]
+  educationLevels              EducationLevel[]
+  curricula                    CurriculumVersion[]
+  stages                       AcademicStage[]
+  subjectGroups                SubjectGroup[]
+  subjectGroupSubjects         SubjectGroupSubject[]
+  subjectCombinationRules      SubjectCombinationRule[]
+  conversionRules              SubjectConversionRule[]
+  divisionRules                DivisionRule[]
+  performanceCategories        PerformanceCategory[]
+  examStructures               ExamStructure[]
+  examComponents               ExamComponent[]
+  bestSubjectRules             BestSubjectSelectionRule[]
+  certificationRules           CertificationRule[]
+  promotionRules               PromotionRule[]
+  pathwayRules                 PathwayRule[]
+  grade7Results                Grade7Result[]
+  selectedGrade7Results        Grade7Result[]                 @relation("SelectedSchool")
+  schoolEducationLevels        SchoolEducationLevel[]
+  schoolCurricula              SchoolCurriculum[]
+  resultSheets                 ResultSheet[]
+  resultAuditLogs              ResultAuditLog[]
+  Topic                        Topic[]
+  Subtopic                     Subtopic[]
+  Competency                   Competency[]
+  ElementOfConstruct           ElementOfConstruct[]
+  LearningOutcome              LearningOutcome[]
+  AssessmentObjective          AssessmentObjective[]
+  SyllabusDocument             SyllabusDocument[]
+  SyllabusDocumentSubject      SyllabusDocumentSubject[]
+  SbaTask                      SbaTask[]
+  CurriculumLessonPlan         CurriculumLessonPlan[]
+  CurriculumLessonPlanActivity CurriculumLessonPlanActivity[]
+  CurriculumCoverage           CurriculumCoverage[]
 
   @@index([institutionTypeId])
   @@index([isActive])
@@ -296,19 +308,20 @@ model School {
 }
 
 model AcademicYear {
-  id                  String               @id @default(uuid())
-  name                String
-  startDate           DateTime
-  endDate             DateTime
-  isCurrent           Boolean              @default(false)
-  schoolId            String
-  createdAt           DateTime             @default(now())
-  school              School               @relation(fields: [schoolId], references: [id])
-  enrollments         Enrollment[]
-  FeeCategory         FeeCategory[]
-  teachingAssignments TeachingAssignment[]
-  terms               Term[]
-  grade7Results       Grade7Result[]
+  id                   String                 @id @default(uuid())
+  name                 String
+  startDate            DateTime
+  endDate              DateTime
+  isCurrent            Boolean                @default(false)
+  schoolId             String
+  createdAt            DateTime               @default(now())
+  school               School                 @relation(fields: [schoolId], references: [id])
+  enrollments          Enrollment[]
+  FeeCategory          FeeCategory[]
+  teachingAssignments  TeachingAssignment[]
+  terms                Term[]
+  grade7Results        Grade7Result[]
+  CurriculumLessonPlan CurriculumLessonPlan[]
 
   @@index([schoolId])
   @@index([isCurrent])
@@ -342,6 +355,8 @@ model Term {
   longitudinalRecords  LongitudinalRecord[]
   grade7Results        Grade7Result[]
   resultSheets         ResultSheet[]
+  SbaTask              SbaTask[]
+  CurriculumLessonPlan CurriculumLessonPlan[]
 
   @@index([academicYearId])
   @@index([isCurrent])
@@ -471,43 +486,54 @@ model Class {
   classGradingPolicies ClassGradingPolicy[]
   termSummaries        TermSummary[]
   longitudinalRecords  LongitudinalRecord[]
+  CurriculumLessonPlan CurriculumLessonPlan[]
+  CurriculumCoverage   CurriculumCoverage[]
 }
 
 model Subject {
-  id                     String                        @id @default(uuid())
-  name                   String
-  code                   String?
-  isCore                 Boolean                       @default(false)
-  schoolId               String
-  category               String?
-  credits                Int?
-  description            String?
-  adaptiveTestSessions   AdaptiveTestSession[]
-  assessments            AssessmentType[]
-  classSubjects          ClassSubject[]
-  exams                  Exam[]
-  homeworks              Homework[]
-  learningAreas          LearningArea[]
-  lessonPlans            LessonPlan[]
-  lessonRequirements     LessonRequirement[]
-  nationalBenchmarks     NationalBenchmark[]
-  results                Result[]
-  school                 School                        @relation(fields: [schoolId], references: [id])
-  assignments            TeachingAssignment[]
-  timetableSlots         TimetableSlot[]
-  uploadedExams          UploadedExam[]
-  questionBankCategories QuestionBankCategory[]
-  questionBankQuestions  QuestionBank[]
-  examTemplates          ExamTemplate[]
-  assessmentConfigs      TermAssessmentConfiguration[]
-  assessmentResults      StudentAssessmentResult[]
-  assessmentBatches      AssessmentBatch[]
-  computedResults        ComputedResult[]
-  classGradingPolicies   ClassGradingPolicy[]
-  remarks                Remark[]
-  longitudinalRecords    LongitudinalRecord[]
-  subjectGroupLinks      SubjectGroupSubject[]
-  conversionRules        SubjectConversionRule[]
+  id                      String                        @id @default(uuid())
+  name                    String
+  code                    String?
+  isCore                  Boolean                       @default(false)
+  schoolId                String
+  category                String?
+  credits                 Int?
+  description             String?
+  adaptiveTestSessions    AdaptiveTestSession[]
+  assessments             AssessmentType[]
+  classSubjects           ClassSubject[]
+  exams                   Exam[]
+  homeworks               Homework[]
+  learningAreas           LearningArea[]
+  lessonPlans             LessonPlan[]
+  lessonRequirements      LessonRequirement[]
+  nationalBenchmarks      NationalBenchmark[]
+  results                 Result[]
+  school                  School                        @relation(fields: [schoolId], references: [id])
+  assignments             TeachingAssignment[]
+  timetableSlots          TimetableSlot[]
+  uploadedExams           UploadedExam[]
+  questionBankCategories  QuestionBankCategory[]
+  questionBankQuestions   QuestionBank[]
+  examTemplates           ExamTemplate[]
+  assessmentConfigs       TermAssessmentConfiguration[]
+  assessmentResults       StudentAssessmentResult[]
+  assessmentBatches       AssessmentBatch[]
+  computedResults         ComputedResult[]
+  classGradingPolicies    ClassGradingPolicy[]
+  remarks                 Remark[]
+  longitudinalRecords     LongitudinalRecord[]
+  subjectGroupLinks       SubjectGroupSubject[]
+  conversionRules         SubjectConversionRule[]
+  Topic                   Topic[]
+  Competency              Competency[]
+  ElementOfConstruct      ElementOfConstruct[]
+  LearningOutcome         LearningOutcome[]
+  AssessmentObjective     AssessmentObjective[]
+  SyllabusDocumentSubject SyllabusDocumentSubject[]
+  SbaTask                 SbaTask[]
+  CurriculumLessonPlan    CurriculumLessonPlan[]
+  CurriculumCoverage      CurriculumCoverage[]
 
   @@unique([name, schoolId])
 }
@@ -543,28 +569,30 @@ model TeachingAssignment {
 }
 
 model Teacher {
-  id                 String              @id @default(uuid())
-  employeeNo         String?
-  photoUrl           String?
-  photoPublicId      String?
-  hireDate           DateTime?
-  userId             String              @unique
-  schoolId           String
-  department         String?
-  departmentId       String?
-  gender             String?
-  staffType          String?             @default("TEACHING")
-  qualification      String?
-  specialization     String?
-  yearsOfExperience  Int?
-  emergencyContact   String?
-  emergencyPhone     String?
-  lessonRequirements LessonRequirement[]
-  school             School              @relation(fields: [schoolId], references: [id])
-  user               User                @relation(fields: [userId], references: [id])
-  departmentRel      Department?         @relation(fields: [departmentId], references: [id])
-  actingPositions    ActingPosition[]
-  timetableSlots     TimetableSlot[]
+  id                   String                 @id @default(uuid())
+  employeeNo           String?
+  photoUrl             String?
+  photoPublicId        String?
+  hireDate             DateTime?
+  userId               String                 @unique
+  schoolId             String
+  department           String?
+  departmentId         String?
+  gender               String?
+  staffType            String?                @default("TEACHING")
+  qualification        String?
+  specialization       String?
+  yearsOfExperience    Int?
+  emergencyContact     String?
+  emergencyPhone       String?
+  lessonRequirements   LessonRequirement[]
+  school               School                 @relation(fields: [schoolId], references: [id])
+  user                 User                   @relation(fields: [userId], references: [id])
+  departmentRel        Department?            @relation(fields: [departmentId], references: [id])
+  actingPositions      ActingPosition[]
+  timetableSlots       TimetableSlot[]
+  CurriculumLessonPlan CurriculumLessonPlan[]
+  CurriculumCoverage   CurriculumCoverage[]
 
   @@index([department])
   @@index([staffType])
@@ -2686,6 +2714,8 @@ enum QuestionType {
   DRAG_DROP
   IMAGE_BASED
   PRACTICAL
+  PROJECT
+  CONTEXTUAL
   STRUCTURED
   COMPREHENSION
   ORDERING
@@ -3828,6 +3858,7 @@ model EducationLevel {
   schoolEducationLevels SchoolEducationLevel[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+  SyllabusDocument      SyllabusDocument[]
 
   @@unique([code, schoolId])
 }
@@ -3885,6 +3916,9 @@ model AcademicStage {
   pathwayRulesExitStage   PathwayRule[]      @relation("ExitStage")
   createdAt               DateTime           @default(now())
   updatedAt               DateTime           @updatedAt
+  Topic                   Topic[]
+  SyllabusDocument        SyllabusDocument[]
+  SbaTask                 SbaTask[]
 
   @@unique([code, curriculumVersionId, schoolId])
   @@index([educationLevelId])
@@ -4272,6 +4306,333 @@ model SchoolCurriculum {
   @@unique([schoolId, curriculumVersionId])
   @@index([schoolId])
   @@index([curriculumVersionId])
+}
+
+// =============================================
+// CURRICULUM INTELLIGENCE ENGINE (CIE) MODELS
+// Comprehensive subject knowledge structure for ECZ, Cambridge, IGCSE
+// =============================================
+
+enum BloomLevel {
+  REMEMBER
+  UNDERSTAND
+  APPLY
+  ANALYZE
+  EVALUATE
+  CREATE
+}
+
+enum SbaStatus {
+  PENDING
+  IN_PROGRESS
+  SUBMITTED
+  MARKED
+  RETURNED
+}
+
+enum LessonPlanStatus {
+  DRAFT
+  PUBLISHED
+  COMPLETED
+  ARCHIVED
+}
+
+model Topic {
+  id                   String                 @id @default(uuid())
+  name                 String
+  code                 String?
+  description          String?
+  sortOrder            Int                    @default(0)
+  subjectId            String
+  subject              Subject                @relation(fields: [subjectId], references: [id])
+  academicStageId      String?
+  academicStage        AcademicStage?         @relation(fields: [academicStageId], references: [id])
+  subtopics            Subtopic[]
+  competencies         Competency[]
+  learningOutcomes     LearningOutcome[]
+  isActive             Boolean                @default(true)
+  schoolId             String?
+  school               School?                @relation(fields: [schoolId], references: [id])
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  CurriculumLessonPlan CurriculumLessonPlan[]
+  CurriculumCoverage   CurriculumCoverage[]
+
+  @@unique([name, subjectId, academicStageId])
+  @@index([subjectId])
+  @@index([academicStageId])
+}
+
+model Subtopic {
+  id                   String                 @id @default(uuid())
+  name                 String
+  code                 String?
+  description          String?
+  sortOrder            Int                    @default(0)
+  topicId              String
+  topic                Topic                  @relation(fields: [topicId], references: [id])
+  competencies         Competency[]
+  learningOutcomes     LearningOutcome[]
+  isActive             Boolean                @default(true)
+  schoolId             String?
+  school               School?                @relation(fields: [schoolId], references: [id])
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  CurriculumLessonPlan CurriculumLessonPlan[]
+
+  @@unique([name, topicId])
+  @@index([topicId])
+}
+
+model Competency {
+  id          String              @id @default(uuid())
+  name        String
+  code        String?
+  description String?
+  category    String? // e.g. "Knowledge", "Skill", "Value", "Attitude"
+  bloomLevel  BloomLevel? // Highest Bloom level required
+  topicId     String?
+  topic       Topic?              @relation(fields: [topicId], references: [id])
+  subtopicId  String?
+  subtopic    Subtopic?           @relation(fields: [subtopicId], references: [id])
+  subjectId   String?
+  subject     Subject?            @relation(fields: [subjectId], references: [id])
+  eocId       String?
+  eoc         ElementOfConstruct? @relation(fields: [eocId], references: [id])
+  isActive    Boolean             @default(true)
+  schoolId    String?
+  school      School?             @relation(fields: [schoolId], references: [id])
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  SbaTask     SbaTask[]
+
+  @@unique([name, topicId, subjectId])
+  @@index([topicId])
+  @@index([subtopicId])
+  @@index([subjectId])
+  @@index([eocId])
+}
+
+model ElementOfConstruct {
+  id           String       @id @default(uuid())
+  name         String
+  code         String?
+  description  String?
+  sortOrder    Int          @default(0)
+  subjectId    String
+  subject      Subject      @relation(fields: [subjectId], references: [id])
+  construct    String? // The broad construct of the subject
+  competencies Competency[]
+  isActive     Boolean      @default(true)
+  schoolId     String?
+  school       School?      @relation(fields: [schoolId], references: [id])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  SbaTask      SbaTask[]
+
+  @@unique([name, subjectId])
+  @@index([subjectId])
+}
+
+model LearningOutcome {
+  id          String      @id @default(uuid())
+  name        String
+  code        String?
+  description String?
+  bloomLevel  BloomLevel?
+  topicId     String?
+  topic       Topic?      @relation(fields: [topicId], references: [id])
+  subtopicId  String?
+  subtopic    Subtopic?   @relation(fields: [subtopicId], references: [id])
+  subjectId   String?
+  subject     Subject?    @relation(fields: [subjectId], references: [id])
+  isActive    Boolean     @default(true)
+  schoolId    String?
+  school      School?     @relation(fields: [schoolId], references: [id])
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([name, topicId, subjectId])
+  @@index([topicId])
+  @@index([subtopicId])
+  @@index([subjectId])
+}
+
+model AssessmentObjective {
+  id          String   @id @default(uuid())
+  name        String
+  code        String?
+  description String?
+  weight      Float? // Percentage weight in exam
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id])
+  isActive    Boolean  @default(true)
+  schoolId    String?
+  school      School?  @relation(fields: [schoolId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([name, subjectId])
+  @@index([subjectId])
+}
+
+model SyllabusDocument {
+  id               String                    @id @default(uuid())
+  title            String
+  documentType     String // ASSESSMENT_SCHEME, SYLLABUS, FRAMEWORK
+  curriculum       String                    @default("ECZ") // ECZ, Cambridge, IGCSE, Custom
+  educationLevelId String?
+  educationLevel   EducationLevel?           @relation(fields: [educationLevelId], references: [id])
+  academicStageId  String?
+  academicStage    AcademicStage?            @relation(fields: [academicStageId], references: [id])
+  filePath         String
+  fileSize         Int?
+  fileType         String?
+  isProcessed      Boolean                   @default(false) // Has PDF been parsed?
+  metadata         Json? // Extracted metadata
+  subjects         SyllabusDocumentSubject[]
+  schoolId         String?
+  school           School?                   @relation(fields: [schoolId], references: [id])
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  @@index([documentType])
+  @@index([curriculum])
+  @@index([educationLevelId])
+}
+
+model SyllabusDocumentSubject {
+  id          String           @id @default(uuid())
+  documentId  String
+  document    SyllabusDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  subjectId   String
+  subject     Subject          @relation(fields: [subjectId], references: [id])
+  subjectCode String? // e.g. "1021" for English Language
+  construct   String? // The construct from the assessment scheme
+  sbaWeight   Float? // SBA weight percentage
+  examWeight  Float? // Final exam weight percentage
+  sbaTasks    Int? // Number of SBA tasks
+  examItems   Int? // Number of exam test items
+  metadata    Json?
+  schoolId    String?
+  school      School?          @relation(fields: [schoolId], references: [id])
+
+  @@unique([documentId, subjectId])
+  @@index([documentId])
+  @@index([subjectId])
+}
+
+model SbaTask {
+  id              String              @id @default(uuid())
+  title           String
+  description     String?
+  taskNumber      Int
+  subjectId       String
+  subject         Subject             @relation(fields: [subjectId], references: [id])
+  academicStageId String?
+  academicStage   AcademicStage?      @relation(fields: [academicStageId], references: [id])
+  termId          String?
+  term            Term?               @relation(fields: [termId], references: [id])
+  maxMarks        Float?
+  weight          Float?
+  dueDate         DateTime?
+  competencyId    String?
+  competency      Competency?         @relation(fields: [competencyId], references: [id])
+  eocId           String?
+  eoc             ElementOfConstruct? @relation(fields: [eocId], references: [id])
+  isActive        Boolean             @default(true)
+  schoolId        String?
+  school          School?             @relation(fields: [schoolId], references: [id])
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([taskNumber, subjectId, academicStageId, termId])
+  @@index([subjectId])
+  @@index([academicStageId])
+  @@index([termId])
+}
+
+model CurriculumLessonPlan {
+  id                String                         @id @default(uuid())
+  title             String
+  subjectId         String
+  subject           Subject                        @relation(fields: [subjectId], references: [id])
+  topicId           String?
+  topic             Topic?                         @relation(fields: [topicId], references: [id])
+  subtopicId        String?
+  subtopic          Subtopic?                      @relation(fields: [subtopicId], references: [id])
+  classId           String?
+  class             Class?                         @relation(fields: [classId], references: [id])
+  teacherId         String?
+  teacher           Teacher?                       @relation(fields: [teacherId], references: [id])
+  duration          Int?
+  weekNumber        Int?
+  termId            String?
+  term              Term?                          @relation(fields: [termId], references: [id])
+  academicYearId    String?
+  academicYear      AcademicYear?                  @relation(fields: [academicYearId], references: [id])
+  status            LessonPlanStatus               @default(DRAFT)
+  objectives        String?
+  materials         String?
+  assessmentMethods String?
+  activities        CurriculumLessonPlanActivity[]
+  isGenerated       Boolean                        @default(false)
+  schoolId          String?
+  school            School?                        @relation(fields: [schoolId], references: [id])
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+
+  @@index([subjectId])
+  @@index([topicId])
+  @@index([classId])
+  @@index([teacherId])
+  @@index([termId])
+}
+
+model CurriculumLessonPlanActivity {
+  id           String               @id @default(uuid())
+  lessonPlanId String
+  lessonPlan   CurriculumLessonPlan @relation(fields: [lessonPlanId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  duration     Int?
+  activityType String?
+  sortOrder    Int                  @default(0)
+  schoolId     String?
+  school       School?              @relation(fields: [schoolId], references: [id])
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([lessonPlanId])
+}
+
+model CurriculumCoverage {
+  id           String    @id @default(uuid())
+  classId      String
+  class        Class     @relation(fields: [classId], references: [id])
+  subjectId    String
+  subject      Subject   @relation(fields: [subjectId], references: [id])
+  topicId      String
+  topic        Topic     @relation(fields: [topicId], references: [id])
+  subtopicId   String    @default("")
+  teacherId    String?
+  teacher      Teacher?  @relation(fields: [teacherId], references: [id])
+  termId       String    @default("")
+  isCovered    Boolean   @default(false)
+  coverageDate DateTime?
+  percentage   Float?
+  notes        String?
+  schoolId     String?
+  school       School?   @relation(fields: [schoolId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([classId, subjectId, topicId, subtopicId, termId])
+  @@index([classId])
+  @@index([subjectId])
+  @@index([topicId])
+  @@index([teacherId])
+  @@index([termId])
 }
 
 // =============================================
