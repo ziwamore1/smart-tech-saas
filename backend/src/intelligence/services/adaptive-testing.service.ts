@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CieAdaptiveService } from '../../curriculum-intelligence/cie-adaptive.service';
 
 @Injectable()
 export class AdaptiveTestingService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cieAdaptive: CieAdaptiveService,
+  ) {}
 
   private readonly DEFAULT_DISCRIMINATION = 0.3;
   private readonly DEFAULT_GUESSING = 0.25;
@@ -44,13 +48,53 @@ export class AdaptiveTestingService {
 
     const answeredIds = session.responses.map(r => r.questionId);
 
-    const questions = await this.prisma.examQuestion.findMany({
-      where: {
-        exam: { subjectId: session.subjectId, schoolId },
-        id: { notIn: answeredIds },
-      },
-      orderBy: { order: 'asc' },
-    });
+    let questions: any[] = [];
+
+    // After MIN_QUESTIONS, use CIE-aware selection: prioritize weak competencies
+    if (session.questionsAsked >= this.MIN_QUESTIONS) {
+      try {
+        questions = await this.getCieAwareQuestions(session, answeredIds, schoolId);
+      } catch {
+        questions = [];
+      }
+    }
+
+    // Fallback to standard question selection
+    if (questions.length === 0) {
+      questions = await this.prisma.examQuestion.findMany({
+        where: {
+          exam: { subjectId: session.subjectId, schoolId },
+          id: { notIn: answeredIds },
+        },
+        orderBy: { order: 'asc' },
+      });
+
+      // If no exam questions, try question bank
+      if (questions.length === 0) {
+        const qbQuestions = await this.prisma.questionBank.findMany({
+          where: {
+            subjectId: session.subjectId,
+            schoolId,
+            id: { notIn: answeredIds },
+            isPublic: true,
+          },
+          take: 10,
+        });
+
+        questions = qbQuestions.map(q => ({
+          id: q.id,
+          question: q.question,
+          questionType: q.questionType,
+          options: q.options,
+          correctAnswer: q.correctAnswer,
+          difficulty: this.mapQuestionBankDifficulty(q.difficulty),
+          score: q.score,
+          competencyId: q.competencyId,
+          topic: q.topic,
+          source: 'question_bank',
+        }));
+      }
+    }
 
     if (!questions.length && answeredIds.length === 0) {
       return { error: 'No questions available for this subject' };
@@ -63,10 +107,10 @@ export class AdaptiveTestingService {
 
     if (session.questionsAsked < this.MIN_QUESTIONS) {
       const medium = questions.filter(q => {
-        const diff = this.estimateDifficulty(q);
+        const diff = typeof q.difficulty === 'number' ? q.difficulty : this.estimateDifficulty(q);
         return diff >= -1 && diff <= 1;
       });
-      return this.pickQuestion(medium.length > 0 ? medium : questions, 0);
+      return this.pickQuestion(medium.length > 0 ? medium : questions, session.questionsAsked);
     }
 
     const bestQuestion = this.selectBestQuestion(questions, session.abilityEstimate);
@@ -87,28 +131,41 @@ export class AdaptiveTestingService {
 
     if (!session || session.schoolId !== schoolId) return { error: 'Session not found' };
 
-    const question = await this.prisma.examQuestion.findUnique({
+    // Try QuestionBank first, then ExamQuestion
+    let question: any = await this.prisma.questionBank.findUnique({
       where: { id: questionId },
     });
 
+    let source = 'question_bank';
+    if (!question) {
+      question = await this.prisma.examQuestion.findUnique({
+        where: { id: questionId },
+      });
+      source = 'exam_question';
+    }
+
     if (!question) return { error: 'Question not found' };
 
-    const isCorrect = studentAnswer.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase();
+    const isCorrect = studentAnswer.trim().toLowerCase() === (question.correctAnswer || '').trim().toLowerCase();
     const answeredCategories = session.responses.filter(r => r.questionId === questionId);
 
     if (answeredCategories.length > 0) {
       return { error: 'Question already answered' };
     }
 
+    const difficulty = typeof question.difficulty === 'number'
+      ? question.difficulty
+      : this.mapQuestionBankDifficulty(question.difficulty as string);
+
     await this.prisma.adaptiveTestResponse.create({
       data: {
         sessionId,
         questionId,
         questionText: question.question,
-        correctAnswer: question.correctAnswer,
+        correctAnswer: question.correctAnswer || '',
         studentAnswer,
         isCorrect,
-        difficulty: this.estimateDifficulty(question),
+        difficulty,
         discrimination: this.DEFAULT_DISCRIMINATION,
         guessed: false,
         responseTime: responseTimeMs,
@@ -121,7 +178,7 @@ export class AdaptiveTestingService {
         id: 'new',
         questionId,
         isCorrect,
-        difficulty: this.estimateDifficulty(question),
+        difficulty,
       },
     ];
 
@@ -147,6 +204,7 @@ export class AdaptiveTestingService {
     const completed = newSE < this.STOP_SE || session.questionsAsked + 1 >= this.MAX_QUESTIONS;
 
     if (completed && newSE < this.STOP_SE) {
+      await this.completeSession(session);
       return { completed: true, abilityEstimate: newAbility, se: newSE };
     }
 
@@ -162,7 +220,10 @@ export class AdaptiveTestingService {
   async getSessionResult(sessionId: string, schoolId: string) {
     const session = await this.prisma.adaptiveTestSession.findUnique({
       where: { id: sessionId },
-      include: { responses: true, subject: true },
+      include: {
+        responses: true,
+        subject: { select: { id: true, name: true } },
+      },
     });
 
     if (!session || session.schoolId !== schoolId) return { error: 'Session not found' };
@@ -171,6 +232,34 @@ export class AdaptiveTestingService {
     const totalQuestions = session.responses.length;
 
     const difficultyLevel = this.interpretAbility(session.abilityEstimate);
+
+    // Build competency analysis from CIE
+    let competencyMastery: any[] = [];
+    let bloomBreakdown: any[] = [];
+    let curriculumRecommendations: string[] = [];
+
+    try {
+      const ctx = await this.cieAdaptive.getCurriculumContext(session.subjectId);
+
+      // Look up competencyId for each response
+      const responseWithComp = await Promise.all(
+        session.responses.map(async r => {
+          const cid = await this.cieAdaptive.getCompetencyForQuestion(r.questionId, 'question_bank')
+            || await this.cieAdaptive.getCompetencyForQuestion(r.questionId, 'exam_question');
+          return { isCorrect: r.isCorrect, competencyId: cid, difficulty: r.difficulty };
+        }),
+      );
+
+      competencyMastery = this.cieAdaptive.analyzeCompetencyMastery(responseWithComp, ctx.competencies);
+      bloomBreakdown = this.cieAdaptive.generateBloomLevelBreakdown(responseWithComp, ctx.competencies);
+      curriculumRecommendations = this.cieAdaptive.generateCurriculumRecommendations(
+        competencyMastery, session.abilityEstimate,
+      );
+    } catch {
+      competencyMastery = [];
+      bloomBreakdown = [];
+      curriculumRecommendations = [];
+    }
 
     return {
       subject: session.subject.name,
@@ -184,8 +273,59 @@ export class AdaptiveTestingService {
       averageDifficulty: Number(
         (session.responses.reduce((s, r) => s + r.difficulty, 0) / (totalQuestions || 1)).toFixed(4),
       ),
-      recommendations: this.getAdaptiveRecommendations(session.abilityEstimate, session.responses),
+      competencyMastery,
+      bloomBreakdown,
+      recommendations: [
+        ...this.getAdaptiveRecommendations(session.abilityEstimate, session.responses),
+        ...curriculumRecommendations,
+      ],
     };
+  }
+
+  private async getCieAwareQuestions(session: any, answeredIds: string[], schoolId: string) {
+    const ctx = await this.cieAdaptive.getCurriculumContext(session.subjectId);
+
+    // Build competency mastery from session responses
+    const responseWithComp = await Promise.all(
+      session.responses.map(async r => {
+        const cid = await this.cieAdaptive.getCompetencyForQuestion(r.questionId, 'question_bank')
+          || await this.cieAdaptive.getCompetencyForQuestion(r.questionId, 'exam_question');
+        return { isCorrect: r.isCorrect, competencyId: cid, difficulty: r.difficulty };
+      }),
+    );
+
+    const mastery = this.cieAdaptive.analyzeCompetencyMastery(responseWithComp, ctx.competencies);
+
+    // Get weak competencies (not yet mastered, with some data)
+    const weakComps = mastery
+      .filter(c => c.masteryLevel !== 'mastered' && c.total > 0)
+      .slice(0, 5)
+      .map(c => c.competencyId);
+
+    // Get untested competencies
+    const untestedComps = mastery
+      .filter(c => c.total === 0)
+      .slice(0, 5)
+      .map(c => c.competencyId);
+
+    const targetCompIds = [...weakComps, ...untestedComps];
+
+    if (targetCompIds.length > 0) {
+      const cieQuestions = await this.cieAdaptive.findQuestionsByCompetencies(
+        session.subjectId,
+        schoolId,
+        targetCompIds,
+        answeredIds,
+        10,
+      );
+
+      if (cieQuestions.length > 0) {
+        return cieQuestions;
+      }
+    }
+
+    // Fallback: get questions from question bank filtered by subject
+    return [];
   }
 
   private pickQuestion(questions: any[], asked: number) {
@@ -195,23 +335,39 @@ export class AdaptiveTestingService {
       questionText: q.question,
       questionType: q.questionType,
       options: q.options,
-      maxScore: q.score,
+      maxScore: q.score || 1,
       questionNumber: asked + 1,
+      source: q.source || 'exam_question',
+      competencyId: q.competencyId,
+      topic: q.topic,
     };
   }
 
   private estimateDifficulty(question: any): number {
-    if (question.difficulty !== undefined && question.difficulty !== null) return question.difficulty;
+    if (typeof question.difficulty === 'number') return question.difficulty;
     const score = question.score || 1;
     return -Math.log((score / 100) || 0.5);
   }
 
+  private mapQuestionBankDifficulty(difficulty: string): number {
+    const map: Record<string, number> = {
+      EASY: -1.5,
+      MEDIUM: 0,
+      HARD: 1.5,
+      ADVANCED: 2.5,
+    };
+    return map[difficulty] ?? 0;
+  }
+
   private selectBestQuestion(questions: any[], currentAbility: number): any {
     return questions.reduce((best, q) => {
-      const diff = this.estimateDifficulty(q);
+      const diff = typeof q.difficulty === 'number' ? q.difficulty : this.estimateDifficulty(q);
       const info = this.informationFunction(diff, currentAbility, this.DEFAULT_DISCRIMINATION, this.DEFAULT_GUESSING);
       const bestInfo = best ? this.informationFunction(
-        this.estimateDifficulty(best), currentAbility, this.DEFAULT_DISCRIMINATION, this.DEFAULT_GUESSING,
+        typeof best.difficulty === 'number' ? best.difficulty : this.estimateDifficulty(best),
+        currentAbility,
+        this.DEFAULT_DISCRIMINATION,
+        this.DEFAULT_GUESSING,
       ) : -1;
       return info > bestInfo ? q : best;
     }, questions[0]);

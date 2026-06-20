@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { QueuesModule } from '../queues/queues.module';
+import { CurriculumIntelligenceModule } from '../curriculum-intelligence/curriculum-intelligence.module';
 import { IntelligenceController } from './intelligence.controller';
 import { DescriptiveStatsService } from './services/descriptive-stats.service';
 import { TrendAnalysisService } from './services/trend-analysis.service';
@@ -21,7 +22,7 @@ import { SubjectEngineService } from './services/subject-engine.service';
 import { AiMemoryService } from './services/ai-memory.service';
 
 @Module({
-  imports: [ConfigModule, QueuesModule],
+  imports: [ConfigModule, QueuesModule, CurriculumIntelligenceModule],
   controllers: [IntelligenceController],
   providers: [
     PrismaService,

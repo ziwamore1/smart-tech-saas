@@ -8,6 +8,7 @@ import { ExaminationGeneratorService } from './examination-generator.service';
 import { SbaManagementService } from './sba-management.service';
 import { LessonPlanningService } from './lesson-planning.service';
 import { AnalyticsService } from './analytics.service';
+import { CieAdaptiveService } from './cie-adaptive.service';
 
 @Module({
   imports: [PrismaModule],
@@ -20,6 +21,7 @@ import { AnalyticsService } from './analytics.service';
     SbaManagementService,
     LessonPlanningService,
     AnalyticsService,
+    CieAdaptiveService,
   ],
   exports: [
     CurriculumIntelligenceService,
@@ -28,6 +30,7 @@ import { AnalyticsService } from './analytics.service';
     SbaManagementService,
     LessonPlanningService,
     AnalyticsService,
+    CieAdaptiveService,
   ],
 })
 export class CurriculumIntelligenceModule {}
