@@ -71,8 +71,9 @@
     },
     "runtimeVersion": "1.0.0",
     "updates": {
-      "enabled": false,
-      "fallbackToCacheTimeout": 0
+      "enabled": true,
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/6ce784fa-e27e-41e7-8961-afbded716fec"
     },
     "jsEngine": "hermes"
   }
