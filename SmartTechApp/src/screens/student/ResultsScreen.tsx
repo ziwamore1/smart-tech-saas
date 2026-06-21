@@ -24,7 +24,35 @@ export const StudentResultsScreen: React.FC = () => {
       if (user?.id && termId) {
         const res = await apiService.getStudentResults(user.id, termId);
         const data = res?.data || res;
-        setResults(Array.isArray(data) ? data : data?.results || data?.subjects || []);
+        let resultsData: any[] = Array.isArray(data) ? data : data?.results || data?.subjects || [];
+
+        // Merge composite subjects
+        if (resultsData.length > 0 && user?.schoolId) {
+          try {
+            const compositeRaw = await apiService.getCompositeForStudent(
+              user.id, termId, user.schoolId, '',
+            );
+            const composites = Array.isArray(compositeRaw) ? compositeRaw : compositeRaw?.data || [];
+            if (composites.length > 0) {
+              const componentIds = new Set(composites.flatMap((c: any) =>
+                (c.components || []).map((cc: any) => cc.subjectId),
+              ));
+              resultsData = resultsData.filter((s: any) => !componentIds.has(s.subjectId));
+              for (const comp of composites) {
+                resultsData.push({
+                  id: comp.composite?.id,
+                  subject: { name: comp.composite?.name, code: comp.composite?.code },
+                  score: comp.finalPercentage,
+                  grade: comp.finalGrade,
+                  remark: null,
+                  isComposite: true,
+                });
+              }
+            }
+          } catch { /* ok */ }
+        }
+
+        setResults(resultsData);
       }
     } catch (err) {
       console.error('Failed to load results');

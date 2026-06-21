@@ -54,6 +54,11 @@ export interface AiContext {
       outcomes: { name: string; bloomLevel: string | null }[];
     } | null;
   } | null;
+  compositeContext?: {
+    isComposite: boolean;
+    compositeName?: string;
+    components?: { subjectName: string; percentage: number | null; weight: number }[];
+  } | null;
 }
 
 export function buildSystemPrompt(context: AiContext): string {
@@ -175,11 +180,15 @@ BASE ALL RESPONSES ON THIS CURRICULUM. Use the constructs, competencies, and out
 IMPORTANT: Always align your responses with the official curriculum above. Reference specific elements of construct, competencies, and learning outcomes. Never teach outside this curriculum unless the student explicitly asks.`
     : '';
 
+  const compositePrompt = context.compositeContext?.isComposite
+    ? `\n\n=== COMPOSITE SUBJECT ANALYSIS ===\n${context.compositeContext.compositeName} is a composite subject made up of:\n${context.compositeContext.components.map(c => `- ${c.subjectName}: ${c.percentage != null ? c.percentage + '%' : 'No data'} (weight: ${c.weight}%)`).join('\n')}\nWhen discussing this subject, ALWAYS break down the performance into its component subjects. Identify which component is the weaker contributor and needs improvement. Drill down into individual component performance when asked.`
+    : '';
+
   const screenPrompt = context.screen
     ? `\n\nCURRENT SCREEN/MODULE: ${context.screen}\nTailor your response to what the user is currently viewing.`
     : '';
 
-  return `${basePrompt}\n\n${rolePrompts[role]}${subjectPrompt}${curriculumPrompt}${screenPrompt}`;
+  return `${basePrompt}\n\n${rolePrompts[role]}${subjectPrompt}${curriculumPrompt}${compositePrompt}${screenPrompt}`;
 }
 
 export function buildUserPrompt(context: AiContext): string {
@@ -206,6 +215,12 @@ export function buildUserPrompt(context: AiContext): string {
   }
   if (context.curriculumContext?.currentTopic) {
     parts.push(`[On topic: ${context.curriculumContext.currentTopic.name}]`);
+  }
+  if (context.compositeContext?.isComposite) {
+    const comps = context.compositeContext.components.map(c =>
+      `${c.subjectName}: ${c.percentage != null ? c.percentage + '%' : 'N/A'} (weight ${c.weight}%)`,
+    ).join(', ');
+    parts.push(`[Composite ${context.compositeContext.compositeName} = ${comps}]`);
   }
 
   const contextPrefix = parts.length > 0 ? `Context: ${parts.join(' ')}\n\n` : '';

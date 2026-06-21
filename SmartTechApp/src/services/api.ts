@@ -2068,6 +2068,57 @@ class ApiService {
     const response = await this.client.get(`/curriculum-intelligence/analytics/subject/${subjectId}`, { params: { schoolId, classId } });
     return response.data;
   }
+
+  // Composite Subject API
+  async getCompositeSubjects(params?: { curriculumId?: string; schoolId?: string; isActive?: boolean }) {
+    const response = await this.client.get('/composite-subjects', { params });
+    return response.data;
+  }
+
+  async getCompositeSubject(id: string) {
+    const response = await this.client.get(`/composite-subjects/${id}`);
+    return response.data;
+  }
+
+  async createCompositeSubject(data: {
+    name: string;
+    code: string;
+    curriculumId: string;
+    calculationMethod?: string;
+    schoolId?: string;
+    components: { subjectId: string; weight: number }[];
+  }) {
+    const response = await this.client.post('/composite-subjects', data);
+    return response.data;
+  }
+
+  async updateCompositeSubject(id: string, data: {
+    name?: string;
+    code?: string;
+    calculationMethod?: string;
+    isActive?: boolean;
+    components?: { subjectId: string; weight: number }[];
+  }) {
+    const response = await this.client.put(`/composite-subjects/${id}`, data);
+    return response.data;
+  }
+
+  async deleteCompositeSubject(id: string) {
+    const response = await this.client.delete(`/composite-subjects/${id}`);
+    return response.data;
+  }
+
+  async recomputeCompositeSubject(id: string, data: { classId: string; termId: string; schoolId: string; studentIds?: string[] }) {
+    const response = await this.client.post(`/composite-subjects/${id}/recompute`, data);
+    return response.data;
+  }
+
+  async getCompositeForStudent(studentId: string, termId: string, schoolId: string, classId: string) {
+    const response = await this.client.get(`/composite-subjects/student/${studentId}/${termId}`, {
+      params: { schoolId, classId },
+    });
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

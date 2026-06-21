@@ -6,6 +6,7 @@ import { AiContextService } from './ai-context.service';
 import { AiMemoryService } from './ai-memory.service';
 import { SubjectEngineService } from './subject-engine.service';
 import { buildSystemPrompt, buildUserPrompt, AiContext, Role } from './prompt-templates';
+import { CompositeSubjectService } from '../../composite-subject/composite-subject.service';
 
 @Injectable()
 export class AiTutorService {
@@ -18,6 +19,7 @@ export class AiTutorService {
     private aiContext: AiContextService,
     private aiMemory: AiMemoryService,
     private subjectEngine: SubjectEngineService,
+    private compositeSubjectService: CompositeSubjectService,
   ) {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (apiKey) {
@@ -308,6 +310,58 @@ export class AiTutorService {
         context.curriculumContext = await this.fetchCurriculumContext(schoolId, subjectId, partial?.topic);
       } catch (err) {
         this.logger.warn(`Failed to fetch curriculum context for subject ${subjectId}: ${err}`);
+      }
+
+      // Check if this subject is a component of a composite subject
+      try {
+        const composites = await this.prisma.compositeSubject.findMany({
+          where: {
+            isActive: true,
+            components: { some: { subjectId } },
+          },
+          include: { components: { include: { subject: true } } },
+        });
+
+        if (composites.length > 0) {
+          const composite = composites[0];
+          const studentId = partial?.studentId || context.studentId;
+          const term = studentId
+            ? await this.prisma.term.findFirst({
+                where: { schoolId, isCurrent: true },
+                orderBy: { startDate: 'desc' },
+              })
+            : null;
+
+          const components = [];
+          for (const component of composite.components) {
+            let percentage: number | null = null;
+            if (studentId && term) {
+              const computed = await this.prisma.computedResult.findUnique({
+                where: {
+                  studentId_subjectId_termId: {
+                    studentId,
+                    subjectId: component.subjectId,
+                    termId: term.id,
+                  },
+                },
+              }).catch(() => null);
+              percentage = computed?.finalPercentage ?? null;
+            }
+            components.push({
+              subjectName: component.subject.name,
+              percentage,
+              weight: component.weight,
+            });
+          }
+
+          context.compositeContext = {
+            isComposite: true,
+            compositeName: composite.name,
+            components,
+          };
+        }
+      } catch (err) {
+        this.logger.warn(`Failed to fetch composite context: ${err}`);
       }
     }
 

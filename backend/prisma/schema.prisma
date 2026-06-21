@@ -301,6 +301,7 @@ model School {
   CurriculumLessonPlan         CurriculumLessonPlan[]
   CurriculumLessonPlanActivity CurriculumLessonPlanActivity[]
   CurriculumCoverage           CurriculumCoverage[]
+  compositeSubjects            CompositeSubject[]
 
   @@index([institutionTypeId])
   @@index([isActive])
@@ -534,6 +535,7 @@ model Subject {
   SbaTask                 SbaTask[]
   CurriculumLessonPlan    CurriculumLessonPlan[]
   CurriculumCoverage      CurriculumCoverage[]
+  compositeSubjectComponents CompositeSubjectComponent[]
 
   @@unique([name, schoolId])
 }
@@ -3508,6 +3510,39 @@ model LongitudinalRecord {
   @@index([subjectId])
 }
 
+model CompositeSubject {
+  id                  String                       @id @default(uuid())
+  name                String
+  code                String
+  curriculumId        String
+  calculationMethod   String                       @default("WEIGHTED_AVERAGE")
+  isActive            Boolean                      @default(true)
+  schoolId            String?
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+  curriculum          CurriculumVersion            @relation(fields: [curriculumId], references: [id])
+  school              School?                      @relation(fields: [schoolId], references: [id])
+  components          CompositeSubjectComponent[]
+
+  @@unique([code, curriculumId])
+  @@index([curriculumId])
+  @@index([schoolId])
+}
+
+model CompositeSubjectComponent {
+  id                  String            @id @default(uuid())
+  compositeSubjectId  String
+  subjectId           String
+  weight              Float             @default(1.0)
+  createdAt           DateTime          @default(now())
+  compositeSubject    CompositeSubject  @relation(fields: [compositeSubjectId], references: [id], onDelete: Cascade)
+  subject             Subject           @relation(fields: [subjectId], references: [id])
+
+  @@unique([compositeSubjectId, subjectId])
+  @@index([compositeSubjectId])
+  @@index([subjectId])
+}
+
 enum AssessmentResultStatus {
   DRAFT
   SUBMITTED
@@ -3889,6 +3924,7 @@ model CurriculumVersion {
   grade7Results         Grade7Result[]
   schoolCurricula       SchoolCurriculum[]
   schoolEducationLevels SchoolEducationLevel[]
+  compositeSubjects      CompositeSubject[]
   createdAt             DateTime                   @default(now())
   updatedAt             DateTime                   @updatedAt
 

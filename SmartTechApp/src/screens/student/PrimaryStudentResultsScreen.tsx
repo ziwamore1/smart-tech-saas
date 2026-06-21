@@ -43,7 +43,41 @@ export const PrimaryStudentResultsScreen: React.FC = () => {
 
       if (resRaw.status === 'fulfilled') {
         const r = resRaw.value?.data || resRaw.value;
-        const data: SubjectResult[] = Array.isArray(r) ? r : r?.results || r?.subjects || [];
+        let data: SubjectResult[] = Array.isArray(r) ? r : r?.results || r?.subjects || [];
+
+        // Merge composite subject results (hide components, show aggregate)
+        if (data.length > 0 && user?.schoolId) {
+          try {
+            const compositeRaw = await apiService.getCompositeForStudent(
+              user.id, termId, user.schoolId, '',
+            );
+            const composites = Array.isArray(compositeRaw) ? compositeRaw : compositeRaw?.data || [];
+            if (composites.length > 0) {
+              const componentIds = new Set(composites.flatMap((c: any) =>
+                (c.components || []).map((cc: any) => cc.subjectId),
+              ));
+              data = data.filter(s => !componentIds.has(s.subjectId));
+              for (const comp of composites) {
+                data.push({
+                  subjectId: comp.composite?.id || `composite-${Date.now()}`,
+                  subjectName: comp.composite?.name || 'Composite',
+                  subjectCode: comp.composite?.code || '',
+                  finalPercentage: comp.finalPercentage,
+                  finalGrade: comp.finalGrade,
+                  finalRemark: undefined,
+                  points: undefined,
+                  performanceCategory: undefined,
+                  assessments: (comp.components || []).map((c: any) => ({
+                    name: c.subjectName,
+                    rawScore: c.percentage,
+                    maxScore: 100,
+                    percentage: c.percentage,
+                  })),
+                });
+              }
+            }
+          } catch { /* composites not available, use raw data */ }
+        }
         setSubjects(data);
         if (data.length > 0) setSelectedSubject(data[0]);
       }

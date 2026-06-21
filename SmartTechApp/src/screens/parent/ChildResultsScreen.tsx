@@ -7,12 +7,14 @@ import * as Print from 'expo-print';
 import { Card, Loading } from '../../components';
 import { colors, spacing, borderRadius } from '../../theme';
 import { useAppStore } from '../../store';
+import { useAuthStore } from '../../store';
 import { apiService } from '../../services/api';
 import { useRoute, RouteProp } from '@react-navigation/native';
 
 export const ParentChildResultsScreen: React.FC = () => {
   const route = useRoute<RouteProp<any>>();
   const { dashboard } = useAppStore();
+  const { user } = useAuthStore();
   const childId = route.params?.childId || dashboard?.children?.[0]?.id;
   const childName = route.params?.childName || dashboard?.children?.[0]?.name;
   const [results, setResults] = useState<any[]>([]);
@@ -30,7 +32,35 @@ export const ParentChildResultsScreen: React.FC = () => {
       if (termId) {
         const res = await apiService.getParentChildResults(childId, termId);
         const data = res?.data || res;
-        setResults(Array.isArray(data) ? data : data?.results || data?.subjects || []);
+        let resultsData: any[] = Array.isArray(data) ? data : data?.results || data?.subjects || [];
+
+        // Merge composite subjects
+        if (resultsData.length > 0 && user?.schoolId) {
+          try {
+            const compositeRaw = await apiService.getCompositeForStudent(
+              childId, termId, user.schoolId, '',
+            );
+            const composites = Array.isArray(compositeRaw) ? compositeRaw : compositeRaw?.data || [];
+            if (composites.length > 0) {
+              const componentIds = new Set(composites.flatMap((c: any) =>
+                (c.components || []).map((cc: any) => cc.subjectId),
+              ));
+              resultsData = resultsData.filter((s: any) => !componentIds.has(s.subjectId));
+              for (const comp of composites) {
+                resultsData.push({
+                  id: comp.composite?.id,
+                  subject: { name: comp.composite?.name, code: comp.composite?.code },
+                  score: comp.finalPercentage,
+                  grade: comp.finalGrade,
+                  remark: null,
+                  isComposite: true,
+                });
+              }
+            }
+          } catch { /* ok */ }
+        }
+
+        setResults(resultsData);
       }
     } catch (err) { console.error('Failed to load results'); }
     finally { setLoading(false); }

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { PrismaService } from '../prisma/prisma.service';
 import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { SocketGateway } from '../messaging/socket.gateway';
+import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 
 export interface CreateAssessmentDefinitionDto {
   name: string;
@@ -69,6 +70,7 @@ export class AssessmentEngineService {
     private prisma: PrismaService,
     private gradingEngine: GradingEngineService,
     private socketGateway: SocketGateway,
+    private compositeSubjectService: CompositeSubjectService,
   ) {}
 
   async createAssessmentDefinition(schoolId: string, data: CreateAssessmentDefinitionDto) {
@@ -576,6 +578,10 @@ export class AssessmentEngineService {
     await this.syncComputedResult(classId, subjectId, termId, schoolId).catch(e =>
       this.logger.error(`syncComputedResult failed: ${e.message}`),
     );
+    // Recompute any composite subjects that include this subject
+    await this.compositeSubjectService.recomputeAllComposites(subjectId, classId, termId, schoolId).catch(e =>
+      this.logger.error(`composite recompute failed: ${e.message}`),
+    );
     const sheet = await this.syncResultSheet(schoolId, classId, termId, enteredBy).catch(e => {
       this.logger.error(`syncResultSheet failed: ${e.message}`);
       return null;
@@ -679,6 +685,10 @@ export class AssessmentEngineService {
     // Sync computed results and result sheet for real-time web analytics
     await this.syncComputedResult(data.classId, data.subjectId, data.termId, schoolId).catch(e =>
       this.logger.error(`syncComputedResult failed: ${e.message}`),
+    );
+    // Recompute any composite subjects that include this subject
+    await this.compositeSubjectService.recomputeAllComposites(data.subjectId, data.classId, data.termId, schoolId).catch(e =>
+      this.logger.error(`composite recompute failed: ${e.message}`),
     );
     await this.syncResultSheet(schoolId, data.classId, data.termId, data.enteredBy).catch(e => {
       this.logger.error(`syncResultSheet failed: ${e.message}`);

@@ -1,11 +1,15 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 
 @Injectable()
 export class ReportCardEngineService {
   private readonly logger = new Logger(ReportCardEngineService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private compositeSubjectService: CompositeSubjectService,
+  ) {}
 
   async generateReportCardData(
     studentId: string,
@@ -104,6 +108,11 @@ export class ReportCardEngineService {
       };
     });
 
+    // Apply composite subject transformations
+    const processedBreakdown = await this.applyCompositeTransform(
+      subjectBreakdown, studentId, termId, classId, schoolId,
+    );
+
     const termSummary = await this.prisma.termSummary.findFirst({
       where: { studentId, termId },
     });
@@ -150,7 +159,7 @@ export class ReportCardEngineService {
     });
 
     // Enrich subject breakdown with performance category
-    const enrichedBreakdown = subjectBreakdown.map(s => {
+    const enrichedBreakdown = processedBreakdown.map(s => {
       const cat = performanceCategories.find(
         c => (c.minScore ?? 0) <= (s.finalPercentage ?? 0) && (!c.maxScore || c.maxScore >= (s.finalPercentage ?? 0)),
       ) ?? performanceCategories.find(c => !c.minScore && !c.maxScore);
@@ -374,5 +383,49 @@ export class ReportCardEngineService {
       completionRate: totalStudents > 0 ? (studentsWithSummary / totalStudents) * 100 : 0,
       readyForPublication: studentsWithSummary === totalStudents,
     };
+  }
+
+  private async applyCompositeTransform(
+    breakdown: any[],
+    studentId: string,
+    termId: string,
+    classId: string,
+    schoolId: string,
+  ) {
+    const composites = await this.compositeSubjectService.getCompositeResultsForStudent(
+      studentId, termId, classId, schoolId,
+    );
+    if (composites.length === 0) return breakdown;
+
+    const componentSubjectIds = new Set<string>();
+    for (const comp of composites) {
+      for (const c of comp.components) {
+        componentSubjectIds.add(c.subjectId);
+      }
+    }
+
+    const filtered = breakdown.filter(s => !componentSubjectIds.has(s.subjectId));
+
+    for (const comp of composites) {
+      filtered.push({
+        subjectId: comp.composite.id,
+        subjectName: comp.composite.name,
+        subjectCode: comp.composite.code,
+        totalRawScore: comp.finalPercentage,
+        totalWeightedScore: null,
+        finalPercentage: comp.finalPercentage,
+        finalGrade: comp.finalGrade,
+        finalRemark: null,
+        points: null,
+        gpa: null,
+        classRank: null,
+        subjectRank: null,
+        assessments: [],
+        isComposite: true,
+        components: comp.components,
+      });
+    }
+
+    return filtered;
   }
 }

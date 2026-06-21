@@ -74,6 +74,7 @@ import { RankingModule } from './ranking-service/ranking.module';
 import { IdentityModule } from './identity-service/identity.module';
 import { CurriculumModule } from './curriculum-service/curriculum.module';
 import { CurriculumIntelligenceModule } from './curriculum-intelligence/curriculum-intelligence.module';
+import { CompositeSubjectModule } from './composite-subject/composite-subject.module';
 import { InstitutionModule } from './institution/institution.module';
 import { PrimarySchoolModule } from './primary-school/primary-grading.module';
 import { Grade7EczModule } from './grade7-ecz/grade7-ecz.module';
@@ -185,6 +186,7 @@ import { ProductionLogger } from './common/production-logger';
     IdentityModule,
     CurriculumModule,
     CurriculumIntelligenceModule,
+    CompositeSubjectModule,
     PrimarySchoolModule,
     Grade7EczModule,
     StaffSyncEngineModule,
