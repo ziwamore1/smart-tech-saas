@@ -23,10 +23,12 @@ export const SuperAdminDashboardScreen: React.FC<SuperAdminDashboardProps> = ({ 
 
   const loadData = useCallback(async () => {
     try {
-      const [mediaStatsRes] = await Promise.all([
+      const [mediaStatsRes, systemStatsRes] = await Promise.all([
         apiService.getMediaStats(),
+        apiService.getSuperAdminStats(),
       ]);
       setMediaStats(mediaStatsRes?.data || mediaStatsRes);
+      setStats(systemStatsRes?.data || systemStatsRes);
     } catch (err) {
       console.error('Failed to load stats:', err);
     }

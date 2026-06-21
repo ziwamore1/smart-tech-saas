@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, StatCard, QuickActionItem, WidgetCard, GradientCard } from '../../components';
 import { colors, spacing } from '../../theme';
-import { useAuthStore, useAppStore } from '../../store';
+import { useAuthStore } from '../../store';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { apiService } from '../../services/api';
@@ -16,12 +16,25 @@ interface DirectorDashboardProps {
 
 export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
   const { user, logout } = useAuthStore();
-  const { dashboard, isLoadingDashboard, fetchDashboard } = useAppStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [signature, setSignature] = useState<any>(null);
+  const [directorStats, setDirectorStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const isPrimarySchool = user?.institutionType === 'PRIMARY_SCHOOL';
 
-  useEffect(() => { fetchDashboard(); }, []);
+  const loadDirectorData = useCallback(async () => {
+    try {
+      const data = await apiService.getDirectorDashboard();
+      setDirectorStats(data);
+    } catch (err) {
+      console.error('Failed to load director dashboard:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadDirectorData(); }, [loadDirectorData]);
 
   useEffect(() => {
     const loadSignature = async () => {
@@ -35,7 +48,12 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
     loadSignature();
   }, []);
 
-  const stats = dashboard?.stats;
+  const stats = directorStats ? {
+    totalClasses: directorStats.totalClasses ?? 0,
+    totalChildren: directorStats.totalStudents ?? 0,
+    totalTeachers: directorStats.totalTeachers ?? 0,
+    todayLessons: 0,
+  } : null;
 
   const handleLogout = () => {
     Alert.alert(
@@ -56,6 +74,12 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
         },
       ]
     );
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadDirectorData();
+    setRefreshing(false);
   };
 
   const drawerScreens = ['DirectorReports', 'DirectorStaff', 'DirectorSettings', 'DirectorProfile', 'DirectorHome', 'DirectorClasses', 'DirectorStudents', 'DirectorLibrary', 'DirectorTimetable', 'DirectorCommunication', 'DirectorECE', 'DirectorPrimaryGrading'];
@@ -98,12 +122,15 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
         rightIcon={{ name: '🔔', onPress: () => navigation.navigate('Notifications') }}
       />
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
         <View style={styles.statsRow}>
           <StatCard label="Classes" value={stats?.totalClasses || 0} icon="🏫" color={colors.primaryLight} bgColor={colors.infoLight} />
           <StatCard label="Students" value={stats?.totalChildren || 0} icon="👥" color={colors.success} bgColor={colors.successLight} />
           <StatCard label="Today" value={stats?.todayLessons || 0} icon="📅" color={colors.warning} bgColor={colors.warningLight} />
-          <StatCard label="Staff" value={stats?.totalClasses || 0} icon="👨‍🏫" color={colors.teal} bgColor={colors.tealLight} />
+          <StatCard label="Staff" value={stats?.totalTeachers || 0} icon="👨‍🏫" color={colors.teal} bgColor={colors.tealLight} />
         </View>
 
         {stats?.pendingTasks != null && (

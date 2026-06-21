@@ -61,7 +61,7 @@ export const TeacherDashboardScreen: React.FC = () => {
         <View style={styles.statsRow}>
           <StatCard label="Classes" value={stats?.totalClasses || 0} icon="🏫" color={colors.primaryLight} bgColor={colors.infoLight} />
           <StatCard label="Today" value={stats?.todayLessons || 0} icon="📅" color={colors.success} bgColor={colors.successLight} />
-          <StatCard label="Students" value={dashboard?.children?.length || 0} icon="👥" color={colors.warning} bgColor={colors.warningLight} />
+          <StatCard label="Students" value={stats?.totalStudents || 0} icon="👥" color={colors.warning} bgColor={colors.warningLight} />
         </View>
 
         <View style={styles.sectionHeader}>

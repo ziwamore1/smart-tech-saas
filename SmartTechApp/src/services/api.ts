@@ -394,6 +394,11 @@ class ApiService {
 
   // ===== Mobile Director Data =====
 
+  async getDirectorDashboard(): Promise<any> {
+    const response = await this.client.get('/director/dashboard');
+    return response.data;
+  }
+
   async getClasses() {
     const response = await this.client.get('/mobile/classes');
     return response.data;

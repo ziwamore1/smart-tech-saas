@@ -102,6 +102,7 @@ export interface DashboardStats {
   totalClasses?: number;
   classes?: { id: string; name: string }[];
   todayLessons?: number;
+  totalStudents?: number;
   averageScore?: number;
   pendingTasks?: number;
   activeAlerts?: number;

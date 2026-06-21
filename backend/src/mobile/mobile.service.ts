@@ -162,10 +162,24 @@ export class MobileService {
           employeeNo: teacher.employeeNo,
         };
 
+        const studentCount = myClasses.length > 0
+          ? await this.prisma.student.count({
+              where: {
+                enrollments: {
+                  some: {
+                    classId: { in: myClasses.map(c => c.classId) },
+                    academicYear: { schoolId, isCurrent: true },
+                  },
+                },
+              },
+            })
+          : 0;
+
         dashboard.stats = {
           totalClasses: classes.length,
           classes: classes.filter(Boolean),
           todayLessons,
+          totalStudents: studentCount,
         };
       }
     }
