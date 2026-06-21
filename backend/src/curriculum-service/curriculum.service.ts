@@ -130,10 +130,11 @@ export class CurriculumService {
     return this.prisma.academicStage.create({ data });
   }
 
-  async getAcademicStages(educationLevelId?: string, curriculumVersionId?: string) {
+  async getAcademicStages(educationLevelId?: string, curriculumVersionId?: string, schoolId?: string) {
     const where: any = {};
     if (educationLevelId) where.educationLevelId = educationLevelId;
     if (curriculumVersionId) where.curriculumVersionId = curriculumVersionId;
+    if (schoolId) where.OR = [{ schoolId }, { schoolId: null }];
     return this.prisma.academicStage.findMany({
       where,
       include: { educationLevel: true, curriculumVersion: true, examStructures: true },

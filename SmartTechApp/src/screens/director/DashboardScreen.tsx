@@ -82,7 +82,7 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
     setRefreshing(false);
   };
 
-  const drawerScreens = ['DirectorReports', 'DirectorStaff', 'DirectorSettings', 'DirectorProfile', 'DirectorHome', 'DirectorClasses', 'DirectorStudents', 'DirectorLibrary', 'DirectorTimetable', 'DirectorCommunication', 'DirectorECE', 'DirectorPrimaryGrading'];
+  const drawerScreens = ['DirectorReports', 'DirectorStaff', 'DirectorSettings', 'DirectorProfile', 'DirectorHome', 'DirectorClasses', 'DirectorStudents', 'DirectorLibrary', 'DirectorTimetable', 'DirectorCommunication', 'DirectorECE', 'DirectorPrimaryGrading', 'DirectorGrade7'];
 
   const handleNavigate = (screen: string, params?: any) => {
     if (drawerScreens.includes(screen)) {
@@ -95,7 +95,7 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
   };
 
   const primaryActions = [
-    { icon: '🎓', label: 'Grade 7 ECZ', screen: 'Grade7', gradient: ['#7C3AED', '#A78BFA'] as const },
+    { icon: '🎓', label: 'Grade 7 ECZ', screen: 'DirectorGrade7', gradient: ['#7C3AED', '#A78BFA'] as const },
     { icon: '🧸', label: 'ECE Module', screen: 'DirectorECE', gradient: ['#EC4899', '#F472B6'] as const },
     { icon: '📊', label: 'Primary Grading', screen: 'DirectorPrimaryGrading', gradient: ['#F59E0B', '#FBBF24'] as const },
     { icon: '👶', label: 'Pre Intake', screen: 'DirectorStudents', gradient: ['#10B981', '#34D399'] as const, params: { filter: 'pre-school' } },
@@ -201,7 +201,7 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
 
         {isPrimarySchool && (
           <>
-            <WidgetCard title="Primary School Overview" action={{ label: 'Grade 7', onPress: () => handleNavigate('Grade7') }}>
+            <WidgetCard title="Primary School Overview" action={{ label: 'Grade 7', onPress: () => handleNavigate('DirectorGrade7') }}>
               <View style={styles.primaryStatsRow}>
                 <View style={styles.primaryStatItem}>
                   <Text style={styles.perfValue}>{stats?.totalChildren || 0}</Text>

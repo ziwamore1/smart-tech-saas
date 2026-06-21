@@ -1529,13 +1529,13 @@ class ApiService {
     return response.data;
   }
 
-  async getCurriculumVersions(educationLevelId?: string) {
-    const response = await this.client.get('/curriculum/versions', { params: { educationLevelId } });
+  async getCurriculumVersions(educationLevelId?: string, schoolId?: string) {
+    const response = await this.client.get('/curriculum/versions', { params: { educationLevelId, schoolId } });
     return response.data;
   }
 
-  async getAcademicStages(educationLevelId?: string) {
-    const response = await this.client.get('/curriculum/stages', { params: { educationLevelId } });
+  async getAcademicStages(educationLevelId?: string, curriculumVersionId?: string, schoolId?: string) {
+    const response = await this.client.get('/curriculum/stages', { params: { educationLevelId, curriculumVersionId, schoolId } });
     return response.data;
   }
 

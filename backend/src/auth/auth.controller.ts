@@ -87,7 +87,7 @@ export class AuthController {
   @Post('mobile-login')
   async mobileLogin(@Body() body: MobileLoginDto) {
     this.logger.log(
-      `Mobile login request - email: ${body.email}, platform: ${body.platform || 'android'}`,
+      `Mobile login request - email: ${body.email}, username: ${body.username}, platform: ${body.platform || 'android'}`,
     );
     return this.authService.mobileLogin(
       body.email,
@@ -95,6 +95,7 @@ export class AuthController {
       body.deviceToken,
       body.deviceId,
       body.platform,
+      body.username,
     );
   }
 

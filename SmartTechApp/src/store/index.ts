@@ -35,11 +35,11 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       error: null,
 
-      login: async (email: string, password: string, deviceToken?: string) => {
+      login: async (email: string, password: string, deviceToken?: string, username?: string) => {
         set({ isLoading: true, error: null });
         try {
           const response = await apiService.login({
-            email,
+            ...(username ? { username } : { email }),
             password,
             deviceToken,
             platform: 'android',

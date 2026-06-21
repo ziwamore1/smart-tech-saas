@@ -86,8 +86,8 @@ export class CurriculumController {
   }
 
   @Get('stages')
-  getStages(@Query('educationLevelId') elId?: string, @Query('curriculumVersionId') cvId?: string) {
-    return this.curriculumService.getAcademicStages(elId, cvId);
+  getStages(@Query('educationLevelId') elId?: string, @Query('curriculumVersionId') cvId?: string, @Query('schoolId') schoolId?: string) {
+    return this.curriculumService.getAcademicStages(elId, cvId, schoolId);
   }
 
   @Get('stages/:id')

@@ -63,7 +63,8 @@ export interface LoginResponse {
 }
 
 export interface MobileLoginRequest {
-  email: string;
+  email?: string;
+  username?: string;
   password: string;
   deviceToken?: string;
   deviceId?: string;

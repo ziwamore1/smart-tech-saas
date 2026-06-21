@@ -108,7 +108,7 @@ export const SuperAdminSettingsScreen: React.FC<Props> = ({ onToggleDrawer }) =>
             <View key={s.id || s.key} style={styles.settingRow}>
               <View style={styles.settingInfo}>
                 <Text style={styles.settingKey}>{s.key}</Text>
-                <Text style={styles.settingValue} numberOfLines={2}>{s.value}</Text>
+                <Text style={styles.settingValue} numberOfLines={2}>{typeof s.value === 'object' ? JSON.stringify(s.value, null, 1) : String(s.value)}</Text>
               </View>
               {s.isPublic && <View style={styles.publicBadge}><Text style={styles.publicText}>Public</Text></View>}
               <TouchableOpacity

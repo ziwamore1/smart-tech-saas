@@ -1,9 +1,15 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, ValidateIf } from 'class-validator';
 
 export class MobileLoginDto {
+  @ValidateIf(o => !o.username)
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  email?: string;
+
+  @ValidateIf(o => !o.email)
+  @IsString()
+  @IsNotEmpty()
+  username?: string;
 
   @IsString()
   @IsNotEmpty()

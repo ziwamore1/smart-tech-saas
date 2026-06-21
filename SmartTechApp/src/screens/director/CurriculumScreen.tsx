@@ -6,8 +6,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius } from '../../theme';
 import { apiService } from '../../services/api';
 import { HeaderBar } from '../../components';
+import { useAuthStore } from '../../store';
 
 export const CurriculumScreen: React.FC<{ onToggleDrawer?: () => void }> = ({ onToggleDrawer }) => {
+  const { user } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [levels, setLevels] = useState<any[]>([]);
   const [versions, setVersions] = useState<any[]>([]);
@@ -18,10 +20,11 @@ export const CurriculumScreen: React.FC<{ onToggleDrawer?: () => void }> = ({ on
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const schoolId = user?.schoolId || undefined;
       const [levelsRes, versionsRes, stagesRes] = await Promise.all([
-        apiService.getEducationLevels(),
-        apiService.getCurriculumVersions(),
-        apiService.getAcademicStages(),
+        apiService.getEducationLevels(schoolId),
+        apiService.getCurriculumVersions(undefined, schoolId),
+        apiService.getAcademicStages(undefined, undefined, schoolId),
       ]);
       setLevels(Array.isArray(levelsRes) ? levelsRes : levelsRes?.data || []);
       setVersions(Array.isArray(versionsRes) ? versionsRes : versionsRes?.data || []);

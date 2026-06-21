@@ -22,20 +22,44 @@ export const LoginScreen: React.FC = () => {
   const [logoError, setLogoError] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showSuperAdmin, setShowSuperAdmin] = useState(false);
+  const [useStudentNumber, setUseStudentNumber] = useState(false);
   const { login, superAdminLogin, isLoading } = useAuthStore();
 
   useEffect(() => {
-    setLogoUrl(`${BASE_URL}/uploads/logo.png`);
+    (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/system/logo`);
+        const data = await response.json();
+        if (data?.url) {
+          const resolved = data.url.startsWith('http') ? data.url : `${BASE_URL}${data.url}`;
+          setLogoUrl(resolved);
+          return;
+        }
+      } catch {}
+      setLogoUrl(`${BASE_URL}/uploads/logo.png`);
+    })();
   }, []);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter email and password');
+    if (!password.trim()) {
+      Alert.alert('Error', 'Please enter password');
+      return;
+    }
+    if (!useStudentNumber && !email.trim()) {
+      Alert.alert('Error', 'Please enter email');
+      return;
+    }
+    if (useStudentNumber && !email.trim()) {
+      Alert.alert('Error', 'Please enter student number');
       return;
     }
     try {
       const deviceToken = `${Device.deviceName || 'Unknown Device'} (${Platform.OS})`;
-      await login(email.trim(), password, deviceToken);
+      if (useStudentNumber) {
+        await login('', password, deviceToken, email.trim());
+      } else {
+        await login(email.trim(), password, deviceToken);
+      }
     } catch (err: any) {
       Alert.alert('Login Failed', err.response?.data?.message || 'Invalid credentials');
     }
@@ -107,17 +131,34 @@ export const LoginScreen: React.FC = () => {
             </View>
 
             <View style={styles.formCard}>
+              {!showSuperAdmin && (
+                <View style={styles.toggleRow}>
+                  <TouchableOpacity
+                    style={[styles.toggleBtn, !useStudentNumber && styles.toggleBtnActive]}
+                    onPress={() => { setUseStudentNumber(false); setEmail(''); }}
+                  >
+                    <Text style={[styles.toggleText, !useStudentNumber && styles.toggleTextActive]}>Email</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.toggleBtn, useStudentNumber && styles.toggleBtnActive]}
+                    onPress={() => { setUseStudentNumber(true); setEmail(''); }}
+                  >
+                    <Text style={[styles.toggleText, useStudentNumber && styles.toggleTextActive]}>Student No.</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               <View style={styles.inputGroup}>
                 <View style={styles.inputIconWrap}>
-                  <Text style={styles.inputIcon}>✉️</Text>
+                  <Text style={styles.inputIcon}>{useStudentNumber ? '🎓' : '✉️'}</Text>
                 </View>
                 <View style={styles.inputField}>
                   <Input
-                    label="Email"
-                    placeholder="Enter your email"
+                    label={useStudentNumber ? 'Student Number' : 'Email'}
+                    placeholder={useStudentNumber ? 'Enter admission number' : 'Enter your email'}
                     value={email}
                     onChangeText={setEmail}
-                    keyboardType="email-address"
+                    keyboardType={useStudentNumber ? 'default' : 'email-address'}
                     autoCapitalize="none"
                   />
                 </View>
@@ -248,6 +289,11 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     ...shadows.lg,
   },
+  toggleRow: { flexDirection: 'row', backgroundColor: colors.background, borderRadius: borderRadius.md, padding: 3, marginBottom: spacing.md },
+  toggleBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: borderRadius.sm },
+  toggleBtnActive: { backgroundColor: colors.white, ...shadows.sm },
+  toggleText: { fontSize: 13, fontWeight: '500', color: colors.textLight },
+  toggleTextActive: { color: colors.primary, fontWeight: '700' },
   inputGroup: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
   inputIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
   inputIcon: { fontSize: 20 },

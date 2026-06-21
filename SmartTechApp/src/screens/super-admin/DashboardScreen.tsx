@@ -42,8 +42,12 @@ export const SuperAdminDashboardScreen: React.FC<SuperAdminDashboardProps> = ({ 
     setRefreshing(false);
   };
 
+  const drawerScreens = ['SuperAdminHome', 'SuperAdminMedia', 'SuperAdminMonitoring', 'SuperAdminCommunications', 'SuperAdminSchools', 'SuperAdminCurriculumCenter', 'SuperAdminProfile'];
+
   const handleNavigate = (screen: string, params?: any) => {
-    if (stackNavigation) {
+    if (drawerScreens.includes(screen) && onNavigate) {
+      onNavigate(screen);
+    } else if (stackNavigation) {
       stackNavigation.navigate(screen as never, params as never);
     } else {
       navigation.navigate(screen as never, params as never);

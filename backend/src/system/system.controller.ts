@@ -15,10 +15,9 @@ export class SystemController {
       url = '/uploads/logo.png';
     } else if (existsSync(systemLogoPath)) {
       url = '/uploads/system/logo.png';
+    } else if (existsSync(smartTechLogo)) {
+      url = '/smart_tech_logo/smart_tech_logo.png';
     }
-    return {
-      url,
-      name: 'SmartTech',
-    };
+    return { url, name: 'SmartTech' };
   }
 }

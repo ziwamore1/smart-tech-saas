@@ -403,45 +403,65 @@ export class AuthService {
   }
 
   async mobileLogin(
-    email: string,
-    password: string,
+    email?: string,
+    password?: string,
     deviceToken?: string,
     deviceId?: string,
     platform: string = 'android',
+    username?: string,
   ) {
-    this.logger.log(`Mobile login attempt for email: "${email}"`);
+    this.logger.log(`Mobile login attempt - email: "${email}", username: "${username}"`);
 
-    const user = await this.prisma.user.findFirst({
-      where: {
-        email: email.trim().toLowerCase(),
-      },
-      include: {
-        userRoles: {
-          include: { role: true },
+    let user = null;
+
+    if (username) {
+      user = await this.prisma.user.findFirst({
+        where: {
+          OR: [
+            { username },
+            { student: { admissionNumber: username } },
+          ],
         },
-        school: {
-          select: {
-            id: true,
-            name: true,
-            logo: true,
-            primaryColor: true,
-            institutionType: {
-              select: { code: true, name: true },
+        include: {
+          userRoles: { include: { role: true } },
+          school: {
+            select: {
+              id: true, name: true, logo: true, primaryColor: true,
+              institutionType: { select: { code: true, name: true } },
             },
           },
         },
-      },
-    });
+      });
+    }
+
+    if (!user && email) {
+      user = await this.prisma.user.findFirst({
+        where: { email: email.trim().toLowerCase() },
+        include: {
+          userRoles: { include: { role: true } },
+          school: {
+            select: {
+              id: true, name: true, logo: true, primaryColor: true,
+              institutionType: { select: { code: true, name: true } },
+            },
+          },
+        },
+      });
+    }
 
     if (!user) {
-      this.logger.warn(`User not found for email: ${email}`);
+      this.logger.warn(`User not found for email/username: ${email || username}`);
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!password) {
+      throw new UnauthorizedException('Password is required');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
-      this.logger.warn(`Invalid password for user: ${email}`);
+      this.logger.warn(`Invalid password for user: ${email || username}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -478,7 +498,7 @@ export class AuthService {
       : null;
 
     this.logger.log(
-      `Mobile login successful for ${email}, roles: ${roles.join(', ')}`,
+      `Mobile login successful for ${email || username}, roles: ${roles.join(', ')}`,
     );
 
     return {

@@ -61,6 +61,7 @@ async function bootstrap() {
   app.use(compression());
 
   app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads/' });
+  app.useStaticAssets(join(__dirname, '..', 'smart_tech_logo'), { prefix: '/smart_tech_logo/' });
 
   app.useGlobalPipes(
     new ValidationPipe({
