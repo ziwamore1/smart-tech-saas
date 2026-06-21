@@ -26,7 +26,7 @@ export const SuperAdminDashboardScreen: React.FC<SuperAdminDashboardProps> = ({ 
       const [mediaStatsRes] = await Promise.all([
         apiService.getMediaStats(),
       ]);
-      setMediaStats(mediaStatsRes);
+      setMediaStats(mediaStatsRes?.data || mediaStatsRes);
     } catch (err) {
       console.error('Failed to load stats:', err);
     }
@@ -112,17 +112,53 @@ export const SuperAdminDashboardScreen: React.FC<SuperAdminDashboardProps> = ({ 
             </View>
             <Text style={styles.quickActionLabel}>Media Library</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => handleNavigate('SuperAdminMonitoring')}>
-            <View style={[styles.quickActionIcon, { backgroundColor: colors.infoLight }]}>
-              <Text style={styles.quickActionEmoji}>📊</Text>
-            </View>
-            <Text style={styles.quickActionLabel}>Monitoring</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={styles.quickActionCard} onPress={() => handleNavigate('SuperAdminSchools')}>
             <View style={[styles.quickActionIcon, { backgroundColor: colors.warningLight }]}>
               <Text style={styles.quickActionEmoji}>🏫</Text>
             </View>
             <Text style={styles.quickActionLabel}>Schools</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => handleNavigate('SuperAdminSubscriptionPlans')}>
+            <View style={[styles.quickActionIcon, { backgroundColor: colors.successLight }]}>
+              <Text style={styles.quickActionEmoji}>📋</Text>
+            </View>
+            <Text style={styles.quickActionLabel}>Plans</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => handleNavigate('SuperAdminInstitutionTypes')}>
+            <View style={[styles.quickActionIcon, { backgroundColor: colors.infoLight }]}>
+              <Text style={styles.quickActionEmoji}>🏛️</Text>
+            </View>
+            <Text style={styles.quickActionLabel}>Types</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => handleNavigate('SuperAdminAuditLogs')}>
+            <View style={[styles.quickActionIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Text style={styles.quickActionEmoji}>📜</Text>
+            </View>
+            <Text style={styles.quickActionLabel}>Audit Logs</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => handleNavigate('SuperAdminSettings')}>
+            <View style={[styles.quickActionIcon, { backgroundColor: '#DBEAFE' }]}>
+              <Text style={styles.quickActionEmoji}>⚙️</Text>
+            </View>
+            <Text style={styles.quickActionLabel}>Settings</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => handleNavigate('SuperAdminCurriculumCenter')}>
+            <View style={[styles.quickActionIcon, { backgroundColor: '#EDE9FE' }]}>
+              <Text style={styles.quickActionEmoji}>📚</Text>
+            </View>
+            <Text style={styles.quickActionLabel}>Curriculum</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => handleNavigate('SuperAdminCommunications')}>
+            <View style={[styles.quickActionIcon, { backgroundColor: '#D1FAE5' }]}>
+              <Text style={styles.quickActionEmoji}>💬</Text>
+            </View>
+            <Text style={styles.quickActionLabel}>Comms</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => handleNavigate('SuperAdminMonitoring')}>
+            <View style={[styles.quickActionIcon, { backgroundColor: '#FEE2E2' }]}>
+              <Text style={styles.quickActionEmoji}>📊</Text>
+            </View>
+            <Text style={styles.quickActionLabel}>Monitoring</Text>
           </TouchableOpacity>
         </View>
 
@@ -164,8 +200,8 @@ const styles = StyleSheet.create({
   healthInfo: { flex: 1 },
   healthLabel: { fontSize: 14, fontWeight: '600', color: colors.text },
   healthValue: { fontSize: 12, color: colors.textLight, marginTop: 2 },
-  quickActionsGrid: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  quickActionCard: { flex: 1, backgroundColor: colors.white, borderRadius: borderRadius.lg, padding: spacing.md, alignItems: 'center', ...shadows.card },
+  quickActionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
+  quickActionCard: { width: '31%', backgroundColor: colors.white, borderRadius: borderRadius.lg, padding: spacing.md, alignItems: 'center', ...shadows.card },
   quickActionIcon: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: spacing.sm },
   quickActionEmoji: { fontSize: 20 },
   quickActionLabel: { fontSize: 12, fontWeight: '600', color: colors.text, textAlign: 'center' },

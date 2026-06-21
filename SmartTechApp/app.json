@@ -62,11 +62,11 @@
       ],
       "@sentry/react-native"
     ],
-    "owner": "smart-tech-saas-system-1",
+    "owner": "ziwamore1",
     "extra": {
       "apiBaseUrl": "https://api.smarttechsaas.com/api/v1",
       "eas": {
-        "projectId": "b008f60c-3bb2-434b-8ed1-7e5a69362ce2"
+        "projectId": "6ce784fa-e27e-41e7-8961-afbded716fec"
       }
     },
     "runtimeVersion": "1.0.0",

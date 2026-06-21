@@ -885,9 +885,18 @@ export class MobileService {
     });
   }
 
-  async getSubjects(schoolId: string) {
+  async getSubjects(schoolId: string, isSuperAdmin?: boolean) {
+    const where: any = {};
+    if (!isSuperAdmin && schoolId) {
+      where.schoolId = schoolId;
+    } else if (isSuperAdmin) {
+      // SuperAdmin sees all subjects across the system
+    } else {
+      where.schoolId = schoolId;
+    }
+
     const subjects = await this.prisma.subject.findMany({
-      where: { schoolId },
+      where,
       orderBy: { name: 'asc' },
     });
 

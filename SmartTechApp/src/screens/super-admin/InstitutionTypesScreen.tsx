@@ -22,12 +22,12 @@ export const SuperAdminInstitutionTypesScreen: React.FC<Props> = ({ onToggleDraw
   const loadData = useCallback(async () => {
     try {
       const res = await apiService.getSuperAdminInstitutionTypes();
-      setTypes(res?.types || res?.data || []);
+      setTypes(Array.isArray(res) ? res : res?.data && Array.isArray(res.data) ? res.data : res?.types || []);
     } catch (err) {
       console.error('Failed to load institution types:', err);
       try {
         const fallback = await apiService.getInstitutionTypes();
-        setTypes(Array.isArray(fallback) ? fallback : fallback?.types || fallback?.data || []);
+        setTypes(Array.isArray(fallback) ? fallback : fallback?.data && Array.isArray(fallback.data) ? fallback.data : fallback?.types || []);
       } catch (e) {
         console.error('Fallback also failed:', e);
       }

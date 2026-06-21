@@ -64,9 +64,9 @@ export const SuperAdminMediaScreen: React.FC<SuperAdminMediaProps> = ({ onToggle
         apiService.getMedia(),
         apiService.getMediaStats(),
       ]);
-      const items = Array.isArray(mediaRes) ? mediaRes : mediaRes?.data || mediaRes?.files || [];
+      const items = Array.isArray(mediaRes) ? mediaRes : mediaRes?.items || mediaRes?.data?.items || mediaRes?.files || [];
       setMedia(items);
-      setMediaStats(statsRes);
+      setMediaStats(statsRes?.data || statsRes);
     } catch (err) {
       console.error('Failed to load media:', err);
     } finally {

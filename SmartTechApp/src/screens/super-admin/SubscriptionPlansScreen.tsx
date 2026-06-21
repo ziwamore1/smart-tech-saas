@@ -22,7 +22,7 @@ export const SuperAdminSubscriptionPlansScreen: React.FC<Props> = ({ onToggleDra
   const loadData = useCallback(async () => {
     try {
       const res = await apiService.getSubscriptionPlans();
-      setPlans(res?.plans || res?.data || []);
+      setPlans(Array.isArray(res) ? res : res?.data && Array.isArray(res.data) ? res.data : res?.plans || []);
     } catch (err) {
       console.error('Failed to load plans:', err);
     } finally {

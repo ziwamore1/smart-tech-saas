@@ -97,11 +97,10 @@ export const LoginScreen: React.FC = () => {
                   onError={() => setLogoError(true)}
                 />
               ) : (
-                <Image
-                  source={require('../../../assets/icon.png')}
-                  style={styles.logoImage}
-                  resizeMode="contain"
-                />
+                <View style={styles.textLogo}>
+                  <Text style={styles.textLogoMain}>SmartTech</Text>
+                  <Text style={styles.textLogoSub}>SaaS</Text>
+                </View>
               )}
               <Text style={styles.title}>SmartTech</Text>
               <Text style={styles.subtitle}>Welcome to your school intelligence platform</Text>
@@ -233,6 +232,9 @@ const styles = StyleSheet.create({
 
   topSection: { alignItems: 'center', marginBottom: spacing.xl },
   logoImage: { width: 120, height: 120, marginBottom: spacing.md, borderRadius: 20 },
+  textLogo: { width: 120, height: 120, marginBottom: spacing.md, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center', alignItems: 'center' },
+  textLogoMain: { fontSize: 22, fontWeight: '800', color: colors.white, letterSpacing: -0.5 },
+  textLogoSub: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.7)', letterSpacing: 2 },
   shieldOuter: { width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', marginBottom: spacing.md },
   shieldLogo: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)' },
   shieldInner: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center' },

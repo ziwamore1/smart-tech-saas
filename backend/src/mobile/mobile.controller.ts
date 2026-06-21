@@ -206,8 +206,8 @@ export class MobileController {
 
   @Get('subjects')
   async getSubjects(@Req() req: any) {
-    const { schoolId } = req.user;
-    return this.mobileService.getSubjects(schoolId);
+    const { schoolId, isSuperAdmin } = req.user;
+    return this.mobileService.getSubjects(schoolId, isSuperAdmin);
   }
 
   @Get('users')
