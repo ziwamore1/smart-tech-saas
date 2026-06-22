@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import * as admin from 'firebase-admin';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getMessaging, Messaging } from 'firebase-admin/messaging';
 
 @Injectable()
 export class FirebaseService implements OnModuleInit {
@@ -19,13 +20,15 @@ export class FirebaseService implements OnModuleInit {
     }
 
     try {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId,
-          clientEmail,
-          privateKey: privateKey.replace(/\\n/g, '\n'),
-        }),
-      });
+      if (getApps().length === 0) {
+        initializeApp({
+          credential: cert({
+            projectId,
+            clientEmail,
+            privateKey: privateKey.replace(/\\n/g, '\n'),
+          }),
+        });
+      }
       this.initialized = true;
       this.logger.log('Firebase Admin SDK initialized successfully');
     } catch (error) {
@@ -33,9 +36,9 @@ export class FirebaseService implements OnModuleInit {
     }
   }
 
-  get messaging(): admin.messaging.Messaging | null {
+  get messaging(): Messaging | null {
     if (!this.initialized) return null;
-    return admin.messaging();
+    return getMessaging();
   }
 
   get isInitialized(): boolean {

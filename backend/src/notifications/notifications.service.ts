@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FirebaseService } from '../firebase/firebase.service';
 import { NotificationQueueService, NotificationJobData } from './notification-queue.service';
 import { SendNotificationDto, BroadcastNotificationDto } from './dto/send-notification.dto';
+import type { Message } from 'firebase-admin/messaging';
 
 const VALID_CATEGORIES = [
   'Academic',
@@ -303,7 +304,7 @@ export class NotificationsService {
 
     for (const device of devices) {
       try {
-        const message: admin.messaging.Message = {
+        const message: Message = {
           token: device.deviceToken,
           notification: {
             title: payload.title,
