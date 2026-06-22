@@ -20,6 +20,7 @@
     "production": {
       "autoIncrement": true,
       "withoutCredentials": true,
+      "channel": "main",
       "env": {
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
