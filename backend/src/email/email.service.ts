@@ -61,9 +61,12 @@ export class EmailService {
   async sendMail(to: string, subject: string, html: string) {
     if (this.mailjetApiKey && this.mailjetSecretKey) {
       try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
         const auth = Buffer.from(`${this.mailjetApiKey}:${this.mailjetSecretKey}`).toString('base64');
         const res = await fetch(MAILJET_API, {
           method: 'POST',
+          signal: controller.signal,
           headers: {
             'Authorization': `Basic ${auth}`,
             'Content-Type': 'application/json',
@@ -79,6 +82,7 @@ export class EmailService {
             ],
           }),
         });
+        clearTimeout(timeout);
         const text = await res.text();
         let result: any;
         try { result = JSON.parse(text); } catch { result = null; }
@@ -96,6 +100,8 @@ export class EmailService {
       } catch (err) {
         console.error('[EmailService] MailJet failed, trying Zoho SMTP fallback:', (err as Error).message);
       }
+    } else {
+      console.warn('[EmailService] MailJet not configured — MAILJET_API_KEY or MAILJET_SECRET_KEY missing');
     }
 
     if (this.useSmtp && this.transporter) {
@@ -109,8 +115,11 @@ export class EmailService {
 
     if (this.sgApiKey) {
       try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
         const res = await fetch(SENDGRID_API, {
           method: 'POST',
+          signal: controller.signal,
           headers: {
             'Authorization': `Bearer ${this.sgApiKey}`,
             'Content-Type': 'application/json',
@@ -123,6 +132,7 @@ export class EmailService {
             content: [{ type: 'text/html', value: html }],
           }),
         });
+        clearTimeout(timeout);
         if (!res.ok) {
           const body = await res.text();
           throw new Error(`SendGrid API ${res.status}: ${body}`);
@@ -133,7 +143,7 @@ export class EmailService {
       }
     }
 
-    throw new Error('No email provider configured');
+    throw new Error('No email provider configured — check MAILJET_API_KEY, MAILJET_SECRET_KEY, SENDGRID_API_KEY, or EMAIL_PASSWORD');
   }
 
   async sendOtpEmail(to: string, otp: string) {
