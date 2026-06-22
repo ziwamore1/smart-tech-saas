@@ -163,9 +163,7 @@ export class AuthService {
     }
 
     if (!school.institutionType) {
-      throw new BadRequestException(
-        `School '${school.name}' has no institution type assigned. Please ensure the school was created with a valid institution type.`,
-      );
+      this.logger.warn(`School '${school.name}' has no institution type assigned - director creation will proceed`);
     }
 
     const existingUser = await this.prisma.user.findFirst({
@@ -193,12 +191,13 @@ export class AuthService {
       },
     });
 
-    const directorRole = await this.prisma.role.findUnique({
-      where: { name: 'Director' },
+    let directorRole = await this.prisma.role.findFirst({
+      where: { name: { equals: 'Director', mode: 'insensitive' } },
     });
 
     if (!directorRole) {
-      throw new Error('Director role not found');
+      directorRole = await this.prisma.role.create({ data: { name: 'Director' } });
+      this.logger.warn('Director role not found - auto-created during director creation');
     }
 
     await this.prisma.userRole.create({
@@ -231,7 +230,7 @@ export class AuthService {
         email: user.email,
         phone: user.phone,
         schoolId: user.schoolId,
-        institutionType: school.institutionType.code,
+        institutionType: school.institutionType?.code || null,
       },
       credentialsSent: true,
     };
@@ -259,12 +258,13 @@ export class AuthService {
       },
     });
 
-    const teacherRole = await this.prisma.role.findFirst({
-      where: { name: 'Teacher' },
+    let teacherRole = await this.prisma.role.findFirst({
+      where: { name: { equals: 'Teacher', mode: 'insensitive' } },
     });
 
     if (!teacherRole) {
-      throw new Error('Teacher role not found');
+      teacherRole = await this.prisma.role.create({ data: { name: 'Teacher' } });
+      this.logger.warn('Teacher role not found - auto-created during teacher registration');
     }
 
     await this.prisma.userRole.create({
@@ -553,12 +553,13 @@ export class AuthService {
       throw new BadRequestException('Email already in use');
     }
 
-    const teacherRole = await this.prisma.role.findFirst({
-      where: { name: 'Teacher' },
+    let teacherRole = await this.prisma.role.findFirst({
+      where: { name: { equals: 'Teacher', mode: 'insensitive' } },
     });
 
     if (!teacherRole) {
-      throw new Error('Teacher role not found');
+      teacherRole = await this.prisma.role.create({ data: { name: 'Teacher' } });
+      this.logger.warn('Teacher role not found - auto-created during teacher registration');
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);

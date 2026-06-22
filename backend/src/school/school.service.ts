@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterSchoolDto } from './dto/register-school.dto';
 import { UnifiedMessagingService } from '../messaging/unified-messaging.service';
@@ -6,6 +6,7 @@ import { GradingSystemService } from '../grading-system/grading-system.service';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 import { InstitutionProvisioningService } from '../institution/institution-provisioning.service';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class SchoolService {
@@ -17,6 +18,7 @@ export class SchoolService {
     private configService: ConfigService,
     private gradingSystemService: GradingSystemService,
     private provisioningService: InstitutionProvisioningService,
+    private notificationService: NotificationService,
   ) {}
 
   async registerSchool(dto: RegisterSchoolDto) {
@@ -29,75 +31,93 @@ export class SchoolService {
       throw new Error(`Institution type '${institutionTypeCode}' not found. Please run seed script.`);
     }
 
-    const school = await this.prisma.school.create({
-      data: {
-        name: dto.schoolName,
-        email: dto.email,
-        phone: dto.phone,
-        institutionTypeId: institutionType.id,
-      },
-    });
-
-    const temporaryPassword = 'ChangeMe123';
-
+    const temporaryPassword = this.generateTempPassword();
     const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
 
-    const directorRole = await this.prisma.role.findFirst({
-      where: {
-        name: {
-          equals: 'Director',
-          mode: 'insensitive',
+    return this.prisma.$transaction(async (tx) => {
+      const school = await tx.school.create({
+        data: {
+          name: dto.schoolName,
+          email: dto.email,
+          phone: dto.phone,
+          institutionTypeId: institutionType.id,
         },
-      },
-    });
+      });
 
-    if (!directorRole) {
-      throw new Error('Director role not found');
-    }
+      let directorRole = await tx.role.findFirst({
+        where: { name: { equals: 'Director', mode: 'insensitive' } },
+      });
 
-    const director = await this.prisma.user.create({
-      data: {
+      if (!directorRole) {
+        directorRole = await tx.role.create({ data: { name: 'Director' } });
+        this.logger.warn('Director role not found - auto-created during school registration');
+      }
+
+      const director = await tx.user.create({
+        data: {
+          email: dto.email,
+          password: hashedPassword,
+          firstName: 'School',
+          lastName: 'Director',
+          schoolId: school.id,
+        },
+      });
+
+      await tx.userRole.create({
+        data: {
+          userId: director.id,
+          roleId: directorRole.id,
+        },
+      });
+
+      await this.initializeSchool(school.id, institutionTypeCode);
+
+      await this.provisioningService.provisionInstitution(school.id, institutionTypeCode);
+
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+      const schoolUrl = `${frontendUrl}/login?school=${school.id}`;
+
+      this.unifiedMessaging
+        .sendDirectorWelcome(
+          {
+            id: director.id,
+            email: director.email,
+            firstName: director.firstName,
+            lastName: director.lastName,
+          },
+          { username: dto.email, password: temporaryPassword },
+          { name: school.name, url: schoolUrl, type: institutionType.code },
+        )
+        .catch((err) => this.logger.error('Failed to send director welcome message:', err));
+
+      this.notificationService.sendCredentials({
+        recipientName: 'School Director',
         email: dto.email,
-        password: hashedPassword,
-        firstName: 'School',
-        lastName: 'Director',
+        phone: dto.phone || '',
+        username: dto.email,
+        password: temporaryPassword,
+        role: 'Director',
+        schoolName: school.name,
+        schoolUrl,
+        appDownloadUrl: this.configService.get<string>('APP_DOWNLOAD_URL') || 'https://play.google.com/store/apps',
+      }).catch((err) => this.logger.error('Failed to send credentials:', err));
+
+      return {
+        message: 'School registered successfully',
         schoolId: school.id,
-      },
+        directorLogin: dto.email,
+        temporaryPassword: temporaryPassword,
+      };
     });
+  }
 
-    await this.prisma.userRole.create({
-      data: {
-        userId: director.id,
-        roleId: directorRole.id,
-      },
-    });
-
-    await this.initializeSchool(school.id, institutionTypeCode);
-
-    await this.provisioningService.provisionInstitution(school.id, institutionTypeCode);
-
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
-    const schoolUrl = `${frontendUrl}/login?school=${school.id}`;
-
-    this.unifiedMessaging
-      .sendDirectorWelcome(
-        {
-          id: director.id,
-          email: director.email,
-          firstName: director.firstName,
-          lastName: director.lastName,
-        },
-        { username: dto.email, password: temporaryPassword },
-        { name: school.name, url: schoolUrl, type: institutionType.code },
-      )
-      .catch((err) => this.logger.error('Failed to send director welcome message:', err));
-
-    return {
-      message: 'School registered successfully',
-      schoolId: school.id,
-      directorLogin: dto.email,
-      temporaryPassword: temporaryPassword,
-    };
+  private generateTempPassword(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let password = '';
+    for (let i = 0; i < 8; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
   }
 
   async initializeSchool(schoolId: string, institutionTypeCode: string = 'PRIMARY_SCHOOL') {
@@ -256,14 +276,28 @@ export class SchoolService {
 
   async updateProfile(
     schoolId: string,
-    data: { name?: string; email?: string; phone?: string; address?: string },
+    data: { name?: string; email?: string; phone?: string; address?: string; institutionType?: string },
   ) {
     if (!schoolId) {
       throw new Error('School ID is required');
     }
+
+    const updateData: any = { ...data };
+    delete updateData.institutionType;
+
+    if (data.institutionType) {
+      const instType = await this.prisma.institutionType.findUnique({
+        where: { code: data.institutionType as any },
+      });
+      if (!instType) {
+        throw new BadRequestException(`Institution type '${data.institutionType}' not found`);
+      }
+      updateData.institutionTypeId = instType.id;
+    }
+
     return this.prisma.school.update({
       where: { id: schoolId },
-      data,
+      data: updateData,
     });
   }
 

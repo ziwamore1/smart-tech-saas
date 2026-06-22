@@ -188,7 +188,7 @@ export class SuperAdminService {
 
     if (data.institutionType) {
       const instType = await this.prisma.institutionType.findUnique({
-        where: { code: data.institutionType },
+        where: { code: data.institutionType as any },
       });
       if (!instType) throw new NotFoundException('Institution type not found');
       data.institutionTypeId = instType.id;
@@ -262,9 +262,7 @@ export class SuperAdminService {
       throw new NotFoundException('School not found');
     }
     if (!school.institutionType) {
-      throw new BadRequestException(
-        `School '${school.name}' has no institution type assigned. Please ensure the school was created with a valid institution type.`,
-      );
+      this.logger.warn(`School '${school.name}' has no institution type assigned - director creation will proceed without type info`);
     }
 
     const normalizedEmail = data.email.trim().toLowerCase();
@@ -278,14 +276,13 @@ export class SuperAdminService {
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
-    const directorRole = await this.prisma.role.findUnique({
-      where: { name: 'Director' },
+    let directorRole = await this.prisma.role.findFirst({
+      where: { name: { equals: 'Director', mode: 'insensitive' } },
     });
 
     if (!directorRole) {
-      throw new NotFoundException(
-        'Director role not found. Please run seed script.',
-      );
+      directorRole = await this.prisma.role.create({ data: { name: 'Director' } });
+      this.logger.warn('Director role not found - auto-created during director creation');
     }
 
     const user = await this.prisma.user.create({
@@ -314,7 +311,7 @@ export class SuperAdminService {
           lastName: user.lastName,
         },
         { username: normalizedEmail, password: data.password },
-        { name: school.name, url: `${this.configService.get<string>('FRONTEND_URL')}/login?school=${schoolId}`, type: school.institutionType.code },
+        { name: school.name, url: `${this.configService.get<string>('FRONTEND_URL')}/login?school=${schoolId}`, type: school.institutionType?.code || 'PRIMARY_SCHOOL' },
       )
       .catch((err) => this.logger.error('Failed to send director welcome message:', err));
 
@@ -323,7 +320,7 @@ export class SuperAdminService {
       email: user.email,
       schoolId,
       schoolName: school.name,
-      institutionType: school.institutionType.code,
+      institutionType: school.institutionType?.code || null,
       message: 'Director account created successfully',
     };
   }
@@ -336,12 +333,12 @@ export class SuperAdminService {
       throw new NotFoundException('School not found');
     }
 
-    const directorRole = await this.prisma.role.findUnique({
-      where: { name: 'Director' },
+    const directorRole = await this.prisma.role.findFirst({
+      where: { name: { equals: 'Director', mode: 'insensitive' } },
     });
 
     if (!directorRole) {
-      throw new NotFoundException('Director role not found');
+      return [];
     }
 
     const directors = await this.prisma.user.findMany({
@@ -699,14 +696,13 @@ Email: ${director.email}
   ) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const superAdminRole = await this.prisma.role.findUnique({
-      where: { name: 'SuperAdmin' },
+    let superAdminRole = await this.prisma.role.findFirst({
+      where: { name: { equals: 'SuperAdmin', mode: 'insensitive' } },
     });
 
     if (!superAdminRole) {
-      throw new NotFoundException(
-        'SuperAdmin role not found. Please run seed script.',
-      );
+      superAdminRole = await this.prisma.role.create({ data: { name: 'SuperAdmin' } });
+      this.logger.warn('SuperAdmin role not found - auto-created');
     }
 
     const user = await this.prisma.user.create({
