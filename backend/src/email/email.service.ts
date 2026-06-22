@@ -20,19 +20,19 @@ export class EmailService {
     this.fromName = process.env.SENDGRID_FROM_NAME || 'Smart Tech';
     const smtpPass = process.env.EMAIL_PASSWORD || process.env.ZOHO_SMTP_PASSWORD || '';
 
-    if (smtpPass) {
-      console.log(`[EmailService] using Zoho SMTP (from: noreply@smarttechsaas.com)`);
-    }
-
     this.mailjetApiKey = process.env.MAILJET_API_KEY || '';
     this.mailjetSecretKey = process.env.MAILJET_SECRET_KEY || '';
 
-    if (this.sgApiKey) {
-      console.log(`[EmailService] SendGrid API available as fallback (from: ${this.fromEmail})`);
+    if (this.mailjetApiKey && this.mailjetSecretKey) {
+      console.log(`[EmailService] MailJet configured as primary provider (from: ${process.env.MAILJET_FROM_EMAIL || this.fromEmail})`);
     }
 
-    if (this.mailjetApiKey && this.mailjetSecretKey) {
-      console.log(`[EmailService] MailJet API available as fallback (from: ${this.fromEmail})`);
+    if (smtpPass) {
+      console.log(`[EmailService] Zoho SMTP available as fallback (from: noreply@smarttechsaas.com)`);
+    }
+
+    if (this.sgApiKey) {
+      console.log(`[EmailService] SendGrid API available as secondary fallback (from: ${this.fromEmail})`);
     }
 
     if (smtpPass) {
