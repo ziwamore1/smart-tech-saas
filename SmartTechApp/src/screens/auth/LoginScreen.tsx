@@ -121,9 +121,11 @@ export const LoginScreen: React.FC = () => {
                   onError={() => setLogoError(true)}
                 />
               ) : (
-                <View style={styles.textLogo}>
-                  <Text style={styles.textLogoMain}>ST</Text>
-                </View>
+                <Image
+                  source={require('../../../assets/icon.png')}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
               )}
               <Text style={styles.title}>SmartTech</Text>
               <Text style={styles.subtitle}>Welcome to your school intelligence platform</Text>
