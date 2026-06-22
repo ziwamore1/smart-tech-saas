@@ -69,6 +69,15 @@ export class MobileController {
     return this.mobileService.markAllNotificationsRead(userId);
   }
 
+  @Post('register-push-token')
+  async registerPushToken(
+    @Req() req: any,
+    @Body() body: { token: string; platform?: string; deviceId?: string },
+  ) {
+    const { id: userId } = req.user;
+    return this.mobileService.registerPushToken(userId, body.token, body.platform, body.deviceId);
+  }
+
   @Post('logout-device')
   async logoutDevice(
     @Req() req: any,

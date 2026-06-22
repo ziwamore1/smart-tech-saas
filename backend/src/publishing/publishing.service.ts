@@ -1,6 +1,7 @@
 import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportCardService } from '../report-card/report-card.service';
+import { PushNotificationService } from '../push-notification/push-notification.service';
 import pLimit from 'p-limit';
 import * as archiver from 'archiver';
 import { PassThrough } from 'stream';
@@ -10,6 +11,7 @@ export class PublishingService {
   constructor(
     private prisma: PrismaService,
     private reportCardService: ReportCardService,
+    private pushNotificationService: PushNotificationService,
   ) {}
 
   async publishResults(schoolId: string, classId: string, termId: string) {
@@ -104,6 +106,36 @@ export class PublishingService {
       where: { id: termId },
       data: { resultsLocked: true },
     });
+
+    for (const enrollment of enrollments) {
+      const studentUser = enrollment.student?.user;
+      if (studentUser) {
+        await this.pushNotificationService.sendToUser(studentUser.id, {
+          title: 'Results Published',
+          body: `Your results for ${classInfo.name} - ${term.name} are now available.`,
+          data: { type: 'result_published', classId, termId },
+        });
+      }
+
+      const parentLinks = await this.prisma.parentStudent.findMany({
+        where: { studentId: enrollment.studentId },
+        include: { parent: { select: { email: true } } },
+      });
+
+      for (const link of parentLinks) {
+        const parentUser = await this.prisma.user.findFirst({
+          where: { email: link.parent.email },
+          select: { id: true },
+        });
+        if (parentUser) {
+          await this.pushNotificationService.sendToUser(parentUser.id, {
+            title: `${enrollment.student.firstName} ${enrollment.student.lastName}'s Results Published`,
+            body: `Results for ${classInfo.name} - ${term.name} are now available.`,
+            data: { type: 'result_published', classId, termId, studentId: enrollment.studentId },
+          });
+        }
+      }
+    }
 
     return {
       message: 'Results published successfully',

@@ -301,6 +301,11 @@ export class MobileService {
     return { count };
   }
 
+  async registerPushToken(userId: string, token: string, platform?: string, deviceId?: string) {
+    await this.pushNotificationService.registerDeviceToken(userId, token, platform || 'android', deviceId);
+    return { success: true };
+  }
+
   async logoutDevice(userId: string, deviceToken: string) {
     await this.pushNotificationService.removeDeviceToken(userId, deviceToken);
     return { success: true };
@@ -1128,6 +1133,62 @@ export class MobileService {
     return { students, stats, date };
   }
 
+  private async sendAttendanceAlert(
+    studentId: string,
+    status: string,
+    date: Date,
+    schoolId: string,
+  ) {
+    if (!['ABSENT', 'LATE'].includes(status.toUpperCase())) return;
+
+    const student = await this.prisma.student.findUnique({
+      where: { id: studentId },
+      include: {
+        user: { select: { id: true } },
+        parents: {
+          include: {
+            parent: { select: { email: true } },
+          },
+        },
+      },
+    });
+    if (!student) return;
+
+    const dateStr = date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const title = status === 'ABSENT' ? 'Absent Alert' : 'Late Arrival Alert';
+    const body = status === 'ABSENT'
+      ? `You were marked absent on ${dateStr}. Please contact your teacher.`
+      : `You were marked late on ${dateStr}. Please arrive on time.`;
+
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { name: true },
+    });
+    const schoolName = school?.name || 'School';
+
+    if (student.user) {
+      await this.pushNotificationService.sendToUser(student.user.id, {
+        title,
+        body: `${schoolName}: ${body}`,
+        data: { type: 'attendance_alert', studentId, date: date.toISOString(), status },
+      });
+    }
+
+    for (const ps of student.parents) {
+      const parentUser = await this.prisma.user.findFirst({
+        where: { email: ps.parent.email },
+        select: { id: true },
+      });
+      if (parentUser) {
+        await this.pushNotificationService.sendToUser(parentUser.id, {
+          title: `${schoolName}: ${title}`,
+          body: `Your child ${student.firstName} ${student.lastName} was ${status.toLowerCase()} on ${dateStr}.`,
+          data: { type: 'attendance_alert', studentId, date: date.toISOString(), status },
+        });
+      }
+    }
+  }
+
   async submitBulkAttendance(schoolId: string, classId: string, date: string, records: { studentId: string; status: string; remarks?: string }[]) {
     const attendanceDate = new Date(date);
 
@@ -1148,6 +1209,10 @@ export class MobileService {
         schoolId,
       })),
     });
+
+    for (const record of records) {
+      await this.sendAttendanceAlert(record.studentId, record.status, attendanceDate, schoolId);
+    }
 
     return { message: 'Attendance saved', count: results.count };
   }
@@ -1175,6 +1240,10 @@ export class MobileService {
         schoolId,
       })),
     });
+
+    for (const enrollment of enrollments) {
+      await this.sendAttendanceAlert(enrollment.studentId, status, attendanceDate, schoolId);
+    }
 
     return { message: `All marked as ${status}`, count: results.count };
   }
