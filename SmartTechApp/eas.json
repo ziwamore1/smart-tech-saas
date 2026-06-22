@@ -19,6 +19,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "withoutCredentials": true,
       "env": {
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
