@@ -64,6 +64,7 @@
         "expr-eval": "^2.0.2",
         "express": "^5.2.1",
         "express-rate-limit": "^8.5.2",
+        "firebase-admin": "^14.0.0",
         "forge": "^2.3.0",
         "fraction.js": "^5.3.4",
         "fs-extra": "^11.3.5",

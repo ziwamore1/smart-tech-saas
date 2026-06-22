@@ -40,6 +40,8 @@ import { CalendarSyncModule } from './calendar-sync/calendar-sync.module';
 import { WorkloadModule } from './workload/workload.module';
 import { MultiSchoolModule } from './multi-school/multi-school.module';
 import { PushNotificationModule } from './push-notification/push-notification.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { FirebaseModule } from './firebase/firebase.module';
 import { MobileModule } from './mobile/mobile.module';
 import { ExamModule } from './exam/exam.module';
 import { MessagingModule } from './messaging/messaging.module';
@@ -153,6 +155,8 @@ import { ProductionLogger } from './common/production-logger';
     WorkloadModule,
     MultiSchoolModule,
     PushNotificationModule,
+    NotificationsModule,
+    FirebaseModule,
     MobileModule,
     ExamModule,
     MessagingModule,

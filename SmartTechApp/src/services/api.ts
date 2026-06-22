@@ -284,8 +284,35 @@ class ApiService {
     return response.data;
   }
 
-  async registerPushToken(token: string) {
-    const response = await this.client.post('/mobile/register-push-token', { token });
+  async registerPushToken(token: string, platform?: string, role?: string) {
+    const response = await this.client.post('/notifications/register-device', { deviceToken: token, platform: platform || 'android', role });
+    return response.data;
+  }
+
+  async getNotifications(page = 1, limit = 20, category?: string) {
+    const params: any = { page, limit };
+    if (category) params.category = category;
+    const response = await this.client.get('/notifications', { params });
+    return response.data;
+  }
+
+  async getUnreadNotificationCount() {
+    const response = await this.client.get('/notifications/unread-count');
+    return response.data;
+  }
+
+  async markNotificationAsRead(id: string) {
+    const response = await this.client.put(`/notifications/${id}/read`);
+    return response.data;
+  }
+
+  async markAllNotificationsAsRead() {
+    const response = await this.client.put('/notifications/read-all');
+    return response.data;
+  }
+
+  async getNotificationCategories() {
+    const response = await this.client.get('/notifications/categories');
     return response.data;
   }
 

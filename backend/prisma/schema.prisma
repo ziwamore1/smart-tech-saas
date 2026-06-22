@@ -391,6 +391,7 @@ model User {
   auditLogs            AuditLog[]
   communications       Communication[]
   deviceTokens         DeviceToken[]
+  notificationDevices  NotificationDevice[]
   createdExams         Exam[]
   createdTemplates     ExamTemplate[]
   createdBankQuestions QuestionBank[]
@@ -1921,21 +1922,49 @@ model DeviceToken {
   @@index([token])
 }
 
+model NotificationDevice {
+  id          String   @id @default(uuid())
+  userId      String
+  role        String?
+  deviceToken String
+  platform    String   @default("android")
+  active      Boolean  @default(true)
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceToken])
+  @@index([userId])
+  @@index([deviceToken])
+  @@index([active])
+}
+
 model Notification {
-  id        String   @id @default(uuid())
-  userId    String
-  title     String
-  body      String
-  data      Json?
-  isRead    Boolean  @default(false)
-  type      String   @default("general")
-  role      String?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String            @id @default(uuid())
+  userId      String
+  title       String
+  body        String
+  data        Json?
+  isRead      Boolean           @default(false)
+  type        String            @default("general")
+  role        String?
+  category    String            @default("System Notifications")
+  status      String            @default("sent")
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  openedAt    DateTime?
+  failedAt    DateTime?
+  failedError String?
+  scheduledFor DateTime?
+  createdBy   String?
+  createdAt   DateTime          @default(now())
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([isRead])
   @@index([role])
+  @@index([category])
+  @@index([status])
   @@index([createdAt])
 }
 

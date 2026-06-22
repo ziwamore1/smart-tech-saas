@@ -80,12 +80,17 @@ export default function App() {
   const { isAuthenticated } = useAuthStore();
 
   useEffect(() => {
-    registerForPushNotificationsAsync().catch(console.warn);
+    (async () => {
+      await setupNotificationChannels();
+      await registerForPushNotificationsAsync();
+    })();
     setAppIsReady(true);
   }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
+
+    registerForPushNotificationsAsync().catch(console.warn);
 
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       console.log('Notification received:', notification);
@@ -134,19 +139,27 @@ export default function App() {
   );
 }
 
+async function setupNotificationChannels() {
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('smart_tech_notifications', {
+      name: 'SmartTech Notifications',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#1E3A8A',
+      sound: 'default',
+    });
+
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'General',
+      importance: Notifications.AndroidImportance.DEFAULT,
+    });
+  }
+}
+
 async function registerForPushNotificationsAsync() {
   if (!Device.isDevice) {
     console.log('Must use physical device for Push Notifications');
     return;
-  }
-
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#1E3A8A',
-    });
   }
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
