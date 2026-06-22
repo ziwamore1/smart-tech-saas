@@ -575,7 +575,7 @@ ON CONFLICT ("institutionTypeId", "key") DO UPDATE SET
 -- 13. SYSTEM SETTINGS
 -- =============================================================================
 INSERT INTO "SystemSetting" ("id", "key", "value", "isPublic", "updatedAt") VALUES
-  (gen_random_uuid(), 'messaging_sandbox_mode', '"true"'::jsonb,         false, NOW()),
+  (gen_random_uuid(), 'messaging_sandbox_mode', '"false"'::jsonb,        false, NOW()),
   (gen_random_uuid(), 'beem_enabled',           '"true"'::jsonb,         false, NOW()),
   (gen_random_uuid(), 'beem_sender_name',       '"SmartTech"'::jsonb,    false, NOW()),
   (gen_random_uuid(), 'system_name',            '"Smart Tech SaaS"'::jsonb, false, NOW()),

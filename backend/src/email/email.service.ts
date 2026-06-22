@@ -59,6 +59,45 @@ export class EmailService {
   }
 
   async sendMail(to: string, subject: string, html: string) {
+    if (this.mailjetApiKey && this.mailjetSecretKey) {
+      try {
+        const auth = Buffer.from(`${this.mailjetApiKey}:${this.mailjetSecretKey}`).toString('base64');
+        const res = await fetch(MAILJET_API, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            Messages: [
+              {
+                From: { Email: process.env.MAILJET_FROM_EMAIL || this.fromEmail, Name: this.fromName },
+                To: [{ Email: to }],
+                Subject: subject,
+                HTMLPart: html,
+              },
+            ],
+          }),
+        });
+        const text = await res.text();
+        let result: any;
+        try { result = JSON.parse(text); } catch { result = null; }
+        const msg = result?.Messages?.[0];
+        if (msg?.Status === 'success') {
+          console.log(`[EmailService] MailJet sent to ${to} (ID: ${msg.To?.[0]?.MessageID || 'N/A'})`);
+          return;
+        }
+        const errors = msg?.Errors?.map((e: any) => e.ErrorMessage).join('; ') || text;
+        console.warn(`[EmailService] MailJet returned status "${msg?.Status || 'unknown'}": ${errors}`);
+        if (msg?.Status === 'error' && msg?.Errors?.some((e: any) => e.ErrorMessage?.toLowerCase().includes('sender'))) {
+          console.warn('[EmailService] ** The sender email needs to be verified at https://app.mailjet.com/account/sender');
+        }
+        throw new Error(`MailJet: ${errors}`);
+      } catch (err) {
+        console.error('[EmailService] MailJet failed, trying Zoho SMTP fallback:', (err as Error).message);
+      }
+    }
+
     if (this.useSmtp && this.transporter) {
       try {
         await this.transporter.sendMail({ from: '"Smart Tech" <noreply@smarttechsaas.com>', to, subject, html });
@@ -90,46 +129,7 @@ export class EmailService {
         }
         return;
       } catch (err) {
-        console.error('[EmailService] SendGrid fallback failed, trying MailJet:', (err as Error).message);
-      }
-    }
-
-    if (this.mailjetApiKey && this.mailjetSecretKey) {
-      try {
-        const auth = Buffer.from(`${this.mailjetApiKey}:${this.mailjetSecretKey}`).toString('base64');
-        const res = await fetch(MAILJET_API, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Basic ${auth}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            Messages: [
-              {
-                From: { Email: this.fromEmail, Name: this.fromName },
-                To: [{ Email: to }],
-                Subject: subject,
-                HTMLPart: html,
-              },
-            ],
-          }),
-        });
-        const text = await res.text();
-        let result: any;
-        try { result = JSON.parse(text); } catch { result = null; }
-        const msg = result?.Messages?.[0];
-        if (msg?.Status === 'success') {
-          console.log(`[EmailService] MailJet sent to ${to} (ID: ${msg.To?.[0]?.MessageID || 'N/A'})`);
-          return;
-        }
-        const errors = msg?.Errors?.map((e: any) => e.ErrorMessage).join('; ') || text;
-        console.warn(`[EmailService] MailJet returned status "${msg?.Status || 'unknown'}": ${errors}`);
-        if (msg?.Status === 'error' && msg?.Errors?.some((e: any) => e.ErrorMessage?.toLowerCase().includes('sender'))) {
-          console.warn('[EmailService] ** The sender email needs to be verified at https://app.mailjet.com/account/sender');
-        }
-        throw new Error(`MailJet: ${errors}`);
-      } catch (err) {
-        console.error('[EmailService] MailJet fallback also failed:', (err as Error).message);
+        console.error('[EmailService] SendGrid fallback failed:', (err as Error).message);
       }
     }
 
