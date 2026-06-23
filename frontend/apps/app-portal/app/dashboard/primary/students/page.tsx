@@ -377,7 +377,6 @@ export default function PrimaryStudentsPage() {
                       .map((t: any) => (
                         <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
-                    }
                   </select>
                 </div>
               </div>
