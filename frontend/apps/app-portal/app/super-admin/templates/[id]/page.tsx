@@ -76,17 +76,49 @@ function getBorderCss(style: string, color: string): React.CSSProperties {
   return borderMap[style] || borderMap.classic;
 }
 
-function getBadgeSvg(style: string, color: string): string {
-  const svgMap: Record<string, string> = {
-    star: `<polygon points="25,3 31,18 47,19 35,30 38,47 25,38 12,47 15,30 3,19 19,18" fill="${color}"/>`,
-    shield: `<path d="M25,2 L2,12 L2,30 Q2,45 25,50 Q48,45 48,30 L48,12 Z" fill="${color}"/><text x="25" y="28" text-anchor="middle" fill="white" font-size="14" font-weight="bold">&#9733;</text>`,
-    circle: `<circle cx="25" cy="25" r="23" fill="${color}"/><circle cx="25" cy="25" r="19" fill="none" stroke="white" stroke-width="1" opacity="0.3"/><text x="25" y="30" text-anchor="middle" fill="white" font-size="18" font-weight="bold">&#9733;</text>`,
-    trophy: `<path d="M10,5 L10,25 Q5,28 3,35 L3,40 L18,40 Q22,48 28,53 L28,58 L15,58 L15,60 L35,60 L35,58 L22,58 L22,53 Q28,48 32,40 L47,40 L47,35 Q45,28 40,25 L40,5 Z" fill="${color}" opacity="0.95"/><rect x="17" y="5" width="16" height="20" fill="white" opacity="0.2" rx="2"/>`,
-    laurel: `<path d="M25,4 Q8,15 5,32 Q3,45 10,58 L15,55 Q10,42 13,30 Q15,18 25,10 Z" fill="${color}"/><path d="M25,4 Q42,15 45,32 Q47,45 40,58 L35,55 Q40,42 37,30 Q35,18 25,10 Z" fill="${color}"/><circle cx="25" cy="25" r="7" fill="white" opacity="0.3"/><text x="25" y="28" text-anchor="middle" fill="white" font-size="10" font-weight="bold">&#9733;</text>`,
-    graduation_cap: `<polygon points="25,2 48,20 25,38 2,20" fill="${color}"/><rect x="13" y="20" width="24" height="28" fill="${color}" rx="2"/><line x1="25" y1="10" x2="25" y2="48" stroke="white" stroke-width="1" opacity="0.3"/>`,
-    medal: `<circle cx="25" cy="18" r="14" fill="${color}"/><circle cx="25" cy="18" r="10" fill="none" stroke="white" stroke-width="1" opacity="0.4"/><text x="25" y="22" text-anchor="middle" fill="white" font-size="10" font-weight="bold">&#9733;</text><path d="M15,28 L15,58 L25,50 L35,58 L35,28" fill="${color}" opacity="0.7"/>`,
-  };
-  return svgMap[style] || svgMap.star;
+function renderBadgeSvg(style: string, color: string) {
+  const s = 50; const h = s / 2; const star = '\u2605';
+  const props: React.SVGProps<SVGSVGElement> = { width: s, height: s, viewBox: `0 0 ${s} ${s}` };
+
+  switch (style) {
+    case 'star':
+      return <svg {...props}><polygon points={`${h},3 ${s*0.64},${s*0.33} ${s},${s*0.36} ${s*0.72},${s*0.58} ${s*0.78},${s} ${h},${s*0.76} ${s*0.22},${s} ${s*0.28},${s*0.58} 0,${s*0.36} ${s*0.36},${s*0.33}`} fill={color}/></svg>;
+    case 'shield':
+      return <svg {...props}><path d={`M${h},2 L2,${s*0.24} L2,${s*0.5} Q2,${s*0.76} ${h},${s} Q${s-2},${s*0.76} ${s-2},${s*0.5} L${s-2},${s*0.24} Z`} fill={color}/><text x={h} y={s*0.42} textAnchor="middle" fill="white" fontSize={s*0.32} fontWeight="bold">{star}</text></svg>;
+    case 'circle':
+      return <svg {...props}><circle cx={h} cy={h} r={s*0.44} fill={color}/><circle cx={h} cy={h} r={s*0.36} fill="none" stroke="white" strokeWidth="1" opacity={0.3}/><text x={h} y={s*0.6} textAnchor="middle" fill="white" fontSize={s*0.36} fontWeight="bold">{star}</text></svg>;
+    case 'trophy':
+      return <svg {...props}><path d={`M${s*0.2},${s*0.1} L${s*0.2},${s*0.42} Q${s*0.1},${s*0.46} ${s*0.06},${s*0.6} L${s*0.06},${s*0.7} L${s*0.3},${s*0.7} Q${s*0.36},${s*0.82} ${s*0.46},${s*0.9} L${s*0.46},${s*0.96} L${s*0.2},${s*0.96} L${s*0.2},${s} L${s*0.8},${s} L${s*0.8},${s*0.96} L${s*0.54},${s*0.96} L${s*0.54},${s*0.9} Q${s*0.64},${s*0.82} ${s*0.7},${s*0.7} L${s*0.94},${s*0.7} L${s*0.94},${s*0.6} Q${s*0.9},${s*0.46} ${s*0.8},${s*0.42} L${s*0.8},${s*0.1} Z`} fill={color} opacity={0.95}/><rect x={s*0.34} y={s*0.1} width={s*0.32} height={s*0.34} fill="white" opacity={0.2} rx={2}/></svg>;
+    case 'laurel':
+      return <svg {...props}><path d={`M${h},${s*0.06} Q${s*0.14},${s*0.2} ${s*0.1},${s*0.46} Q${s*0.06},${s*0.64} ${s*0.14},${s*0.94} L${s*0.24},${s*0.88} Q${s*0.18},${s*0.64} ${s*0.22},${s*0.46} Q${s*0.26},${s*0.22} ${h},${s*0.14} Z`} fill={color}/><path d={`M${h},${s*0.06} Q${s*0.86},${s*0.2} ${s*0.9},${s*0.46} Q${s*0.94},${s*0.64} ${s*0.86},${s*0.94} L${s*0.76},${s*0.88} Q${s*0.82},${s*0.64} ${s*0.78},${s*0.46} Q${s*0.74},${s*0.22} ${h},${s*0.14} Z`} fill={color}/><circle cx={h} cy={h} r={s*0.14} fill="white" opacity={0.3}/><text x={h} y={s*0.54} textAnchor="middle" fill="white" fontSize={s*0.18} fontWeight="bold">{star}</text></svg>;
+    case 'graduation_cap':
+      return <svg {...props}><polygon points={`${h},2 ${s-2},${s*0.3} ${h},${s*0.58} 2,${s*0.3}`} fill={color}/><rect x={s*0.24} y={s*0.3} width={s*0.52} height={s*0.56} fill={color} rx={2}/><line x1={h} y1={s*0.14} x2={h} y2={s*0.86} stroke="white" strokeWidth="1" opacity={0.3}/></svg>;
+    case 'medal':
+      return <svg {...props}><circle cx={h} cy={s*0.34} r={s*0.26} fill={color}/><circle cx={h} cy={s*0.34} r={s*0.18} fill="none" stroke="white" strokeWidth="1" opacity={0.4}/><text x={h} y={s*0.38} textAnchor="middle" fill="white" fontSize={s*0.18} fontWeight="bold">{star}</text><path d={`M${s*0.3},${s*0.54} L${s*0.3},${s*0.96} L${h},${s*0.84} L${s*0.7},${s*0.96} L${s*0.7},${s*0.54}`} fill={color} opacity={0.7}/></svg>;
+    default:
+      return <svg {...props}><circle cx={h} cy={h} r={s*0.44} fill={color}/><circle cx={h} cy={h} r={s*0.36} fill="none" stroke="white" strokeWidth="0.5" opacity={0.3}/></svg>;
+  }
+}
+
+function getDetailText(certType: string): string {
+  switch (certType) {
+    case 'SPORTS_AWARD': return 'In recognition of outstanding athletic achievement and sportsmanship';
+    case 'ATTENDANCE': return 'In recognition of exemplary attendance and punctuality';
+    case 'MERIT_AWARD': return 'In recognition of outstanding merit, dedication, and service';
+    case 'GRADUATION': return 'In recognition of successful completion of academic requirements';
+    default: return 'In recognition of outstanding academic performance and demonstrated excellence';
+  }
+}
+
+function getCertTitle(certType: string): string {
+  switch (certType) {
+    case 'SPORTS_AWARD': return 'Certificate of Athletic Achievement';
+    case 'ATTENDANCE': return 'Certificate of Attendance';
+    case 'MERIT_AWARD': return 'Certificate of Merit';
+    case 'GRADUATION': return 'Diploma of Graduation';
+    case 'ACADEMIC_EXCELLENCE': return 'Certificate of Academic Excellence';
+    default: return 'Certificate of Achievement';
+  }
 }
 
 function CertificatePreviewContent({ template }: { template: Template }) {
@@ -94,7 +126,6 @@ function CertificatePreviewContent({ template }: { template: Template }) {
   const color = cert.borderColor || template.primaryColor || '#1a365d';
   const borderCss = getBorderCss(cert.borderStyle || 'classic', color);
   const isLandscape = template.orientation === 'landscape';
-  const badgeSvg = getBadgeSvg(cert.badgeStyle || 'star', color);
   const gradientId = `sealGrad-${template.id}`;
   const topArcId = `topArc-${template.id}`;
   const bottomArcId = `bottomArc-${template.id}`;
@@ -106,13 +137,15 @@ function CertificatePreviewContent({ template }: { template: Template }) {
       padding: '36px 28px', ...borderCss, borderRadius: '0',
     }}>
       {/* Watermark */}
-      <div style={{
-        position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%) rotate(-28deg)',
-        fontSize: '90px', color, opacity: 0.035, pointerEvents: 'none', whiteSpace: 'nowrap',
-        fontWeight: 'bold', fontFamily: 'Georgia, serif', letterSpacing: '8px', zIndex: 0,
-      }}>
-        {cert.watermarkText || 'CERTIFICATE'}
-      </div>
+      {cert.showWatermark !== false && (
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%) rotate(-28deg)',
+          fontSize: '90px', color, opacity: 0.035, pointerEvents: 'none', whiteSpace: 'nowrap',
+          fontWeight: 'bold', fontFamily: 'Georgia, serif', letterSpacing: '8px', zIndex: 0,
+        }}>
+          {cert.watermarkText || 'CERTIFICATE'}
+        </div>
+      )}
 
       {/* Seal watermark */}
       <svg width="90" height="90" viewBox="0 0 120 120" style={{ position: 'absolute', bottom: '30px', right: '30px', opacity: 0.12, zIndex: 0, pointerEvents: 'none' }}>
@@ -175,7 +208,7 @@ function CertificatePreviewContent({ template }: { template: Template }) {
 
       {/* Certificate title */}
       <div style={{ fontSize: '9px', color: '#999', textTransform: 'uppercase', letterSpacing: '5px', marginBottom: '6px', zIndex: 1 }}>
-        Certificate of Achievement
+        {getCertTitle(cert.certificateType)}
       </div>
 
       {/* Award text */}
@@ -190,7 +223,7 @@ function CertificatePreviewContent({ template }: { template: Template }) {
 
       {/* Detail text */}
       <div style={{ fontSize: '11px', color: '#777', margin: '3px 0', zIndex: 1, textAlign: 'center', lineHeight: '1.6' }}>
-        In recognition of outstanding academic performance and demonstrated excellence
+        {getDetailText(cert.certificateType)}
       </div>
       <div style={{ fontSize: '11px', color: '#777', margin: '3px 0 8px', zIndex: 1, textAlign: 'center' }}>
         Class: [Grade 10A] &middot; [Term 1] [2024]
@@ -199,15 +232,7 @@ function CertificatePreviewContent({ template }: { template: Template }) {
       {/* Badge */}
       {cert.showBadge !== false && (
         <div style={{ margin: '8px 0', zIndex: 1 }}>
-          <svg width="50" height="50" viewBox="0 0 50 50">
-            <defs>
-              <linearGradient id={`badgeGrad-${template.id}`} x1="0" y1="0" x2="50" y2="50">
-                <stop offset="0%" stopColor={color} stopOpacity="1"/>
-                <stop offset="100%" stopColor="#333" stopOpacity="0.7"/>
-              </linearGradient>
-            </defs>
-            <g dangerouslySetInnerHTML={{ __html: badgeSvg }} />
-          </svg>
+          {renderBadgeSvg(cert.badgeStyle || 'star', color)}
         </div>
       )}
 

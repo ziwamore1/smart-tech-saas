@@ -6,6 +6,7 @@ import { studentApi, classApi } from '@/lib/api';
 import { Student } from '@/types/student';
 
 const INTAKE_TYPES = [
+  { value: 'admission', label: 'New Admission', desc: 'Direct entry new student (any grade)' },
   { value: 'pre-school', label: 'Pre-School Intake', desc: 'ECE / Nursery / Reception' },
   { value: 'grade1', label: 'Grade 1 Intake', desc: 'New entrants (age 6–7)' },
   { value: 'transfer', label: 'Transfer Pupil', desc: 'From another school' },
@@ -16,7 +17,7 @@ const GRADE_OPTIONS = ['Pre', '1', '2', '3', '4', '5', '6', '7'];
 
 export default function PrimaryStudentsPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'all' | 'pre-school' | 'grade1' | 'transfer'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'admission' | 'pre-school' | 'grade1' | 'transfer'>('all');
   const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -59,6 +60,7 @@ export default function PrimaryStudentsPage() {
     if (activeTab === 'pre-school') return (s.grade || '').toLowerCase().includes('pre') || (s.className || '').toLowerCase().includes('pre');
     if (activeTab === 'grade1') return (s.grade || '').includes('1') && !(s.className || '').toLowerCase().includes('pre');
     if (activeTab === 'transfer') return s.transferIn || s.previousSchool;
+    if (activeTab === 'admission') return !s.transferIn && !s.previousSchool && !(s.grade || '').toLowerCase().includes('pre') && !(s.grade || '').includes('1');
     return true;
   });
 
@@ -83,6 +85,7 @@ export default function PrimaryStudentsPage() {
           <div className="flex gap-1 p-1">
             {[
               { key: 'all' as const, label: 'All Pupils', icon: 'fa-users' },
+              { key: 'admission' as const, label: 'New Admission', icon: 'fa-user-plus' },
               { key: 'pre-school' as const, label: 'Pre-School', icon: 'fa-baby' },
               { key: 'grade1' as const, label: 'Grade 1 Intake', icon: 'fa-child' },
               { key: 'transfer' as const, label: 'Transfers', icon: 'fa-exchange-alt' },

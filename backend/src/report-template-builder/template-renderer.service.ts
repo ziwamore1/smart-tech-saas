@@ -962,6 +962,11 @@ export class TemplateRendererService {
       ornate: `4px double ${borderColor};box-shadow:inset 0 0 20px ${borderColor}11`,
       minimal: `1px solid ${borderColor}`,
       gold: `3px solid #b8860b;box-shadow:0 0 0 4px #ffd70033`,
+      victorian: `3px solid ${borderColor};box-shadow:0 0 0 6px ${borderColor}11,0 0 0 8px ${borderColor}`,
+      parchment: `2px solid ${borderColor};background:#fef9ef`,
+      gothic: `3px solid ${borderColor}`,
+      academic: `2px solid ${borderColor};background:linear-gradient(135deg,${borderColor}05,${borderColor}10)`,
+      university: `6px solid #0a1628;box-shadow:0 0 0 2px #1a365d`,
     };
 
     const borderCss = borderMap[borderStyle] || borderMap.classic;
@@ -973,11 +978,12 @@ export class TemplateRendererService {
       ${cert.showWatermark && cert.watermarkText ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)rotate(-30deg);font-size:80px;color:${borderColor};opacity:0.04;pointer-events:none;white-space:nowrap;font-weight:bold;">${cert.watermarkText}</div>` : ''}
       ${school?.logoUrl ? `<img src="${school.logoUrl}" style="height:60px;margin-bottom:10px;" />` : ''}
       <div style="font-size:28px;font-weight:bold;color:${borderColor};margin-bottom:5px;">${school?.name || 'School Name'}</div>
-      <div style="font-size:10px;color:#666;margin-bottom:20px;text-transform:uppercase;letter-spacing:3px;">Certificate of Achievement</div>
-      <hr style="width:200px;border:1px solid ${borderColor};margin:10px auto;" />
-      <div style="font-size:14px;color:#555;margin:10px 0;">${cert.awardText || 'This certificate is awarded to'}</div>
-      <div style="font-size:32px;font-weight:bold;color:${borderColor};margin:8px 0;font-family:'Georgia',serif;">${studentName}</div>
-      <div style="font-size:13px;color:#555;margin:8px 0;">For outstanding academic performance</div>
+      <div style="font-size:9px;color:#999;margin-bottom:10px;text-transform:uppercase;letter-spacing:3px;">${cert.borderStyle === 'university' ? 'Official University Document' : 'Official Academic Document'}</div>
+      <hr style="width:160px;border:none;height:1px;background:linear-gradient(90deg,transparent,${borderColor},transparent);margin:10px auto;opacity:0.6;" />
+      <div style="font-size:9px;color:#999;margin-bottom:6px;text-transform:uppercase;letter-spacing:5px;">${cert.certificateType === 'SPORTS_AWARD' ? 'Certificate of Athletic Achievement' : cert.certificateType === 'ATTENDANCE' ? 'Certificate of Attendance' : cert.certificateType === 'MERIT_AWARD' ? 'Certificate of Merit' : cert.certificateType === 'GRADUATION' ? 'Diploma of Graduation' : 'Certificate of Achievement'}</div>
+      <div style="font-size:13px;color:#666;margin:6px 0;font-style:italic;">${cert.awardText || 'This certificate is awarded to'}</div>
+      <div style="font-size:32px;font-weight:bold;color:${borderColor};margin:6px 0;font-family:'Georgia',serif;">${studentName}</div>
+      <div style="font-size:11px;color:#777;margin:3px 0;line-height:1.6;">${cert.certificateType === 'SPORTS_AWARD' ? 'In recognition of outstanding athletic achievement and sportsmanship' : cert.certificateType === 'ATTENDANCE' ? 'In recognition of exemplary attendance and punctuality' : cert.certificateType === 'MERIT_AWARD' ? 'In recognition of outstanding merit, dedication, and service' : cert.certificateType === 'GRADUATION' ? 'In recognition of successful completion of academic requirements' : 'In recognition of outstanding academic performance and demonstrated excellence'}</div>
       <div style="font-size:11px;color:#777;margin:5px 0;">Class: ${data?.class?.name || ''} | Term: ${data?.term?.name || ''} ${data?.term?.academicYear || ''}</div>
       ${cert.showBadge ? `<div style="margin:15px 0;">
         <svg width="50" height="50" viewBox="0 0 50 50"><polygon points="25,3 31,18 47,19 35,30 38,47 25,38 12,47 15,30 3,19 19,18" fill="#f59e0b"/></svg>
