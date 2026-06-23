@@ -18,6 +18,11 @@ import { ParentDashboardScreen } from '../screens/parent/DashboardScreen';
 import { ParentPrimaryDashboardScreen } from '../screens/parent/ParentPrimaryDashboardScreen';
 import { ParentChildrenScreen } from '../screens/parent/ChildrenScreen';
 import { ParentChildResultsScreen } from '../screens/parent/ChildResultsScreen';
+import { ParentHomeworkScreen } from '../screens/parent/HomeworkScreen';
+import { ParentAssessmentsScreen } from '../screens/parent/AssessmentsScreen';
+import { ParentAttendanceScreen } from '../screens/parent/AttendanceScreen';
+import { ParentReportCardsScreen } from '../screens/parent/ReportCardsScreen';
+import { ParentAnalyticsScreen } from '../screens/parent/AnalyticsScreen';
 import { TeacherTabNavigator } from './TeacherTabNavigator';
 import { TeacherClassesScreen } from '../screens/teacher/ClassesScreen';
 import { TeacherMarksScreen } from '../screens/teacher/MarksScreen';
@@ -136,6 +141,11 @@ export function AppNavigator() {
             {isParent && <Stack.Screen name="ParentChildren" component={ParentChildrenScreen} />}
             {isParent && <Stack.Screen name="ParentChildResults" component={ParentChildResultsScreen} />}
             {isParent && institutionType === 'PRIMARY_SCHOOL' && <Stack.Screen name="ParentPrimaryDashboard" component={ParentPrimaryDashboardScreen} />}
+            {isParent && <Stack.Screen name="ParentHomework" component={ParentHomeworkScreen} />}
+            {isParent && <Stack.Screen name="ParentAssessments" component={ParentAssessmentsScreen} />}
+            {isParent && <Stack.Screen name="ParentAttendance" component={ParentAttendanceScreen} />}
+            {isParent && <Stack.Screen name="ParentReportCards" component={ParentReportCardsScreen} />}
+            {isParent && <Stack.Screen name="ParentAnalytics" component={ParentAnalyticsScreen} />}
 
             {(isTeacher || isClassTeacher) && <Stack.Screen name="TeacherClasses" component={TeacherClassesScreen} />}
             {(isTeacher || isClassTeacher) && <Stack.Screen name="TeacherMarks" component={TeacherMarksScreen} />}

@@ -214,12 +214,27 @@ export default function ParentDashboard() {
           </div>
 
           {/* Quick Links */}
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
             <Link href="/parent/timetable" className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-              View Timetables
+              📅 Timetables
             </Link>
             <Link href="/parent/results" className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-              Detailed Results
+              📝 Results
+            </Link>
+            <Link href="/parent/homework" className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              📚 Homework
+            </Link>
+            <Link href="/parent/report-cards" className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              📄 Report Cards
+            </Link>
+            <Link href="/parent/attendance" className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              ✅ Attendance
+            </Link>
+            <Link href="/parent/assessments" className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              📊 Assessments
+            </Link>
+            <Link href="/parent/analytics" className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              📈 Analytics
             </Link>
           </div>
         </>

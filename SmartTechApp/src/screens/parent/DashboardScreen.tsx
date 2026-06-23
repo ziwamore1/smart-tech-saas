@@ -76,9 +76,27 @@ export const ParentDashboardScreen: React.FC = () => {
             <Text style={{ fontSize: 28 }}>📝</Text>
             <Text style={styles.resourceName}>Results</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.resourceCard, { borderColor: '#10B981', borderWidth: 1 }]} onPress={() => navigation.navigate('ParentPrimaryDashboard')}>
-            <Text style={{ fontSize: 28 }}>🌿</Text>
-            <Text style={styles.resourceName}>Primary</Text>
+          <TouchableOpacity style={styles.resourceCard} onPress={() => navigation.navigate('ParentReportCards')}>
+            <Text style={{ fontSize: 28 }}>📄</Text>
+            <Text style={styles.resourceName}>Report Cards</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.resourceCard} onPress={() => navigation.navigate('ParentHomework')}>
+            <Text style={{ fontSize: 28 }}>📚</Text>
+            <Text style={styles.resourceName}>Homework</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.resourceCard} onPress={() => navigation.navigate('ParentAttendance')}>
+            <Text style={{ fontSize: 28 }}>✅</Text>
+            <Text style={styles.resourceName}>Attendance</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.resourcesRow}>
+          <TouchableOpacity style={styles.resourceCard} onPress={() => navigation.navigate('ParentAssessments')}>
+            <Text style={{ fontSize: 28 }}>📋</Text>
+            <Text style={styles.resourceName}>Assessments</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.resourceCard} onPress={() => navigation.navigate('ParentAnalytics')}>
+            <Text style={{ fontSize: 28 }}>📊</Text>
+            <Text style={styles.resourceName}>Analytics</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.resourceCard} onPress={() => navigation.navigate('AiTutor', { sourceScreen: 'parent_dashboard' })}>
             <Text style={{ fontSize: 28 }}>🤖</Text>

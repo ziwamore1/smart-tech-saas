@@ -2151,6 +2151,44 @@ class ApiService {
     });
     return response.data;
   }
+
+  // ===== Parent-specific data endpoints =====
+
+  async getParentHomework(studentId: string) {
+    const response = await this.client.get(`/parent/children/${studentId}/homework`);
+    return response.data;
+  }
+
+  async getParentAttendance(studentId: string) {
+    const response = await this.client.get(`/parent/children/${studentId}/attendance`);
+    return response.data;
+  }
+
+  async getParentAssessmentResults(studentId: string, termId?: string) {
+    const params = termId ? { termId } : {};
+    const response = await this.client.get(`/assessment-engine/results/student/${studentId}`, { params });
+    return response.data;
+  }
+
+  async getParentAnalytics(studentId: string) {
+    const response = await this.client.get(`/intelligence/trends/student/${studentId}`);
+    return response.data;
+  }
+
+  async getParentStudentStats(studentId: string) {
+    const response = await this.client.get(`/intelligence/descriptive-stats/student/${studentId}`);
+    return response.data;
+  }
+
+  async getParentCompetencyDiagnosis(studentId: string, termId: string) {
+    const response = await this.client.get(`/intelligence/diagnostic/competency/${studentId}`, { params: { termId } });
+    return response.data;
+  }
+
+  async getParentRecommendations(studentId: string, termId: string) {
+    const response = await this.client.get(`/intelligence/recommendations/student/${studentId}`, { params: { termId } });
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

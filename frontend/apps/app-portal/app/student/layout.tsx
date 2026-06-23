@@ -16,6 +16,10 @@ export default function StudentLayout({
     { href: '/student', label: 'Dashboard', icon: '🏠' },
     { href: '/student/timetable', label: 'Timetable', icon: '📅' },
     { href: '/student/results', label: 'Results', icon: '📝' },
+    { href: '/student/exams', label: 'Exams', icon: '📋' },
+    { href: '/student/homework', label: 'Homework', icon: '📚' },
+    { href: '/student/report-cards', label: 'Report Cards', icon: '📄' },
+    { href: '/student/assessments', label: 'Assessments', icon: '📊' },
   ];
 
   return (

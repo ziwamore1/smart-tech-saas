@@ -278,17 +278,21 @@ export const ParentPrimaryDashboardScreen: React.FC = () => {
                   <Text style={styles.actionIcon}>📊</Text>
                   <Text style={styles.actionLabel}>Results</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionCard} onPress={() => Alert.alert('Coming Soon', 'Attendance details view')}>
+                <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('ParentAttendance')}>
                   <Text style={styles.actionIcon}>✅</Text>
                   <Text style={styles.actionLabel}>Attendance</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('AiTutor', { sourceScreen: 'parent_primary' })}>
-                  <Text style={styles.actionIcon}>🤖</Text>
-                  <Text style={styles.actionLabel}>AI Tutor</Text>
+                <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('ParentHomework')}>
+                  <Text style={styles.actionIcon}>📚</Text>
+                  <Text style={styles.actionLabel}>Homework</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionCard} onPress={() => Alert.alert('Coming Soon', 'Contact teacher feature')}>
-                  <Text style={styles.actionIcon}>💬</Text>
-                  <Text style={styles.actionLabel}>Contact</Text>
+                <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('ParentAssessments')}>
+                  <Text style={styles.actionIcon}>📋</Text>
+                  <Text style={styles.actionLabel}>Assessments</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('ParentAnalytics')}>
+                  <Text style={styles.actionIcon}>📊</Text>
+                  <Text style={styles.actionLabel}>Analytics</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -338,7 +342,7 @@ const styles = StyleSheet.create({
   gzInfo: { flex: 1 },
   gzTitle: { fontSize: 15, fontWeight: '700', color: '#9A3412' },
   gzDesc: { fontSize: 12, color: '#C2410C', marginTop: 2 },
-  actionsGrid: { flexDirection: 'row', gap: 8 },
+  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   actionCard: { flex: 1, backgroundColor: colors.white, padding: spacing.md, borderRadius: borderRadius.lg, alignItems: 'center', ...shadows.sm },
   actionIcon: { fontSize: 24, marginBottom: 6 },
   actionLabel: { fontSize: 12, fontWeight: '600', color: colors.text },

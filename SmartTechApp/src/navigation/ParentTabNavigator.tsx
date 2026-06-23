@@ -6,38 +6,65 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuthStore } from '../store';
 import { ParentDashboardScreen } from '../screens/parent/DashboardScreen';
 import { ParentChildrenScreen } from '../screens/parent/ChildrenScreen';
+import { ParentHomeworkScreen } from '../screens/parent/HomeworkScreen';
+import { ParentAssessmentsScreen } from '../screens/parent/AssessmentsScreen';
+import { ParentAttendanceScreen } from '../screens/parent/AttendanceScreen';
+import { ParentReportCardsScreen } from '../screens/parent/ReportCardsScreen';
+import { ParentAnalyticsScreen } from '../screens/parent/AnalyticsScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
 import { colors, spacing, borderRadius, shadows } from '../theme';
 
 const { width } = Dimensions.get('window');
 const DRAWER_WIDTH = 280;
 
-interface DrawerScreen {
+interface DrawerSection {
+  title?: string;
+  items: DrawerItem[];
+}
+
+interface DrawerItem {
   name: string;
   label: string;
   icon: string;
   component?: React.FC<any>;
   stackScreen?: string;
-  institutionTypes?: string[];
 }
 
-const allDrawerScreens: DrawerScreen[] = [
-  { name: 'ParentHome', label: 'Dashboard', icon: '🏠', component: ParentDashboardScreen },
-  { name: 'ParentChildrenList', label: 'My Children', icon: '👨‍👩‍👧‍👦', component: ParentChildrenScreen },
-  { name: 'ParentResults', label: 'Results', icon: '📝', stackScreen: 'ParentChildResults' },
-  { name: 'ParentAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor' },
-  { name: 'ParentProfile', label: 'Profile', icon: '👤', component: ProfileScreen },
+const drawerSections: DrawerSection[] = [
+  { items: [
+    { name: 'ParentHome', label: 'Dashboard', icon: '🏠', component: ParentDashboardScreen },
+    { name: 'ParentChildrenList', label: 'My Children', icon: '👨‍👩‍👧‍👦', component: ParentChildrenScreen },
+  ]},
+  { title: 'ACADEMIC',
+    items: [
+      { name: 'ParentResults', label: 'Results', icon: '📝', stackScreen: 'ParentChildResults' },
+      { name: 'ParentReportCards', label: 'Report Cards', icon: '📄', component: ParentReportCardsScreen },
+      { name: 'ParentHomework', label: 'Homework', icon: '📚', component: ParentHomeworkScreen },
+      { name: 'ParentAssessments', label: 'Assessments', icon: '📋', component: ParentAssessmentsScreen },
+    ],
+  },
+  { title: 'MONITORING',
+    items: [
+      { name: 'ParentAttendance', label: 'Attendance', icon: '✅', component: ParentAttendanceScreen },
+      { name: 'ParentAnalytics', label: 'Analytics', icon: '📊', component: ParentAnalyticsScreen },
+    ],
+  },
+  { title: 'SERVICES',
+    items: [
+      { name: 'ParentAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor' },
+      { name: 'ParentProfile', label: 'Profile', icon: '👤', component: ProfileScreen },
+    ],
+  },
 ];
 
 export const ParentTabNavigator: React.FC = () => {
   const { user, logout } = useAuthStore();
-  const drawerScreens = allDrawerScreens;
 
-  const drawerScreenNames = useMemo(() => drawerScreens.map(s => s.name), [drawerScreens]);
-  const stackScreenMap = useMemo(() => drawerScreens.filter(s => s.stackScreen).reduce((acc, s) => {
+  const allItems = useMemo(() => drawerSections.flatMap(s => s.items), []);
+  const stackScreenMap = useMemo(() => allItems.filter(s => s.stackScreen).reduce((acc, s) => {
     acc[s.name] = s.stackScreen!;
     return acc;
-  }, {} as Record<string, string>), [drawerScreens]);
+  }, {} as Record<string, string>), [allItems]);
 
   const [activeScreen, setActiveScreen] = useState('ParentHome');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -63,10 +90,10 @@ export const ParentTabNavigator: React.FC = () => {
   };
 
   const navigateTo = (name: string) => {
-    const stackScreen = stackScreenMap[name];
-    if (stackScreen) {
+    const item = allItems.find(i => i.name === name);
+    if (item?.stackScreen) {
       setDrawerOpen(false);
-      Animated.timing(slideAnim, { toValue: -DRAWER_WIDTH, duration: 250, useNativeDriver: true }).start(() => navigation.navigate(stackScreen as never));
+      Animated.timing(slideAnim, { toValue: -DRAWER_WIDTH, duration: 250, useNativeDriver: true }).start(() => navigation.navigate(item.stackScreen as never));
     } else {
       setActiveScreen(name);
       setDrawerOpen(false);
@@ -75,10 +102,10 @@ export const ParentTabNavigator: React.FC = () => {
   };
 
   const renderActiveScreen = () => {
-    const screenConfig = drawerScreens.find(s => s.name === activeScreen);
-    if (!screenConfig || screenConfig.stackScreen) return <ParentDashboardScreen />;
+    const item = allItems.find(i => i.name === activeScreen);
+    if (!item || item.stackScreen) return <ParentDashboardScreen />;
     if (activeScreen === 'ParentProfile') return <ProfileScreen navigation={navigation as any} />;
-    const Component = screenConfig.component as React.FC<any>;
+    const Component = item.component as React.FC<any>;
     return <Component />;
   };
 
@@ -111,11 +138,16 @@ export const ParentTabNavigator: React.FC = () => {
           </View>
 
           <ScrollView style={styles.drawerNav} showsVerticalScrollIndicator={false}>
-            {drawerScreens.map((screen) => (
-              <TouchableOpacity key={screen.name} style={[styles.navItem, activeScreen === screen.name && styles.navItemActive]} onPress={() => navigateTo(screen.name)}>
-                <Text style={styles.navIcon}>{screen.icon}</Text>
-                <Text style={[styles.navLabel, activeScreen === screen.name && styles.navLabelActive]}>{screen.label}</Text>
-              </TouchableOpacity>
+            {drawerSections.map((section, si) => (
+              <View key={si}>
+                {section.title && <Text style={styles.sectionTitle}>{section.title}</Text>}
+                {section.items.map((item) => (
+                  <TouchableOpacity key={item.name} style={[styles.navItem, activeScreen === item.name && styles.navItemActive]} onPress={() => navigateTo(item.name)}>
+                    <Text style={styles.navIcon}>{item.icon}</Text>
+                    <Text style={[styles.navLabel, activeScreen === item.name && styles.navLabelActive]}>{item.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             ))}
           </ScrollView>
 
@@ -150,7 +182,8 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 18, fontWeight: '700', color: colors.white },
   profileName: { fontSize: 14, fontWeight: '600', color: colors.text },
   profileRole: { fontSize: 11, color: colors.textLight, marginTop: 1 },
-  drawerNav: { flex: 1, paddingVertical: spacing.sm },
+  drawerNav: { flex: 1, paddingVertical: spacing.xs },
+  sectionTitle: { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xs },
   navItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
   navItemActive: { backgroundColor: colors.infoLight, borderRightWidth: 3, borderRightColor: colors.primary },
   navIcon: { fontSize: 20, marginRight: spacing.md, width: 28, textAlign: 'center' },
