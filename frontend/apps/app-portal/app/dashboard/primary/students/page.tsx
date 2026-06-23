@@ -19,9 +19,11 @@ export default function PrimaryStudentsPage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'all' | 'admission' | 'pre-school' | 'grade1' | 'transfer'>('all');
   const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [registerError, setRegisterError] = useState('');
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
+    admissionNumber: '',
     dateOfBirth: '',
     gender: '',
     intakeType: 'grade1',
@@ -42,16 +44,31 @@ export default function PrimaryStudentsPage() {
     queryFn: () => classApi.getAll().then(r => r.data?.data || r.data || []),
   });
 
+  const toCreateStudentDto = (form: any) => ({
+    firstName: form.firstName,
+    lastName: form.lastName,
+    admissionNumber: form.admissionNumber,
+    dateOfBirth: form.dateOfBirth || undefined,
+    gender: form.gender || undefined,
+    parentName: form.guardianName || undefined,
+    parentPhone: form.guardianPhone || undefined,
+    parentEmail: form.guardianEmail || undefined,
+  });
+
   const registerMutation = useMutation({
-    mutationFn: (data: any) => studentApi.create(data),
+    mutationFn: (data: any) => studentApi.create(toCreateStudentDto(data)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['primary-students'] });
       setShowRegisterForm(false);
       setFormData({
-        firstName: '', lastName: '', dateOfBirth: '', gender: '',
+        firstName: '', lastName: '', admissionNumber: '', dateOfBirth: '', gender: '',
         intakeType: 'grade1', grade: '1', previousSchool: '',
         guardianName: '', guardianPhone: '', guardianEmail: '',
       });
+      setRegisterError('');
+    },
+    onError: (err: any) => {
+      setRegisterError(err?.response?.data?.message || err?.response?.data?.error || 'Registration failed. Check required fields and try again.');
     },
   });
 
@@ -73,7 +90,7 @@ export default function PrimaryStudentsPage() {
         </div>
         <button
           onClick={() => setShowRegisterForm(true)}
-          className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 flex items-center gap-2"
+          className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 flex items-center gap-2 cursor-pointer"
         >
           <i className="fas fa-user-plus" />
           Register New Pupil
@@ -115,9 +132,9 @@ export default function PrimaryStudentsPage() {
               <p className="text-gray-500">No pupils found in this category.</p>
               <button
                 onClick={() => setShowRegisterForm(true)}
-                className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"
-              >
-                Register First Pupil
+              className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 cursor-pointer"
+            >
+              Register First Pupil
               </button>
             </div>
           ) : (
@@ -167,7 +184,7 @@ export default function PrimaryStudentsPage() {
           <div key={intake.value} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600">
-                <i className={`fas ${intake.value === 'pre-school' ? 'fa-baby' : intake.value === 'grade1' ? 'fa-child' : intake.value === 'transfer' ? 'fa-exchange-alt' : 'fa-history'}`} />
+                <i className={`fas ${intake.value === 'admission' ? 'fa-user-plus' : intake.value === 'pre-school' ? 'fa-baby' : intake.value === 'grade1' ? 'fa-child' : intake.value === 'transfer' ? 'fa-exchange-alt' : intake.value === 're-admission' ? 'fa-undo' : 'fa-history'}`} />
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900">{intake.label}</h3>
@@ -179,7 +196,7 @@ export default function PrimaryStudentsPage() {
                 setFormData(prev => ({ ...prev, intakeType: intake.value }));
                 setShowRegisterForm(true);
               }}
-              className="text-sm text-emerald-600 font-medium hover:text-emerald-700"
+              className="text-sm text-emerald-600 font-medium hover:text-emerald-700 cursor-pointer"
             >
               Register Now →
             </button>
@@ -197,9 +214,15 @@ export default function PrimaryStudentsPage() {
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              {registerError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
+                  <i className="fas fa-exclamation-circle mt-0.5" />
+                  <span>{registerError}</span>
+                </div>
+              )}
+              <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
                   <input
                     type="text" value={formData.firstName}
                     onChange={e => setFormData(p => ({ ...p, firstName: e.target.value }))}
@@ -208,12 +231,21 @@ export default function PrimaryStudentsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
                   <input
                     type="text" value={formData.lastName}
                     onChange={e => setFormData(p => ({ ...p, lastName: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
                     placeholder="Last name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Admission # *</label>
+                  <input
+                    type="text" value={formData.admissionNumber}
+                    onChange={e => setFormData(p => ({ ...p, admissionNumber: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    placeholder="e.g. ST-2024-001"
                   />
                 </div>
               </div>
@@ -314,7 +346,8 @@ export default function PrimaryStudentsPage() {
               </button>
               <button
                 onClick={() => {
-                  if (!formData.firstName || !formData.lastName) return;
+                  if (!formData.firstName || !formData.lastName || !formData.admissionNumber) return;
+                  setRegisterError('');
                   registerMutation.mutate(formData);
                 }}
                 disabled={registerMutation.isPending}
