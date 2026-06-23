@@ -69,15 +69,19 @@ export class StudentService {
     if (dto.linkingParentId) {
       await this.linkStudentToParent(student.id, dto.linkingParentId);
     } else if (dto.parentEmail || dto.parentPhone) {
-      await this.createParentWithCredentials({
-        parentName: dto.parentName,
-        parentEmail: dto.parentEmail,
-        parentPhone: dto.parentPhone,
-        studentFirstName: dto.firstName,
-        studentName: `${dto.firstName} ${dto.lastName}`,
-        studentUsername,
-        studentPassword: studentPassword.password,
-      }, student.id, schoolId, school, schoolUrl);
+      try {
+        await this.createParentWithCredentials({
+          parentName: dto.parentName,
+          parentEmail: dto.parentEmail,
+          parentPhone: dto.parentPhone,
+          studentFirstName: dto.firstName,
+          studentName: `${dto.firstName} ${dto.lastName}`,
+          studentUsername,
+          studentPassword: studentPassword.password,
+        }, student.id, schoolId, school, schoolUrl);
+      } catch (parentErr) {
+        this.logger.warn(`Parent account creation skipped for student ${student.id}: ${parentErr.message}`);
+      }
     }
 
     return {
@@ -126,6 +130,27 @@ export class StudentService {
         });
         return;
       }
+      // User exists but no Parent record — re-use the user and create Parent record
+      const parentRole = await this.prisma.role.findFirst({ where: { name: 'Parent' } });
+      if (parentRole) {
+        await this.prisma.userRole.upsert({
+          where: { userId_roleId: { userId: existingParentUser.id, roleId: parentRole.id } },
+          create: { userId: existingParentUser.id, roleId: parentRole.id },
+          update: {},
+        });
+      }
+      const parentRecord = await this.prisma.parent.create({
+        data: {
+          firstName: existingParentUser.firstName,
+          lastName: existingParentUser.lastName,
+          email: existingParentUser.email,
+          phone: info.parentPhone || existingParentUser.phone,
+          password: existingParentUser.password,
+          schoolId,
+          children: { create: { studentId } },
+        },
+      });
+      return;
     }
 
     const parentPassword = this.passwordGenService.generateRoleBasedPassword('Parent');

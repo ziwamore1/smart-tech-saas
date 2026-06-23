@@ -67,15 +67,28 @@ export default function PrimaryStudentsPage() {
 
   const registerMutation = useMutation({
     mutationFn: async (data: any) => {
-      const studentRes = await studentApi.create(toCreateStudentDto(data));
-      const studentId = studentRes.data?.id || studentRes.data?.data?.id || studentRes.id;
+      let studentId: string | undefined;
+      let studentRes: any;
+
+      try {
+        studentRes = await studentApi.create(toCreateStudentDto(data));
+        studentId = studentRes.data?.data?.id || studentRes.data?.id || studentRes?.id;
+      } catch (err: any) {
+        // Student may have been created on the backend even if parent/credential delivery failed
+        studentId = err?.response?.data?.data?.id || err?.response?.data?.id;
+        if (!studentId) throw err;
+      }
+
       if (data.classId && currentAcademicYear?.id && studentId) {
         await enrollmentApi.create({
           studentId,
           classId: data.classId,
           academicYearId: currentAcademicYear.id,
-        }).catch(() => {});
+        }).catch((enrollErr: any) => {
+          console.warn('Auto-enrollment failed, student can be enrolled manually:', enrollErr?.response?.data);
+        });
       }
+
       return studentRes;
     },
     onSuccess: () => {
