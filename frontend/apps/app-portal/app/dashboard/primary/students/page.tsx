@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { studentApi, classApi, enrollmentApi, academicYearApi } from '@/lib/api';
+import { studentApi, classApi, enrollmentApi, academicYearApi, termApi } from '@/lib/api';
 import { Student } from '@/types/student';
 
 const INTAKE_TYPES = [
@@ -29,6 +29,8 @@ export default function PrimaryStudentsPage() {
     intakeType: 'grade1',
     grade: '1',
     classId: '',
+    academicYearId: '',
+    termId: '',
     previousSchool: '',
     guardianName: '',
     guardianPhone: '',
@@ -50,8 +52,14 @@ export default function PrimaryStudentsPage() {
     queryFn: () => academicYearApi.getAll().then(r => r.data?.data || r.data || []),
   });
 
+  const { data: terms } = useQuery({
+    queryKey: ['primary-terms'],
+    queryFn: () => termApi.getAll().then(r => r.data?.data || r.data || []),
+  });
+
   const classList = Array.isArray(classes) ? classes : [];
   const academicYearList = Array.isArray(academicYears) ? academicYears : [];
+  const termList = Array.isArray(terms) ? terms : [];
   const currentAcademicYear = academicYearList.find((y: any) => y.isCurrent);
 
   const toCreateStudentDto = (form: any) => ({
@@ -79,11 +87,12 @@ export default function PrimaryStudentsPage() {
         if (!studentId) throw err;
       }
 
-      if (data.classId && currentAcademicYear?.id && studentId) {
+      if (data.classId && data.academicYearId && studentId) {
         await enrollmentApi.create({
           studentId,
           classId: data.classId,
-          academicYearId: currentAcademicYear.id,
+          academicYearId: data.academicYearId,
+          termId: data.termId || undefined,
         }).catch((enrollErr: any) => {
           console.warn('Auto-enrollment failed, student can be enrolled manually:', enrollErr?.response?.data);
         });
@@ -97,7 +106,7 @@ export default function PrimaryStudentsPage() {
       setShowRegisterForm(false);
       setFormData({
         firstName: '', lastName: '', admissionNumber: '', dateOfBirth: '', gender: '',
-        intakeType: 'grade1', grade: '1', classId: '', previousSchool: '',
+        intakeType: 'grade1', grade: '1', classId: '', academicYearId: '', termId: '', previousSchool: '',
         guardianName: '', guardianPhone: '', guardianEmail: '',
       });
       setRegisterError('');
@@ -340,6 +349,37 @@ export default function PrimaryStudentsPage() {
                     <option key={cls.id} value={cls.id}>{cls.name}</option>
                   ))}
                 </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Academic Year *</label>
+                  <select
+                    value={formData.academicYearId}
+                    onChange={e => setFormData(p => ({ ...p, academicYearId: e.target.value, termId: '' }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  >
+                    <option value="">Select academic year</option>
+                    {academicYearList.map((y: any) => (
+                      <option key={y.id} value={y.id}>{y.name} {y.isCurrent ? '(Current)' : ''}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Term</label>
+                  <select
+                    value={formData.termId}
+                    onChange={e => setFormData(p => ({ ...p, termId: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  >
+                    <option value="">Select term (optional)</option>
+                    {termList
+                      .filter((t: any) => t.academicYearId === formData.academicYearId)
+                      .map((t: any) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    }
+                  </select>
+                </div>
               </div>
               {formData.intakeType === 'transfer' && (
                 <div>
