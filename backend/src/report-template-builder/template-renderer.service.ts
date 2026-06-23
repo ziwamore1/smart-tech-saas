@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CertificateRendererService } from './certificate-renderer.service';
 import { DigitalStampService } from './digital-stamp.service';
 import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
 import * as puppeteer from 'puppeteer';
@@ -15,6 +16,7 @@ export class TemplateRendererService {
     private prisma: PrismaService,
     private digitalStampService: DigitalStampService,
     private cloudinary: CloudinaryService,
+    private certificateRenderer: CertificateRendererService,
   ) {}
 
   async getSchool(schoolId: string) {
@@ -862,13 +864,57 @@ export class TemplateRendererService {
     const componentsHtml = this.renderComponentsToHtml(template.components, defaultData, school);
 
     let stampOverlay = '';
-    try {
-      const templateStamps = await this.digitalStampService.getTemplateStamps(schoolId, templateId);
-      if (templateStamps && templateStamps.length > 0) {
-        stampOverlay = this.digitalStampService.getStampSvgOverlay(templateStamps);
+    let mainContent: string;
+
+    if (template.certificate) {
+      try {
+        const templateStamps = await this.digitalStampService.getTemplateStamps(schoolId, templateId).catch(() => []);
+        const cert = template.certificate;
+        mainContent = await this.certificateRenderer.generateCertificateHtml({}, {
+          schoolName: school?.name || '',
+          studentName: `${defaultData.student.firstName} ${defaultData.student.lastName}`,
+          className: defaultData.class.name,
+          termName: defaultData.term.name,
+          academicYear: defaultData.term.academicYear,
+          certificateNumber: 'XXXXXXXX',
+          verificationUrl: '',
+          schoolLogo: school?.logoUrl || school?.logo || '',
+          studentPhoto: defaultData.student.photoUrl || '',
+          signature1Name: cert.signature1Name || '',
+          signature1Label: cert.signature1Label || 'Head Teacher',
+          signature2Name: cert.signature2Name || '',
+          signature2Label: cert.signature2Label || 'Director',
+          awardText: cert.awardText || 'This certificate is awarded to',
+          borderStyle: cert.borderStyle || 'classic',
+          borderColor: cert.borderColor || '#1a365d',
+          showQrCode: cert.showQrCode || false,
+          showBadge: cert.showBadge || false,
+          badgeStyle: cert.badgeStyle || 'star',
+          showWatermark: cert.showWatermark || false,
+          watermarkText: cert.watermarkText || 'CERTIFICATE',
+          orientation: template.orientation || 'portrait',
+          pageSize: template.pageSize || 'A4',
+          stamps: templateStamps,
+        });
+      } catch {
+        mainContent = this.renderCertificateHtml(template, defaultData, school);
+        try {
+          const templateStamps = await this.digitalStampService.getTemplateStamps(schoolId, templateId);
+          if (templateStamps && templateStamps.length > 0) {
+            stampOverlay = this.digitalStampService.getStampSvgOverlay(templateStamps);
+          }
+        } catch {}
       }
-    } catch {
-      // Stamps are optional; continue without overlay on error
+    } else {
+      mainContent = componentsHtml;
+      try {
+        const templateStamps = await this.digitalStampService.getTemplateStamps(schoolId, templateId);
+        if (templateStamps && templateStamps.length > 0) {
+          stampOverlay = this.digitalStampService.getStampSvgOverlay(templateStamps);
+        }
+      } catch {
+        // Stamps are optional; continue without overlay on error
+      }
     }
 
     const pageSize = template.pageSize || 'A4';
@@ -894,7 +940,7 @@ export class TemplateRendererService {
 </head>
 <body>
   ${template.headerText ? `<div style="text-align:center;margin-bottom:10px;font-size:10px;color:#666;border-bottom:1px solid #ddd;padding-bottom:5px;">${template.headerText}</div>` : ''}
-  ${template.certificate ? this.renderCertificateHtml(template, defaultData, school) : componentsHtml}
+  ${mainContent}
   ${stampOverlay ? `<div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">${stampOverlay}</div>` : ''}
   ${template.footerText ? `<div style="text-align:center;margin-top:10px;font-size:9px;color:#999;border-top:1px solid #ddd;padding-top:5px;">${template.footerText}</div>` : ''}
 </body>

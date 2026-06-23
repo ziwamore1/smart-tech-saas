@@ -41,7 +41,7 @@ export class ReportTemplateBuilderService {
   }
 
   async getTemplate(id: string, schoolId?: string) {
-    const t = await this.prisma.reportTemplate.findFirst({
+    let t = await this.prisma.reportTemplate.findFirst({
       where: { id, ...(schoolId ? { schoolId } : {}) },
       include: {
         category: true,
@@ -50,6 +50,17 @@ export class ReportTemplateBuilderService {
         versions: { orderBy: { version: 'desc' }, take: 10 },
       },
     });
+    if (!t && schoolId) {
+      t = await this.prisma.reportTemplate.findFirst({
+        where: { id, isDefault: true },
+        include: {
+          category: true,
+          components: { orderBy: { sortOrder: 'asc' }, include: { children: { orderBy: { sortOrder: 'asc' } } } },
+          certificate: true,
+          versions: { orderBy: { version: 'desc' }, take: 10 },
+        },
+      });
+    }
     if (!t) throw new NotFoundException('Template not found');
     return t;
   }

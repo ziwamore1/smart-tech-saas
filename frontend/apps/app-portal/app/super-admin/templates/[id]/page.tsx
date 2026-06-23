@@ -59,12 +59,196 @@ function getComponentIcon(type: string): string {
   return icons[type] || 'puzzle-piece';
 }
 
+function getBorderCss(style: string, color: string): React.CSSProperties {
+  const borderMap: Record<string, React.CSSProperties> = {
+    classic: { border: `4px double ${color}` },
+    modern: { border: `3px solid ${color}` },
+    elegant: { border: `1px solid ${color}`, boxShadow: `0 0 0 4px ${color}22, 0 0 0 5px ${color}` },
+    ornate: { border: `4px double ${color}`, boxShadow: `inset 0 0 30px ${color}15` },
+    minimal: { border: `1px solid ${color}` },
+    gold: { border: `3px solid #b8860b`, boxShadow: `0 0 0 4px #ffd70033, inset 0 0 20px #ffd70011` },
+    parchment: { border: `2px solid ${color}`, background: '#fef9ef' },
+    gothic: { border: `3px solid ${color}` },
+    victorian: { border: `3px solid ${color}`, boxShadow: `0 0 0 6px ${color}11, 0 0 0 8px ${color}` },
+    academic: { border: `2px solid ${color}`, background: `linear-gradient(135deg, ${color}05, ${color}10)` },
+    university: { border: `6px solid #0a1628`, boxShadow: `0 0 0 2px #1a365d` },
+  };
+  return borderMap[style] || borderMap.classic;
+}
+
+function getBadgeSvg(style: string, color: string): string {
+  const svgMap: Record<string, string> = {
+    star: `<polygon points="25,3 31,18 47,19 35,30 38,47 25,38 12,47 15,30 3,19 19,18" fill="${color}"/>`,
+    shield: `<path d="M25,2 L2,12 L2,30 Q2,45 25,50 Q48,45 48,30 L48,12 Z" fill="${color}"/><text x="25" y="28" text-anchor="middle" fill="white" font-size="14" font-weight="bold">&#9733;</text>`,
+    circle: `<circle cx="25" cy="25" r="23" fill="${color}"/><circle cx="25" cy="25" r="19" fill="none" stroke="white" stroke-width="1" opacity="0.3"/><text x="25" y="30" text-anchor="middle" fill="white" font-size="18" font-weight="bold">&#9733;</text>`,
+    trophy: `<path d="M10,5 L10,25 Q5,28 3,35 L3,40 L18,40 Q22,48 28,53 L28,58 L15,58 L15,60 L35,60 L35,58 L22,58 L22,53 Q28,48 32,40 L47,40 L47,35 Q45,28 40,25 L40,5 Z" fill="${color}" opacity="0.95"/><rect x="17" y="5" width="16" height="20" fill="white" opacity="0.2" rx="2"/>`,
+    laurel: `<path d="M25,4 Q8,15 5,32 Q3,45 10,58 L15,55 Q10,42 13,30 Q15,18 25,10 Z" fill="${color}"/><path d="M25,4 Q42,15 45,32 Q47,45 40,58 L35,55 Q40,42 37,30 Q35,18 25,10 Z" fill="${color}"/><circle cx="25" cy="25" r="7" fill="white" opacity="0.3"/><text x="25" y="28" text-anchor="middle" fill="white" font-size="10" font-weight="bold">&#9733;</text>`,
+    graduation_cap: `<polygon points="25,2 48,20 25,38 2,20" fill="${color}"/><rect x="13" y="20" width="24" height="28" fill="${color}" rx="2"/><line x1="25" y1="10" x2="25" y2="48" stroke="white" stroke-width="1" opacity="0.3"/>`,
+    medal: `<circle cx="25" cy="18" r="14" fill="${color}"/><circle cx="25" cy="18" r="10" fill="none" stroke="white" stroke-width="1" opacity="0.4"/><text x="25" y="22" text-anchor="middle" fill="white" font-size="10" font-weight="bold">&#9733;</text><path d="M15,28 L15,58 L25,50 L35,58 L35,28" fill="${color}" opacity="0.7"/>`,
+  };
+  return svgMap[style] || svgMap.star;
+}
+
+function CertificatePreviewContent({ template }: { template: Template }) {
+  const cert = template.certificate || {};
+  const color = cert.borderColor || template.primaryColor || '#1a365d';
+  const borderCss = getBorderCss(cert.borderStyle || 'classic', color);
+  const isLandscape = template.orientation === 'landscape';
+  const badgeSvg = getBadgeSvg(cert.badgeStyle || 'star', color);
+  const gradientId = `sealGrad-${template.id}`;
+  const topArcId = `topArc-${template.id}`;
+  const bottomArcId = `bottomArc-${template.id}`;
+
+  return (
+    <div style={{
+      position: 'relative', width: '100%', minHeight: isLandscape ? '460px' : '660px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      padding: '36px 28px', ...borderCss, borderRadius: '0',
+    }}>
+      {/* Watermark */}
+      <div style={{
+        position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%) rotate(-28deg)',
+        fontSize: '90px', color, opacity: 0.035, pointerEvents: 'none', whiteSpace: 'nowrap',
+        fontWeight: 'bold', fontFamily: 'Georgia, serif', letterSpacing: '8px', zIndex: 0,
+      }}>
+        {cert.watermarkText || 'CERTIFICATE'}
+      </div>
+
+      {/* Seal watermark */}
+      <svg width="90" height="90" viewBox="0 0 120 120" style={{ position: 'absolute', bottom: '30px', right: '30px', opacity: 0.12, zIndex: 0, pointerEvents: 'none' }}>
+        <defs>
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#996515"/>
+            <stop offset="30%" stopColor="#ffd700"/>
+            <stop offset="50%" stopColor="#fff8dc"/>
+            <stop offset="70%" stopColor="#ffd700"/>
+            <stop offset="100%" stopColor="#996515"/>
+          </linearGradient>
+          <path id={topArcId} d="M 36,60 A 24,24 0 0,1 84,60" fill="none"/>
+          <path id={bottomArcId} d="M 32,60 A 28,28 0 0,0 88,60" fill="none"/>
+        </defs>
+        <circle cx="60" cy="60" r="57" fill="none" stroke="url(#{gradientId})" strokeWidth="3"/>
+        <circle cx="60" cy="60" r="51" fill="none" stroke="url(#{gradientId})" strokeWidth="1.5" strokeDasharray="4,3"/>
+        <circle cx="60" cy="60" r="42" fill="none" stroke="url(#{gradientId})" strokeWidth="2"/>
+        <text fontSize="10" fontFamily="Georgia, serif" fill="#ffd700" fontWeight="bold" textAnchor="middle" letterSpacing="2">
+          <textPath href={`#${topArcId}`} startOffset="50%">VERIFIED</textPath>
+        </text>
+        <text fontSize="7" fontFamily="Georgia, serif" fill="#b8860b" textAnchor="middle" letterSpacing="1">
+          <textPath href={`#${bottomArcId}`} startOffset="50%">AUTHENTICATED</textPath>
+        </text>
+        <polygon points="46,62 60,46 74,62 68,62 68,72 52,72 52,62" fill="url(#{gradientId})" opacity="0.9"/>
+        <circle cx="60" cy="54" r="3" fill="#fff8dc" opacity="0.6"/>
+        <text x="60" y="86" fontSize="7" fontFamily="Arial, sans-serif" fill="#b8860b" textAnchor="middle">&#9733;</text>
+      </svg>
+
+      {/* Ribbon */}
+      <svg width="70" height="26" viewBox="0 0 80 30" style={{ marginBottom: '6px', zIndex: 1 }}>
+        <defs>
+          <linearGradient id={`ribbon-${template.id}`} x1="0" y1="0" x2="80" y2="0">
+            <stop offset="0%" stopColor={color} stopOpacity="0.8"/>
+            <stop offset="50%" stopColor={color} stopOpacity="1"/>
+            <stop offset="100%" stopColor={color} stopOpacity="0.8"/>
+          </linearGradient>
+        </defs>
+        <path d="M0,15 L10,0 L70,0 L80,15 L70,30 L10,30 Z" fill={`url(#ribbon-${template.id})`}/>
+      </svg>
+
+      {/* Logo placeholder */}
+      <div style={{ marginBottom: '8px', zIndex: 1 }}>
+        <div style={{
+          width: '50px', height: '50px', background: `linear-gradient(135deg, ${color}, ${template.secondaryColor || '#ccc'})`,
+          borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'white', fontSize: '20px', fontWeight: 700, margin: '0 auto',
+        }}>S</div>
+      </div>
+
+      {/* School name */}
+      <div style={{ fontSize: '20px', fontWeight: 'bold', color, marginBottom: '2px', zIndex: 1, textAlign: 'center', letterSpacing: '1px' }}>
+        [School Name]
+      </div>
+      <div style={{ fontSize: '8px', color: '#999', textTransform: 'uppercase', letterSpacing: '3px', marginBottom: '10px', zIndex: 1 }}>
+        Official Academic Document
+      </div>
+
+      {/* Divider */}
+      <div style={{ width: '160px', height: '1px', background: `linear-gradient(90deg, transparent, ${color}, transparent)`, margin: '8px auto 10px', opacity: 0.6, zIndex: 1 }} />
+
+      {/* Certificate title */}
+      <div style={{ fontSize: '9px', color: '#999', textTransform: 'uppercase', letterSpacing: '5px', marginBottom: '6px', zIndex: 1 }}>
+        Certificate of Achievement
+      </div>
+
+      {/* Award text */}
+      <div style={{ fontSize: '12px', color: '#666', margin: '6px 0', zIndex: 1, textAlign: 'center', fontStyle: 'italic' }}>
+        <em>{cert.awardText || 'This certificate is awarded to'}</em>
+      </div>
+
+      {/* Student name */}
+      <div style={{ fontSize: '32px', fontWeight: 'bold', color, margin: '6px 0', fontFamily: 'Georgia, serif', zIndex: 1, textAlign: 'center', letterSpacing: '1px' }}>
+        [Student Name]
+      </div>
+
+      {/* Detail text */}
+      <div style={{ fontSize: '11px', color: '#777', margin: '3px 0', zIndex: 1, textAlign: 'center', lineHeight: '1.6' }}>
+        In recognition of outstanding academic performance and demonstrated excellence
+      </div>
+      <div style={{ fontSize: '11px', color: '#777', margin: '3px 0 8px', zIndex: 1, textAlign: 'center' }}>
+        Class: [Grade 10A] &middot; [Term 1] [2024]
+      </div>
+
+      {/* Badge */}
+      {cert.showBadge !== false && (
+        <div style={{ margin: '8px 0', zIndex: 1 }}>
+          <svg width="50" height="50" viewBox="0 0 50 50">
+            <defs>
+              <linearGradient id={`badgeGrad-${template.id}`} x1="0" y1="0" x2="50" y2="50">
+                <stop offset="0%" stopColor={color} stopOpacity="1"/>
+                <stop offset="100%" stopColor="#333" stopOpacity="0.7"/>
+              </linearGradient>
+            </defs>
+            <g dangerouslySetInnerHTML={{ __html: badgeSvg }} />
+          </svg>
+        </div>
+      )}
+
+      {/* Signatures */}
+      <div style={{ display: 'flex', justifyContent: 'space-around', width: '80%', marginTop: '20px', zIndex: 1 }}>
+        <div style={{ textAlign: 'center', width: '200px' }}>
+          <div style={{ borderTop: `2px solid ${color}`, width: '85%', margin: '0 auto 6px', paddingTop: '8px' }}></div>
+          <div style={{ fontSize: '10px', color: '#333', fontWeight: 'bold' }}>{cert.signature1Name || ''}</div>
+          <div style={{ fontSize: '8px', color: '#999', textTransform: 'uppercase', letterSpacing: '1px', marginTop: '2px' }}>{cert.signature1Label || 'Head Teacher'}</div>
+          {cert.signature1Name && <div style={{ fontSize: '7px', color: '#aaa', fontStyle: 'italic' }}>Signature</div>}
+        </div>
+        <div style={{ textAlign: 'center', width: '200px' }}>
+          <div style={{ borderTop: `2px solid ${color}`, width: '85%', margin: '0 auto 6px', paddingTop: '8px' }}></div>
+          <div style={{ fontSize: '10px', color: '#333', fontWeight: 'bold' }}>{cert.signature2Name || ''}</div>
+          <div style={{ fontSize: '8px', color: '#999', textTransform: 'uppercase', letterSpacing: '1px', marginTop: '2px' }}>{cert.signature2Label || 'Director'}</div>
+          {cert.signature2Name && <div style={{ fontSize: '7px', color: '#aaa', fontStyle: 'italic' }}>Signature</div>}
+        </div>
+      </div>
+
+      {/* Verification row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px', zIndex: 1 }}>
+        {cert.showQrCode && (
+          <div style={{ width: '40px', height: '40px', background: 'white', borderRadius: '4px', border: '1px solid #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <i className="fa fa-qrcode" style={{ fontSize: '20px', color: '#333' }} />
+          </div>
+        )}
+        <div style={{ fontSize: '7px', color: '#bbb', fontFamily: "'Courier New', monospace", letterSpacing: '1px' }}>
+          Certificate No: XXXX-000000-XXXX
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TemplateDetailPage() {
   const { isAuthenticated, isLoading } = useAuth();
   const params = useParams();
   const router = useRouter();
   const [template, setTemplate] = useState<Template | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'preview' | 'components' | 'settings'>('preview');
 
   useEffect(() => {
@@ -78,10 +262,12 @@ export default function TemplateDetailPage() {
   const loadTemplate = async () => {
     try {
       setLoading(true);
+      setError(null);
       const res = await templateBuilderApi.getTemplate(params.id as string);
       setTemplate(res.data?.data || res.data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load template:', err);
+      setError(err?.response?.data?.message || 'Failed to load template');
     } finally {
       setLoading(false);
     }
@@ -139,13 +325,13 @@ export default function TemplateDetailPage() {
 
   if (!isAuthenticated) return null;
 
-  if (!template) {
+  if (error || !template) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5efe8', flexDirection: 'column', gap: '16px' }}>
         <div style={{ width: '64px', height: '64px', background: '#fee2e2', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <i className="fa fa-exclamation-triangle" style={{ fontSize: '28px', color: '#dc2626' }}></i>
         </div>
-        <p style={{ fontSize: '14px', color: '#6b7280' }}>Template not found.</p>
+        <p style={{ fontSize: '14px', color: '#6b7280' }}>{error || 'Template not found.'}</p>
         <button onClick={() => router.push('/super-admin/templates')} style={{ padding: '10px 20px', background: gradBlue, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 600 }}>
           <i className="fa fa-arrow-left" style={{ marginRight: '6px' }}></i>Back to Templates
         </button>
@@ -253,85 +439,90 @@ export default function TemplateDetailPage() {
           <div style={{
             width: template.orientation === 'landscape' ? '700px' : '500px',
             minHeight: template.orientation === 'landscape' ? '500px' : '700px',
-            background: 'white', borderRadius: '8px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-            border: '1px solid #e5e7eb', padding: '18px', position: 'relative',
+            background: template.certificate?.borderStyle === 'parchment' ? '#fef9ef' : 'white',
+            borderRadius: '8px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+            border: '1px solid #e5e7eb', padding: '18px', position: 'relative', overflow: 'hidden',
           }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minHeight: template.orientation === 'landscape' ? '460px' : '660px' }}>
-              {(template.components || []).sort((a, b) => a.sortOrder - b.sortOrder).map(comp => {
-                const styles = (comp.styles || {}) as any;
-                const content = (comp.content || {}) as any;
-                const baseStyle: React.CSSProperties = {
-                  fontSize: content.fontSize || 10, color: styles.color || '#333',
-                  textAlign: styles.textAlign || 'left', fontWeight: styles.fontWeight as any || 'normal',
-                  backgroundColor: styles.bgColor || 'transparent',
-                  border: styles.border, padding: '2px 4px', borderRadius: '2px',
-                };
+            {template.certificate ? (
+              <CertificatePreviewContent template={template} />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minHeight: template.orientation === 'landscape' ? '460px' : '660px' }}>
+                {(template.components || []).sort((a, b) => a.sortOrder - b.sortOrder).map(comp => {
+                  const styles = (comp.styles || {}) as any;
+                  const content = (comp.content || {}) as any;
+                  const baseStyle: React.CSSProperties = {
+                    fontSize: content.fontSize || 10, color: styles.color || '#333',
+                    textAlign: styles.textAlign || 'left', fontWeight: styles.fontWeight as any || 'normal',
+                    backgroundColor: styles.bgColor || 'transparent',
+                    border: styles.border, padding: '2px 4px', borderRadius: '2px',
+                  };
 
-                switch (comp.type) {
-                  case 'HEADER':
-                    return <div key={comp.id} style={{ textAlign: 'center', padding: '6px 10px', background: template.primaryColor || '#1a365d', color: 'white', borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>{content.text || template.name}</div>;
-                  case 'DIVIDER':
-                    return <div key={comp.id} style={{ height: '1px', background: styles.color || '#ccc', margin: '2px 0' }} />;
-                  case 'SCHOOL_LOGO':
-                    return <div key={comp.id} style={{ display: 'flex', justifyContent: 'center', padding: '4px' }}>
-                      <div style={{ width: '40px', height: '40px', background: `linear-gradient(135deg, ${template.primaryColor || '#1a365d'}, ${template.secondaryColor || '#ccc'})`, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '16px', fontWeight: 700 }}>S</div>
-                    </div>;
-                  case 'SCHOOL_NAME':
-                    return <div key={comp.id} style={{ ...baseStyle, fontSize: content.fontSize || 14, fontWeight: 'bold', textAlign: 'center', color: template.primaryColor || '#1a365d' }}>[School Name]</div>;
-                  case 'STUDENT_INFO':
-                    return <div key={comp.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', padding: '6px 8px', background: '#f9fafb', borderRadius: '4px', fontSize: '9px', color: '#666' }}>
-                      <span>Name: ____________________</span><span>Grade: ____</span>
-                      <span>DOB: __________</span><span>Gender: ____</span>
-                    </div>;
-                  case 'ATTENDANCE_TABLE':
-                    return <div key={comp.id} style={{ background: '#f9fafb', borderRadius: '4px', padding: '4px 6px', fontSize: '9px' }}>
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '3px 6px', background: template.primaryColor || '#1a365d', color: 'white', borderRadius: '3px', fontWeight: 600 }}>
-                        <span>Attendance Record</span><span style={{ marginLeft: 'auto', opacity: 0.8 }}>Present: _/__</span>
-                      </div>
-                    </div>;
-                  case 'SUBJECT_TABLE':
-                  case 'RESULTS_TABLE':
-                    return <div key={comp.id} style={{ flex: 1, background: '#f9fafb', borderRadius: '4px', padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '9px' }}>
-                      <div style={{ display: 'flex', gap: '4px', padding: '3px 6px', background: template.primaryColor || '#1a365d', color: 'white', borderRadius: '3px', fontWeight: 600 }}>
-                        {['Subject', 'Score', 'Grade', 'Remark'].map(h => <div key={h} style={{ flex: 1 }}>{h}</div>)}
-                      </div>
-                      {Array.from({ length: 6 }).map((_, i) => (
-                        <div key={i} style={{ display: 'flex', gap: '4px', padding: '3px 6px', background: i % 2 === 0 ? 'white' : '#f3f4f6', borderRadius: '2px' }}>
-                          <div style={{ flex: 1, color: '#333' }}>Subject {i + 1}</div>
-                          <div style={{ flex: 1, color: i < 3 ? '#059669' : '#dc2626' }}>{[75, 82, 68, 91, 54, 88][i]}%</div>
-                          <div style={{ flex: 0.6, color: '#555' }}>{['A', 'A', 'B+', 'A*', 'C', 'A'][i]}</div>
-                          <div style={{ flex: 1, color: '#777', fontSize: '8px' }}>{['Excellent', 'Very Good', 'Good', 'Outstanding', 'Fair', 'Excellent'][i]}</div>
+                  switch (comp.type) {
+                    case 'HEADER':
+                      return <div key={comp.id} style={{ textAlign: 'center', padding: '6px 10px', background: template.primaryColor || '#1a365d', color: 'white', borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>{content.text || template.name}</div>;
+                    case 'DIVIDER':
+                      return <div key={comp.id} style={{ height: '1px', background: styles.color || '#ccc', margin: '2px 0' }} />;
+                    case 'SCHOOL_LOGO':
+                      return <div key={comp.id} style={{ display: 'flex', justifyContent: 'center', padding: '4px' }}>
+                        <div style={{ width: '40px', height: '40px', background: `linear-gradient(135deg, ${template.primaryColor || '#1a365d'}, ${template.secondaryColor || '#ccc'})`, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '16px', fontWeight: 700 }}>S</div>
+                      </div>;
+                    case 'SCHOOL_NAME':
+                      return <div key={comp.id} style={{ ...baseStyle, fontSize: content.fontSize || 14, fontWeight: 'bold', textAlign: 'center', color: template.primaryColor || '#1a365d' }}>[School Name]</div>;
+                    case 'STUDENT_INFO':
+                      return <div key={comp.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', padding: '6px 8px', background: '#f9fafb', borderRadius: '4px', fontSize: '9px', color: '#666' }}>
+                        <span>Name: ____________________</span><span>Grade: ____</span>
+                        <span>DOB: __________</span><span>Gender: ____</span>
+                      </div>;
+                    case 'ATTENDANCE_TABLE':
+                      return <div key={comp.id} style={{ background: '#f9fafb', borderRadius: '4px', padding: '4px 6px', fontSize: '9px' }}>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '3px 6px', background: template.primaryColor || '#1a365d', color: 'white', borderRadius: '3px', fontWeight: 600 }}>
+                          <span>Attendance Record</span><span style={{ marginLeft: 'auto', opacity: 0.8 }}>Present: _/__</span>
                         </div>
-                      ))}
-                    </div>;
-                  case 'TEACHER_REMARKS':
-                    return <div key={comp.id} style={{ background: '#fefce8', borderRadius: '4px', padding: '4px 8px', border: '1px solid #fde68a', fontSize: '9px' }}>
-                      <span style={{ color: '#854d0e' }}>Teacher Remarks: [Student] has shown satisfactory progress this term.</span>
-                    </div>;
-                  case 'SIGNATURE':
-                    return <div key={comp.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 8px', marginTop: '4px' }}>
-                      <div style={{ textAlign: 'center', width: '120px' }}>
-                        <div style={{ height: '20px', borderTop: '1px solid #999', marginBottom: '2px' }} />
-                        <div style={{ fontSize: '8px', color: '#999' }}>{content.label || 'Signature'}</div>
-                      </div>
-                    </div>;
-                  case 'FOOTER':
-                    return <div key={comp.id} style={{ textAlign: 'center', padding: '3px', fontSize: '7px', color: '#999', borderTop: '1px solid #e5e7eb', marginTop: 'auto' }}>
-                      {content.text || `Template Preview — ${template.pageSize || 'A4'} ${template.orientation || 'portrait'}`}
-                    </div>;
-                  case 'QR_CODE':
-                    return <div key={comp.id} style={{ display: 'flex', justifyContent: 'flex-end', padding: '2px' }}>
-                      <div style={{ width: '32px', height: '32px', background: 'white', borderRadius: '4px', border: '1px solid #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <i className="fa fa-qrcode" style={{ fontSize: '16px', color: '#333' }} />
-                      </div>
-                    </div>;
-                  default:
-                    return <div key={comp.id} style={{ ...baseStyle, fontSize: '9px', padding: '4px 8px', background: '#f3f4f6', borderRadius: '4px', color: '#999' }}>
-                      <i className="fa fa-puzzle-piece" style={{ marginRight: '4px' }} />{comp.label || comp.type}
-                    </div>;
-                }
-              })}
-            </div>
+                      </div>;
+                    case 'SUBJECT_TABLE':
+                    case 'RESULTS_TABLE':
+                      return <div key={comp.id} style={{ flex: 1, background: '#f9fafb', borderRadius: '4px', padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '9px' }}>
+                        <div style={{ display: 'flex', gap: '4px', padding: '3px 6px', background: template.primaryColor || '#1a365d', color: 'white', borderRadius: '3px', fontWeight: 600 }}>
+                          {['Subject', 'Score', 'Grade', 'Remark'].map(h => <div key={h} style={{ flex: 1 }}>{h}</div>)}
+                        </div>
+                        {Array.from({ length: 6 }).map((_, i) => (
+                          <div key={i} style={{ display: 'flex', gap: '4px', padding: '3px 6px', background: i % 2 === 0 ? 'white' : '#f3f4f6', borderRadius: '2px' }}>
+                            <div style={{ flex: 1, color: '#333' }}>Subject {i + 1}</div>
+                            <div style={{ flex: 1, color: i < 3 ? '#059669' : '#dc2626' }}>{[75, 82, 68, 91, 54, 88][i]}%</div>
+                            <div style={{ flex: 0.6, color: '#555' }}>{['A', 'A', 'B+', 'A*', 'C', 'A'][i]}</div>
+                            <div style={{ flex: 1, color: '#777', fontSize: '8px' }}>{['Excellent', 'Very Good', 'Good', 'Outstanding', 'Fair', 'Excellent'][i]}</div>
+                          </div>
+                        ))}
+                      </div>;
+                    case 'TEACHER_REMARKS':
+                      return <div key={comp.id} style={{ background: '#fefce8', borderRadius: '4px', padding: '4px 8px', border: '1px solid #fde68a', fontSize: '9px' }}>
+                        <span style={{ color: '#854d0e' }}>Teacher Remarks: [Student] has shown satisfactory progress this term.</span>
+                      </div>;
+                    case 'SIGNATURE':
+                      return <div key={comp.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 8px', marginTop: '4px' }}>
+                        <div style={{ textAlign: 'center', width: '120px' }}>
+                          <div style={{ height: '20px', borderTop: '1px solid #999', marginBottom: '2px' }} />
+                          <div style={{ fontSize: '8px', color: '#999' }}>{content.label || 'Signature'}</div>
+                        </div>
+                      </div>;
+                    case 'FOOTER':
+                      return <div key={comp.id} style={{ textAlign: 'center', padding: '3px', fontSize: '7px', color: '#999', borderTop: '1px solid #e5e7eb', marginTop: 'auto' }}>
+                        {content.text || `Template Preview — ${template.pageSize || 'A4'} ${template.orientation || 'portrait'}`}
+                      </div>;
+                    case 'QR_CODE':
+                      return <div key={comp.id} style={{ display: 'flex', justifyContent: 'flex-end', padding: '2px' }}>
+                        <div style={{ width: '32px', height: '32px', background: 'white', borderRadius: '4px', border: '1px solid #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <i className="fa fa-qrcode" style={{ fontSize: '16px', color: '#333' }} />
+                        </div>
+                      </div>;
+                    default:
+                      return <div key={comp.id} style={{ ...baseStyle, fontSize: '9px', padding: '4px 8px', background: '#f3f4f6', borderRadius: '4px', color: '#999' }}>
+                        <i className="fa fa-puzzle-piece" style={{ marginRight: '4px' }} />{comp.label || comp.type}
+                      </div>;
+                  }
+                })}
+              </div>
+            )}
           </div>
           {(!template.components || template.components.length === 0) && (
             <p style={{ fontSize: '13px', color: '#9ca3af', marginTop: '16px' }}>No components configured for this template.</p>
