@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { studentApi, classApi } from '@/lib/api';
+import { studentApi, classApi, enrollmentApi, academicYearApi } from '@/lib/api';
 import { Student } from '@/types/student';
 
 const INTAKE_TYPES = [
@@ -28,6 +28,7 @@ export default function PrimaryStudentsPage() {
     gender: '',
     intakeType: 'grade1',
     grade: '1',
+    classId: '',
     previousSchool: '',
     guardianName: '',
     guardianPhone: '',
@@ -44,6 +45,15 @@ export default function PrimaryStudentsPage() {
     queryFn: () => classApi.getAll().then(r => r.data?.data || r.data || []),
   });
 
+  const { data: academicYears } = useQuery({
+    queryKey: ['primary-academic-years'],
+    queryFn: () => academicYearApi.getAll().then(r => r.data?.data || r.data || []),
+  });
+
+  const classList = Array.isArray(classes) ? classes : [];
+  const academicYearList = Array.isArray(academicYears) ? academicYears : [];
+  const currentAcademicYear = academicYearList.find((y: any) => y.isCurrent);
+
   const toCreateStudentDto = (form: any) => ({
     firstName: form.firstName,
     lastName: form.lastName,
@@ -56,13 +66,25 @@ export default function PrimaryStudentsPage() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: (data: any) => studentApi.create(toCreateStudentDto(data)),
+    mutationFn: async (data: any) => {
+      const studentRes = await studentApi.create(toCreateStudentDto(data));
+      const studentId = studentRes.data?.id || studentRes.data?.data?.id || studentRes.id;
+      if (data.classId && currentAcademicYear?.id && studentId) {
+        await enrollmentApi.create({
+          studentId,
+          classId: data.classId,
+          academicYearId: currentAcademicYear.id,
+        }).catch(() => {});
+      }
+      return studentRes;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['primary-students'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
       setShowRegisterForm(false);
       setFormData({
         firstName: '', lastName: '', admissionNumber: '', dateOfBirth: '', gender: '',
-        intakeType: 'grade1', grade: '1', previousSchool: '',
+        intakeType: 'grade1', grade: '1', classId: '', previousSchool: '',
         guardianName: '', guardianPhone: '', guardianEmail: '',
       });
       setRegisterError('');
@@ -292,6 +314,19 @@ export default function PrimaryStudentsPage() {
                     {GRADE_OPTIONS.map(g => <option key={g} value={g}>Grade {g}</option>)}
                   </select>
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Class</label>
+                <select
+                  value={formData.classId}
+                  onChange={e => setFormData(p => ({ ...p, classId: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  <option value="">Select class (optional)</option>
+                  {classList.map((cls: any) => (
+                    <option key={cls.id} value={cls.id}>{cls.name}</option>
+                  ))}
+                </select>
               </div>
               {formData.intakeType === 'transfer' && (
                 <div>
