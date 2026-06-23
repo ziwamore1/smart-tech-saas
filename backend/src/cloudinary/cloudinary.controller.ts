@@ -117,7 +117,15 @@ export class CloudinaryController {
 
   @Get('stats')
   async getStats() {
-    const usage = await this.cloudinary.getUsage();
+    let usage = { storageUsedMB: 0, totalFiles: 0, creditsUsed: 0 };
+    try {
+      usage = await Promise.race([
+        this.cloudinary.getUsage(),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Cloudinary usage fetch timed out after 8s')), 8000)),
+      ]);
+    } catch (err) {
+      usage = { storageUsedMB: 0, totalFiles: 0, creditsUsed: 0 };
+    }
     const total = await this.prisma.media.count();
     const byFolder = await this.prisma.media.groupBy({ by: ['folder'], _count: true });
 

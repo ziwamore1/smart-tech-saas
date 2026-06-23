@@ -624,6 +624,22 @@ export class GradingEngineService {
     });
   }
 
+  async createEczCompetencyPolicy(schoolId: string) {
+    return this.createGradingPolicy(schoolId, {
+      name: 'ECZ Competency Based (Forms 1-4)',
+      code: 'ECZ_COMPETENCY',
+      type: 'COMPETENCY',
+      isDefault: false,
+      scales: [
+        { minScore: 70, maxScore: 100, grade: '1', remark: 'Outstanding', points: 1, gpa: 4.0, sortOrder: 1 },
+        { minScore: 60, maxScore: 69, grade: '2', remark: 'Advanced', points: 2, gpa: 3.5, sortOrder: 2 },
+        { minScore: 50, maxScore: 59, grade: '3', remark: 'Basic', points: 3, gpa: 3.0, sortOrder: 3 },
+        { minScore: 40, maxScore: 49, grade: '4', remark: 'Satisfactory', points: 4, gpa: 2.0, sortOrder: 4 },
+        { minScore: 0, maxScore: 39, grade: '5', remark: 'Unsatisfactory', points: 5, gpa: 0, sortOrder: 5 },
+      ],
+    });
+  }
+
   async createGpaPolicy(schoolId: string) {
     return this.createGradingPolicy(schoolId, {
       name: 'GPA Grading System',

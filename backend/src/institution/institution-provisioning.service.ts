@@ -31,6 +31,7 @@ export class InstitutionProvisioningService {
     await this.provisionSettings(schoolId, type);
     await this.provisionGradingPolicies(schoolId, institutionTypeCode);
     await this.provisionAssessmentDefinitions(schoolId, institutionTypeCode);
+    await this.provisionEducationLevels(schoolId, institutionTypeCode);
 
     this.logger.log(`Institution ${schoolId} provisioned successfully`);
     return { success: true, type: type.code, modules: type.modules.length };
@@ -113,39 +114,69 @@ export class InstitutionProvisioningService {
         this.logger.log(`Created 3 primary grading policies for ${schoolId}`);
       });
     } else {
-      this.logger.log(`Provisioning secondary grading policy for ${schoolId}`);
-      const existingPolicy = await this.prisma.gradingPolicy.findFirst({
-        where: { schoolId, code: 'ECZ_ZM' },
+      this.logger.log(`Provisioning secondary grading policies for ${schoolId}`);
+
+      await this.prisma.$transaction(async (tx) => {
+        const eczZm = await tx.gradingPolicy.findFirst({
+          where: { schoolId, code: 'ECZ_ZM' },
+        });
+
+        if (!eczZm) {
+          this.logger.log(`Creating ECZ_ZM policy for ${schoolId}`);
+          await tx.gradingPolicy.create({
+            data: {
+              schoolId,
+              name: 'ECZ Zambia Grading System',
+              code: 'ECZ_ZM',
+              type: 'ECZ_ZAMBIA',
+              isDefault: true,
+              active: true,
+              scales: {
+                create: [
+                  { minScore: 75, maxScore: 100, grade: '1', remark: 'Distinction', points: 1, gpa: 4.0, sortOrder: 1 },
+                  { minScore: 70, maxScore: 74, grade: '2', remark: 'Distinction', points: 2, gpa: 3.75, sortOrder: 2 },
+                  { minScore: 65, maxScore: 69, grade: '3', remark: 'Merit', points: 3, gpa: 3.5, sortOrder: 3 },
+                  { minScore: 60, maxScore: 64, grade: '4', remark: 'Merit', points: 4, gpa: 3.25, sortOrder: 4 },
+                  { minScore: 55, maxScore: 59, grade: '5', remark: 'Credit', points: 5, gpa: 3.0, sortOrder: 5 },
+                  { minScore: 50, maxScore: 54, grade: '6', remark: 'Credit', points: 6, gpa: 2.75, sortOrder: 6 },
+                  { minScore: 45, maxScore: 49, grade: '7', remark: 'Satisfactory', points: 7, gpa: 2.5, sortOrder: 7 },
+                  { minScore: 40, maxScore: 44, grade: '8', remark: 'Satisfactory', points: 8, gpa: 2.0, sortOrder: 8 },
+                  { minScore: 0, maxScore: 39, grade: '9', remark: 'Unsatisfactory', points: 9, gpa: 0, sortOrder: 9 },
+                ],
+              },
+            },
+          });
+        }
+
+        const eczCompetency = await tx.gradingPolicy.findFirst({
+          where: { schoolId, code: 'ECZ_COMPETENCY' },
+        });
+
+        if (!eczCompetency) {
+          this.logger.log(`Creating ECZ_COMPETENCY policy for ${schoolId}`);
+          await tx.gradingPolicy.create({
+            data: {
+              schoolId,
+              name: 'ECZ Competency Based (Forms 1-4)',
+              code: 'ECZ_COMPETENCY',
+              type: 'COMPETENCY',
+              isDefault: false,
+              active: true,
+              scales: {
+                create: [
+                  { minScore: 70, maxScore: 100, grade: '1', remark: 'Outstanding', points: 1, gpa: 4.0, sortOrder: 1 },
+                  { minScore: 60, maxScore: 69, grade: '2', remark: 'Advanced', points: 2, gpa: 3.5, sortOrder: 2 },
+                  { minScore: 50, maxScore: 59, grade: '3', remark: 'Basic', points: 3, gpa: 3.0, sortOrder: 3 },
+                  { minScore: 40, maxScore: 49, grade: '4', remark: 'Satisfactory', points: 4, gpa: 2.0, sortOrder: 4 },
+                  { minScore: 0, maxScore: 39, grade: '5', remark: 'Unsatisfactory', points: 5, gpa: 0, sortOrder: 5 },
+                ],
+              },
+            },
+          });
+        }
       });
 
-      if (existingPolicy) {
-        this.logger.log(`ECZ grading policy already exists for ${schoolId}, skipping`);
-        return;
-      }
-
-      await this.prisma.gradingPolicy.create({
-        data: {
-          schoolId,
-          name: 'ECZ Zambia Grading System',
-          code: 'ECZ_ZM',
-          type: 'ECZ_ZAMBIA',
-          isDefault: true,
-          active: true,
-          scales: {
-            create: [
-              { minScore: 75, maxScore: 100, grade: '1', remark: 'Distinction', points: 1, gpa: 4.0, sortOrder: 1 },
-              { minScore: 70, maxScore: 74, grade: '2', remark: 'Distinction', points: 2, gpa: 3.75, sortOrder: 2 },
-              { minScore: 65, maxScore: 69, grade: '3', remark: 'Merit', points: 3, gpa: 3.5, sortOrder: 3 },
-              { minScore: 60, maxScore: 64, grade: '4', remark: 'Merit', points: 4, gpa: 3.25, sortOrder: 4 },
-              { minScore: 55, maxScore: 59, grade: '5', remark: 'Credit', points: 5, gpa: 3.0, sortOrder: 5 },
-              { minScore: 50, maxScore: 54, grade: '6', remark: 'Credit', points: 6, gpa: 2.75, sortOrder: 6 },
-              { minScore: 45, maxScore: 49, grade: '7', remark: 'Satisfactory', points: 7, gpa: 2.5, sortOrder: 7 },
-              { minScore: 40, maxScore: 44, grade: '8', remark: 'Satisfactory', points: 8, gpa: 2.0, sortOrder: 8 },
-              { minScore: 0, maxScore: 39, grade: '9', remark: 'Unsatisfactory', points: 9, gpa: 0, sortOrder: 9 },
-            ],
-          },
-        },
-      });
+      this.logger.log(`Secondary grading policies provisioned for ${schoolId}`);
     }
   }
 
@@ -413,5 +444,35 @@ export class InstitutionProvisioningService {
     });
 
     this.logger.log(`Created ${definitions.length} assessment definitions for ${schoolId} (${institutionTypeCode})`);
+  }
+
+  private async provisionEducationLevels(schoolId: string, institutionTypeCode: string) {
+    const mapping: Record<string, string[]> = {
+      PRIMARY_SCHOOL: ['ECE', 'PRIMARY'],
+      SECONDARY_SCHOOL: ['SECONDARY'],
+      ADVANCED_SECONDARY: ['ADVANCED_SECONDARY'],
+      COLLEGE: ['TERTIARY'],
+      UNIVERSITY: ['TERTIARY'],
+    };
+
+    const levelCodes = mapping[institutionTypeCode];
+    if (!levelCodes || levelCodes.length === 0) {
+      this.logger.warn(`No education level mapping for ${institutionTypeCode}`);
+      return;
+    }
+
+    const levels = await this.prisma.educationLevel.findMany({
+      where: { code: { in: levelCodes as any }, schoolId: null },
+    });
+
+    for (const level of levels) {
+      await this.prisma.schoolEducationLevel.upsert({
+        where: { schoolId_educationLevelId: { schoolId, educationLevelId: level.id } },
+        update: { isActive: true },
+        create: { schoolId, educationLevelId: level.id, isActive: true },
+      });
+    }
+
+    this.logger.log(`Provisioned ${levels.length} education levels for ${schoolId} (${institutionTypeCode})`);
   }
 }

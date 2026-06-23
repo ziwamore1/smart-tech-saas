@@ -145,7 +145,8 @@ export class SuperAdminService {
     });
 
     if (institutionType) {
-      await this.provisioningService.provisionInstitution(school.id, institutionTypeCode);
+      this.provisioningService.provisionInstitution(school.id, institutionTypeCode)
+        .catch((err) => this.logger.error(`Provisioning failed for school ${school.id}:`, err));
     }
 
     this.logger.log(`School created: ${school.id} - ${school.name} type: ${institutionTypeCode}`);

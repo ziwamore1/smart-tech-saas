@@ -83,7 +83,34 @@ ON CONFLICT ("code") DO UPDATE SET
   "description" = EXCLUDED."description";
 
 -- =============================================================================
--- 4. INSTITUTION MODULES
+-- 4. EDUCATION LEVELS (global, used for stats and curriculum)
+-- =============================================================================
+INSERT INTO "EducationLevel" ("id", "name", "code", "description", "updatedAt")
+SELECT gen_random_uuid(), 'Early Childhood Education', 'ECE'::"EducationLevelCategory", 'Early childhood education (Pre-school)', NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "EducationLevel" WHERE "code" = 'ECE'::"EducationLevelCategory" AND "schoolId" IS NULL);
+
+INSERT INTO "EducationLevel" ("id", "name", "code", "description", "updatedAt")
+SELECT gen_random_uuid(), 'Primary Education', 'PRIMARY'::"EducationLevelCategory", 'Primary education (Grade 1-7)', NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "EducationLevel" WHERE "code" = 'PRIMARY'::"EducationLevelCategory" AND "schoolId" IS NULL);
+
+INSERT INTO "EducationLevel" ("id", "name", "code", "description", "updatedAt")
+SELECT gen_random_uuid(), 'Secondary Education', 'SECONDARY'::"EducationLevelCategory", 'Secondary education (Grade 8-12)', NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "EducationLevel" WHERE "code" = 'SECONDARY'::"EducationLevelCategory" AND "schoolId" IS NULL);
+
+INSERT INTO "EducationLevel" ("id", "name", "code", "description", "updatedAt")
+SELECT gen_random_uuid(), 'Advanced Secondary', 'ADVANCED_SECONDARY'::"EducationLevelCategory", 'Advanced secondary education (Form 5-6)', NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "EducationLevel" WHERE "code" = 'ADVANCED_SECONDARY'::"EducationLevelCategory" AND "schoolId" IS NULL);
+
+INSERT INTO "EducationLevel" ("id", "name", "code", "description", "updatedAt")
+SELECT gen_random_uuid(), 'Vocational Education', 'VOCATIONAL'::"EducationLevelCategory", 'Vocational and technical education', NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "EducationLevel" WHERE "code" = 'VOCATIONAL'::"EducationLevelCategory" AND "schoolId" IS NULL);
+
+INSERT INTO "EducationLevel" ("id", "name", "code", "description", "updatedAt")
+SELECT gen_random_uuid(), 'Tertiary Education', 'TERTIARY'::"EducationLevelCategory", 'Tertiary and higher education', NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "EducationLevel" WHERE "code" = 'TERTIARY'::"EducationLevelCategory" AND "schoolId" IS NULL);
+
+-- =============================================================================
+-- 5. INSTITUTION MODULES
 -- =============================================================================
 INSERT INTO "InstitutionModule" ("id", "code", "name", "category", "description") VALUES
   -- Core Modules
@@ -164,7 +191,7 @@ ON CONFLICT ("code") DO UPDATE SET
   "description" = EXCLUDED."description";
 
 -- =============================================================================
--- 5. INSTITUTION ROLES
+-- 6. INSTITUTION ROLES
 -- =============================================================================
 INSERT INTO "InstitutionRole" ("id", "code", "name", "category", "description") VALUES
   -- Primary School Roles
@@ -206,7 +233,7 @@ ON CONFLICT ("code") DO UPDATE SET
   "description" = EXCLUDED."description";
 
 -- =============================================================================
--- 6. INSTITUTION FEATURES
+-- 7. INSTITUTION FEATURES
 -- =============================================================================
 INSERT INTO "InstitutionFeature" ("id", "code", "name", "category", "description") VALUES
   (gen_random_uuid(), 'AI_TUTOR',               'AI Tutor',              'AI',           'AI-powered tutoring assistance'),
@@ -232,7 +259,7 @@ ON CONFLICT ("code") DO UPDATE SET
   "description" = EXCLUDED."description";
 
 -- =============================================================================
--- 7. INSTITUTION DASHBOARDS
+-- 8. INSTITUTION DASHBOARDS
 -- =============================================================================
 INSERT INTO "InstitutionDashboard" ("id", "code", "name", "description") VALUES
   -- Primary School Dashboards
@@ -273,7 +300,7 @@ ON CONFLICT ("code") DO UPDATE SET
   "description" = EXCLUDED."description";
 
 -- =============================================================================
--- 8. INSTITUTION TYPE → MODULES (junction)
+-- 9. INSTITUTION TYPE → MODULES (junction)
 -- =============================================================================
 INSERT INTO "InstitutionTypeModule" ("id", "institutionTypeId", "moduleId", "isActive", "sortOrder")
 SELECT gen_random_uuid(), it.id, m.id, true, t.sort_order
@@ -395,7 +422,7 @@ ON CONFLICT ("institutionTypeId", "moduleId") DO UPDATE SET
   "sortOrder" = EXCLUDED."sortOrder";
 
 -- =============================================================================
--- 9. INSTITUTION TYPE → FEATURES (junction)
+-- 10. INSTITUTION TYPE → FEATURES (junction)
 -- =============================================================================
 INSERT INTO "InstitutionTypeFeature" ("id", "institutionTypeId", "featureId", "isEnabled")
 SELECT gen_random_uuid(), it.id, f.id, true
@@ -459,7 +486,7 @@ ON CONFLICT ("institutionTypeId", "featureId") DO UPDATE SET
   "isEnabled" = true;
 
 -- =============================================================================
--- 10. INSTITUTION TYPE → ROLES (junction)
+-- 11. INSTITUTION TYPE → ROLES (junction)
 -- =============================================================================
 INSERT INTO "InstitutionTypeRole" ("id", "institutionTypeId", "roleId", "isActive")
 SELECT gen_random_uuid(), it.id, ir.id, true
@@ -499,7 +526,7 @@ ON CONFLICT ("institutionTypeId", "roleId") DO UPDATE SET
   "isActive" = true;
 
 -- =============================================================================
--- 11. INSTITUTION TYPE → DASHBOARDS (junction)
+-- 12. INSTITUTION TYPE → DASHBOARDS (junction)
 -- =============================================================================
 INSERT INTO "InstitutionTypeDashboard" ("id", "institutionTypeId", "dashboardId", "isDefault")
 SELECT gen_random_uuid(), it.id, d.id, true
@@ -539,7 +566,7 @@ ON CONFLICT ("institutionTypeId", "dashboardId") DO UPDATE SET
   "isDefault" = true;
 
 -- =============================================================================
--- 12. INSTITUTION SETTINGS
+-- 13. INSTITUTION SETTINGS
 -- =============================================================================
 INSERT INTO "InstitutionSetting" ("id", "institutionTypeId", "key", "value", "isRequired")
 SELECT gen_random_uuid(), it.id, t.setting_key, t.setting_value, t.is_required
@@ -572,7 +599,7 @@ ON CONFLICT ("institutionTypeId", "key") DO UPDATE SET
   "isRequired" = EXCLUDED."isRequired";
 
 -- =============================================================================
--- 13. SYSTEM SETTINGS
+-- 14. SYSTEM SETTINGS
 -- =============================================================================
 INSERT INTO "SystemSetting" ("id", "key", "value", "isPublic", "updatedAt") VALUES
   (gen_random_uuid(), 'messaging_sandbox_mode', '"false"'::jsonb,        false, NOW()),
@@ -588,7 +615,7 @@ ON CONFLICT ("key") DO UPDATE SET
   "updatedAt" = NOW();
 
 -- =============================================================================
--- 14. SYSTEM COMMUNICATION PROVIDERS
+-- 15. SYSTEM COMMUNICATION PROVIDERS
 -- =============================================================================
 INSERT INTO "SystemProvider" (
   "id", "name", "type", "channel",
