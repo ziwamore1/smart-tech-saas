@@ -313,9 +313,16 @@ export default function PrimaryStudentsPage() {
                 Cancel
               </button>
               <button
-                onClick={() => registerMutation.mutate(formData)}
-                disabled={!formData.firstName || !formData.lastName || registerMutation.isPending}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+                onClick={() => {
+                  if (!formData.firstName || !formData.lastName) return;
+                  registerMutation.mutate(formData);
+                }}
+                disabled={registerMutation.isPending}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  registerMutation.isPending
+                    ? 'bg-emerald-400 text-white cursor-not-allowed'
+                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                }`}
               >
                 {registerMutation.isPending ? 'Registering...' : 'Register Pupil'}
               </button>
