@@ -32,8 +32,9 @@ export default function ParentReportCards() {
     if (!selectedChildId) return;
     setActionLoading(true);
     try {
-      const blob = await parentApi.downloadReportCard(selectedChildId, '');
-      const url = window.URL.createObjectURL(blob as Blob);
+      const res = await parentApi.downloadReportCard(selectedChildId, '');
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data]);
+      const url = window.URL.createObjectURL(blob);
       const a = window.document.createElement('a');
       a.href = url;
       a.download = `Report_Card_${childName.replace(/\s+/g, '_')}.pdf`;

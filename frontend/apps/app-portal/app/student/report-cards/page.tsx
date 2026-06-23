@@ -30,8 +30,9 @@ export default function StudentReportCards() {
   const handleDownloadPDF = async () => {
     if (!user?.id || !termId) return;
     try {
-      const blob = await reportCardApi.downloadReportCardPdf(String(user.id), termId);
-      const url = window.URL.createObjectURL(blob as Blob);
+      const res = await reportCardApi.downloadReportCardPdf(String(user.id), termId);
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data]);
+      const url = window.URL.createObjectURL(blob);
       const a = window.document.createElement('a');
       a.href = url;
       a.download = `Report_Card_${termId}.pdf`;
