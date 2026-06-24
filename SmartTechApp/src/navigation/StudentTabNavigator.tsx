@@ -7,6 +7,7 @@ import { useAuthStore } from '../store';
 import { StudentDashboardScreen } from '../screens/student/DashboardScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
 import { colors, spacing, borderRadius, shadows } from '../theme';
+import { apiService } from '../services/api';
 
 const { width } = Dimensions.get('window');
 const DRAWER_WIDTH = 280;
@@ -25,6 +26,9 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'StudentTimetable', label: 'Timetable', icon: '📅', stackScreen: 'StudentTimetable' },
   { name: 'StudentAttendance', label: 'Attendance', icon: '✅', stackScreen: 'StudentAttendance' },
   { name: 'StudentExams', label: 'Exams', icon: '📋', stackScreen: 'ExamList' },
+  { name: 'StudentHomework', label: 'Homework', icon: '📚', stackScreen: 'Homework' },
+  { name: 'StudentReportCards', label: 'Report Cards', icon: '📄', stackScreen: 'StudentReportCards' },
+  { name: 'StudentAssessments', label: 'Assessments', icon: '📊', stackScreen: 'StudentAssessments' },
   { name: 'StudentAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor' },
   { name: 'StudentLearningStyle', label: 'My Style', icon: '🧠', stackScreen: 'LearningStyle' },
   { name: 'StudentAnalytics', label: 'Analytics', icon: '📊', stackScreen: 'Analytics' },
@@ -84,6 +88,18 @@ export const StudentTabNavigator: React.FC = () => {
     return <Component />;
   };
 
+  const [studentPhoto, setStudentPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.studentId) {
+      apiService.getStudentPhoto(user.studentId).then(r => {
+        const data = r?.data;
+        if (data?.imageUrl) setStudentPhoto(data.imageUrl);
+        else if (data?.photoUrl) setStudentPhoto(data.photoUrl);
+      }).catch(() => {});
+    }
+  }, [user?.studentId]);
+
   const initials = user ? `${(user.firstName||'')[0]||''}${(user.lastName||'')[0]||''}`.toUpperCase() : 'S';
   const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Student';
 
@@ -106,10 +122,14 @@ export const StudentTabNavigator: React.FC = () => {
             <Text style={styles.drawerSubtitle}>{user?.school?.name || 'Student Portal'}</Text>
             <View style={styles.divider} />
             <View style={styles.profileSection}>
-              <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
-              <Text style={styles.profileName}>{userName}</Text>
-              <Text style={styles.profileRole}>Student</Text>
-            </View>
+              {studentPhoto ? (
+                <Image source={{ uri: studentPhoto }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
+              )}
+                <Text style={styles.profileName}>{userName}</Text>
+                <Text style={styles.profileRole}>Student</Text>
+              </View>
           </View>
 
           <ScrollView style={styles.drawerNav} showsVerticalScrollIndicator={false}>
@@ -149,6 +169,7 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.border, width: '80%', marginVertical: spacing.sm },
   profileSection: { alignItems: 'center', marginTop: spacing.xs },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.teal, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  avatarImage: { width: 44, height: 44, borderRadius: 22, marginBottom: 4 },
   avatarText: { fontSize: 18, fontWeight: '700', color: colors.white },
   profileName: { fontSize: 14, fontWeight: '600', color: colors.text },
   profileRole: { fontSize: 11, color: colors.textLight, marginTop: 1 },

@@ -119,6 +119,13 @@ export default function StudentResultsPage() {
 
               <div className="mt-6 pt-6 border-t">
                 <h3 className="font-medium mb-3">Student Info</h3>
+                <div className="flex flex-col items-center mb-4">
+                  {student?.photoUrl ? (
+                    <img src={student.photoUrl} alt="Student" className="w-20 h-20 rounded-full object-cover border-2 border-gray-200" />
+                  ) : (
+                    <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center text-3xl">👨‍🎓</div>
+                  )}
+                </div>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-500">Name</span>

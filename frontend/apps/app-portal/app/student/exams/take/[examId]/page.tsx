@@ -51,9 +51,13 @@ export default function TakeExam() {
       examApi.submitAnswer(String(attemptId), { questionId, answer }),
   });
 
+  const [submissionResult, setSubmissionResult] = useState<any>(null);
+
   const submitExamMutation = useMutation({
     mutationFn: () => examApi.submitExam(String(attemptId)),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const res = data?.data?.data || data?.data || data;
+      setSubmissionResult(res);
       setSubmitted(true);
     },
   });
@@ -111,12 +115,25 @@ export default function TakeExam() {
   const currentQ = allQuestions[currentQuestion];
 
   if (submitted) {
+    const score = submissionResult?.percentage || submissionResult?.score || 0;
+    const grade = submissionResult?.grade || '';
+    const total = submissionResult?.exam?.totalScore || examData?.totalScore || 0;
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white rounded-2xl p-8 shadow-sm text-center max-w-md">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-8 shadow-sm text-center max-w-md w-full">
           <span className="text-6xl">✅</span>
           <h1 className="text-2xl font-bold text-gray-900 mt-4">Exam Submitted!</h1>
-          <p className="text-gray-500 mt-2">Your answers have been recorded.</p>
+          <p className="text-gray-500 mt-2">Your answers have been recorded and graded.</p>
+          <div className="mt-6 grid grid-cols-2 gap-4">
+            <div className="bg-blue-50 rounded-xl p-4">
+              <p className="text-sm text-blue-600 font-medium">Score</p>
+              <p className="text-2xl font-bold text-blue-700">{typeof score === 'number' ? `${score.toFixed(1)}%` : `${score}%`}</p>
+            </div>
+            <div className="bg-green-50 rounded-xl p-4">
+              <p className="text-sm text-green-600 font-medium">Grade</p>
+              <p className="text-2xl font-bold text-green-700">{grade || 'N/A'}</p>
+            </div>
+          </div>
           <button onClick={() => router.push('/student/exams')} className="mt-6 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Back to Exams</button>
         </div>
       </div>
@@ -145,9 +162,9 @@ export default function TakeExam() {
             <div className="flex items-start justify-between mb-6">
               <div className="flex-1">
                 <p className="text-sm font-medium text-blue-600 mb-1">Question {currentQuestion + 1} of {allQuestions.length}</p>
-                <p className="text-base text-gray-900 whitespace-pre-wrap">{currentQ.text || currentQ.question}</p>
+                <p className="text-base text-gray-900 whitespace-pre-wrap">{currentQ.question || currentQ.text}</p>
               </div>
-              <span className="text-sm text-gray-400 ml-4">{currentQ.marks || currentQ.points || 1} pt</span>
+              <span className="text-sm text-gray-400 ml-4">{currentQ.score || currentQ.marks || 1} pt</span>
             </div>
 
             {currentQ.type === 'MULTIPLE_CHOICE' || currentQ.type === 'TRUE_FALSE' ? (

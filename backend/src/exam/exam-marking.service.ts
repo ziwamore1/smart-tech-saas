@@ -15,6 +15,12 @@ const stemmer = natural.PorterStemmer;
 export class ExamMarkingService {
   constructor(private prisma: PrismaService) {}
 
+  private AUTO_GRADABLE_TYPES = ['MULTIPLE_CHOICE', 'TRUE_FALSE', 'FILL_IN_BLANK', 'SHORT_ANSWER', 'ORDERING', 'MATCHING'];
+
+  isAutoGradable(questionType: string): boolean {
+    return this.AUTO_GRADABLE_TYPES.includes(questionType);
+  }
+
   async autoMarkAttempt(attemptId: string) {
     const attempt = await this.prisma.examAttempt.findUnique({
       where: { id: attemptId },
@@ -37,7 +43,6 @@ export class ExamMarkingService {
       const result = this.checkAnswer(question, answer.answer || '');
       const earned = result.isCorrect ? question.score : 0;
       const penalty = !result.isCorrect && question.negativeMarking > 0 ? question.negativeMarking : 0;
-      const confidence = result.confidence || 1;
 
       await this.prisma.examAnswer.update({
         where: { id: answer.id },
@@ -69,6 +74,72 @@ export class ExamMarkingService {
         negativeScore,
         isGraded: true,
         gradedAt: new Date(),
+      },
+    });
+  }
+
+  async autoMarkSubmission(attemptId: string) {
+    const attempt = await this.prisma.examAttempt.findUnique({
+      where: { id: attemptId },
+      include: {
+        answers: true,
+        exam: { include: { questions: true } },
+      },
+    });
+    if (!attempt) return null;
+
+    const questions = attempt.exam.questions;
+    let totalScore = 0;
+    let negativeScore = 0;
+    let pendingReview = false;
+
+    for (const answer of attempt.answers) {
+      const question = questions.find(q => q.id === answer.questionId);
+      if (!question) continue;
+
+      if (!this.isAutoGradable(question.questionType) || !question.correctAnswer) {
+        pendingReview = true;
+        await this.prisma.examAnswer.update({
+          where: { id: answer.id },
+          data: { maxScore: question.score },
+        });
+        continue;
+      }
+
+      const result = this.checkAnswer(question, answer.answer || '');
+      const earned = result.isCorrect ? question.score : 0;
+      const penalty = !result.isCorrect && question.negativeMarking > 0 ? question.negativeMarking : 0;
+
+      await this.prisma.examAnswer.update({
+        where: { id: answer.id },
+        data: {
+          isCorrect: result.isCorrect,
+          score: earned - penalty,
+          maxScore: question.score,
+          feedback: result.feedback || null,
+        },
+      });
+
+      totalScore += earned;
+      negativeScore += penalty;
+    }
+
+    const percentage = attempt.exam.totalScore > 0
+      ? Math.round((totalScore / attempt.exam.totalScore) * 100 * 100) / 100
+      : 0;
+
+    const grade = this.calculateGrade(percentage);
+
+    return this.prisma.examAttempt.update({
+      where: { id: attemptId },
+      data: {
+        score: totalScore,
+        totalScore: attempt.exam.totalScore,
+        percentage,
+        grade,
+        negativeScore,
+        isGraded: !pendingReview,
+        gradedAt: pendingReview ? undefined : new Date(),
       },
     });
   }

@@ -14,6 +14,9 @@ import { PrimaryStudentResultsScreen } from '../screens/student/PrimaryStudentRe
 import { StudentResultsScreen } from '../screens/student/ResultsScreen';
 import { StudentTimetableScreen } from '../screens/student/TimetableScreen';
 import { StudentAttendanceScreen } from '../screens/student/AttendanceScreen';
+import { StudentHomeworkScreen } from '../screens/student/HomeworkScreen';
+import { StudentReportCardsScreen } from '../screens/student/ReportCardsScreen';
+import { StudentAssessmentsScreen } from '../screens/student/AssessmentsScreen';
 import { ParentDashboardScreen } from '../screens/parent/DashboardScreen';
 import { ParentPrimaryDashboardScreen } from '../screens/parent/ParentPrimaryDashboardScreen';
 import { ParentChildrenScreen } from '../screens/parent/ChildrenScreen';
@@ -137,6 +140,9 @@ export function AppNavigator() {
             {isStudent && institutionType === 'PRIMARY_SCHOOL' && <Stack.Screen name="PrimaryStudentResults" component={PrimaryStudentResultsScreen} />}
             {isStudent && <Stack.Screen name="StudentTimetable" component={StudentTimetableScreen} />}
             {isStudent && <Stack.Screen name="StudentAttendance" component={StudentAttendanceScreen} />}
+            {isStudent && <Stack.Screen name="StudentHomework" component={StudentHomeworkScreen} />}
+            {isStudent && <Stack.Screen name="StudentReportCards" component={StudentReportCardsScreen} />}
+            {isStudent && <Stack.Screen name="StudentAssessments" component={StudentAssessmentsScreen} />}
 
             {isParent && <Stack.Screen name="ParentChildren" component={ParentChildrenScreen} />}
             {isParent && <Stack.Screen name="ParentChildResults" component={ParentChildResultsScreen} />}

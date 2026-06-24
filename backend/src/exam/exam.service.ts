@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ExamMarkingService } from './exam-marking.service';
 
 interface ExamCreateInput {
   title: string; description?: string; type?: string;
@@ -7,13 +8,17 @@ interface ExamCreateInput {
   duration: number; totalScore: number; passingScore?: number;
   instructions?: string; shuffleQuestions?: boolean; showResults?: boolean;
   maxAttempts?: number; allowReview?: boolean; randomizeOrder?: boolean;
+  autoGrade?: boolean; markingKeyUrl?: string; answerKeyUrl?: string;
   startsAt: string; endsAt: string; scheduledAt?: string;
   templateId?: string; createdById?: string;
 }
 
 @Injectable()
 export class ExamService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private markingService: ExamMarkingService,
+  ) {}
 
   async create(data: ExamCreateInput & { questions?: any[] }) {
     const exam = await this.prisma.exam.create({
@@ -35,6 +40,9 @@ export class ExamService {
         maxAttempts: data.maxAttempts ?? 1,
         allowReview: data.allowReview ?? true,
         randomizeOrder: data.randomizeOrder ?? false,
+        autoGrade: data.autoGrade ?? true,
+        markingKeyUrl: data.markingKeyUrl,
+        answerKeyUrl: data.answerKeyUrl,
         scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
         startsAt: new Date(data.startsAt),
         endsAt: new Date(data.endsAt),
@@ -114,6 +122,9 @@ export class ExamService {
     duration?: number;
     totalScore?: number;
     passingScore?: number;
+    autoGrade?: boolean;
+    markingKeyUrl?: string;
+    answerKeyUrl?: string;
     scheduledAt?: Date;
     startsAt?: Date;
     endsAt?: Date;
@@ -131,6 +142,9 @@ export class ExamService {
         duration: data.duration,
         totalScore: data.totalScore,
         passingScore: data.passingScore,
+        autoGrade: data.autoGrade,
+        markingKeyUrl: data.markingKeyUrl,
+        answerKeyUrl: data.answerKeyUrl,
         scheduledAt: data.scheduledAt,
         startsAt: data.startsAt,
         endsAt: data.endsAt,
@@ -204,7 +218,7 @@ export class ExamService {
     return { success: true };
   }
 
-  async startAttempt(examId: string, studentId: string) {
+  async startAttempt(examId: string, studentId: string, ipAddress?: string, userAgent?: string) {
     const exam = await this.getById(examId);
     
     if (!exam.isPublished) {
@@ -228,6 +242,13 @@ export class ExamService {
     }
 
     if (existing) {
+      // If existing attempt timed out, auto-submit it and forbid a new one
+      const elapsed = (now.getTime() - existing.startedAt.getTime()) / 1000;
+      const maxDuration = exam.duration * 60;
+      if (elapsed > maxDuration + 60) {
+        await this.submitExam(existing.id);
+        throw new ForbiddenException('Your previous attempt time has expired');
+      }
       return existing;
     }
 
@@ -235,6 +256,8 @@ export class ExamService {
       data: {
         examId,
         studentId,
+        ipAddress,
+        userAgent,
       },
     });
   }
@@ -270,7 +293,7 @@ export class ExamService {
     const attempt = await this.prisma.examAttempt.findUnique({
       where: { id: attemptId },
       include: {
-        exam: true,
+        exam: { include: { questions: true } },
         answers: true,
       },
     });
@@ -283,20 +306,103 @@ export class ExamService {
       throw new ForbiddenException('Exam already submitted');
     }
 
-    const totalScore = attempt.answers.reduce((sum, a) => sum + (a.score || 0), 0);
-    const isPassed = totalScore >= attempt.exam.passingScore;
+    // Server-side timer enforcement
+    const exam = attempt.exam;
+    const now = new Date();
+    if (now > exam.endsAt) {
+      throw new ForbiddenException('Exam has ended');
+    }
+    const elapsed = (now.getTime() - attempt.startedAt.getTime()) / 1000;
+    const maxDurationSec = exam.duration * 60;
+    if (elapsed > maxDurationSec + 60) {
+      throw new ForbiddenException('Time limit exceeded');
+    }
 
-    return this.prisma.examAttempt.update({
+    // Auto-grade questions on submission if autoGrade is enabled
+    if (exam.autoGrade) {
+      await this.markingService.autoMarkSubmission(attemptId);
+    }
+
+    // Re-fetch with graded scores
+    const gradedAttempt = await this.prisma.examAttempt.findUnique({
+      where: { id: attemptId },
+      include: { answers: true, exam: true },
+    });
+
+    const totalScore = gradedAttempt.answers.reduce((sum, a) => sum + (a.score || 0), 0);
+    const totalPossible = exam.questions.reduce((sum, q) => sum + q.score, 0);
+    const percentage = totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100 * 100) / 100 : 0;
+    const grade = this.markingService.calculateGrade(percentage);
+
+    await this.prisma.examAttempt.update({
       where: { id: attemptId },
       data: {
         isSubmitted: true,
-        submittedAt: new Date(),
+        submittedAt: now,
         score: totalScore,
+        totalScore: totalPossible,
+        percentage,
+        grade,
       },
+    });
+
+    // Record results in the Result model for MID_TERM / END_TERM exam types
+    if (['MID_TERM', 'END_TERM', 'TEST', 'EXAM'].includes(exam.type)) {
+      await this.recordExamResult(attempt.studentId, exam, totalScore, totalPossible, grade);
+    }
+
+    return this.prisma.examAttempt.findUnique({
+      where: { id: attemptId },
       include: {
         answers: true,
-        exam: { select: { title: true, passingScore: true } },
+        exam: { select: { id: true, title: true, type: true, totalScore: true, passingScore: true } },
       },
+    });
+  }
+
+  private async recordExamResult(studentId: string, exam: any, score: number, totalPossible: number, grade: string) {
+    try {
+      const percentage = totalPossible > 0 ? score / totalPossible : 0;
+
+      await this.prisma.result.upsert({
+        where: {
+          studentId_subjectId_termId: {
+            studentId,
+            subjectId: exam.subjectId,
+            termId: exam.termId,
+          },
+        },
+        update: {
+          score: percentage * 100,
+          grade,
+          teacherId: exam.createdById || 'system',
+          updatedAt: new Date(),
+        },
+        create: {
+          studentId,
+          subjectId: exam.subjectId,
+          termId: exam.termId,
+          schoolId: exam.schoolId,
+          score: percentage * 100,
+          grade,
+          teacherId: exam.createdById || 'system',
+        },
+      });
+    } catch (e) {
+      // Log but don't fail the submission if result recording has a unique constraint issue
+      console.error('Failed to record exam result:', e);
+    }
+  }
+
+  async updateExamAnswer(attemptId: string, questionId: string, data: { score?: number; isCorrect?: boolean; feedback?: string }) {
+    const answer = await this.prisma.examAnswer.findFirst({
+      where: { attemptId, questionId },
+    });
+    if (!answer) throw new NotFoundException('Answer not found');
+
+    return this.prisma.examAnswer.update({
+      where: { id: answer.id },
+      data,
     });
   }
 

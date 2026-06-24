@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, StatCard, QuickActionItem, WidgetCard } from '../../components';
 import { colors, spacing } from '../../theme';
@@ -13,11 +13,19 @@ export const StudentDashboardScreen: React.FC = () => {
   const { dashboard, isLoadingDashboard, fetchDashboard } = useAppStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [intelligence, setIntelligence] = useState<any>(null);
+  const [studentPhoto, setStudentPhoto] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDashboard();
     if (user?.id) {
       apiService.getMobileIntelligenceSummary(user.id).then(r => setIntelligence(r?.data || r)).catch(() => {});
+    }
+    if (user?.studentId) {
+      apiService.getStudentPhoto(user.studentId).then(r => {
+        const data = r?.data;
+        if (data?.imageUrl) setStudentPhoto(data.imageUrl);
+        else if (data?.photoUrl) setStudentPhoto(data.photoUrl);
+      }).catch(() => {});
     }
   }, []);
 
@@ -52,6 +60,9 @@ export const StudentDashboardScreen: React.FC = () => {
     { icon: '🤖', label: 'AI Tutor', screen: 'AiTutor', gradient: ['#D97706', '#F59E0B'] as const, params: { sourceScreen: 'student_dashboard' } },
     { icon: '🧠', label: 'My Style', screen: 'LearningStyle', gradient: ['#8B5CF6', '#A78BFA'] as const },
     { icon: '📊', label: 'Analytics', screen: 'Analytics', gradient: ['#EC4899', '#F472B6'] as const },
+    { icon: '📚', label: 'Homework', screen: 'StudentHomework', gradient: ['#D97706', '#F59E0B'] as const },
+    { icon: '📄', label: 'Report Cards', screen: 'StudentReportCards', gradient: ['#0D9488', '#14B8A6'] as const },
+    { icon: '📊', label: 'Assessments', screen: 'StudentAssessments', gradient: ['#7C3AED', '#A78BFA'] as const },
   ];
 
   return (

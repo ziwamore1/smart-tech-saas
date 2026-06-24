@@ -54,12 +54,14 @@ export default function StudentPortal() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-2xl">
-                👨‍🎓
-              </div>
+              {student?.photoUrl ? (
+                <img src={student.photoUrl} alt="Student" className="w-12 h-12 rounded-full object-cover" />
+              ) : (
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-2xl">👨‍🎓</div>
+              )}
               <div>
                 <p className="text-sm text-gray-500">Class</p>
                 <p className="text-lg font-semibold">{student?.class?.name || 'Not assigned'}</p>

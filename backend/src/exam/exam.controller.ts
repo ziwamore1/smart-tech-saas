@@ -155,12 +155,51 @@ export class ExamController {
     return this.examService.renderPreviewHtml(id);
   }
 
+  // ===== Answer Key / Marking Key =====
+  @Post(':id/answer-key')
+  @Roles('TEACHER', 'DIRECTOR')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: cloudinaryMemoryStorage(),
+    fileFilter: CLOUDINARY_FILE_FILTER,
+    limits: { fileSize: 50 * 1024 * 1024 },
+  }))
+  async uploadAnswerKey(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+    const result = await this.cloudinary.upload(file, FOLDERS.examinations);
+    return this.examService.update(id, { answerKeyUrl: result.secureUrl });
+  }
+
+  @Post(':id/marking-key')
+  @Roles('TEACHER', 'DIRECTOR')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: cloudinaryMemoryStorage(),
+    fileFilter: CLOUDINARY_FILE_FILTER,
+    limits: { fileSize: 50 * 1024 * 1024 },
+  }))
+  async uploadMarkingKey(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+    const result = await this.cloudinary.upload(file, FOLDERS.examinations);
+    return this.examService.update(id, { markingKeyUrl: result.secureUrl });
+  }
+
+  @Patch(':id/auto-grade')
+  @Roles('TEACHER', 'DIRECTOR')
+  async toggleAutoGrade(@Param('id') id: string, @Body('enabled') enabled: boolean) {
+    return this.examService.update(id, { autoGrade: enabled });
+  }
+
+  @Patch('attempt/:attemptId/answer')
+  @Roles('TEACHER', 'DIRECTOR')
+  async gradeAnswer(@Param('attemptId') attemptId: string, @Body() data: { questionId: string; score: number; isCorrect?: boolean; feedback?: string }) {
+    return this.examService.updateExamAnswer(attemptId, data.questionId, data);
+  }
+
   // ===== Attempts & Taking Exams =====
   @Post(':id/start')
   @Roles('STUDENT', 'TEACHER', 'DIRECTOR')
   async startAttempt(@Param('id') id: string, @Body() data: { studentId: string }, @Request() req: any) {
     const studentId = data.studentId || req.user.studentId;
-    return this.examService.startAttempt(id, studentId);
+    const ip = req.ip;
+    const ua = req.headers?.['user-agent'];
+    return this.examService.startAttempt(id, studentId, ip, ua);
   }
 
   @Post('attempt/:attemptId/answer')

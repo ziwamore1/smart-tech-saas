@@ -1120,6 +1120,22 @@ export const examApi = {
   autoMarkExam: (examId: string) => api.post(`/exam/${examId}/auto-mark`),
   autoMarkAttempt: (attemptId: string) => api.post(`/exam/attempt/${attemptId}/auto-mark`),
 
+  // Answer Key / Marking Key
+  uploadAnswerKey: (examId: string, formData: FormData) =>
+    api.post(`/exam/${examId}/answer-key`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  uploadMarkingKey: (examId: string, formData: FormData) =>
+    api.post(`/exam/${examId}/marking-key`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  toggleAutoGrade: (examId: string, enabled: boolean) =>
+    api.patch(`/exam/${examId}/auto-grade`, { enabled }),
+
+  // Grade individual answer
+  gradeAnswer: (attemptId: string, data: { questionId: string; score: number; isCorrect?: boolean; feedback?: string }) =>
+    api.patch(`/exam/attempt/${attemptId}/answer`, data),
+
   // Results
   getResults: (examId: string) => api.get(`/exam/${examId}/results`),
   getStudentResults: (params?: Record<string, string | undefined>) =>

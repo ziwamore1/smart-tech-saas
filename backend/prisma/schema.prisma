@@ -2005,6 +2005,9 @@ model Exam {
   maxAttempts      Int            @default(1)
   allowReview      Boolean        @default(true)
   randomizeOrder   Boolean        @default(false)
+  autoGrade        Boolean        @default(true)
+  markingKeyUrl    String?
+  answerKeyUrl     String?
   scheduledAt      DateTime?
   startsAt         DateTime
   endsAt           DateTime

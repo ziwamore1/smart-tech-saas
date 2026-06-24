@@ -942,6 +942,20 @@ class ApiService {
     return response.data;
   }
 
+  // ===== Student Homework =====
+  async getStudentHomework(studentId: string) {
+    const response = await this.client.get(`/homework/student/${studentId}`);
+    return response.data;
+  }
+
+  // ===== Student Report Cards =====
+  async getStudentReportCard(studentId: string, termId?: string) {
+    const params: any = {};
+    if (termId) params.termId = termId;
+    const response = await this.client.get(`/report-card/${studentId}/${termId || ''}/pdf`, { params, responseType: 'blob' });
+    return response.data;
+  }
+
   async deleteStudentPhoto(studentId: string) {
     const response = await this.client.delete(`/student-photo/${studentId}`);
     return response.data;

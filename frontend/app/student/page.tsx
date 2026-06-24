@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { studentApi, resultApi, termApi } from '@/lib/api';
+import { studentApi, resultApi, termApi, examApi, homeworkApi, assessmentApi, reportCardApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
 export default function StudentPortal() {
@@ -54,12 +54,14 @@ export default function StudentPortal() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-2xl">
-                👨‍🎓
-              </div>
+              {student?.photoUrl ? (
+                <img src={student.photoUrl} alt="Student" className="w-12 h-12 rounded-full object-cover" />
+              ) : (
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-2xl">👨‍🎓</div>
+              )}
               <div>
                 <p className="text-sm text-gray-500">Class</p>
                 <p className="text-lg font-semibold">{student?.class?.name || 'Not assigned'}</p>
@@ -69,9 +71,7 @@ export default function StudentPortal() {
 
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-2xl">
-                📊
-              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-2xl">📊</div>
               <div>
                 <p className="text-sm text-gray-500">Average Score</p>
                 <p className="text-lg font-semibold">{calculateAverage()}%</p>
@@ -81,12 +81,20 @@ export default function StudentPortal() {
 
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-2xl">
-                📚
-              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-2xl">📚</div>
               <div>
                 <p className="text-sm text-gray-500">Subjects</p>
                 <p className="text-lg font-semibold">{results.length}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-sm">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center text-2xl">🏆</div>
+              <div>
+                <p className="text-sm text-gray-500">Grade</p>
+                <p className="text-lg font-semibold">{results[0]?.grade || '-'}</p>
               </div>
             </div>
           </div>
@@ -98,25 +106,47 @@ export default function StudentPortal() {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold">Quick Actions</h2>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Link
-                  href="/student/timetable"
-                  className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
-                >
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <Link href="/student/timetable" className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
                   <span className="text-3xl">📅</span>
                   <div>
                     <p className="font-medium text-gray-900">My Timetable</p>
                     <p className="text-sm text-gray-500">View class schedule</p>
                   </div>
                 </Link>
-                <Link
-                  href="/student/results"
-                  className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors"
-                >
+                <Link href="/student/results" className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors">
                   <span className="text-3xl">📝</span>
                   <div>
                     <p className="font-medium text-gray-900">My Results</p>
                     <p className="text-sm text-gray-500">View published results</p>
+                  </div>
+                </Link>
+                <Link href="/student/exams" className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors">
+                  <span className="text-3xl">📋</span>
+                  <div>
+                    <p className="font-medium text-gray-900">Online Exams</p>
+                    <p className="text-sm text-gray-500">Take exams & view results</p>
+                  </div>
+                </Link>
+                <Link href="/student/homework" className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-orange-500 hover:bg-orange-50 transition-colors">
+                  <span className="text-3xl">📚</span>
+                  <div>
+                    <p className="font-medium text-gray-900">Homework</p>
+                    <p className="text-sm text-gray-500">View assignments & submit</p>
+                  </div>
+                </Link>
+                <Link href="/student/report-cards" className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-teal-500 hover:bg-teal-50 transition-colors">
+                  <span className="text-3xl">📄</span>
+                  <div>
+                    <p className="font-medium text-gray-900">Report Cards</p>
+                    <p className="text-sm text-gray-500">Download & print reports</p>
+                  </div>
+                </Link>
+                <Link href="/student/assessments" className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-pink-500 hover:bg-pink-50 transition-colors">
+                  <span className="text-3xl">📊</span>
+                  <div>
+                    <p className="font-medium text-gray-900">Assessments</p>
+                    <p className="text-sm text-gray-500">View assessment scores</p>
                   </div>
                 </Link>
               </div>
