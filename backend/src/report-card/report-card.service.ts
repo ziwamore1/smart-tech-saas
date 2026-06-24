@@ -66,12 +66,33 @@ export class ReportCardService {
   }
 
   private async getGradeFromScore(schoolId: string, score: number) {
-    let gradingSystem = await this.prisma.gradingSystem.findFirst({
-      where: {
-        schoolId,
-        isDefault: true,
-      },
+    const codeToName: Record<string, string> = {
+      PRIMARY_ECZ: 'ECZ Primary Grading System',
+      SECONDARY_ECZ: 'ECZ Secondary Grading System',
+      FORMS_ECZ: 'ECZ Forms Grading System',
+      COLLEGE_GPA: 'College GPA Grading System',
+      UNIVERSITY_CGPA: 'University CGPA Grading System',
+    };
+
+    const schoolSetting = await this.prisma.schoolSetting.findUnique({
+      where: { schoolId },
     });
+
+    const preferredName = schoolSetting?.gradingSystem
+      ? codeToName[schoolSetting.gradingSystem]
+      : undefined;
+
+    let gradingSystem = preferredName
+      ? await this.prisma.gradingSystem.findFirst({
+          where: { schoolId, name: preferredName },
+        })
+      : undefined;
+
+    if (!gradingSystem) {
+      gradingSystem = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId, isDefault: true },
+      });
+    }
 
     if (!gradingSystem) {
       gradingSystem = await this.prisma.gradingSystem.findFirst({

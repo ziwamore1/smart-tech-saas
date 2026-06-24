@@ -308,29 +308,45 @@ export class ResultService {
   }
 
   async calculateGrade(score: number, schoolId: string) {
-    const gradingSystem = await this.prisma.gradingSystem.findFirst({
-      where: { schoolId, isDefault: true },
-      include: { gradeScales: true },
+    const codeToName: Record<string, string> = {
+      PRIMARY_ECZ: 'ECZ Primary Grading System',
+      SECONDARY_ECZ: 'ECZ Secondary Grading System',
+      FORMS_ECZ: 'ECZ Forms Grading System',
+      COLLEGE_GPA: 'College GPA Grading System',
+      UNIVERSITY_CGPA: 'University CGPA Grading System',
+    };
+
+    const schoolSetting = await this.prisma.schoolSetting.findUnique({
+      where: { schoolId },
     });
 
+    const preferredName = schoolSetting?.gradingSystem
+      ? codeToName[schoolSetting.gradingSystem]
+      : undefined;
+
+    let gradingSystem = preferredName
+      ? await this.prisma.gradingSystem.findFirst({
+          where: { schoolId, name: preferredName },
+          include: { gradeScales: true },
+        })
+      : undefined;
+
     if (!gradingSystem) {
-      const fallbackScale = await this.prisma.gradingSystem.findFirst({
+      gradingSystem = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId, isDefault: true },
+        include: { gradeScales: true },
+      });
+    }
+
+    if (!gradingSystem) {
+      gradingSystem = await this.prisma.gradingSystem.findFirst({
         where: { schoolId },
         include: { gradeScales: true },
       });
+    }
 
-      if (!fallbackScale) {
-        return { grade: 'N/A', remark: 'No grading system configured' };
-      }
-
-      const scale = fallbackScale.gradeScales.find(
-        (s) => score >= s.minScore && score <= s.maxScore,
-      );
-
-      return {
-        grade: scale?.grade || 'N/A',
-        remark: scale?.remark || 'No remark',
-      };
+    if (!gradingSystem) {
+      return { grade: 'N/A', remark: 'No grading system configured' };
     }
 
     const scale = gradingSystem.gradeScales.find(
