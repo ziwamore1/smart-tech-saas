@@ -298,9 +298,16 @@ export class TeacherService {
       },
     });
 
+    // Resolve classId from active enrollment
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: { studentId: data.studentId, status: 'ACTIVE' },
+      orderBy: { createdAt: 'desc' },
+    });
+    const classId = enrollment?.classId || null;
+
     // Sync ComputedResult for real-time analytics
     const gradeResult = await this.gradingEngine.computeGradeFull(
-      data.score, null, data.subjectId, data.termId, data.schoolId,
+      data.score, classId, data.subjectId, data.termId, data.schoolId,
     ).catch(() => null);
 
     await this.prisma.computedResult.upsert({
@@ -312,6 +319,7 @@ export class TeacherService {
         },
       },
       update: {
+        classId: classId || '',
         totalRawScore: data.score,
         finalPercentage: data.score,
         finalGrade: gradeResult?.grade ?? null,
@@ -325,7 +333,7 @@ export class TeacherService {
         studentId: data.studentId,
         subjectId: data.subjectId,
         termId: data.termId,
-        classId: '',
+        classId: classId || '',
         schoolId: data.schoolId,
         totalRawScore: data.score,
         finalPercentage: data.score,
@@ -425,7 +433,7 @@ export class TeacherService {
     // Sync ComputedResults for real-time analytics
     for (const s of scores) {
       const gradeResult = await this.gradingEngine.computeGradeFull(
-        s.score, null, subjectId, termId, schoolId,
+        s.score, classId, subjectId, termId, schoolId,
       ).catch(() => null);
 
       await this.prisma.computedResult.upsert({

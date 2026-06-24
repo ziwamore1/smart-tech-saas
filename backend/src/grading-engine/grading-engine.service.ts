@@ -29,6 +29,26 @@ export class GradingEngineService {
     termId: string,
     schoolId: string,
   ): Promise<string | null> {
+    // First check: new GradingSystem via class.gradingSystemId
+    if (classId) {
+      const cls = await this.prisma.class.findUnique({
+        where: { id: classId },
+        include: {
+          gradingSystem: {
+            include: { gradeScales: { orderBy: { sortOrder: 'asc' } } },
+          },
+        },
+      });
+
+      if (cls?.gradingSystem?.gradeScales?.length > 0) {
+        const scale = cls.gradingSystem.gradeScales.find(
+          s => percentage >= s.minScore && percentage <= s.maxScore,
+        );
+        if (scale) return scale.grade;
+      }
+    }
+
+    // Fallback: old GradingPolicy via ClassGradingPolicy
     const policy = await this.getActiveGradingPolicy(classId, subjectId, termId, schoolId);
 
     if (!policy) {
@@ -54,6 +74,33 @@ export class GradingEngineService {
     termId: string,
     schoolId: string,
   ): Promise<GradeResult> {
+    // First check: new GradingSystem via class.gradingSystemId
+    if (classId) {
+      const cls = await this.prisma.class.findUnique({
+        where: { id: classId },
+        include: {
+          gradingSystem: {
+            include: { gradeScales: { orderBy: { sortOrder: 'asc' } } },
+          },
+        },
+      });
+
+      if (cls?.gradingSystem?.gradeScales?.length > 0) {
+        const scale = cls.gradingSystem.gradeScales.find(
+          s => percentage >= s.minScore && percentage <= s.maxScore,
+        );
+        if (scale) {
+          return {
+            grade: scale.grade,
+            remark: scale.remark,
+            points: scale.points ?? undefined,
+            gpa: undefined,
+          };
+        }
+      }
+    }
+
+    // Fallback: old GradingPolicy via ClassGradingPolicy
     const policy = await this.getActiveGradingPolicy(classId, subjectId, termId, schoolId);
 
     if (!policy) {
