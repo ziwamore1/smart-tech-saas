@@ -418,7 +418,12 @@ export class AssessmentService {
 
     const finalScore = Math.round(totalWeightedScore * 100) / 100;
 
-    const gradeData = await this.calculateGrade(finalScore, schoolId);
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: { studentId, status: 'ACTIVE' },
+      select: { classId: true },
+    });
+
+    const gradeData = await this.calculateGrade(finalScore, schoolId, enrollment?.classId);
 
     const result = await this.prisma.result.upsert({
       where: {
@@ -481,7 +486,7 @@ export class AssessmentService {
     return { computed: results.length, results };
   }
 
-  private async calculateGrade(score: number, schoolId: string) {
+  private async calculateGrade(score: number, schoolId: string, classId?: string) {
     const codeToName: Record<string, string> = {
       PRIMARY_ECZ: 'ECZ Primary Grading System',
       SECONDARY_ECZ: 'ECZ Secondary Grading System',
@@ -490,20 +495,35 @@ export class AssessmentService {
       UNIVERSITY_CGPA: 'University CGPA Grading System',
     };
 
-    const schoolSetting = await this.prisma.schoolSetting.findUnique({
-      where: { schoolId },
-    });
+    let gradingSystem: any;
 
-    const preferredName = schoolSetting?.gradingSystem
-      ? codeToName[schoolSetting.gradingSystem]
-      : undefined;
-
-    let gradingSystem = preferredName
-      ? await this.prisma.gradingSystem.findFirst({
-          where: { schoolId, name: preferredName },
+    if (classId) {
+      const cls = await this.prisma.class.findUnique({
+        where: { id: classId },
+        select: { gradingSystemId: true },
+      });
+      if (cls?.gradingSystemId) {
+        gradingSystem = await this.prisma.gradingSystem.findUnique({
+          where: { id: cls.gradingSystemId },
           include: { gradeScales: true },
-        })
-      : undefined;
+        });
+      }
+    }
+
+    if (!gradingSystem) {
+      const schoolSetting = await this.prisma.schoolSetting.findUnique({
+        where: { schoolId },
+      });
+      const preferredName = schoolSetting?.gradingSystem
+        ? codeToName[schoolSetting.gradingSystem]
+        : undefined;
+      gradingSystem = preferredName
+        ? await this.prisma.gradingSystem.findFirst({
+            where: { schoolId, name: preferredName },
+            include: { gradeScales: true },
+          })
+        : undefined;
+    }
 
     if (!gradingSystem) {
       gradingSystem = await this.prisma.gradingSystem.findFirst({

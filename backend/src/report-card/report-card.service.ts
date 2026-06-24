@@ -65,7 +65,7 @@ export class ReportCardService {
     return page;
   }
 
-  private async getGradeFromScore(schoolId: string, score: number) {
+  private async getGradeFromScore(schoolId: string, score: number, classId?: string) {
     const codeToName: Record<string, string> = {
       PRIMARY_ECZ: 'ECZ Primary Grading System',
       SECONDARY_ECZ: 'ECZ Secondary Grading System',
@@ -74,19 +74,33 @@ export class ReportCardService {
       UNIVERSITY_CGPA: 'University CGPA Grading System',
     };
 
-    const schoolSetting = await this.prisma.schoolSetting.findUnique({
-      where: { schoolId },
-    });
+    let gradingSystem: any;
 
-    const preferredName = schoolSetting?.gradingSystem
-      ? codeToName[schoolSetting.gradingSystem]
-      : undefined;
+    if (classId) {
+      const cls = await this.prisma.class.findUnique({
+        where: { id: classId },
+        select: { gradingSystemId: true },
+      });
+      if (cls?.gradingSystemId) {
+        gradingSystem = await this.prisma.gradingSystem.findUnique({
+          where: { id: cls.gradingSystemId },
+        });
+      }
+    }
 
-    let gradingSystem = preferredName
-      ? await this.prisma.gradingSystem.findFirst({
-          where: { schoolId, name: preferredName },
-        })
-      : undefined;
+    if (!gradingSystem) {
+      const schoolSetting = await this.prisma.schoolSetting.findUnique({
+        where: { schoolId },
+      });
+      const preferredName = schoolSetting?.gradingSystem
+        ? codeToName[schoolSetting.gradingSystem]
+        : undefined;
+      gradingSystem = preferredName
+        ? await this.prisma.gradingSystem.findFirst({
+            where: { schoolId, name: preferredName },
+          })
+        : undefined;
+    }
 
     if (!gradingSystem) {
       gradingSystem = await this.prisma.gradingSystem.findFirst({
@@ -177,7 +191,7 @@ export class ReportCardService {
     const pointsMap: Record<string, number> = {};
 
     for (const r of allResults) {
-      const grade = await this.getGradeFromScore(schoolId, r.score);
+      const grade = await this.getGradeFromScore(schoolId, r.score, enrollment.classId);
 
       if (!pointsMap[r.studentId]) {
         pointsMap[r.studentId] = 0;
@@ -222,9 +236,7 @@ export class ReportCardService {
     }[] = [];
 
     for (const r of results) {
-      const gradeScale = await this.getGradeFromScore(schoolId, r.score);
-
-      console.log('DEBUG gradeScale remark:', gradeScale.remark, 'for score:', r.score);
+      const gradeScale = await this.getGradeFromScore(schoolId, r.score, enrollment.classId);
 
       totalMarks += r.score;
       totalPoints += gradeScale.points;
@@ -567,7 +579,7 @@ export class ReportCardService {
         });
 
         for (const r of results) {
-          const grade = await this.getGradeFromScore(schoolId, r.score);
+          const grade = await this.getGradeFromScore(schoolId, r.score, enrollment.classId);
 
           transcriptRows += `
             <tr>

@@ -63,7 +63,7 @@ export class ExamMarkingService {
       : 0;
 
     const grade = schoolId
-      ? await this.getGradeFromScale(percentage, schoolId)
+      ? await this.getGradeFromScale(percentage, schoolId, attempt.exam.classId)
       : this.calculateGrade(percentage);
 
     return this.prisma.examAttempt.update({
@@ -131,7 +131,7 @@ export class ExamMarkingService {
       : 0;
 
     const grade = schoolId
-      ? await this.getGradeFromScale(percentage, schoolId)
+      ? await this.getGradeFromScale(percentage, schoolId, attempt.exam.classId)
       : this.calculateGrade(percentage);
 
     return this.prisma.examAttempt.update({
@@ -283,7 +283,7 @@ export class ExamMarkingService {
     }
   }
 
-  async getGradeFromScale(score: number, schoolId: string): Promise<string> {
+  async getGradeFromScale(score: number, schoolId: string, classId?: string): Promise<string> {
     const codeToName: Record<string, string> = {
       PRIMARY_ECZ: 'ECZ Primary Grading System',
       SECONDARY_ECZ: 'ECZ Secondary Grading System',
@@ -292,20 +292,35 @@ export class ExamMarkingService {
       UNIVERSITY_CGPA: 'University CGPA Grading System',
     };
 
-    const schoolSetting = await this.prisma.schoolSetting.findUnique({
-      where: { schoolId },
-    });
+    let system: any;
 
-    const preferredName = schoolSetting?.gradingSystem
-      ? codeToName[schoolSetting.gradingSystem]
-      : undefined;
-
-    let system = preferredName
-      ? await this.prisma.gradingSystem.findFirst({
-          where: { schoolId, name: preferredName },
+    if (classId) {
+      const cls = await this.prisma.class.findUnique({
+        where: { id: classId },
+        select: { gradingSystemId: true },
+      });
+      if (cls?.gradingSystemId) {
+        system = await this.prisma.gradingSystem.findUnique({
+          where: { id: cls.gradingSystemId },
           include: { gradeScales: true },
-        })
-      : undefined;
+        });
+      }
+    }
+
+    if (!system) {
+      const schoolSetting = await this.prisma.schoolSetting.findUnique({
+        where: { schoolId },
+      });
+      const preferredName = schoolSetting?.gradingSystem
+        ? codeToName[schoolSetting.gradingSystem]
+        : undefined;
+      system = preferredName
+        ? await this.prisma.gradingSystem.findFirst({
+            where: { schoolId, name: preferredName },
+            include: { gradeScales: true },
+          })
+        : undefined;
+    }
 
     system ??= await this.prisma.gradingSystem.findFirst({
       where: { schoolId, isDefault: true },

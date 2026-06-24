@@ -332,7 +332,7 @@ export class ExamService {
     const totalScore = gradedAttempt.answers.reduce((sum, a) => sum + (a.score || 0), 0);
     const totalPossible = exam.questions.reduce((sum, q) => sum + q.score, 0);
     const percentage = totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100 * 100) / 100 : 0;
-    const grade = await this.markingService.getGradeFromScale(percentage, exam.schoolId);
+    const grade = await this.markingService.getGradeFromScale(percentage, exam.schoolId, exam.classId);
 
     await this.prisma.examAttempt.update({
       where: { id: attemptId },

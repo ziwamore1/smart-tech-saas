@@ -464,9 +464,11 @@ model Class {
   capacity             Int?
   schoolId             String
   levelTypeId          String
+  gradingSystemId      String?
   order                Int
   classTeacherId       String?
   levelType            LevelType                     @relation(fields: [levelTypeId], references: [id])
+  gradingSystem        GradingSystem?                @relation(fields: [gradingSystemId], references: [id])
   school               School                        @relation(fields: [schoolId], references: [id])
   classTeacher         User?                         @relation(fields: [classTeacherId], references: [id])
   classSubjects        ClassSubject[]
@@ -757,6 +759,7 @@ model GradingSystem {
   isDefault   Boolean      @default(false)
   createdAt   DateTime     @default(now())
   gradeScales GradeScale[]
+  classes     Class[]
   school      School       @relation(fields: [schoolId], references: [id])
 
   @@unique([schoolId, name])

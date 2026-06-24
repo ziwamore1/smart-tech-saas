@@ -165,7 +165,7 @@ export class ResultService {
       throw new BadRequestException('Result already recorded. Use update instead.');
     }
 
-    const gradeData = await this.calculateGrade(score, schoolId);
+    const gradeData = await this.calculateGrade(score, schoolId, enrollment.classId);
 
     return this.prisma.result.create({
       data: {
@@ -207,9 +207,24 @@ export class ResultService {
     const created: any[] = [];
     const errors: any[] = [];
 
+    const enrollmentMap = new Map<string, string>();
+    const uniqueStudentIds = [...new Set(results.map(r => r.studentId))];
+    const allEnrollments = await this.prisma.enrollment.findMany({
+      where: {
+        studentId: { in: uniqueStudentIds },
+        academicYearId: term.academicYearId,
+        status: 'ACTIVE',
+      },
+      select: { studentId: true, classId: true },
+    });
+    for (const e of allEnrollments) {
+      enrollmentMap.set(e.studentId, e.classId);
+    }
+
     for (const item of results) {
       try {
-        const gradeData = await this.calculateGrade(item.score, schoolId);
+        const classId = enrollmentMap.get(item.studentId);
+        const gradeData = await this.calculateGrade(item.score, schoolId, classId);
         const result = await this.prisma.result.upsert({
           where: {
             studentId_subjectId_termId: {
@@ -271,7 +286,12 @@ export class ResultService {
       throw new ForbiddenException('Results are locked. Contact administrator.');
     }
 
-    const gradeData = await this.calculateGrade(score, schoolId);
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: { studentId: result.studentId, status: 'ACTIVE' },
+      select: { classId: true },
+    });
+
+    const gradeData = await this.calculateGrade(score, schoolId, enrollment?.classId);
 
     return this.prisma.result.update({
       where: { id },
@@ -307,7 +327,7 @@ export class ResultService {
     return { message: 'Result deleted successfully' };
   }
 
-  async calculateGrade(score: number, schoolId: string) {
+  async calculateGrade(score: number, schoolId: string, classId?: string) {
     const codeToName: Record<string, string> = {
       PRIMARY_ECZ: 'ECZ Primary Grading System',
       SECONDARY_ECZ: 'ECZ Secondary Grading System',
@@ -316,34 +336,37 @@ export class ResultService {
       UNIVERSITY_CGPA: 'University CGPA Grading System',
     };
 
-    const schoolSetting = await this.prisma.schoolSetting.findUnique({
-      where: { schoolId },
-    });
+    let gradingSystem: any;
 
-    const preferredName = schoolSetting?.gradingSystem
-      ? codeToName[schoolSetting.gradingSystem]
-      : undefined;
-
-    let gradingSystem = preferredName
-      ? await this.prisma.gradingSystem.findFirst({
-          where: { schoolId, name: preferredName },
+    if (classId) {
+      const cls = await this.prisma.class.findUnique({
+        where: { id: classId },
+        select: { gradingSystemId: true },
+      });
+      if (cls?.gradingSystemId) {
+        gradingSystem = await this.prisma.gradingSystem.findUnique({
+          where: { id: cls.gradingSystemId },
           include: { gradeScales: true },
-        })
-      : undefined;
-
-    if (!gradingSystem) {
-      gradingSystem = await this.prisma.gradingSystem.findFirst({
-        where: { schoolId, isDefault: true },
-        include: { gradeScales: true },
-      });
+        });
+      }
     }
 
     if (!gradingSystem) {
-      gradingSystem = await this.prisma.gradingSystem.findFirst({
+      const schoolSetting = await this.prisma.schoolSetting.findUnique({
         where: { schoolId },
-        include: { gradeScales: true },
       });
+      const preferredName = schoolSetting?.gradingSystem
+        ? codeToName[schoolSetting.gradingSystem]
+        : undefined;
+      gradingSystem = preferredName
+        ? await this.prisma.gradingSystem.findFirst({
+            where: { schoolId, name: preferredName },
+            include: { gradeScales: true },
+          })
+        : undefined;
     }
+
+    if (!gradingSystem) {
 
     if (!gradingSystem) {
       return { grade: 'N/A', remark: 'No grading system configured' };
@@ -674,10 +697,9 @@ export class ResultService {
           }
         }
 
-        const gradeData = await this.calculateGrade(score, schoolId);
+        const gradeData = await this.calculateGrade(score, schoolId, enrollment?.classId);
 
         const existing = await this.prisma.result.findFirst({
-          where: { studentId: student.id, subjectId, termId },
         });
 
         if (existing) {
@@ -758,7 +780,7 @@ export class ResultService {
     let updated = 0;
 
     for (const result of results) {
-      const gradeData = await this.calculateGrade(result.score, schoolId);
+      const gradeData = await this.calculateGrade(result.score, schoolId, classId);
 
       await this.prisma.result.update({
         where: { id: result.id },
