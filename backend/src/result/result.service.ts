@@ -367,6 +367,18 @@ export class ResultService {
     }
 
     if (!gradingSystem) {
+      gradingSystem = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId, isDefault: true },
+        include: { gradeScales: true },
+      });
+    }
+
+    if (!gradingSystem) {
+      gradingSystem = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId },
+        include: { gradeScales: true },
+      });
+    }
 
     if (!gradingSystem) {
       return { grade: 'N/A', remark: 'No grading system configured' };
