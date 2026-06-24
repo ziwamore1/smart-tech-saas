@@ -177,6 +177,7 @@ export const schoolApi = {
     breaks?: Array<{ afterPeriod: number; duration: number; name?: string }>;
     periodDurations?: number[];
   }) => api.patch('/school/time-settings', data),
+  updateGradingSystem: (gradingSystem: string) => api.patch('/school/grading-system', { gradingSystem }),
 };
 
 export const classroomApi = {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { schoolApi, termApi, academicYearApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -71,7 +71,26 @@ export default function SettingsPage() {
   const [academicYearMessage, setAcademicYearMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [termMessage, setTermMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const [gradingSystem, setGradingSystem] = useState<'ECZ' | 'GPA'>('ECZ');
+  const [gradingSystem, setGradingSystem] = useState<'PRIMARY_ECZ' | 'SECONDARY_ECZ' | 'FORMS_ECZ' | 'COLLEGE_GPA' | 'UNIVERSITY_CGPA'>('SECONDARY_ECZ');
+
+  const { data: timeSettings } = useQuery({
+    queryKey: ['time-settings'],
+    queryFn: () => schoolApi.getTimeSettings().then(res => res.data),
+  });
+
+  useEffect(() => {
+    if (timeSettings?.gradingSystem) {
+      setGradingSystem(timeSettings.gradingSystem);
+    }
+  }, [timeSettings]);
+
+  const gradingSystemCodeToLabel: Record<string, string> = {
+    PRIMARY_ECZ: 'ECZ Primary (Grade 7)',
+    SECONDARY_ECZ: 'ECZ Secondary (Grade 9/12)',
+    FORMS_ECZ: 'ECZ Forms (Competency)',
+    COLLEGE_GPA: 'College GPA',
+    UNIVERSITY_CGPA: 'University CGPA',
+  };
 
   const [eczGrades, setEczGrades] = useState([
     { grade: '1', points: 1, minScore: 75, maxScore: 100, description: 'Distinction' },
@@ -96,6 +115,14 @@ export default function SettingsPage() {
     { grade: 'C', points: 2.0, minScore: 50, maxScore: 54, description: 'Satisfactory' },
     { grade: 'D', points: 1.0, minScore: 40, maxScore: 49, description: 'Poor' },
     { grade: 'F', points: 0.0, minScore: 0, maxScore: 39, description: 'Fail' },
+  ]);
+
+  const [formsGrades, setFormsGrades] = useState([
+    { grade: '1', points: 1, minScore: 70, maxScore: 100, description: 'Outstanding' },
+    { grade: '2', points: 2, minScore: 60, maxScore: 69, description: 'Advanced' },
+    { grade: '3', points: 3, minScore: 50, maxScore: 59, description: 'Basic' },
+    { grade: '4', points: 4, minScore: 40, maxScore: 49, description: 'Satisfactory' },
+    { grade: '5', points: 5, minScore: 0, maxScore: 39, description: 'Unsatisfactory' },
   ]);
 
   const updateSchoolMutation = useMutation({
@@ -192,6 +219,18 @@ export default function SettingsPage() {
 
   const [notificationMessage, setNotificationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [gradingMessage, setGradingMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const updateGradingMutation = useMutation({
+    mutationFn: (code: string) => schoolApi.updateGradingSystem(code),
+    onSuccess: () => {
+      setGradingMessage({ type: 'success', text: 'Grading system saved successfully!' });
+      setTimeout(() => setGradingMessage(null), 3000);
+    },
+    onError: () => {
+      setGradingMessage({ type: 'error', text: 'Failed to save grading system' });
+      setTimeout(() => setGradingMessage(null), 3000);
+    },
+  });
 
   const tabs = [
     { key: 'school' as SettingsTab, label: 'School Info', icon: '🏫' },
@@ -527,26 +566,19 @@ export default function SettingsPage() {
             <h2 className="text-xl font-semibold mb-6">Grading System Configuration</h2>
             
             <div className="flex gap-4 mb-6">
-              <button
-                onClick={() => setGradingSystem('ECZ')}
-                className={`px-6 py-3 rounded-lg font-medium ${
-                  gradingSystem === 'ECZ'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                🇿🇲 ECZ Point System
-              </button>
-              <button
-                onClick={() => setGradingSystem('GPA')}
-                className={`px-6 py-3 rounded-lg font-medium ${
-                  gradingSystem === 'GPA'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                🎓 GPA System
-              </button>
+              {Object.entries(gradingSystemCodeToLabel).map(([code, label]) => (
+                <button
+                  key={code}
+                  onClick={() => setGradingSystem(code as any)}
+                  className={`px-6 py-3 rounded-lg font-medium ${
+                    gradingSystem === code
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
             <div className="overflow-x-auto">
@@ -561,7 +593,7 @@ export default function SettingsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(gradingSystem === 'ECZ' ? eczGrades : gpaGrades).map((grade, index) => (
+                  {(gradingSystem === 'PRIMARY_ECZ' || gradingSystem === 'SECONDARY_ECZ' ? eczGrades : gradingSystem === 'FORMS_ECZ' ? formsGrades : gpaGrades).map((grade, index) => (
                     <tr key={index} className="border-b">
                       <td className="py-3 px-4 font-bold text-lg">{grade.grade}</td>
                       <td className="py-3 px-4">
@@ -570,10 +602,14 @@ export default function SettingsPage() {
                           step="0.1"
                           value={grade.points}
                           onChange={(e) => {
-                            if (gradingSystem === 'ECZ') {
+                            if (gradingSystem === 'PRIMARY_ECZ' || gradingSystem === 'SECONDARY_ECZ') {
                               const newGrades = [...eczGrades];
                               newGrades[index].points = parseFloat(e.target.value);
                               setEczGrades(newGrades);
+                            } else if (gradingSystem === 'FORMS_ECZ') {
+                              const newGrades = [...formsGrades];
+                              newGrades[index].points = parseFloat(e.target.value);
+                              setFormsGrades(newGrades);
                             } else {
                               const newGrades = [...gpaGrades];
                               newGrades[index].points = parseFloat(e.target.value);
@@ -588,10 +624,14 @@ export default function SettingsPage() {
                           type="number"
                           value={grade.minScore}
                           onChange={(e) => {
-                            if (gradingSystem === 'ECZ') {
+                            if (gradingSystem === 'PRIMARY_ECZ' || gradingSystem === 'SECONDARY_ECZ') {
                               const newGrades = [...eczGrades];
                               newGrades[index].minScore = parseInt(e.target.value);
                               setEczGrades(newGrades);
+                            } else if (gradingSystem === 'FORMS_ECZ') {
+                              const newGrades = [...formsGrades];
+                              newGrades[index].minScore = parseInt(e.target.value);
+                              setFormsGrades(newGrades);
                             } else {
                               const newGrades = [...gpaGrades];
                               newGrades[index].minScore = parseInt(e.target.value);
@@ -606,10 +646,14 @@ export default function SettingsPage() {
                           type="number"
                           value={grade.maxScore}
                           onChange={(e) => {
-                            if (gradingSystem === 'ECZ') {
+                            if (gradingSystem === 'PRIMARY_ECZ' || gradingSystem === 'SECONDARY_ECZ') {
                               const newGrades = [...eczGrades];
                               newGrades[index].maxScore = parseInt(e.target.value);
                               setEczGrades(newGrades);
+                            } else if (gradingSystem === 'FORMS_ECZ') {
+                              const newGrades = [...formsGrades];
+                              newGrades[index].maxScore = parseInt(e.target.value);
+                              setFormsGrades(newGrades);
                             } else {
                               const newGrades = [...gpaGrades];
                               newGrades[index].maxScore = parseInt(e.target.value);
@@ -624,10 +668,14 @@ export default function SettingsPage() {
                           type="text"
                           value={grade.description}
                           onChange={(e) => {
-                            if (gradingSystem === 'ECZ') {
+                            if (gradingSystem === 'PRIMARY_ECZ' || gradingSystem === 'SECONDARY_ECZ') {
                               const newGrades = [...eczGrades];
                               newGrades[index].description = e.target.value;
                               setEczGrades(newGrades);
+                            } else if (gradingSystem === 'FORMS_ECZ') {
+                              const newGrades = [...formsGrades];
+                              newGrades[index].description = e.target.value;
+                              setFormsGrades(newGrades);
                             } else {
                               const newGrades = [...gpaGrades];
                               newGrades[index].description = e.target.value;
@@ -643,15 +691,19 @@ export default function SettingsPage() {
               </table>
             </div>
 
-            <div className="mt-6 flex justify-end">
-              <button 
-                onClick={() => {
-                  setGradingMessage({ type: 'success', text: 'Grading system saved successfully!' });
-                  setTimeout(() => setGradingMessage(null), 3000);
-                }}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setGradingSystem(timeSettings?.gradingSystem || 'SECONDARY_ECZ')}
+                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
               >
-                Save Grading System
+                Reset
+              </button>
+              <button
+                onClick={() => updateGradingMutation.mutate(gradingSystem)}
+                disabled={updateGradingMutation.isPending}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {updateGradingMutation.isPending ? 'Saving...' : 'Save Grading System'}
               </button>
             </div>
           </div>

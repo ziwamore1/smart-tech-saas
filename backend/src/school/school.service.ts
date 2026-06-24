@@ -406,6 +406,7 @@ export class SchoolService {
       breakDuration?: number;
       breaks?: any[];
       periodDurations?: number[];
+      gradingSystem?: string;
     }
   ) {
     console.log('[SchoolService] Updating time settings for school:', schoolId, JSON.stringify(data));
@@ -420,6 +421,7 @@ export class SchoolService {
         ...(data.breakDuration && { breakDuration: data.breakDuration }),
         ...(data.breaks && { breaks: JSON.stringify(data.breaks) as any }),
         ...(data.periodDurations && { periodDurations: JSON.stringify(data.periodDurations) as any }),
+        ...(data.gradingSystem && { gradingSystem: data.gradingSystem }),
       },
       create: {
         schoolId,
@@ -431,6 +433,7 @@ export class SchoolService {
         breakDuration: data.breakDuration ?? 15,
         breaks: data.breaks ? (JSON.stringify(data.breaks) as any) : null,
         periodDurations: data.periodDurations ? (JSON.stringify(data.periodDurations) as any) : null,
+        gradingSystem: data.gradingSystem ?? "SECONDARY_ECZ",
       },
     });
     console.log('[SchoolService] Upsert result:', JSON.stringify(result));

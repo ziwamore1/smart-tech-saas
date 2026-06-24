@@ -102,4 +102,11 @@ export class SchoolController {
   updateTimeSettings(@Req() req: any, @Body() body: any) {
     return this.schoolService.updateTimeSettings(req.user.schoolId, body);
   }
+
+  @Patch('grading-system')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Director', 'Admin')
+  updateGradingSystem(@Req() req: any, @Body() body: { gradingSystem: string }) {
+    return this.schoolService.updateTimeSettings(req.user.schoolId, { gradingSystem: body.gradingSystem });
+  }
 }
