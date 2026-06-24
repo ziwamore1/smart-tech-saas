@@ -30,15 +30,11 @@ async function main() {
   ];
 
   const formsGradingScales = [
-    { minScore: 75, maxScore: 100, grade: '1', remark: 'Distinction', points: 1 },
-    { minScore: 70, maxScore: 74, grade: '2', remark: 'Very Good', points: 2 },
-    { minScore: 65, maxScore: 69, grade: '3', remark: 'Merit', points: 3 },
-    { minScore: 60, maxScore: 64, grade: '4', remark: 'Merit', points: 4 },
-    { minScore: 55, maxScore: 59, grade: '5', remark: 'Credit', points: 5 },
-    { minScore: 50, maxScore: 54, grade: '6', remark: 'Credit', points: 6 },
-    { minScore: 45, maxScore: 49, grade: '7', remark: 'Satisfactory', points: 7 },
-    { minScore: 40, maxScore: 44, grade: '8', remark: 'Satisfactory', points: 8 },
-    { minScore: 0, maxScore: 39, grade: '9', remark: 'Unsatisfactory', points: 9 },
+    { minScore: 70, maxScore: 100, grade: '1', remark: 'Outstanding', points: 1 },
+    { minScore: 60, maxScore: 69, grade: '2', remark: 'Advanced', points: 2 },
+    { minScore: 50, maxScore: 59, grade: '3', remark: 'Basic', points: 3 },
+    { minScore: 40, maxScore: 49, grade: '4', remark: 'Satisfactory', points: 4 },
+    { minScore: 0, maxScore: 39, grade: '5', remark: 'Unsatisfactory', points: 5 },
   ];
 
   const collegeGradingScales = [
