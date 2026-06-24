@@ -12,16 +12,19 @@ export const StudentReportCardsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user?.studentId) {
-      apiService.getStudentAssessmentResults(user.studentId)
+    const sid = user?.studentId || user?.id;
+    if (sid) {
+      apiService.getStudentAssessmentResults(sid)
         .then(r => {
           const data = r?.data || r || [];
           setResults(Array.isArray(data) ? data : []);
         })
         .catch(() => {})
         .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
     }
-  }, [user?.studentId]);
+  }, [user?.studentId, user?.id]);
 
   const avg = results.length > 0 ? (results.reduce((s: number, r: any) => s + (r.score || r.finalPercentage || 0), 0) / results.length).toFixed(1) : '0.0';
 

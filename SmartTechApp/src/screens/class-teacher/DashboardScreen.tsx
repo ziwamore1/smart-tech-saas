@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, StatCard, QuickActionItem, WidgetCard, GradientCard } from '../../components';
 import { colors, spacing, borderRadius, shadows, typography } from '../../theme';
@@ -7,8 +7,14 @@ import { useAuthStore, useAppStore } from '../../store';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-export const ClassTeacherDashboardScreen: React.FC = () => {
-  const { user, logout } = useAuthStore();
+interface Props {
+  onToggleDrawer?: () => void;
+  onNavigate?: (screen: string) => void;
+  stackNavigation?: any;
+}
+
+export const ClassTeacherDashboardScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
+  const { user } = useAuthStore();
   const { dashboard, isLoadingDashboard, fetchDashboard } = useAppStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [insights, setInsights] = useState<any[]>([]);
@@ -24,27 +30,6 @@ export const ClassTeacherDashboardScreen: React.FC = () => {
       ]);
     }
   }, [dashboard]);
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-            } catch (err) {
-              console.error('Logout failed:', err);
-            }
-          },
-        },
-      ]
-    );
-  };
 
   const stats = dashboard?.stats;
 
@@ -63,7 +48,7 @@ export const ClassTeacherDashboardScreen: React.FC = () => {
       <HeaderBar
         title={user?.firstName ? `Hello, ${user.firstName}` : 'Dashboard'}
         subtitle={`Class Teacher • ${stats?.totalClasses || 0} Classes`}
-        leftIcon={{ name: '🚪', onPress: handleLogout }}
+        leftIcon={{ name: '☰', onPress: onToggleDrawer }}
         rightIcon={{ name: '🔔', onPress: () => navigation.navigate('Notifications') }}
       />
 
@@ -80,12 +65,12 @@ export const ClassTeacherDashboardScreen: React.FC = () => {
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickActionsScroll}>
           {quickActions.map((a) => (
-            <QuickActionItem key={a.label} icon={a.icon} label={a.label} gradient={a.gradient as any} onPress={() => navigation.navigate(a.screen, (a as any).params)} />
+            <QuickActionItem key={a.label} icon={a.icon} label={a.label} gradient={a.gradient as any} onPress={() => onNavigate ? onNavigate(a.screen) : navigation.navigate(a.screen, (a as any).params)} />
           ))}
         </ScrollView>
 
         {insights.length > 0 && (
-          <WidgetCard title="AI Insights" action={{ label: 'View All', onPress: () => navigation.navigate('AiTutor', { sourceScreen: 'class_teacher_dashboard' }) }}>
+          <WidgetCard title="AI Insights" action={{ label: 'View All', onPress: () => onNavigate ? onNavigate('AiTutor') : navigation.navigate('AiTutor', { sourceScreen: 'class_teacher_dashboard' }) }}>
             {insights.map((insight, i) => (
               <View key={i} style={styles.insightRow}>
                 <View style={styles.insightDot} />

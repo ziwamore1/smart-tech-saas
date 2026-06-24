@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, StatCard, QuickActionItem, WidgetCard } from '../../components';
 import { colors, spacing } from '../../theme';
@@ -8,8 +8,14 @@ import { apiService } from '../../services/api';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-export const StudentDashboardScreen: React.FC = () => {
-  const { user, logout } = useAuthStore();
+interface Props {
+  onToggleDrawer?: () => void;
+  onNavigate?: (screen: string) => void;
+  stackNavigation?: any;
+}
+
+export const StudentDashboardScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
+  const { user } = useAuthStore();
   const { dashboard, isLoadingDashboard, fetchDashboard } = useAppStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [intelligence, setIntelligence] = useState<any>(null);
@@ -20,35 +26,15 @@ export const StudentDashboardScreen: React.FC = () => {
     if (user?.id) {
       apiService.getMobileIntelligenceSummary(user.id).then(r => setIntelligence(r?.data || r)).catch(() => {});
     }
-    if (user?.studentId) {
-      apiService.getStudentPhoto(user.studentId).then(r => {
+    const photoId = user?.studentId || user?.id;
+    if (photoId) {
+      apiService.getStudentPhoto(photoId).then(r => {
         const data = r?.data;
         if (data?.imageUrl) setStudentPhoto(data.imageUrl);
         else if (data?.photoUrl) setStudentPhoto(data.photoUrl);
       }).catch(() => {});
     }
   }, []);
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-            } catch (err) {
-              console.error('Logout failed:', err);
-            }
-          },
-        },
-      ]
-    );
-  };
 
   if (isLoadingDashboard && !dashboard) return null;
 
@@ -70,11 +56,24 @@ export const StudentDashboardScreen: React.FC = () => {
       <HeaderBar
         title={user?.firstName ? `Hello, ${user.firstName}` : 'Dashboard'}
         subtitle={dashboard?.currentTerm?.name || 'No active term'}
-        leftIcon={{ name: '🚪', onPress: handleLogout }}
+        leftIcon={{ name: '☰', onPress: onToggleDrawer }}
         rightIcon={{ name: '🔔', onPress: () => navigation.navigate('Notifications') }}
       />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.profileRow}>
+          {studentPhoto ? (
+            <Image source={{ uri: studentPhoto }} style={styles.profileAvatar} />
+          ) : (
+            <View style={styles.profileAvatarPlaceholder}>
+              <Text style={styles.profileAvatarText}>{user?.firstName?.[0] || 'S'}</Text>
+            </View>
+          )}
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>{user?.firstName} {user?.lastName}</Text>
+            <Text style={styles.profileRole}>Student</Text>
+          </View>
+        </View>
         <View style={styles.statsRow}>
           <StatCard label="Average" value={intelligence?.studentStats?.average || '-'} icon="📊" color={colors.primaryLight} bgColor={colors.infoLight} />
           <StatCard label="Grade" value={intelligence?.studentStats?.grade || '-'} icon="🎯" color={colors.success} bgColor={colors.successLight} />
@@ -129,6 +128,13 @@ export const StudentDashboardScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: spacing.md },
+  profileRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md, backgroundColor: colors.white, borderRadius: 12, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
+  profileAvatar: { width: 48, height: 48, borderRadius: 24, marginRight: spacing.md },
+  profileAvatarPlaceholder: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.teal, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
+  profileAvatarText: { fontSize: 20, fontWeight: '700', color: colors.white },
+  profileInfo: { flex: 1 },
+  profileName: { fontSize: 16, fontWeight: '700', color: colors.text },
+  profileRole: { fontSize: 12, color: colors.textLight, marginTop: 2 },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md, marginTop: spacing.sm },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.text },

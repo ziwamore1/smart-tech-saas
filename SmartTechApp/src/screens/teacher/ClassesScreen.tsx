@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Loading } from '../../components';
+import { Card, Loading, HeaderBar } from '../../components';
 import { colors, spacing } from '../../theme';
 import { apiService } from '../../services/api';
 
-export const TeacherClassesScreen: React.FC = () => {
+interface TeacherClassesProps {
+  onToggleDrawer?: () => void;
+}
+
+export const TeacherClassesScreen: React.FC<TeacherClassesProps> = ({ onToggleDrawer }) => {
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,10 +38,11 @@ export const TeacherClassesScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Classes</Text>
-        <Text style={styles.headerSub}>{classes.length} classes, {subjects.length} subjects</Text>
-      </View>
+      <HeaderBar
+        title="My Classes"
+        subtitle={`${classes.length} classes, ${subjects.length} subjects`}
+        leftIcon={onToggleDrawer ? { name: '☰', onPress: onToggleDrawer } : undefined}
+      />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {classes.map((cls: any, i: number) => (
           <Card key={cls.id || i} variant="outlined" style={styles.classCard}>
@@ -62,9 +67,6 @@ export const TeacherClassesScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
-  headerTitle: { fontSize: 22, fontWeight: '700', color: colors.text },
-  headerSub: { fontSize: 14, color: colors.textLight, marginTop: 2 },
   scrollContent: { padding: spacing.md, gap: spacing.sm },
   classCard: { padding: spacing.md },
   classRow: { flexDirection: 'row', alignItems: 'center' },

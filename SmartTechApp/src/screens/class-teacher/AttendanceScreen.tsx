@@ -34,7 +34,13 @@ const STATUS_BG = {
   EXCUSED: colors.infoLight,
 };
 
-export const AttendanceScreen: React.FC = () => {
+interface Props {
+  onToggleDrawer?: () => void;
+  onNavigate?: (screen: string) => void;
+  stackNavigation?: any;
+}
+
+export const AttendanceScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { user } = useAuthStore();
   const [students, setStudents] = useState<StudentRecord[]>([]);
@@ -203,7 +209,7 @@ export const AttendanceScreen: React.FC = () => {
         <HeaderBar
           title="Attendance"
           subtitle="Select a class to begin"
-          leftIcon={{ name: '☰', onPress: () => {} }}
+          leftIcon={{ name: '☰', onPress: onToggleDrawer }}
         />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>📋</Text>
@@ -218,7 +224,7 @@ export const AttendanceScreen: React.FC = () => {
       <HeaderBar
         title="Attendance"
         subtitle={`${selectedClass.name} • ${selectedDate}`}
-        leftIcon={{ name: '☰', onPress: () => {} }}
+        leftIcon={{ name: '☰', onPress: onToggleDrawer }}
         rightIcon={{ name: saving ? '⏳' : hasChanges ? '💾' : '✅', onPress: hasChanges ? saveAttendance : () => {} }}
       />
 

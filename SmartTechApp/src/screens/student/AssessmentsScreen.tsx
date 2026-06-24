@@ -12,16 +12,19 @@ export const StudentAssessmentsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user?.studentId) {
-      apiService.getStudentAssessmentResults(user.studentId)
+    const sid = user?.studentId || user?.id;
+    if (sid) {
+      apiService.getStudentAssessmentResults(sid)
         .then(r => {
           const data = r?.data || r || [];
           setAssessments(Array.isArray(data) ? data : []);
         })
         .catch(() => {})
         .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
     }
-  }, [user?.studentId]);
+  }, [user?.studentId, user?.id]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

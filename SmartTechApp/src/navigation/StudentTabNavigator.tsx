@@ -26,7 +26,7 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'StudentTimetable', label: 'Timetable', icon: '📅', stackScreen: 'StudentTimetable' },
   { name: 'StudentAttendance', label: 'Attendance', icon: '✅', stackScreen: 'StudentAttendance' },
   { name: 'StudentExams', label: 'Exams', icon: '📋', stackScreen: 'ExamList' },
-  { name: 'StudentHomework', label: 'Homework', icon: '📚', stackScreen: 'Homework' },
+  { name: 'StudentHomework', label: 'Homework', icon: '📚', stackScreen: 'StudentHomework' },
   { name: 'StudentReportCards', label: 'Report Cards', icon: '📄', stackScreen: 'StudentReportCards' },
   { name: 'StudentAssessments', label: 'Assessments', icon: '📊', stackScreen: 'StudentAssessments' },
   { name: 'StudentAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor' },
@@ -59,40 +59,46 @@ export const StudentTabNavigator: React.FC = () => {
     return () => backHandler.remove();
   }, [drawerOpen, activeScreen]);
 
-  const toggleDrawer = () => {
+  const toggleDrawer = useCallback(() => {
     if (drawerOpen) {
       Animated.timing(slideAnim, { toValue: -DRAWER_WIDTH, duration: 250, useNativeDriver: true }).start(() => setDrawerOpen(false));
     } else {
       setDrawerOpen(true);
       Animated.timing(slideAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start();
     }
-  };
+  }, [drawerOpen]);
 
-  const navigateTo = (name: string) => {
-    const stackScreen = stackScreenMap[name];
-    if (stackScreen) {
+  const handleNavigate = useCallback((screen: string) => {
+    if (stackScreenMap[screen]) {
       setDrawerOpen(false);
-      Animated.timing(slideAnim, { toValue: -DRAWER_WIDTH, duration: 250, useNativeDriver: true }).start(() => navigation.navigate(stackScreen as never));
-    } else {
-      setActiveScreen(name);
+      Animated.timing(slideAnim, { toValue: -DRAWER_WIDTH, duration: 250, useNativeDriver: true }).start(() => navigation.navigate(stackScreenMap[screen] as never));
+    } else if (drawerScreenNames.includes(screen)) {
+      setActiveScreen(screen);
       setDrawerOpen(false);
       Animated.timing(slideAnim, { toValue: -DRAWER_WIDTH, duration: 250, useNativeDriver: true }).start();
+    } else {
+      navigation.navigate(screen as never);
     }
+  }, [navigation, drawerScreenNames, stackScreenMap]);
+
+  const navigateTo = (name: string) => {
+    handleNavigate(name);
   };
 
   const renderActiveScreen = () => {
     const screenConfig = drawerScreens.find(s => s.name === activeScreen);
-    if (!screenConfig || screenConfig.stackScreen) return <StudentDashboardScreen />;
+    if (!screenConfig || screenConfig.stackScreen) return <StudentDashboardScreen onToggleDrawer={toggleDrawer} onNavigate={handleNavigate} stackNavigation={navigation} />;
     if (activeScreen === 'StudentProfile') return <ProfileScreen navigation={navigation as any} />;
     const Component = screenConfig.component as React.FC<any>;
-    return <Component />;
+    return <Component onToggleDrawer={toggleDrawer} onNavigate={handleNavigate} stackNavigation={navigation} />;
   };
 
   const [studentPhoto, setStudentPhoto] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user?.studentId) {
-      apiService.getStudentPhoto(user.studentId).then(r => {
+    const photoId = user?.studentId || user?.id;
+    if (photoId) {
+      apiService.getStudentPhoto(photoId).then(r => {
         const data = r?.data;
         if (data?.imageUrl) setStudentPhoto(data.imageUrl);
         else if (data?.photoUrl) setStudentPhoto(data.photoUrl);
@@ -105,12 +111,7 @@ export const StudentTabNavigator: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.activeScreen}>
-        <TouchableOpacity style={styles.hamburger} onPress={toggleDrawer}>
-          <Text style={styles.hamburgerText}>☰</Text>
-        </TouchableOpacity>
-        {renderActiveScreen()}
-      </View>
+      {renderActiveScreen()}
 
       {drawerOpen && <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={toggleDrawer} />}
 

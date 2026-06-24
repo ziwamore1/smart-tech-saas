@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, StatCard, QuickActionItem, WidgetCard } from '../../components';
 import { colors, spacing } from '../../theme';
@@ -7,33 +7,18 @@ import { useAuthStore, useAppStore } from '../../store';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-export const TeacherDashboardScreen: React.FC = () => {
-  const { user, logout } = useAuthStore();
+interface Props {
+  onToggleDrawer?: () => void;
+  onNavigate?: (screen: string) => void;
+  stackNavigation?: any;
+}
+
+export const TeacherDashboardScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
+  const { user } = useAuthStore();
   const { dashboard, isLoadingDashboard, fetchDashboard } = useAppStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
   useEffect(() => { fetchDashboard(); }, []);
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-            } catch (err) {
-              console.error('Logout failed:', err);
-            }
-          },
-        },
-      ]
-    );
-  };
 
   const stats = dashboard?.stats;
   const isHod = user?.roles?.some((r) => r === 'HOD' || r === 'HEAD_OF_DEPARTMENT');
@@ -53,7 +38,7 @@ export const TeacherDashboardScreen: React.FC = () => {
       <HeaderBar
         title={user?.firstName ? `Hello, ${user.firstName}` : 'Dashboard'}
         subtitle="Teacher Dashboard"
-        leftIcon={{ name: '🚪', onPress: handleLogout }}
+        leftIcon={{ name: '☰', onPress: onToggleDrawer }}
         rightIcon={{ name: '🔔', onPress: () => navigation.navigate('Notifications') }}
       />
 
@@ -69,7 +54,7 @@ export const TeacherDashboardScreen: React.FC = () => {
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickActionsScroll}>
           {quickActions.map((a) => (
-            <QuickActionItem key={a.label} icon={a.icon} label={a.label} gradient={a.gradient as any} onPress={() => navigation.navigate(a.screen, (a as any).params)} />
+            <QuickActionItem key={a.label} icon={a.icon} label={a.label} gradient={a.gradient as any} onPress={() => onNavigate ? onNavigate(a.screen) : navigation.navigate(a.screen, (a as any).params)} />
           ))}
         </ScrollView>
 

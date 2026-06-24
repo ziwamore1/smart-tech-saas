@@ -4,12 +4,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
-import { Card, Button, Loading } from '../../components';
+import { Card, Button, Loading, HeaderBar } from '../../components';
 import { colors, spacing, borderRadius } from '../../theme';
 import { apiService } from '../../services/api';
 import { useAppStore } from '../../store';
 
-export const TeacherMarksScreen: React.FC = () => {
+interface TeacherMarksProps {
+  onToggleDrawer?: () => void;
+}
+
+export const TeacherMarksScreen: React.FC<TeacherMarksProps> = ({ onToggleDrawer }) => {
   const { dashboard } = useAppStore();
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -181,25 +185,24 @@ export const TeacherMarksScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{submitted ? 'Class Results' : 'Enter Marks'}</Text>
-        {submitted && selectedClass && (
-          <Text style={styles.headerSub}>{selectedClass.name} — {selectedSubject?.name}</Text>
-        )}
-        {students.length > 0 && submitted && (
-          <View style={styles.actions}>
-            <TouchableOpacity style={styles.actionBtn} onPress={handleShareResults} disabled={actionLoading}>
-              <Text style={styles.actionBtnText}>📤 Share</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionBtn, styles.actionBtnSecondary]} onPress={handleDownloadPdf} disabled={actionLoading}>
-              <Text style={styles.actionBtnTextSecondary}>⬇ PDF</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionBtn, styles.actionBtnOutline]} onPress={handlePrintReport} disabled={actionLoading}>
-              <Text style={styles.actionBtnTextOutline}>🖨 Print</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
+      <HeaderBar
+        title={submitted ? 'Class Results' : 'Enter Marks'}
+        subtitle={submitted && selectedClass ? `${selectedClass.name} — ${selectedSubject?.name}` : undefined}
+        leftIcon={onToggleDrawer ? { name: '☰', onPress: onToggleDrawer } : undefined}
+      />
+      {students.length > 0 && submitted && (
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.actionBtn} onPress={handleShareResults} disabled={actionLoading}>
+            <Text style={styles.actionBtnText}>📤 Share</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, styles.actionBtnSecondary]} onPress={handleDownloadPdf} disabled={actionLoading}>
+            <Text style={styles.actionBtnTextSecondary}>⬇ PDF</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, styles.actionBtnOutline]} onPress={handlePrintReport} disabled={actionLoading}>
+            <Text style={styles.actionBtnTextOutline}>🖨 Print</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {!submitted && (
           <>
@@ -281,10 +284,7 @@ export const TeacherMarksScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
-  headerTitle: { fontSize: 22, fontWeight: '700', color: colors.text },
-  headerSub: { fontSize: 14, color: colors.textLight, marginTop: 2 },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  actions: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
   actionBtn: { backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.md },
   actionBtnSecondary: { backgroundColor: colors.secondary },
   actionBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.primary },

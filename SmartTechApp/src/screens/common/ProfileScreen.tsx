@@ -22,9 +22,10 @@ import { apiService, resolveImageUrl } from '../../services/api';
 
 type ProfileScreenProps = {
   navigation: NativeStackNavigationProp<any>;
+  onToggleDrawer?: () => void;
 };
 
-export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
+export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation, onToggleDrawer }) => {
   const { user, logout, setUser } = useAuthStore();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -191,6 +192,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           end={{ x: 1, y: 1 }}
           style={styles.header}
         >
+          {onToggleDrawer && (
+            <TouchableOpacity style={styles.hamburgerBtn} onPress={onToggleDrawer}>
+              <Text style={styles.hamburgerBtnText}>☰</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={showPhotoOptions} disabled={isUploadingPhoto} style={styles.photoContainer}>
             {isUploadingPhoto ? (
               <View style={[styles.avatarPlaceholder, styles.avatarLoading]}>
@@ -394,6 +400,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
   },
+  hamburgerBtn: { position: 'absolute', top: spacing.sm, left: spacing.sm, padding: spacing.sm, zIndex: 10 },
+  hamburgerBtnText: { fontSize: 24, color: colors.white },
   photoContainer: {
     position: 'relative',
     marginBottom: spacing.md,

@@ -211,6 +211,30 @@ export const MonitoringDashboardScreen: React.FC<MonitoringProps> = ({ onToggleD
         {(isDirector || isDeputyDirector) ? 'School Leadership Overview' : 'My Department Overview'}
       </Text>
 
+      {isHod && (
+        <View style={styles.quickActionsRow}>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => stackNavigation?.navigate('PendingAssessments')}>
+            <Text style={styles.quickActionIcon}>📋</Text>
+            <Text style={styles.quickActionLabel}>Pending{'\n'}Assessments</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => {
+            const myDept = monitoringChain?.supervises?.[0]?.department;
+            if (myDept) { stackNavigation?.navigate('DepartmentTeachers', { departmentId: myDept.id, departmentName: myDept.name }); }
+          }}>
+            <Text style={styles.quickActionIcon}>👥</Text>
+            <Text style={styles.quickActionLabel}>My Dept{'\n'}Teachers</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('ExamList')}>
+            <Text style={styles.quickActionIcon}>📋</Text>
+            <Text style={styles.quickActionLabel}>View{'\n'}Exams</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('ExamResults')}>
+            <Text style={styles.quickActionIcon}>📊</Text>
+            <Text style={styles.quickActionLabel}>Exam{'\n'}Results</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.statsRow}>
         <View style={[styles.statCard, { backgroundColor: colors.successLight }]}>
           <Text style={[styles.statValue, { color: colors.success }]}>{activeDeptCount}</Text>
@@ -391,6 +415,10 @@ const styles = StyleSheet.create({
   loadingText: { marginTop: spacing.md, color: colors.textLight, fontSize: 14 },
   scroll: { padding: spacing.md, paddingBottom: spacing.xxl },
   greeting: { fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
+  quickActionsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  quickActionCard: { flex: 1, backgroundColor: colors.white, borderRadius: borderRadius.md, padding: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.borderLight },
+  quickActionIcon: { fontSize: 24, marginBottom: spacing.xs },
+  quickActionLabel: { fontSize: 11, fontWeight: '600', color: colors.text, textAlign: 'center', lineHeight: 14 },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
   statCard: { flex: 1, padding: spacing.md, borderRadius: borderRadius.md, alignItems: 'center' },
   statValue: { fontSize: 24, fontWeight: '700' },

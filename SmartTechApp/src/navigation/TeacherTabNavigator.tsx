@@ -62,82 +62,38 @@ export const TeacherTabNavigator: React.FC = () => {
     return () => backHandler.remove();
   }, [drawerOpen, activeScreen]);
 
-  const toggleDrawer = () => {
+  const toggleDrawer = useCallback(() => {
     if (drawerOpen) {
-      Animated.timing(slideAnim, {
-        toValue: -DRAWER_WIDTH,
-        duration: 250,
-        useNativeDriver: true,
-      }).start(() => setDrawerOpen(false));
+      Animated.timing(slideAnim, { toValue: -DRAWER_WIDTH, duration: 250, useNativeDriver: true }).start(() => setDrawerOpen(false));
     } else {
       setDrawerOpen(true);
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
+      Animated.timing(slideAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start();
     }
-  };
-
-  const navigateTo = (name: string) => {
-    const stackScreen = stackScreenMap[name];
-    if (stackScreen) {
-      setDrawerOpen(false);
-      Animated.timing(slideAnim, {
-        toValue: -DRAWER_WIDTH,
-        duration: 250,
-        useNativeDriver: true,
-      }).start(() => {
-        navigation.navigate(stackScreen as never);
-      });
-    } else {
-      setActiveScreen(name);
-      setDrawerOpen(false);
-      Animated.timing(slideAnim, {
-        toValue: -DRAWER_WIDTH,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    }
-  };
+  }, [drawerOpen]);
 
   const handleNavigate = useCallback((screen: string) => {
     if (stackScreenMap[screen]) {
-      navigation.navigate(stackScreenMap[screen] as never);
+      setDrawerOpen(false);
+      Animated.timing(slideAnim, { toValue: -DRAWER_WIDTH, duration: 250, useNativeDriver: true }).start(() => navigation.navigate(stackScreenMap[screen] as never));
     } else if (drawerScreenNames.includes(screen)) {
-      navigateTo(screen);
+      setActiveScreen(screen);
+      setDrawerOpen(false);
+      Animated.timing(slideAnim, { toValue: -DRAWER_WIDTH, duration: 250, useNativeDriver: true }).start();
     } else {
       navigation.navigate(screen as never);
     }
-  }, [navigation]);
+  }, [navigation, drawerScreenNames, stackScreenMap]);
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try { await logout(); } catch (err) { console.error('Logout failed:', err); }
-          },
-        },
-      ]
-    );
+  const navigateTo = (name: string) => {
+    handleNavigate(name);
   };
 
   const renderActiveScreen = () => {
     const screenConfig = drawerScreens.find(s => s.name === activeScreen);
-    if (!screenConfig || screenConfig.stackScreen) {
-      return <TeacherDashboardScreen />;
-    }
-    if (activeScreen === 'TeacherProfile') {
-      return <ProfileScreen navigation={navigation as any} />;
-    }
+    if (!screenConfig || screenConfig.stackScreen) return <TeacherDashboardScreen onToggleDrawer={toggleDrawer} onNavigate={handleNavigate} stackNavigation={navigation} />;
+    if (activeScreen === 'TeacherProfile') return <ProfileScreen navigation={navigation as any} />;
     const Component = screenConfig.component as React.FC<any>;
-    return <Component />;
+    return <Component onToggleDrawer={toggleDrawer} onNavigate={handleNavigate} stackNavigation={navigation} />;
   };
 
   const schoolLogo = user?.school?.logo
@@ -154,12 +110,7 @@ export const TeacherTabNavigator: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.activeScreen}>
-        <TouchableOpacity style={styles.hamburger} onPress={toggleDrawer}>
-          <Text style={styles.hamburgerText}>☰</Text>
-        </TouchableOpacity>
-        {renderActiveScreen()}
-      </View>
+      {renderActiveScreen()}
 
       {drawerOpen && (
         <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={toggleDrawer} />
@@ -199,7 +150,7 @@ export const TeacherTabNavigator: React.FC = () => {
           </ScrollView>
 
           <View style={styles.drawerFooter}>
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <TouchableOpacity style={styles.logoutBtn} onPress={() => { Alert.alert('Sign Out', 'Are you sure?', [{text:'Cancel',style:'cancel'},{text:'Sign Out',style:'destructive', onPress:() => logout()}]); }}>
               <Text style={styles.logoutIcon}>🚪</Text>
               <Text style={styles.logoutText}>Sign Out</Text>
             </TouchableOpacity>

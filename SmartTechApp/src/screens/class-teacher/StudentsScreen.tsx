@@ -30,7 +30,13 @@ interface StudentRecord {
   attendance?: number;
 }
 
-export const ClassTeacherStudentsScreen: React.FC = () => {
+interface Props {
+  onToggleDrawer?: () => void;
+  onNavigate?: (screen: string) => void;
+  stackNavigation?: any;
+}
+
+export const ClassTeacherStudentsScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
   const { dashboard } = useAppStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [filter, setFilter] = useState<string>('all');
@@ -184,6 +190,7 @@ export const ClassTeacherStudentsScreen: React.FC = () => {
       <HeaderBar
         title="Students"
         subtitle={`${students.length} enrolled`}
+        leftIcon={{ name: '☰', onPress: onToggleDrawer }}
         rightIcon={{ name: '🔍', onPress: () => {} }}
       />
 

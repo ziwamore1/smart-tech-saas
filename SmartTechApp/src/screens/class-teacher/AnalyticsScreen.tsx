@@ -6,7 +6,13 @@ import { colors, spacing, borderRadius, shadows, typography } from '../../theme'
 import { useAppStore } from '../../store';
 import { apiService } from '../../services/api';
 
-export const ClassTeacherAnalyticsScreen: React.FC = () => {
+interface Props {
+  onToggleDrawer?: () => void;
+  onNavigate?: (screen: string) => void;
+  stackNavigation?: any;
+}
+
+export const ClassTeacherAnalyticsScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
   const { dashboard, isLoadingDashboard, fetchDashboard } = useAppStore();
   const [classStudents, setClassStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +39,7 @@ export const ClassTeacherAnalyticsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <HeaderBar title="Class Analytics" subtitle="Performance & Insights" />
+      <HeaderBar title="Class Analytics" subtitle="Performance & Insights" leftIcon={{ name: '☰', onPress: onToggleDrawer }} />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.summaryRow}>

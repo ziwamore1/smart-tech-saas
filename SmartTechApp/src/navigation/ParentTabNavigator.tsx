@@ -80,33 +80,41 @@ export const ParentTabNavigator: React.FC = () => {
     return () => backHandler.remove();
   }, [drawerOpen, activeScreen]);
 
-  const toggleDrawer = () => {
+  const toggleDrawer = useCallback(() => {
     if (drawerOpen) {
       Animated.timing(slideAnim, { toValue: -DRAWER_WIDTH, duration: 250, useNativeDriver: true }).start(() => setDrawerOpen(false));
     } else {
       setDrawerOpen(true);
       Animated.timing(slideAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start();
     }
-  };
+  }, [drawerOpen]);
 
-  const navigateTo = (name: string) => {
-    const item = allItems.find(i => i.name === name);
+  const allItemNames = useMemo(() => allItems.map(i => i.name), [allItems]);
+
+  const handleNavigate = useCallback((screen: string) => {
+    const item = allItems.find(i => i.name === screen);
     if (item?.stackScreen) {
       setDrawerOpen(false);
       Animated.timing(slideAnim, { toValue: -DRAWER_WIDTH, duration: 250, useNativeDriver: true }).start(() => navigation.navigate(item.stackScreen as never));
-    } else {
-      setActiveScreen(name);
+    } else if (allItemNames.includes(screen)) {
+      setActiveScreen(screen);
       setDrawerOpen(false);
       Animated.timing(slideAnim, { toValue: -DRAWER_WIDTH, duration: 250, useNativeDriver: true }).start();
+    } else {
+      navigation.navigate(screen as never);
     }
+  }, [navigation, allItemNames, allItems]);
+
+  const navigateTo = (name: string) => {
+    handleNavigate(name);
   };
 
   const renderActiveScreen = () => {
     const item = allItems.find(i => i.name === activeScreen);
-    if (!item || item.stackScreen) return <ParentDashboardScreen />;
+    if (!item || item.stackScreen) return <ParentDashboardScreen onToggleDrawer={toggleDrawer} onNavigate={handleNavigate} stackNavigation={navigation} />;
     if (activeScreen === 'ParentProfile') return <ProfileScreen navigation={navigation as any} />;
     const Component = item.component as React.FC<any>;
-    return <Component />;
+    return <Component onToggleDrawer={toggleDrawer} onNavigate={handleNavigate} stackNavigation={navigation} />;
   };
 
   const initials = user ? `${(user.firstName||'')[0]||''}${(user.lastName||'')[0]||''}`.toUpperCase() : 'P';
@@ -114,12 +122,7 @@ export const ParentTabNavigator: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.activeScreen}>
-        <TouchableOpacity style={styles.hamburger} onPress={toggleDrawer}>
-          <Text style={styles.hamburgerText}>☰</Text>
-        </TouchableOpacity>
-        {renderActiveScreen()}
-      </View>
+      {renderActiveScreen()}
 
       {drawerOpen && <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={toggleDrawer} />}
 

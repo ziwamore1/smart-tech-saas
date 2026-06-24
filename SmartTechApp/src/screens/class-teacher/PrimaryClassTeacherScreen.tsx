@@ -27,7 +27,13 @@ interface Subject {
   code: string;
 }
 
-export const PrimaryClassTeacherScreen: React.FC = () => {
+interface Props {
+  onToggleDrawer?: () => void;
+  onNavigate?: (screen: string) => void;
+  stackNavigation?: any;
+}
+
+export const PrimaryClassTeacherScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
   const { user } = useAuthStore();
   const { dashboard } = useAppStore();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -282,6 +288,9 @@ export const PrimaryClassTeacherScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
+        <TouchableOpacity style={styles.hamburger} onPress={onToggleDrawer}>
+          <Text style={styles.hamburgerText}>☰</Text>
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Primary Class Teacher</Text>
         <Text style={styles.headerSub}>{user?.firstName} {user?.lastName}</Text>
       </View>
@@ -525,6 +534,8 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.xs },
   headerTitle: { fontSize: 20, fontWeight: '700', color: colors.text },
   headerSub: { fontSize: 13, color: colors.textLight, marginTop: 2 },
+  hamburger: { position: 'absolute', top: -4, left: 4, zIndex: 10, padding: 8 },
+  hamburgerText: { fontSize: 22, color: colors.text },
   classStrip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, maxHeight: 48 },
   classChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.white, marginRight: 8, borderWidth: 1, borderColor: colors.border },
   classChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },

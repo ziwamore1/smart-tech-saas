@@ -8,9 +8,10 @@ import { apiService } from '../../services/api';
 interface DepartmentTeachersProps {
   route?: any;
   stackNavigation?: any;
+  onToggleDrawer?: () => void;
 }
 
-export const DepartmentTeachersScreen: React.FC<DepartmentTeachersProps> = ({ route, stackNavigation }) => {
+export const DepartmentTeachersScreen: React.FC<DepartmentTeachersProps> = ({ route, stackNavigation, onToggleDrawer }) => {
   const departmentId = route?.params?.departmentId;
   const departmentName = route?.params?.departmentName || 'Department';
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -42,7 +43,7 @@ export const DepartmentTeachersScreen: React.FC<DepartmentTeachersProps> = ({ ro
       <HeaderBar
         title={departmentName}
         subtitle={`${loading ? '...' : `${teachers.length} teacher${teachers.length !== 1 ? 's' : ''}`}`}
-        leftIcon={{ name: '←', onPress: () => stackNavigation?.goBack?.() }}
+        leftIcon={onToggleDrawer ? { name: '☰', onPress: onToggleDrawer } : { name: '←', onPress: () => stackNavigation?.goBack?.() }}
         rightIcon={{ name: '🔔', onPress: () => {} }}
       />
 

@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Card, Loading } from '../../components';
 import { colors, spacing, shadows } from '../../theme';
 import { useAuthStore } from '../../store';
@@ -11,20 +13,26 @@ export const StudentAttendanceScreen: React.FC = () => {
   const [attendance, setAttendance] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
-  useEffect(() => { loadAttendance(); }, []);
-
-  const loadAttendance = async () => {
+  const loadAttendance = useCallback(async () => {
+    const sid = user?.studentId || user?.id;
+    if (!sid) { setLoading(false); return; }
     try {
-      if (user?.id) {
-        const res = await apiService.getStudentAttendance(user.id);
-        const data = res?.data || res;
-        setAttendance(Array.isArray(data) ? data : data?.records || data?.attendance || []);
-        setSummary(data?.summary || data?.stats || null);
-      }
+      setLoading(true);
+      const res = await apiService.getStudentAttendance(sid);
+      const data = res?.data || res;
+      setAttendance(Array.isArray(data) ? data : data?.records || data?.attendance || []);
+      setSummary(data?.summary || data?.stats || null);
     } catch (err) { console.error('Failed to load attendance'); }
     finally { setLoading(false); }
-  };
+  }, [user?.studentId, user?.id]);
+
+  useEffect(() => {
+    loadAttendance();
+    const unsubscribe = navigation.addListener('focus', loadAttendance);
+    return unsubscribe;
+  }, [loadAttendance, navigation]);
 
   if (loading) return <Loading fullScreen message="Loading attendance..." />;
 

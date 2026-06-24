@@ -12,16 +12,19 @@ export const StudentHomeworkScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user?.studentId) {
-      apiService.getStudentHomework(user.studentId)
+    const sid = user?.studentId || user?.id;
+    if (sid) {
+      apiService.getStudentHomework(sid)
         .then(r => {
           const data = r?.data || r || [];
           setHomework(Array.isArray(data) ? data : []);
         })
         .catch(() => {})
         .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
     }
-  }, [user?.studentId]);
+  }, [user?.studentId, user?.id]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

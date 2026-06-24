@@ -25,7 +25,13 @@ const STATUS_STYLES: Record<string, { color: string }> = {
   CANCELLED: { color: colors.textLight },
 };
 
-export const ClassTeacherCommunicationScreen: React.FC = () => {
+interface Props {
+  onToggleDrawer?: () => void;
+  onNavigate?: (screen: string) => void;
+  stackNavigation?: any;
+}
+
+export const ClassTeacherCommunicationScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [activeTab, setActiveTab] = useState<'messages' | 'notices'>('messages');
   const [communications, setCommunications] = useState<Communication[]>([]);
@@ -72,6 +78,7 @@ export const ClassTeacherCommunicationScreen: React.FC = () => {
       <HeaderBar
         title="Communication"
         subtitle="Parent Messages & Notices"
+        leftIcon={{ name: '☰', onPress: onToggleDrawer }}
         rightIcon={{ name: '🔄', onPress: fetchData }}
       />
 

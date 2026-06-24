@@ -21,6 +21,9 @@ import { apiService } from '../../services/api';
 
 type StudentPhotoScreenProps = {
   navigation: NativeStackNavigationProp<any>;
+  onToggleDrawer?: () => void;
+  onNavigate?: (screen: string) => void;
+  stackNavigation?: any;
 };
 
 interface StudentWithPhoto {
@@ -263,6 +266,9 @@ export const StudentPhotoScreen: React.FC<StudentPhotoScreenProps> = ({ navigati
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
+        <TouchableOpacity style={styles.hamburger} onPress={onToggleDrawer}>
+          <Text style={styles.hamburgerText}>☰</Text>
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Student Photos</Text>
         <Text style={styles.headerSubtitle}>
           {students.filter(s => s.hasPhoto).length} / {students.length} have photos
@@ -307,6 +313,17 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
     paddingBottom: spacing.lg,
     paddingHorizontal: spacing.lg,
+  },
+  hamburger: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    zIndex: 10,
+    padding: 8,
+  },
+  hamburgerText: {
+    fontSize: 22,
+    color: colors.white,
   },
   headerTitle: {
     fontSize: 22,

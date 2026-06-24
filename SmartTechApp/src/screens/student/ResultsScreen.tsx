@@ -16,7 +16,7 @@ export const StudentResultsScreen: React.FC = () => {
 
   useEffect(() => {
     loadResults();
-  }, []);
+  }, [dashboard?.currentTerm?.id]);
 
   const loadResults = async () => {
     try {

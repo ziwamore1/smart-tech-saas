@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, WidgetCard, GradientCard } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
@@ -7,33 +7,18 @@ import { useAuthStore, useAppStore } from '../../store';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-export const ParentDashboardScreen: React.FC = () => {
-  const { user, logout } = useAuthStore();
+interface Props {
+  onToggleDrawer?: () => void;
+  onNavigate?: (screen: string) => void;
+  stackNavigation?: any;
+}
+
+export const ParentDashboardScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
+  const { user } = useAuthStore();
   const { dashboard, isLoadingDashboard, fetchDashboard } = useAppStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
   useEffect(() => { fetchDashboard(); }, []);
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-            } catch (err) {
-              console.error('Logout failed:', err);
-            }
-          },
-        },
-      ]
-    );
-  };
 
   const children = dashboard?.children || [];
 
@@ -42,7 +27,7 @@ export const ParentDashboardScreen: React.FC = () => {
       <HeaderBar
         title={user?.firstName ? `Hello, ${user.firstName}` : 'Dashboard'}
         subtitle="Parent Dashboard"
-        leftIcon={{ name: '🚪', onPress: handleLogout }}
+        leftIcon={{ name: '☰', onPress: onToggleDrawer }}
         rightIcon={{ name: '🔔', onPress: () => navigation.navigate('Notifications') }}
       />
 

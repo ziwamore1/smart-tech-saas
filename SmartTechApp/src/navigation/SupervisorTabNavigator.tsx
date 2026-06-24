@@ -100,9 +100,11 @@ export const SupervisorTabNavigator: React.FC = () => {
   const renderActiveScreen = () => {
     const screenConfig = drawerScreens.find(s => s.name === activeScreen);
     if (!screenConfig || screenConfig.stackScreen) return <MonitoringDashboardScreen stackNavigation={navigation} onNavigate={handleNavigate} />;
-    if (activeScreen === 'SupervisorProfile') return <ProfileScreen navigation={navigation as any} />;
     if (activeScreen === 'SupervisorHome') return <MonitoringDashboardScreen stackNavigation={navigation} onToggleDrawer={toggleDrawer} onNavigate={handleNavigate} />;
-    if (activeScreen === 'SupervisorDeptTeachers') return <DepartmentTeachersScreen stackNavigation={navigation} />;
+    if (activeScreen === 'SupervisorDeptTeachers') return <DepartmentTeachersScreen stackNavigation={navigation} onToggleDrawer={toggleDrawer} />;
+    if (activeScreen === 'SupervisorClasses') return <TeacherClassesScreen onToggleDrawer={toggleDrawer} />;
+    if (activeScreen === 'SupervisorMarks') return <TeacherMarksScreen onToggleDrawer={toggleDrawer} />;
+    if (activeScreen === 'SupervisorProfile') return <ProfileScreen navigation={navigation as any} onToggleDrawer={toggleDrawer} />;
     const Component = screenConfig.component as React.FC<any>;
     return <Component />;
   };
@@ -117,9 +119,6 @@ export const SupervisorTabNavigator: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.activeScreen}>
-        <TouchableOpacity style={styles.hamburger} onPress={toggleDrawer}>
-          <Text style={styles.hamburgerText}>☰</Text>
-        </TouchableOpacity>
         {renderActiveScreen()}
       </View>
 
@@ -170,8 +169,6 @@ export const SupervisorTabNavigator: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   activeScreen: { flex: 1 },
-  hamburger: { position: 'absolute', top: 8, left: 8, zIndex: 10, padding: 8 },
-  hamburgerText: { fontSize: 24, color: colors.primary },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 50 },
   drawer: { position: 'absolute', left: 0, top: 0, bottom: 0, width: DRAWER_WIDTH, backgroundColor: colors.white, zIndex: 100, ...shadows.lg },
   drawerContent: { flex: 1 },

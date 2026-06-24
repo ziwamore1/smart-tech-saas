@@ -10,6 +10,7 @@ export interface User {
   schoolId: string | null;
   school?: School | null;
   institutionType?: string | null;
+  studentId?: string | null;
 }
 
 export const INSTITUTION_TYPES = {
