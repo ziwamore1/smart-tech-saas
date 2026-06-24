@@ -21,7 +21,7 @@ export class ExamMarkingService {
     return this.AUTO_GRADABLE_TYPES.includes(questionType);
   }
 
-  async autoMarkAttempt(attemptId: string) {
+  async autoMarkAttempt(attemptId: string, schoolId?: string) {
     const attempt = await this.prisma.examAttempt.findUnique({
       where: { id: attemptId },
       include: {
@@ -62,7 +62,9 @@ export class ExamMarkingService {
       ? Math.round((totalScore / attempt.exam.totalScore) * 100 * 100) / 100
       : 0;
 
-    const grade = this.calculateGrade(percentage);
+    const grade = schoolId
+      ? await this.getGradeFromScale(percentage, schoolId)
+      : this.calculateGrade(percentage);
 
     return this.prisma.examAttempt.update({
       where: { id: attemptId },
@@ -78,7 +80,7 @@ export class ExamMarkingService {
     });
   }
 
-  async autoMarkSubmission(attemptId: string) {
+  async autoMarkSubmission(attemptId: string, schoolId?: string) {
     const attempt = await this.prisma.examAttempt.findUnique({
       where: { id: attemptId },
       include: {
@@ -128,7 +130,9 @@ export class ExamMarkingService {
       ? Math.round((totalScore / attempt.exam.totalScore) * 100 * 100) / 100
       : 0;
 
-    const grade = this.calculateGrade(percentage);
+    const grade = schoolId
+      ? await this.getGradeFromScale(percentage, schoolId)
+      : this.calculateGrade(percentage);
 
     return this.prisma.examAttempt.update({
       where: { id: attemptId },
@@ -279,7 +283,51 @@ export class ExamMarkingService {
     }
   }
 
-  calculateGrade(percentage: number): string {
+  async getGradeFromScale(score: number, schoolId: string): Promise<string> {
+    const codeToName: Record<string, string> = {
+      PRIMARY_ECZ: 'ECZ Primary Grading System',
+      SECONDARY_ECZ: 'ECZ Secondary Grading System',
+      FORMS_ECZ: 'ECZ Forms Grading System',
+      COLLEGE_GPA: 'College GPA Grading System',
+      UNIVERSITY_CGPA: 'University CGPA Grading System',
+    };
+
+    const schoolSetting = await this.prisma.schoolSetting.findUnique({
+      where: { schoolId },
+    });
+
+    const preferredName = schoolSetting?.gradingSystem
+      ? codeToName[schoolSetting.gradingSystem]
+      : undefined;
+
+    let system = preferredName
+      ? await this.prisma.gradingSystem.findFirst({
+          where: { schoolId, name: preferredName },
+          include: { gradeScales: true },
+        })
+      : undefined;
+
+    system ??= await this.prisma.gradingSystem.findFirst({
+      where: { schoolId, isDefault: true },
+      include: { gradeScales: true },
+    });
+
+    system ??= await this.prisma.gradingSystem.findFirst({
+      where: { schoolId },
+      include: { gradeScales: true },
+    });
+
+    if (system) {
+      const scale = system.gradeScales.find(
+        (s) => score >= s.minScore && score <= s.maxScore,
+      );
+      if (scale) return scale.grade;
+    }
+
+    return this.calculateGrade(score);
+  }
+
+  private calculateGrade(percentage: number): string {
     if (percentage >= 80) return 'A';
     if (percentage >= 70) return 'B';
     if (percentage >= 60) return 'C';
@@ -379,12 +427,16 @@ export class ExamMarkingService {
   }
 
   async batchAutoMark(examId: string) {
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: examId },
+      select: { schoolId: true },
+    });
     const attempts = await this.prisma.examAttempt.findMany({
       where: { examId, isSubmitted: true, isGraded: false },
     });
     const results: any[] = [];
     for (const a of attempts) {
-      results.push(await this.autoMarkAttempt(a.id));
+      results.push(await this.autoMarkAttempt(a.id, exam?.schoolId));
     }
     return { graded: results.length, results };
   }
