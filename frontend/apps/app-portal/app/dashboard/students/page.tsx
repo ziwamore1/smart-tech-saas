@@ -180,8 +180,7 @@ export default function StudentsPage() {
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
       setShowAddModal(false);
-      setMessage({ type: 'success', text: 'Student added successfully!' });
-      setTimeout(() => setMessage(null), 3000);
+      setMessage({ type: 'success', text: 'Student registered successfully! Login credentials have been sent.' });
       setStudentForm({
         firstName: '',
         lastName: '',
@@ -198,8 +197,7 @@ export default function StudentsPage() {
     },
     onError: (error: any) => {
       console.error('Failed to create student:', error);
-      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to add student. Please try again.' });
-      setTimeout(() => setMessage(null), 5000);
+      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to register student. Please try again.' });
     },
   });
 
@@ -275,12 +273,14 @@ export default function StudentsPage() {
     <div className="space-y-6">
       <ReadOnlyBanner managePermission="students.manage" />
       {message && (
-        <div className={`px-4 py-3 rounded-lg ${
+        <div className={`fixed top-4 right-4 z-[100] px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 min-w-[320px] ${
           message.type === 'success' 
-            ? 'bg-green-50 text-green-700 border border-green-200' 
-            : 'bg-red-50 text-red-700 border border-red-200'
+            ? 'bg-green-500 text-white' 
+            : 'bg-red-500 text-white'
         }`}>
-          {message.text}
+          <span className="text-lg font-bold">{message.type === 'success' ? '✓' : '✕'}</span>
+          <span className="flex-1 text-sm">{message.text}</span>
+          <button onClick={() => setMessage(null)} className="text-white/80 hover:text-white font-bold text-lg leading-none">✕</button>
         </div>
       )}
 
@@ -761,10 +761,18 @@ export default function StudentsPage() {
 
       {showViewModal && selectedStudent && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-2xl font-bold mb-6">
-              Student Details
-            </h2>
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start mb-6">
+              <h2 className="text-2xl font-bold">
+                Student Details
+              </h2>
+              <button
+                onClick={() => { setShowViewModal(false); setSelectedStudent(null); }}
+                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+              >
+                ✕
+              </button>
+            </div>
 
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
