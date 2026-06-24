@@ -84,10 +84,11 @@ export default function SettingsPage() {
     }
   }, [timeSettings]);
 
-  const { data: gradingSystemsList } = useQuery({
+  const { data: gradingSystemsList, isLoading: gsLoading, error: gsError } = useQuery({
     queryKey: ['grading-systems'],
     queryFn: () => gradingSystemApi.getAll().then((res: any) => {
       const data = res.data?.data || res.data;
+      console.log('[Settings] grading systems response:', data);
       return Array.isArray(data) ? data : [];
     }),
   });
@@ -610,8 +611,12 @@ export default function SettingsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {editableScales.length === 0 ? (
-                    <tr><td colSpan={5} className="py-4 text-center text-gray-500">Loading grading scales...</td></tr>
+                  {gsLoading ? (
+                    <tr><td colSpan={5} className="py-4 text-center text-gray-500">Loading grading systems...</td></tr>
+                  ) : gsError ? (
+                    <tr><td colSpan={5} className="py-4 text-center text-red-500">Error loading grading systems</td></tr>
+                  ) : editableScales.length === 0 ? (
+                    <tr><td colSpan={5} className="py-4 text-center text-gray-500">No grading scales found for the selected system</td></tr>
                   ) : editableScales.map((grade, index) => (
                     <tr key={index} className="border-b">
                       <td className="py-3 px-4 font-bold text-lg">{grade.grade}</td>
