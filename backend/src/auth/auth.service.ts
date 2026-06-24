@@ -138,6 +138,9 @@ export class AuthService {
 
     this.logger.log(`School created: ${school.id}`);
 
+    this.provisioningService.provisionInstitution(school.id, institutionTypeCode)
+      .catch((err) => this.logger.error(`Provisioning failed for school ${school.id}:`, err));
+
     return {
       message: 'School created successfully',
       school: {

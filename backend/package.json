@@ -25,6 +25,8 @@
         "seed:supabase": "dotenv -e .env.production -- npx tsx prisma/seed.ts",
         "seed:learning-areas": "npx ts-node prisma/seed-learning-areas.ts",
         "seed:grading": "npx tsx prisma/seed-grading.ts",
+        "seed:cie": "npx tsx prisma/seed-cie.ts",
+        "seed:cie:supabase": "dotenv -e .env.production -- npx tsx prisma/seed-cie-direct.ts",
         "migrate:cloudinary": "npx tsx prisma/migrate-cloudinary.ts"
     },
     "dependencies": {

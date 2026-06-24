@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { getCurriculumData } from './default-curriculum-data';
 
 @Injectable()
 export class InstitutionProvisioningService {
@@ -32,6 +33,7 @@ export class InstitutionProvisioningService {
     await this.provisionGradingPolicies(schoolId, institutionTypeCode);
     await this.provisionAssessmentDefinitions(schoolId, institutionTypeCode);
     await this.provisionEducationLevels(schoolId, institutionTypeCode);
+    await this.provisionSubjects(schoolId, institutionTypeCode);
 
     this.logger.log(`Institution ${schoolId} provisioned successfully`);
     return { success: true, type: type.code, modules: type.modules.length };
@@ -444,6 +446,59 @@ export class InstitutionProvisioningService {
     });
 
     this.logger.log(`Created ${definitions.length} assessment definitions for ${schoolId} (${institutionTypeCode})`);
+  }
+
+  async provisionSubjects(schoolId: string, institutionTypeCode: string) {
+    const curriculum = getCurriculumData(institutionTypeCode);
+    if (!curriculum) {
+      this.logger.log(`No curriculum data for ${institutionTypeCode}, skipping subject provisioning`);
+      return;
+    }
+
+    this.logger.log(`Provisioning ${curriculum.subjects.length} subjects for ${schoolId}`);
+
+    let createdCount = 0;
+
+    for (const subjectDef of curriculum.subjects) {
+      const existing = await this.prisma.subject.findUnique({
+        where: { name_schoolId: { name: subjectDef.name, schoolId } },
+      });
+
+      if (existing) {
+        this.logger.debug(`Subject ${subjectDef.name} already exists for ${schoolId}, skipping`);
+        continue;
+      }
+
+      const subjectEocs = curriculum.eocs[subjectDef.name] || [];
+      const subjectAos = curriculum.aos[subjectDef.name] || [];
+
+      await this.prisma.subject.create({
+        data: {
+          name: subjectDef.name,
+          code: subjectDef.code,
+          isCore: subjectDef.isCore,
+          schoolId,
+          elementOfConstruct: {
+            create: subjectEocs.map((eoc) => ({
+              name: eoc.name,
+              construct: eoc.construct,
+              schoolId,
+            })),
+          },
+          assessmentObjectives: {
+            create: subjectAos.map((ao) => ({
+              name: ao.name,
+              weight: ao.weight,
+              schoolId,
+            })),
+          },
+        },
+      });
+
+      createdCount++;
+    }
+
+    this.logger.log(`Created ${createdCount} new subjects for ${schoolId} (${institutionTypeCode})`);
   }
 
   private async provisionEducationLevels(schoolId: string, institutionTypeCode: string) {
