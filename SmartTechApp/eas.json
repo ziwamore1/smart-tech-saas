@@ -10,6 +10,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "channel": "production",
       "android": {
         "buildType": "apk"
       },
@@ -20,7 +21,7 @@
     "production": {
       "autoIncrement": true,
       "withoutCredentials": true,
-      "channel": "main",
+      "channel": "production",
       "env": {
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
