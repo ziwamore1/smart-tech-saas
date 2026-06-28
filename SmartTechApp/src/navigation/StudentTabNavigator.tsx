@@ -7,7 +7,7 @@ import { useAuthStore } from '../store';
 import { StudentDashboardScreen } from '../screens/student/DashboardScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
 import { colors, spacing, borderRadius, shadows } from '../theme';
-import { apiService } from '../services/api';
+import { apiService, resolveImageUrl } from '../services/api';
 
 const { width } = Dimensions.get('window');
 const DRAWER_WIDTH = 280;
@@ -99,9 +99,8 @@ export const StudentTabNavigator: React.FC = () => {
     const photoId = user?.studentId || user?.id;
     if (photoId) {
       apiService.getStudentPhoto(photoId).then(r => {
-        const data = r?.data;
-        if (data?.imageUrl) setStudentPhoto(data.imageUrl);
-        else if (data?.photoUrl) setStudentPhoto(data.photoUrl);
+        const url = r?.imageUrl || r?.photoUrl;
+        if (url) setStudentPhoto(url);
       }).catch(() => {});
     }
   }, [user?.studentId]);
@@ -124,7 +123,7 @@ export const StudentTabNavigator: React.FC = () => {
             <View style={styles.divider} />
             <View style={styles.profileSection}>
               {studentPhoto ? (
-                <Image source={{ uri: studentPhoto }} style={styles.avatarImage} />
+                <Image source={{ uri: resolveImageUrl(studentPhoto) || studentPhoto }} style={styles.avatarImage} />
               ) : (
                 <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
               )}

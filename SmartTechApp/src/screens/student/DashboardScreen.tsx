@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, StatCard, QuickActionItem, WidgetCard } from '../../components';
 import { colors, spacing } from '../../theme';
 import { useAuthStore, useAppStore } from '../../store';
-import { apiService } from '../../services/api';
+import { apiService, resolveImageUrl } from '../../services/api';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -29,8 +29,8 @@ export const StudentDashboardScreen: React.FC<Props> = ({ onToggleDrawer, onNavi
     const photoId = user?.studentId || user?.id;
     if (photoId) {
       apiService.getStudentPhoto(photoId).then(r => {
-        if (r?.imageUrl) setStudentPhoto(r.imageUrl);
-        else if (r?.photoUrl) setStudentPhoto(r.photoUrl);
+        const url = r?.imageUrl || r?.photoUrl;
+        if (url) setStudentPhoto(resolveImageUrl(url) || url);
       }).catch(() => {});
     }
   }, []);
