@@ -117,14 +117,28 @@ export class IdentityService {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const schoolUrl = school ? `${frontendUrl}/login?school=${school.id}` : `${frontendUrl}/login`;
 
+    let recipientEmail = user.email || undefined;
+    let recipientName = `${user.firstName} ${user.lastName}`;
+
+    if (user.studentId) {
+      const parentStudent = await this.prisma.parentStudent.findFirst({
+        where: { studentId: user.studentId },
+        include: { parent: true },
+      });
+      if (parentStudent?.parent?.email) {
+        recipientEmail = parentStudent.parent.email;
+        recipientName = `${parentStudent.parent.firstName} ${parentStudent.parent.lastName}`;
+      }
+    }
+
     const deliveryResult = await this.credentialDeliveryService.deliverCredentials({
       userId,
       userCredentialId: credential.id,
-      recipientEmail: user.email || undefined,
+      recipientEmail,
       recipientPhone: user.phone || undefined,
       username,
       password: generatedPassword.password,
-      recipientName: `${user.firstName} ${user.lastName}`,
+      recipientName,
       role,
       schoolName: school?.name,
       schoolUrl,

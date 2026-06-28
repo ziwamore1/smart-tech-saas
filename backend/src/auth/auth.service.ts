@@ -515,6 +515,7 @@ export class AuthService {
         roles,
         primaryRole,
         schoolId: user.schoolId,
+        studentId: user.studentId,
         institutionType,
         school: schoolInfo,
       },

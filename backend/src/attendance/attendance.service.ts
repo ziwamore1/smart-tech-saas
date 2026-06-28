@@ -306,20 +306,25 @@ export class AttendanceService {
   }
 
   async getStudentSummary(studentId: string, termId?: string) {
-    const enrollments = await this.prisma.enrollment.findMany({
-      where: {
-        studentId,
-        status: 'ACTIVE',
-        ...(termId ? { academicYearId: termId } : {}),
-      },
-    });
-
-    if (enrollments.length === 0) {
-      return { total: 0, present: 0, absent: 0, late: 0, excused: 0, attendanceRate: 0, records: [] };
+    let termFilter: { gte: Date; lte: Date } | undefined;
+    if (termId) {
+      const term = await this.prisma.term.findUnique({ where: { id: termId } });
+      if (term) {
+        termFilter = { gte: term.startDate, lte: term.endDate };
+      }
+    }
+    if (!termFilter) {
+      const activeTerm = await this.prisma.term.findFirst({
+        where: { isCurrent: true, academicYear: { isCurrent: true } },
+        select: { startDate: true, endDate: true },
+      });
+      if (activeTerm) {
+        termFilter = { gte: activeTerm.startDate, lte: activeTerm.endDate };
+      }
     }
 
     const records = await this.prisma.attendance.findMany({
-      where: { studentId },
+      where: { studentId, ...(termFilter ? { date: termFilter } : {}) },
       orderBy: { date: 'desc' },
     });
 
@@ -343,7 +348,7 @@ export class AttendanceService {
       suspended,
       activity,
       partial,
-      attendanceRate: total > 0 ? Math.round(((present + partial) / total) * 100) : 0,
+      attendanceRate: total > 0 ? Math.round((present / total) * 100) : 0,
       records: records.map(r => ({
         id: r.id,
         date: r.date,
