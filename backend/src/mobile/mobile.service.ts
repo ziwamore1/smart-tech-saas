@@ -108,6 +108,18 @@ export class MobileService {
           currentTerm?.id,
         );
 
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+        const todayAttendance = await this.prisma.attendance.findFirst({
+          where: {
+            studentId: student.id,
+            date: { gte: todayStart, lte: todayEnd },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
         dashboard.student = {
           id: student.id,
           name: `${student.firstName} ${student.lastName}`,
@@ -118,6 +130,7 @@ export class MobileService {
         dashboard.stats = {
           resultsCount,
           attendanceRate,
+          todayStatus: todayAttendance?.status || null,
         };
       }
     }

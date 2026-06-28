@@ -124,6 +124,11 @@ class ApiService {
     AsyncStorage.removeItem('user').catch(() => {});
   }
 
+  async getAppVersion() {
+    const response = await this.client.get('/app-info/version');
+    return response.data;
+  }
+
   // Institution type API methods
   async getInstitutionTypes() {
     const response = await this.client.get('/auth/institution-types');

@@ -315,11 +315,12 @@ export class AttendanceService {
     });
 
     if (enrollments.length === 0) {
-      return { total: 0, present: 0, absent: 0, late: 0, excused: 0, attendanceRate: 0 };
+      return { total: 0, present: 0, absent: 0, late: 0, excused: 0, attendanceRate: 0, records: [] };
     }
 
     const records = await this.prisma.attendance.findMany({
       where: { studentId },
+      orderBy: { date: 'desc' },
     });
 
     const total = records.length;
@@ -343,6 +344,12 @@ export class AttendanceService {
       activity,
       partial,
       attendanceRate: total > 0 ? Math.round(((present + partial) / total) * 100) : 0,
+      records: records.map(r => ({
+        id: r.id,
+        date: r.date,
+        status: r.status,
+        remarks: r.remarks,
+      })),
     };
   }
 
@@ -1100,6 +1107,90 @@ export class AttendanceService {
       averageLateMinutes: totalLate > 0
         ? Math.round(records.reduce((s, r) => s + (r.lateMinutes || 0), 0) / totalLate)
         : 0,
+    };
+  }
+
+  async autoMarkTodayAttendance(schoolId: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const dayOfWeek = today.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      return { message: 'Weekend — skipped', marked: 0, schoolId };
+    }
+
+    const currentTerm = await this.prisma.term.findFirst({
+      where: {
+        academicYear: { schoolId, isCurrent: true },
+        isCurrent: true,
+      },
+    });
+
+    if (!currentTerm) {
+      return { message: 'No active term — skipped', marked: 0, schoolId };
+    }
+
+    if (today < currentTerm.startDate || today > currentTerm.endDate) {
+      return { message: 'Today is outside term dates — skipped', marked: 0, schoolId };
+    }
+
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: {
+        schoolId,
+        status: 'ACTIVE',
+        academicYear: { isCurrent: true },
+      },
+      select: { studentId: true },
+    });
+
+    if (enrollments.length === 0) {
+      return { message: 'No active enrollments — skipped', marked: 0, schoolId };
+    }
+
+    const studentIds = enrollments.map(e => e.studentId);
+
+    const existingRecords = await this.prisma.attendance.findMany({
+      where: {
+        studentId: { in: studentIds },
+        date: today,
+      },
+      select: { studentId: true },
+    });
+
+    const alreadyMarked = new Set(existingRecords.map(r => r.studentId));
+
+    const toCreate = studentIds
+      .filter(id => !alreadyMarked.has(id))
+      .map(studentId => ({
+        studentId,
+        date: today,
+        status: 'PRESENT' as any,
+        schoolId,
+      }));
+
+    if (toCreate.length === 0) {
+      return { message: 'All students already marked for today', marked: 0, schoolId };
+    }
+
+    await this.prisma.attendance.createMany({ data: toCreate });
+
+    return { message: `Auto-marked ${toCreate.length} students as PRESENT`, marked: toCreate.length, schoolId };
+  }
+
+  async autoMarkTodayAttendanceAllSchools() {
+    const schools = await this.prisma.school.findMany({
+      select: { id: true },
+    });
+
+    const results = [];
+    for (const school of schools) {
+      const result = await this.autoMarkTodayAttendance(school.id);
+      results.push(result);
+    }
+
+    return {
+      totalSchools: schools.length,
+      results,
     };
   }
 }

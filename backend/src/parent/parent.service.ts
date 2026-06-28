@@ -2,6 +2,8 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportCardService } from '../report-card/report-card.service';
 import { UnifiedMessagingService } from '../messaging/unified-messaging.service';
+import { CredentialDeliveryService } from '../identity-service/credential-delivery.service';
+import { PasswordGenerationService } from '../identity-service/password-generation.service';
 import { CreateParentDto } from './dto/create-parent.dto';
 import * as bcrypt from 'bcrypt';
 

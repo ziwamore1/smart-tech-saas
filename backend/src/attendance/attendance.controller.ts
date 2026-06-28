@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Res, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Res, Req, NotFoundException } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Response } from 'express';
@@ -336,5 +336,15 @@ export class AttendanceController {
     } catch (err: any) {
       throw new NotFoundException(`Failed to generate PDF: ${err.message}`);
     }
+  }
+
+  @Post('auto-mark-today')
+  async autoMarkToday(@Req() req: any) {
+    return this.attendanceService.autoMarkTodayAttendance(req.user.schoolId);
+  }
+
+  @Post('auto-mark-today-all')
+  async autoMarkTodayAll() {
+    return this.attendanceService.autoMarkTodayAttendanceAllSchools();
   }
 }

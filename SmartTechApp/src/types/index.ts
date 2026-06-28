@@ -101,6 +101,7 @@ export interface DashboardStats {
   totalChildren?: number;
   resultsCount?: number;
   attendanceRate?: number;
+  todayStatus?: string | null;
   totalClasses?: number;
   classes?: { id: string; name: string }[];
   todayLessons?: number;

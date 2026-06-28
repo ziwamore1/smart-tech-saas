@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { PrismaService } from '../prisma/prisma.service';
 import { EmailQueueService } from './email-queue.service';
 import { SmsQueueService } from './sms-queue.service';
 import { WhatsAppQueueService } from './whatsapp-queue.service';
@@ -12,6 +13,7 @@ export class PgQueueWorker {
     private readonly emailQueue: EmailQueueService,
     private readonly smsQueue: SmsQueueService,
     private readonly whatsAppQueue: WhatsAppQueueService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -48,5 +50,78 @@ export class PgQueueWorker {
     } catch (error: any) {
       this.logger.error(`WhatsApp queue processing failed: ${error.message}`);
     }
+  }
+
+  @Cron('0 20 * * 1-5')
+  async autoMarkAttendance() {
+    this.logger.log('Running daily attendance auto-mark...');
+
+    const schools = await this.prisma.school.findMany({
+      select: { id: true },
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const dayOfWeek = today.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      this.logger.log('Weekend — skipping attendance auto-mark');
+      return;
+    }
+
+    for (const school of schools) {
+      try {
+        const currentTerm = await this.prisma.term.findFirst({
+          where: {
+            academicYear: { schoolId: school.id, isCurrent: true },
+            isCurrent: true,
+          },
+        });
+
+        if (!currentTerm) continue;
+        if (today < currentTerm.startDate || today > currentTerm.endDate) continue;
+
+        const enrollments = await this.prisma.enrollment.findMany({
+          where: {
+            schoolId: school.id,
+            status: 'ACTIVE',
+            academicYear: { isCurrent: true },
+          },
+          select: { studentId: true },
+        });
+
+        if (enrollments.length === 0) continue;
+
+        const studentIds = enrollments.map(e => e.studentId);
+
+        const existingRecords = await this.prisma.attendance.findMany({
+          where: {
+            studentId: { in: studentIds },
+            date: today,
+          },
+          select: { studentId: true },
+        });
+
+        const alreadyMarked = new Set(existingRecords.map(r => r.studentId));
+
+        const toCreate = studentIds
+          .filter(id => !alreadyMarked.has(id))
+          .map(studentId => ({
+            studentId,
+            date: today,
+            status: 'PRESENT' as any,
+            schoolId: school.id,
+          }));
+
+        if (toCreate.length === 0) continue;
+
+        await this.prisma.attendance.createMany({ data: toCreate });
+        this.logger.log(`School ${school.id}: Auto-marked ${toCreate.length} students as PRESENT`);
+      } catch (err: any) {
+        this.logger.error(`School ${school.id}: Auto-mark failed — ${err.message}`);
+      }
+    }
+
+    this.logger.log('Daily attendance auto-mark complete');
   }
 }

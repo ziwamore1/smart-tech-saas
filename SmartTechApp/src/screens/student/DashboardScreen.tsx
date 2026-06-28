@@ -29,9 +29,8 @@ export const StudentDashboardScreen: React.FC<Props> = ({ onToggleDrawer, onNavi
     const photoId = user?.studentId || user?.id;
     if (photoId) {
       apiService.getStudentPhoto(photoId).then(r => {
-        const data = r?.data;
-        if (data?.imageUrl) setStudentPhoto(data.imageUrl);
-        else if (data?.photoUrl) setStudentPhoto(data.photoUrl);
+        if (r?.imageUrl) setStudentPhoto(r.imageUrl);
+        else if (r?.photoUrl) setStudentPhoto(r.photoUrl);
       }).catch(() => {});
     }
   }, []);
@@ -74,6 +73,17 @@ export const StudentDashboardScreen: React.FC<Props> = ({ onToggleDrawer, onNavi
             <Text style={styles.profileRole}>Student</Text>
           </View>
         </View>
+        {dashboard?.stats?.todayStatus && (
+          <View style={[styles.todayBadge, {
+            backgroundColor: dashboard.stats.todayStatus === 'PRESENT' ? '#D1FAE5' : dashboard.stats.todayStatus === 'LATE' ? '#FEF3C7' : dashboard.stats.todayStatus === 'ABSENT' ? '#FEE2E2' : '#F3F4F6',
+          }]}>
+            <Text style={[styles.todayBadgeText, {
+              color: dashboard.stats.todayStatus === 'PRESENT' ? '#065F46' : dashboard.stats.todayStatus === 'LATE' ? '#92400E' : dashboard.stats.todayStatus === 'ABSENT' ? '#991B1B' : '#374151',
+            }]}>
+              Today: {dashboard.stats.todayStatus === 'PRESENT' ? 'Present ✅' : dashboard.stats.todayStatus === 'LATE' ? 'Late ⏰' : dashboard.stats.todayStatus === 'ABSENT' ? 'Absent ❌' : dashboard.stats.todayStatus}
+            </Text>
+          </View>
+        )}
         <View style={styles.statsRow}>
           <StatCard label="Average" value={intelligence?.studentStats?.average || '-'} icon="📊" color={colors.primaryLight} bgColor={colors.infoLight} />
           <StatCard label="Grade" value={intelligence?.studentStats?.grade || '-'} icon="🎯" color={colors.success} bgColor={colors.successLight} />
@@ -136,6 +146,8 @@ const styles = StyleSheet.create({
   profileName: { fontSize: 16, fontWeight: '700', color: colors.text },
   profileRole: { fontSize: 12, color: colors.textLight, marginTop: 2 },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  todayBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: 8, marginBottom: spacing.md },
+  todayBadgeText: { fontSize: 15, fontWeight: '700' },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md, marginTop: spacing.sm },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
   quickActionsScroll: { marginBottom: spacing.lg },

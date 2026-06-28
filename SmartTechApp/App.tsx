@@ -1,11 +1,12 @@
 // Must be first import - patches TurboModuleProxy before any native module imports
 import './src/turboModulePatcher';
-import React, { useEffect, useState, useRef, Component } from 'react';
-import { StyleSheet, View, Platform, Text } from 'react-native';
+import React, { useEffect, useState, useRef, Component, useCallback } from 'react';
+import { StyleSheet, View, Platform, Text, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import * as Updates from 'expo-updates';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -75,6 +76,7 @@ class ErrorBoundary extends Component<{children: React.ReactNode}, {error: Error
 
 export default function App() {
   const [appIsReady, setAppIsReady] = useState(false);
+  const [updateState, setUpdateState] = useState<{ available: boolean; downloading: boolean; downloaded: boolean; apkInfo?: any }>({ available: false, downloading: false, downloaded: false });
   const notificationListener = useRef<any>();
   const responseListener = useRef<any>();
   const { isAuthenticated } = useAuthStore();
@@ -110,6 +112,40 @@ export default function App() {
     };
   }, [isAuthenticated]);
 
+  const checkForUpdates = useCallback(async () => {
+    if (__DEV__) return;
+    try {
+      const update = await Updates.checkForUpdateAsync();
+      if (update.isAvailable) {
+        setUpdateState(prev => ({ ...prev, available: true, downloading: true }));
+        await Updates.fetchUpdateAsync();
+        setUpdateState(prev => ({ ...prev, downloading: false, downloaded: true }));
+      }
+    } catch (e) {
+      console.log('OTA update check failed:', e);
+    }
+    try {
+      const info = await apiService.getAppVersion();
+      if (info?.apkUrl && info?.latestVersion && info.latestVersion !== '1.0.0') {
+        setUpdateState(prev => ({ ...prev, apkInfo: info }));
+      }
+    } catch (_) {}
+  }, []);
+
+  const applyUpdate = useCallback(async () => {
+    setUpdateState(prev => ({ ...prev, downloading: true }));
+    try {
+      await Updates.reloadAsync();
+    } catch (e) {
+      console.log('Update reload failed:', e);
+      setUpdateState(prev => ({ ...prev, downloading: false }));
+    }
+  }, []);
+
+  useEffect(() => {
+    checkForUpdates();
+  }, [checkForUpdates]);
+
   useEffect(() => {
     if (appIsReady) {
       SplashScreen.hideAsync();
@@ -133,6 +169,21 @@ export default function App() {
           <ErrorBoundary>
             <AppNavigator />
           </ErrorBoundary>
+          {updateState.downloading && !updateState.downloaded && (
+            <View style={styles.updateBanner}>
+              <Text style={styles.updateBannerText}>Downloading update...</Text>
+            </View>
+          )}
+          {updateState.downloaded && (
+            <TouchableOpacity style={styles.updateBannerRestart} onPress={applyUpdate} activeOpacity={0.8}>
+              <Text style={styles.updateBannerRestartText}>Update ready — Tap to restart</Text>
+            </TouchableOpacity>
+          )}
+          {updateState.apkInfo?.apkUrl && (
+            <View style={styles.updateBanner}>
+              <Text style={styles.updateBannerText}>New version {updateState.apkInfo.latestVersion} available — Download from portal</Text>
+            </View>
+          )}
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
@@ -188,4 +239,8 @@ async function registerForPushNotificationsAsync() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   loadingContainer: { flex: 1, backgroundColor: '#1E3A8A' },
+  updateBanner: { position: 'absolute', top: 50, left: 16, right: 16, backgroundColor: '#1E3A8A', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center', zIndex: 9999, elevation: 10 },
+  updateBannerText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+  updateBannerRestart: { position: 'absolute', bottom: 30, left: 16, right: 16, backgroundColor: '#10B981', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', zIndex: 9999, elevation: 10 },
+  updateBannerRestartText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 });

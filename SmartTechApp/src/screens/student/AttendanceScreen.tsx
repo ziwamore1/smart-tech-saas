@@ -23,7 +23,7 @@ export const StudentAttendanceScreen: React.FC = () => {
       const res = await apiService.getStudentAttendance(sid);
       const data = res?.data || res;
       setAttendance(Array.isArray(data) ? data : data?.records || data?.attendance || []);
-      setSummary(data?.summary || data?.stats || null);
+      setSummary(data);
     } catch (err) { console.error('Failed to load attendance'); }
     finally { setLoading(false); }
   }, [user?.studentId, user?.id]);
@@ -36,9 +36,32 @@ export const StudentAttendanceScreen: React.FC = () => {
 
   if (loading) return <Loading fullScreen message="Loading attendance..." />;
 
-  const present = attendance.filter((a: any) => a.status === 'PRESENT').length;
-  const total = attendance.length || 1;
-  const rate = Math.round((present / total) * 100);
+  const rate = summary?.attendanceRate != null ? summary.attendanceRate : (attendance.length > 0 ? Math.round((attendance.filter((a: any) => a.status === 'PRESENT').length / attendance.length) * 100) : 0);
+  const present = summary?.present ?? attendance.filter((a: any) => a.status === 'PRESENT').length;
+  const absent = summary?.absent ?? attendance.filter((a: any) => a.status === 'ABSENT').length;
+  const late = summary?.late ?? attendance.filter((a: any) => a.status === 'LATE').length;
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'PRESENT': return '✅';
+      case 'LATE': return '⏰';
+      case 'ABSENT': return '❌';
+      case 'EXCUSED': return '📄';
+      case 'SICK': return '🤒';
+      default: return '❓';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'PRESENT': return '#059669';
+      case 'LATE': return '#D97706';
+      case 'ABSENT': return '#DC2626';
+      case 'EXCUSED': return '#7C3AED';
+      case 'SICK': return '#6366F1';
+      default: return '#6B7280';
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -54,10 +77,23 @@ export const StudentAttendanceScreen: React.FC = () => {
           </View>
           <View style={styles.summaryRow}>
             <View><Text style={styles.summaryNum}>{present}</Text><Text style={styles.summarySmall}>Present</Text></View>
-            <View><Text style={styles.summaryNum}>{attendance.filter((a: any) => a.status === 'ABSENT').length}</Text><Text style={styles.summarySmall}>Absent</Text></View>
-            <View><Text style={styles.summaryNum}>{attendance.filter((a: any) => a.status === 'LATE').length}</Text><Text style={styles.summarySmall}>Late</Text></View>
+            <View><Text style={styles.summaryNum}>{absent}</Text><Text style={styles.summarySmall}>Absent</Text></View>
+            <View><Text style={styles.summaryNum}>{late}</Text><Text style={styles.summarySmall}>Late</Text></View>
           </View>
         </Card>
+
+        {attendance.map((r) => (
+          <View key={r.id} style={styles.recordCard}>
+            <Text style={styles.statusIcon}>{getStatusIcon(r.status)}</Text>
+            <View style={styles.recordInfo}>
+              <Text style={styles.recordDate}>{new Date(r.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+              <Text style={[styles.recordStatus, { color: getStatusColor(r.status) }]}>
+                {r.status === 'PRESENT' ? 'Present' : r.status === 'LATE' ? 'Late' : r.status === 'ABSENT' ? 'Absent' : r.status === 'EXCUSED' ? 'Excused' : r.status === 'SICK' ? 'Sick' : r.status}
+              </Text>
+            </View>
+            {r.remarks ? <Text style={styles.recordRemarks}>{r.remarks}</Text> : null}
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
@@ -76,4 +112,10 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: 'row', width: '100%', justifyContent: 'space-around' },
   summaryNum: { fontSize: 24, fontWeight: '700', color: colors.text, textAlign: 'center' },
   summarySmall: { fontSize: 12, color: colors.textLight, textAlign: 'center' },
+  recordCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, padding: spacing.md, borderRadius: 8, marginBottom: spacing.xs, ...shadows.sm },
+  statusIcon: { fontSize: 20, marginRight: spacing.md },
+  recordInfo: { flex: 1 },
+  recordDate: { fontSize: 14, fontWeight: '600', color: colors.text },
+  recordStatus: { fontSize: 12, fontWeight: '500', marginTop: 2 },
+  recordRemarks: { fontSize: 11, color: colors.textLight, marginLeft: 'auto', maxWidth: 100 },
 });
