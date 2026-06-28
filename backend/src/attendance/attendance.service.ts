@@ -308,7 +308,7 @@ export class AttendanceService {
   private async resolveStudentId(id: string): Promise<string> {
     const student = await this.prisma.student.findUnique({ where: { id } });
     if (student) return id;
-    const user = await this.prisma.user.findUnique({ where: { id, studentId: { not: null } } });
+    const user = await this.prisma.user.findUnique({ where: { id } });
     if (user?.studentId) return user.studentId;
     return id;
   }

@@ -54,8 +54,15 @@ export class StudentService {
         studentId: student.id,
         mustChangePassword: true,
       },
-      update: {},
+      update: { studentId: student.id },
     });
+
+    if (!studentUser.studentId) {
+      await this.prisma.user.update({
+        where: { id: studentUser.id },
+        data: { studentId: student.id },
+      });
+    }
 
     const studentRole = await this.prisma.role.findFirst({ where: { name: 'Student' } });
     if (studentRole) {

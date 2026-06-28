@@ -120,24 +120,34 @@ export class IdentityService {
     let recipientEmail = user.email || undefined;
     let recipientName = `${user.firstName} ${user.lastName}`;
 
-    if (user.studentId) {
+    let studentId = user.studentId;
+    if (studentId) {
       let parentStudent = await this.prisma.parentStudent.findFirst({
-        where: { studentId: user.studentId },
+        where: { studentId },
         include: { parent: true },
       });
-      // Fallback: look up via Student relation
       if (!parentStudent) {
         const student = await this.prisma.student.findUnique({
-          where: { id: user.studentId },
-          include: { parentStudents: { include: { parent: true } } },
+          where: { id: studentId },
+          include: { parents: { include: { parent: true } } },
         });
-        if (student?.parentStudents?.length) {
-          parentStudent = student.parentStudents[0] as any;
+        if (student?.parents?.length) {
+          parentStudent = student.parents[0] as any;
         }
       }
       if (parentStudent?.parent?.email) {
         recipientEmail = parentStudent.parent.email;
         recipientName = `${parentStudent.parent.firstName} ${parentStudent.parent.lastName}`;
+      }
+    } else {
+      // studentId is null — try to find student by matching name/school
+      const matchingStudent = await this.prisma.student.findFirst({
+        where: { firstName: user.firstName, lastName: user.lastName, schoolId: user.schoolId || undefined },
+        include: { parents: { include: { parent: true } } },
+      });
+      if (matchingStudent?.parents?.length && matchingStudent.parents[0].parent.email) {
+        recipientEmail = matchingStudent.parents[0].parent.email;
+        recipientName = `${matchingStudent.parents[0].parent.firstName} ${matchingStudent.parents[0].parent.lastName}`;
       }
     }
 
