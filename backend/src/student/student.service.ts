@@ -331,7 +331,7 @@ export class StudentService {
     });
   }
 
-  linkStudentToParentWithCredentials
+  async linkStudentToParentWithCredentials(studentId: string, parentId: string) {
     const student = await this.prisma.student.findUnique({ where: { id: studentId } });
     if (!student) throw new NotFoundException('Student not found');
     const parent = await this.prisma.parent.findUnique({ where: { id: parentId } });
