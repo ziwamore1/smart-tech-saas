@@ -42,13 +42,23 @@ export class StudentPhotoService {
   }
 
   async getStudentPhoto(studentId: string) {
+    const resolvedId = await this.resolveStudentId(studentId);
+
     const photo = await this.prisma.studentPhoto.findFirst({
-      where: { studentId },
+      where: { studentId: resolvedId },
       orderBy: { createdAt: 'desc' },
       select: { id: true, imageUrl: true, thumbnailUrl: true, createdAt: true },
     });
 
-    return photo || { studentId, imageUrl: null, thumbnailUrl: null };
+    return photo || { studentId: resolvedId, imageUrl: null, thumbnailUrl: null };
+  }
+
+  private async resolveStudentId(id: string): Promise<string> {
+    const student = await this.prisma.student.findUnique({ where: { id } });
+    if (student) return id;
+    const user = await this.prisma.user.findUnique({ where: { id, studentId: { not: null } } });
+    if (user?.studentId) return user.studentId;
+    return id;
   }
 
   async getBatchStudentPhotos(studentIds: string[]) {

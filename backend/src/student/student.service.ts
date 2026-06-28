@@ -128,6 +128,22 @@ export class StudentService {
           create: { parentId: existingParent.id, studentId },
           update: {},
         });
+        // Send bundled credentials to existing parent
+        this.credentialDeliveryService.deliverBundledCredentials({
+          parentUserId: existingParentUser.id,
+          studentUserId: studentId,
+          parentEmail: info.parentEmail,
+          parentPhone: info.parentPhone,
+          parentUsername: existingParentUser.username || existingParentUser.email,
+          parentPassword: 'Use existing password',
+          parentName: `${existingParent.firstName} ${existingParent.lastName}`,
+          studentUsername: info.studentUsername,
+          studentPassword: info.studentPassword,
+          studentName: info.studentName,
+          schoolName: school?.name,
+          schoolUrl,
+          channel: info.parentEmail ? 'EMAIL' : 'SMS',
+        }).catch(err => this.logger.error(`Failed to send bundled credentials to existing parent: ${err.message}`));
         return;
       }
       // User exists but no Parent record — re-use the user and create Parent record
@@ -150,6 +166,22 @@ export class StudentService {
           children: { create: { studentId } },
         },
       });
+      // Send bundled credentials to the newly created parent record
+      this.credentialDeliveryService.deliverBundledCredentials({
+        parentUserId: existingParentUser.id,
+        studentUserId: studentId,
+        parentEmail: existingParentUser.email || undefined,
+        parentPhone: info.parentPhone,
+        parentUsername: existingParentUser.username || existingParentUser.email,
+        parentPassword: 'See admin for password reset',
+        parentName: `${parentRecord.firstName} ${parentRecord.lastName}`,
+        studentUsername: info.studentUsername,
+        studentPassword: info.studentPassword,
+        studentName: info.studentName,
+        schoolName: school?.name,
+        schoolUrl,
+        channel: existingParentUser.email ? 'EMAIL' : 'SMS',
+      }).catch(err => this.logger.error(`Failed to send bundled credentials: ${err.message}`));
       return;
     }
 

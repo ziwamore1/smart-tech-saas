@@ -121,10 +121,20 @@ export class IdentityService {
     let recipientName = `${user.firstName} ${user.lastName}`;
 
     if (user.studentId) {
-      const parentStudent = await this.prisma.parentStudent.findFirst({
+      let parentStudent = await this.prisma.parentStudent.findFirst({
         where: { studentId: user.studentId },
         include: { parent: true },
       });
+      // Fallback: look up via Student relation
+      if (!parentStudent) {
+        const student = await this.prisma.student.findUnique({
+          where: { id: user.studentId },
+          include: { parentStudents: { include: { parent: true } } },
+        });
+        if (student?.parentStudents?.length) {
+          parentStudent = student.parentStudents[0] as any;
+        }
+      }
       if (parentStudent?.parent?.email) {
         recipientEmail = parentStudent.parent.email;
         recipientName = `${parentStudent.parent.firstName} ${parentStudent.parent.lastName}`;
