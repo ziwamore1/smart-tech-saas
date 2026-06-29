@@ -2155,3 +2155,18 @@ export const curriculumIntelligenceApi = {
   getComplianceAnalytics: (params?: { schoolId?: string; subjectId?: string; classId?: string }) =>
     api.get('/curriculum-intelligence/analytics/compliance', { params }),
 };
+
+export const landingMockupApi = {
+  getAll: () => api.get('/landing-mockups'),
+  getActive: () => api.get('/landing-mockups/active'),
+  getOne: (id: string) => api.get(`/landing-mockups/${id}`),
+  create: (data: { label: string; role?: string; category?: string; imageUrl: string; order?: number; isActive?: boolean }) =>
+    api.post('/landing-mockups', data),
+  update: (id: string, data: any) => api.patch(`/landing-mockups/${id}`, data),
+  delete: (id: string) => api.delete(`/landing-mockups/${id}`),
+  upload: (formData: FormData) =>
+    api.post('/landing-mockups/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000,
+    }),
+};

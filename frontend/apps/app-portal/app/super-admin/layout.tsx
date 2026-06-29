@@ -178,6 +178,12 @@ const superAdminNav = [
     color: '#ec4899'
   },
   { 
+    name: 'Landing Mockups', 
+    href: '/super-admin/landing-mockups', 
+    icon: 'fa-mobile-alt',
+    color: '#f97316'
+  },
+  { 
     name: 'Monitoring', 
     href: '/super-admin/monitoring', 
     icon: 'fa-chart-line',
