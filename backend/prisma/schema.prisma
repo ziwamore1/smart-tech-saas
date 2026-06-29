@@ -1240,6 +1240,22 @@ model SubscriptionPlan {
   @@index([isActive])
 }
 
+model LandingMockup {
+  id           String   @id @default(cuid())
+  label        String
+  role         String   @default("student")
+  category     String   @default("dashboard")
+  imageUrl     String
+  thumbnailUrl String?
+  order        Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([role, category])
+  @@index([isActive, order])
+}
+
 model Subscription {
   id                        String             @id @default(uuid())
   schoolId                  String             @unique

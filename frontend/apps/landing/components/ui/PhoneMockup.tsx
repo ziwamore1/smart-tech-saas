@@ -2,9 +2,17 @@
 
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
+
+interface Screenshot {
+  label: string;
+  imageUrl?: string;
+  gradient?: string;
+  icon?: React.ReactNode;
+}
 
 interface PhoneMockupProps {
-  screenshots: { label: string; gradient: string; icon: React.ReactNode }[];
+  screenshots: Screenshot[];
   className?: string;
 }
 
@@ -39,17 +47,31 @@ export default function PhoneMockup({ screenshots, className = '' }: PhoneMockup
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: i === current ? 1 : 0, scale: i === current ? 1 : 0.95 }}
                 transition={{ duration: 0.5 }}
-                className="absolute inset-0 flex flex-col items-center justify-center p-6"
-                style={{ background: s.gradient }}
+                className="absolute inset-0 flex flex-col items-center justify-center"
               >
-                <div className="text-6xl mb-4">{s.icon}</div>
-                <span className="text-white font-semibold text-lg text-center">{s.label}</span>
-                <div className="mt-6 w-full space-y-2">
-                  <div className="h-2 bg-white/20 rounded-full w-3/4 mx-auto" />
-                  <div className="h-2 bg-white/20 rounded-full w-1/2 mx-auto" />
-                  <div className="h-2 bg-white/20 rounded-full w-5/6 mx-auto" />
-                  <div className="h-2 bg-white/20 rounded-full w-2/3 mx-auto" />
-                </div>
+                {s.imageUrl ? (
+                  <Image
+                    src={s.imageUrl}
+                    alt={s.label}
+                    fill
+                    className="object-cover"
+                    sizes="280px"
+                  />
+                ) : (
+                  <div
+                    className="w-full h-full flex flex-col items-center justify-center p-6"
+                    style={{ background: s.gradient || 'linear-gradient(135deg, #0F4C81, #00AEEF)' }}
+                  >
+                    {s.icon && <div className="text-6xl mb-4">{s.icon}</div>}
+                    <span className="text-white font-semibold text-lg text-center">{s.label}</span>
+                    <div className="mt-6 w-full space-y-2">
+                      <div className="h-2 bg-white/20 rounded-full w-3/4 mx-auto" />
+                      <div className="h-2 bg-white/20 rounded-full w-1/2 mx-auto" />
+                      <div className="h-2 bg-white/20 rounded-full w-5/6 mx-auto" />
+                      <div className="h-2 bg-white/20 rounded-full w-2/3 mx-auto" />
+                    </div>
+                  </div>
+                )}
               </motion.div>
             ))}
           </div>

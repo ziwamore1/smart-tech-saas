@@ -27,6 +27,7 @@ import { TimetableModule } from './timetable/timetable.module';
 import { ConstraintsModule } from './constraints/constraints.module';
 import { DashboardConfigModule } from './dashboard-config/dashboard-config.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
+import { LandingMockupModule } from './landing-mockup/landing-mockup.module';
 import { RoleModule } from './role/role.module';
 import { PaymentModule } from './payment/payment.module';
 import { CommunicationModule } from './communication/communication.module';
@@ -142,6 +143,7 @@ import { ProductionLogger } from './common/production-logger';
     ConstraintsModule,
     DashboardConfigModule,
     SuperAdminModule,
+    LandingMockupModule,
     RoleModule,
     PaymentModule,
     CommunicationModule,

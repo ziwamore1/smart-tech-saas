@@ -1,11 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GraduationCap, BarChart3, BookOpen, Shield, TrendingUp, Bot, ScrollText, Award } from 'lucide-react';
+import Image from 'next/image';
+import {
+  GraduationCap, BarChart3, BookOpen, Shield, TrendingUp, Bot, ScrollText, Award,
+} from 'lucide-react';
 import SectionHeading from '@/components/ui/SectionHeading';
+import { fetchMockups, type MockupImage } from '@/lib/api';
 
-const screenshots = [
+const fallbackScreenshots = [
   { label: 'Student Dashboard', gradient: 'linear-gradient(135deg, #0F4C81, #00AEEF)', icon: <GraduationCap className="w-8 h-8" />, desc: 'View grades, attendance, timetable, and assignments' },
   { label: 'Parent Dashboard', gradient: 'linear-gradient(135deg, #00C896, #00AEEF)', icon: <BarChart3 className="w-8 h-8" />, desc: 'Monitor child progress and school communications' },
   { label: 'Teacher Dashboard', gradient: 'linear-gradient(135deg, #0B1220, #0F4C81)', icon: <BookOpen className="w-8 h-8" />, desc: 'Manage classes, grades, and attendance records' },
@@ -18,20 +22,48 @@ const screenshots = [
 
 export default function GallerySection() {
   const [active, setActive] = useState(0);
+  const [mockups, setMockups] = useState<MockupImage[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchMockups().then((data) => {
+      setMockups(data);
+      setLoading(false);
+    });
+  }, []);
+
+  const hasRealImages = mockups.length > 0;
+
+  const displayItems = hasRealImages
+    ? mockups.map((m) => ({
+        id: m.id,
+        label: m.label,
+        gradient: 'linear-gradient(135deg, #0F4C81, #00AEEF)',
+        icon: <GraduationCap className="w-8 h-8" />,
+        imageUrl: m.imageUrl,
+        desc: `${m.role} — ${m.category}`,
+      }))
+    : fallbackScreenshots.map((s, i) => ({
+        id: String(i),
+        ...s,
+        imageUrl: undefined,
+      }));
+
+  const current = displayItems[active] || displayItems[0];
 
   return (
-    <section className="py-20 lg:py-28 bg-surface">
+    <section className="py-20 lg:py-28 bg-white" id="gallery">
       <div className="container-main">
         <SectionHeading
           title="See SMART_TECH in Action"
-          subtitle="Explore the intuitive interfaces designed for every role in your school."
+          subtitle={hasRealImages ? 'Real screenshots from the live mobile app. Uploaded by our team.' : 'Explore the intuitive interfaces designed for every role in your school.'}
         />
 
         <div className="mt-16 grid lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-2">
-            {screenshots.map((s, i) => (
+            {displayItems.map((s, i) => (
               <motion.button
-                key={i}
+                key={s.id}
                 onClick={() => setActive(i)}
                 whileHover={{ x: 4 }}
                 className={`w-full text-left p-4 rounded-xl transition-all duration-300 border ${
@@ -47,13 +79,18 @@ export default function GallerySection() {
                   >
                     {s.icon}
                   </div>
-                  <div>
-                    <div className="font-semibold text-text text-sm">{s.label}</div>
-                    <div className="text-xs text-text-secondary">{s.desc}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-text text-sm truncate">{s.label}</div>
+                    <div className="text-xs text-text-secondary truncate">
+                      {s.imageUrl ? `${(s as any).desc || s.label}` : (s as any).desc}
+                    </div>
                   </div>
                 </div>
               </motion.button>
             ))}
+            {loading && (
+              <div className="text-center py-4 text-text-secondary text-sm">Loading screenshots...</div>
+            )}
           </div>
 
           <div className="lg:col-span-3">
@@ -64,22 +101,33 @@ export default function GallerySection() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.4 }}
-                className="rounded-2xl p-8 lg:p-12 text-white min-h-[400px] flex flex-col items-center justify-center shadow-xl"
-                style={{ background: screenshots[active].gradient }}
+                className="rounded-2xl min-h-[400px] flex flex-col items-center justify-center shadow-xl overflow-hidden"
               >
-                <div className="text-8xl mb-6 opacity-30">
-                  {screenshots[active].icon}
-                </div>
-                <h3 className="text-2xl lg:text-3xl font-bold text-center">{screenshots[active].label}</h3>
-                <p className="text-white/70 text-center mt-3 max-w-md">{screenshots[active].desc}</p>
-                <div className="mt-8 flex gap-2">
-                  {[...Array(5)].map((_, i) => (
-                    <div
-                      key={i}
-                      className={`w-2 h-2 rounded-full ${i < 4 ? 'bg-white/60' : 'bg-white/20'}`}
+                {current.imageUrl ? (
+                  <div className="relative w-full h-[500px]">
+                    <Image
+                      src={current.imageUrl}
+                      alt={current.label}
+                      fill
+                      className="object-contain"
+                      sizes="(max-width: 1024px) 100vw, 60vw"
                     />
-                  ))}
-                </div>
+                  </div>
+                ) : (
+                  <div
+                    className="w-full h-full p-8 lg:p-12 text-white flex flex-col items-center justify-center"
+                    style={{ background: current.gradient, minHeight: '400px' }}
+                  >
+                    <div className="text-8xl mb-6 opacity-30">{current.icon}</div>
+                    <h3 className="text-2xl lg:text-3xl font-bold text-center">{current.label}</h3>
+                    <p className="text-white/70 text-center mt-3 max-w-md">{(current as any).desc}</p>
+                    <div className="mt-8 flex gap-2">
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} className={`w-2 h-2 rounded-full ${i < 4 ? 'bg-white/60' : 'bg-white/20'}`} />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </motion.div>
             </AnimatePresence>
           </div>

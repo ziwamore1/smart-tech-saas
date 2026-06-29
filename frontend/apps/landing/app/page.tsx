@@ -1,10 +1,10 @@
 import HeroSection from '@/components/sections/HeroSection';
 import StatsSection from '@/components/sections/StatsSection';
 import FeaturesSection from '@/components/sections/FeaturesSection';
-import AiTutorSection from '@/components/sections/AiTutorSection';
-import RoleSection from '@/components/sections/RoleSection';
 import PrimarySection from '@/components/sections/PrimarySection';
 import SecondarySection from '@/components/sections/SecondarySection';
+import AiTutorSection from '@/components/sections/AiTutorSection';
+import RoleSection from '@/components/sections/RoleSection';
 import MobileAppSection from '@/components/sections/MobileAppSection';
 import GallerySection from '@/components/sections/GallerySection';
 import WhySection from '@/components/sections/WhySection';
@@ -18,10 +18,10 @@ export default function HomePage() {
       <HeroSection />
       <StatsSection />
       <FeaturesSection />
-      <AiTutorSection />
-      <RoleSection />
       <PrimarySection />
       <SecondarySection />
+      <AiTutorSection />
+      <RoleSection />
       <MobileAppSection />
       <GallerySection />
       <WhySection />

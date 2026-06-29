@@ -19,7 +19,7 @@ export const ParentAttendanceScreen: React.FC = () => {
   const [children, setChildren] = useState<any[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [summary, setSummary] = useState({ present: 0, absent: 0, late: 0, excused: 0, total: 0 });
+  const [summary, setSummary] = useState({ present: 0, absent: 0, late: 0, excused: 0, sick: 0, total: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -42,12 +42,13 @@ export const ParentAttendanceScreen: React.FC = () => {
       const res = await apiService.getParentAttendance(selectedChildId);
       const data = Array.isArray(res) ? res : res?.data || res?.records || res?.attendance || [];
       setRecords(data);
-      const s = { present: 0, absent: 0, late: 0, excused: 0, total: data.length };
+      const s = { present: 0, absent: 0, late: 0, excused: 0, sick: 0, total: data.length };
       data.forEach((r: AttendanceRecord) => {
         if (r.status === 'PRESENT') s.present++;
         else if (r.status === 'ABSENT') s.absent++;
         else if (r.status === 'LATE') s.late++;
         else if (r.status === 'EXCUSED') s.excused++;
+        else if (r.status === 'SICK') s.sick++;
       });
       setSummary(s);
     } catch (err) {
@@ -73,6 +74,7 @@ export const ParentAttendanceScreen: React.FC = () => {
       case 'LATE': return '⏰';
       case 'ABSENT': return '❌';
       case 'EXCUSED': return '📄';
+      case 'SICK': return '🤒';
       default: return '❓';
     }
   };
@@ -83,6 +85,7 @@ export const ParentAttendanceScreen: React.FC = () => {
       case 'LATE': return '#D97706';
       case 'ABSENT': return '#DC2626';
       case 'EXCUSED': return '#7C3AED';
+      case 'SICK': return '#6366F1';
       default: return '#6B7280';
     }
   };
@@ -124,6 +127,7 @@ export const ParentAttendanceScreen: React.FC = () => {
                 <View style={styles.statItem}><Text style={[styles.statValue, { color: colors.warning }]}>{summary.late}</Text><Text style={styles.statLabel}>Late</Text></View>
                 <View style={styles.statItem}><Text style={[styles.statValue, { color: colors.error }]}>{summary.absent}</Text><Text style={styles.statLabel}>Absent</Text></View>
                 <View style={styles.statItem}><Text style={[styles.statValue, { color: colors.purple }]}>{summary.excused}</Text><Text style={styles.statLabel}>Excused</Text></View>
+                <View style={styles.statItem}><Text style={[styles.statValue, { color: '#6366F1' }]}>{summary.sick}</Text><Text style={styles.statLabel}>Sick</Text></View>
               </View>
               <View style={styles.progressBar}>
                 <View style={[styles.progressFill, { width: `${attendanceRate}%`, backgroundColor: rateColor }]} />
@@ -142,7 +146,7 @@ export const ParentAttendanceScreen: React.FC = () => {
                   <View style={styles.recordInfo}>
                     <Text style={styles.recordDate}>{new Date(r.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</Text>
                     <Text style={[styles.recordStatus, { color: getStatusColor(r.status) }]}>
-                      {r.status === 'PRESENT' ? 'Present' : r.status === 'LATE' ? 'Late' : r.status === 'ABSENT' ? 'Absent' : r.status === 'EXCUSED' ? 'Excused' : r.status}
+                      {r.status === 'PRESENT' ? 'Present' : r.status === 'LATE' ? 'Late' : r.status === 'ABSENT' ? 'Absent' : r.status === 'EXCUSED' ? 'Excused' : r.status === 'SICK' ? 'Sick' : r.status}
                     </Text>
                   </View>
                   <View style={styles.recordTimes}>
