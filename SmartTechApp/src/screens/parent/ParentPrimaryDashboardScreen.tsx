@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
+  View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
   RefreshControl, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +15,7 @@ interface ChildSummary {
   firstName: string;
   lastName: string;
   admissionNumber: string;
+  photoUrl?: string;
   className?: string;
   levelType?: string;
   attendanceRate?: number;
@@ -46,6 +47,7 @@ export const ParentPrimaryDashboardScreen: React.FC = () => {
           firstName: c.firstName || c.student?.firstName,
           lastName: c.lastName || c.student?.lastName,
           admissionNumber: c.admissionNumber || c.student?.admissionNumber,
+          photoUrl: c.photoUrl || c.student?.photoUrl || null,
           className: c.class?.name || c.className,
           levelType: c.levelType || c.class?.levelType?.name,
         };
@@ -150,11 +152,15 @@ export const ParentPrimaryDashboardScreen: React.FC = () => {
           <>
             {/* Hero Card */}
             <View style={styles.heroCard}>
-              <View style={styles.heroAvatar}>
-                <Text style={styles.heroAvatarText}>
-                  {selectedChild.firstName[0]}{selectedChild.lastName[0]}
-                </Text>
-              </View>
+              {selectedChild.photoUrl ? (
+                <Image source={{ uri: selectedChild.photoUrl }} style={styles.heroAvatarImg} />
+              ) : (
+                <View style={styles.heroAvatar}>
+                  <Text style={styles.heroAvatarText}>
+                    {selectedChild.firstName[0]}{selectedChild.lastName[0]}
+                  </Text>
+                </View>
+              )}
               <Text style={styles.heroName}>{selectedChild.firstName} {selectedChild.lastName}</Text>
               <Text style={styles.heroClass}>{selectedChild.className || 'Class not set'}</Text>
               {selectedChild.levelType && (
@@ -321,6 +327,7 @@ const styles = StyleSheet.create({
   childChipTextActive: { color: colors.white },
   heroCard: { backgroundColor: colors.white, borderRadius: borderRadius.xl, padding: spacing.lg, alignItems: 'center', marginBottom: spacing.md, ...shadows.md },
   heroAvatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginBottom: spacing.sm },
+  heroAvatarImg: { width: 64, height: 64, borderRadius: 32, marginBottom: spacing.sm },
   heroAvatarText: { color: colors.white, fontSize: 22, fontWeight: '700' },
   heroName: { fontSize: 20, fontWeight: '700', color: colors.text },
   heroClass: { fontSize: 14, color: colors.textLight, marginTop: 2 },

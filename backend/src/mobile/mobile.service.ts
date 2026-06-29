@@ -70,8 +70,11 @@ export class MobileService {
         dashboard.children = children.map((ps) => ({
           id: ps.student.id,
           name: `${ps.student.firstName} ${ps.student.lastName}`,
+          firstName: ps.student.firstName,
+          lastName: ps.student.lastName,
           admissionNumber: ps.student.admissionNumber,
           class: ps.student.enrollments[0]?.class?.name || 'Not assigned',
+          photoUrl: ps.student.photoUrl || null,
         }));
 
         dashboard.stats = {

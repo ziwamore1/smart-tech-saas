@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, WidgetCard, GradientCard } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useAuthStore, useAppStore } from '../../store';
+import { resolveImageUrl } from '../../services/api';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -43,9 +44,13 @@ export const ParentDashboardScreen: React.FC<Props> = ({ onToggleDrawer, onNavig
           ) : (
             children.map((child: any) => (
               <TouchableOpacity key={child.id} style={styles.childCard} onPress={() => navigation.navigate('ParentChildResults', { childId: child.id, childName: child.name })}>
-                <View style={styles.childAvatar}>
-                  <Text style={styles.childAvatarText}>{child.name?.[0]}</Text>
-                </View>
+                {child.photoUrl ? (
+                  <Image source={{ uri: resolveImageUrl(child.photoUrl) || child.photoUrl }} style={styles.childAvatarImg} />
+                ) : (
+                  <View style={styles.childAvatar}>
+                    <Text style={styles.childAvatarText}>{child.name?.[0]}</Text>
+                  </View>
+                )}
                 <View style={styles.childInfo}>
                   <Text style={styles.childName}>{child.name}</Text>
                   <Text style={styles.childClass}>{child.class} • {child.admissionNumber}</Text>
@@ -104,6 +109,7 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.md },
   childCard: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   childAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
+  childAvatarImg: { width: 48, height: 48, borderRadius: 24, marginRight: spacing.md },
   childAvatarText: { color: colors.white, fontWeight: '700', fontSize: 18 },
   childInfo: { flex: 1 },
   childName: { fontSize: 16, fontWeight: '600', color: colors.text },

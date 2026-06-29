@@ -94,6 +94,7 @@ export class ParentService {
           class: currentEnrollment?.class?.name || 'Not assigned',
           attendancePercentage: attendanceRate,
           upcomingActivity,
+          photoUrl: ps.student.photoUrl || null,
         };
       }),
     );

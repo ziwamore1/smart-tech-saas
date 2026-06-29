@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '../../components';
 import { colors, spacing } from '../../theme';
 import { useAppStore } from '../../store';
+import { resolveImageUrl } from '../../services/api';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -26,7 +27,11 @@ export const ParentChildrenScreen: React.FC = () => {
           children.map((child: any) => (
             <TouchableOpacity key={child.id} onPress={() => navigation.navigate('PResults', { childId: child.id, childName: child.name })}>
               <Card variant="outlined" style={styles.childCard}>
-                <View style={styles.avatar}><Text style={styles.avatarText}>{child.name?.[0]}</Text></View>
+                {child.photoUrl ? (
+                  <Image source={{ uri: resolveImageUrl(child.photoUrl) || child.photoUrl }} style={styles.avatarImg} />
+                ) : (
+                  <View style={styles.avatar}><Text style={styles.avatarText}>{child.name?.[0]}</Text></View>
+                )}
                 <View style={styles.info}>
                   <Text style={styles.name}>{child.name}</Text>
                   <Text style={styles.detail}>{child.class}</Text>
@@ -49,6 +54,7 @@ const styles = StyleSheet.create({
   emptyCard: { padding: spacing.xl },
   childCard: { padding: spacing.md, flexDirection: 'row', alignItems: 'center' },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.secondary, justifyContent: 'center', alignItems: 'center' },
+  avatarImg: { width: 48, height: 48, borderRadius: 24 },
   avatarText: { color: colors.white, fontWeight: '700', fontSize: 20 },
   info: { marginLeft: spacing.md, flex: 1 },
   name: { fontSize: 16, fontWeight: '600', color: colors.text },
