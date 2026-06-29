@@ -7,6 +7,7 @@ import { OtpService } from './otp.service';
 import { AccountRecoveryService } from './account-recovery.service';
 import { SessionManagementService } from './session-management.service';
 import { SecurityAuditService } from './security-audit.service';
+import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -111,6 +112,12 @@ export class IdentityService {
         generatedById: adminId,
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
+    });
+
+    const hashedPassword = await bcrypt.hash(generatedPassword.password, 10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
     });
 
     const school = user.schoolId ? await this.prisma.school.findUnique({ where: { id: user.schoolId } }) : null;
@@ -223,6 +230,7 @@ export class IdentityService {
 
     const role = user.userRoles[0]?.role?.name || 'User';
     const generatedPassword = this.passwordGenService.generateRoleBasedPassword(role);
+    const hashedPassword = await bcrypt.hash(generatedPassword.password, 10);
 
     await this.prisma.$transaction([
       this.prisma.passwordHistory.create({
@@ -231,7 +239,7 @@ export class IdentityService {
       this.prisma.user.update({
         where: { id: userId },
         data: {
-          password: generatedPassword.hash,
+          password: hashedPassword,
           mustChangePassword: true,
           lastPasswordChange: new Date(),
         },
@@ -537,10 +545,10 @@ export class IdentityService {
       throw new BadRequestException(validation.errors.join('; '));
     }
 
-    const hash = crypto.createHash('sha256').update(newPassword).digest('hex');
-
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     await this.prisma.$transaction([
       this.prisma.passwordHistory.create({
@@ -549,7 +557,7 @@ export class IdentityService {
       this.prisma.user.update({
         where: { id: userId },
         data: {
-          password: hash,
+          password: hashedPassword,
           mustChangePassword: false,
           lastPasswordChange: new Date(),
         },

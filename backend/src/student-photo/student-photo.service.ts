@@ -50,7 +50,18 @@ export class StudentPhotoService {
       select: { id: true, imageUrl: true, thumbnailUrl: true, createdAt: true },
     });
 
-    return photo || { studentId: resolvedId, imageUrl: null, thumbnailUrl: null };
+    if (photo) return photo;
+
+    const student = await this.prisma.student.findUnique({
+      where: { id: resolvedId },
+      select: { photoUrl: true },
+    });
+
+    return {
+      studentId: resolvedId,
+      imageUrl: student?.photoUrl || null,
+      thumbnailUrl: student?.photoUrl || null,
+    };
   }
 
   private async resolveStudentId(id: string): Promise<string> {
@@ -72,6 +83,17 @@ export class StudentPhotoService {
     for (const p of photos) {
       if (!latestPerStudent.has(p.studentId)) {
         latestPerStudent.set(p.studentId, { imageUrl: p.imageUrl, thumbnailUrl: p.thumbnailUrl });
+      }
+    }
+
+    const studentsWithPhoto = await this.prisma.student.findMany({
+      where: { id: { in: studentIds }, photoUrl: { not: null } },
+      select: { id: true, photoUrl: true },
+    });
+
+    for (const s of studentsWithPhoto) {
+      if (!latestPerStudent.has(s.id)) {
+        latestPerStudent.set(s.id, { imageUrl: s.photoUrl, thumbnailUrl: s.photoUrl });
       }
     }
 

@@ -40,6 +40,10 @@ export const StudentAttendanceScreen: React.FC = () => {
   const present = summary?.present ?? attendance.filter((a: any) => a.status === 'PRESENT').length;
   const absent = summary?.absent ?? attendance.filter((a: any) => a.status === 'ABSENT').length;
   const late = summary?.late ?? attendance.filter((a: any) => a.status === 'LATE').length;
+  const excused = summary?.excused ?? attendance.filter((a: any) => a.status === 'EXCUSED').length;
+  const sick = summary?.sick ?? attendance.filter((a: any) => a.status === 'SICK').length;
+
+  const rateColor = rate >= 90 ? '#10b981' : rate >= 75 ? '#3b82f6' : rate >= 50 ? '#f59e0b' : '#ef4444';
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -70,15 +74,17 @@ export const StudentAttendanceScreen: React.FC = () => {
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Card style={styles.summaryCard}>
-          <Text style={styles.summaryValue}>{rate}%</Text>
+          <Text style={[styles.summaryValue, { color: rateColor }]}>{rate}%</Text>
           <Text style={styles.summaryLabel}>Attendance Rate</Text>
           <View style={styles.progressBg}>
-            <View style={[styles.progressFill, { width: `${rate}%`, backgroundColor: rate >= 75 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444' }]} />
+            <View style={[styles.progressFill, { width: `${rate}%`, backgroundColor: rateColor }]} />
           </View>
           <View style={styles.summaryRow}>
             <View><Text style={styles.summaryNum}>{present}</Text><Text style={styles.summarySmall}>Present</Text></View>
-            <View><Text style={styles.summaryNum}>{absent}</Text><Text style={styles.summarySmall}>Absent</Text></View>
-            <View><Text style={styles.summaryNum}>{late}</Text><Text style={styles.summarySmall}>Late</Text></View>
+            <View><Text style={[styles.summaryNum, { color: '#D97706' }]}>{late}</Text><Text style={styles.summarySmall}>Late</Text></View>
+            <View><Text style={[styles.summaryNum, { color: '#DC2626' }]}>{absent}</Text><Text style={styles.summarySmall}>Absent</Text></View>
+            <View><Text style={[styles.summaryNum, { color: '#7C3AED' }]}>{excused}</Text><Text style={styles.summarySmall}>Excused</Text></View>
+            <View><Text style={[styles.summaryNum, { color: '#6366F1' }]}>{sick}</Text><Text style={styles.summarySmall}>Sick</Text></View>
           </View>
         </Card>
 
