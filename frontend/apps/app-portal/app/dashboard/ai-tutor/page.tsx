@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { intelligenceApi, subjectApi } from '@/lib/api';
+import { intelligenceApi, subjectApi, studentApi } from '@/lib/api';
 import { classApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
@@ -50,10 +50,19 @@ export default function AiTutorPage() {
     subjectId: selectedSubject || undefined,
   }), [user, selectedSubject, subjects]);
 
-  const { data: students } = useQuery({
-    queryKey: ['class-students', selectedStudent],
-    enabled: false,
+  const { data: studentsData } = useQuery({
+    queryKey: ['ai-tutor-students'],
+    queryFn: async () => {
+      const res = await studentApi.getAll({ limit: 500 });
+      const d = res.data?.data || res.data;
+      return Array.isArray(d) ? d : [];
+    },
   });
+  const students = useMemo(() => {
+    if (Array.isArray(studentsData)) return studentsData;
+    if (studentsData?.data && Array.isArray(studentsData.data)) return studentsData.data;
+    return [];
+  }, [studentsData]);
 
   const startSession = useMutation({
     mutationFn: () => intelligenceApi.startTutorSession(selectedStudent, selectedSubject || undefined, undefined, context),
@@ -126,11 +135,11 @@ export default function AiTutorPage() {
               className="w-full px-3 py-2 border rounded-lg"
             >
               <option value="">Select Student</option>
-              {(classes || []).flatMap((cls: any) =>
-                cls.students?.map((s: any) => (
-                  <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({cls.name})</option>
-                )) || []
-              )}
+              {(students || []).map((s: any) => (
+                <option key={s.id} value={s.id}>
+                  {s.firstName} {s.lastName}{s.className || s.class?.name ? ` (${s.className || s.class?.name})` : ''}
+                </option>
+              ))}
             </select>
           </div>
           <div>
