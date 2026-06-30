@@ -7,13 +7,15 @@ import TrustIndicator from '@/components/ui/TrustIndicator';
 import PhoneMockup from '@/components/ui/PhoneMockup';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.smarttechsaas.com/api/v1';
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'https://api.smarttechsaas.com/api/v1').replace(/\/+$/, '');
+const API_URL = API_BASE.includes('/api/v1') ? API_BASE : `${API_BASE}/api/v1`;
+const PUBLIC_MOCKUPS_URL = `${API_URL}/public/landing-mockups`;
 
 interface MockupImage { id: string; label: string; role: string; category: string; imageUrl: string; thumbnailUrl?: string; }
 
 async function fetchMockups(): Promise<MockupImage[]> {
   try {
-    const res = await fetch(`${API_URL}/public/landing-mockups`);
+    const res = await fetch(PUBLIC_MOCKUPS_URL);
     if (!res.ok) return [];
     return res.json();
   } catch { return []; }
