@@ -13,7 +13,8 @@ export class CreateMockupDto {
   category?: string;
 
   @IsString()
-  imageUrl: string;
+  @IsOptional()
+  imageUrl?: string;
 
   @IsString()
   @IsOptional()
