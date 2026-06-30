@@ -37,7 +37,9 @@ export default function GallerySection() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('[GallerySection] Fetching mockups from:', PUBLIC_MOCKUPS_URL);
     fetchMockups().then((data) => {
+      console.log('[GallerySection] Mockups fetched:', data?.length, data);
       setMockups(data);
       setLoading(false);
     });

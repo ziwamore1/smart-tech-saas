@@ -31,12 +31,18 @@ export default function HeroSection() {
   const [mockups, setMockups] = useState<MockupImage[]>([]);
 
   useEffect(() => {
-    fetchMockups().then(setMockups);
+    console.log('[HeroSection] Fetching mockups from:', PUBLIC_MOCKUPS_URL);
+    fetchMockups().then((data) => {
+      console.log('[HeroSection] Mockups fetched:', data?.length, data);
+      setMockups(data);
+    });
   }, []);
 
   const screenshots = mockups.length > 0
     ? mockups.map((m) => ({ label: m.label, imageUrl: m.imageUrl }))
     : fallbackScreenshots;
+
+  console.log('[HeroSection] screenshots:', mockups.length, screenshots.length, screenshots[0]?.imageUrl?.slice(0, 50));
 
     return (
     <section className="relative min-h-screen flex items-center overflow-hidden gradient-hero">
