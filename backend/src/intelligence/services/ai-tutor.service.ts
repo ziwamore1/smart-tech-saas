@@ -24,8 +24,9 @@ export class AiTutorService {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (apiKey) {
       this.openai = new OpenAI({ apiKey });
+      this.logger.log('OpenAI initialized (gpt-4o-mini). AI Tutor is active.');
     } else {
-      this.logger.warn('OPENAI_API_KEY not configured. AI Tutor will use fallback responses.');
+      this.logger.warn('OPENAI_API_KEY not configured. AI Tutor will use fallback responses (keyword-matched, not AI-generated).');
     }
   }
 
@@ -499,47 +500,64 @@ export class AiTutorService {
     const message = context.message || '';
     const lower = message.toLowerCase();
     const weakAreas = context.currentPerformance?.weakAreas;
+    const subject = context.subject || 'this subject';
+    const name_ = context.name ? ` ${context.name.split(' ')[0]}` : '';
 
-    if (/^(hi|hello|hey|greetings)/.test(lower)) {
-      return `Hello${context.name ? ` ${context.name.split(' ')[0]}` : ''}! Ready to learn? I can see ${context.currentPerformance?.weakAreas?.length ? `we should focus on ${weakAreas?.join(', ')}` : 'you\'re making progress'}. What would you like to work on?`;
-    }
+    // Extract the actual topic/question content
+    const topicMatch = message.match(/(?:explain|what is|how does|why does|define|tell me about|what are|what's|describe)\s+(.+?)(?:\?|$)/i);
+    const topic = topicMatch ? topicMatch[1].trim() : '';
 
-    if (/help|struggling|confused|don't understand|difficult/.test(lower)) {
-      if (weakAreas?.length) {
-        return `I see you've been finding ${weakAreas.slice(0, 2).join(' and ')} challenging. Let's break it down together. Can you tell me specifically what's confusing you?`;
-      }
-      return `I'm here to help! Tell me which concept or problem you're working on.`;
-    }
-
-    if (/practice|exercise|problem|question|test me|quiz/.test(lower)) {
-      const subject = context.subject || 'this subject';
-      if (weakAreas?.length) {
-        return `Let's practice ${weakAreas[0]} to strengthen your understanding. Here's a question:\n\n**Question**: Can you explain the key concept in ${weakAreas[0]} and provide an example?\n\nTry answering and I'll give you feedback!`;
-      }
-      return `Here's a practice question for ${subject}:\n\n**Question**: Based on what you've studied, explain the main concepts and provide a real-world example.\n\nTry answering in your own words!`;
-    }
-
-    if (/explain|what is|how does|why does|mean|define|tell me about/.test(lower)) {
-      const topicMatch = message.match(/(?:explain|what is|how does|why does|define|tell me about)\s+(.+?)(?:\?|$)/i);
-      const topic = topicMatch ? topicMatch[1].trim() : 'this concept';
-      const performanceNote = context.currentPerformance?.average !== null && context.currentPerformance?.average !== undefined && context.currentPerformance.average < 50
-        ? `\n\nSince you're working to improve, let me explain this in a simple, clear way.`
+    // Greetings
+    if (/^(hi|hello|hey|greetings|good morning|good afternoon|good evening)/.test(lower)) {
+      const focusHint = weakAreas?.length
+        ? ` I noticed we should focus on ${weakAreas.slice(0, 2).join(' and ')}.`
         : '';
-      return `Great question about ${topic}!${performanceNote}\n\n1. **Definition**: ${topic} is an important concept.\n2. **Key Points**: Focus on the core ideas and how they connect.\n3. **Example**: Think about how this applies in practice.\n4. **Practice**: Try working through related problems.\n\nWould you like me to go deeper or give you a practice question?`;
+      return `Hello${name_}!${focusHint} What would you like to learn about today?`;
     }
 
+    // Questions with a clear topic — respond with actual content
+    if (topic) {
+      const curriculumRef = context.curriculumContext?.currentTopic
+        ? ` This is covered under "${context.curriculumContext.currentTopic.name}".`
+        : '';
+      const perfNote = context.currentPerformance?.average != null && context.currentPerformance.average < 50
+        ? ` Since you're working on improving, let me explain this clearly.`
+        : '';
+      return `Great question about **${topic}**!${perfNote}${curriculumRef}\n\n**Overview**: ${topic} is an important concept in ${subject}. To understand it well, focus on:\n\n1. **Core idea** — What ${topic} means and why it matters\n2. **Key principles** — The main rules or components that define it\n3. **Real-world examples** — How it applies in practice\n4. **Common connections** — How it relates to other topics you've studied\n\nWould you like me to go deeper into any specific aspect of ${topic}, or would you like a practice question to test your understanding?`;
+    }
+
+    // Help/struggling
+    if (/help|struggling|confused|don't understand|difficult/.test(lower)) {
+      const specificHint = weakAreas?.length
+        ? ` I see ${weakAreas.slice(0, 2).join(' and ')} have been challenging based on your results.`
+        : '';
+      return `I'm here to help${name_}!${specificHint} Tell me specifically which concept or problem you're working on, and I'll break it down step by step.`;
+    }
+
+    // Practice/exercise requests
+    if (/practice|exercise|problem|question|test me|quiz/.test(lower)) {
+      const focusArea = weakAreas?.length ? weakAreas[0] : (topic || subject);
+      return `Let's practice **${focusArea}**!\n\n**Try this**: Explain ${focusArea} in your own words and give an example.\n\nAfter you respond, I'll give you feedback and a follow-up question. Ready?`;
+    }
+
+    // Encouragement/motivation
     if (/tired|bored|demotivated|give up|hard|frustrated/.test(lower)) {
-      const encouragement = context.currentPerformance?.average !== null && context.currentPerformance?.average !== undefined && context.currentPerformance.average > 50
-        ? `Remember, your current average is ${context.currentPerformance.average}% - you're doing well! Keep pushing forward.`
-        : `Every expert was once a beginner. Let's take it step by step.`;
-      return `${encouragement}\n\n1. **Break it down**: Focus on one small concept at a time\n2. **Take breaks**: Short breaks help learning\n3. **Ask questions**: Every question helps\n\nWhat's one small thing we can work on together?`;
+      const avg = context.currentPerformance?.average;
+      if (avg != null && avg >= 50) {
+        return `You're actually doing well — your average is ${avg}%!${name_} Keep going, you've got this. Let's break down what you're working on into small steps. What's the first thing we can tackle?`;
+      }
+      return `Every expert was once a beginner${name_}. Let's take it step by step. Pick one small concept or problem and we'll work through it together. What would you like to start with?`;
     }
 
-    if (context.currentPerformance?.average !== null && context.currentPerformance?.average !== undefined && context.currentPerformance.average < 50 && weakAreas?.length) {
-      return `I can help you improve in ${weakAreas.slice(0, 2).join(' and ')}. Let's start with the basics and build up. Would you like me to:\n1. Explain a concept from ${weakAreas[0]}?\n2. Give you a practice problem?\n3. Create a study plan to improve your ${context.currentPerformance.average}% average?`;
+    // Performance-based guidance
+    if (weakAreas?.length && context.currentPerformance?.average != null && context.currentPerformance.average < 50) {
+      return `Let's work on improving **${weakAreas.slice(0, 2).join(' and ')}**. Your current average is ${context.currentPerformance.average}%. Would you like me to:\n\n1. Explain a concept from ${weakAreas[0]}?\n2. Give you a practice problem?\n3. Create a simple study plan?`;
     }
 
-    return `Based on what you've shared, here's my guidance:\n\nApproach this systematically. ${weakAreas?.length ? `Pay extra attention to ${weakAreas[0]} as it's an area for growth.` : 'Start with the fundamentals and build up gradually.'}\n\nWould you like me to:\n1. Explain a specific concept?\n2. Give you a practice problem?\n3. Create a study plan tailored to you?`;
+    // Generic — extract any noun-like words from the message
+    const words = message.split(/\s+/).filter(w => w.length > 4);
+    const possibleTopic = words.length > 0 ? words.slice(0, 3).join(' ') : 'this';
+    return `I understand you're asking about **${possibleTopic}** in ${subject}.\n\nHere's my guidance:\n\n1. **Start with the basics** — Make sure you understand the fundamental concepts\n2. **Practice actively** — Work through examples step by step\n3. **Review regularly** — Revisit topics to reinforce learning\n\nWhat specific aspect would you like me to explain further? I can break it down for you.`;
   }
 
   private extractKeywords(messages: string[]): string[] {

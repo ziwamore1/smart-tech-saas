@@ -62,7 +62,7 @@ export default function AiTutorPage() {
       setSessionId(data.sessionId || data.id);
       setChatMessages([{
         role: 'tutor',
-        content: `Hello! I'm your AI tutor. I'm here to help you with ${selectedSubject || 'your studies'}. What would you like to learn about?`,
+        content: data.message || `Hello! I'm your AI tutor. I'm here to help you with ${selectedSubject || 'your studies'}. What would you like to learn about?`,
         timestamp: new Date().toISOString(),
       }]);
     },
