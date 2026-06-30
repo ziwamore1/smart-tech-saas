@@ -113,8 +113,21 @@ export default function LessonPlansPage() {
   const handleCreate = async () => {
     if (!newPlan.title.trim() || !newPlan.classId || !newPlan.subjectId) return;
     
+    const today = new Date();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - today.getDay() + 1);
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4);
+
+    const payload = {
+      ...newPlan,
+      tags: newPlan.tags,
+      weekStart: newPlan.weekStart || monday.toISOString().split('T')[0],
+      weekEnd: newPlan.weekEnd || friday.toISOString().split('T')[0],
+    };
+
     try {
-      const response = await lessonPlansApi.create({ ...newPlan, tags: newPlan.tags });
+      const response = await lessonPlansApi.create(payload);
       setShowAddModal(false);
       router.push(`/dashboard/lesson-plans/${response.data.id}/edit`);
     } catch (error) {
