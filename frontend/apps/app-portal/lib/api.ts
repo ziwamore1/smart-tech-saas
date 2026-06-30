@@ -2166,6 +2166,6 @@ export const landingMockupApi = {
   delete: (id: string) => api.delete(`/landing-mockups/${id}`),
   upload: (formData: FormData) =>
     api.post('/landing-mockups/upload', formData, {
-      timeout: 60000,
+      timeout: 180000,
     }),
 };
