@@ -1,19 +1,29 @@
 'use client';
 
-import { BookOpen, BarChart3, MessageSquare, GraduationCap, Smartphone } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { BookOpen, BarChart3, GraduationCap, Smartphone } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import TrustIndicator from '@/components/ui/TrustIndicator';
 import PhoneMockup from '@/components/ui/PhoneMockup';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
+import { fetchMockups, type MockupImage } from '@/lib/api';
 
-const screenshots = [
+const fallbackScreenshots = [
   { label: 'Student Dashboard', gradient: 'linear-gradient(135deg, #0F4C81, #00AEEF)', icon: <GraduationCap /> },
   { label: 'Parent Dashboard', gradient: 'linear-gradient(135deg, #00C896, #00AEEF)', icon: <BarChart3 /> },
   { label: 'Teacher Dashboard', gradient: 'linear-gradient(135deg, #0B1220, #0F4C81)', icon: <BookOpen /> },
 ];
 
 export default function HeroSection() {
-  return (
+  const [mockups, setMockups] = useState<MockupImage[]>([]);
+
+  useEffect(() => {
+    fetchMockups().then(setMockups);
+  }, []);
+
+  const screenshots = mockups.length > 0
+    ? mockups.map((m) => ({ label: m.label, imageUrl: m.imageUrl }))
+    : fallbackScreenshots;
     <section className="relative min-h-screen flex items-center overflow-hidden gradient-hero">
       <AnimatedBackground />
 
