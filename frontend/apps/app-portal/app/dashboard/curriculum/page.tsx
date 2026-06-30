@@ -7,6 +7,7 @@ const sections = [
   { name: 'Curriculum Versions', href: '/dashboard/curriculum/versions', icon: 'fa-code-branch', color: '#10b981', desc: 'Manage curriculum versions and effective periods' },
   { name: 'Academic Stages', href: '/dashboard/curriculum/stages', icon: 'fa-stairs', color: '#8b5cf6', desc: 'Define grades, forms, and academic stages per level' },
   { name: 'Subject Groups', href: '/dashboard/curriculum/subject-groups', icon: 'fa-object-group', color: '#f59e0b', desc: 'Group subjects by category (core, elective, optional)' },
+  { name: 'Composite Subjects', href: '/dashboard/curriculum/composite-subjects', icon: 'fa-puzzle-piece', color: '#06b6d4', desc: 'Combine component subjects into a single computed score for report cards (Grades 10-12)' },
   { name: 'Conversion Rules', href: '/dashboard/curriculum/conversion-rules', icon: 'fa-exchange-alt', color: '#ef4444', desc: 'ECZ Grade 7 raw-to-standardized score conversion' },
   { name: 'Division Rules', href: '/dashboard/curriculum/divisions', icon: 'fa-trophy', color: '#14b8a6', desc: 'Per-subject and composite division cutoff rules' },
   { name: 'Performance Categories', href: '/dashboard/curriculum/performance-categories', icon: 'fa-chart-line', color: '#f97316', desc: 'Define performance labels and score ranges' },

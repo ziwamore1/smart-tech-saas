@@ -1706,6 +1706,16 @@ export const curriculumApi = {
   removeSubjectFromGroup: (groupId: string, subjectId: string) =>
     api.delete(`/curriculum/subject-groups/${groupId}/subjects/${subjectId}`),
 
+  // Composite Subjects
+  createCompositeSubject: (data: any) => api.post('/composite-subjects', data),
+  getCompositeSubjects: (params?: { curriculumId?: string; schoolId?: string; isActive?: boolean }) =>
+    api.get('/composite-subjects', { params }),
+  getCompositeSubject: (id: string) => api.get(`/composite-subjects/${id}`),
+  updateCompositeSubject: (id: string, data: any) => api.put(`/composite-subjects/${id}`, data),
+  deleteCompositeSubject: (id: string) => api.delete(`/composite-subjects/${id}`),
+  recomputeCompositeSubject: (id: string, data: { classId: string; termId: string; schoolId: string; studentIds?: string[] }) =>
+    api.post(`/composite-subjects/${id}/recompute`, data),
+
   // Subject Combination Rules
   createCombinationRule: (data: any) => api.post('/curriculum/subject-combination-rules', data),
   getCombinationRules: (subjectGroupId?: string) =>
