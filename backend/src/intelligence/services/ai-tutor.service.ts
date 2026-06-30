@@ -255,6 +255,39 @@ export class AiTutorService {
     };
   }
 
+  async checkHealth(): Promise<{ status: string; openai: boolean; model: string; testResponse?: string; error?: string }> {
+    if (!this.openai) {
+      return { status: 'fallback', openai: false, model: 'none', error: 'OPENAI_API_KEY not configured' };
+    }
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: 'You are a health check endpoint. Reply with exactly: "OK" followed by today\'s date.' },
+          { role: 'user', content: 'Confirm you are working.' },
+        ],
+        max_tokens: 50,
+        temperature: 0,
+      });
+
+      const content = response.choices[0]?.message?.content || '(empty)';
+      return {
+        status: 'active',
+        openai: true,
+        model: 'gpt-4o-mini',
+        testResponse: content,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        openai: true,
+        model: 'gpt-4o-mini',
+        error: `${(error as any)?.message || error}`,
+      };
+    }
+  }
+
   private async buildFullContext(schoolId: string, partial?: Partial<AiContext>): Promise<AiContext> {
     const context: AiContext = {
       role: partial?.role || 'student',
@@ -451,13 +484,23 @@ export class AiTutorService {
       const response = await this.openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages,
-        max_tokens: 1024,
+        max_tokens: 2048,
         temperature: 0.7,
       });
 
-      return response.choices[0]?.message?.content || this.fallbackResponse(context);
+      const content = response.choices[0]?.message?.content;
+      const finishReason = response.choices[0]?.finish_reason;
+      if (content) {
+        this.logger.log(`OpenAI response OK (${content.length} chars, finish_reason: ${finishReason})`);
+        return content;
+      }
+      this.logger.warn(`OpenAI returned empty content (finish_reason: ${finishReason})`);
+      return this.fallbackResponse(context);
     } catch (error) {
-      this.logger.error('OpenAI API error:', error);
+      this.logger.error(`OpenAI API error [${(error as any)?.status || 'unknown'}]: ${(error as any)?.message || error}`);
+      if ((error as any)?.response?.data) {
+        this.logger.error(`OpenAI error details: ${JSON.stringify((error as any).response.data)}`);
+      }
       return this.fallbackResponse(context);
     }
   }
@@ -474,7 +517,7 @@ export class AiTutorService {
             { role: 'system', content: systemPrompt },
             { role: 'user', content: introPrompt },
           ],
-          max_tokens: 200,
+          max_tokens: 300,
           temperature: 0.8,
         });
 

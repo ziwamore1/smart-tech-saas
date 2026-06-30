@@ -407,4 +407,9 @@ export class IntelligenceController {
   async getTutorInsights(@Req() req: any, @Param('studentId') studentId: string) {
     return this.aiTutor.getTutorInsights(studentId, req.user.schoolId);
   }
+
+  @Get('ai-tutor/health')
+  async checkAiTutorHealth() {
+    return this.aiTutor.checkHealth();
+  }
 }
