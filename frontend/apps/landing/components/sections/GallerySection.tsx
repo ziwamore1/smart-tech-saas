@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import Image from 'next/image';
 import {
   GraduationCap, BarChart3, BookOpen, Shield, TrendingUp, Bot, ScrollText, Award,
 } from 'lucide-react';
@@ -117,13 +116,10 @@ export default function GallerySection() {
               >
                 {current.imageUrl ? (
                   <div className="relative w-full h-[500px]">
-                    <Image
+                    <img
                       src={current.imageUrl}
                       alt={current.label}
-                      fill
-                      className="object-contain"
-                      sizes="(max-width: 1024px) 100vw, 60vw"
-                      unoptimized
+                      className="absolute inset-0 w-full h-full object-contain"
                     />
                   </div>
                 ) : (

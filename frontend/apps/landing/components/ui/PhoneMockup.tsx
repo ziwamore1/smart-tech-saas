@@ -2,7 +2,6 @@
 
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 
 interface Screenshot {
   label: string;
@@ -48,13 +47,10 @@ export default function PhoneMockup({ screenshots, className = '' }: PhoneMockup
                 className="absolute inset-0 flex flex-col items-center justify-center"
               >
                 {s.imageUrl ? (
-                  <Image
+                  <img
                     src={s.imageUrl}
                     alt={s.label}
-                    fill
-                    className="object-cover"
-                    sizes="280px"
-                    unoptimized
+                    className="absolute inset-0 w-full h-full object-cover"
                   />
                 ) : (
                   <div
