@@ -32,8 +32,6 @@ export default function PhoneMockup({ screenshots, className = '' }: PhoneMockup
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.8, delay: 0.2 }}
-      animate={{ y: [0, -12, 0] }}
-      transition={{ y: { duration: 6, repeat: Infinity, ease: 'easeInOut' } }}
       className={`relative mx-auto ${className}`}
     >
       <div className="relative w-[280px] h-[580px] mx-auto">
@@ -56,6 +54,7 @@ export default function PhoneMockup({ screenshots, className = '' }: PhoneMockup
                     fill
                     className="object-cover"
                     sizes="280px"
+                    unoptimized
                   />
                 ) : (
                   <div

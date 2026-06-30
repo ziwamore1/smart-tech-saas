@@ -123,6 +123,7 @@ export default function GallerySection() {
                       fill
                       className="object-contain"
                       sizes="(max-width: 1024px) 100vw, 60vw"
+                      unoptimized
                     />
                   </div>
                 ) : (
