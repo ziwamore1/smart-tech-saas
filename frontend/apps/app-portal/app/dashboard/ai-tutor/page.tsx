@@ -159,7 +159,7 @@ export default function AiTutorPage() {
             <button
               onClick={() => startSession.mutate()}
               disabled={!selectedStudent || startSession.isPending}
-              className="w-full px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg font-medium hover:from-orange-600 hover:to-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-lg shadow-md hover:shadow-lg hover:from-orange-600 hover:to-amber-600 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none transition-all duration-200 not-disabled:cursor-pointer"
             >
               {startSession.isPending ? 'Starting...' : sessionId ? 'New Session' : 'Start Tutoring'}
             </button>
@@ -222,7 +222,7 @@ export default function AiTutorPage() {
             <button
               onClick={handleSend}
               disabled={!message.trim() || !selectedStudent}
-              className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg font-medium hover:from-orange-600 hover:to-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-lg shadow-md hover:shadow-lg hover:from-orange-600 hover:to-amber-600 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none transition-all duration-200 not-disabled:cursor-pointer"
             >
               <i className="fa fa-paper-plane mr-2"></i>
               Send
