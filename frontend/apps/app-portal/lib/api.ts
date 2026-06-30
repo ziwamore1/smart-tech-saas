@@ -2166,7 +2166,6 @@ export const landingMockupApi = {
   delete: (id: string) => api.delete(`/landing-mockups/${id}`),
   upload: (formData: FormData) =>
     api.post('/landing-mockups/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 60000,
     }),
 };

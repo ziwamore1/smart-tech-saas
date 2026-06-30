@@ -1,10 +1,11 @@
 import {
   Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, UseInterceptors,
-  UploadedFile, ParseFilePipe, MaxFileSizeValidator, FileTypeValidator,
+  UploadedFile, Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
 import { SuperAdminGuard } from '../auth/guards/super-admin.guard';
+import { cloudinaryMemoryStorage, CLOUDINARY_FILE_FILTER } from '../cloudinary/multer-cloudinary';
 import { LandingMockupService } from './landing-mockup.service';
 import { CreateMockupDto } from './dto/create-mockup.dto';
 import { UpdateMockupDto } from './dto/update-mockup.dto';
@@ -48,19 +49,19 @@ export class LandingMockupController {
 
   @Post('upload')
   @UseGuards(AuthGuard('jwt'), SuperAdminGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: cloudinaryMemoryStorage(),
+      fileFilter: CLOUDINARY_FILE_FILTER,
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
   async upload(
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }),
-          new FileTypeValidator({ fileType: '.(png|jpeg|jpg|webp)' }),
-        ],
-      }),
-    )
-    file: Express.Multer.File,
+    @UploadedFile() file: Express.Multer.File,
     @Body() dto: CreateMockupDto,
+    @Req() req: any,
   ) {
+    if (!file) throw new Error('No file uploaded');
     return this.service.uploadAndCreate(file, dto);
   }
 }
