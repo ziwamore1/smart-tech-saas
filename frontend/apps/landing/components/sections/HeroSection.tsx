@@ -17,7 +17,8 @@ async function fetchMockups(): Promise<MockupImage[]> {
   try {
     const res = await fetch(PUBLIC_MOCKUPS_URL);
     if (!res.ok) return [];
-    return res.json();
+    const body = await res.json();
+    return body.data || [];
   } catch { return []; }
 }
 
@@ -31,18 +32,12 @@ export default function HeroSection() {
   const [mockups, setMockups] = useState<MockupImage[]>([]);
 
   useEffect(() => {
-    console.log('[HeroSection] Fetching mockups from:', PUBLIC_MOCKUPS_URL);
-    fetchMockups().then((data) => {
-      console.log('[HeroSection] Mockups fetched:', data?.length, data);
-      setMockups(data);
-    });
+    fetchMockups().then(setMockups);
   }, []);
 
   const screenshots = mockups.length > 0
     ? mockups.map((m) => ({ label: m.label, imageUrl: m.imageUrl }))
     : fallbackScreenshots;
-
-  console.log('[HeroSection] screenshots:', mockups.length, screenshots.length, screenshots[0]?.imageUrl?.slice(0, 50));
 
     return (
     <section className="relative min-h-screen flex items-center overflow-hidden gradient-hero">

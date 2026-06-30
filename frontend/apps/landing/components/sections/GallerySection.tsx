@@ -16,7 +16,8 @@ async function fetchMockups(): Promise<MockupImage[]> {
   try {
     const res = await fetch(PUBLIC_MOCKUPS_URL);
     if (!res.ok) return [];
-    return res.json();
+    const body = await res.json();
+    return body.data || [];
   } catch { return []; }
 }
 
@@ -37,9 +38,7 @@ export default function GallerySection() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('[GallerySection] Fetching mockups from:', PUBLIC_MOCKUPS_URL);
     fetchMockups().then((data) => {
-      console.log('[GallerySection] Mockups fetched:', data?.length, data);
       setMockups(data);
       setLoading(false);
     });
