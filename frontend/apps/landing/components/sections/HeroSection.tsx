@@ -6,7 +6,18 @@ import Button from '@/components/ui/Button';
 import TrustIndicator from '@/components/ui/TrustIndicator';
 import PhoneMockup from '@/components/ui/PhoneMockup';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
-import { fetchMockups, type MockupImage } from '@/lib/api';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.smarttechsaas.com/api/v1';
+
+interface MockupImage { id: string; label: string; role: string; category: string; imageUrl: string; thumbnailUrl?: string; }
+
+async function fetchMockups(): Promise<MockupImage[]> {
+  try {
+    const res = await fetch(`${API_URL}/public/landing-mockups`);
+    if (!res.ok) return [];
+    return res.json();
+  } catch { return []; }
+}
 
 const fallbackScreenshots = [
   { label: 'Student Dashboard', gradient: 'linear-gradient(135deg, #0F4C81, #00AEEF)', icon: <GraduationCap /> },
@@ -24,6 +35,8 @@ export default function HeroSection() {
   const screenshots = mockups.length > 0
     ? mockups.map((m) => ({ label: m.label, imageUrl: m.imageUrl }))
     : fallbackScreenshots;
+
+    return (
     <section className="relative min-h-screen flex items-center overflow-hidden gradient-hero">
       <AnimatedBackground />
 

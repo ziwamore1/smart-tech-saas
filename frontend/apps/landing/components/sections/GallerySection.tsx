@@ -7,7 +7,17 @@ import {
   GraduationCap, BarChart3, BookOpen, Shield, TrendingUp, Bot, ScrollText, Award,
 } from 'lucide-react';
 import SectionHeading from '@/components/ui/SectionHeading';
-import { fetchMockups, type MockupImage } from '@/lib/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.smarttechsaas.com/api/v1';
+
+interface MockupImage { id: string; label: string; role: string; category: string; imageUrl: string; thumbnailUrl?: string; }
+
+async function fetchMockups(): Promise<MockupImage[]> {
+  try {
+    const res = await fetch(`${API_URL}/public/landing-mockups`);
+    if (!res.ok) return [];
+    return res.json();
+  } catch { return []; }
+}
 
 const fallbackScreenshots = [
   { label: 'Student Dashboard', gradient: 'linear-gradient(135deg, #0F4C81, #00AEEF)', icon: <GraduationCap className="w-8 h-8" />, desc: 'View grades, attendance, timetable, and assignments' },
