@@ -20,13 +20,6 @@ export default function AiTutorPage() {
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
-  const context = useMemo(() => ({
-    role: user?.roles?.[0]?.toLowerCase().replace(' ', '_') || 'student',
-    screen: 'ai_tutor',
-    subject: selectedSubject ? subjects.find((s: any) => s.id === selectedSubject)?.name || undefined : undefined,
-    subjectId: selectedSubject || undefined,
-  }), [user, selectedSubject, subjects]);
-
   const { data: classes } = useQuery({
     queryKey: ['classes'],
     queryFn: async () => {
@@ -49,6 +42,13 @@ export default function AiTutorPage() {
       Array.isArray(subjectsResponse) ? subjectsResponse : [];
     return raw;
   }, [subjectsResponse]);
+
+  const context = useMemo(() => ({
+    role: user?.roles?.[0]?.toLowerCase().replace(' ', '_') || 'student',
+    screen: 'ai_tutor',
+    subject: selectedSubject ? subjects.find((s: any) => s.id === selectedSubject)?.name || undefined : undefined,
+    subjectId: selectedSubject || undefined,
+  }), [user, selectedSubject, subjects]);
 
   const { data: students } = useQuery({
     queryKey: ['class-students', selectedStudent],
