@@ -74,6 +74,13 @@ export class SystemCommunicationsController {
     return this.systemCommunicationsService.testProvider(id);
   }
 
+  @Post('test-sms')
+  async sendTestSms(
+    @Body() data: { to: string; message?: string },
+  ) {
+    return this.systemCommunicationsService.sendTestSms(data.to, data.message);
+  }
+
   @Post('providers/:id/set-default')
   async setDefaultProvider(@Param('id') id: string) {
     return this.systemCommunicationsService.setDefaultProvider(id);

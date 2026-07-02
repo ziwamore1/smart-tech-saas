@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { BeemService } from '../beem/beem.service';
+import { TwilioService } from '../twilio/twilio.service';
 import { EmailService } from '../email/email.service';
 
 interface UserInfo {
@@ -118,6 +119,7 @@ export class UnifiedMessagingService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private beemService: BeemService,
+    private twilioService: TwilioService,
     private emailService: EmailService,
   ) {
     this.envSandboxMode = this.configService.get<string>('MESSAGING_SANDBOX_MODE', 'false') === 'true';
@@ -231,31 +233,60 @@ export class UnifiedMessagingService {
       return { success: true, channel: 'SMS', messageId: 'sandbox_sms_id' };
     }
 
-    if (!(await this.beemService.isConfigured())) {
-      this.logger.warn(`[SMS] Beem not configured. Would send to: ${normalizedPhone}`);
+    const twilioConfigured = await this.twilioService.isConfigured();
+    const beemConfigured = await this.beemService.isConfigured();
+
+    if (!twilioConfigured && !beemConfigured) {
+      this.logger.warn(`[SMS] No SMS provider configured. Would send to: ${normalizedPhone}`);
       await this.logMessage(null, 'SMS', 'SENT', undefined, normalizedPhone, undefined, message, 'sandbox_sms_id');
       return { success: true, channel: 'SMS', messageId: 'sandbox_sms_id' };
     }
 
-    try {
-      const result = await this.retryOperation(
-        () => this.beemService.sendSms(normalizedPhone, message),
-        `SMS to ${normalizedPhone}`,
-      );
+    if (twilioConfigured) {
+      try {
+        const result = await this.retryOperation(
+          () => this.twilioService.sendSms(normalizedPhone, message),
+          `Twilio SMS to ${normalizedPhone}`,
+        );
 
-      if (result.success) {
-        this.logger.log(`[SMS] Beem sent to ${normalizedPhone}, messageId: ${result.messageId}`);
-        await this.logMessage(null, 'SMS', 'SENT', undefined, normalizedPhone, undefined, message, result.messageId);
-        return { success: true, channel: 'SMS', messageId: result.messageId };
+        if (result.success) {
+          this.logger.log(`[SMS] Twilio sent to ${normalizedPhone}, SID: ${result.messageId}`);
+          await this.logMessage(null, 'SMS', 'SENT', undefined, normalizedPhone, undefined, message, result.messageId);
+          return { success: true, channel: 'SMS', messageId: result.messageId };
+        }
+
+        this.logger.warn(`[SMS] Twilio failed, falling back to Beem: ${result.error}`);
+      } catch (error) {
+        this.logger.warn(`[SMS] Twilio error, falling back to Beem: ${(error as Error).message}`);
       }
-
-      throw new Error(result.error || 'Unknown Beem SMS error');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`[SMS] Failed to send to ${normalizedPhone}: ${errorMessage}`);
-      await this.logMessage(null, 'SMS', 'FAILED', undefined, normalizedPhone, undefined, message, undefined, errorMessage);
-      return { success: false, channel: 'SMS', error: errorMessage };
     }
+
+    if (beemConfigured) {
+      try {
+        const result = await this.retryOperation(
+          () => this.beemService.sendSms(normalizedPhone, message),
+          `Beem SMS to ${normalizedPhone}`,
+        );
+
+        if (result.success) {
+          this.logger.log(`[SMS] Beem sent to ${normalizedPhone}, messageId: ${result.messageId}`);
+          await this.logMessage(null, 'SMS', 'SENT', undefined, normalizedPhone, undefined, message, result.messageId);
+          return { success: true, channel: 'SMS', messageId: result.messageId };
+        }
+
+        throw new Error(result.error || 'Unknown Beem SMS error');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`[SMS] All providers failed for ${normalizedPhone}: ${errorMessage}`);
+        await this.logMessage(null, 'SMS', 'FAILED', undefined, normalizedPhone, undefined, message, undefined, errorMessage);
+        return { success: false, channel: 'SMS', error: errorMessage };
+      }
+    }
+
+    const errorMessage = 'No SMS provider available';
+    this.logger.error(`[SMS] ${errorMessage}`);
+    await this.logMessage(null, 'SMS', 'FAILED', undefined, normalizedPhone, undefined, message, undefined, errorMessage);
+    return { success: false, channel: 'SMS', error: errorMessage };
   }
 
   async sendWhatsApp(phoneNumber: string, message: string): Promise<MessagingResult> {

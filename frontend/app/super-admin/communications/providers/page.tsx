@@ -78,6 +78,11 @@ export default function ProvidersPage() {
   const [testing, setTesting] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ id: string; success: boolean; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [testSmsOpen, setTestSmsOpen] = useState(false);
+  const [testPhone, setTestPhone] = useState('');
+  const [testMsg, setTestMsg] = useState('');
+  const [sendingTest, setSendingTest] = useState(false);
+  const [testSmsResult, setTestSmsResult] = useState<{ success: boolean; messageId?: string; error?: string } | null>(null);
 
   useEffect(() => {
     loadProviders();
@@ -156,6 +161,19 @@ export default function ProvidersPage() {
       await systemCommunicationApi.setDefaultProvider(id);
       await loadProviders();
     } catch {}
+  };
+
+  const handleSendTestSms = async () => {
+    if (!testPhone) return;
+    setSendingTest(true);
+    setTestSmsResult(null);
+    try {
+      const res = await systemCommunicationApi.sendTestSms({ to: testPhone, message: testMsg || undefined });
+      setTestSmsResult(res.data);
+    } catch (err: any) {
+      setTestSmsResult({ success: false, error: err?.response?.data?.message || err.message });
+    }
+    setSendingTest(false);
   };
 
   return (
@@ -410,6 +428,80 @@ export default function ProvidersPage() {
           </div>
         </div>
       )}
+
+      {/* Send Test SMS */}
+      <div style={{ background: '#fefcf9', borderRadius: '16px', border: '1px solid #e8ddd0', overflow: 'hidden' }}>
+        <div
+          onClick={() => setTestSmsOpen(!testSmsOpen)}
+          style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '36px', height: '36px', background: '#fef3c7', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="fa fa-paper-plane" style={{ fontSize: '16px', color: '#d97706' }}></i>
+            </div>
+            <div>
+              <div style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>Send Test SMS</div>
+              <div style={{ fontSize: '12px', color: '#9ca3af' }}>Send a real SMS to verify your provider works</div>
+            </div>
+          </div>
+          <i className={`fa fa-chevron-${testSmsOpen ? 'up' : 'down'}`} style={{ color: '#9ca3af', fontSize: '14px' }}></i>
+        </div>
+        {testSmsOpen && (
+          <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px', display: 'block' }}>Phone Number</label>
+              <input
+                type="text"
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+                placeholder="+260978805917"
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px', display: 'block' }}>Message (optional)</label>
+              <textarea
+                value={testMsg}
+                onChange={(e) => setTestMsg(e.target.value)}
+                placeholder="This is a test SMS from Smart Tech. If you receive this, SMS is working."
+                rows={3}
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button
+                onClick={handleSendTestSms}
+                disabled={sendingTest || !testPhone}
+                style={{
+                  padding: '12px 24px',
+                  background: sendingTest ? '#fef3c7' : 'linear-gradient(135deg, #d97706, #b45309)',
+                  color: sendingTest ? '#92400e' : 'white',
+                  borderRadius: '10px', border: 'none', fontSize: '14px', fontWeight: 600,
+                  cursor: (sendingTest || !testPhone) ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  boxShadow: sendingTest ? 'none' : '0 4px 12px rgba(217,119,6,0.3)',
+                }}
+              >
+                <i className={`fa ${sendingTest ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`}></i>
+                {sendingTest ? 'Sending...' : 'Send Test SMS'}
+              </button>
+              {testSmsResult && (
+                <div style={{
+                  padding: '10px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 500,
+                  background: testSmsResult.success ? '#ecfdf5' : '#fef2f2',
+                  color: testSmsResult.success ? '#065f46' : '#991b1b',
+                  display: 'flex', alignItems: 'center', gap: '8px', flex: 1,
+                }}>
+                  <i className={`fa ${testSmsResult.success ? 'fa-check-circle' : 'fa-exclamation-circle'}`}></i>
+                  {testSmsResult.success
+                    ? `SMS sent! Message ID: ${testSmsResult.messageId}`
+                    : testSmsResult.error}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Delete Confirmation */}
       {showDelete && (

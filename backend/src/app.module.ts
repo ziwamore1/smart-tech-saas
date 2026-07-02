@@ -67,6 +67,7 @@ import { CertificateValidationModule } from './certificate-validation-service/ce
 import { VerificationModule } from './verification-service/verification.module';
 import { ApprovalModule } from './approval-service/approval.module';
 import { BeemModule } from './beem/beem.module';
+import { TwilioModule } from './twilio/twilio.module';
 import { AssessmentEngineModule } from './assessment-engine/assessment-engine.module';
 import { GradingEngineModule } from './grading-engine/grading-engine.module';
 import { ResultAnalyticsModule } from './result-analytics/result-analytics.module';
@@ -182,6 +183,7 @@ import { ProductionLogger } from './common/production-logger';
     VerificationModule,
     ApprovalModule,
     BeemModule,
+    TwilioModule,
     AssessmentEngineModule,
     GradingEngineModule,
     ResultAnalyticsModule,

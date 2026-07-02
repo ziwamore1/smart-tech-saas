@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BeemService } from '../beem/beem.service';
+import { TwilioService } from '../twilio/twilio.service';
 
 @Injectable()
 export class SmsQueueService {
@@ -9,6 +10,7 @@ export class SmsQueueService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly beemService: BeemService,
+    private readonly twilioService: TwilioService,
   ) {}
 
   async enqueue(phoneNumber: string, message: string, provider = 'beem', scheduledAt?: Date) {
@@ -41,7 +43,11 @@ export class SmsQueueService {
           data: { status: 'processing', attempts: { increment: 1 } },
         });
 
-        await this.beemService.sendSms(job.phoneNumber, job.message);
+        if (job.provider === 'twilio') {
+          await this.twilioService.sendSms(job.phoneNumber, job.message);
+        } else {
+          await this.beemService.sendSms(job.phoneNumber, job.message);
+        }
 
         await this.prisma.smsQueue.update({
           where: { id: job.id },

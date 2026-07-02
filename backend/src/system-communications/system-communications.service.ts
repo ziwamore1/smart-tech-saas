@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { BeemService } from '../beem/beem.service';
+import { TwilioService } from '../twilio/twilio.service';
 import { EmailService } from '../email/email.service';
 import { PushNotificationService } from '../push-notification/push-notification.service';
 import { NotificationService } from '../notification/notification.service';
@@ -21,6 +22,7 @@ export class SystemCommunicationsService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private beemService: BeemService,
+    private twilioService: TwilioService,
     private emailService: EmailService,
     private pushNotificationService: PushNotificationService,
     private notificationService: NotificationService,
@@ -323,6 +325,19 @@ export class SystemCommunicationsService {
       const apiSecret = provider.apiSecret || '';
       if (!apiKey || !apiSecret) {
         return { success: false, message: 'API credentials not configured. Save API Key and API Secret first.' };
+      }
+
+      if (apiKey.startsWith('AC') && apiKey.length === 34) {
+        try {
+          const client = new (require('twilio'))(apiKey, apiSecret);
+          const balanceData = await client.api.accounts(apiKey).balance.fetch();
+          return {
+            success: true,
+            message: `Twilio connection successful. Balance: ${balanceData.currency || 'USD'} ${balanceData.balance || '0'}`,
+          };
+        } catch (twilioError: any) {
+          return { success: false, message: `Twilio connection failed: ${twilioError.message}` };
+        }
       }
 
       const response = await fetch('https://apisms.beem.africa/public/v1/vendors/balance', {
@@ -1580,13 +1595,37 @@ export class SystemCommunicationsService {
       if (!phone) continue;
 
       try {
-        const result = await this.beemService.sendSms(phone, item.message);
-        await this.logMessageSent('SMS', result.success ? 'SENT' : 'FAILED', {
-          recipientPhone: phone,
-          messageId: result.messageId,
-          errorMessage: result.error,
-          message: item.message,
-        });
+        const twilioConfigured = await this.twilioService.isConfigured();
+        const beemConfigured = await this.beemService.isConfigured();
+
+        if (twilioConfigured) {
+          const result = await this.twilioService.sendSms(phone, item.message);
+          await this.logMessageSent('SMS', result.success ? 'SENT' : 'FAILED', {
+            recipientPhone: phone,
+            messageId: result.messageId,
+            errorMessage: result.error,
+            message: item.message,
+          });
+          if (result.success) continue;
+          this.logger.warn(`[SMS] Twilio failed, falling back to Beem: ${result.error}`);
+        }
+
+        if (beemConfigured) {
+          const result = await this.beemService.sendSms(phone, item.message);
+          await this.logMessageSent('SMS', result.success ? 'SENT' : 'FAILED', {
+            recipientPhone: phone,
+            messageId: result.messageId,
+            errorMessage: result.error,
+            message: item.message,
+          });
+        } else {
+          this.logger.warn(`[SMS] No provider configured for ${phone}`);
+          await this.logMessageSent('SMS', 'FAILED', {
+            recipientPhone: phone,
+            errorMessage: 'No SMS provider configured',
+            message: item.message,
+          });
+        }
       } catch (error: any) {
         this.logger.error(`[SMS] Failed to send to ${phone}: ${error.message}`);
         await this.logMessageSent('SMS', 'FAILED', {
@@ -1658,6 +1697,52 @@ export class SystemCommunicationsService {
         this.logger.error(`[InApp] Failed to create notification for user ${userId}: ${error.message}`);
       }
     }
+  }
+
+  async sendTestSms(to: string, message?: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    const msg = message || 'This is a test SMS from Smart Tech SaaS. If you receive this, SMS is working correctly.';
+
+    const normalizedTo = to.replace(/[+\s\-\(\)]/g, '');
+    const formattedTo = normalizedTo.startsWith('+') ? normalizedTo : `+${normalizedTo}`;
+
+    const twilioConfigured = await this.twilioService.isConfigured();
+    const beemConfigured = await this.beemService.isConfigured();
+
+    if (twilioConfigured) {
+      try {
+        const result = await this.twilioService.sendSms(formattedTo, msg);
+        if (result.success) {
+          await this.logMessageSent('SMS', 'SENT', {
+            recipientPhone: formattedTo,
+            messageId: result.messageId,
+            message: msg,
+          });
+          return { success: true, messageId: result.messageId };
+        }
+        this.logger.warn(`[Test SMS] Twilio failed, falling back to Beem: ${result.error}`);
+      } catch (error: any) {
+        this.logger.warn(`[Test SMS] Twilio error, falling back to Beem: ${error.message}`);
+      }
+    }
+
+    if (beemConfigured) {
+      try {
+        const result = await this.beemService.sendSms(formattedTo, msg);
+        if (result.success) {
+          await this.logMessageSent('SMS', 'SENT', {
+            recipientPhone: formattedTo,
+            messageId: result.messageId,
+            message: msg,
+          });
+          return { success: true, messageId: result.messageId };
+        }
+        return { success: false, error: result.error || 'Beem SMS failed' };
+      } catch (error: any) {
+        return { success: false, error: error.message };
+      }
+    }
+
+    return { success: false, error: 'No SMS provider configured. Set up Twilio or Beem first.' };
   }
 
   private async logMessageSent(

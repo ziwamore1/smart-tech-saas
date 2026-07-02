@@ -2044,6 +2044,7 @@ export const systemCommunicationApi = {
   // Scheduled
   getScheduled: () => api.get('/system-communications/scheduled'),
   cancelScheduled: (id: string) => api.post(`/system-communications/scheduled/${id}/cancel`),
+  sendTestSms: (data: { to: string; message?: string }) => api.post('/system-communications/test-sms', data),
 };
 
 export const primaryGradingApi = {

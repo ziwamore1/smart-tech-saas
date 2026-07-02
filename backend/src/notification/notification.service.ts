@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { BeemService } from '../beem/beem.service';
+import { TwilioService } from '../twilio/twilio.service';
 
 export interface CredentialNotificationData {
   recipientName: string;
@@ -67,6 +68,7 @@ export class NotificationService {
     private prisma: PrismaService,
     private emailService: EmailService,
     private beemService: BeemService,
+    private twilioService: TwilioService,
   ) {}
 
   async sendCredentials(data: CredentialNotificationData): Promise<void> {
@@ -247,7 +249,24 @@ export class NotificationService {
   }
 
   private async sendSMS(phone: string, message: string): Promise<void> {
-    if (await this.beemService.isConfigured()) {
+    const twilioConfigured = await this.twilioService.isConfigured();
+    const beemConfigured = await this.beemService.isConfigured();
+
+    if (twilioConfigured) {
+      try {
+        const result = await this.twilioService.sendSms(phone, message);
+        if (result.success) {
+          this.logger.log(`[Twilio SMS] Sent to ${phone}, SID: ${result.messageId}`);
+          await this.logNotification(phone, 'sms', 'generic', 'sent', undefined, message);
+          return;
+        }
+        this.logger.warn(`[Twilio SMS] Failed, falling back to Beem: ${result.error}`);
+      } catch (error) {
+        this.logger.warn(`[Twilio SMS] Error, falling back to Beem: ${error.message}`);
+      }
+    }
+
+    if (beemConfigured) {
       try {
         const result = await this.beemService.sendSms(phone, message);
         if (result.success) {

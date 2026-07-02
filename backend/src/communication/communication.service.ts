@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { BeemService } from '../beem/beem.service';
+import { TwilioService } from '../twilio/twilio.service';
 import mail from '@sendgrid/mail';
 import * as nodemailer from 'nodemailer';
 import { google } from 'googleapis';
@@ -24,6 +25,7 @@ export class CommunicationService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private beemService: BeemService,
+    private twilioService: TwilioService,
   ) {
     this.sendgridApiKey = this.configService.get<string>('SENDGRID_API_KEY', '');
     this.sendgridFromEmail = this.configService.get<string>('SENDGRID_FROM_EMAIL', 'noreply@smarttechsaas.com');
@@ -1046,7 +1048,23 @@ export class CommunicationService {
   }
 
   private async simulateSMSApi(settings: any, phone: string, message: string) {
-    if (await this.beemService.isConfigured()) {
+    const twilioConfigured = await this.twilioService.isConfigured();
+    const beemConfigured = await this.beemService.isConfigured();
+
+    if (twilioConfigured) {
+      try {
+        const result = await this.twilioService.sendSms(phone, message);
+        if (result.success) {
+          this.logger.log(`[Twilio SMS] Sent to ${phone}, SID: ${result.messageId}`);
+          return { success: true, messageId: result.messageId };
+        }
+        this.logger.warn(`[Twilio SMS] Failed, falling back to Beem: ${result.error}`);
+      } catch (error) {
+        this.logger.warn(`[Twilio SMS] Error, falling back to Beem: ${error.message}`);
+      }
+    }
+
+    if (beemConfigured) {
       try {
         const result = await this.beemService.sendSms(phone, message);
         if (result.success) {
@@ -1064,7 +1082,7 @@ export class CommunicationService {
     this.logger.warn(
       `[SMS API] Not configured. To: ${phone}, Message: ${message.substring(0, 30)}...`,
     );
-    return { success: false, error: 'SMS service not configured. Please set up Beem SMS provider in Settings.' };
+    return { success: false, error: 'SMS service not configured. Please set up an SMS provider in Settings.' };
   }
 
   private async simulateEmailApi(
