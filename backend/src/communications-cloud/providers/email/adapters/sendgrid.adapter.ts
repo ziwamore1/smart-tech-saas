@@ -1,5 +1,4 @@
 import { Logger } from '@nestjs/common';
-import * as sgMail from '@sendgrid/mail';
 import type { EmailProvider } from '../../../interfaces/provider.interface';
 import type { SendEmailOptions, SendResult } from '../../../interfaces/message.interface';
 
@@ -11,38 +10,46 @@ export interface SendGridConfig {
 
 export class SendGridAdapter implements EmailProvider {
   private readonly logger = new Logger(SendGridAdapter.name);
+  private sgMail: any;
 
-  constructor(private readonly config: SendGridConfig) {
-    sgMail.setApiKey(config.apiKey);
+  constructor(private readonly config: SendGridConfig) {}
+
+  private async getClient(): Promise<any> {
+    if (this.sgMail) return this.sgMail;
+    const sgMail = await import('@sendgrid/mail');
+    sgMail.default.setApiKey(this.config.apiKey);
+    this.sgMail = sgMail.default;
+    return this.sgMail;
   }
 
   async send(options: SendEmailOptions): Promise<SendResult> {
     const to = Array.isArray(options.to) ? options.to : [options.to];
 
     try {
-      const msg: sgMail.MailDataRequired = {
+      const sgMail = await this.getClient();
+      const msg: any = {
         to: to.map((addr) => ({ email: addr })),
         from: { email: this.config.fromEmail, name: this.config.fromName },
         subject: options.subject,
         text: options.body,
         html: options.htmlBody,
-      } as sgMail.MailDataRequired;
+      };
 
       if (options.cc) {
-        (msg as any).cc = Array.isArray(options.cc)
+        msg.cc = Array.isArray(options.cc)
           ? options.cc.map((addr) => ({ email: addr }))
           : [{ email: options.cc }];
       }
       if (options.bcc) {
-        (msg as any).bcc = Array.isArray(options.bcc)
+        msg.bcc = Array.isArray(options.bcc)
           ? options.bcc.map((addr) => ({ email: addr }))
           : [{ email: options.bcc }];
       }
       if (options.replyTo) {
-        (msg as any).replyTo = { email: options.replyTo };
+        msg.replyTo = { email: options.replyTo };
       }
       if (options.attachments?.length) {
-        (msg as any).attachments = options.attachments.map((a) => ({
+        msg.attachments = options.attachments.map((a) => ({
           filename: a.filename,
           content: a.url,
           type: a.type,
@@ -85,13 +92,14 @@ export class SendGridAdapter implements EmailProvider {
   async healthCheck(): Promise<{ status: string; latencyMs: number; details?: string }> {
     const startTime = Date.now();
     try {
+      const sgMail = await this.getClient();
       const [response] = await sgMail.send({
         to: this.config.fromEmail,
         from: { email: this.config.fromEmail, name: this.config.fromName },
         subject: 'SendGrid Health Check',
         text: 'This is a health check email. If received, ignore.',
         mailSettings: { sandboxMode: { enable: true } },
-      } as sgMail.MailDataRequired);
+      });
 
       const latencyMs = Date.now() - startTime;
       this.logger.log(`SendGrid health check passed (${latencyMs}ms)`);

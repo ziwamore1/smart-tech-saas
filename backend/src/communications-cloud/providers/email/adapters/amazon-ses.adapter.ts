@@ -1,9 +1,4 @@
 import { Logger } from '@nestjs/common';
-import {
-  SESClient,
-  SendEmailCommand,
-  GetSendQuotaCommand,
-} from '@aws-sdk/client-ses';
 import type { EmailProvider } from '../../../interfaces/provider.interface';
 import type { SendEmailOptions, SendResult } from '../../../interfaces/message.interface';
 
@@ -16,24 +11,32 @@ export interface AmazonSESConfig {
 
 export class AmazonSESAdapter implements EmailProvider {
   private readonly logger = new Logger(AmazonSESAdapter.name);
-  private readonly client: SESClient;
+  private client: any;
   private readonly fromEmail: string;
 
   constructor(private readonly config: AmazonSESConfig) {
     this.fromEmail = config.fromEmail;
+  }
+
+  private async getClient(): Promise<any> {
+    if (this.client) return this.client;
+    const { SESClient } = await import('@aws-sdk/client-ses');
     this.client = new SESClient({
-      region: config.region,
+      region: this.config.region,
       credentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
+        accessKeyId: this.config.accessKeyId,
+        secretAccessKey: this.config.secretAccessKey,
       },
     });
+    return this.client;
   }
 
   async send(options: SendEmailOptions): Promise<SendResult> {
     const toAddresses = Array.isArray(options.to) ? options.to : [options.to];
 
     try {
+      const client = await this.getClient();
+      const { SendEmailCommand } = await import('@aws-sdk/client-ses');
       const destination: Record<string, string[]> = {
         ToAddresses: toAddresses,
       };
@@ -63,7 +66,7 @@ export class AmazonSESAdapter implements EmailProvider {
         ReplyToAddresses: options.replyTo ? [options.replyTo] : undefined,
       });
 
-      const result = await this.client.send(command);
+      const result = await client.send(command);
 
       const providerMessageId = result.MessageId || `ses-${Date.now()}`;
       this.logger.log(`Email sent via SES to ${toAddresses.join(', ')} (ID: ${providerMessageId})`);
@@ -99,8 +102,10 @@ export class AmazonSESAdapter implements EmailProvider {
   async healthCheck(): Promise<{ status: string; latencyMs: number; details?: string }> {
     const startTime = Date.now();
     try {
+      const client = await this.getClient();
+      const { GetSendQuotaCommand } = await import('@aws-sdk/client-ses');
       const command = new GetSendQuotaCommand({});
-      const response = await this.client.send(command);
+      const response = await client.send(command);
       const latencyMs = Date.now() - startTime;
 
       const max24HourSend = response.Max24HourSend ?? 0;
@@ -126,8 +131,10 @@ export class AmazonSESAdapter implements EmailProvider {
 
   async getBalance(): Promise<{ balance: number; currency: string }> {
     try {
+      const client = await this.getClient();
+      const { GetSendQuotaCommand } = await import('@aws-sdk/client-ses');
       const command = new GetSendQuotaCommand({});
-      const response = await this.client.send(command);
+      const response = await client.send(command);
       const max24HourSend = response.Max24HourSend ?? 0;
       const sentLast24Hours = response.SentLast24Hours ?? 0;
       const remaining = Math.max(0, max24HourSend - sentLast24Hours);
