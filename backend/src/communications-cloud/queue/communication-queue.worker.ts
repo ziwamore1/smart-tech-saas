@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { CommunicationsCloudService } from '../communications-cloud.service';
 
@@ -7,7 +7,6 @@ export class CommunicationQueueWorker {
   private readonly logger = new Logger(CommunicationQueueWorker.name);
 
   constructor(
-    @Inject(forwardRef(() => CommunicationsCloudService))
     private readonly communicationsCloudService: CommunicationsCloudService,
   ) {}
 
