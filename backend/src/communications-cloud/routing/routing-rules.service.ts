@@ -9,8 +9,8 @@ import {
   RoutingRule,
   RoutingStrategy,
   RetryBackoffStrategy,
-} from '../../interfaces/routing.interface';
-import { CommCloudChannel } from '../../interfaces/message.interface';
+} from '../interfaces/routing.interface';
+import { CommCloudChannel } from '../interfaces/message.interface';
 
 export interface CreateRoutingRuleInput {
   name: string;
