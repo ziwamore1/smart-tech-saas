@@ -10,6 +10,7 @@ import '../super-admin-fix.css';
 function ResetPasswordForm() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,8 +23,6 @@ function ResetPasswordForm() {
     const tokenParam = searchParams.get('token');
     if (tokenParam) {
       setToken(tokenParam);
-    } else {
-      setError('Invalid or missing reset token. Please request a new password reset link.');
     }
   }, [searchParams]);
 
@@ -41,15 +40,16 @@ function ResetPasswordForm() {
       return;
     }
 
-    if (!token) {
-      setError('Invalid reset token. Please request a new password reset link.');
+    const effectiveToken = token || otp;
+    if (!effectiveToken) {
+      setError('Please enter the reset code sent to your email or phone.');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      await authApi.resetPassword(token, password);
+      await authApi.resetPassword(effectiveToken, password);
       setSuccess(true);
       setTimeout(() => {
         router.push('/login');
@@ -177,6 +177,47 @@ function ResetPasswordForm() {
                     }}>
                       <i className="fa fa-exclamation-circle"></i>
                       {error}
+                    </div>
+                  )}
+
+                  {!token && (
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        color: '#374151',
+                        marginBottom: '6px'
+                      }}>
+                        Reset Code (OTP)
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <span style={{
+                          position: 'absolute',
+                          left: '12px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          color: '#9ca3af'
+                        }}>
+                          <i className="fa fa-key"></i>
+                        </span>
+                        <input
+                          type="text"
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '12px 12px 12px 40px',
+                            fontSize: '14px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '8px',
+                            outline: 'none',
+                            transition: 'all 0.2s'
+                          }}
+                          placeholder="Enter the 6-digit code from your SMS"
+                          maxLength={6}
+                        />
+                      </div>
                     </div>
                   )}
 

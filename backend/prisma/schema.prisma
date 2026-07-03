@@ -1326,6 +1326,464 @@ model Receipt {
   @@index([invoiceNumber])
 }
 
+// =============================================
+// SMARTTECH COMMUNICATIONS CLOUD MODELS
+// =============================================
+
+enum CommCloudChannel {
+  SMS
+  EMAIL
+  WHATSAPP
+  PUSH
+  IN_APP
+}
+
+enum CommCloudMessageStatus {
+  QUEUED
+  PROCESSING
+  SENT
+  DELIVERED
+  FAILED
+  READ
+  OPENED
+  CLICKED
+  CANCELLED
+  SCHEDULED
+}
+
+model CommCloudProvider {
+  id           String   @id @default(uuid())
+  name         String
+  channel      CommCloudChannel
+  providerType String   // beem, twilio, zoho, sendgrid, firebase, etc.
+  isActive     Boolean  @default(true)
+  priority     Int      @default(0)
+  weight       Float    @default(1.0)
+  
+  // Connection credentials (encrypted at application level)
+  credentials  Json?
+  
+  // Provider capabilities
+  capabilities Json?    // { countries: ["TZ","KE"], maxLength: 160, supportsUnicode: true, etc. }
+  
+  // Health & status
+  status       String   @default("active") // active, degraded, down, maintenance
+  lastHealthCheckAt DateTime?
+  lastError     String?
+  successRate  Float    @default(100.0)
+  avgLatencyMs Int      @default(0)
+  totalSent    Int      @default(0)
+  totalFailed  Int      @default(0)
+  
+  // Cost configuration
+  costPerMessage Float   @default(0.0)
+  currency       String  @default("USD")
+  
+  // Rate limiting
+  rateLimit      Int     @default(10)  // messages per second
+  maxConcurrent  Int     @default(5)
+  
+  // Metadata
+  config        Json?
+  notes         String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  routingRules  CommCloudRoutingRule[]
+  deliveryLogs  CommCloudDeliveryLog[]
+
+  @@unique([name, channel])
+  @@index([channel])
+  @@index([providerType])
+  @@index([isActive])
+  @@index([priority])
+  @@index([status])
+}
+
+model CommCloudRoutingRule {
+  id              String   @id @default(uuid())
+  name            String
+  channel         CommCloudChannel
+  ruleType        String   // preferred, cheapest, highest_delivery, country_based, school_preferred, priority_based, fallback
+  priority        Int      @default(0)
+  isActive        Boolean  @default(true)
+  
+  // Conditions
+  conditions      Json?    // { countries: ["TZ","KE"], schoolId: "...", messageType: "OTP", minSuccessRate: 95 }
+  
+  // Action: which providers to use in order
+  providerOrder   String[] // ordered list of provider IDs for failover
+  preferredProviderId String?
+  fallbackProviderIds String[]?
+  
+  // Settings
+  maxRetries      Int      @default(3)
+  retryDelayMs    Int      @default(2000)
+  retryBackoff    String   @default("exponential") // exponential, linear, fixed
+  
+  // Usage tracking
+  timesUsed       Int      @default(0)
+  lastUsedAt      DateTime?
+  
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  preferredProvider CommCloudProvider? @relation(fields: [preferredProviderId], references: [id])
+  
+  @@index([channel])
+  @@index([ruleType])
+  @@index([isActive])
+}
+
+model CommCloudMessage {
+  id                String                @id @default(uuid())
+  channel           CommCloudChannel
+  messageType       String                // transactional, bulk, OTP, marketing, emergency, etc.
+  status            CommCloudMessageStatus @default(QUEUED)
+  
+  // Sender/Recipient
+  senderId          String?               // CommCloudSenderIdentity ID
+  senderIdentity    String?               // From address, sender ID, etc.
+  recipient         String                // phone, email, device token, user ID
+  recipientName     String?
+  recipientMetadata Json?                 // { userId, schoolId, role, etc. }
+  
+  // Content
+  subject           String?
+  body              String?
+  htmlBody          String?
+  templateId        String?
+  templateData      Json?
+  attachments       Json?                 // [{ filename, url, type }]
+  metadata          Json?                 // custom metadata
+  
+  // Media (for WhatsApp, etc.)
+  mediaUrl          String?
+  mediaType         String?
+  
+  // Scheduling
+  scheduledAt       DateTime?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  openedAt          DateTime?
+  clickedAt         DateTime?
+  
+  // Delivery tracking
+  providerId        String?
+  providerName      String?
+  providerMessageId String?               // External provider's message ID
+  cost              Float?
+  currency          String?
+  creditsUsed       Int       @default(0)
+  
+  // Retry handling
+  retryCount        Int       @default(0)
+  maxRetries        Int       @default(3)
+  lastError         String?
+  
+  // Relations
+  schoolId          String?
+  userId            String?
+  createdById       String?
+  batchId           String?               // For bulk messages
+  
+  // Notifications
+  inAppNotificationId String?              // Link to in-app notification if generated
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  deliveryLogs      CommCloudDeliveryLog[]
+  
+  @@index([channel])
+  @@index([status])
+  @@index([schoolId])
+  @@index([userId])
+  @@index([providerId])
+  @@index([batchId])
+  @@index([createdAt])
+  @@index([scheduledAt])
+  @@index([recipient])
+}
+
+model CommCloudDeliveryLog {
+  id                String   @id @default(uuid())
+  messageId         String
+  providerId        String?
+  providerName      String
+  providerMessageId String?
+  
+  event             String   // queued, sent, delivered, failed, read, opened, clicked, bounced, rejected
+  status            String
+  statusCode        String?
+  description       String?
+  
+  cost              Float?
+  latencyMs         Int?
+  attempt           Int      @default(1)
+  
+  rawResponse       Json?    // raw response from provider
+  errorDetails      Json?
+  
+  loggedAt          DateTime @default(now())
+  
+  message           CommCloudMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  provider          CommCloudProvider? @relation(fields: [providerId], references: [id])
+  
+  @@index([messageId])
+  @@index([providerId])
+  @@index([event])
+  @@index([status])
+  @@index([loggedAt])
+}
+
+model CommCloudCreditWallet {
+  id            String   @id @default(uuid())
+  ownerType     String   // platform, school
+  ownerId       String   // 'platform' or schoolId
+  
+  // Balances per channel
+  smsBalance    Int      @default(0)
+  emailBalance  Int      @default(0)
+  whatsappBalance Int    @default(0)
+  pushBalance   Int      @default(0)
+  
+  // Financial
+  prepaidBalance Float   @default(0)
+  currency      String   @default("USD")
+  
+  // Spending limits
+  monthlyLimit  Float?
+  overageAllowed Boolean @default(false)
+  
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  transactions  CommCloudBillingTransaction[]
+  
+  @@unique([ownerType, ownerId])
+  @@index([ownerType])
+  @@index([ownerId])
+}
+
+model CommCloudBillingTransaction {
+  id              String   @id @default(uuid())
+  walletId        String
+  
+  transactionType String   // credit, debit, refund, recharge, subscription
+  channel         CommCloudChannel?
+  units           Int?     // number of messages
+  amount          Float    @default(0)
+  currency        String   @default("USD")
+  balanceBefore   Float
+  balanceAfter    Float
+  
+  description     String?
+  reference       String?  // external payment reference
+  invoiceId       String?
+  
+  status          String   @default("completed") // pending, completed, failed, refunded
+  performedById   String?
+  
+  createdAt       DateTime @default(now())
+  
+  wallet          CommCloudCreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  
+  @@index([walletId])
+  @@index([transactionType])
+  @@index([channel])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model CommCloudTemplate {
+  id              String   @id @default(uuid())
+  name            String
+  channel         CommCloudChannel
+  type            String   // attendance, results, fees, admissions, registration, password_reset, OTP, marketing, system, etc.
+  subject         String?
+  body            String
+  htmlBody        String?
+  
+  // Variables
+  variables       Json?    // [{ name: "studentName", type: "string", required: true }]
+  
+  // WhatsApp template specific
+  whatsappTemplateId    String?
+  whatsappNamespace     String?
+  whatsappLanguage     String   @default("en_US")
+  headerType           String?  // text, image, video, document
+  headerMediaUrl       String?
+  footerText           String?
+  
+  // Scoping
+  scope           String   @default("platform") // platform, school
+  schoolId        String?
+  isDefault       Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  
+  category        String?
+  tags            String[]?
+  
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([name, channel, scope, schoolId])
+  @@index([channel])
+  @@index([type])
+  @@index([scope])
+  @@index([schoolId])
+  @@index([isActive])
+}
+
+model CommCloudSenderIdentity {
+  id              String   @id @default(uuid())
+  name            String
+  channel         CommCloudChannel
+  
+  // Sender details
+  senderId        String?  // SMS sender ID (e.g., "SMARTTECH")
+  senderName      String?  // Email sender name
+  senderEmail     String?  // Email sender address
+  senderPhone     String?  // WhatsApp sender phone number
+  businessAccountId String? // WhatsApp Business Account ID
+  
+  // Verification
+  isVerified      Boolean  @default(false)
+  verificationStatus String? // pending, verified, rejected
+  verifiedAt      DateTime?
+  
+  // Scoping
+  scope           String   @default("platform") // platform, school
+  schoolId        String?
+  
+  isActive        Boolean  @default(true)
+  isDefault       Boolean  @default(false)
+  
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([name, channel, scope, schoolId])
+  @@index([channel])
+  @@index([scope])
+  @@index([schoolId])
+  @@index([isActive])
+}
+
+model CommCloudAnalytics {
+  id              String   @id @default(uuid())
+  
+  period          String   // daily, weekly, monthly, yearly
+  periodStart     DateTime
+  periodEnd       DateTime
+  
+  channel         CommCloudChannel
+  schoolId        String?
+  
+  // Counters
+  totalSent       Int      @default(0)
+  totalDelivered  Int      @default(0)
+  totalFailed     Int      @default(0)
+  totalBounced    Int      @default(0)
+  totalRead       Int      @default(0)
+  totalOpened     Int      @default(0)
+  totalClicked    Int      @default(0)
+  
+  // Financial
+  totalCost       Float    @default(0)
+  totalCreditsUsed Int     @default(0)
+  
+  // Performance
+  avgLatencyMs    Float?
+  deliveryRate    Float?
+  failureRate     Float?
+  
+  // Provider breakdown
+  byProvider      Json?    // { "twilio": { sent: 100, delivered: 95, failed: 5 } }
+  
+  // Country breakdown
+  byCountry       Json?    // { "TZ": { sent: 50 }, "KE": { sent: 30 } }
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([period, periodStart, channel, schoolId])
+  @@index([period])
+  @@index([periodStart])
+  @@index([channel])
+  @@index([schoolId])
+}
+
+model CommCloudWebhookEvent {
+  id              String   @id @default(uuid())
+  providerId      String
+  providerName    String
+  eventType       String   // delivery_receipt, message_received, status_callback, etc.
+  
+  // Raw payload
+  rawPayload      Json?
+  
+  // Parsed data
+  messageId       String?
+  providerMessageId String?
+  status          String?
+  statusCode      String?
+  errorCode       String?
+  errorMessage    String?
+  
+  processed       Boolean  @default(false)
+  processedAt     DateTime?
+  processingError String?
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([providerId])
+  @@index([eventType])
+  @@index([processed])
+  @@index([createdAt])
+}
+
+model CommCloud {
+  id              String   @id @default(uuid())
+  
+  // Platform settings
+  platformName    String   @default("SmartTech Communications Cloud")
+  platformEmail   String?
+  platformPhone   String?
+  platformWebsite String?
+  
+  // Default sender identities
+  defaultSmsSenderId    String?
+  defaultEmailSender    String?
+  defaultEmailName      String?
+  defaultWhatsAppSender String?
+  
+  // Routing default
+  defaultRoutingStrategy String @default("priority") // priority, cheapest, highest_delivery
+  
+  // Branding
+  brandingConfig  Json?
+  
+  // Feature flags
+  allowSchoolProviders Boolean @default(false)
+  requireApproval      Boolean @default(true)
+  autoRetryFailed      Boolean @default(true)
+  maxRetryAttempts     Int     @default(3)
+  
+  // Audit
+  updatedById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([platformName])
+}
+
 model Communication {
   id                String              @id @default(uuid())
   type              CommunicationType

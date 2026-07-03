@@ -22,7 +22,7 @@ export const LoginScreen: React.FC = () => {
   const [logoError, setLogoError] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showSuperAdmin, setShowSuperAdmin] = useState(false);
-  const [useStudentNumber, setUseStudentNumber] = useState(false);
+  const [loginMode, setLoginMode] = useState<'email' | 'phone' | 'student'>('email');
   const { login, superAdminLogin, isLoading } = useAuthStore();
 
   useEffect(() => {
@@ -45,17 +45,16 @@ export const LoginScreen: React.FC = () => {
       Alert.alert('Error', 'Please enter password');
       return;
     }
-    if (!useStudentNumber && !email.trim()) {
-      Alert.alert('Error', 'Please enter email');
-      return;
-    }
-    if (useStudentNumber && !email.trim()) {
-      Alert.alert('Error', 'Please enter student number');
+    if (!email.trim()) {
+      const fieldLabel = loginMode === 'student' ? 'student number' : loginMode === 'phone' ? 'phone number' : 'email';
+      Alert.alert('Error', `Please enter ${fieldLabel}`);
       return;
     }
     try {
       const deviceToken = `${Device.deviceName || 'Unknown Device'} (${Platform.OS})`;
-      if (useStudentNumber) {
+      if (loginMode === 'student') {
+        await login('', password, deviceToken, email.trim());
+      } else if (loginMode === 'phone') {
         await login('', password, deviceToken, email.trim());
       } else {
         await login(email.trim(), password, deviceToken);
@@ -135,31 +134,39 @@ export const LoginScreen: React.FC = () => {
               {!showSuperAdmin && (
                 <View style={styles.toggleRow}>
                   <TouchableOpacity
-                    style={[styles.toggleBtn, !useStudentNumber && styles.toggleBtnActive]}
-                    onPress={() => { setUseStudentNumber(false); setEmail(''); }}
+                    style={[styles.toggleBtn, loginMode === 'email' && styles.toggleBtnActive]}
+                    onPress={() => { setLoginMode('email'); setEmail(''); }}
                   >
-                    <Text style={[styles.toggleText, !useStudentNumber && styles.toggleTextActive]}>Email</Text>
+                    <Text style={[styles.toggleText, loginMode === 'email' && styles.toggleTextActive]}>Email</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.toggleBtn, useStudentNumber && styles.toggleBtnActive]}
-                    onPress={() => { setUseStudentNumber(true); setEmail(''); }}
+                    style={[styles.toggleBtn, loginMode === 'phone' && styles.toggleBtnActive]}
+                    onPress={() => { setLoginMode('phone'); setEmail(''); }}
                   >
-                    <Text style={[styles.toggleText, useStudentNumber && styles.toggleTextActive]}>Student No.</Text>
+                    <Text style={[styles.toggleText, loginMode === 'phone' && styles.toggleTextActive]}>Phone</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.toggleBtn, loginMode === 'student' && styles.toggleBtnActive]}
+                    onPress={() => { setLoginMode('student'); setEmail(''); }}
+                  >
+                    <Text style={[styles.toggleText, loginMode === 'student' && styles.toggleTextActive]}>Student No.</Text>
                   </TouchableOpacity>
                 </View>
               )}
 
               <View style={styles.inputGroup}>
                 <View style={styles.inputIconWrap}>
-                  <Text style={styles.inputIcon}>{useStudentNumber ? '🎓' : '✉️'}</Text>
+                  <Text style={styles.inputIcon}>
+                    {loginMode === 'student' ? '🎓' : loginMode === 'phone' ? '📱' : '✉️'}
+                  </Text>
                 </View>
                 <View style={styles.inputField}>
                   <Input
-                    label={useStudentNumber ? 'Student Number' : 'Email'}
-                    placeholder={useStudentNumber ? 'Enter admission number' : 'Enter your email'}
+                    label={loginMode === 'student' ? 'Student Number' : loginMode === 'phone' ? 'Phone Number' : 'Email'}
+                    placeholder={loginMode === 'student' ? 'Enter admission number' : loginMode === 'phone' ? '+260XXXXXXXXX' : 'Enter your email'}
                     value={email}
                     onChangeText={setEmail}
-                    keyboardType={useStudentNumber ? 'default' : 'email-address'}
+                    keyboardType={loginMode === 'email' ? 'email-address' : 'phone-pad'}
                     autoCapitalize="none"
                   />
                 </View>

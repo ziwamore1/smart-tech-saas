@@ -80,7 +80,7 @@ export class RegisterTeacherDto {
 
 export class LoginDto {
   @IsNotEmpty()
-  email: string;
+  identifier: string;
 
   @IsNotEmpty()
   password: string;

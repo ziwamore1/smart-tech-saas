@@ -4,16 +4,22 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 
 const commNav = [
-  { name: 'Communication Dashboard', href: '/super-admin/communications', icon: 'fa-tachometer-alt', color: '#ea6645' },
+  { name: 'Dashboard', href: '/super-admin/communications', icon: 'fa-tachometer-alt', color: '#ea6645' },
+  { name: 'SMS', href: '/super-admin/communications/sms', icon: 'fa-sms', color: '#3b82f6' },
+  { name: 'Email', href: '/super-admin/communications/email', icon: 'fa-envelope', color: '#10b981' },
+  { name: 'WhatsApp', href: '/super-admin/communications/whatsapp', icon: 'fa-whatsapp', color: '#25D366' },
+  { name: 'Push', href: '/super-admin/communications/push', icon: 'fa-bell', color: '#8b5cf6' },
   { name: 'Providers', href: '/super-admin/communications/providers', icon: 'fa-server', color: '#3b82f6' },
-  { name: 'Campaigns', href: '/super-admin/communications/campaigns', icon: 'fa-bullhorn', color: '#8b5cf6' },
+  { name: 'Routing', href: '/super-admin/communications/routing', icon: 'fa-route', color: '#f97316' },
   { name: 'Templates', href: '/super-admin/communications/templates', icon: 'fa-file-alt', color: '#f97316' },
-  { name: 'Notifications', href: '/super-admin/communications/notifications', icon: 'fa-bell', color: '#10b981' },
-  { name: 'Usage Analytics', href: '/super-admin/communications/analytics', icon: 'fa-chart-bar', color: '#14b8a6' },
+  { name: 'Sender IDs', href: '/super-admin/communications/sender-ids', icon: 'fa-id-card', color: '#ec4899' },
+  { name: 'Campaigns', href: '/super-admin/communications/campaigns', icon: 'fa-bullhorn', color: '#8b5cf6' },
+  { name: 'Broadcast', href: '/super-admin/communications/broadcast', icon: 'fa-broadcast-tower', color: '#f59e0b' },
+  { name: 'Scheduled', href: '/super-admin/communications/scheduled', icon: 'fa-calendar-alt', color: '#ec4899' },
+  { name: 'Analytics', href: '/super-admin/communications/analytics', icon: 'fa-chart-bar', color: '#14b8a6' },
   { name: 'Delivery Logs', href: '/super-admin/communications/delivery-logs', icon: 'fa-clipboard-list', color: '#6366f1' },
-  { name: 'Broadcast Center', href: '/super-admin/communications/broadcast', icon: 'fa-broadcast-tower', color: '#f59e0b' },
-  { name: 'YouTube Channel', href: '/super-admin/communications/youtube', icon: 'fa-youtube', color: '#ef4444' },
-  { name: 'Scheduled Messages', href: '/super-admin/communications/scheduled', icon: 'fa-calendar-alt', color: '#ec4899' },
+  { name: 'Credits', href: '/super-admin/communications/credits', icon: 'fa-coins', color: '#f59e0b' },
+  { name: 'Notifications', href: '/super-admin/communications/notifications', icon: 'fa-bell', color: '#10b981' },
 ];
 
 export default function CommunicationsLayout({ children }: { children: React.ReactNode }) {
@@ -53,8 +59,8 @@ export default function CommunicationsLayout({ children }: { children: React.Rea
             <i className="fa fa-comments" style={{ fontSize: '18px', color: 'white' }}></i>
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '18px', color: '#1f2937' }}>Communications Hub</div>
-            <div style={{ fontSize: '12px', color: '#9ca3af' }}>Manage all platform communications, providers, and channels</div>
+            <div style={{ fontWeight: 700, fontSize: '18px', color: '#1f2937' }}>SmartTech Communications Cloud</div>
+            <div style={{ fontSize: '12px', color: '#9ca3af' }}>Multi-channel communication platform with unified messaging, routing, and analytics</div>
           </div>
         </div>
 

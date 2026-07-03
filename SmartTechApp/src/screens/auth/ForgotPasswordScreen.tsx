@@ -9,21 +9,23 @@ import { apiService } from '../../services/api';
 const { height, width } = Dimensions.get('window');
 
 export const ForgotPasswordScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
+  const isEmail = identifier.includes('@');
+
   const handleReset = async () => {
-    if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
+    if (!identifier.trim()) {
+      Alert.alert('Error', 'Please enter your email or phone number');
       return;
     }
     setIsLoading(true);
     try {
-      await apiService.forgotPassword(email.trim());
+      await apiService.forgotPassword(identifier.trim());
       setEmailSent(true);
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to send reset email');
+      Alert.alert('Error', err.response?.data?.message || 'Failed to send reset link');
     } finally {
       setIsLoading(false);
     }
@@ -42,24 +44,24 @@ export const ForgotPasswordScreen: React.FC<{ onBack: () => void }> = ({ onBack 
             <Text style={styles.title}>Forgot Password?</Text>
             <Text style={styles.subtitle}>
               {emailSent
-                ? 'We have sent a password reset link to your email. Please check your inbox.'
-                : 'Enter your email address and we will send you a link to reset your password.'}
+                ? `We have sent a password reset ${isEmail ? 'link' : 'code'} to your ${isEmail ? 'email' : 'phone'}. Please check your ${isEmail ? 'inbox' : 'messages'}.`
+                : 'Enter your email or phone number to receive a password reset link/code.'}
             </Text>
 
             {!emailSent && (
               <View style={styles.formCard}>
                 <Input
-                  label="Email Address"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
+                  label="Email or Phone Number"
+                  placeholder="email@school.com or +260XXXXXXXXX"
+                  value={identifier}
+                  onChangeText={setIdentifier}
+                  keyboardType={isEmail ? 'email-address' : 'phone-pad'}
                   autoCapitalize="none"
                 />
 
                 <TouchableOpacity onPress={handleReset} disabled={isLoading} activeOpacity={0.8} style={styles.resetBtn}>
                   <LinearGradient colors={['#F59E0B', '#D97706'] as const} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.resetBtnInner}>
-                    <Text style={styles.resetBtnText}>{isLoading ? 'Sending...' : 'Send Reset Link'}</Text>
+                    <Text style={styles.resetBtnText}>{isLoading ? 'Sending...' : 'Send Reset Link / Code'}</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
@@ -67,7 +69,7 @@ export const ForgotPasswordScreen: React.FC<{ onBack: () => void }> = ({ onBack 
 
             {emailSent && (
               <TouchableOpacity onPress={() => setEmailSent(false)} style={styles.resendBtn}>
-                <Text style={styles.resendText}>Resend Email</Text>
+                <Text style={styles.resendText}>Resend</Text>
               </TouchableOpacity>
             )}
           </View>

@@ -108,8 +108,8 @@ class ApiService {
     return response.data;
   }
 
-  async forgotPassword(email: string) {
-    const response = await this.client.post('/auth/forgot-password', { email });
+  async forgotPassword(identifier: string) {
+    const response = await this.client.post('/auth/forgot-password', { identifier });
     return response.data;
   }
 

@@ -87,6 +87,7 @@ import { StaffRecordsModule } from './premium/staff-records-service/staff-record
 import { StaffPositionModule } from './staff-position/staff-position.module';
 import { ContactModule } from './contact/contact.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { CommunicationsCloudModule } from './communications-cloud/communications-cloud.module';
 import { HealthModule } from './common/health.module';
 import { ProductionLogger } from './common/production-logger';
 
@@ -204,6 +205,7 @@ import { ProductionLogger } from './common/production-logger';
     InstitutionModule,
     ContactModule,
     CloudinaryModule,
+    CommunicationsCloudModule,
   ],
   providers: [ProductionLogger],
 })

@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { communicationApi } from '@/lib/api';
+import { communicationApi, communicationsCloudApi } from '@/lib/api';
 import {
   CommunicationType,
   Communication,
@@ -83,6 +84,13 @@ export default function CommunicationsPage() {
     refetchInterval: 30000,
   });
 
+  const { data: walletData } = useQuery({
+    queryKey: ['school-wallet-summary'],
+    queryFn: () => communicationsCloudApi.getSchoolWallet().then(res => res.data),
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
+
   const createMutation = useMutation({
     mutationFn: (data: any) => communicationApi.create(data),
     onSuccess: () => {
@@ -136,6 +144,18 @@ export default function CommunicationsPage() {
           <p className="text-gray-600 mt-1">Manage all school communications across multiple platforms</p>
         </div>
         <div className="flex gap-3">
+          <Link
+            href="/dashboard/communications/wallet"
+            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2"
+          >
+            <i className="fa fa-wallet"></i> Wallet
+          </Link>
+          <Link
+            href="/dashboard/communications/history"
+            className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors flex items-center gap-2"
+          >
+            <i className="fa fa-history"></i> History
+          </Link>
           <button
             onClick={() => setShowAlertsModal(true)}
             className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2"
@@ -161,6 +181,43 @@ export default function CommunicationsPage() {
           </button>
         </div>
       </div>
+
+      {walletData && (
+        <div style={{ background: 'linear-gradient(135deg, #fdfaf7 0%, #fefcf9 100%)', borderRadius: '12px', border: '1px solid #e8ddd0', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '40px', height: '40px', background: '#ea6645', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '18px' }}>
+              <i className="fa fa-wallet"></i>
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', color: '#6b7280' }}>SMS Credits</div>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#1f2937' }}>
+                {walletData.smsCredits?.used ?? 0} <span style={{ fontSize: '14px', color: '#9ca3af' }}>/ {walletData.smsCredits?.total ?? 0}</span>
+              </div>
+            </div>
+            <div style={{ width: '1px', height: '32px', background: '#e8ddd0' }}></div>
+            <div>
+              <div style={{ fontSize: '13px', color: '#6b7280' }}>Prepaid Balance</div>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#ea6645' }}>
+                ZMW {(walletData.prepaidBalance ?? 0).toLocaleString('en-ZM', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Link
+              href="/dashboard/communications/wallet"
+              style={{ padding: '8px 16px', background: '#ea6645', color: 'white', borderRadius: '8px', fontSize: '13px', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <i className="fa fa-credit-card"></i> View Wallet
+            </Link>
+            <Link
+              href="/dashboard/communications/history"
+              style={{ padding: '8px 16px', background: '#1f2937', color: 'white', borderRadius: '8px', fontSize: '13px', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <i className="fa fa-list"></i> Message History
+            </Link>
+          </div>
+        </div>
+      )}
 
       {stats && stats.total !== undefined && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

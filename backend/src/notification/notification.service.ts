@@ -309,6 +309,11 @@ export class NotificationService {
     }
   }
 
+  async sendGenericSms(phone: string, message: string): Promise<void> {
+    this.logger.log(`Sending generic SMS to ${phone}`);
+    await this.sendSMS(phone, message);
+  }
+
   async sendVoiceOtp(phone: string, otp: string, language?: string): Promise<void> {
     this.logger.warn(`[Voice OTP] Voice OTP not supported by Beem Africa. Cannot send OTP to ${phone}`);
     await this.logNotification(phone, 'voice', 'otp', 'failed', undefined, `OTP: ${otp}`, 'Voice OTP not supported by Beem');

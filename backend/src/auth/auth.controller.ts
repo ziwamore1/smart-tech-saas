@@ -29,7 +29,7 @@ export class AuthController {
   }
 
   @Post('super-admin/login')
-  async superAdminLogin(@Body() body: LoginDto) {
+  async superAdminLogin(@Body() body: { email: string; password: string }) {
     this.logger.log(`Super admin login request: ${body.email}`);
     return this.authService.superAdminLogin(body.email, body.password);
   }
@@ -79,9 +79,9 @@ export class AuthController {
   @Post('login')
   async login(@Body() body: LoginDto) {
     this.logger.log(
-      `Login request - email: ${body.email}, password length: ${body.password?.length}, schoolId: ${body.schoolId || 'not provided'}`,
+      `Login request - identifier: ${body.identifier}, password length: ${body.password?.length}, schoolId: ${body.schoolId || 'not provided'}`,
     );
-    return this.authService.login(body.email, body.password, body.schoolId);
+    return this.authService.login(body.identifier, body.password, body.schoolId);
   }
 
   @Post('mobile-login')
@@ -100,9 +100,9 @@ export class AuthController {
   }
 
   @Post('forgot-password')
-  async forgotPassword(@Body() body: { email: string }) {
-    this.logger.log(`Forgot password request for email: ${body.email}`);
-    return this.authService.forgotPassword(body.email);
+  async forgotPassword(@Body() body: { identifier: string }) {
+    this.logger.log(`Forgot password request for identifier: ${body.identifier}`);
+    return this.authService.forgotPassword(body.identifier);
   }
 
   @Post('reset-password')

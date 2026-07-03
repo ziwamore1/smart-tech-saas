@@ -8,7 +8,7 @@ import Link from 'next/link';
 import '../super-admin-fix.css';
 
 function LoginForm() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -28,7 +28,7 @@ function LoginForm() {
     setIsLoading(true);
 
     try {
-      await login(email, password, loginAsSuperAdmin, schoolId || undefined);
+      await login(identifier, password, loginAsSuperAdmin, schoolId || undefined);
       
       if (loginAsSuperAdmin) {
         router.push('/super-admin');
@@ -141,7 +141,7 @@ function LoginForm() {
                     color: '#374151', 
                     marginBottom: '6px' 
                   }}>
-                    Email Address
+                    Email or Phone Number
                   </label>
                   <div style={{ position: 'relative' }}>
                     <span style={{
@@ -151,12 +151,12 @@ function LoginForm() {
                       transform: 'translateY(-50%)',
                       color: '#9ca3af'
                     }}>
-                      <i className="fa fa-envelope"></i>
+                      <i className="fa fa-user"></i>
                     </span>
                     <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      type="text"
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
                       style={{
                         width: '100%',
                         padding: '12px 12px 12px 40px',
@@ -166,7 +166,7 @@ function LoginForm() {
                         outline: 'none',
                         transition: 'all 0.2s'
                       }}
-                      placeholder="you@school.com"
+                      placeholder="email@school.com or +260XXXXXXXXX"
                       required
                     />
                   </div>

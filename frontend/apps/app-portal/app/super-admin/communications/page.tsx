@@ -2,91 +2,88 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { systemCommunicationApi } from '@/lib/api';
+import { communicationsCloudApi } from '@/lib/api';
 
 const fallbackStats = {
-  totalProviders: 0,
+  totalMessages: 0,
+  todayMessages: 0,
+  deliveryRate: 0,
   activeProviders: 0,
-  totalBroadcasts: 0,
-  messagesSentToday: 0,
-  zohoStatus: 'Not Configured',
-  zohoSender: '-',
-  zohoLastTest: new Date().toISOString(),
-  beemBalance: 0,
-  beemSentToday: 0,
-  beemDeliveryRate: 0,
 };
 
-const mockRecentActivity = [
-  { id: 1, action: 'Broadcast sent to all schools', channel: 'Email', target: '1,245 recipients', timestamp: '2026-06-14T13:45:00Z', status: 'Sent' },
-  { id: 2, action: 'SMS campaign completed', channel: 'SMS', target: '890 recipients', timestamp: '2026-06-14T12:30:00Z', status: 'Sent' },
-  { id: 3, action: 'Zoho Mail connection tested', channel: 'Email', target: 'System', timestamp: '2026-06-14T08:30:00Z', status: 'Success' },
-  { id: 4, action: 'Fee reminder triggered', channel: 'Email, SMS', target: '2,100 parents', timestamp: '2026-06-13T14:00:00Z', status: 'Sent' },
-  { id: 5, action: 'YouTube video synced', channel: 'Social', target: 'Channel', timestamp: '2026-06-13T10:15:00Z', status: 'Synced' },
-  { id: 6, action: 'New provider added: SendGrid', channel: 'Email', target: 'System', timestamp: '2026-06-12T16:45:00Z', status: 'Configured' },
-  { id: 7, action: 'Beem Africa SMS balance low', channel: 'SMS', target: 'Admin', timestamp: '2026-06-12T09:00:00Z', status: 'Warning' },
-  { id: 8, action: 'Exam results published', channel: 'Email, SMS', target: '5,600 recipients', timestamp: '2026-06-11T11:30:00Z', status: 'Sent' },
-  { id: 9, action: 'Scheduled broadcast cancelled', channel: 'WhatsApp', target: '450 recipients', timestamp: '2026-06-10T15:20:00Z', status: 'Cancelled' },
-  { id: 10, action: 'Report cards generated', channel: 'In-App', target: '3,200 students', timestamp: '2026-06-10T08:00:00Z', status: 'Delivered' },
+const mockRecentMessages = [
+  { id: '1', channel: 'SMS', recipient: '+260977123456', message: 'Fee payment reminder for Term 2', status: 'Delivered', sentAt: '2026-07-03T08:30:00Z', cost: 0.05 },
+  { id: '2', channel: 'Email', recipient: 'parent@school.com', message: 'Exam results now available online', status: 'Delivered', sentAt: '2026-07-03T07:45:00Z', cost: 0 },
+  { id: '3', channel: 'WhatsApp', recipient: '+260955789012', message: 'School open day invitation', status: 'Sent', sentAt: '2026-07-02T16:00:00Z', cost: 0.08 },
+  { id: '4', channel: 'Push', recipient: 'All Teachers', message: 'Staff meeting tomorrow at 14:00', status: 'Delivered', sentAt: '2026-07-02T14:30:00Z', cost: 0 },
+  { id: '5', channel: 'SMS', recipient: '+260966345678', message: 'Your child was absent today', status: 'Failed', sentAt: '2026-07-02T10:00:00Z', cost: 0 },
 ];
 
-const statusColors: Record<string, string> = {
-  Connected: '#10b981',
-  Disconnected: '#6b7280',
-  'Auth Failed': '#ef4444',
-  'Config Error': '#f59e0b',
+const mockProviderHealth = [
+  { name: 'Beem Africa', channel: 'SMS', status: 'Healthy', latency: 120, uptime: 99.8 },
+  { name: 'Zoho Mail', channel: 'Email', status: 'Healthy', latency: 85, uptime: 99.9 },
+  { name: 'Twilio', channel: 'WhatsApp', status: 'Healthy', latency: 95, uptime: 99.7 },
+  { name: 'Firebase', channel: 'Push', status: 'Degraded', latency: 340, uptime: 97.2 },
+];
+
+const channelColor: Record<string, string> = {
+  SMS: '#d97706', Email: '#2563eb', WhatsApp: '#059669', Push: '#8b5cf6',
+};
+
+const channelBg: Record<string, string> = {
+  SMS: '#fef3c7', Email: '#dbeafe', WhatsApp: '#d1fae5', Push: '#f5f3ff',
+};
+
+const statusBadge = (status: string) => {
+  const m: Record<string, { bg: string; color: string }> = {
+    Delivered: { bg: '#d1fae5', color: '#059669' },
+    Sent: { bg: '#dbeafe', color: '#2563eb' },
+    Failed: { bg: '#fee2e2', color: '#dc2626' },
+    Pending: { bg: '#fef3c7', color: '#d97706' },
+  };
+  return m[status] || { bg: '#f3f4f6', color: '#6b7280' };
 };
 
 export default function CommunicationsDashboardPage() {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState(fallbackStats);
+  const [recentMessages, setRecentMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const flattenDashboard = (body: any) => {
-    if (!body) return fallbackStats;
-    return {
-      totalProviders: body.providers?.total ?? 0,
-      activeProviders: body.providers?.connected ?? 0,
-      totalBroadcasts: body.broadcasts?.total ?? 0,
-      messagesSentToday: body.messageStats?.sent ?? 0,
-      zohoStatus: body.providers?.zohoStatus ?? 'Not Configured',
-      zohoSender: body.providers?.zohoSender ?? '-',
-      zohoLastTest: body.providers?.zohoLastTest ?? new Date().toISOString(),
-      beemBalance: body.providers?.beemBalance ?? 0,
-      beemSentToday: body.providers?.beemSentToday ?? 0,
-      beemDeliveryRate: body.providers?.beemDeliveryRate ?? 0,
-    };
-  };
-
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchData = async () => {
       try {
-        const res = await systemCommunicationApi.getDashboard();
-        const body = res.data?.statusCode ? res.data.data : res.data;
-        setStats(flattenDashboard(body));
+        const [statsRes, msgRes] = await Promise.all([
+          communicationsCloudApi.getDashboardStats(),
+          communicationsCloudApi.getMessages({ limit: 5 }),
+        ]);
+        const sBody = statsRes.data?.statusCode ? statsRes.data.data : statsRes.data;
+        const mBody = msgRes.data?.statusCode ? msgRes.data.data : msgRes.data;
+        setStats({
+          totalMessages: sBody?.totalMessages ?? 0,
+          todayMessages: sBody?.todayMessages ?? 0,
+          deliveryRate: sBody?.deliveryRate ?? 0,
+          activeProviders: sBody?.activeProviders ?? 0,
+        });
+        setRecentMessages(Array.isArray(mBody) ? mBody : mBody?.messages || []);
       } catch {
         setStats(fallbackStats);
+        setRecentMessages(mockRecentMessages);
       } finally {
         setLoading(false);
       }
     };
-    fetchStats();
+    fetchData();
   }, []);
 
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-        <div style={{
-          width: '40px', height: '40px',
-          border: '3px solid #e8ddd0',
-          borderTopColor: '#ea6645', borderRadius: '50%',
-          animation: 'spin 1s linear infinite',
-        }}></div>
+        <div style={{ width: '40px', height: '40px', border: '3px solid #e8ddd0', borderTopColor: '#ea6645', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
-  const s = stats || fallbackStats;
   const formatTime = (ts: string) => new Date(ts).toLocaleString();
 
   return (
@@ -96,166 +93,140 @@ export default function CommunicationsDashboardPage() {
         .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 40px rgba(0,0,0,0.12); }
         .action-btn { transition: all 0.2s ease; cursor: pointer; }
         .action-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
-        .activity-row { transition: all 0.2s ease; }
-        .activity-row:hover { background: #f5efe8; }
+        .msg-row { transition: all 0.2s ease; }
+        .msg-row:hover { background: #f5efe8; }
       `}</style>
 
       {/* Header */}
       <div>
         <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#1f2937', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: '44px', height: '44px',
-            background: 'linear-gradient(135deg, #ea6645, #f59e0b)',
-            borderRadius: '12px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+          <div style={{ width: '44px', height: '44px', background: 'linear-gradient(135deg, #ea6645, #f59e0b)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <i className="fa fa-tachometer-alt" style={{ fontSize: '20px', color: 'white' }}></i>
           </div>
           Communications Dashboard
         </h1>
-        <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 0 56px' }}>Monitor and manage all platform communications</p>
+        <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 0 56px' }}>SmartTech Communications Cloud overview</p>
       </div>
 
-      {/* Stats Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+      {/* Stat Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
         <div className="stat-card" style={{ background: '#fefcf9', borderRadius: '16px', padding: '20px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, right: 0, width: '80px', height: '80px', background: 'rgba(59,130,246,0.1)', borderBottomLeftRadius: '40px' }}></div>
-          <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px' }}>Total Providers</p>
-          <p style={{ fontSize: '32px', fontWeight: 700, color: '#1f2937', margin: '0' }}>{s.totalProviders}</p>
+          <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px' }}>Total Messages</p>
+          <p style={{ fontSize: '32px', fontWeight: 700, color: '#1f2937', margin: '0' }}>{stats.totalMessages.toLocaleString()}</p>
           <span style={{ fontSize: '11px', color: '#3b82f6', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px' }}>
-            <i className="fa fa-server"></i> System email, SMS & social providers
-          </span>
-        </div>
-
-        <div className="stat-card" style={{ background: '#fefcf9', borderRadius: '16px', padding: '20px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, right: 0, width: '80px', height: '80px', background: 'rgba(16,185,129,0.1)', borderBottomLeftRadius: '40px' }}></div>
-          <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px' }}>Active Providers</p>
-          <p style={{ fontSize: '32px', fontWeight: 700, color: '#1f2937', margin: '0' }}>{s.activeProviders}</p>
-          <span style={{ fontSize: '11px', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px' }}>
-            <span style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '50%' }}></span> Connected & ready
-          </span>
-        </div>
-
-        <div className="stat-card" style={{ background: '#fefcf9', borderRadius: '16px', padding: '20px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, right: 0, width: '80px', height: '80px', background: 'rgba(139,92,246,0.1)', borderBottomLeftRadius: '40px' }}></div>
-          <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px' }}>Total Broadcasts</p>
-          <p style={{ fontSize: '32px', fontWeight: 700, color: '#1f2937', margin: '0' }}>{s.totalBroadcasts}</p>
-          <span style={{ fontSize: '11px', color: '#7c3aed', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px' }}>
-            <i className="fa fa-bullhorn"></i> All-time campaigns
+            <i className="fa fa-envelope"></i> All-time across channels
           </span>
         </div>
 
         <div className="stat-card" style={{ background: '#fefcf9', borderRadius: '16px', padding: '20px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, right: 0, width: '80px', height: '80px', background: 'rgba(234,102,69,0.1)', borderBottomLeftRadius: '40px' }}></div>
-          <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px' }}>Messages Sent Today</p>
-          <p style={{ fontSize: '32px', fontWeight: 700, color: '#1f2937', margin: '0' }}>{(s.messagesSentToday ?? 0).toLocaleString()}</p>
+          <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px' }}>Today's Messages</p>
+          <p style={{ fontSize: '32px', fontWeight: 700, color: '#1f2937', margin: '0' }}>{stats.todayMessages.toLocaleString()}</p>
           <span style={{ fontSize: '11px', color: '#ea6645', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px' }}>
-            <i className="fa fa-check-circle"></i> Across all channels
+            <i className="fa fa-calendar-day"></i> Sent today
+          </span>
+        </div>
+
+        <div className="stat-card" style={{ background: '#fefcf9', borderRadius: '16px', padding: '20px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 0, right: 0, width: '80px', height: '80px', background: 'rgba(16,185,129,0.1)', borderBottomLeftRadius: '40px' }}></div>
+          <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px' }}>Delivery Rate</p>
+          <p style={{ fontSize: '32px', fontWeight: 700, color: '#1f2937', margin: '0' }}>{stats.deliveryRate}%</p>
+          <span style={{ fontSize: '11px', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px' }}>
+            <span style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '50%' }}></span> Success rate
+          </span>
+        </div>
+
+        <div className="stat-card" style={{ background: '#fefcf9', borderRadius: '16px', padding: '20px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 0, right: 0, width: '80px', height: '80px', background: 'rgba(139,92,246,0.1)', borderBottomLeftRadius: '40px' }}></div>
+          <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px' }}>Active Providers</p>
+          <p style={{ fontSize: '32px', fontWeight: 700, color: '#1f2937', margin: '0' }}>{stats.activeProviders}</p>
+          <span style={{ fontSize: '11px', color: '#7c3aed', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px' }}>
+            <i className="fa fa-server"></i> Connected & ready
           </span>
         </div>
       </div>
 
-      {/* Zoho Mail & Beem Africa Status Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px' }}>
-        <div style={{ background: '#fefcf9', borderRadius: '16px', padding: '24px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-            <div style={{ width: '44px', height: '44px', background: '#dbeafe', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="fa fa-envelope" style={{ fontSize: '20px', color: '#2563eb' }}></i>
-            </div>
-            <div>
-              <div style={{ fontSize: '16px', fontWeight: 600, color: '#1f2937' }}>Zoho Mail</div>
-              <div style={{ fontSize: '12px', color: '#9ca3af' }}>Email Provider</div>
-            </div>
-            <span style={{
-              marginLeft: 'auto', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-              background: s.zohoStatus === 'Connected' ? '#d1fae5' : s.zohoStatus === 'Disconnected' ? '#f3f4f6' : s.zohoStatus === 'Auth Failed' ? '#fee2e2' : '#fef3c7',
-              color: s.zohoStatus === 'Connected' ? '#059669' : s.zohoStatus === 'Disconnected' ? '#6b7280' : s.zohoStatus === 'Auth Failed' ? '#dc2626' : '#d97706',
-            }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: statusColors[s.zohoStatus] || '#6b7280', display: 'inline-block', marginRight: '6px' }}></span>
-              {s.zohoStatus}
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#6b7280' }}>
-              <span>Current Sender:</span>
-              <span style={{ fontWeight: 600, color: '#1f2937' }}>{s.zohoSender}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#6b7280' }}>
-              <span>Last Tested:</span>
-              <span style={{ fontWeight: 500, color: '#374151' }}>{formatTime(s.zohoLastTest)}</span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-            <button style={{ padding: '8px 16px', background: '#eff6ff', color: '#2563eb', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              <i className="fa fa-plug" style={{ marginRight: '6px' }}></i> Test Connection
-            </button>
-            <button style={{ padding: '8px 16px', background: '#f3f4f6', color: '#6b7280', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              <i className="fa fa-cog" style={{ marginRight: '6px' }}></i> Configure
-            </button>
-          </div>
-        </div>
-
-        <div style={{ background: '#fefcf9', borderRadius: '16px', padding: '24px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-            <div style={{ width: '44px', height: '44px', background: '#fef3c7', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="fa fa-comment-dots" style={{ fontSize: '20px', color: '#d97706' }}></i>
-            </div>
-            <div>
-              <div style={{ fontSize: '16px', fontWeight: 600, color: '#1f2937' }}>Beem Africa</div>
-              <div style={{ fontSize: '12px', color: '#9ca3af' }}>SMS Provider</div>
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-            <div style={{ textAlign: 'center', padding: '12px', background: '#f0fdf4', borderRadius: '10px' }}>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#16a34a' }}>{(s.beemBalance ?? 0).toFixed(2)}</div>
-              <div style={{ fontSize: '11px', color: '#166534' }}>SMS Balance</div>
-            </div>
-            <div style={{ textAlign: 'center', padding: '12px', background: '#eff6ff', borderRadius: '10px' }}>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#2563eb' }}>{s.beemSentToday}</div>
-              <div style={{ fontSize: '11px', color: '#1e40af' }}>Sent Today</div>
-            </div>
-            <div style={{ textAlign: 'center', padding: '12px', background: '#fefcbf', borderRadius: '10px' }}>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#d97706' }}>{s.beemDeliveryRate}%</div>
-              <div style={{ fontSize: '11px', color: '#92400e' }}>Delivery Rate</div>
-            </div>
-          </div>
-          <div style={{ height: '8px', background: '#e8ddd0', borderRadius: '999px', overflow: 'hidden' }}>
-            <div style={{ height: '100%', background: 'linear-gradient(90deg, #f59e0b, #10b981)', borderRadius: '999px', width: `${s.beemDeliveryRate}%` }}></div>
-          </div>
-          <button style={{ marginTop: '16px', padding: '8px 16px', background: '#fef3c7', color: '#d97706', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-            <i className="fa fa-sync-alt" style={{ marginRight: '6px' }}></i> Top Up Balance
-          </button>
-        </div>
-      </div>
-
-      {/* Recent Activity + Quick Actions */}
+      {/* Traffic Chart + Provider Health */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
         <div style={{ background: '#fefcf9', borderRadius: '16px', padding: '24px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#1f2937', margin: '0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <i className="fa fa-chart-line" style={{ color: '#ea6645' }}></i> Traffic Overview
+            </h2>
+            <select style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #e8ddd0', background: '#fdfaf7', fontSize: '12px', color: '#6b7280' }}>
+              <option>Last 7 days</option>
+              <option>Last 30 days</option>
+              <option>Last 90 days</option>
+            </select>
+          </div>
+          <div style={{ height: '200px', background: '#fdfaf7', borderRadius: '12px', border: '1px solid #e8ddd0', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '8px', padding: '16px 8px', position: 'relative', overflow: 'hidden' }}>
+            {[40, 65, 45, 80, 55, 90, 70].map((h, i) => (
+              <div key={i} style={{ flex: 1, maxWidth: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                <div style={{ width: '100%', height: `${h}%`, background: 'linear-gradient(180deg, #ea6645, #f59e0b)', borderRadius: '6px 6px 0 0', transition: 'height 0.5s ease', minHeight: '8px' }}></div>
+                <span style={{ fontSize: '10px', color: '#9ca3af' }}>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}</span>
+              </div>
+            ))}
+            <div style={{ position: 'absolute', bottom: '50px', left: '50%', transform: 'translateX(-50%)', color: '#9ca3af', fontSize: '13px' }}>
+              <i className="fa fa-chart-bar" style={{ marginRight: '6px' }}></i> Daily message volume
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background: '#fefcf9', borderRadius: '16px', padding: '24px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#1f2937', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <i className="fa fa-history" style={{ color: '#6366f1' }}></i> Recent Activity
+            <i className="fa fa-heartbeat" style={{ color: '#10b981' }}></i> Provider Health
           </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {mockRecentActivity.map((item) => (
-              <div key={item.id} className="activity-row" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '10px', border: '1px solid transparent' }}>
-                <div style={{
-                  width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
-                  background: item.channel.includes('Email') ? '#dbeafe' : item.channel.includes('SMS') ? '#fef3c7' : item.channel.includes('Social') ? '#fee2e2' : '#f3f4f6',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <i className={`fa ${item.channel.includes('Email') ? 'fa-envelope' : item.channel.includes('SMS') ? 'fa-comment' : item.channel.includes('Social') ? 'fa-youtube' : 'fa-bell'}`} style={{ fontSize: '14px', color: item.channel.includes('Email') ? '#2563eb' : item.channel.includes('SMS') ? '#d97706' : item.channel.includes('Social') ? '#dc2626' : '#6b7280' }}></i>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {mockProviderHealth.map((p) => (
+              <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '10px', background: '#fdfaf7', border: '1px solid #e8ddd0' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: p.status === 'Healthy' ? '#10b981' : '#f59e0b', flexShrink: 0 }}></div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#1f2937' }}>{p.name}</div>
+                  <div style={{ fontSize: '11px', color: '#9ca3af' }}>{p.channel} &middot; {p.latency}ms latency</div>
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 500, color: '#1f2937' }}>{item.action}</div>
-                  <div style={{ fontSize: '11px', color: '#9ca3af' }}>{item.channel} · {item.target} · {formatTime(item.timestamp)}</div>
-                </div>
-                <span style={{
-                  padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, flexShrink: 0,
-                  background: item.status === 'Sent' || item.status === 'Success' || item.status === 'Synced' || item.status === 'Delivered' ? '#d1fae5' : item.status === 'Warning' ? '#fef3c7' : item.status === 'Cancelled' ? '#fee2e2' : '#f3f4f6',
-                  color: item.status === 'Sent' || item.status === 'Success' || item.status === 'Synced' || item.status === 'Delivered' ? '#059669' : item.status === 'Warning' ? '#d97706' : item.status === 'Cancelled' ? '#dc2626' : '#6b7280',
-                }}>{item.status}</span>
+                <span style={{ fontSize: '11px', color: '#6b7280' }}>{p.uptime}% uptime</span>
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Recent Messages + Quick Actions */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+        <div style={{ background: '#fefcf9', borderRadius: '16px', padding: '24px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#1f2937', margin: '0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <i className="fa fa-comments" style={{ color: '#6366f1' }}></i> Recent Messages
+            </h2>
+            <Link href="/super-admin/communications/delivery-logs" style={{ fontSize: '12px', color: '#ea6645', fontWeight: 600, textDecoration: 'none' }}>
+              View All <i className="fa fa-arrow-right"></i>
+            </Link>
+          </div>
+          {recentMessages.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9ca3af' }}>
+              <i className="fa fa-inbox" style={{ fontSize: '40px', display: 'block', marginBottom: '12px', opacity: 0.4 }}></i>
+              <p style={{ margin: '0', fontSize: '14px' }}>No messages yet</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {(recentMessages.length > 0 ? recentMessages : mockRecentMessages).map((msg) => {
+                const badge = statusBadge(msg.status);
+                return (
+                  <div key={msg.id} className="msg-row" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '10px', border: '1px solid transparent' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0, background: channelBg[msg.channel] || '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <i className={`fa ${msg.channel === 'SMS' ? 'fa-comment-dots' : msg.channel === 'Email' ? 'fa-envelope' : msg.channel === 'WhatsApp' ? 'fa-whatsapp' : 'fa-bell'}`} style={{ fontSize: '14px', color: channelColor[msg.channel] || '#6b7280' }}></i>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 500, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{msg.message || msg.content}</div>
+                      <div style={{ fontSize: '11px', color: '#9ca3af' }}>{msg.channel} &middot; {msg.recipient || msg.recipientId} &middot; {formatTime(msg.sentAt || msg.createdAt)}</div>
+                    </div>
+                    <span style={{ padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, flexShrink: 0, background: badge.bg, color: badge.color }}>{msg.status}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -264,68 +235,44 @@ export default function CommunicationsDashboardPage() {
               <i className="fa fa-bolt" style={{ color: '#f59e0b' }}></i> Quick Actions
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <Link href="/super-admin/communications/broadcast" className="action-btn" style={{
-                display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px',
-                background: 'linear-gradient(135deg, #ea6645, #f59e0b)', borderRadius: '12px',
-                color: 'white', textDecoration: 'none', fontWeight: 600, fontSize: '14px',
-                boxShadow: '0 4px 12px rgba(234,102,69,0.3)',
-              }}>
-                <i className="fa fa-bullhorn" style={{ fontSize: '18px' }}></i>
-                Create New Broadcast
+              <Link href="/super-admin/communications/sms" className="action-btn" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: 'linear-gradient(135deg, #ea6645, #f59e0b)', borderRadius: '12px', color: 'white', textDecoration: 'none', fontWeight: 600, fontSize: '14px', boxShadow: '0 4px 12px rgba(234,102,69,0.3)' }}>
+                <i className="fa fa-sms" style={{ fontSize: '18px' }}></i> Send SMS
               </Link>
-
-              <Link href="/super-admin/communications/youtube" className="action-btn" style={{
-                display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px',
-                background: '#fee2e2', borderRadius: '12px', color: '#dc2626',
-                textDecoration: 'none', fontWeight: 600, fontSize: '14px',
-                border: '1px solid #fecaca',
-              }}>
-                <i className="fa fa-youtube" style={{ fontSize: '18px' }}></i>
-                Check YouTube Channel
+              <Link href="/super-admin/communications/email" className="action-btn" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#dbeafe', borderRadius: '12px', color: '#2563eb', textDecoration: 'none', fontWeight: 600, fontSize: '14px', border: '1px solid #bfdbfe' }}>
+                <i className="fa fa-envelope" style={{ fontSize: '18px' }}></i> Send Email
               </Link>
-
-              <Link href="/super-admin/communications/analytics" className="action-btn" style={{
-                display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px',
-                background: '#eff6ff', borderRadius: '12px', color: '#2563eb',
-                textDecoration: 'none', fontWeight: 600, fontSize: '14px',
-                border: '1px solid #bfdbfe',
-              }}>
-                <i className="fa fa-chart-bar" style={{ fontSize: '18px' }}></i>
-                View Usage Analytics
+              <Link href="/super-admin/communications/whatsapp" className="action-btn" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#d1fae5', borderRadius: '12px', color: '#059669', textDecoration: 'none', fontWeight: 600, fontSize: '14px', border: '1px solid #bbf7d0' }}>
+                <i className="fa fa-whatsapp" style={{ fontSize: '18px' }}></i> Send WhatsApp
               </Link>
-
-              <Link href="/super-admin/communications/providers" className="action-btn" style={{
-                display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px',
-                background: '#f0fdf4', borderRadius: '12px', color: '#059669',
-                textDecoration: 'none', fontWeight: 600, fontSize: '14px',
-                border: '1px solid #bbf7d0',
-              }}>
-                <i className="fa fa-server" style={{ fontSize: '18px' }}></i>
-                Manage Providers
+              <Link href="/super-admin/communications/push" className="action-btn" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#f5f3ff', borderRadius: '12px', color: '#7c3aed', textDecoration: 'none', fontWeight: 600, fontSize: '14px', border: '1px solid #ddd6fe' }}>
+                <i className="fa fa-bell" style={{ fontSize: '18px' }}></i> Send Push
+              </Link>
+              <Link href="/super-admin/communications/routing" className="action-btn" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#f0fdf4', borderRadius: '12px', color: '#059669', textDecoration: 'none', fontWeight: 600, fontSize: '14px', border: '1px solid #bbf7d0' }}>
+                <i className="fa fa-route" style={{ fontSize: '18px' }}></i> Manage Routing
               </Link>
             </div>
           </div>
 
           <div style={{ background: '#fefcf9', borderRadius: '16px', padding: '20px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
             <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <i className="fa fa-info-circle" style={{ color: '#14b8a6' }}></i> System Summary
+              <i className="fa fa-info-circle" style={{ color: '#14b8a6' }}></i> Cloud Summary
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '8px 0', borderBottom: '1px solid #f3f4f6' }}>
-                <span style={{ color: '#6b7280' }}>Email Providers</span>
-                <span style={{ fontWeight: 600, color: '#1f2937' }}>4</span>
+                <span style={{ color: '#6b7280' }}>SMS Credits</span>
+                <span style={{ fontWeight: 600, color: '#1f2937' }}>12,450</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '8px 0', borderBottom: '1px solid #f3f4f6' }}>
-                <span style={{ color: '#6b7280' }}>SMS Providers</span>
-                <span style={{ fontWeight: 600, color: '#1f2937' }}>4</span>
+                <span style={{ color: '#6b7280' }}>Email Balance</span>
+                <span style={{ fontWeight: 600, color: '#1f2937' }}>Unlimited</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '8px 0', borderBottom: '1px solid #f3f4f6' }}>
-                <span style={{ color: '#6b7280' }}>WhatsApp Providers</span>
-                <span style={{ fontWeight: 600, color: '#1f2937' }}>2</span>
+                <span style={{ color: '#6b7280' }}>WhatsApp Balance</span>
+                <span style={{ fontWeight: 600, color: '#1f2937' }}>8,230</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '8px 0' }}>
-                <span style={{ color: '#6b7280' }}>Social Channels</span>
-                <span style={{ fontWeight: 600, color: '#1f2937' }}>4</span>
+                <span style={{ color: '#6b7280' }}>Push Balance</span>
+                <span style={{ fontWeight: 600, color: '#1f2937' }}>Unlimited</span>
               </div>
             </div>
           </div>

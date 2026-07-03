@@ -8,7 +8,7 @@ import Link from 'next/link';
 import '../super-admin-fix.css';
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -20,7 +20,7 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
 
     try {
-      await authApi.forgotPassword(email);
+      await authApi.forgotPassword(identifier);
       setSuccess(true);
     } catch (err: any) {
       const errorMessage =
@@ -81,8 +81,8 @@ export default function ForgotPasswordPage() {
               </h2>
               <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
                 {success
-                  ? 'Check your email for the reset link'
-                  : 'Enter your email and we will send you a reset link'}
+                  ? 'Check your email or phone for the reset link/code'
+                  : 'Enter your email or phone number to receive a reset link/code'}
               </p>
             </div>
 
@@ -102,10 +102,10 @@ export default function ForgotPasswordPage() {
                     <i className="fa fa-check" style={{ fontSize: '32px', color: '#059669' }}></i>
                   </div>
                   <p style={{ fontSize: '14px', color: '#374151', marginBottom: '24px' }}>
-                    We sent a password reset link to <strong>{email}</strong>
+                    We sent a password reset link to <strong>{identifier}</strong>
                   </p>
                   <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '24px' }}>
-                    Didn&apos;t receive the email? Check your spam folder or try again.
+                    Didn&apos;t receive it? Check your spam folder or try again.
                   </p>
                   <button
                     onClick={() => setSuccess(false)}
@@ -122,7 +122,7 @@ export default function ForgotPasswordPage() {
                       marginBottom: '16px'
                     }}
                   >
-                    Try another email
+                    Try again
                   </button>
                 </div>
               ) : (
@@ -151,7 +151,7 @@ export default function ForgotPasswordPage() {
                       color: '#374151',
                       marginBottom: '6px'
                     }}>
-                      Email Address
+                      Email or Phone Number
                     </label>
                     <div style={{ position: 'relative' }}>
                       <span style={{
@@ -161,12 +161,12 @@ export default function ForgotPasswordPage() {
                         transform: 'translateY(-50%)',
                         color: '#9ca3af'
                       }}>
-                        <i className="fa fa-envelope"></i>
+                        <i className="fa fa-user"></i>
                       </span>
                       <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        type="text"
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
                         style={{
                           width: '100%',
                           padding: '12px 12px 12px 40px',
@@ -176,7 +176,7 @@ export default function ForgotPasswordPage() {
                           outline: 'none',
                           transition: 'all 0.2s'
                         }}
-                        placeholder="you@school.com"
+                        placeholder="email@school.com or +260XXXXXXXXX"
                         required
                       />
                     </div>

@@ -81,8 +81,8 @@ api.interceptors.response.use(
 );
 
 export const authApi = {
-  login: (email: string, password: string) =>
-    api.post('/auth/login', { email, password }),
+  login: (identifier: string, password: string, schoolId?: string) =>
+    api.post('/auth/login', { identifier, password, ...(schoolId ? { schoolId } : {}) }),
   
   superAdminLogin: (email: string, password: string) =>
     api.post('/auth/super-admin/login', { email, password }),
@@ -146,8 +146,8 @@ export const authApi = {
     subjectId?: string;
   }) => api.post('/auth/teacher', data),
 
-  forgotPassword: (email: string) =>
-    api.post('/auth/forgot-password', { email }),
+  forgotPassword: (identifier: string) =>
+    api.post('/auth/forgot-password', { identifier }),
 
   resetPassword: (token: string, newPassword: string) =>
     api.post('/auth/reset-password', { token, newPassword }),
@@ -2045,6 +2045,114 @@ export const systemCommunicationApi = {
   getScheduled: () => api.get('/system-communications/scheduled'),
   cancelScheduled: (id: string) => api.post(`/system-communications/scheduled/${id}/cancel`),
   sendTestSms: (data: { to: string; message?: string }) => api.post('/system-communications/test-sms', data),
+};
+
+export const communicationsCloudApi = {
+  // Unified Send APIs
+  sendSms: (data: any) => api.post('/communications-cloud/send/sms', data),
+  sendEmail: (data: any) => api.post('/communications-cloud/send/email', data),
+  sendWhatsApp: (data: any) => api.post('/communications-cloud/send/whatsapp', data),
+  sendPush: (data: any) => api.post('/communications-cloud/send/push', data),
+  sendInApp: (data: any) => api.post('/communications-cloud/send/in-app', data),
+  broadcast: (data: any) => api.post('/communications-cloud/broadcast', data),
+  schedule: (data: any) => api.post('/communications-cloud/schedule', data),
+  cancel: (id: string) => api.post(`/communications-cloud/${id}/cancel`),
+  retry: (id: string) => api.post(`/communications-cloud/${id}/retry`),
+  sendOtp: (data: { phone: string; message?: string }) => api.post('/communications-cloud/send/otp', data),
+
+  // Messages
+  getMessages: (params?: any) => api.get('/communications-cloud/messages', { params }),
+  getMessage: (id: string) => api.get(`/communications-cloud/messages/${id}`),
+
+  // Providers
+  getProviders: (params?: { channel?: string }) => api.get('/communications-cloud/providers', { params }),
+  getProvider: (id: string) => api.get(`/communications-cloud/providers/${id}`),
+  createProvider: (data: any) => api.post('/communications-cloud/providers', data),
+  updateProvider: (id: string, data: any) => api.put(`/communications-cloud/providers/${id}`, data),
+  deleteProvider: (id: string) => api.delete(`/communications-cloud/providers/${id}`),
+  testProvider: (id: string) => api.post(`/communications-cloud/providers/${id}/test`),
+  toggleProvider: (id: string, isActive: boolean) => api.patch(`/communications-cloud/providers/${id}/toggle`, { isActive }),
+  getProviderHealth: () => api.get('/communications-cloud/providers/health'),
+
+  // Routing Rules
+  getRoutingRules: (params?: { channel?: string }) => api.get('/communications-cloud/routing/rules', { params }),
+  getRoutingRule: (id: string) => api.get(`/communications-cloud/routing/rules/${id}`),
+  createRoutingRule: (data: any) => api.post('/communications-cloud/routing/rules', data),
+  updateRoutingRule: (id: string, data: any) => api.put(`/communications-cloud/routing/rules/${id}`, data),
+  deleteRoutingRule: (id: string) => api.delete(`/communications-cloud/routing/rules/${id}`),
+  toggleRoutingRule: (id: string, isActive: boolean) => api.patch(`/communications-cloud/routing/rules/${id}`, { isActive }),
+
+  // Templates
+  getTemplates: (params?: any) => api.get('/communications-cloud/templates', { params }),
+  getTemplate: (id: string) => api.get(`/communications-cloud/templates/${id}`),
+  createTemplate: (data: any) => api.post('/communications-cloud/templates', data),
+  updateTemplate: (id: string, data: any) => api.put(`/communications-cloud/templates/${id}`, data),
+  deleteTemplate: (id: string) => api.delete(`/communications-cloud/templates/${id}`),
+  renderTemplate: (id: string, variables: any) => api.post(`/communications-cloud/templates/${id}/render`, { variables }),
+  seedDefaultTemplates: () => api.post('/communications-cloud/templates/seed-defaults'),
+
+  // Sender Identities
+  getSenderIdentities: (params?: any) => api.get('/communications-cloud/sender-identities', { params }),
+  getSenderIdentity: (id: string) => api.get(`/communications-cloud/sender-identities/${id}`),
+  createSenderIdentity: (data: any) => api.post('/communications-cloud/sender-identities', data),
+  updateSenderIdentity: (id: string, data: any) => api.put(`/communications-cloud/sender-identities/${id}`, data),
+  deleteSenderIdentity: (id: string) => api.delete(`/communications-cloud/sender-identities/${id}`),
+  setDefaultSenderIdentity: (id: string) => api.post(`/communications-cloud/sender-identities/${id}/default`),
+  verifySenderIdentity: (id: string) => api.post(`/communications-cloud/sender-identities/${id}/verify`),
+
+  // Delivery
+  getDeliveryLogs: (messageId: string) => api.get(`/communications-cloud/delivery/${messageId}`),
+  getDeliveryStats: (params?: any) => api.get('/communications-cloud/delivery/stats', { params }),
+  getFailedDeliveries: (params?: any) => api.get('/communications-cloud/delivery/failed', { params }),
+
+  // Wallet / Credits
+  getWallet: (ownerType: string, ownerId: string) => api.get(`/communications-cloud/billing/wallet/${ownerType}/${ownerId}`),
+  getWalletBalance: (walletId: string) => api.get(`/communications-cloud/billing/wallet/${walletId}/balance`),
+  rechargeWallet: (walletId: string, data: any) => api.post(`/communications-cloud/billing/wallet/${walletId}/recharge`, data),
+  getTransactions: (walletId: string) => api.get(`/communications-cloud/billing/transactions/${walletId}`),
+  getPricing: () => api.get('/communications-cloud/billing/pricing'),
+
+  // Analytics
+  getDashboardStats: () => api.get('/communications-cloud/analytics/dashboard'),
+  getDailyMessages: (days?: number) => api.get(`/communications-cloud/analytics/daily?days=${days || 30}`),
+  getMonthlyMessages: (months?: number) => api.get(`/communications-cloud/analytics/monthly?months=${months || 12}`),
+  getCountryUsage: (channel?: string) => api.get(`/communications-cloud/analytics/country${channel ? `?channel=${channel}` : ''}`),
+  getSchoolUsage: (schoolId: string) => api.get(`/communications-cloud/analytics/school/${schoolId}`),
+  getProviderComparison: (channel?: string) => api.get(`/communications-cloud/analytics/providers${channel ? `?channel=${channel}` : ''}`),
+  getRevenue: () => api.get('/communications-cloud/analytics/revenue'),
+
+  // Webhook management
+  getWebhookEvents: (params?: any) => api.get('/communications-cloud/webhooks/events', { params }),
+
+  // Queue management
+  getQueueStatus: () => api.get('/communications-cloud/queue/status'),
+  getFailedJobs: () => api.get('/communications-cloud/queue/failed'),
+  retryJob: (jobId: string) => api.post(`/communications-cloud/queue/retry/${jobId}`),
+
+  // School-level convenience endpoints (for school admin dashboard)
+  getSchoolWallet: () => api.get('/communications-cloud/school/wallet'),
+  getSchoolTransactions: () => api.get('/communications-cloud/school/wallet/transactions'),
+  rechargeSchoolWallet: (data: { amount: number; channel?: string; description?: string }) =>
+    api.post('/communications-cloud/school/wallet/recharge', data),
+  getSchoolBalance: (provider?: string) => api.get('/communications-cloud/school/balance', { params: { provider } }),
+  getSchoolSettings: () => api.get('/communications-cloud/school/settings'),
+  updateSchoolSettings: (data: any) => api.post('/communications-cloud/school/settings', data),
+  sendSchoolSms: (data: { recipient: string; message: string; senderId?: string; scheduledAt?: string }) =>
+    api.post('/communications-cloud/school/send-sms', data),
+  getSchoolStats: () => api.get('/communications-cloud/school/stats'),
+  getSchoolMessages: (params?: any) => api.get('/communications-cloud/school/messages', { params }),
+
+  // Additional analytics endpoints
+  getDeliveryRate: (params?: { channel?: string; from?: string; to?: string }) =>
+    api.get('/communications-cloud/analytics/delivery-rate', { params }),
+  getFailureRate: (params?: { channel?: string; from?: string; to?: string }) =>
+    api.get('/communications-cloud/analytics/failure-rate', { params }),
+
+  // Billing convenience
+  generateInvoice: (walletId: string) => api.get(`/communications-cloud/billing/invoice/${walletId}`),
+  getUsageReport: (walletId: string) => api.get(`/communications-cloud/billing/usage/${walletId}`),
+  calculateCost: (data: { channel: string; units: number; providerType?: string }) =>
+    api.post('/communications-cloud/billing/calculate-cost', data),
 };
 
 export const primaryGradingApi = {

@@ -169,12 +169,22 @@ export class AuthService {
       this.logger.warn(`School '${school.name}' has no institution type assigned - director creation will proceed`);
     }
 
-    const existingUser = await this.prisma.user.findFirst({
-      where: { email: data.email?.toLowerCase() },
-    });
+    if (data.email) {
+      const existingUser = await this.prisma.user.findFirst({
+        where: { email: data.email.toLowerCase() },
+      });
+      if (existingUser) {
+        throw new BadRequestException('Email already in use');
+      }
+    }
 
-    if (existingUser) {
-      throw new BadRequestException('Email already in use');
+    if (data.phone) {
+      const existingPhone = await this.prisma.user.findFirst({
+        where: { phone: data.phone },
+      });
+      if (existingPhone) {
+        throw new BadRequestException('Phone number already in use');
+      }
     }
 
     const tempPassword = this.generateTempPassword();
@@ -183,12 +193,14 @@ export class AuthService {
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ') || firstName;
 
+    const hasEmail = !!data.email;
     const user = await this.prisma.user.create({
       data: {
         firstName,
         lastName,
         email: data.email?.toLowerCase() || `${data.schoolId}-${Date.now()}@placeholder.local`,
         phone: data.phone,
+        username: hasEmail ? undefined : data.phone,
         password: hashedPassword,
         schoolId: data.schoolId,
       },
@@ -214,9 +226,9 @@ export class AuthService {
 
     await this.notificationService.sendCredentials({
       recipientName: data.fullName,
-      email: data.email,
+      email: hasEmail ? data.email : undefined,
       phone: data.phone,
-      username: data.email || data.phone,
+      username: hasEmail ? data.email : data.phone,
       password: tempPassword,
       role: 'Director',
       schoolName: school.name,
@@ -232,6 +244,7 @@ export class AuthService {
         lastName: user.lastName,
         email: user.email,
         phone: user.phone,
+        username: user.username,
         schoolId: user.schoolId,
         institutionType: school.institutionType?.code || null,
       },
@@ -242,12 +255,22 @@ export class AuthService {
   async createTeacher(data: RegisterTeacherDto, directorId: string, schoolId: string) {
     this.logger.log(`Creating teacher at school: ${schoolId}`);
 
+    if (data.phone) {
+      const existingPhone = await this.prisma.user.findFirst({
+        where: { phone: data.phone },
+      });
+      if (existingPhone) {
+        throw new BadRequestException('Phone number already in use');
+      }
+    }
+
     const tempPassword = this.generateTempPassword();
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
     const nameParts = data.fullName.split(' ');
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ') || firstName;
 
+    const hasEmail = !!data.email;
     const email = data.email || `${Date.now()}@placeholder.local`;
 
     const user = await this.prisma.user.create({
@@ -256,6 +279,7 @@ export class AuthService {
         lastName,
         email: email.toLowerCase(),
         phone: data.phone,
+        username: hasEmail ? undefined : data.phone,
         password: hashedPassword,
         schoolId,
       },
@@ -292,9 +316,9 @@ export class AuthService {
 
     await this.notificationService.sendCredentials({
       recipientName: data.fullName,
-      email: data.email,
+      email: hasEmail ? data.email : undefined,
       phone: data.phone,
-      username: data.email || data.phone,
+      username: hasEmail ? data.email : data.phone,
       password: tempPassword,
       role: 'Teacher',
       schoolName: school?.name,
@@ -310,42 +334,55 @@ export class AuthService {
         lastName: user.lastName,
         email: user.email,
         phone: user.phone,
+        username: user.username,
       },
       credentialsSent: true,
     };
   }
 
-  async login(email: string, password: string, schoolId?: string) {
-    this.logger.log(`Login attempt for email: "${email}"${schoolId ? `, URL schoolId: ${schoolId}` : ''}`);
+  async login(identifier: string, password: string, schoolId?: string) {
+    this.logger.log(`Login attempt for identifier: "${identifier}"${schoolId ? `, URL schoolId: ${schoolId}` : ''}`);
 
-    const user = await this.prisma.user.findFirst({
-      where: {
-        email: email.trim().toLowerCase(),
-      },
-      include: {
-        userRoles: {
-          include: { role: true },
+    const isEmail = identifier.includes('@');
+    let user;
+
+    if (isEmail) {
+      user = await this.prisma.user.findFirst({
+        where: { email: identifier.trim().toLowerCase() },
+        include: {
+          userRoles: { include: { role: true } },
+          schoolUsers: { select: { schoolId: true, isPrimary: true } },
+          school: { include: { institutionType: true } },
         },
-        schoolUsers: {
-          select: { schoolId: true, isPrimary: true },
+      });
+    } else {
+      const cleanedPhone = identifier.trim().replace(/[^0-9+]/g, '');
+      user = await this.prisma.user.findFirst({
+        where: {
+          OR: [
+            { phone: { equals: cleanedPhone, mode: 'insensitive' } },
+            { username: { equals: cleanedPhone, mode: 'insensitive' } },
+          ],
         },
-        school: {
-          include: { institutionType: true },
+        include: {
+          userRoles: { include: { role: true } },
+          schoolUsers: { select: { schoolId: true, isPrimary: true } },
+          school: { include: { institutionType: true } },
         },
-      },
-    });
-    
-    this.logger.log(`User found: ${user?.email}, schoolId: ${user?.schoolId}`);
+      });
+    }
+
+    this.logger.log(`User found: ${user?.email || user?.phone}, schoolId: ${user?.schoolId}`);
 
     if (!user) {
-      this.logger.warn(`User not found for email: ${email}`);
+      this.logger.warn(`User not found for identifier: ${identifier}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
-      this.logger.warn(`Invalid password for user: ${email}`);
+      this.logger.warn(`Invalid password for user: ${identifier}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -385,9 +422,8 @@ export class AuthService {
     };
 
     this.logger.log(
-      `Login successful for ${email}, roles: ${roles.join(', ')}, schoolId: ${payload.schoolId}, type: ${effectiveInstitutionType}`,
+      `Login successful for ${identifier}, roles: ${roles.join(', ')}, schoolId: ${payload.schoolId}, type: ${effectiveInstitutionType}`,
     );
-    this.logger.log(`User data - schoolId in DB: ${user.schoolId}, resolved: ${resolvedSchoolId}, effective: ${effectiveSchoolId}`);
 
     return {
       message: 'Login successful',
@@ -418,10 +454,12 @@ export class AuthService {
     let user = null;
 
     if (username) {
+      const cleanedPhone = username.replace(/[^0-9+]/g, '');
       user = await this.prisma.user.findFirst({
         where: {
           OR: [
             { username },
+            { phone: { equals: cleanedPhone, mode: 'insensitive' } },
             { student: { admissionNumber: username } },
           ],
         },
@@ -591,14 +629,28 @@ export class AuthService {
     };
   }
 
-  async forgotPassword(email: string) {
-    const normalizedEmail = email.trim().toLowerCase();
-    const user = await this.prisma.user.findFirst({
-      where: { email: normalizedEmail },
-    });
+  async forgotPassword(identifier: string) {
+    const isEmail = identifier.includes('@');
+    let user;
+
+    if (isEmail) {
+      user = await this.prisma.user.findFirst({
+        where: { email: identifier.trim().toLowerCase() },
+      });
+    } else {
+      const cleanedPhone = identifier.trim().replace(/[^0-9+]/g, '');
+      user = await this.prisma.user.findFirst({
+        where: {
+          OR: [
+            { phone: { equals: cleanedPhone, mode: 'insensitive' } },
+            { username: { equals: cleanedPhone, mode: 'insensitive' } },
+          ],
+        },
+      });
+    }
 
     if (!user) {
-      return { message: 'If an account exists with that email, a password reset link has been sent.' };
+      return { message: 'If an account exists with that identifier, a reset link has been sent.' };
     }
 
     const resetToken = crypto.randomBytes(32).toString('hex');
@@ -612,11 +664,22 @@ export class AuthService {
       },
     });
 
-    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
-    await this.emailService.sendPasswordResetEmail(user.email, resetLink);
+    if (isEmail) {
+      const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+      await this.emailService.sendPasswordResetEmail(user.email, resetLink);
+      this.logger.log(`Password reset email sent to: ${user.email}`);
+    } else {
+      const otp = crypto.randomInt(100000, 999999).toString();
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { resetToken: otp },
+      });
+      const message = `Your Smart Tech password reset OTP is: ${otp}. This code expires in 1 hour.`;
+      await this.notificationService.sendGenericSms(user.phone, message);
+      this.logger.log(`Password reset SMS sent to: ${user.phone}`);
+    }
 
-    this.logger.log(`Password reset email sent to: ${user.email}`);
-    return { message: 'If an account exists with that email, a password reset link has been sent.' };
+    return { message: 'If an account exists with that identifier, a reset link has been sent.' };
   }
 
   async resetPassword(token: string, newPassword: string) {
