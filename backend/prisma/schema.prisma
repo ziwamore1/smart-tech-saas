@@ -1415,7 +1415,7 @@ model CommCloudRoutingRule {
   // Action: which providers to use in order
   providerOrder   String[] // ordered list of provider IDs for failover
   preferredProviderId String?
-  fallbackProviderIds String[]?
+  fallbackProviderIds String[]
   
   // Settings
   maxRetries      Int      @default(3)
@@ -1627,7 +1627,7 @@ model CommCloudTemplate {
   isActive        Boolean  @default(true)
   
   category        String?
-  tags            String[]?
+  tags            String[]
   
   createdById     String?
   createdAt       DateTime @default(now())
