@@ -111,10 +111,10 @@ export class TwilioService {
         body: message,
       };
 
-      if (this.messagingServiceSid) {
-        payload.messagingServiceSid = this.messagingServiceSid;
-      } else if (this.fromNumber) {
+      if (this.fromNumber) {
         payload.from = this.fromNumber;
+      } else if (this.messagingServiceSid) {
+        payload.messagingServiceSid = this.messagingServiceSid;
       }
 
       const twilioMsg = await client.messages.create(payload);
@@ -145,10 +145,10 @@ export class TwilioService {
       const messageIds: string[] = [];
 
       const payload: any = { body: message };
-      if (this.messagingServiceSid) {
-        payload.messagingServiceSid = this.messagingServiceSid;
-      } else if (this.fromNumber) {
+      if (this.fromNumber) {
         payload.from = this.fromNumber;
+      } else if (this.messagingServiceSid) {
+        payload.messagingServiceSid = this.messagingServiceSid;
       }
 
       for (const recipient of recipients) {
