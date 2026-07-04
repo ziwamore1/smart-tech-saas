@@ -18,10 +18,13 @@ export const RedisProvider: Provider = {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
       lazyConnect: true,
-      retryStrategy: () => null,
-      enableOfflineQueue: false,
-      connectTimeout: 5000,
-      commandTimeout: 5000,
+      retryStrategy: (times) => {
+        const delay = Math.min(times * 200, 5000);
+        return delay;
+      },
+      enableOfflineQueue: true,
+      connectTimeout: 10000,
+      commandTimeout: 10000,
     });
 
     client.on('connect', () => {
@@ -40,9 +43,12 @@ export const RedisProvider: Provider = {
       logger.warn('Redis connection error (Redis may be unavailable)');
     });
 
-    client.connect().catch((err: Error) => {
-      logger.warn(`Redis connection failed: ${err.message}`);
+    client.on('reconnecting', () => {
+      logger.log('Redis reconnecting...');
     });
+
+    // Connect in background — never block startup; retryStrategy handles retries
+    client.connect().catch(() => {});
 
     return client;
   },

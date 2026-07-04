@@ -16,10 +16,10 @@ export class QueuesService {
     }
   }
 
-  getQueue(name: string): Queue {
-    if (!this.redisAvailable) {
-      throw new Error(`Redis unavailable — cannot access queue '${name}'`);
-    }
+  private tryGetQueue(name: string): Queue | null {
+    if (!this.redisAvailable) return null;
+    const status = this.redis ? (this.redis as any).status : 'close';
+    if (status !== 'ready' && status !== 'connect' && status !== 'connecting') return null;
 
     if (!this.queues.has(name)) {
       const defaultOpts = QUEUE_DEFAULT_OPTIONS[name as QueueName];
@@ -45,11 +45,11 @@ export class QueuesService {
     data: Record<string, any>,
     opts?: { jobId?: string; priority?: number; delay?: number },
   ): Promise<Job | null> {
-    if (!this.redisAvailable) {
+    const queue = this.tryGetQueue(queueName);
+    if (!queue) {
       this.logger.warn(`Redis unavailable — skipping addJob to '${queueName}'`);
       return null;
     }
-    const queue = this.getQueue(queueName);
     const job = await queue.add(jobName, data, {
       jobId: opts?.jobId,
       priority: opts?.priority,
@@ -60,14 +60,14 @@ export class QueuesService {
   }
 
   async getJob(queueName: string, jobId: string): Promise<Job | undefined | null> {
-    if (!this.redisAvailable) return null;
-    const queue = this.getQueue(queueName);
+    const queue = this.tryGetQueue(queueName);
+    if (!queue) return null;
     return queue.getJob(jobId);
   }
 
   async getJobStatus(queueName: string, jobId: string) {
-    if (!this.redisAvailable) return null;
-    const queue = this.getQueue(queueName);
+    const queue = this.tryGetQueue(queueName);
+    if (!queue) return null;
     const job = await queue.getJob(jobId);
     if (!job) return null;
 
@@ -87,48 +87,47 @@ export class QueuesService {
   }
 
   async getQueueStats(queueName: string) {
-    if (!this.redisAvailable) return null;
-    const queue = this.getQueue(queueName);
-    const [waiting, active, completed, failed, delayed, paused] = await Promise.all([
-      queue.getWaitingCount(),
-      queue.getActiveCount(),
-      queue.getCompletedCount(),
-      queue.getFailedCount(),
-      queue.getDelayedCount(),
-      queue.isPaused().then((p) => (p ? 1 : 0)),
-    ]);
-
-    return { name: queueName, waiting, active, completed, failed, delayed, paused };
+    const queue = this.tryGetQueue(queueName);
+    if (!queue) return null;
+    try {
+      const [waiting, active, completed, failed, delayed, paused] = await Promise.all([
+        queue.getWaitingCount(),
+        queue.getActiveCount(),
+        queue.getCompletedCount(),
+        queue.getFailedCount(),
+        queue.getDelayedCount(),
+        queue.isPaused().then((p) => (p ? 1 : 0)),
+      ]);
+      return { name: queueName, waiting, active, completed, failed, delayed, paused };
+    } catch (err) {
+      this.logger.warn(`Failed to get stats for queue '${queueName}': ${(err as Error).message}`);
+      return null;
+    }
   }
 
   async getAllQueueStats() {
-    if (!this.redisAvailable) return [];
-    const names = this.getRegisteredQueueNames();
+    const names = Array.from(this.queues.keys());
     const stats = await Promise.all(names.map((name) => this.getQueueStats(name)));
     return stats.filter(Boolean);
   }
 
-  getRegisteredQueueNames(): string[] {
-    return Array.from(this.queues.keys());
-  }
-
   async pauseQueue(queueName: string) {
-    if (!this.redisAvailable) throw new Error('Redis unavailable');
-    const queue = this.getQueue(queueName);
+    const queue = this.tryGetQueue(queueName);
+    if (!queue) throw new Error('Redis unavailable');
     await queue.pause();
     this.logger.log(`Queue '${queueName}' paused`);
   }
 
   async resumeQueue(queueName: string) {
-    if (!this.redisAvailable) throw new Error('Redis unavailable');
-    const queue = this.getQueue(queueName);
+    const queue = this.tryGetQueue(queueName);
+    if (!queue) throw new Error('Redis unavailable');
     await queue.resume();
     this.logger.log(`Queue '${queueName}' resumed`);
   }
 
   async cleanQueue(queueName: string, hours = 24) {
-    if (!this.redisAvailable) throw new Error('Redis unavailable');
-    const queue = this.getQueue(queueName);
+    const queue = this.tryGetQueue(queueName);
+    if (!queue) throw new Error('Redis unavailable');
     const timestamp = hours * 60 * 60 * 1000;
     await queue.clean(timestamp, 100, 'completed');
     await queue.clean(timestamp, 100, 'failed');
@@ -136,15 +135,15 @@ export class QueuesService {
   }
 
   async drainQueue(queueName: string) {
-    if (!this.redisAvailable) throw new Error('Redis unavailable');
-    const queue = this.getQueue(queueName);
+    const queue = this.tryGetQueue(queueName);
+    if (!queue) throw new Error('Redis unavailable');
     await queue.drain();
     this.logger.log(`Queue '${queueName}' drained`);
   }
 
   async getFailedJobs(queueName: string, start = 0, end = 20) {
-    if (!this.redisAvailable) return [];
-    const queue = this.getQueue(queueName);
+    const queue = this.tryGetQueue(queueName);
+    if (!queue) return [];
     const jobs = await queue.getJobs(['failed'], start, end);
     return Promise.all(
       jobs.map(async (job) => ({
@@ -160,8 +159,8 @@ export class QueuesService {
   }
 
   async retryJob(queueName: string, jobId: string) {
-    if (!this.redisAvailable) throw new Error('Redis unavailable');
-    const queue = this.getQueue(queueName);
+    const queue = this.tryGetQueue(queueName);
+    if (!queue) throw new Error('Redis unavailable');
     const job = await queue.getJob(jobId);
     if (!job) throw new Error(`Job ${jobId} not found in queue '${queueName}'`);
     await job.retry();
@@ -169,8 +168,8 @@ export class QueuesService {
   }
 
   async removeJob(queueName: string, jobId: string) {
-    if (!this.redisAvailable) throw new Error('Redis unavailable');
-    const queue = this.getQueue(queueName);
+    const queue = this.tryGetQueue(queueName);
+    if (!queue) throw new Error('Redis unavailable');
     const job = await queue.getJob(jobId);
     if (!job) throw new Error(`Job ${jobId} not found in queue '${queueName}'`);
     await job.remove();
