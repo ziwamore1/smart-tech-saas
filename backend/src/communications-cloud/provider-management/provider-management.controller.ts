@@ -1,11 +1,9 @@
 import {
-  Controller, Get, Post, Put, Delete, Patch, Param, Query, Body, UseGuards,
+  Controller, Get, Post, Put, Delete, Patch, Param, Query, Body,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { ProviderManagementService, CreateProviderDto, UpdateProviderDto } from './provider-management.service';
 
 @Controller('communications-cloud/providers')
-@UseGuards(JwtAuthGuard)
 export class ProviderManagementController {
   constructor(private readonly providerService: ProviderManagementService) {}
 

@@ -1,12 +1,10 @@
 import {
-  Controller, Get, Post, Put, Delete, Param, Query, Body, UseGuards,
+  Controller, Get, Post, Put, Delete, Param, Query, Body,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { SenderIdentityService } from './sender-identity.service';
 import type { CommCloudChannel } from '../interfaces/message.interface';
 
 @Controller('communications-cloud/sender-identities')
-@UseGuards(JwtAuthGuard)
 export class SenderIdentityController {
   constructor(private readonly identityService: SenderIdentityService) {}
 

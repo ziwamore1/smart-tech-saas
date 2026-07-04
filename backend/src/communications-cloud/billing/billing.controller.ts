@@ -1,10 +1,8 @@
-import { Controller, Get, Post, Param, Query, Body, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { Controller, Get, Post, Param, Query, Body } from '@nestjs/common';
 import { CreditWalletService } from './credit-wallet.service';
 import { BillingService } from './billing.service';
 
 @Controller('communications-cloud/billing')
-@UseGuards(JwtAuthGuard)
 export class BillingController {
   constructor(
     private readonly creditWalletService: CreditWalletService,

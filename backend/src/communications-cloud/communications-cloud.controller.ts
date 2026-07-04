@@ -1,7 +1,6 @@
 import {
-  Controller, Get, Post, Param, Query, Body, UseGuards, Request,
+  Controller, Get, Post, Param, Query, Body, Request,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CommunicationsCloudService } from './communications-cloud.service';
 import {
   SendSmsDto, SendEmailDto, SendWhatsAppDto, SendPushDto, SendInAppDto,
@@ -9,7 +8,6 @@ import {
 } from './dto';
 
 @Controller('communications-cloud')
-@UseGuards(JwtAuthGuard)
 export class CommunicationsCloudController {
   constructor(private readonly service: CommunicationsCloudService) {}
 

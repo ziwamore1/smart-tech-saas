@@ -6,15 +6,10 @@ export class JwtAuthGuard {
   constructor(private readonly jwtService: JwtService) {}
 
   canActivate(context: ExecutionContext) {
-    console.error('[JwtAuthGuard] canActivate called');
-
     const request = context.switchToHttp().getRequest();
     const token = this.extractToken(request);
 
-    if (!token) {
-      console.error('[JwtAuthGuard] no token found, returning false');
-      return false;
-    }
+    if (!token) return false;
 
     try {
       const payload = this.jwtService.verify(token);
@@ -26,8 +21,7 @@ export class JwtAuthGuard {
         schoolId: payload.type === 'super_admin' ? null : (payload.schoolId || null),
       };
       return true;
-    } catch (err: any) {
-      console.error('[JwtAuthGuard] token invalid:', err.message);
+    } catch {
       return false;
     }
   }

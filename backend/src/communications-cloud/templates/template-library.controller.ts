@@ -1,12 +1,10 @@
 import {
-  Controller, Get, Post, Put, Delete, Param, Query, Body, UseGuards,
+  Controller, Get, Post, Put, Delete, Param, Query, Body,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { TemplateLibraryService } from './template-library.service';
 import type { CommCloudChannel } from '../interfaces/message.interface';
 
 @Controller('communications-cloud/templates')
-@UseGuards(JwtAuthGuard)
 export class TemplateLibraryController {
   constructor(private readonly templateService: TemplateLibraryService) {}
 

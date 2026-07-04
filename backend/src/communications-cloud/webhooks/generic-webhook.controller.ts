@@ -8,10 +8,8 @@ import {
   Headers,
   HttpCode,
   Logger,
-  UseGuards,
 } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DeliveryTrackingService } from '../delivery/delivery-tracking.service';
 
@@ -25,7 +23,6 @@ export class GenericWebhookController {
   ) {}
 
   @Get('events')
-  @UseGuards(JwtAuthGuard)
   async getWebhookEvents(
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,

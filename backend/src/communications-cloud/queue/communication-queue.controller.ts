@@ -1,9 +1,7 @@
-import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { Controller, Get, Post, Param } from '@nestjs/common';
 import { CommunicationQueueService } from './communication-queue.service';
 
 @Controller('communications-cloud/queue')
-@UseGuards(JwtAuthGuard)
 export class CommunicationQueueController {
   constructor(private readonly queueService: CommunicationQueueService) {}
 

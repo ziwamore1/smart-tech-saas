@@ -5,6 +5,8 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import compression from 'compression';
 import * as Sentry from '@sentry/node';
+import { Request, Response, NextFunction } from 'express';
+import { JwtService } from '@nestjs/jwt';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -59,7 +61,8 @@ async function bootstrap() {
   });
 
   // Auth middleware at Express level — runs before NestJS Router
-  // Returns 401 directly without going through NestJS guard/exception pipelines
+  // Replaces NestJS guards entirely since guard->response pipeline is broken
+  const jwtService = app.get(JwtService);
   app.use((req: Request, res: Response, next: NextFunction) => {
     const skipAuth =
       !req.path.startsWith('/api/v1/communications-cloud') &&
@@ -67,15 +70,24 @@ async function bootstrap() {
     if (skipAuth) return next();
     if (req.method === 'POST' && req.path.includes('/webhooks/delivery/')) return next();
 
-    console.error('[expressAuth] path:', req.path);
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
-      console.error('[expressAuth] no token, returning 401');
       return res.status(401).json({ statusCode: 401, message: 'Unauthorized', timestamp: new Date().toISOString() });
     }
-    // token present — let NestJS handle the rest
-    console.error('[expressAuth] token present, passing to NestJS');
-    next();
+    const token = auth.slice(7);
+    try {
+      const payload = jwtService.verify(token);
+      (req as any).user = {
+        id: payload.sub,
+        type: payload.type || 'user',
+        roles: payload.roles || [],
+        isSuperAdmin: payload.type === 'super_admin',
+        schoolId: payload.type === 'super_admin' ? null : (payload.schoolId || null),
+      };
+      next();
+    } catch {
+      return res.status(401).json({ statusCode: 401, message: 'Invalid token', timestamp: new Date().toISOString() });
+    }
   });
 
   app.use(compression());
