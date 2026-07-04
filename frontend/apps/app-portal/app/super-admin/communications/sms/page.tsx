@@ -70,7 +70,7 @@ export default function SmsManagementPage() {
     setSending(true);
     setSendStatus(null);
     try {
-      await communicationsCloudApi.sendSms({ to: recipient, message, senderId });
+      await communicationsCloudApi.sendSms({ recipient, message, senderId });
       setSendStatus({ type: 'success', text: 'SMS sent successfully!' });
       setRecipient('');
       setMessage('');
