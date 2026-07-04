@@ -37,6 +37,7 @@ export class CommunicationsCloudService {
   ) {}
 
   async sendSms(options: SendSmsDto): Promise<CommunicationResponseDto> {
+    console.error('[commService] sendSms called', JSON.stringify({ recipient: options.recipient?.slice(0,4) }));
     return this.send(CommCloudChannel.SMS, {
       recipient: options.recipient,
       body: options.message,
@@ -352,6 +353,8 @@ export class CommunicationsCloudService {
   }
 
   private async send(channel: CommCloudChannel, data: any): Promise<CommunicationResponseDto> {
+    console.error('[commService] send called', channel, data.recipient?.slice(0,4));
+    try {
     const message = await this.prisma.commCloudMessage.create({
       data: {
         channel,
@@ -390,6 +393,10 @@ export class CommunicationsCloudService {
       subject: data.subject,
       createdAt: message.createdAt.toISOString(),
     };
+    } catch (err: any) {
+      console.error('[commService] send failed:', err?.message || err);
+      throw err;
+    }
   }
 
   private async resolveRecipients(options: BroadcastDto): Promise<string[]> {

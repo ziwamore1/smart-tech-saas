@@ -163,6 +163,14 @@ async function bootstrap() {
     }
   }
 
+  // Global Express error handler — catches errors escaping NestJS Router
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    console.error('[expressGlobalErrorHandler]', err?.message || err?.toString() || 'Unknown error');
+    if (!res.headersSent) {
+      res.status(500).json({ statusCode: 500, message: 'Internal server error', timestamp: new Date().toISOString() });
+    }
+  });
+
   console.log(`[bootstrap] listening on port ${port}...`);
   await app.listen(port, '0.0.0.0');
   console.log(`[bootstrap] app.listen completed in ${Date.now() - t0}ms`);

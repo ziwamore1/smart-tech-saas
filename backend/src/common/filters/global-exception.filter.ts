@@ -81,7 +81,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       errorResponse.errors = errors;
     }
 
-    response.status(status).json(errorResponse);
+    try {
+      if (!response.headersSent) {
+        response.status(status).json(errorResponse);
+      } else {
+        console.error('[GlobalExceptionFilter] headers already sent, cannot send error response');
+      }
+    } catch (sendErr: any) {
+      console.error('[GlobalExceptionFilter] failed to send error response:', sendErr?.message || sendErr);
+    }
   }
 
   private handlePrismaError(
