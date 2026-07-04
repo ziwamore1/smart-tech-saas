@@ -8,7 +8,7 @@ import {
   RoutingContext,
   ProviderHealth,
 } from '../interfaces/routing.interface';
-import { CommCloudChannel } from '../interfaces/message.interface';
+import { CommCloudChannel } from '../dto/communication-channel.enum';
 
 @Injectable()
 export class RoutingEngineService {
