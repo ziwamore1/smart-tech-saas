@@ -1,26 +1,23 @@
 import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { verify } = require('jsonwebtoken');
-
-const IS_PUBLIC_KEY = 'isPublic';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class JwtAuthGuard {
+  constructor(private readonly jwtService: JwtService) {}
+
   canActivate(context: ExecutionContext) {
-    const isPublic = Reflect.getMetadata(IS_PUBLIC_KEY, context.getHandler());
-    if (isPublic) return true;
+    console.error('[JwtAuthGuard] canActivate called');
 
     const request = context.switchToHttp().getRequest();
     const token = this.extractToken(request);
 
     if (!token) {
-      throw new UnauthorizedException('No auth token');
+      console.error('[JwtAuthGuard] no token found, returning false');
+      return false;
     }
 
     try {
-      const secret = process.env.JWT_SECRET || 'default-secret-key';
-      const payload = verify(token, secret);
-
+      const payload = this.jwtService.verify(token);
       request.user = {
         id: payload.sub,
         type: payload.type || 'user',
@@ -28,10 +25,10 @@ export class JwtAuthGuard {
         isSuperAdmin: payload.type === 'super_admin',
         schoolId: payload.type === 'super_admin' ? null : (payload.schoolId || null),
       };
-
       return true;
     } catch (err: any) {
-      throw new UnauthorizedException(err.message || 'Invalid token');
+      console.error('[JwtAuthGuard] token invalid:', err.message);
+      return false;
     }
   }
 

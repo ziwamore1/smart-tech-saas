@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
@@ -8,7 +8,9 @@ import { JwtStrategy } from '../strategies/jwt.strategy';
 import { PushNotificationModule } from '../push-notification/push-notification.module';
 import { EmailModule } from '../email/email.module';
 import { InstitutionModule } from '../institution/institution.module';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
+@Global()
 @Module({
   imports: [
     PrismaModule,
@@ -25,7 +27,7 @@ import { InstitutionModule } from '../institution/institution.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [JwtModule],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard],
+  exports: [JwtModule, JwtAuthGuard],
 })
 export class AuthModule {}
