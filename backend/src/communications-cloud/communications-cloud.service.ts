@@ -384,6 +384,9 @@ export class CommunicationsCloudService {
         await this.auditLog.record('MESSAGE_SENT', {
           channel, messageId: message.id, recipient: data.recipient, schoolId: data.schoolId,
         });
+        if (!syncResult.success) {
+          throw new Error(syncResult.error || 'Failed to send message');
+        }
         return {
           id: message.id,
           channel,
