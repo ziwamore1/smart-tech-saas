@@ -1,7 +1,7 @@
 export enum CommCloudChannel {
-  SMS = 'sms',
-  EMAIL = 'email',
-  WHATSAPP = 'whatsapp',
-  PUSH = 'push',
-  IN_APP = 'in_app',
+  SMS = 'SMS',
+  EMAIL = 'EMAIL',
+  WHATSAPP = 'WHATSAPP',
+  PUSH = 'PUSH',
+  IN_APP = 'IN_APP',
 }
