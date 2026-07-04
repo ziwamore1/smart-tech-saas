@@ -1,5 +1,6 @@
 import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { verify } from 'jsonwebtoken';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { verify } = require('jsonwebtoken');
 
 const IS_PUBLIC_KEY = 'isPublic';
 
