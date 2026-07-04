@@ -246,6 +246,7 @@ export class CommunicationsCloudService {
       };
 
       const decision = await this.routingEngine.resolveProvider(routingContext);
+      const dbProviderId = decision.providerId.startsWith('env:') ? null : decision.providerId;
 
       let result: any;
       switch (channel) {
@@ -291,7 +292,7 @@ export class CommunicationsCloudService {
         where: { id },
         data: {
           status,
-          providerId: decision.providerId,
+          providerId: dbProviderId,
           providerName: decision.providerName,
           providerMessageId: result.providerMessageId,
           cost: result.cost,
@@ -302,7 +303,7 @@ export class CommunicationsCloudService {
       });
 
       await this.deliveryTracking.logDeliveryAttempt(
-        id, decision.providerId, decision.providerName,
+        id, dbProviderId, decision.providerName,
         status.toLowerCase(), status, {
           providerMessageId: result.providerMessageId,
           cost: result.cost,
@@ -320,7 +321,7 @@ export class CommunicationsCloudService {
       }
 
       await this.analytics.recordMessage(
-        channel, schoolId, decision.providerId,
+        channel, schoolId, dbProviderId,
         status, result.cost || 0, result.creditsUsed || 0, result.latencyMs,
         metadata?.country,
       );
