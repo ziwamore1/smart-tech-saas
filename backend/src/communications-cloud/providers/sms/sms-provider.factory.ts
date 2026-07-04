@@ -37,6 +37,17 @@ export class SmsProviderFactory {
   }
 
   async getProvider(providerId: string): Promise<SmsProvider> {
+    if (providerId.startsWith('env:')) {
+      const type = providerId.slice(4);
+      if (type === 'twilio') {
+        return new TwilioAdapter(this.twilioService) as SmsProvider;
+      }
+      if (type === 'beem') {
+        return new BeemAdapter(this.beemService) as SmsProvider;
+      }
+      throw new Error(`Unsupported env-configured provider type: "${type}"`);
+    }
+
     const record = await this.prisma.commCloudProvider.findUnique({
       where: { id: providerId },
     });

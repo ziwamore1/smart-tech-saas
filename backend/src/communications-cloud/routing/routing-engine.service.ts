@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   RoutingStrategy,
@@ -13,7 +14,10 @@ import { CommCloudChannel } from '../interfaces/message.interface';
 export class RoutingEngineService {
   private readonly logger = new Logger(RoutingEngineService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private configService: ConfigService,
+  ) {}
 
   async resolveProvider(context: RoutingContext): Promise<RoutingDecision> {
     const rules = await this.loadRules(context.channel);
@@ -159,20 +163,48 @@ export class RoutingEngineService {
       orderBy: [{ priority: 'asc' }, { successRate: 'desc' }],
     });
 
-    if (providers.length === 0) {
-      throw new Error(
-        `No active providers found for channel: ${channel}`,
-      );
+    if (providers.length > 0) {
+      const p = providers[0];
+      return {
+        providerId: p.id,
+        providerName: p.name,
+        strategy: RoutingStrategy.PRIORITY_BASED,
+        reason: 'Priority-based fallback',
+        confidence: 0.7,
+      };
     }
 
-    const p = providers[0];
-    return {
-      providerId: p.id,
-      providerName: p.name,
-      strategy: RoutingStrategy.PRIORITY_BASED,
-      reason: 'Priority-based fallback',
-      confidence: 0.7,
-    };
+    return this.getEnvFallback(channel);
+  }
+
+  private getEnvFallback(channel: CommCloudChannel): RoutingDecision {
+    if (channel !== CommCloudChannel.SMS) {
+      throw new Error(`No active providers found for channel: ${channel}`);
+    }
+
+    const twilioSid = this.configService.get<string>('TWILIO_ACCOUNT_SID');
+    if (twilioSid) {
+      return {
+        providerId: 'env:twilio',
+        providerName: 'Twilio',
+        strategy: RoutingStrategy.PRIORITY_BASED,
+        reason: 'Env-configured fallback (Twilio)',
+        confidence: 0.7,
+      };
+    }
+
+    const beemKey = this.configService.get<string>('BEEM_API_KEY');
+    if (beemKey) {
+      return {
+        providerId: 'env:beem',
+        providerName: 'Beem',
+        strategy: RoutingStrategy.PRIORITY_BASED,
+        reason: 'Env-configured fallback (Beem)',
+        confidence: 0.7,
+      };
+    }
+
+    throw new Error(`No active providers found for channel: ${channel}`);
   }
 
   async getFallbackProvider(
