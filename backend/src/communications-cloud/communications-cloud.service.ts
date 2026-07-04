@@ -377,7 +377,21 @@ export class CommunicationsCloudService {
     if (data.scheduledAt) {
       await this.queueService.scheduleMessage(message, new Date(data.scheduledAt));
     } else {
-      await this.queueService.enqueueMessage(message, data.priority);
+      const job = await this.queueService.enqueueMessage(message, data.priority);
+      if (!job) {
+        const syncResult = await this.processMessage(message);
+        await this.auditLog.record('MESSAGE_SENT', {
+          channel, messageId: message.id, recipient: data.recipient, schoolId: data.schoolId,
+        });
+        return {
+          id: message.id,
+          channel,
+          status: syncResult.status || 'SENT',
+          recipient: data.recipient,
+          subject: data.subject,
+          createdAt: message.createdAt.toISOString(),
+        };
+      }
     }
 
     await this.analytics.recordMessage(channel, data.schoolId, null, 'QUEUED', 0, 0, 0);
