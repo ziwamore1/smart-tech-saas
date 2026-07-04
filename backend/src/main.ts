@@ -58,6 +58,26 @@ async function bootstrap() {
     next();
   });
 
+  // Auth middleware at Express level — runs before NestJS Router
+  // Returns 401 directly without going through NestJS guard/exception pipelines
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const skipAuth =
+      !req.path.startsWith('/api/v1/communications-cloud') &&
+      !req.path.startsWith('/api/v1/feature-locks');
+    if (skipAuth) return next();
+    if (req.method === 'POST' && req.path.includes('/webhooks/delivery/')) return next();
+
+    console.error('[expressAuth] path:', req.path);
+    const auth = req.headers.authorization;
+    if (!auth || !auth.startsWith('Bearer ')) {
+      console.error('[expressAuth] no token, returning 401');
+      return res.status(401).json({ statusCode: 401, message: 'Unauthorized', timestamp: new Date().toISOString() });
+    }
+    // token present — let NestJS handle the rest
+    console.error('[expressAuth] token present, passing to NestJS');
+    next();
+  });
+
   app.use(compression());
 
   app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads/' });
