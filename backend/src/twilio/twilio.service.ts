@@ -24,6 +24,8 @@ export class TwilioService {
   private client: Twilio | null = null;
   private readonly accountSid: string;
   private readonly authToken: string;
+  private readonly apiKeySid: string;
+  private readonly apiKeySecret: string;
   private readonly messagingServiceSid: string;
   private readonly fromNumber: string;
   private readonly enabled: boolean;
@@ -34,30 +36,46 @@ export class TwilioService {
   ) {
     this.accountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID', '');
     this.authToken = this.configService.get<string>('TWILIO_AUTH_TOKEN', '');
+    this.apiKeySid = this.configService.get<string>('TWILIO_API_KEY_SID', '');
+    this.apiKeySecret = this.configService.get<string>('TWILIO_API_KEY_SECRET', '');
     this.messagingServiceSid = this.configService.get<string>('TWILIO_MESSAGING_SERVICE_SID', '');
     this.fromNumber = this.configService.get<string>('TWILIO_FROM_NUMBER', '');
     this.enabled = this.configService.get<string>('TWILIO_ENABLED', 'false') === 'true';
 
-    if (this.enabled && this.accountSid && this.authToken) {
+    const useApiKey = this.enabled && this.apiKeySid && this.apiKeySecret;
+    const useAuthToken = this.enabled && this.accountSid && this.authToken;
+
+    if (useApiKey) {
+      this.client = new Twilio(this.apiKeySid, this.apiKeySecret, { accountSid: this.accountSid });
+      this.logger.log('[Twilio] Service initialized with API Key');
+    } else if (useAuthToken) {
       this.client = new Twilio(this.accountSid, this.authToken);
-      this.logger.log('[Twilio] Service initialized successfully');
+      this.logger.log('[Twilio] Service initialized with Auth Token');
     } else if (!this.enabled) {
       this.logger.warn('[Twilio] Service disabled - set TWILIO_ENABLED=true');
     } else {
-      this.logger.warn('[Twilio] Missing credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)');
+      this.logger.warn('[Twilio] Missing credentials (TWILIO_API_KEY_SID+TWILIO_API_KEY_SECRET or TWILIO_ACCOUNT_SID+TWILIO_AUTH_TOKEN)');
     }
   }
 
+  private get sid(): string {
+    return this.apiKeySid || this.accountSid;
+  }
+
+  private get secret(): string {
+    return this.apiKeySecret || this.authToken;
+  }
+
   private async resolveCredentials(channel?: string): Promise<{
-    accountSid: string;
-    authToken: string;
+    sid: string;
+    secret: string;
     messagingServiceSid: string;
     fromNumber: string;
   }> {
-    if (this.accountSid && this.authToken) {
+    if (this.sid && this.secret) {
       return {
-        accountSid: this.accountSid,
-        authToken: this.authToken,
+        sid: this.sid,
+        secret: this.secret,
         messagingServiceSid: this.messagingServiceSid,
         fromNumber: this.fromNumber,
       };
@@ -69,8 +87,8 @@ export class TwilioService {
       });
       if (provider?.apiKey && provider?.apiSecret) {
         return {
-          accountSid: provider.apiKey,
-          authToken: provider.apiSecret,
+          sid: provider.apiKey,
+          secret: provider.apiSecret,
           messagingServiceSid: this.messagingServiceSid,
           fromNumber: this.fromNumber,
         };
@@ -79,8 +97,8 @@ export class TwilioService {
       // DB not available, fall back to env vars
     }
     return {
-      accountSid: this.accountSid,
-      authToken: this.authToken,
+      sid: this.sid,
+      secret: this.secret,
       messagingServiceSid: this.messagingServiceSid,
       fromNumber: this.fromNumber,
     };
@@ -88,10 +106,13 @@ export class TwilioService {
 
   private async getClient(channel?: string): Promise<Twilio> {
     const creds = await this.resolveCredentials(channel);
-    if (this.client && creds.accountSid === this.accountSid && creds.authToken === this.authToken) {
+    if (this.client && creds.sid === this.sid && creds.secret === this.secret) {
       return this.client;
     }
-    return new Twilio(creds.accountSid, creds.authToken);
+    if (this.apiKeySid && this.apiKeySecret) {
+      return new Twilio(creds.sid, creds.secret, { accountSid: this.accountSid });
+    }
+    return new Twilio(creds.sid, creds.secret);
   }
 
   async sendSms(to: string, message: string): Promise<TwilioSmsResult> {
@@ -186,7 +207,7 @@ export class TwilioService {
 
     try {
       const client = await this.getClient('SMS');
-      const balanceData = await client.api.accounts(this.accountSid).balance.fetch();
+      const balanceData = await client.api.accounts(this.accountSid || this.sid).balance.fetch();
 
       return {
         success: true,
@@ -200,7 +221,7 @@ export class TwilioService {
   }
 
   async isConfigured(): Promise<boolean> {
-    if (this.enabled && this.accountSid && this.authToken) return true;
+    if (this.enabled && this.sid && this.secret) return true;
     try {
       const provider = await this.prisma.systemProvider.findFirst({
         where: { channel: 'SMS', isDefault: true },
@@ -212,11 +233,13 @@ export class TwilioService {
     }
   }
 
-  getConfigStatus(): { enabled: boolean; hasAccountSid: boolean; hasAuthToken: boolean; hasMessagingServiceSid: boolean } {
+  getConfigStatus(): { enabled: boolean; hasAccountSid: boolean; hasAuthToken: boolean; hasApiKeySid: boolean; hasApiKeySecret: boolean; hasMessagingServiceSid: boolean } {
     return {
       enabled: this.enabled,
       hasAccountSid: !!this.accountSid,
       hasAuthToken: !!this.authToken,
+      hasApiKeySid: !!this.apiKeySid,
+      hasApiKeySecret: !!this.apiKeySecret,
       hasMessagingServiceSid: !!this.messagingServiceSid,
     };
   }
