@@ -64,6 +64,18 @@ export class CommunicationsCloudController {
     return this.service.sendOTP(dto.phone, dto.message);
   }
 
+  @Get('ping')
+  async ping() {
+    return { ok: true };
+  }
+
+  @Get('db-check')
+  async dbCheck() {
+    const templateCount = await this.service['prisma'].commCloudTemplate.count();
+    const messageCount = await this.service['prisma'].commCloudMessage.count();
+    return { ok: true, templateCount, messageCount };
+  }
+
   @Get('messages')
   async findAll(
     @Query('channel') channel?: string,
