@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import type { WhatsAppProvider } from '../../../interfaces/provider.interface';
 import type { SendWhatsAppOptions, SendResult } from '../../../interfaces/message.interface';
-import { BeemService } from '../../../../beem/beem.service';
+import { BeemService, type BeemWhatsAppPayload } from '../../../../beem/beem.service';
 
 export class BeemWhatsAppAdapter implements WhatsAppProvider {
   private readonly logger = new Logger(BeemWhatsAppAdapter.name);
@@ -14,7 +14,15 @@ export class BeemWhatsAppAdapter implements WhatsAppProvider {
     try {
       this.logger.log(`Sending WhatsApp via Beem to ${options.to}`);
 
-      const result = await this.beemService.sendWhatsApp(options.to, options.body);
+      const waPayload: BeemWhatsAppPayload = {
+        body: options.body,
+        templateId: options.templateId,
+        templateData: options.templateData,
+        mediaUrl: options.mediaUrl,
+        mediaType: options.mediaType,
+      };
+
+      const result = await this.beemService.sendWhatsApp(options.to, options.body, waPayload);
 
       if (result.success) {
         return {
@@ -63,12 +71,17 @@ export class BeemWhatsAppAdapter implements WhatsAppProvider {
   async healthCheck(): Promise<{ status: string; latencyMs: number; details?: string }> {
     const start = Date.now();
     try {
-      const result = await this.beemService.sendWhatsApp('255700000000', 'healthcheck');
-      const latencyMs = Date.now() - start;
-      if (result.success) {
-        return { status: 'healthy', latencyMs, details: 'Beem WhatsApp API reachable' };
+      const config = this.beemService.getConfigStatus();
+      if (!config.enabled) {
+        return { status: 'unhealthy', latencyMs: Date.now() - start, details: 'Beem disabled' };
       }
-      return { status: 'degraded', latencyMs, details: result.error || 'Health check failed' };
+      if (!config.hasWhatsAppFrom) {
+        return { status: 'unhealthy', latencyMs: Date.now() - start, details: 'BEEM_WHATSAPP_FROM not set' };
+      }
+      if (!config.hasApiKey || !config.hasSecretKey) {
+        return { status: 'unhealthy', latencyMs: Date.now() - start, details: 'Missing API credentials' };
+      }
+      return { status: 'healthy', latencyMs: Date.now() - start, details: `Configured - from: ${config.senderName}` };
     } catch (error) {
       const latencyMs = Date.now() - start;
       return { status: 'unhealthy', latencyMs, details: error.message };

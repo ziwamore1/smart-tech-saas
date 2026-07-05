@@ -22,12 +22,21 @@ export interface BeemBalanceResult {
   error?: string;
 }
 
+export interface BeemWhatsAppPayload {
+  body: string;
+  templateId?: string;
+  templateData?: Record<string, unknown>;
+  mediaUrl?: string;
+  mediaType?: string;
+}
+
 @Injectable()
 export class BeemService {
   private readonly logger = new Logger(BeemService.name);
   private readonly apiKey: string;
   private readonly secretKey: string;
   private readonly senderName: string;
+  private readonly whatsappFrom: string;
   private readonly enabled: boolean;
 
   constructor(
@@ -37,10 +46,14 @@ export class BeemService {
     this.apiKey = this.configService.get<string>('BEEM_API_KEY', '');
     this.secretKey = this.configService.get<string>('BEEM_SECRET_KEY', '');
     this.senderName = this.configService.get<string>('BEEM_SENDER_NAME', 'SmartTech');
+    this.whatsappFrom = this.configService.get<string>('BEEM_WHATSAPP_FROM', '');
     this.enabled = this.configService.get<string>('BEEM_ENABLED', 'false') === 'true';
 
     if (this.enabled && this.apiKey && this.secretKey) {
       this.logger.log('[Beem] Service initialized successfully');
+      if (!this.whatsappFrom) {
+        this.logger.warn('[Beem] BEEM_WHATSAPP_FROM not set - WhatsApp messages will fail');
+      }
     } else if (!this.enabled) {
       this.logger.warn('[Beem] Service disabled - set BEEM_ENABLED=true');
     } else {
@@ -175,25 +188,60 @@ export class BeemService {
     }
   }
 
-  async sendWhatsApp(to: string, message: string): Promise<BeemWhatsAppResult> {
+  async sendWhatsApp(to: string, message: string, payload?: BeemWhatsAppPayload): Promise<BeemWhatsAppResult> {
     if (!this.enabled) {
       return { success: false, error: 'Beem WhatsApp service is disabled' };
+    }
+
+    if (!this.whatsappFrom) {
+      return { success: false, error: 'BEEM_WHATSAPP_FROM not configured. Set the verified WhatsApp Business phone number.' };
     }
 
     try {
       this.logger.log(`[Beem WhatsApp] Sending to ${to}: ${message.substring(0, 50)}...`);
 
       const normalizedTo = to.replace(/[+\s\-\(\)]/g, '');
+      const body: Record<string, unknown> = {
+        from: this.whatsappFrom,
+        to: normalizedTo,
+        channel: 'whatsapp',
+        transaction_id: Date.now().toString(),
+      };
+
+      if (payload?.templateId) {
+        body.message_type = 'template';
+        body.template = {
+          name: payload.templateId,
+          language: { code: 'en' },
+        };
+        if (payload.templateData) {
+          const components: Record<string, unknown>[] = [
+            {
+              type: 'body',
+              parameters: Object.values(payload.templateData).map((v) => ({
+                type: 'text',
+                text: String(v),
+              })),
+            },
+          ];
+          body.template = { ...(body.template as object), components };
+        }
+      } else if (payload?.mediaUrl) {
+        const mediaType = payload.mediaType || 'image';
+        body.message_type = mediaType;
+        body.media = {
+          type: mediaType,
+          url: payload.mediaUrl,
+          caption: message || undefined,
+        };
+      } else {
+        body.message_type = 'text';
+        body.text = message;
+      }
+
       const result = await this.request<{ success: boolean; messageId?: string; code?: number; error?: string }>(
         'https://apichatcore.beem.africa/v1/chatapi',
-        {
-          from: this.senderName,
-          to: normalizedTo,
-          channel: 'whatsapp',
-          transaction_id: Date.now().toString(),
-          message_type: 'text',
-          text: message,
-        },
+        body,
         'POST',
         'WHATSAPP',
       );
@@ -254,11 +302,13 @@ export class BeemService {
     }
   }
 
-  getConfigStatus(): { enabled: boolean; hasApiKey: boolean; hasSecretKey: boolean } {
+  getConfigStatus(): { enabled: boolean; hasApiKey: boolean; hasSecretKey: boolean; hasWhatsAppFrom: boolean; senderName: string } {
     return {
       enabled: this.enabled,
       hasApiKey: !!this.apiKey,
       hasSecretKey: !!this.secretKey,
+      hasWhatsAppFrom: !!this.whatsappFrom,
+      senderName: this.senderName,
     };
   }
 }

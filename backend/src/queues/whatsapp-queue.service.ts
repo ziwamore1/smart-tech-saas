@@ -41,7 +41,10 @@ export class WhatsAppQueueService {
           data: { status: 'processing', attempts: { increment: 1 } },
         });
 
-        await this.beemService.sendWhatsApp(job.phoneNumber, job.message);
+        const extras = job.templateName
+          ? { templateId: job.templateName }
+          : undefined;
+        await this.beemService.sendWhatsApp(job.phoneNumber, job.message, extras);
 
         await this.prisma.whatsAppQueue.update({
           where: { id: job.id },
