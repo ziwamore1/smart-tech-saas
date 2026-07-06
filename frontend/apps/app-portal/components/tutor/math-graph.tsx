@@ -170,34 +170,55 @@ export function MathGraph({ spec }: { spec: GraphSpec }) {
         formatter: (params: any) => {
           const p = params[0];
           if (!p) return '';
-          return `x = ${p.axisValue}<br/>y = ${typeof p.value === 'number' ? p.value.toFixed(4) : p.value[1].toFixed(4)}`;
+          const xVal = typeof p.value === 'number' ? p.value : p.value[0];
+          const yVal = typeof p.value === 'number' ? p.value : p.value[1];
+          return `x = ${typeof xVal === 'number' ? xVal.toFixed(4) : xVal}<br/>y = ${typeof yVal === 'number' ? yVal.toFixed(4) : yVal}`;
         },
       },
       grid: {
-        left: 50,
-        right: 20,
-        top: 30,
-        bottom: 40,
+        left: 55,
+        right: 25,
+        top: 35,
+        bottom: 45,
       },
       xAxis: {
         type: 'value',
         name: spec.xLabel || 'x',
-        nameLocation: 'center',
+        nameLocation: 'middle',
         nameGap: 30,
+        nameTextStyle: { fontWeight: 'bold', fontSize: 13 },
         min: domain[0],
         max: domain[1],
         splitLine: { lineStyle: { type: 'dashed', color: '#e5e7eb' } },
-        axisLine: { lineStyle: { color: '#6b7280' } },
+        axisLine: { lineStyle: { color: '#374151' } },
+        axisLabel: { fontSize: 11 },
       },
       yAxis: {
         type: 'value',
         name: spec.yLabel || 'y',
-        nameLocation: 'center',
+        nameLocation: 'middle',
         nameGap: 40,
+        nameTextStyle: { fontWeight: 'bold', fontSize: 13 },
         min: yMin,
         max: yMax,
         splitLine: { lineStyle: { type: 'dashed', color: '#e5e7eb' } },
-        axisLine: { lineStyle: { color: '#6b7280' } },
+        axisLine: { lineStyle: { color: '#374151' } },
+        axisLabel: { fontSize: 11 },
+      },
+      dataZoom: [
+        { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+        { type: 'inside', yAxisIndex: 0, filterMode: 'none' },
+        { type: 'slider', xAxisIndex: 0, filterMode: 'none', height: 16, bottom: 6, borderColor: '#d1d5db' },
+      ],
+      toolbox: {
+        feature: {
+          dataZoom: { yAxisIndex: 'none', title: { zoom: 'Zoom', back: 'Reset' } },
+          restore: { title: 'Reset' },
+          saveAsImage: { title: 'Save', pixelRatio: 2, name: 'graph' },
+        },
+        iconStyle: { borderColor: '#6b7280' },
+        right: 8,
+        top: 4,
       },
       series,
       animation: false,

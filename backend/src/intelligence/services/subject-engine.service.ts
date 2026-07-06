@@ -29,8 +29,35 @@ export class SubjectEngineService {
 
   detectSubjectFromQuery(query: string): string | undefined {
     const lower = query.toLowerCase();
+
+    // Check for LaTeX math delimiters — strong signal it's a math question
+    if (/\\\(|\\\)|\\\[|\\\]|\$\$|\$[^$]+\$/.test(query)) return 'mathematics';
+
     const subjectMap: Record<string, string[]> = {
-      mathematics: ['algebra', 'calculus', 'equation', 'derivative', 'integral', 'geometry', 'trigonometry', 'theorem', 'matrix', 'vector', 'probability', 'statistics'],
+      mathematics: [
+        'algebra', 'calculus', 'derivative', 'integral', 'geometry', 'trigonometry',
+        'theorem', 'matrix', 'vector', 'probability', 'statistics',
+        'math', 'mathematics', 'maths', 'solve', 'equation', 'quadratic',
+        'polynomial', 'factoring', 'factorize', 'fraction', 'ratio',
+        'percentage', 'power', 'exponent', 'root', 'square root',
+        'square', 'cube', 'logarithm', 'log', 'graph', 'function',
+        'limit', 'differentiation', 'integration', 'definite integral',
+        'indefinite integral', 'simultaneous', 'inequality', 'rational',
+        'domain', 'range', 'asymptote', 'intercept', 'slope', 'gradient',
+        'tangent', 'normal', 'parabola', 'hyperbola', 'ellipse', 'circle',
+        'permutation', 'combination', 'binomial', 'variance', 'mean',
+        'median', 'mode', 'standard deviation', 'correlation',
+        'regression', 'hypothesis', 'normal distribution', 'z-score',
+        'pythagoras', 'pythagorean', 'sine', 'cosine', 'tan',
+        'sin(', 'cos(', 'tan(', 'arcsin', 'arccos', 'arctan',
+        'angle', 'triangle', 'polygon', 'congruent', 'similar',
+        'symmetry', 'transformation', 'translation', 'reflection',
+        'rotation', 'dilation', 'vector', 'magnitude', 'scalar',
+        'complex number', 'imaginary', 'real number', 'integer',
+        'prime number', 'factor', 'multiple', 'divisible', 'gcd', 'lcm',
+        'sequence', 'series', 'arithmetic progression', 'geometric progression',
+        'summation', 'sigma', 'factorial', 'modulo', 'modulus',
+      ],
       science: ['physics', 'chemistry', 'biology', 'force', 'energy', 'atom', 'molecule', 'cell', 'dna', 'photosynthesis', 'chemical', 'circuit'],
       english: ['grammar', 'essay', 'paragraph', 'vocabulary', 'noun', 'verb', 'adjective', 'tense', 'comprehension', 'literature', 'novel', 'poem'],
       history: ['history', 'war', 'independence', 'colonial', 'kingdom', 'empire', 'revolution', 'civilization'],

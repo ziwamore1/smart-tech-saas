@@ -37,18 +37,31 @@ export class AiTutorService {
     schoolId: string,
     options?: { subjectId?: string; topic?: string; context?: Partial<AiContext> },
   ) {
+    // Detect subject from topic if no subjectId given
+    let detectedSubjectId = options?.subjectId || options?.context?.subjectId;
+    if (!detectedSubjectId && options?.topic) {
+      const detected = this.subjectEngine.detectSubjectFromQuery(options.topic);
+      if (detected) {
+        const subjectRecord = await this.prisma.subject.findFirst({
+          where: { schoolId, name: { contains: detected, mode: 'insensitive' } },
+          orderBy: { name: 'asc' },
+        });
+        if (subjectRecord) detectedSubjectId = subjectRecord.id;
+      }
+    }
+
     const session = await this.prisma.aiTutorSession.create({
       data: {
         studentId,
         schoolId,
-        subjectId: options?.subjectId,
+        subjectId: detectedSubjectId,
         topic: options?.topic,
       },
     });
 
     const context = await this.buildFullContext(schoolId, {
       ...options?.context,
-      subjectId: options?.subjectId || options?.context?.subjectId,
+      subjectId: detectedSubjectId || options?.context?.subjectId,
       topic: options?.topic || options?.context?.topic,
     });
     const greeting = await this.generateGreeting(context, options);
@@ -58,7 +71,7 @@ export class AiTutorService {
     });
 
     await this.aiMemory.update(studentId, {
-      subject: options?.subjectId,
+      subject: detectedSubjectId,
       topic: options?.topic,
       role: context.role,
       className: context.className,
