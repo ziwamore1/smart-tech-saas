@@ -413,6 +413,10 @@ export class AiTutorService {
     if (subjectId && schoolId) {
       try {
         context.curriculumContext = await this.fetchCurriculumContext(schoolId, subjectId, partial?.topic);
+        // Resolve subject name from the database so it can be used for math detection
+        if (context.curriculumContext?.subjectName && !context.subject) {
+          context.subject = context.curriculumContext.subjectName;
+        }
       } catch (err) {
         this.logger.warn(`Failed to fetch curriculum context for subject ${subjectId}: ${err}`);
       }
