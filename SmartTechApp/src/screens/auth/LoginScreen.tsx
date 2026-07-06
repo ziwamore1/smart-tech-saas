@@ -166,7 +166,7 @@ export const LoginScreen: React.FC = () => {
                     placeholder={loginMode === 'student' ? 'Enter admission number' : loginMode === 'phone' ? '+260XXXXXXXXX' : 'Enter your email'}
                     value={email}
                     onChangeText={setEmail}
-                    keyboardType={loginMode === 'email' ? 'email-address' : 'phone-pad'}
+                    keyboardType={loginMode === 'email' ? 'email-address' : loginMode === 'student' ? 'default' : 'phone-pad'}
                     autoCapitalize="none"
                   />
                 </View>
