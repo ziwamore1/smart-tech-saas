@@ -7,6 +7,7 @@ import { AiMemoryService } from './ai-memory.service';
 import { SubjectEngineService } from './subject-engine.service';
 import { buildSystemPrompt, buildUserPrompt, AiContext, Role } from './prompt-templates';
 import { CompositeSubjectService } from '../../composite-subject/composite-subject.service';
+import { CloudinaryService, FOLDERS } from '../../cloudinary/cloudinary.service';
 
 @Injectable()
 export class AiTutorService {
@@ -20,6 +21,7 @@ export class AiTutorService {
     private aiMemory: AiMemoryService,
     private subjectEngine: SubjectEngineService,
     private compositeSubjectService: CompositeSubjectService,
+    private cloudinary: CloudinaryService,
   ) {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (apiKey) {
@@ -75,7 +77,7 @@ export class AiTutorService {
     studentId: string,
     message: string,
     schoolId: string,
-    context?: Partial<AiContext>,
+    context?: Partial<AiContext> & { fileUrls?: string[] },
   ) {
     const session = await this.prisma.aiTutorSession.findUnique({
       where: { id: sessionId },
@@ -89,35 +91,64 @@ export class AiTutorService {
       return { error: 'Session not found' };
     }
 
+    const { fileUrls, ...restContext } = context || {};
+    const fileAttachmentContent = fileUrls?.length
+      ? `\n\n[Attached files: ${fileUrls.join(', ')}]`
+      : '';
+
     await this.prisma.aiTutorMessage.create({
-      data: { sessionId, role: 'student', content: message },
+      data: { sessionId, role: 'student', content: message + fileAttachmentContent },
     });
 
-    const memory = await this.aiMemory.pushMessage(studentId, 'user', message, sessionId);
+    const memory = await this.aiMemory.pushMessage(studentId, 'user', message + fileAttachmentContent, sessionId);
     const previousMessages = memory.recentMessages.slice(-10).map(m => ({
       role: m.role === 'tutor' ? 'assistant' : 'user',
       content: m.content,
     }));
 
     const fullContext = await this.buildFullContext(schoolId, {
-      ...context,
+      ...restContext,
       studentId,
-      message,
-      subject: context?.subject || session.subjectId || memory.subject || undefined,
-      subjectId: context?.subjectId || session.subjectId || undefined,
-      topic: context?.topic || session.topic || memory.topic || undefined,
+      message: fileUrls?.length
+        ? `${message}\n\nThe student has attached the following files for review: ${fileUrls.join(', ')}. Please analyze the attached files and incorporate them into your response.`
+        : message,
+      subject: restContext?.subject || session.subjectId || memory.subject || undefined,
+      subjectId: restContext?.subjectId || session.subjectId || undefined,
+      topic: restContext?.topic || session.topic || memory.topic || undefined,
       previousMessages,
     });
 
     const response = await this.generateLLMResponse(fullContext);
 
+    // Try to parse structured JSON and store in metadata
+    let structuredContent: any = null;
+    let displayContent = response;
+    try {
+      const parsed = JSON.parse(response);
+      if (parsed && typeof parsed === 'object' && parsed.type) {
+        structuredContent = parsed;
+        // Use explanation or steps as the display content
+        displayContent = parsed.explanation || parsed.answer?.text || response;
+      }
+    } catch {
+      // Not JSON, store as plain text
+    }
+
     await this.prisma.aiTutorMessage.create({
-      data: { sessionId, role: 'tutor', content: response },
+      data: {
+        sessionId,
+        role: 'tutor',
+        content: displayContent,
+        metadata: structuredContent || { raw: response },
+      },
     });
 
     await this.aiMemory.pushMessage(studentId, 'tutor', response, sessionId);
 
-    return { response };
+    return {
+      response: displayContent,
+      ...(structuredContent ? { structured: structuredContent, raw: response } : {}),
+    };
   }
 
   async askQuestion(
@@ -125,17 +156,31 @@ export class AiTutorService {
     schoolId: string,
     question: string,
     subjectId?: string,
-    context?: Partial<AiContext>,
+    context?: Partial<AiContext> & { fileUrls?: string[] },
   ) {
     if (!studentId) {
+      const { fileUrls, ...restContext } = context || {};
       const genericCtx: AiContext = {
         role: 'student',
-        message: question,
-        subject: context?.subject || subjectId,
-        subjectId: context?.subjectId || subjectId,
+        message: fileUrls?.length
+          ? `${question}\n\nThe student has attached the following files: ${fileUrls.join(', ')}. Please analyze them.`
+          : question,
+        subject: restContext?.subject || subjectId,
+        subjectId: restContext?.subjectId || subjectId,
       };
       const response = await this.generateLLMResponse(genericCtx);
-      return { response, isGeneral: true };
+      let structuredData: any = null;
+      try {
+        const parsed = JSON.parse(response);
+        if (parsed && typeof parsed === 'object' && parsed.type) {
+          structuredData = parsed;
+        }
+      } catch {}
+      return {
+        response: structuredData?.explanation || response,
+        ...(structuredData ? { structured: structuredData, raw: response } : {}),
+        isGeneral: true,
+      };
     }
 
     const sessions = await this.prisma.aiTutorSession.findMany({
@@ -171,6 +216,7 @@ export class AiTutorService {
       messages: session.messages.map(m => ({
         role: m.role,
         content: m.content,
+        metadata: m.metadata,
         createdAt: m.createdAt,
       })),
     };
@@ -252,6 +298,31 @@ export class AiTutorService {
       recommendations: keywords.length > 0
         ? [`Student frequently asks about: ${keywords.slice(0, 5).join(', ')}. Consider providing additional resources in these areas.`]
         : ['No specific patterns detected yet. Continue tutoring sessions for more insights.'],
+    };
+  }
+
+  async uploadFile(
+    file: Express.Multer.File,
+    sessionId?: string,
+    studentId?: string,
+    schoolId?: string,
+  ): Promise<{
+    url: string;
+    secureUrl: string;
+    publicId: string;
+    fileName: string;
+    mimeType: string;
+    size: number;
+  }> {
+    const folder = FOLDERS.aiContent;
+    const result = await this.cloudinary.upload(file, folder);
+    return {
+      url: result.url,
+      secureUrl: result.secureUrl,
+      publicId: result.publicId,
+      fileName: file.originalname,
+      mimeType: result.mimeType,
+      size: result.size,
     };
   }
 
@@ -465,6 +536,9 @@ export class AiTutorService {
       const subject = context.subject || this.subjectEngine.detectSubjectFromQuery(context.message || '');
       const subjectPrompt = this.subjectEngine.getSystemPromptForSubject(subject);
       const rolePrompt = buildSystemPrompt(context);
+      const isMathOrScience = subject && ['mathematics', 'math'].some(s =>
+        subject.toLowerCase().includes(s),
+      );
       const systemPrompt = subjectPrompt
         ? `${rolePrompt}\n\n=== SUBJECT-SPECIFIC INSTRUCTIONS ===\n${subjectPrompt}\n\nRemember: You are teaching ${subject}. Follow the subject-specific methodology above while also adapting to the user's role and context.`
         : rolePrompt;
@@ -481,17 +555,36 @@ export class AiTutorService {
         { role: 'user', content: userPrompt },
       ];
 
-      const response = await this.openai.chat.completions.create({
+      const completionOptions: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
         model: 'gpt-4o-mini',
         messages,
-        max_tokens: 2048,
+        max_tokens: 4096,
         temperature: 0.7,
-      });
+      };
+
+      // Use JSON response format for math/science to get structured data
+      if (isMathOrScience) {
+        completionOptions.response_format = { type: 'json_object' };
+      }
+
+      const response = await this.openai.chat.completions.create(completionOptions);
 
       const content = response.choices[0]?.message?.content;
       const finishReason = response.choices[0]?.finish_reason;
       if (content) {
         this.logger.log(`OpenAI response OK (${content.length} chars, finish_reason: ${finishReason})`);
+        // For math/science, try to parse as JSON and store both raw and structured
+        if (isMathOrScience) {
+          try {
+            const parsed = JSON.parse(content);
+            // Return the structured JSON string - frontend will parse it
+            return content;
+          } catch {
+            // If JSON parsing fails, return content as-is (fallback)
+            this.logger.warn('Failed to parse structured JSON from math response, using raw text');
+            return content;
+          }
+        }
         return content;
       }
       this.logger.warn(`OpenAI returned empty content (finish_reason: ${finishReason})`);

@@ -402,8 +402,8 @@ class ApiService {
 
   async sendAiTutorMessage(sessionId: string, message: string, context?: {
     role?: string; screen?: string; subject?: string; topic?: string;
-  }) {
-    const response = await this.client.post('/mobile/ai-tutor/message', { sessionId, message, context });
+  }, fileUrls?: string[]) {
+    const response = await this.client.post('/mobile/ai-tutor/message', { sessionId, message, context, fileUrls });
     return response.data;
   }
 
@@ -419,8 +419,19 @@ class ApiService {
 
   async askAiTutor(question: string, subjectId?: string, context?: {
     role?: string; screen?: string; subject?: string; topic?: string;
-  }) {
-    const response = await this.client.post('/mobile/ai-tutor/ask', { question, subjectId, context });
+  }, fileUrls?: string[]) {
+    const response = await this.client.post('/mobile/ai-tutor/ask', { question, subjectId, context, fileUrls });
+    return response.data;
+  }
+
+  async uploadTutorFile(formData: FormData, onProgress?: (progress: number) => void) {
+    const response = await this.client.post('/intelligence/ai-tutor/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: onProgress ? (e) => {
+        if (e.total) onProgress(Math.round((e.loaded * 100) / e.total));
+      } : undefined,
+      timeout: 120000,
+    });
     return response.data;
   }
 

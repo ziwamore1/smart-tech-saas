@@ -155,6 +155,7 @@ export class MobileController {
   async sendAiTutorMessage(@Req() req: any, @Body() body: {
     sessionId: string;
     message: string;
+    fileUrls?: string[];
     context?: {
       role?: string;
       screen?: string;
@@ -164,7 +165,7 @@ export class MobileController {
     };
   }) {
     const { id: userId, schoolId } = req.user;
-    return this.mobileService.sendAiTutorMessage(userId, schoolId, body.sessionId, body.message, body.context);
+    return this.mobileService.sendAiTutorMessage(userId, schoolId, body.sessionId, body.message, { ...body.context, fileUrls: body.fileUrls });
   }
 
   @Get('ai-tutor/history/:sessionId')
@@ -183,6 +184,7 @@ export class MobileController {
   async askAiTutor(@Req() req: any, @Body() body: {
     question: string;
     subjectId?: string;
+    fileUrls?: string[];
     context?: {
       role?: string;
       screen?: string;
@@ -192,7 +194,7 @@ export class MobileController {
     };
   }) {
     const { id: userId, schoolId, roles } = req.user;
-    return this.mobileService.askAiTutor(userId, schoolId, roles, body.question, body.subjectId, body.context);
+    return this.mobileService.askAiTutor(userId, schoolId, roles, body.question, body.subjectId, { ...body.context, fileUrls: body.fileUrls });
   }
 
   @Get('classes')

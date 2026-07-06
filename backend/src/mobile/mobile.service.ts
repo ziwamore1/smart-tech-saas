@@ -688,15 +688,28 @@ export class MobileService {
       return { sessionId: session.id, message: greeting, isGeneral: true };
     }
 
-    return this.aiTutorService.startSession(studentId, schoolId, {
+    const result = await this.aiTutorService.startSession(studentId, schoolId, {
       subjectId: options?.subjectId,
       topic: options?.topic,
       context: contextPayload,
     });
+
+    // Check if the greeting is structured JSON
+    let structured = null;
+    try {
+      const parsed = JSON.parse(result.message);
+      if (parsed && typeof parsed === 'object' && parsed.type) structured = parsed;
+    } catch {}
+
+    return {
+      sessionId: result.sessionId,
+      message: structured?.explanation || result.message,
+      ...(structured ? { structured } : {}),
+    };
   }
 
   async sendAiTutorMessage(userId: string, schoolId: string, sessionId: string, message: string, context?: {
-    role?: string; screen?: string; subject?: string; topic?: string; studentId?: string;
+    role?: string; screen?: string; subject?: string; topic?: string; studentId?: string; fileUrls?: string[];
   }) {
     const session = await this.prisma.aiTutorSession.findUnique({
       where: { id: sessionId },
@@ -707,30 +720,39 @@ export class MobileService {
       return { error: 'Session not found' };
     }
 
-    const contextPayload = context ? {
-      role: (context.role || 'student') as any,
-      screen: context.screen,
-      subject: context.subject || session.subjectId || undefined,
-      topic: context.topic || session.topic || undefined,
-      studentId: context.studentId || session.studentId || undefined,
+    const { fileUrls, ...restContext } = context || {};
+    const contextPayload = {
+      role: (restContext.role || 'student') as any,
+      screen: restContext.screen,
+      subject: restContext.subject || session.subjectId || undefined,
+      topic: restContext.topic || session.topic || undefined,
+      studentId: restContext.studentId || session.studentId || undefined,
       userId,
-    } : { studentId: session.studentId || undefined, userId };
+      fileUrls,
+    };
 
     await this.prisma.aiTutorMessage.create({
       data: { sessionId, role: 'user', content: message },
     });
 
-    const response = await this.generateTutorResponse(message, session, contextPayload);
+    const result = await this.generateTutorResponse(message, session, contextPayload);
+    const response = typeof result === 'string' ? result : result.response;
+    const structured = typeof result === 'object' ? result.structured : null;
 
     await this.prisma.aiTutorMessage.create({
-      data: { sessionId, role: 'tutor', content: response },
+      data: {
+        sessionId,
+        role: 'tutor',
+        content: response,
+        metadata: structured ? JSON.parse(JSON.stringify(structured)) : undefined,
+      },
     });
 
-    return { response };
+    return { response, ...(structured ? { structured } : {}) };
   }
 
   async askAiTutor(userId: string, schoolId: string, roles: string[], question: string, subjectId?: string, context?: {
-    role?: string; screen?: string; subject?: string; topic?: string; studentId?: string;
+    role?: string; screen?: string; subject?: string; topic?: string; studentId?: string; fileUrls?: string[];
   }) {
     let studentId: string | null = null;
 
@@ -746,17 +768,20 @@ export class MobileService {
       topic: context?.topic,
       studentId: context?.studentId || studentId || undefined,
       userId,
+      fileUrls: context?.fileUrls,
     };
 
     if (!studentId) {
-      const response = await this.generateTutorResponse(question, null, contextPayload);
-      return { response, isGeneral: true };
+      const result = await this.generateTutorResponse(question, null, contextPayload);
+      const response = typeof result === 'string' ? result : result.response;
+      const structured = typeof result === 'object' ? result.structured : null;
+      return { response, ...(structured ? { structured } : {}), isGeneral: true };
     }
 
     return this.aiTutorService.askQuestion(studentId, schoolId, question, subjectId, contextPayload);
   }
 
-  private async generateTutorResponse(message: string, session: any, context?: any): Promise<string> {
+  private async generateTutorResponse(message: string, session: any, context?: any): Promise<string | { response: string; structured?: any }> {
     if (!session) {
       return this.generateGeneralTutorResponse(message, context?.subject);
     }
@@ -767,7 +792,7 @@ export class MobileService {
       session.schoolId,
       context || {},
     );
-    return result.response;
+    return result;
   }
 
   private generateGeneralGreeting(topic?: string, subjectId?: string): string {

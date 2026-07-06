@@ -1,5 +1,7 @@
-import { Controller, Get, Post, Param, Query, Req, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Req, Body, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { cloudinaryMemoryStorage } from '../cloudinary/multer-cloudinary';
 import { DescriptiveStatsService } from './services/descriptive-stats.service';
 import { TrendAnalysisService } from './services/trend-analysis.service';
 import { CorrelationAnalysisService } from './services/correlation-analysis.service';
@@ -371,9 +373,9 @@ export class IntelligenceController {
   @Post('ai-tutor/message')
   async sendTutorMessage(
     @Req() req: any,
-    @Body() body: { sessionId: string; studentId: string; message: string; context?: Record<string, any> },
+    @Body() body: { sessionId: string; studentId: string; message: string; fileUrls?: string[]; context?: Record<string, any> },
   ) {
-    return this.aiTutor.sendMessage(body.sessionId, body.studentId, body.message, req.user.schoolId, body.context as any);
+    return this.aiTutor.sendMessage(body.sessionId, body.studentId, body.message, req.user.schoolId, { ...body.context as any, fileUrls: body.fileUrls });
   }
 
   @Get('ai-tutor/history/:sessionId')
@@ -398,9 +400,20 @@ export class IntelligenceController {
   @Post('ai-tutor/ask')
   async askTutor(
     @Req() req: any,
-    @Body() body: { studentId: string; question: string; subjectId?: string; context?: Record<string, any> },
+    @Body() body: { studentId: string; question: string; subjectId?: string; fileUrls?: string[]; context?: Record<string, any> },
   ) {
-    return this.aiTutor.askQuestion(body.studentId, req.user.schoolId, body.question, body.subjectId, body.context as any);
+    return this.aiTutor.askQuestion(body.studentId, req.user.schoolId, body.question, body.subjectId, { ...body.context as any, fileUrls: body.fileUrls });
+  }
+
+  @Post('ai-tutor/upload')
+  @UseInterceptors(FileInterceptor('file', { storage: cloudinaryMemoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }))
+  async uploadTutorFile(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { sessionId?: string; studentId?: string },
+  ) {
+    if (!file) throw new BadRequestException('No file provided');
+    return this.aiTutor.uploadFile(file, body.sessionId, body.studentId, req.user.schoolId);
   }
 
   @Get('ai-tutor/insights/:studentId')

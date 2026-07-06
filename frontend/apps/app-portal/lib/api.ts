@@ -1425,11 +1425,22 @@ export const intelligenceApi = {
 
   // AI Tutor
   startTutorSession: (studentId: string, subjectId?: string, topic?: string, context?: Record<string, any>) => api.post('/intelligence/ai-tutor/start', { studentId, subjectId, topic, context }, { timeout: 30000 }),
-  sendTutorMessage: (sessionId: string, studentId: string, message: string, context?: Record<string, any>) => api.post('/intelligence/ai-tutor/message', { sessionId, studentId, message, context }, { timeout: 120000 }),
+  sendTutorMessage: (sessionId: string, studentId: string, message: string, fileUrls?: string[], context?: Record<string, any>) => api.post('/intelligence/ai-tutor/message', { sessionId, studentId, message, fileUrls, context }, { timeout: 120000 }),
   getTutorSessionHistory: (sessionId: string) => api.get(`/intelligence/ai-tutor/history/${sessionId}`),
   getStudentTutorSessions: (studentId: string) => api.get(`/intelligence/ai-tutor/sessions/${studentId}`),
   endTutorSession: (sessionId: string, rating?: number, helpful?: boolean, comment?: string) => api.post(`/intelligence/ai-tutor/end/${sessionId}`, { rating, helpful, comment }),
-  askTutor: (studentId: string, question: string, subjectId?: string, context?: Record<string, any>) => api.post('/intelligence/ai-tutor/ask', { studentId, question, subjectId, context }, { timeout: 120000 }),
+  askTutor: (studentId: string, question: string, subjectId?: string, fileUrls?: string[], context?: Record<string, any>) => api.post('/intelligence/ai-tutor/ask', { studentId, question, subjectId, fileUrls, context }, { timeout: 120000 }),
+  uploadTutorFile: (file: File, sessionId?: string, studentId?: string, onProgress?: (pct: number) => void) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (sessionId) formData.append('sessionId', sessionId);
+    if (studentId) formData.append('studentId', studentId);
+    return api.post('/intelligence/ai-tutor/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: onProgress ? (e) => { if (e.total) onProgress(Math.round((e.loaded * 100) / e.total)); } : undefined,
+      timeout: 120000,
+    });
+  },
   getTutorInsights: (studentId: string) => api.get(`/intelligence/ai-tutor/insights/${studentId}`),
 };
 
