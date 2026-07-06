@@ -427,7 +427,9 @@ export class AiTutorService {
       try {
         context.curriculumContext = await this.fetchCurriculumContext(schoolId, subjectId, partial?.topic);
         // Resolve subject name from the database so it can be used for math detection
-        if (context.curriculumContext?.subjectName && !context.subject) {
+        // Always prefer the resolved DB name over a raw UUID that may have been
+        // set from session.subjectId
+        if (context.curriculumContext?.subjectName) {
           context.subject = context.curriculumContext.subjectName;
         }
       } catch (err) {
