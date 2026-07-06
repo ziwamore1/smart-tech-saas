@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import MathJax from 'react-native-mathjax-svg';
 import { colors, spacing, borderRadius } from '../../theme';
+import { MobileMathGraph } from './MobileMathGraph';
 
 interface MathExpression {
   latex: string;
@@ -18,7 +19,13 @@ interface Step {
 interface GraphSpec {
   type: string;
   function: string;
+  xLabel?: string;
+  yLabel?: string;
+  showIntercepts?: boolean;
+  showTurningPoint?: boolean;
+  showAsymptotes?: boolean;
   domain?: [number, number];
+  shadedRegion?: { start: number; end: number; color: string };
 }
 
 interface TableData {
@@ -240,7 +247,7 @@ export function MobileTutorResponse({
     return <Text style={styles.plainText}>{content}</Text>;
   }
 
-  const { explanation, rendered_math, steps, answer, common_mistakes, practice_question, interactive } = parsed;
+  const { explanation, rendered_math, steps, graphs, answer, common_mistakes, practice_question, interactive } = parsed;
 
   return (
     <View style={styles.container}>
@@ -253,6 +260,14 @@ export function MobileTutorResponse({
       {steps && steps.length > 0 && (
         <MobileStepSolution steps={steps} interactive={interactive} />
       )}
+      {graphs && graphs.length > 0 && (
+        <View style={styles.graphSection}>
+          <Text style={styles.sectionTitle}>Graph</Text>
+          {graphs.map((graph, i) => (
+            <MobileMathGraph key={i} spec={graph} />
+          ))}
+        </View>
+      )}
       {answer && <MobileAnswerBlock answer={answer} />}
       {common_mistakes && <MobileCommonMistakes mistakes={common_mistakes} />}
       {practice_question && <MobilePracticeQuestion pq={practice_question} />}
@@ -262,6 +277,7 @@ export function MobileTutorResponse({
 
 const styles = StyleSheet.create({
   container: { gap: spacing.md },
+  graphSection: { gap: spacing.sm, marginTop: spacing.sm },
   plainText: { fontSize: 15, color: colors.text, lineHeight: 22 },
   explanationText: { fontSize: 15, color: colors.text, lineHeight: 22 },
   mathBlockContainer: { gap: spacing.xs },
