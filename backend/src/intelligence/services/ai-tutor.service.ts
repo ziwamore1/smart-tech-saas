@@ -559,8 +559,9 @@ export class AiTutorService {
         'english', 'language', 'literature', 'history', 'geography', 'civic', 'religious',
         'ict', 'agriculture', 'social studies', 'humanities',
       ];
-      const isMathOrScience = subject && structuredSubjects.some(s =>
-        subject.toLowerCase().includes(s),
+      const isMathOrScience = subject && (
+        structuredSubjects.some(s => subject.toLowerCase().includes(s)) ||
+        this.subjectEngine.getEngineForSubject(subject)
       );
       const systemPrompt = subjectPrompt
         ? `${rolePrompt}\n\n=== SUBJECT-SPECIFIC INSTRUCTIONS ===\n${subjectPrompt}\n\nRemember: You are teaching ${subject}. Follow the subject-specific methodology above while also adapting to the user's role and context.`
