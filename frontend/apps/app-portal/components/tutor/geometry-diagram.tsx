@@ -1,7 +1,7 @@
 'use client';
 
 interface GeometryDiagramSpec {
-  type: 'triangle' | 'circle' | 'angle' | 'polygon' | 'coordinate' | 'construction';
+  type: string;
   params: Record<string, any>;
 }
 
@@ -19,9 +19,69 @@ export function GeometryDiagram({ spec }: { spec: GeometryDiagramSpec }) {
       return <CoordinateDiagram params={spec.params} />;
     case 'polygon':
       return <PolygonDiagram params={spec.params} />;
+    case 'biology':
+      return <BioDiagram params={spec.params} />;
     default:
       return <div className="p-4 bg-gray-50 rounded-lg text-sm text-gray-500">Diagram: {spec.type}</div>;
   }
+}
+
+function BioDiagram({ params }: { params: Record<string, any> }) {
+  const diagramType = params.diagram_type || 'cell';
+  const w = 220;
+  const h = 180;
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-3 max-w-[260px] mx-auto">
+      <h4 className="text-xs font-bold text-amber-600 uppercase mb-2">
+        {params.label || `Biology: ${diagramType}`}
+      </h4>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full">
+        {diagramType === 'cell' && (
+          <>
+            <circle cx={w/2} cy={h/2} r="60" fill="#fef3c7" stroke="#d97706" strokeWidth="2" />
+            <circle cx={w/2} cy={h/2} r="18" fill="#f59e0b" />
+            <circle cx={w/2} cy={h/2} r="14" fill="#d97706" />
+            <ellipse cx={w/2 - 20} cy={h/2 - 15} rx="12" ry="6" fill="#fbbf24" opacity="0.7" />
+            <ellipse cx={w/2 + 18} cy={h/2 + 12} rx="8" ry="12" fill="#fbbf24" opacity="0.5" />
+          </>
+        )}
+        {diagramType === 'dna' && (
+          <>
+            {Array.from({ length: 6 }).map((_, i) => {
+              const y = 20 + i * 28;
+              const offset = i % 2 === 0 ? -25 : 25;
+              return (
+                <g key={i}>
+                  <circle cx={w/2 + offset} cy={y} r="2" fill="#059669" />
+                  {i < 5 && <line x1={w/2 + offset} y1={y} x2={w/2 - offset} y2={y + 28} stroke={i % 2 === 0 ? '#ef4444' : '#3b82f6'} strokeWidth="1.5" />}
+                </g>
+              );
+            })}
+          </>
+        )}
+        {diagramType === 'photosynthesis' && (
+          <>
+            <text x={w/2} y="20" textAnchor="middle" fontSize="10" fill="#15803d">☀️ Sunlight</text>
+            <ellipse cx={w/2} cy={h/2 + 5} rx="45" ry="35" fill="#86efac" stroke="#16a34a" strokeWidth="1.5" />
+            <rect x={w/2 - 6} y={h/2 + 5} width="12" height="25" rx="2" fill="#166534" />
+            <line x1={w/2} y1={h/2 + 30} x2={w/2} y2={h - 15} stroke="#166534" strokeWidth="2" />
+            <text x={w/2} y={h/2} textAnchor="middle" fontSize="8" fill="#15803d" fontWeight="bold">Chloroplast</text>
+          </>
+        )}
+      </svg>
+      {params.descriptions && (
+        <div className="mt-2 text-[10px] text-gray-500 space-y-1">
+          {Object.entries(params.descriptions).slice(0, 3).map(([key, val]) => (
+            <div key={key} className="flex gap-1">
+              <span className="font-semibold text-gray-700">{key}:</span>
+              <span>{val as string}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function TriangleDiagram({ params }: { params: Record<string, any> }) {

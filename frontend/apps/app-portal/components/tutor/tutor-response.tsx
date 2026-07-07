@@ -5,6 +5,12 @@ import { MathRenderer, RichMathText, MathBlock } from './math-renderer';
 import { StepSolution } from './step-solution';
 import { MathGraph } from './math-graph';
 import { GeometryDiagram } from './geometry-diagram';
+import { Timeline } from './timeline';
+import { MapView } from './map-view';
+import { PortraitCard } from './portrait-card';
+import { FlowChart } from './flow-chart';
+import { ComparisonTable } from './comparison-table';
+import { MindMap } from './mind-map';
 import { AlertTriangle, Lightbulb, Target, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface MathExpression {
@@ -62,7 +68,7 @@ interface InteractiveOptions {
 }
 
 export interface StructuredTutorResponse {
-  type: 'math_solution' | 'explanation' | 'practice' | 'general';
+  type: string;
   explanation?: string;
   rendered_math?: MathExpression[];
   steps?: Step[];
@@ -163,9 +169,26 @@ export function TutorResponse({ content, structured }: TutorResponseProps) {
       {diagrams && diagrams.length > 0 && (
         <div className="space-y-3">
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Diagram</span>
-          {diagrams.map((diagram, i) => (
-            <GeometryDiagram key={i} spec={diagram as any} />
-          ))}
+          {diagrams.map((diagram, i) => {
+            switch (diagram.type) {
+              case 'biology':
+                return <GeometryDiagram key={i} spec={diagram as any} />;
+              case 'timeline':
+                return <Timeline key={i} params={diagram.params} />;
+              case 'map':
+                return <MapView key={i} params={diagram.params} />;
+              case 'portrait':
+                return <PortraitCard key={i} params={diagram.params} />;
+              case 'flowchart':
+                return <FlowChart key={i} params={diagram.params} />;
+              case 'comparison':
+                return <ComparisonTable key={i} params={diagram.params} />;
+              case 'mindmap':
+                return <MindMap key={i} params={diagram.params} />;
+              default:
+                return <GeometryDiagram key={i} spec={diagram as any} />;
+            }
+          })}
         </div>
       )}
 
