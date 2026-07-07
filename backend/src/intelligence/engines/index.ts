@@ -3,6 +3,7 @@ import { MathEngine } from './math-engine';
 import { ScienceEngine } from './science-engine';
 import { LanguageEngine } from './language-engine';
 import { HumanitiesEngine } from './humanities-engine';
+import { SUBJECT_PROMPTS, SUBJECT_SPECIFIC_INSTRUCTIONS } from './subject-prompts';
 
 export { BaseSubjectEngine, EngineResponse } from './base-engine';
 export { MathEngine } from './math-engine';
@@ -31,6 +32,13 @@ export function getSubjectSystemPrompt(subject: string): string {
     const prompt = engine.getSystemPrompt();
     const instructions = engine.getSubjectInstructions();
     if (prompt) return `${prompt}\n\n${instructions}`.trim();
+  }
+  const directPrompt = SUBJECT_PROMPTS[subject];
+  if (directPrompt) {
+    const directInstructions = SUBJECT_SPECIFIC_INSTRUCTIONS[subject] || '';
+    return directInstructions
+      ? `${directPrompt}\n\n${directInstructions}`.trim()
+      : directPrompt;
   }
   return '';
 }

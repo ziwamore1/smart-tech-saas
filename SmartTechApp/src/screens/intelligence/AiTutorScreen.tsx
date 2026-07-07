@@ -98,10 +98,14 @@ export const AiTutorScreen: React.FC = () => {
       };
       setActiveSession(session);
       let msgStructured = null;
-      try {
-        const parsed = JSON.parse(res.message);
-        if (parsed && typeof parsed === 'object' && parsed.type) msgStructured = parsed;
-      } catch {}
+      if (res.structured) {
+        msgStructured = res.structured;
+      } else {
+        try {
+          const parsed = JSON.parse(res.message);
+          if (parsed && typeof parsed === 'object' && parsed.type) msgStructured = parsed;
+        } catch {}
+      }
       setMessages([{ role: 'tutor', content: msgStructured?.explanation || res.message, structured: msgStructured, createdAt: new Date().toISOString() }]);
       setScreen('chat');
     } catch (err) {
