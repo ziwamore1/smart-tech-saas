@@ -555,7 +555,11 @@ export class AiTutorService {
       const subject = context.subject || this.subjectEngine.detectSubjectFromQuery(context.message || '');
       const subjectPrompt = this.subjectEngine.getSystemPromptForSubject(subject);
       const rolePrompt = buildSystemPrompt(context);
-      const isMathOrScience = subject && ['mathematics', 'math'].some(s =>
+      const structuredSubjects = ['mathematics', 'math', 'science', 'physics', 'chemistry', 'biology',
+        'english', 'language', 'literature', 'history', 'geography', 'civic', 'religious',
+        'ict', 'agriculture', 'social studies', 'humanities',
+      ];
+      const isMathOrScience = subject && structuredSubjects.some(s =>
         subject.toLowerCase().includes(s),
       );
       const systemPrompt = subjectPrompt

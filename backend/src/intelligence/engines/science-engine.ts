@@ -26,6 +26,41 @@ const CHEMISTRY_FORMULAS: Record<string, string> = {
   'ph': 'pH = -log[H⁺] (pH Calculation)',
 };
 
+interface StructuredScienceResult {
+  type: 'science_explanation' | 'physics' | 'chemistry' | 'biology' | 'general';
+  explanation: string;
+  rendered_math?: Array<{ latex: string; display: 'block' | 'inline' }>;
+  steps?: Array<{
+    number: number;
+    title: string;
+    content: string;
+    math?: Array<{ latex: string; display: 'block' | 'inline' }>;
+  }>;
+  tables?: Array<{
+    title: string;
+    headers: string[];
+    rows: string[][];
+  }>;
+  diagrams?: Array<{
+    type: string;
+    params: Record<string, any>;
+  }>;
+  answer?: {
+    latex: string;
+    text: string;
+  };
+  practice_question?: {
+    question: string;
+    math?: Array<{ latex: string; display: 'block' | 'inline' }>;
+    difficulty: string;
+  };
+  common_mistakes?: string[];
+  interactive?: {
+    whyThisMethod?: string;
+    alternativeMethod?: string;
+  };
+}
+
 export class ScienceEngine extends BaseSubjectEngine {
   constructor() {
     super('science', [
@@ -39,13 +74,16 @@ export class ScienceEngine extends BaseSubjectEngine {
     const formulas = this.getRelevantFormulas(query);
     const practiceQuestions = await this.generatePracticeQuestions(query);
 
-    let enhanced = response;
-    if (formulas.length > 0) {
-      enhanced += `\n\n**Relevant Formulas:**\n${formulas.map(f => `• ${f}`).join('\n')}`;
-    }
+    let finalContent = response;
+    try {
+      const parsed = JSON.parse(response) as StructuredScienceResult;
+      if (parsed && typeof parsed === 'object' && parsed.type) {
+        finalContent = JSON.stringify(parsed);
+      }
+    } catch {}
 
     return {
-      content: enhanced,
+      content: finalContent,
       subject: 'Science',
       topic,
       suggestions: this.getStudySuggestions(topic),

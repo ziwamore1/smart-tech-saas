@@ -1,5 +1,29 @@
 import { BaseSubjectEngine, EngineResponse } from './base-engine';
 
+interface StructuredEnglishResult {
+  type: 'english_explanation' | 'literature' | 'grammar' | 'comprehension' | 'essay' | 'general';
+  explanation: string;
+  steps?: Array<{
+    number: number;
+    title: string;
+    content: string;
+    math?: Array<{ latex: string; display: 'block' | 'inline' }>;
+  }>;
+  tables?: Array<{
+    title: string;
+    headers: string[];
+    rows: string[][];
+  }>;
+  diagrams?: Array<{
+    type: string;
+    params: Record<string, any>;
+  }>;
+  answer?: { latex: string; text: string };
+  practice_question?: { question: string; difficulty: string };
+  common_mistakes?: string[];
+  interactive?: { whyThisMethod?: string; alternativeMethod?: string };
+}
+
 export class LanguageEngine extends BaseSubjectEngine {
   private compromise: any = null;
 
@@ -20,9 +44,20 @@ export class LanguageEngine extends BaseSubjectEngine {
     const topic = this.detectTopic(query);
     const corrections = this.checkGrammar(response);
 
-    let enhanced = response;
+    let finalContent = response;
+    try {
+      const parsed = JSON.parse(response) as StructuredEnglishResult;
+      if (parsed && typeof parsed === 'object' && parsed.type) {
+        finalContent = JSON.stringify(parsed);
+      }
+    } catch {}
+
+    let enhanced = finalContent;
     if (corrections.length > 0) {
-      enhanced += `\n\n---\n*Note: I've identified some areas for improvement in my response that I want to help you learn from.*`;
+      enhanced = JSON.stringify({
+        ...(JSON.parse(finalContent) || {}),
+        common_mistakes: corrections,
+      });
     }
 
     return {

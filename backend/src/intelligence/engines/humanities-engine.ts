@@ -1,5 +1,23 @@
 import { BaseSubjectEngine, EngineResponse } from './base-engine';
 
+interface StructuredHumanitiesResult {
+  type: string;
+  explanation: string;
+  tables?: Array<{
+    title: string;
+    headers: string[];
+    rows: string[][];
+  }>;
+  diagrams?: Array<{
+    type: string;
+    params: Record<string, any>;
+  }>;
+  answer?: { latex: string; text: string };
+  practice_question?: { question: string; difficulty: string };
+  common_mistakes?: string[];
+  interactive?: { whyThisMethod?: string; alternativeMethod?: string };
+}
+
 export class HumanitiesEngine extends BaseSubjectEngine {
   private readonly domains: Record<string, string[]> = {
     history: ['history', 'historical', 'civilization', 'kingdom', 'colonial', 'independence', 'war', 'revolution'],
@@ -21,12 +39,19 @@ export class HumanitiesEngine extends BaseSubjectEngine {
     const domain = this.detectDomain(query);
     const topic = this.detectTopic(query);
 
-    let enhanced = response;
+    let finalContent = response;
+    try {
+      const parsed = JSON.parse(response) as StructuredHumanitiesResult;
+      if (parsed && typeof parsed === 'object' && parsed.type) {
+        finalContent = JSON.stringify(parsed);
+      }
+    } catch {}
+
     const questions_result = await this.generatePracticeQuestion(topic || query, 1);
     const questions = questions_result ? [questions_result] : [];
 
     return {
-      content: enhanced,
+      content: finalContent,
       subject: this.capitalize(domain),
       topic,
       suggestions: this.getStudySuggestions(domain),

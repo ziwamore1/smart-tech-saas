@@ -731,22 +731,9 @@ export class MobileService {
       fileUrls,
     };
 
-    await this.prisma.aiTutorMessage.create({
-      data: { sessionId, role: 'user', content: message },
-    });
-
     const result = await this.generateTutorResponse(message, session, contextPayload);
     const response = typeof result === 'string' ? result : result.response;
     const structured = typeof result === 'object' ? result.structured : null;
-
-    await this.prisma.aiTutorMessage.create({
-      data: {
-        sessionId,
-        role: 'tutor',
-        content: response,
-        metadata: structured ? JSON.parse(JSON.stringify(structured)) : undefined,
-      },
-    });
 
     return { response, ...(structured ? { structured } : {}) };
   }
