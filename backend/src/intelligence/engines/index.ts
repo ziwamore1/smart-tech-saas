@@ -23,7 +23,7 @@ export function getEngineForSubject(subjectIdOrName: string): BaseSubjectEngine 
 }
 
 export function getAllEngines(): BaseSubjectEngine[] {
-  return DEFAULT_ENGINES;
+  return [...DEFAULT_ENGINES];
 }
 
 export function getSubjectSystemPrompt(subject: string): string {
