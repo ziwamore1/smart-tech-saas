@@ -33,9 +33,10 @@ export function getSubjectSystemPrompt(subject: string): string {
     const instructions = engine.getSubjectInstructions();
     if (prompt) return `${prompt}\n\n${instructions}`.trim();
   }
-  const directPrompt = SUBJECT_PROMPTS[subject];
+  const subjectKey = subject.toLowerCase();
+  const directPrompt = SUBJECT_PROMPTS[subjectKey];
   if (directPrompt) {
-    const directInstructions = SUBJECT_SPECIFIC_INSTRUCTIONS[subject] || '';
+    const directInstructions = SUBJECT_SPECIFIC_INSTRUCTIONS[subjectKey] || '';
     return directInstructions
       ? `${directPrompt}\n\n${directInstructions}`.trim()
       : directPrompt;
