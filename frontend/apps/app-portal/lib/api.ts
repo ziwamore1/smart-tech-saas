@@ -40,8 +40,9 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       const url = error.config?.url || '';
       const isAuthEndpoint = url.startsWith('/auth/');
+      const isPublicEndpoint = url.includes('/public/');
       const alreadyOnLogin = window.location.pathname === '/login';
-      if (!isAuthEndpoint && !alreadyOnLogin) {
+      if (!isAuthEndpoint && !isPublicEndpoint && !alreadyOnLogin) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');
         window.location.href = '/login';
@@ -65,6 +66,7 @@ api.interceptors.response.use(
         '/class',
         '/rooms',
         '/auth/',
+        '/public/',
         '/feature-locks',
       ];
       const isSilent = silentUrls.some(url => error.config.url?.includes(url));
