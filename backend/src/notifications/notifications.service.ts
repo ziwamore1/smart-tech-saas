@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FirebaseService } from '../firebase/firebase.service';
 import { NotificationQueueService, NotificationJobData } from './notification-queue.service';
 import { SendNotificationDto, BroadcastNotificationDto } from './dto/send-notification.dto';
+import { StudentFilterService } from '../common/services/student-filter.service';
 import type { Message } from 'firebase-admin/messaging';
 
 const VALID_CATEGORIES = [
@@ -22,6 +23,7 @@ export class NotificationsService {
     private prisma: PrismaService,
     private firebase: FirebaseService,
     private queue: NotificationQueueService,
+    private studentFilter: StudentFilterService,
   ) {}
 
   validateCategory(category: string): string {
@@ -115,7 +117,11 @@ export class NotificationsService {
     createdBy?: string,
   ): Promise<string | null> {
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { classId, status: 'ACTIVE' },
+      where: {
+        classId,
+        status: 'ACTIVE',
+        student: this.studentFilter.communicationRecipientWhere(),
+      },
       include: { student: { include: { user: { select: { id: true } } } } },
     });
 
@@ -560,7 +566,11 @@ export class NotificationsService {
       });
       const classIds = classes.map(c => c.id);
       const enrollments = await this.prisma.enrollment.findMany({
-        where: { classId: { in: classIds }, status: 'ACTIVE' },
+        where: {
+          classId: { in: classIds },
+          status: 'ACTIVE',
+          student: this.studentFilter.communicationRecipientWhere(),
+        },
         include: { student: { include: { user: { select: { id: true } } } } },
       });
       const userIds = enrollments.map(e => e.student?.user?.id).filter(Boolean);

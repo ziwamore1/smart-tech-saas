@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsBoolean } from 'class-validator';
 
 export class UpdateStudentDto {
   @IsString()
@@ -36,4 +36,12 @@ export class UpdateStudentDto {
   @IsString()
   @IsOptional()
   linkingParentId?: string;
+
+  @IsString()
+  @IsOptional()
+  status?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  manualOverride?: boolean;
 }

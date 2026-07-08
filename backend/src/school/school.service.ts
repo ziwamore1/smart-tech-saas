@@ -155,6 +155,15 @@ export class SchoolService {
       ],
     });
 
+    await this.prisma.admissionSequence.create({
+      data: {
+        schoolId,
+        academicYearId: academicYear.id,
+        year: 2026,
+        currentSequence: 0,
+      },
+    });
+
     const typeLabel = this.getLabelForInstitutionType(institutionTypeCode);
     const levelType = await this.prisma.levelType.create({
       data: {
@@ -179,7 +188,7 @@ export class SchoolService {
       },
     });
 
-    this.logger.log(`School ${schoolId} initialized with ${institutionTypeCode} structure`);
+    this.logger.log(`School ${schoolId} initialized with ${institutionTypeCode} structure and admission sequence`);
   }
 
   private getLabelForInstitutionType(typeCode: string): string {

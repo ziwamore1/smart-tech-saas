@@ -7,6 +7,7 @@ import { useAuthStore } from '../store';
 import { ClassTeacherDashboardScreen } from '../screens/class-teacher/DashboardScreen';
 import { PrimaryClassTeacherScreen } from '../screens/class-teacher/PrimaryClassTeacherScreen';
 import { ClassTeacherStudentsScreen } from '../screens/class-teacher/StudentsScreen';
+import { RegisterStudentScreen } from '../screens/registration/RegisterStudentScreen';
 import { ClassTeacherCommunicationScreen } from '../screens/class-teacher/CommunicationScreen';
 import { ClassTeacherAnalyticsScreen } from '../screens/class-teacher/AnalyticsScreen';
 import { ClassTeacherAttendanceScreen } from '../screens/class-teacher/AttendanceScreen';
@@ -30,6 +31,7 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'CTHome', label: 'Dashboard', icon: '🏠', component: ClassTeacherDashboardScreen },
   { name: 'CTPrimary', label: 'Primary', icon: '🌿', component: PrimaryClassTeacherScreen, primaryOnly: true },
   { name: 'CTStudents', label: 'Students', icon: '👥', component: ClassTeacherStudentsScreen },
+  { name: 'CTRegister', label: 'Register Student', icon: '➕', component: RegisterStudentScreen },
   { name: 'CTCommunication', label: 'Messages', icon: '💬', component: ClassTeacherCommunicationScreen },
   { name: 'CTAnalytics', label: 'Analytics', icon: '📊', component: ClassTeacherAnalyticsScreen },
   { name: 'CTAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor' },

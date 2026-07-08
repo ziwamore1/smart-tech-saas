@@ -1,4 +1,11 @@
-import { IsString, IsNotEmpty, IsOptional, IsDateString } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsDateString, IsBoolean } from 'class-validator';
+
+export const StudentStatusValues = [
+  'ACTIVE', 'INACTIVE', 'TRANSFERRED', 'GRADUATED',
+  'WITHDRAWN', 'SUSPENDED', 'DECEASED',
+] as const;
+
+export type StudentStatusType = typeof StudentStatusValues[number];
 
 export class CreateStudentDto {
   @IsString()
@@ -10,8 +17,8 @@ export class CreateStudentDto {
   lastName: string;
 
   @IsString()
-  @IsNotEmpty()
-  admissionNumber: string;
+  @IsOptional()
+  admissionNumber?: string;
 
   @IsString()
   @IsOptional()
@@ -48,4 +55,20 @@ export class CreateStudentDto {
   @IsString()
   @IsOptional()
   linkingParentId?: string;
+
+  @IsString()
+  @IsOptional()
+  academicYearId?: string;
+
+  @IsString()
+  @IsOptional()
+  classId?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  manualOverride?: boolean;
+
+  @IsString()
+  @IsOptional()
+  status?: string;
 }

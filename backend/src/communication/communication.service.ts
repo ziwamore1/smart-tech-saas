@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { BeemService } from '../beem/beem.service';
 import { TwilioService } from '../twilio/twilio.service';
+import { StudentFilterService } from '../common/services/student-filter.service';
 import mail from '@sendgrid/mail';
 import * as nodemailer from 'nodemailer';
 import { google } from 'googleapis';
@@ -26,6 +27,7 @@ export class CommunicationService {
     private configService: ConfigService,
     private beemService: BeemService,
     private twilioService: TwilioService,
+    private studentFilter: StudentFilterService,
   ) {
     this.sendgridApiKey = this.configService.get<string>('SENDGRID_API_KEY', '');
     this.sendgridFromEmail = this.configService.get<string>('SENDGRID_FROM_EMAIL', 'noreply@smarttechsaas.com');
@@ -456,7 +458,7 @@ export class CommunicationService {
       case 'student':
         return this.prisma.student
           .findMany({
-            where: { schoolId },
+            where: { schoolId, ...this.studentFilter.communicationRecipientWhere() },
             include: { user: { select: { id: true, email: true } } },
           })
           .then((students) =>

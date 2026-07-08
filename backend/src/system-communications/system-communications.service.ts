@@ -11,6 +11,7 @@ import { TwilioService } from '../twilio/twilio.service';
 import { EmailService } from '../email/email.service';
 import { PushNotificationService } from '../push-notification/push-notification.service';
 import { NotificationService } from '../notification/notification.service';
+import { StudentFilterService } from '../common/services/student-filter.service';
 import * as nodemailer from 'nodemailer';
 import { google } from 'googleapis';
 
@@ -26,6 +27,7 @@ export class SystemCommunicationsService {
     private emailService: EmailService,
     private pushNotificationService: PushNotificationService,
     private notificationService: NotificationService,
+    private studentFilter: StudentFilterService,
   ) {}
 
   // ===================== DASHBOARD =====================
@@ -1510,6 +1512,7 @@ export class SystemCommunicationsService {
       }
       case 'students': {
         return this.prisma.student.findMany({
+          where: this.studentFilter.communicationRecipientWhere(),
           select: { id: true, firstName: true, lastName: true },
         });
       }

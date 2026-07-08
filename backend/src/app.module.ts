@@ -88,6 +88,7 @@ import { StaffPositionModule } from './staff-position/staff-position.module';
 import { ContactModule } from './contact/contact.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { CommunicationsCloudModule } from './communications-cloud/communications-cloud.module';
+import { AdmissionNumberModule } from './admission-number/admission-number.module';
 import { HealthModule } from './common/health.module';
 import { ProductionLogger } from './common/production-logger';
 

@@ -34,6 +34,7 @@ export class InstitutionProvisioningService {
     await this.provisionAssessmentDefinitions(schoolId, institutionTypeCode);
     await this.provisionEducationLevels(schoolId, institutionTypeCode);
     await this.provisionSubjects(schoolId, institutionTypeCode);
+    await this.provisionAdmissionSequence(schoolId);
 
     this.logger.log(`Institution ${schoolId} provisioned successfully`);
     return { success: true, type: type.code, modules: type.modules.length };
@@ -529,5 +530,36 @@ export class InstitutionProvisioningService {
     }
 
     this.logger.log(`Provisioned ${levels.length} education levels for ${schoolId} (${institutionTypeCode})`);
+  }
+
+  private async provisionAdmissionSequence(schoolId: string) {
+    const currentAcademicYear = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+    });
+
+    if (!currentAcademicYear) {
+      this.logger.warn(`No current academic year found for school ${schoolId}, skipping admission sequence provisioning`);
+      return;
+    }
+
+    const existing = await this.prisma.admissionSequence.findUnique({
+      where: { schoolId_academicYearId: { schoolId, academicYearId: currentAcademicYear.id } },
+    });
+
+    if (existing) {
+      this.logger.log(`Admission sequence already exists for school ${schoolId}, skipping`);
+      return;
+    }
+
+    await this.prisma.admissionSequence.create({
+      data: {
+        schoolId,
+        academicYearId: currentAcademicYear.id,
+        year: currentAcademicYear.startDate.getFullYear(),
+        currentSequence: 0,
+      },
+    });
+
+    this.logger.log(`Admission sequence provisioned for school ${schoolId}`);
   }
 }

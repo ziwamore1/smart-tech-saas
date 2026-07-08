@@ -650,7 +650,7 @@ export const communicationApi = {
 export const enrollmentApi = {
   getByStudent: (studentId: string) => api.get(`/enrollments/student/${studentId}`),
   getByClass: (classId: string) => api.get(`/enrollments/class/${classId}`),
-  create: (data: { studentId: string; academicYearId: string; classId: string; termId?: string }) => api.post('/enrollments', data),
+  create: (data: { studentId: string; academicYearId: string; classId: string; termId?: string; streamId?: string }) => api.post('/enrollments', data),
   update: (id: string, data: any) => api.patch(`/enrollments/${id}`, data),
   delete: (id: string) => api.delete(`/enrollments/${id}`),
 };

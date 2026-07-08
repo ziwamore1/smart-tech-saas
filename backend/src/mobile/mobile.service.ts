@@ -2,6 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PushNotificationService } from '../push-notification/push-notification.service';
 import { AiTutorService } from '../intelligence/services/ai-tutor.service';
+import { StudentService } from '../student/student.service';
+import { AdmissionNumberService } from '../admission-number/admission-number.service';
+import { CreateStudentDto } from '../student/dto/create-student.dto';
 
 @Injectable()
 export class MobileService {
@@ -11,6 +14,8 @@ export class MobileService {
     private prisma: PrismaService,
     private pushNotificationService: PushNotificationService,
     private aiTutorService: AiTutorService,
+    private studentService: StudentService,
+    private admissionNumberService: AdmissionNumberService,
   ) {}
 
   async getDashboard(userId: string, schoolId: string, roles: string[]) {
@@ -838,6 +843,14 @@ export class MobileService {
     }));
   }
 
+  async getAcademicYears(schoolId: string) {
+    return this.prisma.academicYear.findMany({
+      where: { schoolId },
+      orderBy: { year: 'desc' },
+      select: { id: true, name: true, year: true, isCurrent: true },
+    });
+  }
+
   async getStudents(schoolId: string, classId?: string) {
     const currentAcademicYear = await this.prisma.academicYear.findFirst({
       where: { schoolId, isCurrent: true },
@@ -874,6 +887,44 @@ export class MobileService {
       class: s.enrollments[0]?.class?.name || 'Not assigned',
       classId: s.enrollments[0]?.class?.id || null,
     }));
+  }
+
+  async previewAdmission(
+    schoolId: string,
+    academicYearId?: string,
+  ) {
+    const yearId = academicYearId || (await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      select: { id: true },
+    }))?.id;
+    if (!yearId) return { admissionNumber: null };
+    return this.admissionNumberService.previewNextAdmission(schoolId, yearId);
+  }
+
+  async createStudent(
+    userId: string,
+    schoolId: string,
+    dto: {
+      firstName: string;
+      lastName: string;
+      admissionNumber?: string;
+      gender?: string;
+      dateOfBirth?: string;
+      email?: string;
+      phone?: string;
+      address?: string;
+      parentName?: string;
+      parentPhone?: string;
+      parentEmail?: string;
+      academicYearId?: string;
+      classId?: string;
+      manualOverride?: boolean;
+      status?: string;
+    },
+  ) {
+    const createDto = new CreateStudentDto();
+    Object.assign(createDto, dto);
+    return this.studentService.create(createDto, userId, schoolId);
   }
 
   async getStaff(schoolId: string) {

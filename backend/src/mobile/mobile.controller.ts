@@ -197,6 +197,12 @@ export class MobileController {
     return this.mobileService.askAiTutor(userId, schoolId, roles, body.question, body.subjectId, { ...body.context, fileUrls: body.fileUrls });
   }
 
+  @Get('academic-years')
+  async getAcademicYears(@Req() req: any) {
+    const { schoolId } = req.user;
+    return this.mobileService.getAcademicYears(schoolId);
+  }
+
   @Get('classes')
   async getClasses(@Req() req: any) {
     const { schoolId } = req.user;
@@ -207,6 +213,40 @@ export class MobileController {
   async getStudents(@Req() req: any, @Query('classId') classId?: string) {
     const { schoolId } = req.user;
     return this.mobileService.getStudents(schoolId, classId);
+  }
+
+  @Get('students/preview-admission')
+  async previewAdmission(
+    @Req() req: any,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    const { schoolId } = req.user;
+    return this.mobileService.previewAdmission(schoolId, academicYearId);
+  }
+
+  @Post('students')
+  async createStudent(
+    @Req() req: any,
+    @Body() body: {
+      firstName: string;
+      lastName: string;
+      admissionNumber?: string;
+      gender?: string;
+      dateOfBirth?: string;
+      email?: string;
+      phone?: string;
+      address?: string;
+      parentName?: string;
+      parentPhone?: string;
+      parentEmail?: string;
+      academicYearId?: string;
+      classId?: string;
+      manualOverride?: boolean;
+      status?: string;
+    },
+  ) {
+    const { id: userId, schoolId } = req.user;
+    return this.mobileService.createStudent(userId, schoolId, body);
   }
 
   @Get('staff')

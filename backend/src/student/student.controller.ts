@@ -8,6 +8,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
+import { AdmissionNumberService } from '../admission-number/admission-number.service';
 
 @Controller('student')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -15,18 +16,51 @@ export class StudentController {
   constructor(
     private readonly service: StudentService,
     private readonly cloudinary: CloudinaryService,
+    private readonly admissionNumberService: AdmissionNumberService,
   ) {}
+
+  @Get('preview-admission')
+  @Roles('Director', 'Teacher')
+  async previewAdmissionNumber(@Req() req: any, @Query('academicYearId') academicYearId?: string) {
+    const schoolId = req.user.schoolId;
+    const yearId = academicYearId || await this.service.getCurrentAcademicYearId(schoolId);
+    const preview = await this.admissionNumberService.previewNextAdmissionNumber(schoolId, yearId);
+    return { admissionNumber: preview };
+  }
 
   @Post()
   @Roles('Director', 'Teacher')
   create(@Body() dto: CreateStudentDto, @Req() req: any) {
-    return this.service.create(dto, req.user.schoolId);
+    return this.service.create(dto, req.user.schoolId, req.user.id, req.user.roles);
   }
 
   @Get()
   @Roles('Director', 'Teacher')
-  findAll(@Req() req: any, @Query('classId') classId?: string) {
-    return this.service.findAll(req.user.schoolId, classId);
+  findAll(
+    @Req() req: any,
+    @Query('classId') classId?: string,
+    @Query('status') status?: string,
+    @Query('includeInactive') includeInactive?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.service.findAll(req.user.schoolId, {
+      classId,
+      status,
+      includeInactive: includeInactive === 'true',
+      search,
+    });
+  }
+
+  @Get('search')
+  @Roles('Director', 'Teacher')
+  search(@Req() req: any, @Query('q') query: string) {
+    return this.service.comprehensiveSearch(query, req.user.schoolId);
+  }
+
+  @Get('admission/:admissionNumber')
+  @Roles('Director', 'Teacher')
+  findByAdmissionNumber(@Param('admissionNumber') admissionNumber: string, @Req() req: any) {
+    return this.service.findByAdmissionNumber(admissionNumber, req.user.schoolId);
   }
 
   @Get(':id')
@@ -38,14 +72,30 @@ export class StudentController {
   @Patch(':id')
   @Put(':id')
   @Roles('Director')
-  update(@Param('id') id: string, @Body() dto: UpdateStudentDto) {
-    return this.service.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateStudentDto, @Req() req: any) {
+    return this.service.update(id, dto, req.user.id, req.user.roles);
   }
 
   @Delete(':id')
   @Roles('Director')
   delete(@Param('id') id: string) {
     return this.service.delete(id);
+  }
+
+  @Post(':id/status')
+  @Roles('Director')
+  changeStatus(
+    @Param('id') id: string,
+    @Body() body: { status: string },
+    @Req() req: any,
+  ) {
+    return this.service.changeStatus(id, body.status as any, req.user.id);
+  }
+
+  @Get(':id/status-history')
+  @Roles('Director', 'Teacher')
+  getStatusHistory(@Param('id') id: string) {
+    return this.service.getStatusHistory(id);
   }
 
   @Post(':id/upload-photo')

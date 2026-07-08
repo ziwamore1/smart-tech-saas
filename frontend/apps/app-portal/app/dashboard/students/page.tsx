@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { studentApi, classApi, termApi, enrollmentApi, academicYearApi, parentApi, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -28,6 +28,7 @@ export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterClass, setFilterClass] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [includeInactive, setIncludeInactive] = useState(false);
   const [linkParentSearch, setLinkParentSearch] = useState('');
   const [selectedParentId, setSelectedParentId] = useState('');
 
@@ -73,10 +74,14 @@ export default function StudentsPage() {
   });
 
   const { data: studentsData, isLoading: studentsLoading, error: studentsError } = useQuery({
-    queryKey: ['students'],
+    queryKey: ['students', includeInactive, filterStatus, filterClass],
     queryFn: async () => {
       try {
-        const res = await api.get('/student');
+        const params: any = {};
+        if (includeInactive) params.includeInactive = 'true';
+        if (filterStatus) params.status = filterStatus;
+        if (filterClass) params.classId = filterClass;
+        const res = await api.get('/student', { params });
         console.log('Students API response:', res.data);
         console.log('Response status:', res.status);
         let data = res.data?.data || res.data?.students || res.data;
@@ -152,7 +157,28 @@ export default function StudentsPage() {
     parentName: '',
     parentPhone: '',
     parentEmail: '',
+    academicYearId: currentAcademicYear?.id || '',
+    classId: '',
+    manualOverride: false,
   });
+
+  const [admissionPreview, setAdmissionPreview] = useState('');
+
+  useEffect(() => {
+    if (showAddModal && currentAcademicYear) {
+      const fetchPreview = async () => {
+        try {
+          const res = await api.get('/student/preview-admission', {
+            params: { academicYearId: currentAcademicYear.id },
+          });
+          setAdmissionPreview(res.data?.admissionNumber || '');
+        } catch {
+          setAdmissionPreview('');
+        }
+      };
+      fetchPreview();
+    }
+  }, [showAddModal, currentAcademicYear]);
 
   const [enrollmentForm, setEnrollmentForm] = useState({
     classId: '',
@@ -174,13 +200,15 @@ export default function StudentsPage() {
     parentEmail: '',
   });
 
+  const [formMessage, setFormMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const createStudentMutation = useMutation({
     mutationFn: (data: any) => studentApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
-      setShowAddModal(false);
-      setMessage({ type: 'success', text: 'Student registered successfully! Login credentials have been sent.' });
+      setFormMessage({ type: 'success', text: 'Student registered successfully! Login credentials have been sent.' });
+      setTimeout(() => setFormMessage(null), 4000);
       setStudentForm({
         firstName: '',
         lastName: '',
@@ -193,11 +221,16 @@ export default function StudentsPage() {
         parentName: '',
         parentPhone: '',
         parentEmail: '',
+        academicYearId: currentAcademicYear?.id || '',
+        classId: '',
+        manualOverride: false,
       });
+      setAdmissionPreview('');
     },
     onError: (error: any) => {
       console.error('Failed to create student:', error);
-      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to register student. Please try again.' });
+      setFormMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to register student. Please try again.' });
+      setTimeout(() => setFormMessage(null), 6000);
     },
   });
 
@@ -249,6 +282,13 @@ export default function StudentsPage() {
 
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => setMessage(null), message.type === 'success' ? 3000 : 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
   const students = Array.isArray(studentsData) ? studentsData : [];
   const totalStudents = students.length;
 
@@ -257,16 +297,12 @@ export default function StudentsPage() {
   }
 
   const filteredStudents = students.filter((student: any) => {
-    if (filterClass) console.log('Student:', student.firstName, 'Enrollments:', JSON.stringify(student.enrollments));
     const matchesSearch = searchTerm === '' ||
       student.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.admissionNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesClass = filterClass === '' || student.enrollments?.some((e: any) => e.classId === filterClass && e.status?.toUpperCase() === 'ACTIVE');
-    const matchesStatus = filterStatus === '' || student.status === filterStatus;
-    
-    return matchesSearch && matchesClass && matchesStatus;
+    return matchesSearch;
   });
 
   return (
@@ -334,9 +370,24 @@ export default function StudentsPage() {
               <option value="">All Status</option>
               <option value="ACTIVE">Active</option>
               <option value="INACTIVE">Inactive</option>
+              <option value="TRANSFERRED">Transferred</option>
               <option value="GRADUATED">Graduated</option>
+              <option value="WITHDRAWN">Withdrawn</option>
               <option value="SUSPENDED">Suspended</option>
+              <option value="DECEASED">Deceased</option>
             </select>
+          </div>
+
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeInactive}
+                onChange={(e) => setIncludeInactive(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-600">Include Inactive Students</span>
+            </label>
           </div>
 
           <div className="flex items-end">
@@ -421,7 +472,11 @@ export default function StudentsPage() {
                       <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
                         student.status === 'ACTIVE' ? 'bg-green-100 text-green-700 border-green-200' :
                         student.status === 'INACTIVE' ? 'bg-gray-100 text-gray-600 border-gray-200' :
+                        student.status === 'TRANSFERRED' ? 'bg-purple-100 text-purple-700 border-purple-200' :
                         student.status === 'GRADUATED' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                        student.status === 'WITHDRAWN' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                        student.status === 'SUSPENDED' ? 'bg-red-100 text-red-700 border-red-200' :
+                        student.status === 'DECEASED' ? 'bg-gray-200 text-gray-800 border-gray-300' :
                         'bg-red-100 text-red-700 border-red-200'
                       }`}>
                         {student.status || 'ACTIVE'}
@@ -497,6 +552,16 @@ export default function StudentsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-6">Add New Student</h2>
+
+            {formMessage && (
+              <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${
+                formMessage.type === 'success'
+                  ? 'bg-green-50 text-green-800 border border-green-200'
+                  : 'bg-red-50 text-red-800 border border-red-200'
+              }`}>
+                {formMessage.text}
+              </div>
+            )}
             
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -528,15 +593,43 @@ export default function StudentsPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Admission Number *
+                    Admission Number
                   </label>
-                  <input
-                    type="text"
-                    value={studentForm.admissionNumber}
-                    onChange={(e) => setStudentForm({ ...studentForm, admissionNumber: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    required
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={studentForm.manualOverride ? studentForm.admissionNumber : admissionPreview}
+                      onChange={(e) => setStudentForm({ ...studentForm, admissionNumber: e.target.value })}
+                      readOnly={!studentForm.manualOverride}
+                      className={`w-full px-3 py-2 border rounded-lg font-mono ${
+                        studentForm.manualOverride ? 'bg-white' : 'bg-gray-50'
+                      }`}
+                      placeholder={admissionPreview || 'Auto-generated'}
+                    />
+                    {(user?.roles?.includes('Director') || user?.roles?.includes('SuperAdmin')) && (
+                      <button
+                        type="button"
+                        onClick={() => setStudentForm({ ...studentForm, manualOverride: !studentForm.manualOverride, admissionNumber: '' })}
+                        className={`px-3 py-2 rounded-lg text-sm whitespace-nowrap border ${
+                          studentForm.manualOverride
+                            ? 'bg-amber-100 text-amber-700 border-amber-300'
+                            : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                        }`}
+                      >
+                        {studentForm.manualOverride ? 'Auto' : 'Override'}
+                      </button>
+                    )}
+                  </div>
+                  {!studentForm.manualOverride && admissionPreview && (
+                    <p className="text-xs text-green-600 mt-1">
+                      ✓ Auto-generated: {admissionPreview}
+                    </p>
+                  )}
+                  {studentForm.manualOverride && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      ⚠ Manual override: enter a unique admission number
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -604,6 +697,43 @@ export default function StudentsPage() {
               </div>
 
               <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold mb-4">Enrollment Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Academic Year
+                    </label>
+                    <select
+                      value={studentForm.academicYearId}
+                      onChange={(e) => setStudentForm({ ...studentForm, academicYearId: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    >
+                      {academicYears.map((year: any) => (
+                        <option key={year.id} value={year.id}>
+                          {year.name} {year.isCurrent ? '(Current)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Class
+                    </label>
+                    <select
+                      value={studentForm.classId}
+                      onChange={(e) => setStudentForm({ ...studentForm, classId: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    >
+                      <option value="">Select Class (Optional)</option>
+                      {(classes || []).map((cls: any) => (
+                        <option key={cls.id} value={cls.id}>{cls.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
                 <h3 className="text-lg font-semibold mb-4">Parent/Guardian Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
@@ -653,7 +783,7 @@ export default function StudentsPage() {
                 </button>
                 <button
                   onClick={() => createStudentMutation.mutate(studentForm)}
-                  disabled={!studentForm.firstName || !studentForm.lastName || !studentForm.admissionNumber}
+                  disabled={!studentForm.firstName || !studentForm.lastName || (studentForm.manualOverride && !studentForm.admissionNumber)}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
                 >
                   {createStudentMutation.isPending ? 'Creating...' : 'Create Student'}

@@ -11,6 +11,7 @@ import { DirectorReportsScreen } from '../screens/director/ReportsScreen';
 import { DirectorSettingsScreen } from '../screens/director/SettingsScreen';
 import { DirectorClassesScreen } from '../screens/director/ClassesScreen';
 import { DirectorStudentsScreen } from '../screens/director/StudentsScreen';
+import { RegisterStudentScreen } from '../screens/registration/RegisterStudentScreen';
 import { DirectorLibraryScreen } from '../screens/director/LibraryScreen';
 import { DirectorTimetableScreen } from '../screens/director/TimetableScreen';
 import { DirectorCommunicationScreen } from '../screens/director/CommunicationScreen';
@@ -42,6 +43,7 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'DirectorHome', label: 'Dashboard', icon: '🏠', component: DirectorDashboardScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
   { name: 'DirectorClasses', label: 'Classes', icon: '🏫', component: DirectorClassesScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorStudents', label: 'Students', icon: '👨‍🎓', component: DirectorStudentsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'], requiredPermission: 'students.manage' },
+  { name: 'DirectorRegister', label: 'Register Student', icon: '➕', component: RegisterStudentScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorStaff', label: 'Staff', icon: '👥', component: DirectorStaffScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'], requiredPermission: 'staff.manage' },
   { name: 'DirectorMonitoring', label: 'Departments', icon: '🏛️', component: MonitoringDashboardScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorLibrary', label: 'Library', icon: '📚', component: DirectorLibraryScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },

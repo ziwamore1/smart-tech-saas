@@ -442,6 +442,11 @@ class ApiService {
     return response.data;
   }
 
+  async getAcademicYears() {
+    const response = await this.client.get('/mobile/academic-years');
+    return response.data;
+  }
+
   async getClasses() {
     const response = await this.client.get('/mobile/classes');
     return response.data;
@@ -450,6 +455,33 @@ class ApiService {
   async getStudents(classId?: string) {
     const params = classId ? { classId } : {};
     const response = await this.client.get('/mobile/students', { params });
+    return response.data;
+  }
+
+  async previewAdmission(academicYearId?: string) {
+    const params = academicYearId ? { academicYearId } : {};
+    const response = await this.client.get('/mobile/students/preview-admission', { params });
+    return response.data;
+  }
+
+  async createStudent(data: {
+    firstName: string;
+    lastName: string;
+    admissionNumber?: string;
+    gender?: string;
+    dateOfBirth?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    parentName?: string;
+    parentPhone?: string;
+    parentEmail?: string;
+    academicYearId?: string;
+    classId?: string;
+    manualOverride?: boolean;
+    status?: string;
+  }) {
+    const response = await this.client.post('/mobile/students', data);
     return response.data;
   }
 

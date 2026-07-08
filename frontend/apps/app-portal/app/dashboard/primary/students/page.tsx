@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { studentApi, classApi, enrollmentApi, academicYearApi, termApi } from '@/lib/api';
+import { studentApi, classApi, enrollmentApi, academicYearApi, termApi, api } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 import { Student } from '@/types/student';
 
 const INTAKE_TYPES = [
@@ -16,10 +17,15 @@ const INTAKE_TYPES = [
 const GRADE_OPTIONS = ['Pre', '1', '2', '3', '4', '5', '6', '7'];
 
 export default function PrimaryStudentsPage() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'all' | 'admission' | 'pre-school' | 'grade1' | 'transfer'>('all');
   const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
   const [registerError, setRegisterError] = useState('');
+  const [registerSuccess, setRegisterSuccess] = useState('');
+  const [admissionPreview, setAdmissionPreview] = useState('');
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -35,6 +41,8 @@ export default function PrimaryStudentsPage() {
     guardianName: '',
     guardianPhone: '',
     guardianEmail: '',
+    manualOverride: false,
+    status: 'ACTIVE',
   });
 
   const { data: students, isLoading } = useQuery({
@@ -62,16 +70,48 @@ export default function PrimaryStudentsPage() {
   const termList = Array.isArray(terms) ? terms : [];
   const currentAcademicYear = academicYearList.find((y: any) => y.isCurrent);
 
-  const toCreateStudentDto = (form: any) => ({
-    firstName: form.firstName,
-    lastName: form.lastName,
-    admissionNumber: form.admissionNumber,
-    dateOfBirth: form.dateOfBirth || undefined,
-    gender: form.gender || undefined,
-    parentName: form.guardianName || undefined,
-    parentPhone: form.guardianPhone || undefined,
-    parentEmail: form.guardianEmail || undefined,
-  });
+  useEffect(() => {
+    if (showRegisterForm && currentAcademicYear) {
+      const fetchPreview = async () => {
+        try {
+          const yearId = formData.academicYearId || currentAcademicYear.id;
+          const res = await api.get('/student/preview-admission', {
+            params: { academicYearId: yearId },
+          });
+          setAdmissionPreview(res.data?.admissionNumber || '');
+        } catch {
+          setAdmissionPreview('');
+        }
+      };
+      fetchPreview();
+    }
+  }, [showRegisterForm, currentAcademicYear, formData.academicYearId]);
+
+  const toCreateStudentDto = (form: any) => {
+    const dto: any = {
+      firstName: form.firstName,
+      lastName: form.lastName,
+      dateOfBirth: form.dateOfBirth || undefined,
+      gender: form.gender || undefined,
+      status: 'ACTIVE',
+    };
+
+    if (form.manualOverride && form.admissionNumber) {
+      dto.admissionNumber = form.admissionNumber;
+      dto.manualOverride = true;
+    }
+
+    dto.academicYearId = form.academicYearId || currentAcademicYear?.id;
+    dto.classId = form.classId || undefined;
+
+    if (form.guardianName || form.guardianPhone || form.guardianEmail) {
+      dto.parentName = form.guardianName || undefined;
+      dto.parentPhone = form.guardianPhone || undefined;
+      dto.parentEmail = form.guardianEmail || undefined;
+    }
+
+    return dto;
+  };
 
   const registerMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -82,7 +122,6 @@ export default function PrimaryStudentsPage() {
         studentRes = await studentApi.create(toCreateStudentDto(data));
         studentId = studentRes.data?.data?.id || studentRes.data?.id || studentRes?.id;
       } catch (err: any) {
-        // Student may have been created on the backend even if parent/credential delivery failed
         studentId = err?.response?.data?.data?.id || err?.response?.data?.id;
         if (!studentId) throw err;
       }
@@ -103,16 +142,24 @@ export default function PrimaryStudentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['primary-students'] });
       queryClient.invalidateQueries({ queryKey: ['students'] });
-      setShowRegisterForm(false);
+      setRegisterSuccess('Pupil registered successfully! You can now register another pupil.');
+      setTimeout(() => setRegisterSuccess(''), 4000);
       setFormData({
         firstName: '', lastName: '', admissionNumber: '', dateOfBirth: '', gender: '',
-        intakeType: 'grade1', grade: '1', classId: '', academicYearId: '', termId: '', previousSchool: '',
-        guardianName: '', guardianPhone: '', guardianEmail: '',
+        intakeType: 'grade1', grade: '1', classId: '', academicYearId: '', termId: '',
+        previousSchool: '', guardianName: '', guardianPhone: '', guardianEmail: '',
+        manualOverride: false, status: 'ACTIVE',
       });
+      setAdmissionPreview('');
       setRegisterError('');
     },
     onError: (err: any) => {
-      setRegisterError(err?.response?.data?.message || err?.response?.data?.error || 'Registration failed. Check required fields and try again.');
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        'Registration failed. Check required fields and try again.';
+      setRegisterError(msg);
+      setTimeout(() => setRegisterError(''), 6000);
     },
   });
 
@@ -124,6 +171,8 @@ export default function PrimaryStudentsPage() {
     if (activeTab === 'admission') return !s.transferIn && !s.previousSchool && !(s.grade || '').toLowerCase().includes('pre') && !(s.grade || '').includes('1');
     return true;
   });
+
+  const canOverride = user?.roles?.includes('Director') || user?.roles?.includes('SuperAdmin');
 
   return (
     <div className="space-y-6">
@@ -186,6 +235,7 @@ export default function PrimaryStudentsPage() {
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Admission #</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Grade</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Gender</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">DOB</th>
@@ -204,16 +254,26 @@ export default function PrimaryStudentsPage() {
                         <span className="font-medium text-gray-900">{student.firstName} {student.lastName}</span>
                       </div>
                     </td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                      {student.admissionNumber || '—'}
+                    </td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">
                         {student.className || student.grade || '—'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-600">{student.gender || '—'}</td>
-                    <td className="px-4 py-3 text-gray-500 text-sm">{student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : '—'}</td>
+                    <td className="px-4 py-3 text-gray-500 text-sm">
+                      {student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : '—'}
+                    </td>
                     <td className="px-4 py-3 text-gray-500 text-sm">{student.guardianName || '—'}</td>
                     <td className="px-4 py-3 text-right">
-                      <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">View</button>
+                      <button
+                        onClick={() => { setViewingStudent(student); setShowViewModal(true); }}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium cursor-pointer"
+                      >
+                        View
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -248,6 +308,76 @@ export default function PrimaryStudentsPage() {
         ))}
       </div>
 
+      {/* View Modal */}
+      {showViewModal && viewingStudent && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowViewModal(false)}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-gray-900">Pupil Details</h2>
+              <button onClick={() => setShowViewModal(false)} className="text-gray-400 hover:text-gray-600">
+                <i className="fas fa-times" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 text-lg font-bold">
+                  {viewingStudent.firstName?.[0]}{viewingStudent.lastName?.[0]}
+                </div>
+                <div>
+                  <p className="text-lg font-semibold text-gray-900">{viewingStudent.firstName} {viewingStudent.lastName}</p>
+                  <p className="text-sm font-mono text-gray-500">{viewingStudent.admissionNumber || '—'}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-500">Gender</span>
+                  <p className="font-medium text-gray-900">{viewingStudent.gender || '—'}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Date of Birth</span>
+                  <p className="font-medium text-gray-900">
+                    {viewingStudent.dateOfBirth ? new Date(viewingStudent.dateOfBirth).toLocaleDateString() : '—'}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Grade / Class</span>
+                  <p className="font-medium text-gray-900">{viewingStudent.className || viewingStudent.grade || '—'}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Status</span>
+                  <p className="font-medium text-gray-900">Active</p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-gray-500">Guardian</span>
+                  <p className="font-medium text-gray-900">{viewingStudent.guardianName || 'Not provided'}</p>
+                </div>
+                {viewingStudent.guardianPhone && (
+                  <div>
+                    <span className="text-gray-500">Guardian Phone</span>
+                    <p className="font-medium text-gray-900">{viewingStudent.guardianPhone}</p>
+                  </div>
+                )}
+                {viewingStudent.guardianEmail && (
+                  <div>
+                    <span className="text-gray-500">Guardian Email</span>
+                    <p className="font-medium text-gray-900">{viewingStudent.guardianEmail}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setShowViewModal(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Register Form Modal */}
       {showRegisterForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowRegisterForm(false)}>
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -258,6 +388,12 @@ export default function PrimaryStudentsPage() {
               </button>
             </div>
             <div className="p-6 space-y-4">
+              {registerSuccess && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-start gap-2">
+                  <i className="fas fa-check-circle mt-0.5" />
+                  <span>{registerSuccess}</span>
+                </div>
+              )}
               {registerError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
                   <i className="fas fa-exclamation-circle mt-0.5" />
@@ -284,13 +420,45 @@ export default function PrimaryStudentsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Admission # *</label>
-                  <input
-                    type="text" value={formData.admissionNumber}
-                    onChange={e => setFormData(p => ({ ...p, admissionNumber: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                    placeholder="e.g. ST-2024-001"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Admission #
+                    {formData.manualOverride && ' *'}
+                  </label>
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      value={formData.manualOverride ? formData.admissionNumber : admissionPreview}
+                      onChange={e => setFormData(p => ({ ...p, admissionNumber: e.target.value }))}
+                      readOnly={!formData.manualOverride}
+                      className={`w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono ${
+                        formData.manualOverride ? 'bg-white' : 'bg-gray-50'
+                      }`}
+                      placeholder={admissionPreview || 'Auto-generated'}
+                    />
+                    {canOverride && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData(p => ({ ...p, manualOverride: !p.manualOverride, admissionNumber: '' }))}
+                        className={`px-2 py-2 rounded-lg text-xs whitespace-nowrap border ${
+                          formData.manualOverride
+                            ? 'bg-amber-100 text-amber-700 border-amber-300'
+                            : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                        }`}
+                      >
+                        {formData.manualOverride ? 'Auto' : 'Override'}
+                      </button>
+                    )}
+                  </div>
+                  {!formData.manualOverride && admissionPreview && (
+                    <p className="text-xs text-green-600 mt-1">
+                      Auto-generated: {admissionPreview}
+                    </p>
+                  )}
+                  {formData.manualOverride && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      Manual override: enter unique number
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -392,7 +560,10 @@ export default function PrimaryStudentsPage() {
                 </div>
               )}
               <div className="border-t border-gray-100 pt-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Guardian Information</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                  Guardian Information
+                  <span className="text-xs font-normal text-gray-400 ml-2">(optional — can be added later)</span>
+                </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Guardian Name</label>
@@ -433,7 +604,8 @@ export default function PrimaryStudentsPage() {
               </button>
               <button
                 onClick={() => {
-                  if (!formData.firstName || !formData.lastName || !formData.admissionNumber) return;
+                  if (!formData.firstName || !formData.lastName) return;
+                  if (formData.manualOverride && !formData.admissionNumber) return;
                   setRegisterError('');
                   registerMutation.mutate(formData);
                 }}

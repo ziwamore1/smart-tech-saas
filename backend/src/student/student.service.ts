@@ -2,10 +2,11 @@ import { Injectable, NotFoundException, ForbiddenException, ConflictException, L
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
-import { Prisma, EnrollmentStatus } from '@prisma/client';
+import { Prisma, EnrollmentStatus, StudentStatus } from '@prisma/client';
 import { PasswordGenerationService } from '../identity-service/password-generation.service';
 import { UsernameGenerationService } from '../identity-service/username-generation.service';
 import { CredentialDeliveryService } from '../identity-service/credential-delivery.service';
+import { AdmissionNumberService } from '../admission-number/admission-number.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -17,20 +18,50 @@ export class StudentService {
     private passwordGenService: PasswordGenerationService,
     private usernameGenService: UsernameGenerationService,
     private credentialDeliveryService: CredentialDeliveryService,
+    private admissionNumberService: AdmissionNumberService,
   ) {}
 
-  async create(dto: CreateStudentDto, schoolId: string) {
-    const allowedFields = ['firstName', 'lastName', 'admissionNumber', 'dateOfBirth', 'gender'];
-    const data: any = {};
-    for (const key of allowedFields) {
-      if (dto[key]) data[key] = dto[key];
-    }
-    data.schoolId = schoolId;
-    if (dto.dateOfBirth) {
-      data.dateOfBirth = new Date(dto.dateOfBirth);
+  async create(dto: CreateStudentDto, schoolId: string, userId: string, userRoles: string[]) {
+    const academicYearId = dto.academicYearId || await this.getCurrentAcademicYearId(schoolId);
+
+    let admissionNumber = dto.admissionNumber;
+
+    if (dto.manualOverride) {
+      if (!this.canOverrideAdmission(userRoles)) {
+        throw new ForbiddenException('Only Directors and SuperAdmin may manually override admission numbers');
+      }
+      if (!admissionNumber) {
+        throw new Error('admissionNumber is required when manualOverride is true');
+      }
+      await this.admissionNumberService.setManualAdmissionNumber(schoolId, academicYearId, admissionNumber);
+    } else {
+      admissionNumber = await this.admissionNumberService.getNextAdmissionNumber(schoolId, academicYearId);
     }
 
-    const student = await this.prisma.student.create({ data });
+    const student = await this.prisma.student.create({
+      data: {
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        admissionNumber,
+        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
+        gender: dto.gender,
+        status: (dto.status as StudentStatus) || StudentStatus.ACTIVE,
+        schoolId,
+      },
+    });
+
+    await this.createAuditLog(userId, schoolId, 'ADMISSION_GENERATED', 'Student', student.id, {
+      admissionNumber,
+      method: dto.manualOverride ? 'MANUAL_OVERRIDE' : 'AUTO_GENERATED',
+    });
+
+    if (dto.classId) {
+      try {
+        await this.enroll(student.id, academicYearId, dto.classId, schoolId);
+      } catch (err) {
+        this.logger.warn(`Auto-enrollment failed for student ${student.id}: ${err.message}`);
+      }
+    }
 
     const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -100,6 +131,19 @@ export class StudentService {
     };
   }
 
+  private canOverrideAdmission(roles: string[]): boolean {
+    const overrideRoles = ['Director', 'SuperAdmin'];
+    return roles.some(role => overrideRoles.includes(role));
+  }
+
+  async getCurrentAcademicYearId(schoolId: string): Promise<string> {
+    const year = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+    });
+    if (!year) throw new NotFoundException('No current academic year found for this school');
+    return year.id;
+  }
+
   private async createParentWithCredentials(
     info: {
       parentName?: string;
@@ -132,7 +176,6 @@ export class StudentService {
           create: { parentId: existingParent.id, studentId },
           update: {},
         });
-        // Send bundled credentials to existing parent
         this.credentialDeliveryService.deliverBundledCredentials({
           parentUserId: existingParentUser.id,
           studentUserId: studentId,
@@ -150,7 +193,6 @@ export class StudentService {
         }).catch(err => this.logger.error(`Failed to send bundled credentials to existing parent: ${err.message}`));
         return;
       }
-      // User exists but no Parent record — re-use the user and create Parent record
       const parentRole = await this.prisma.role.findFirst({ where: { name: 'Parent' } });
       if (parentRole) {
         await this.prisma.userRole.upsert({
@@ -170,7 +212,6 @@ export class StudentService {
           children: { create: { studentId } },
         },
       });
-      // Send bundled credentials to the newly created parent record
       this.credentialDeliveryService.deliverBundledCredentials({
         parentUserId: existingParentUser.id,
         studentUserId: studentId,
@@ -328,6 +369,10 @@ export class StudentService {
     });
   }
 
+  async linkStudentToParent(studentId: string, parentId: string) {
+    return this.linkStudentToParentWithCredentials(studentId, parentId);
+  }
+
   async linkStudentToParentWithCredentials(studentId: string, parentId: string) {
     const student = await this.prisma.student.findUnique({ where: { id: studentId } });
     if (!student) throw new NotFoundException('Student not found');
@@ -351,24 +396,54 @@ export class StudentService {
     return { message: 'Student unlinked from parent successfully' };
   }
 
-  async findAll(schoolId: string, classId?: string) {
+  async findAll(
+    schoolId: string,
+    options?: {
+      classId?: string;
+      status?: string;
+      includeInactive?: boolean;
+      search?: string;
+    },
+  ) {
     const where: Prisma.StudentWhereInput = { schoolId };
-    if (classId) {
+
+    if (!options?.includeInactive) {
+      where.status = StudentStatus.ACTIVE;
+    } else if (options?.status) {
+      where.status = options.status as StudentStatus;
+    }
+
+    if (options?.classId) {
       where.enrollments = {
         some: {
-          classId,
-          status: EnrollmentStatus.ACTIVE,
+          classId: options.classId,
+          ...(options.includeInactive ? {} : { status: EnrollmentStatus.ACTIVE }),
         },
       };
     }
+
+    if (options?.search) {
+      const search = options.search;
+      where.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { admissionNumber: { contains: search, mode: 'insensitive' } },
+        { studentUuid: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
     return this.prisma.student.findMany({
       where,
       include: {
         enrollments: {
-          where: { status: EnrollmentStatus.ACTIVE },
-          include: { class: true },
+          include: { class: true, academicYear: true },
+          orderBy: { academicYear: { startDate: 'desc' } },
+        },
+        parents: {
+          include: { parent: true },
         },
       },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -378,6 +453,13 @@ export class StudentService {
       include: {
         enrollments: {
           include: { class: true, academicYear: true },
+          orderBy: { academicYear: { startDate: 'desc' } },
+        },
+        parents: {
+          include: { parent: true },
+        },
+        user: {
+          select: { username: true, email: true },
         },
       },
     });
@@ -385,21 +467,132 @@ export class StudentService {
     return student;
   }
 
-  async update(id: string, dto: UpdateStudentDto) {
+  async findByAdmissionNumber(admissionNumber: string, schoolId: string) {
+    const student = await this.prisma.student.findUnique({
+      where: { admissionNumber_schoolId: { admissionNumber, schoolId } },
+      include: {
+        enrollments: {
+          include: { class: true, academicYear: true },
+          orderBy: { academicYear: { startDate: 'desc' } },
+        },
+        parents: {
+          include: { parent: true },
+        },
+        results: {
+          include: { subject: true, term: true },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        },
+        attendances: {
+          orderBy: { date: 'desc' },
+          take: 50,
+        },
+        FeePayment: {
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        },
+      },
+    });
+    if (!student) throw new NotFoundException('Student not found');
+    return student;
+  }
+
+  async comprehensiveSearch(query: string, schoolId: string) {
+    const students = await this.prisma.student.findMany({
+      where: {
+        schoolId,
+        OR: [
+          { admissionNumber: { contains: query, mode: 'insensitive' } },
+          { studentUuid: { contains: query, mode: 'insensitive' } },
+          { firstName: { contains: query, mode: 'insensitive' } },
+          { lastName: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+      include: {
+        enrollments: {
+          include: { class: true, academicYear: true },
+          orderBy: { academicYear: { startDate: 'desc' } },
+        },
+        parents: {
+          include: { parent: true },
+        },
+        user: {
+          select: { username: true, email: true },
+        },
+        results: {
+          include: { subject: true, term: true },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        },
+        attendances: {
+          orderBy: { date: 'desc' },
+          take: 10,
+        },
+        FeePayment: {
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        },
+      },
+    });
+
+    return students;
+  }
+
+  async update(id: string, dto: UpdateStudentDto, userId: string, userRoles: string[]) {
     const student = await this.prisma.student.findUnique({ where: { id } });
     if (!student) throw new NotFoundException('Student not found');
-    const allowedFields = ['firstName', 'lastName', 'admissionNumber', 'dateOfBirth', 'gender', 'photoUrl'];
+
+    if (dto.admissionNumber && dto.admissionNumber !== student.admissionNumber) {
+      if (!this.canOverrideAdmission(userRoles)) {
+        throw new ForbiddenException('Only Directors and SuperAdmin may change admission numbers');
+      }
+      const valid = await this.admissionNumberService.validateAdmissionNumber(
+        student.schoolId, dto.admissionNumber,
+      );
+      if (!valid) {
+        throw new ConflictException(`Admission number ${dto.admissionNumber} already exists in this school`);
+      }
+    }
+
+    const allowedFields = ['firstName', 'lastName', 'dateOfBirth', 'gender', 'photoUrl'];
     const data: any = {};
+
+    if (dto.admissionNumber && this.canOverrideAdmission(userRoles)) {
+      data.admissionNumber = dto.admissionNumber;
+    }
+
+    if (dto.status) {
+      data.status = dto.status as StudentStatus;
+    }
+
     for (const key of allowedFields) {
       if (dto[key]) data[key] = dto[key];
     }
     if (dto.dateOfBirth) {
       data.dateOfBirth = new Date(dto.dateOfBirth);
     }
-    return this.prisma.student.update({
+
+    const updated = await this.prisma.student.update({
       where: { id },
       data,
     });
+
+    if (dto.admissionNumber && dto.admissionNumber !== student.admissionNumber) {
+      await this.createAuditLog(userId, student.schoolId, 'ADMISSION_OVERRIDDEN', 'Student', student.id, {
+        oldAdmissionNumber: student.admissionNumber,
+        newAdmissionNumber: dto.admissionNumber,
+        overriddenBy: userId,
+      });
+    }
+
+    if (dto.status && dto.status !== student.status) {
+      await this.createAuditLog(userId, student.schoolId, 'STATUS_CHANGED', 'Student', student.id, {
+        oldStatus: student.status,
+        newStatus: dto.status,
+      });
+    }
+
+    return updated;
   }
 
   async uploadPhoto(id: string, photoUrl: string, photoPublicId: string, schoolId: string): Promise<string | null> {
@@ -421,7 +614,7 @@ export class StudentService {
       await this.prisma.student.delete({ where: { id } });
       return { message: 'Student deleted successfully' };
     } catch (error: any) {
-      console.error('Delete student error:', error);
+      this.logger.error('Delete student error:', error);
       if (error.code === 'P2003' || error.code === 'P2014') {
         throw new ConflictException('Cannot delete student - it has related records like enrollments, results, or attendance. Please remove related data first.');
       }
@@ -439,7 +632,7 @@ export class StudentService {
     });
     if (existing) throw new ForbiddenException('Student already enrolled in this academic year');
 
-    return this.prisma.enrollment.create({
+    const enrollment = await this.prisma.enrollment.create({
       data: {
         studentId,
         academicYearId,
@@ -448,6 +641,15 @@ export class StudentService {
         status: EnrollmentStatus.ACTIVE,
       },
     });
+
+    if (student.status !== StudentStatus.ACTIVE) {
+      await this.prisma.student.update({
+        where: { id: studentId },
+        data: { status: StudentStatus.ACTIVE },
+      });
+    }
+
+    return enrollment;
   }
 
   async promoteStudent(fromAcademicYearId: string, toAcademicYearId: string, schoolId: string) {
@@ -462,6 +664,11 @@ export class StudentService {
 
     const promotions = [];
     for (const enrollment of enrollments) {
+      const existing = await this.prisma.enrollment.findFirst({
+        where: { studentId: enrollment.studentId, academicYearId: toAcademicYearId },
+      });
+      if (existing) continue;
+
       const newEnrollment = await this.prisma.enrollment.create({
         data: {
           studentId: enrollment.studentId,
@@ -474,5 +681,70 @@ export class StudentService {
       promotions.push(newEnrollment);
     }
     return promotions;
+  }
+
+  async changeStatus(studentId: string, newStatus: StudentStatus, userId: string) {
+    const student = await this.prisma.student.findUnique({ where: { id: studentId } });
+    if (!student) throw new NotFoundException('Student not found');
+
+    const oldStatus = student.status;
+
+    const updated = await this.prisma.student.update({
+      where: { id: studentId },
+      data: { status: newStatus },
+    });
+
+    if (newStatus === StudentStatus.TRANSFERRED || newStatus === StudentStatus.WITHDRAWN || newStatus === StudentStatus.GRADUATED) {
+      await this.prisma.enrollment.updateMany({
+        where: { studentId, status: EnrollmentStatus.ACTIVE },
+        data: { status: EnrollmentStatus.INACTIVE },
+      });
+    }
+
+    if (oldStatus !== newStatus) {
+      await this.createAuditLog(userId, student.schoolId, 'STATUS_CHANGED', 'Student', student.id, {
+        oldStatus,
+        newStatus,
+        changedBy: userId,
+      });
+    }
+
+    return updated;
+  }
+
+  async getStatusHistory(studentId: string) {
+    const student = await this.prisma.student.findUnique({ where: { id: studentId } });
+    if (!student) throw new NotFoundException('Student not found');
+
+    const logs = await this.prisma.auditLog.findMany({
+      where: {
+        recordId: studentId,
+        model: 'Student',
+        action: { in: ['STATUS_CHANGED', 'ADMISSION_GENERATED', 'ADMISSION_OVERRIDDEN'] },
+      },
+      include: {
+        user: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return logs;
+  }
+
+  private async createAuditLog(
+    userId: string,
+    schoolId: string,
+    action: string,
+    model: string,
+    recordId: string,
+    changes?: any,
+  ) {
+    try {
+      await this.prisma.auditLog.create({
+        data: { userId, schoolId, action, model, recordId, changes },
+      });
+    } catch (error) {
+      this.logger.error(`Failed to create audit log: ${error.message}`);
+    }
   }
 }
