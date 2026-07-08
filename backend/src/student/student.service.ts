@@ -408,7 +408,14 @@ export class StudentService {
     const where: Prisma.StudentWhereInput = { schoolId };
 
     if (!options?.includeInactive) {
-      where.status = StudentStatus.ACTIVE;
+      where.AND = [
+        {
+          OR: [
+            { status: StudentStatus.ACTIVE },
+            { status: null },
+          ],
+        },
+      ];
     } else if (options?.status) {
       where.status = options.status as StudentStatus;
     }
