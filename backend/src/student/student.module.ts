@@ -10,5 +10,6 @@ import { AdmissionNumberModule } from '../admission-number/admission-number.modu
   imports: [PrismaModule, EnrollmentModule, IdentityModule, AdmissionNumberModule],
   controllers: [StudentController],
   providers: [StudentService],
+  exports: [StudentService],
 })
 export class StudentModule {}
