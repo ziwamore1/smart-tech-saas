@@ -447,6 +447,46 @@ class ApiService {
     return response.data;
   }
 
+  async createAcademicYear(data: { name: string; startDate: string; endDate: string }) {
+    const response = await this.client.post('/academic-year', data);
+    return response.data;
+  }
+
+  async updateAcademicYear(id: string, data: Partial<{ name: string; startDate: string; endDate: string; isCurrent: boolean }>) {
+    const response = await this.client.patch(`/academic-year/${id}`, data);
+    return response.data;
+  }
+
+  async deleteAcademicYear(id: string) {
+    const response = await this.client.delete(`/academic-year/${id}`);
+    return response.data;
+  }
+
+  async getTerms(academicYearId: string) {
+    const response = await this.client.get(`/term/academic-year/${academicYearId}`);
+    return response.data;
+  }
+
+  async createTerm(data: { name: string; academicYearId: string; startDate: string; endDate: string }) {
+    const response = await this.client.post('/term', data);
+    return response.data;
+  }
+
+  async updateTerm(id: string, data: Partial<{ name: string; startDate: string; endDate: string; isCurrent: boolean }>) {
+    const response = await this.client.patch(`/term/${id}`, data);
+    return response.data;
+  }
+
+  async deleteTerm(id: string) {
+    const response = await this.client.delete(`/term/${id}`);
+    return response.data;
+  }
+
+  async setCurrentTerm(id: string) {
+    const response = await this.client.patch(`/term/${id}/set-current`);
+    return response.data;
+  }
+
   async getClasses() {
     const response = await this.client.get('/mobile/classes');
     return response.data;

@@ -976,6 +976,7 @@ export class MobileService {
         phone: t.user.phone,
         isActive: t.user.isActive,
         employeeNo: t.employeeNo,
+        gender: t.gender || null,
         roles: rolesByUser.get(t.userId) || [],
         subjects: [...new Set(ta.map(a => a.subject.name))],
         classes: [...new Set(ta.map(a => a.class.name))],

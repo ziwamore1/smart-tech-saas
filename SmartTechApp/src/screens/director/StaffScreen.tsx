@@ -43,10 +43,13 @@ export const DirectorStaffScreen: React.FC<DirectorStaffProps> = ({ onToggleDraw
     (s) => s.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
            s.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
            s.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           s.roles?.some((r: string) => r.toLowerCase().includes(searchQuery.toLowerCase()))
+           s.roles?.some((r: string) => r.toLowerCase().includes(searchQuery.toLowerCase())) ||
+           (s.gender || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const activeCount = staff.filter((s) => s.isActive).length;
+  const maleCount = staff.filter((s) => s.gender?.toLowerCase() === 'male').length;
+  const femaleCount = staff.filter((s) => s.gender?.toLowerCase() === 'female').length;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -77,6 +80,17 @@ export const DirectorStaffScreen: React.FC<DirectorStaffProps> = ({ onToggleDraw
           </View>
         </View>
 
+        <View style={styles.statsRow}>
+          <View style={[styles.statCardHalf, { backgroundColor: colors.tealLight }]}>
+            <Text style={styles.genderLabel}>♂ Male</Text>
+            <Text style={[styles.statValue, { color: colors.teal }]}>{maleCount}</Text>
+          </View>
+          <View style={[styles.statCardHalf, { backgroundColor: colors.purpleLight }]}>
+            <Text style={styles.genderLabel}>♀ Female</Text>
+            <Text style={[styles.statValue, { color: colors.purple }]}>{femaleCount}</Text>
+          </View>
+        </View>
+
         <View style={styles.searchContainer}>
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
@@ -94,7 +108,14 @@ export const DirectorStaffScreen: React.FC<DirectorStaffProps> = ({ onToggleDraw
                 <Text style={styles.staffAvatarText}>{member.firstName.charAt(0)}{member.lastName.charAt(0)}</Text>
               </View>
               <View style={styles.staffInfo}>
-                <Text style={styles.staffName}>{member.firstName} {member.lastName}</Text>
+                <View style={styles.staffNameRow}>
+                  <Text style={styles.staffName}>{member.firstName} {member.lastName}</Text>
+                  {member.gender && (
+                    <Text style={[styles.genderBadge, member.gender.toLowerCase() === 'male' ? styles.genderMale : styles.genderFemale]}>
+                      {member.gender.toLowerCase() === 'male' ? '♂' : '♀'}
+                    </Text>
+                  )}
+                </View>
                 <Text style={styles.staffRole}>{member.roles?.join(', ') || 'Staff'}{member.employeeNo ? ` • ${member.employeeNo}` : ''}</Text>
               </View>
               <View style={[styles.statusDot, member.isActive ? styles.statusActive : styles.statusInactive]} />
@@ -119,8 +140,10 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.md },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
   statCard: { flex: 1, padding: spacing.md, borderRadius: borderRadius.lg, alignItems: 'center' },
+  statCardHalf: { flex: 1, padding: spacing.sm, borderRadius: borderRadius.lg, alignItems: 'center' },
   statValue: { fontSize: 24, fontWeight: '700' },
   statLabel: { fontSize: 12, color: colors.textLight, marginTop: 4 },
+  genderLabel: { fontSize: 13, fontWeight: '600', marginBottom: 2 },
   searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: borderRadius.lg, paddingHorizontal: spacing.md, marginBottom: spacing.md, ...shadows.sm },
   searchIcon: { fontSize: 18, marginRight: spacing.sm },
   searchInput: { flex: 1, paddingVertical: spacing.md, fontSize: 15, color: colors.text },
@@ -128,7 +151,11 @@ const styles = StyleSheet.create({
   staffAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.teal, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
   staffAvatarText: { color: colors.white, fontWeight: '700', fontSize: 14 },
   staffInfo: { flex: 1 },
+  staffNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   staffName: { fontSize: 15, fontWeight: '600', color: colors.text },
+  genderBadge: { fontSize: 13, fontWeight: '700', paddingHorizontal: 6, paddingVertical: 1, borderRadius: borderRadius.sm, overflow: 'hidden' },
+  genderMale: { backgroundColor: colors.tealLight, color: colors.teal },
+  genderFemale: { backgroundColor: colors.purpleLight, color: colors.purple },
   staffRole: { fontSize: 13, color: colors.textLight, marginTop: 2 },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   statusActive: { backgroundColor: colors.success },

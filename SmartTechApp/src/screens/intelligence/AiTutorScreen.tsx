@@ -249,8 +249,17 @@ export const AiTutorScreen: React.FC = () => {
         }),
         fileUrls,
       );
-      const reply = res?.response || res?.data?.response || "I'll help you with that!";
-      const structured = res?.structured || null;
+      let reply = res?.response || res?.data?.response || "I'll help you with that!";
+      let structured = res?.structured || null;
+      if (!structured) {
+        try {
+          const parsed = JSON.parse(reply);
+          if (parsed && typeof parsed === 'object' && parsed.type) {
+            structured = parsed;
+            reply = parsed.explanation || parsed.answer?.text || reply;
+          }
+        } catch {}
+      }
       setMessages(prev => [...prev, { role: 'tutor', content: reply, structured, createdAt: new Date().toISOString() }]);
     } catch {
       setMessages(prev => [...prev, { role: 'tutor', content: "I'm having trouble connecting. Please try again.", createdAt: new Date().toISOString() }]);

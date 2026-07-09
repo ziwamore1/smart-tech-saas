@@ -70,6 +70,7 @@ export const DirectorSettingsScreen: React.FC<DirectorSettingsProps> = ({ onTogg
         { icon: '📅', label: 'Timetable', action: () => handleNav('DirectorTimetable') },
         { icon: '💬', label: 'Communication', action: () => handleNav('DirectorCommunication') },
         { icon: '📊', label: 'Reports & Analytics', action: () => handleNav('DirectorReports') },
+        { icon: '📅', label: 'Academic Years & Terms', action: () => handleNav('AcademicYearManagement') },
       ],
     },
     {

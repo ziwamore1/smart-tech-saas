@@ -67,6 +67,8 @@ import { PasswordManagementScreen } from '../screens/security/PasswordManagement
 import { AccountRecoveryScreen } from '../screens/security/AccountRecoveryScreen';
 import { OtpScreen } from '../screens/security/OtpScreen';
 import { SessionManagementScreen } from '../screens/security/SessionManagementScreen';
+import { AcademicYearManagementScreen } from '../screens/director/AcademicYearManagementScreen';
+import { TermManagementScreen } from '../screens/director/TermManagementScreen';
 import { INSTITUTION_TYPE_ROLES, InstitutionTypeCode, isRoleForType } from '../types';
 import { usePermissions } from '../utils/usePermissions';
 
@@ -194,6 +196,10 @@ export function AppNavigator() {
             <Stack.Screen name="AccountRecovery" component={AccountRecoveryScreen} />
             <Stack.Screen name="OtpVerification" component={OtpScreen} />
             <Stack.Screen name="SessionManagement" component={SessionManagementScreen} />
+
+            {/* Director School Management Screens */}
+            {isDirector && <Stack.Screen name="AcademicYearManagement" component={AcademicYearManagementScreen} />}
+            {isDirector && <Stack.Screen name="TermManagement" component={TermManagementScreen} />}
 
             {/* SuperAdmin Screens */}
             {isSuperAdmin && <Stack.Screen name="SuperAdminSchoolDetail" component={require('../screens/super-admin/SchoolDetailScreen').SuperAdminSchoolDetailScreen} />}
