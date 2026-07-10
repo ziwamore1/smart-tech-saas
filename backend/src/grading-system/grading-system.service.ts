@@ -1,9 +1,22 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
-export class GradingSystemService {
+export class GradingSystemService implements OnModuleInit {
+  private readonly logger = new Logger(GradingSystemService.name);
   constructor(private prisma: PrismaService) {}
+
+  async onModuleInit() {
+    try {
+      const schools = await this.prisma.school.findMany({ select: { id: true } });
+      for (const school of schools) {
+        await this.seedG7GradingPolicy(school.id);
+      }
+      if (schools.length > 0) this.logger.log(`ECZ Grade 7 policies seeded for ${schools.length} schools`);
+    } catch (err) {
+      this.logger.warn('Could not auto-seed ECZ Grade 7 policies (DB may not be ready yet)');
+    }
+  }
 
   async findAll(schoolId: string) {
     return this.prisma.gradingSystem.findMany({
@@ -253,6 +266,33 @@ export class GradingSystemService {
     await this.ensureGradingSystem(schoolId, 'ECZ Forms Grading System', this.formsGradingScales, false);
     await this.ensureGradingSystem(schoolId, 'College GPA Grading System', this.collegeGradingScales, false);
     await this.ensureGradingSystem(schoolId, 'University CGPA Grading System', this.universityGradingScales, false);
+  }
+
+  async seedG7GradingPolicy(schoolId: string) {
+    const existing = await this.prisma.gradingPolicy.findFirst({
+      where: { schoolId, code: 'ECZ_G7' },
+    });
+    if (existing) return;
+    await this.prisma.gradingPolicy.create({
+      data: {
+        schoolId,
+        name: 'ECZ Grade 7 National Examination Grading',
+        code: 'ECZ_G7',
+        type: 'ECZ_ZAMBIA',
+        isDefault: false,
+        active: true,
+        scales: {
+          create: [
+            { minScore: 75, maxScore: 100, grade: 'One', remark: 'Excellent', points: 1, gpa: 5.0, sortOrder: 1 },
+            { minScore: 60, maxScore: 74, grade: 'Two', remark: 'Very Good', points: 2, gpa: 4.0, sortOrder: 2 },
+            { minScore: 50, maxScore: 59, grade: 'Three', remark: 'Good', points: 3, gpa: 3.0, sortOrder: 3 },
+            { minScore: 25, maxScore: 49, grade: 'Four', remark: 'Satisfactory', points: 4, gpa: 2.0, sortOrder: 4 },
+            { minScore: 0, maxScore: 24, grade: 'Five', remark: 'Fail', points: 5, gpa: 0, sortOrder: 5 },
+          ],
+        },
+      },
+    });
+    this.logger.log(`ECZ_G7 grading policy created for school ${schoolId}`);
   }
 
   async setDefault(id: string, schoolId: string) {

@@ -176,6 +176,7 @@ export class SchoolService {
     await this.prisma.class.createMany({ data: classes });
 
     await this.gradingSystemService.seedDefaultGradingSystems(schoolId);
+    await this.gradingSystemService.seedG7GradingPolicy(schoolId);
 
     const gradingSystemCode = this.getGradingSystemForInstitutionType(institutionTypeCode);
 
