@@ -37,10 +37,10 @@ function GradeBar({ minScore, maxScore, grade, remark, points }: GradingScale & 
   const width = maxScore - minScore;
   const left = minScore;
   const getBarColor = (g: string) => {
-    if (g === 'A' || g === '1') return '#059669';
-    if (g === 'B' || g === '2' || g === '3') return '#3b82f6';
-    if (g === 'C' || g === '4' || g === '5') return '#f59e0b';
-    if (g === 'D' || g === '6' || g === '7') return '#f97316';
+    if (g === 'A' || g === 'One' || g === '1') return '#059669';
+    if (g === 'B' || g === 'Two' || g === '2' || g === '3') return '#3b82f6';
+    if (g === 'C' || g === 'Three' || g === '4' || g === '5') return '#f59e0b';
+    if (g === 'D' || g === 'Four' || g === '6' || g === '7') return '#f97316';
     return '#dc2626';
   };
 
@@ -135,9 +135,9 @@ export default function PrimaryGradingPage() {
             <p className="text-sm text-gray-600">
               Primary schools use a different grading system than secondary schools. 
               <strong> Grades 1-4 (Lower Primary)</strong> use competency-based grading (A-E) with descriptive remarks.
-              <strong> Grades 5-6 (Upper Primary)</strong> use standard A-F grading. 
-              The pass threshold is <strong>35%</strong> (compared to 50% in secondary).
-              Grade 7 uses the ECZ national examination grading system.
+              <strong> Grades 5-6 (Upper Primary)</strong> use standard A-F grading.
+              <strong> Grade 7</strong> uses the ECZ national examination grading system (One–Five, inverse points).
+              The pass threshold is <strong>35%</strong> for Grades 1-6 (compared to 50% in secondary).
             </p>
           </div>
         </div>
@@ -255,7 +255,7 @@ export default function PrimaryGradingPage() {
                 <tbody>
                   <tr className="border-b border-gray-100">
                     <td className="py-3 px-4 font-medium text-gray-700">Scale</td>
-                    <td className="py-3 px-4 text-gray-600">A (80-100%), B (65-79%), C (50-64%), D (35-49%), E/F (0-34%)</td>
+                    <td className="py-3 px-4 text-gray-600">A-F for Grades 1-6; ECZ One-Five for Grade 7</td>
                     <td className="py-3 px-4 text-gray-600">1-9 scale (ECZ), A-F (GPA), or custom</td>
                   </tr>
                   <tr className="border-b border-gray-100">
@@ -275,7 +275,7 @@ export default function PrimaryGradingPage() {
                   </tr>
                   <tr className="border-b border-gray-100">
                     <td className="py-3 px-4 font-medium text-gray-700">Grade 7</td>
-                    <td className="py-3 px-4 text-gray-600">ECZ National Examination (separate system)</td>
+                    <td className="py-3 px-4 text-gray-600">ECZ National Examination — One (75-100%) to Five (0-24%), inverse points (1 best → 5 worst)</td>
                     <td className="py-3 px-4 text-gray-400">N/A</td>
                   </tr>
                   <tr className="border-b border-gray-100">

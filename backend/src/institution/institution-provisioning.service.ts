@@ -114,7 +114,27 @@ export class InstitutionProvisioningService {
           },
         });
 
-        this.logger.log(`Created 3 primary grading policies for ${schoolId}`);
+        const eczG7Scales = [
+          { minScore: 75, maxScore: 100, grade: 'One', remark: 'Excellent', points: 1, gpa: 5.0, sortOrder: 1 },
+          { minScore: 60, maxScore: 74, grade: 'Two', remark: 'Very Good', points: 2, gpa: 4.0, sortOrder: 2 },
+          { minScore: 50, maxScore: 59, grade: 'Three', remark: 'Good', points: 3, gpa: 3.0, sortOrder: 3 },
+          { minScore: 25, maxScore: 49, grade: 'Four', remark: 'Satisfactory', points: 4, gpa: 2.0, sortOrder: 4 },
+          { minScore: 0, maxScore: 24, grade: 'Five', remark: 'Fail', points: 5, gpa: 0, sortOrder: 5 },
+        ];
+
+        await tx.gradingPolicy.create({
+          data: {
+            schoolId,
+            name: 'ECZ Grade 7 National Examination Grading',
+            code: 'ECZ_G7',
+            type: 'ECZ_ZAMBIA',
+            isDefault: false,
+            active: true,
+            scales: { create: eczG7Scales },
+          },
+        });
+
+        this.logger.log(`Created 4 primary grading policies for ${schoolId}`);
       });
     } else {
       this.logger.log(`Provisioning secondary grading policies for ${schoolId}`);
