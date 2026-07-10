@@ -60,12 +60,11 @@ async function main() {
   ];
 
   const grade7EczScales = [
-    { minScore: 80, maxScore: 100, grade: 'A', remark: 'Excellent', points: 5 },
-    { minScore: 70, maxScore: 79, grade: 'B', remark: 'Very Good', points: 4 },
-    { minScore: 60, maxScore: 69, grade: 'C', remark: 'Good', points: 3 },
-    { minScore: 50, maxScore: 59, grade: 'D', remark: 'Satisfactory', points: 2 },
-    { minScore: 40, maxScore: 49, grade: 'E', remark: 'Fair', points: 1 },
-    { minScore: 0, maxScore: 39, grade: 'F', remark: 'Fail', points: 0 },
+    { minScore: 75, maxScore: 100, grade: 'One', remark: 'Excellent', points: 1 },
+    { minScore: 60, maxScore: 74, grade: 'Two', remark: 'Very Good', points: 2 },
+    { minScore: 50, maxScore: 59, grade: 'Three', remark: 'Good', points: 3 },
+    { minScore: 25, maxScore: 49, grade: 'Four', remark: 'Satisfactory', points: 4 },
+    { minScore: 0, maxScore: 24, grade: 'Five', remark: 'Fail', points: 5 },
   ];
 
   const gradingSystems = [

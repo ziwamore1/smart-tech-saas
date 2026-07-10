@@ -1,7 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, useIsSuperAdmin, useIsDirector, useIsTeacher, useIsClassTeacher } from '@/lib/auth-context';

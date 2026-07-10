@@ -177,12 +177,11 @@ export class GradingSystemService {
   ];
 
   private grade7EczScales = [
-    { grade: 'A', points: 5, minScore: 80, maxScore: 100, remark: 'Excellent' },
-    { grade: 'B', points: 4, minScore: 70, maxScore: 79, remark: 'Very Good' },
-    { grade: 'C', points: 3, minScore: 60, maxScore: 69, remark: 'Good' },
-    { grade: 'D', points: 2, minScore: 50, maxScore: 59, remark: 'Satisfactory' },
-    { grade: 'E', points: 1, minScore: 40, maxScore: 49, remark: 'Fair' },
-    { grade: 'F', points: 0, minScore: 0, maxScore: 39, remark: 'Fail' },
+    { grade: 'One', points: 1, minScore: 75, maxScore: 100, remark: 'Excellent' },
+    { grade: 'Two', points: 2, minScore: 60, maxScore: 74, remark: 'Very Good' },
+    { grade: 'Three', points: 3, minScore: 50, maxScore: 59, remark: 'Good' },
+    { grade: 'Four', points: 4, minScore: 25, maxScore: 49, remark: 'Satisfactory' },
+    { grade: 'Five', points: 5, minScore: 0, maxScore: 24, remark: 'Fail' },
   ];
 
   private secondaryEczScales = [

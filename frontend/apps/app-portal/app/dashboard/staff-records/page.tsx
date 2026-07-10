@@ -424,6 +424,14 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
   const [templateName, setTemplateName] = useState('');
   const [templatePeriod, setTemplatePeriod] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const selectedTemplateIdRef = useRef<string | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [sampleRows, setSampleRows] = useState<any[]>([]);
+
+  const showToast = (type: 'success' | 'error', text: string) => {
+    setToast({ type, text });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const fetchColumns = useCallback(async (templateId: string) => {
     try {
@@ -434,6 +442,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
       setEditTemplate(t);
       setTemplateName(t?.name || '');
       setTemplatePeriod(t?.period || '');
+      selectedTemplateIdRef.current = templateId;
     } catch {
       setTemplateColumns([]);
     }
@@ -442,22 +451,29 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
   const handleCreateTemplate = async () => {
     try {
       await premiumStaffRecordsApi.createTemplate({ name: 'New Return Template', period: new Date().toISOString().slice(0, 7) });
+      showToast('success', 'Template created');
       onRefresh();
-    } catch { }
+    } catch {
+      showToast('error', 'Failed to create template');
+    }
   };
 
   const handleSaveTemplate = async () => {
     if (!editTemplate?.id) return;
     try {
       await premiumStaffRecordsApi.updateTemplate(editTemplate.id, { name: templateName, period: templatePeriod });
+      showToast('success', 'Template saved');
       onRefresh();
-    } catch { }
+    } catch {
+      showToast('error', 'Failed to save template');
+    }
   };
 
   const handleAddColumn = async () => {
-    if (!selectedTemplateId) return;
+    const tid = selectedTemplateIdRef.current;
+    if (!tid) return;
     try {
-      await premiumStaffRecordsApi.addColumn(selectedTemplateId, {
+      await premiumStaffRecordsApi.addColumn(tid, {
         columnName: `field_${Date.now()}`,
         headerName: 'New Field',
         dataType: 'STRING',
@@ -466,29 +482,95 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
         required: false,
         editable: true,
       });
-      fetchColumns(selectedTemplateId);
-    } catch { }
+      showToast('success', 'Column added');
+      fetchColumns(tid);
+    } catch (err: any) {
+      showToast('error', err?.response?.data?.message || 'Failed to add column');
+    }
   };
 
   const handleDeleteColumn = async (columnId: string) => {
     try {
       await premiumStaffRecordsApi.deleteColumn(columnId);
-      if (selectedTemplateId) fetchColumns(selectedTemplateId);
-    } catch { }
+      showToast('success', 'Column deleted');
+      const tid = selectedTemplateIdRef.current;
+      if (tid) fetchColumns(tid);
+    } catch {
+      showToast('error', 'Failed to delete column');
+    }
   };
 
   const handleColumnToggle = async (column: any) => {
     try {
       await premiumStaffRecordsApi.updateColumn(column.id, { active: !column.active });
-      if (selectedTemplateId) fetchColumns(selectedTemplateId);
-    } catch { }
+      const tid = selectedTemplateIdRef.current;
+      if (tid) fetchColumns(tid);
+    } catch {
+      showToast('error', 'Failed to update column');
+    }
   };
 
   const handleColumnRename = async (columnId: string, newName: string) => {
     try {
       await premiumStaffRecordsApi.updateColumn(columnId, { headerName: newName });
-      if (selectedTemplateId) fetchColumns(selectedTemplateId);
-    } catch { }
+      const tid = selectedTemplateIdRef.current;
+      if (tid) fetchColumns(tid);
+    } catch {
+      showToast('error', 'Failed to rename column');
+    }
+  };
+
+  const DATA_TYPES = ['STRING', 'NUMBER', 'DATE', 'BOOLEAN', 'EMAIL', 'PHONE', 'TEXTAREA', 'SELECT', 'CURRENCY'];
+
+  const handleColumnTypeChange = async (columnId: string, dataType: string) => {
+    try {
+      await premiumStaffRecordsApi.updateColumn(columnId, { dataType });
+      showToast('success', `Type changed to ${dataType}`);
+      const tid = selectedTemplateIdRef.current;
+      if (tid) fetchColumns(tid);
+    } catch {
+      showToast('error', 'Failed to update column type');
+    }
+  };
+
+  const handleToggleRequired = async (column: any) => {
+    try {
+      await premiumStaffRecordsApi.updateColumn(column.id, { required: !column.required });
+      const tid = selectedTemplateIdRef.current;
+      if (tid) fetchColumns(tid);
+    } catch {
+      showToast('error', 'Failed to update column');
+    }
+  };
+
+  const handleToggleEditable = async (column: any) => {
+    try {
+      await premiumStaffRecordsApi.updateColumn(column.id, { editable: !(column.editable !== false) });
+      const tid = selectedTemplateIdRef.current;
+      if (tid) fetchColumns(tid);
+    } catch {
+      showToast('error', 'Failed to update column');
+    }
+  };
+
+  const handleReorderColumn = async (columnId: string, direction: 'up' | 'down') => {
+    const tid = selectedTemplateIdRef.current;
+    if (!tid) return;
+    const sorted = [...templateColumns].sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+    const idx = sorted.findIndex((c: any) => c.id === columnId);
+    if (idx < 0) return;
+    if (direction === 'up' && idx === 0) return;
+    if (direction === 'down' && idx === sorted.length - 1) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    [sorted[idx].order, sorted[swapIdx].order] = [sorted[swapIdx].order, sorted[idx].order];
+    const reordered = sorted.map((c: any) => ({ id: c.id, order: c.order }));
+    try {
+      await premiumStaffRecordsApi.reorderColumns(tid, reordered);
+      showToast('success', 'Column reordered');
+      fetchColumns(tid);
+    } catch {
+      showToast('error', 'Failed to reorder columns');
+    }
   };
 
   const handleExportTemplate = async (templateId: string) => {
@@ -592,7 +674,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                       <tbody>
                         {templateColumns.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)).map((col: any, idx: number) => (
                           <tr key={col.id} style={{ borderTop: '1px solid #f3eee8' }}>
-                            <td style={{ padding: '6px 10px', color: '#6b7280' }}>{idx + 1}</td>
+                            <td style={{ padding: '6px 10px', color: '#6b7280', fontSize: 11 }}>{idx + 1}</td>
                             <td style={{ padding: '6px 10px', fontFamily: 'monospace', fontSize: 12 }}>{col.columnName}</td>
                             <td style={{ padding: '6px 10px' }}>
                               <input
@@ -602,19 +684,128 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                                 onFocus={e => (e.target.style.borderColor = '#d1d5db')}
                               />
                             </td>
-                            <td style={{ padding: '6px 10px' }}>{col.dataType}</td>
-                            <td style={{ padding: '6px 10px' }}>{col.required ? '✓' : '✗'}</td>
-                            <td style={{ padding: '6px 10px' }}>{col.editable !== false ? '✓' : '✗'}</td>
                             <td style={{ padding: '6px 10px' }}>
-                              <input type="checkbox" checked={col.active !== false} onChange={() => handleColumnToggle(col)} />
+                              <select
+                                defaultValue={col.dataType || 'STRING'}
+                                onChange={e => handleColumnTypeChange(col.id, e.target.value)}
+                                style={{ padding: '2px 4px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                              >
+                                {DATA_TYPES.map(dt => (
+                                  <option key={dt} value={dt}>{dt}</option>
+                                ))}
+                              </select>
                             </td>
                             <td style={{ padding: '6px 10px' }}>
-                              <button onClick={() => handleDeleteColumn(col.id)} style={{ padding: '2px 6px', background: '#fecaca', color: '#dc2626', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Delete</button>
+                              <button
+                                onClick={() => handleToggleRequired(col)}
+                                style={{ padding: '2px 8px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, background: col.required ? '#dcfce7' : '#f3f4f6', color: col.required ? '#16a34a' : '#6b7280' }}
+                              >{col.required ? 'Yes' : 'No'}</button>
+                            </td>
+                            <td style={{ padding: '6px 10px' }}>
+                              <button
+                                onClick={() => handleToggleEditable(col)}
+                                style={{ padding: '2px 8px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, background: col.editable !== false ? '#dcfce7' : '#f3f4f6', color: col.editable !== false ? '#16a34a' : '#6b7280' }}
+                              >{col.editable !== false ? 'Yes' : 'No'}</button>
+                            </td>
+                            <td style={{ padding: '6px 10px' }}>
+                              <button
+                                onClick={() => handleColumnToggle(col)}
+                                style={{ padding: '2px 8px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, background: col.active !== false ? '#dcfce7' : '#f3f4f6', color: col.active !== false ? '#16a34a' : '#6b7280' }}
+                              >{col.active !== false ? 'Active' : 'Off'}</button>
+                            </td>
+                            <td style={{ padding: '6px 10px' }}>
+                              <div style={{ display: 'flex', gap: 2 }}>
+                                <button onClick={() => handleReorderColumn(col.id, 'up')} disabled={idx === 0} style={{ padding: '2px 5px', border: '1px solid #d1d5db', borderRadius: 4, cursor: idx === 0 ? 'not-allowed' : 'pointer', fontSize: 11, background: '#fff', opacity: idx === 0 ? 0.4 : 1 }}>▲</button>
+                                <button onClick={() => handleReorderColumn(col.id, 'down')} disabled={idx === templateColumns.length - 1} style={{ padding: '2px 5px', border: '1px solid #d1d5db', borderRadius: 4, cursor: idx === templateColumns.length - 1 ? 'not-allowed' : 'pointer', fontSize: 11, background: '#fff', opacity: idx === templateColumns.length - 1 ? 0.4 : 1 }}>▼</button>
+                                <button onClick={() => handleDeleteColumn(col.id)} style={{ padding: '2px 6px', background: '#fecaca', color: '#dc2626', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Delete</button>
+                              </div>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                )}
+
+                {templateColumns.length > 0 && (
+                  <div style={{ marginTop: 16, borderTop: '1px solid #e8ddd0', paddingTop: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <span style={{ fontWeight: 600, fontSize: 14 }}>Template Preview</span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          onClick={() => {
+                            const newRow: any = {};
+                            const sorted = [...templateColumns].sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+                            sorted.forEach((col: any) => {
+                              if (col.dataType === 'NUMBER') newRow[col.columnName] = 0;
+                              else if (col.dataType === 'DATE') newRow[col.columnName] = new Date().toISOString().slice(0, 10);
+                              else if (col.dataType === 'BOOLEAN') newRow[col.columnName] = false;
+                              else if (col.dataType === 'CURRENCY') newRow[col.columnName] = 0;
+                              else newRow[col.columnName] = '';
+                            });
+                            setSampleRows([...sampleRows, newRow]);
+                          }}
+                          style={{ padding: '4px 10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+                        ><i className="fas fa-plus"></i> Add Row
+                        </button>
+                        <button
+                          onClick={() => setSampleRows([])}
+                          style={{ padding: '4px 10px', background: '#6b7280', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+                        >Clear</button>
+                      </div>
+                    </div>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                        <thead>
+                          <tr style={{ background: '#f9f5f0', textAlign: 'left' }}>
+                            <th style={{ padding: '6px 8px', fontWeight: 600, width: 30 }}>#</th>
+                            {templateColumns.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)).map((col: any) => (
+                              <th key={col.id} style={{ padding: '6px 8px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                {col.headerName || col.columnName}
+                                {col.required && <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span>}
+                                <span style={{ color: '#9ca3af', fontSize: 10, marginLeft: 4, fontWeight: 400 }}>{col.dataType}</span>
+                              </th>
+                            ))}
+                            <th style={{ padding: '6px 8px', fontWeight: 600, width: 50 }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sampleRows.length === 0 ? (
+                            <tr>
+                              <td colSpan={templateColumns.length + 2} style={{ padding: 16, textAlign: 'center', color: '#9ca3af' }}>
+                                No rows yet. Click "Add Row" to add sample data for preview.
+                              </td>
+                            </tr>
+                          ) : (
+                            sampleRows.map((row: any, rIdx: number) => (
+                              <tr key={rIdx} style={{ borderTop: '1px solid #f3eee8' }}>
+                                <td style={{ padding: '4px 8px', color: '#6b7280', fontSize: 11 }}>{rIdx + 1}</td>
+                                {templateColumns.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)).map((col: any) => (
+                                  <td key={col.id} style={{ padding: '4px 8px' }}>
+                                    <input
+                                      value={row[col.columnName] ?? ''}
+                                      onChange={e => {
+                                        const updated = [...sampleRows];
+                                        updated[rIdx] = { ...updated[rIdx], [col.columnName]: e.target.value };
+                                        setSampleRows(updated);
+                                      }}
+                                      placeholder={`Enter ${col.headerName || col.columnName}`}
+                                      style={{ width: '100%', minWidth: 100, border: '1px solid #d1d5db', padding: '3px 6px', borderRadius: 4, fontSize: 12 }}
+                                    />
+                                  </td>
+                                ))}
+                                <td style={{ padding: '4px 8px' }}>
+                                  <button
+                                    onClick={() => setSampleRows(sampleRows.filter((_: any, i: number) => i !== rIdx))}
+                                    style={{ padding: '2px 6px', background: '#fecaca', color: '#dc2626', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                                  >Delete</button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
@@ -629,6 +820,18 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
 
       {activeSubTab === 'submissions' && (
         <SubmissionsGrid templates={templates} />
+      )}
+
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+          padding: '12px 20px', borderRadius: 8, fontSize: 14, fontWeight: 500,
+          background: toast.type === 'success' ? '#059669' : '#dc2626',
+          color: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          transition: 'opacity 0.3s'
+        }}>
+          {toast.type === 'success' ? '✓ ' : '✕ '}{toast.text}
+        </div>
       )}
     </div>
   );
