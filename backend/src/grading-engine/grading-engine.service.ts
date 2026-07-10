@@ -35,7 +35,7 @@ export class GradingEngineService {
         where: { id: classId },
         include: {
           gradingSystem: {
-            include: { gradeScales: { orderBy: { sortOrder: 'asc' } } },
+            include: { gradeScales: { orderBy: { minScore: 'asc' } } },
           },
         },
       });
@@ -80,7 +80,7 @@ export class GradingEngineService {
         where: { id: classId },
         include: {
           gradingSystem: {
-            include: { gradeScales: { orderBy: { sortOrder: 'asc' } } },
+            include: { gradeScales: { orderBy: { minScore: 'asc' } } },
           },
         },
       });

@@ -177,6 +177,8 @@ export class SchoolService {
 
     await this.gradingSystemService.seedDefaultGradingSystems(schoolId);
 
+    const gradingSystemCode = this.getGradingSystemForInstitutionType(institutionTypeCode);
+
     await this.prisma.schoolSetting.create({
       data: {
         schoolId,
@@ -185,10 +187,22 @@ export class SchoolService {
         periodsPerDay: 7,
         daysPerWeek: 5,
         breakAfterPeriod: 3,
+        gradingSystem: gradingSystemCode,
       },
     });
 
     this.logger.log(`School ${schoolId} initialized with ${institutionTypeCode} structure and admission sequence`);
+  }
+
+  private getGradingSystemForInstitutionType(typeCode: string): string {
+    switch (typeCode) {
+      case 'PRIMARY_SCHOOL': return 'PRIMARY_ECZ';
+      case 'SECONDARY_SCHOOL': return 'SECONDARY_ECZ';
+      case 'ADVANCED_SECONDARY': return 'ADVANCED_A_LEVEL';
+      case 'COLLEGE': return 'COLLEGE_GPA';
+      case 'UNIVERSITY': return 'UNIVERSITY_CGPA';
+      default: return 'SECONDARY_ECZ';
+    }
   }
 
   private getLabelForInstitutionType(typeCode: string): string {

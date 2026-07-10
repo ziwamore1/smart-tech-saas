@@ -4,6 +4,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Param,
   Body,
   Req,
@@ -39,6 +40,18 @@ export class TermController {
   @Roles('DIRECTOR')
   findAllByYear(@Param('academicYearId') academicYearId: string) {
     return this.termService.findAll(academicYearId);
+  }
+
+  @Patch(':id')
+  @Roles('DIRECTOR')
+  update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.termService.update(id, body, req.user.schoolId);
+  }
+
+  @Delete(':id')
+  @Roles('DIRECTOR')
+  delete(@Param('id') id: string, @Req() req: any) {
+    return this.termService.delete(id, req.user.schoolId);
   }
 
   @Patch(':id/set-current')

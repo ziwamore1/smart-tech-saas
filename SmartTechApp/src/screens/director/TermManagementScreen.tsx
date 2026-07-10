@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Modal, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, Input } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
@@ -27,6 +27,7 @@ export const TermManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNaviga
   const [form, setForm] = useState({ name: '', startDate: '', endDate: '' });
   const [saving, setSaving] = useState(false);
   const [settingCurrentId, setSettingCurrentId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadTerms = async () => {
     if (!academicYearId) return;
@@ -97,12 +98,14 @@ export const TermManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNaviga
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            setDeletingId(term.id);
             try {
               await apiService.deleteTerm(term.id);
               loadTerms();
-              Alert.alert('Success', 'Term deleted');
             } catch (err: any) {
               Alert.alert('Error', err.response?.data?.message || 'Failed to delete');
+            } finally {
+              setDeletingId(null);
             }
           },
         },
@@ -138,7 +141,10 @@ export const TermManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNaviga
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         {loading ? (
-          <Text style={styles.loadingText}>Loading...</Text>
+          <View style={styles.centeredState}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading terms...</Text>
+          </View>
         ) : terms.length === 0 ? (
           <View style={styles.emptyBox}>
             <Text style={styles.emptyIcon}>📆</Text>
@@ -156,6 +162,7 @@ export const TermManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNaviga
               <View style={styles.termActions}>
                 {!term.isCurrent && (
                   <TouchableOpacity
+                    activeOpacity={0.7}
                     style={[styles.actionBtn, styles.setBtn]}
                     onPress={() => handleSetCurrent(term)}
                     disabled={settingCurrentId === term.id}
@@ -163,11 +170,20 @@ export const TermManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNaviga
                     <Text style={styles.actionBtnText}>{settingCurrentId === term.id ? 'Setting...' : 'Set Active'}</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity style={[styles.actionBtn, styles.editBtn]} onPress={() => openEdit(term)}>
+                <TouchableOpacity activeOpacity={0.7} style={[styles.actionBtn, styles.editBtn]} onPress={() => openEdit(term)}>
                   <Text style={styles.actionBtnWhite}>Edit</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionBtn, styles.deleteBtn]} onPress={() => handleDelete(term)}>
-                  <Text style={styles.actionBtnWhite}>Del</Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={[styles.actionBtn, styles.deleteBtn, deletingId === term.id && styles.btnDisabled]}
+                  onPress={() => handleDelete(term)}
+                  disabled={deletingId === term.id}
+                >
+                  {deletingId === term.id ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Text style={styles.actionBtnWhite}>Del</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -179,19 +195,32 @@ export const TermManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNaviga
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{editingTerm ? 'Edit Term' : 'Create Term'}</Text>
-            <Input label="Term Name" placeholder="e.g. Term 1" value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} />
-            <Input label="Start Date" placeholder="YYYY-MM-DD" value={form.startDate} onChangeText={(v) => setForm({ ...form, startDate: v })} />
-            <Input label="End Date" placeholder="YYYY-MM-DD" value={form.endDate} onChangeText={(v) => setForm({ ...form, endDate: v })} />
+            <Input label="Term Name" placeholder="e.g. Term 1" value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} disabled={saving} />
+            <Input label="Start Date" placeholder="YYYY-MM-DD" value={form.startDate} onChangeText={(v) => setForm({ ...form, startDate: v })} disabled={saving} />
+            <Input label="End Date" placeholder="YYYY-MM-DD" value={form.endDate} onChangeText={(v) => setForm({ ...form, endDate: v })} disabled={saving} />
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowModal(false)}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={[styles.cancelBtn, saving && styles.btnDisabled]}
+                onPress={() => setShowModal(false)}
+                disabled={saving}
+              >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.saveBtn, saving && styles.btnDisabled]}
+                activeOpacity={0.7}
+                style={[styles.saveBtn, saving && styles.savingBtn]}
                 onPress={handleSave}
                 disabled={saving}
               >
-                <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save'}</Text>
+                {saving ? (
+                  <View style={styles.savingRow}>
+                    <ActivityIndicator size="small" color={colors.white} />
+                    <Text style={styles.saveBtnText}>  Saving...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.saveBtnText}>Save</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -204,7 +233,8 @@ export const TermManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNaviga
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: spacing.md, paddingBottom: spacing.xxl },
-  loadingText: { textAlign: 'center', color: colors.textLight, marginTop: spacing.xl },
+  centeredState: { alignItems: 'center', justifyContent: 'center', marginTop: 80 },
+  loadingText: { textAlign: 'center', color: colors.textLight, fontSize: 14, marginTop: spacing.md },
   emptyBox: { alignItems: 'center', marginTop: 80 },
   emptyIcon: { fontSize: 48, marginBottom: spacing.md },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
@@ -228,7 +258,9 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.lg },
   cancelBtn: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.border },
   cancelBtnText: { fontSize: 14, fontWeight: '600', color: colors.text },
-  saveBtn: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.primary },
+  saveBtn: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.primary, minWidth: 90, alignItems: 'center' },
   saveBtnText: { fontSize: 14, fontWeight: '600', color: colors.white },
-  btnDisabled: { opacity: 0.6 },
+  btnDisabled: { opacity: 0.5 },
+  savingBtn: { backgroundColor: colors.primaryLight || '#7C9EE0', opacity: 0.8 },
+  savingRow: { flexDirection: 'row', alignItems: 'center' },
 });

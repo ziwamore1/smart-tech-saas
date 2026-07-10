@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { classApi, teacherApi, studentApi } from '@/lib/api';
+import { classApi, teacherApi, studentApi, gradingSystemApi } from '@/lib/api';
 
 const PRIMARY_GRADES = [
   { grade: 'Pre', label: 'Pre-School (ECE)', ecxAlignment: 'Preparatory', color: '#f59e0b' },
@@ -22,6 +22,7 @@ export default function PrimaryClassesPage() {
     name: '',
     grade: '1',
     classTeacher: '',
+    gradingSystemId: '',
   });
 
   const { data: classes, isLoading } = useQuery({
@@ -32,6 +33,11 @@ export default function PrimaryClassesPage() {
   const { data: teachers } = useQuery({
     queryKey: ['primary-teachers-all'],
     queryFn: () => teacherApi.getAll({}).then(r => r.data?.data || r.data || []),
+  });
+
+  const { data: gradingSystems } = useQuery({
+    queryKey: ['grading-systems'],
+    queryFn: () => gradingSystemApi.getAll().then((r: any) => r.data?.data || r.data || []),
   });
 
   const { data: students } = useQuery({
@@ -110,6 +116,7 @@ export default function PrimaryClassesPage() {
                 <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Class Name</th>
                 <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Grade</th>
                 <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">ECZ Alignment</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Grading System</th>
                 <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Class Teacher</th>
                 <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Pupils</th>
                 <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -132,6 +139,11 @@ export default function PrimaryClassesPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">{gradeInfo?.ecxAlignment || '—'}</td>
+                    <td className="px-6 py-4">
+                      <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                        {cls.gradingSystem?.name || 'Default'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{cls.classTeacherName || cls.classTeacher || 'Not assigned'}</td>
                     <td className="px-6 py-4">
                       <span className="font-medium text-gray-900">{pupilCount}</span>
@@ -187,6 +199,21 @@ export default function PrimaryClassesPage() {
                   <option value="">Select teacher</option>
                   {(teachers || []).map((t: any) => (
                     <option key={t.id} value={t.id}>{t.firstName} {t.lastName} ({t.role || 'Teacher'})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Grading System</label>
+                <select
+                  value={formData.gradingSystemId}
+                  onChange={e => setFormData(p => ({ ...p, gradingSystemId: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  <option value="">Use School Default</option>
+                  {(gradingSystems || []).map((gs: any) => (
+                    <option key={gs.id} value={gs.id}>
+                      {gs.name} {gs.isDefault ? '(Default)' : ''}
+                    </option>
                   ))}
                 </select>
               </div>

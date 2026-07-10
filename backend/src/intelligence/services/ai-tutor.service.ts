@@ -41,7 +41,7 @@ export class AiTutorService {
     let detectedSubjectId = options?.subjectId || options?.context?.subjectId;
     if (!detectedSubjectId && options?.topic) {
       const detected = this.subjectEngine.detectSubjectFromQuery(options.topic);
-      if (detected) {
+      if (detected && detected !== 'general') {
         const subjectRecord = await this.prisma.subject.findFirst({
           where: { schoolId, name: { contains: detected, mode: 'insensitive' } },
           orderBy: { name: 'asc' },
@@ -61,6 +61,7 @@ export class AiTutorService {
 
     const context = await this.buildFullContext(schoolId, {
       ...options?.context,
+      subject: await this.resolveSubjectName(options?.context?.subject || detectedSubjectId || undefined),
       subjectId: detectedSubjectId || options?.context?.subjectId,
       topic: options?.topic || options?.context?.topic,
     });
@@ -125,7 +126,7 @@ export class AiTutorService {
       message: fileUrls?.length
         ? `${message}\n\nThe student has attached the following files for review: ${fileUrls.join(', ')}. Please analyze the attached files and incorporate them into your response.`
         : message,
-      subject: restContext?.subject || session.subjectId || memory.subject || undefined,
+      subject: await this.resolveSubjectName(restContext?.subject || session.subjectId || memory.subject || undefined),
       subjectId: restContext?.subjectId || session.subjectId || undefined,
       topic: restContext?.topic || session.topic || memory.topic || undefined,
       previousMessages,
@@ -178,7 +179,7 @@ export class AiTutorService {
         message: fileUrls?.length
           ? `${question}\n\nThe student has attached the following files: ${fileUrls.join(', ')}. Please analyze them.`
           : question,
-        subject: restContext?.subject || subjectId,
+        subject: await this.resolveSubjectName(restContext?.subject || subjectId),
         subjectId: restContext?.subjectId || subjectId,
       };
       const response = await this.generateLLMResponse(genericCtx);
@@ -559,13 +560,15 @@ export class AiTutorService {
         'english', 'language', 'literature', 'history', 'geography', 'civic', 'religious',
         'ict', 'agriculture', 'social studies', 'humanities',
       ];
-      const isMathOrScience = subject && (
+      const isMathOrScience = subject && subject !== 'general' && (
         structuredSubjects.some(s => subject.toLowerCase().includes(s)) ||
         this.subjectEngine.getEngineForSubject(subject)
       );
-      const systemPrompt = subjectPrompt
-        ? `${rolePrompt}\n\n=== SUBJECT-SPECIFIC INSTRUCTIONS ===\n${subjectPrompt}\n\nRemember: You are teaching ${subject}. Follow the subject-specific methodology above while also adapting to the user's role and context.`
-        : rolePrompt;
+      const systemPrompt = subject === 'general' && subjectPrompt
+        ? `${rolePrompt}\n\n=== GENERAL INSTRUCTIONS ===\n${subjectPrompt}\n\nRemember: You are a helpful AI assistant. Answer naturally while respecting the user's role and context above.`
+        : subjectPrompt
+          ? `${rolePrompt}\n\n=== SUBJECT-SPECIFIC INSTRUCTIONS ===\n${subjectPrompt}\n\nRemember: You are teaching ${subject}. Follow the subject-specific methodology above while also adapting to the user's role and context.`
+          : rolePrompt;
 
       const preprocessedQuery = await this.subjectEngine.preprocessQuery(subject, context.message || '', context);
       const userPrompt = buildUserPrompt({ ...context, message: preprocessedQuery });
@@ -656,12 +659,59 @@ export class AiTutorService {
     return `Welcome! I'm your AI tutor. I can help you understand concepts, solve problems, and practice for exams. What would you like to learn today?`;
   }
 
+  private async resolveSubjectName(subject: string | undefined): Promise<string | undefined> {
+    if (!subject) return subject;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(subject)) {
+      try {
+        const record = await this.prisma.subject.findUnique({ where: { id: subject }, select: { name: true } });
+        if (record) return record.name;
+      } catch {}
+    }
+    return subject;
+  }
+
+  private structuredSubjects = [
+    'mathematics', 'math', 'science', 'physics', 'chemistry', 'biology',
+    'english', 'language', 'literature', 'history', 'geography', 'civic', 'religious',
+    'ict', 'agriculture', 'social studies', 'humanities',
+  ];
+
+  private isStructuredSubject(subject?: string): boolean {
+    if (!subject) return false;
+    return this.structuredSubjects.some(s => subject.toLowerCase().includes(s));
+  }
+
   private fallbackResponse(context: AiContext): string {
     const message = context.message || '';
     const lower = message.toLowerCase();
     const weakAreas = context.currentPerformance?.weakAreas;
     const subject = context.subject || 'this subject';
     const name_ = context.name ? ` ${context.name.split(' ')[0]}` : '';
+    const structured = this.isStructuredSubject(context.subject);
+
+    const wrapJson = (data: Record<string, any>) => structured ? JSON.stringify(data) : data.explanation || data.text || '';
+
+    // For general queries (no academic subject detected), return natural plain text
+    if (subject === 'general') {
+      if (/^(hi|hello|hey|greetings|good morning|good afternoon|good evening)/.test(lower)) {
+        return `Hello${name_}! How can I help you today? Feel free to ask me anything!`;
+      }
+      if (/how are you|how's it going|what's up/.test(lower)) {
+        return `I'm doing great, thanks for asking${name_}! I'm here to help with any questions you have. What's on your mind?`;
+      }
+      if (/your (name|creator|purpose)|who (are|made|created) you|what can you do/.test(lower)) {
+        return `I'm SMART_TECH AI, an intelligent assistant built into the SMART_TECH SAAS educational platform. I can help with:\n\n- Answering general knowledge questions\n- Explaining concepts across many subjects\n- Assisting with academic work and studying\n- Providing educational guidance\n\nWhat would you like to know about?`;
+      }
+      if (topic) {
+        return `That's a great question about **${topic}**! Here's what I can tell you:\n\n${topic} is an interesting topic. To give you the most helpful response, could you clarify what specific aspect you're most curious about? I'm happy to dive deeper into any area you'd like to explore!`;
+      }
+      if (/tell me (a|some|about)|share|recommend|suggest/.test(lower)) {
+        return `I'd be happy to help${name_}! What kind of information are you looking for? I can share knowledge about science, history, technology, culture, health, and much more. Just let me know what interests you!`;
+      }
+      // Generic fallback for any general query
+      return `That's an interesting question${name_}! Here's my take:\n\n**Key point**: Let me think about this carefully.\n\nWould you mind sharing a bit more context or specifying what aspect you'd like me to focus on? I want to make sure I give you the most helpful answer possible!`;
+    }
 
     // Extract the actual topic/question content
     const topicMatch = message.match(/(?:explain|what is|how does|why does|define|tell me about|what are|what's|describe)\s+(.+?)(?:\?|$)/i);
@@ -672,7 +722,10 @@ export class AiTutorService {
       const focusHint = weakAreas?.length
         ? ` I noticed we should focus on ${weakAreas.slice(0, 2).join(' and ')}.`
         : '';
-      return `Hello${name_}!${focusHint} What would you like to learn about today?`;
+      return wrapJson({
+        type: 'greeting',
+        explanation: `Hello${name_}!${focusHint} What would you like to learn about today?`,
+      });
     }
 
     // Questions with a clear topic — respond with actual content
@@ -683,7 +736,22 @@ export class AiTutorService {
       const perfNote = context.currentPerformance?.average != null && context.currentPerformance.average < 50
         ? ` Since you're working on improving, let me explain this clearly.`
         : '';
-      return `Great question about **${topic}**!${perfNote}${curriculumRef}\n\n**Overview**: ${topic} is an important concept in ${subject}. To understand it well, focus on:\n\n1. **Core idea** — What ${topic} means and why it matters\n2. **Key principles** — The main rules or components that define it\n3. **Real-world examples** — How it applies in practice\n4. **Common connections** — How it relates to other topics you've studied\n\nWould you like me to go deeper into any specific aspect of ${topic}, or would you like a practice question to test your understanding?`;
+      const explanation = `Great question about **${topic}**!${perfNote}${curriculumRef}\n\n**Overview**: ${topic} is an important concept in ${subject}. To understand it well, focus on:\n\n1. **Core idea** — What ${topic} means and why it matters\n2. **Key principles** — The main rules or components that define it\n3. **Real-world examples** — How it applies in practice\n4. **Common connections** — How it relates to other topics you've studied\n\nWould you like me to go deeper into any specific aspect of ${topic}, or would you like a practice question to test your understanding?`;
+      if (structured) {
+        return JSON.stringify({
+          type: 'concept_explanation',
+          subject: context.subject,
+          topic,
+          explanation,
+          steps: [
+            `Understand the core idea of ${topic}`,
+            `Learn the key principles and rules`,
+            `Apply with real-world examples`,
+            `Connect to related topics`,
+          ],
+        });
+      }
+      return explanation;
     }
 
     // Help/struggling
@@ -691,33 +759,86 @@ export class AiTutorService {
       const specificHint = weakAreas?.length
         ? ` I see ${weakAreas.slice(0, 2).join(' and ')} have been challenging based on your results.`
         : '';
-      return `I'm here to help${name_}!${specificHint} Tell me specifically which concept or problem you're working on, and I'll break it down step by step.`;
+      const explanation = `I'm here to help${name_}!${specificHint} Tell me specifically which concept or problem you're working on, and I'll break it down step by step.`;
+      if (structured) {
+        return JSON.stringify({
+          type: 'general_guidance',
+          subject: context.subject,
+          explanation,
+          steps: [`Identify the specific concept`, `Break it down into smaller parts`, `Work through examples together`],
+        });
+      }
+      return explanation;
     }
 
     // Practice/exercise requests
     if (/practice|exercise|problem|question|test me|quiz/.test(lower)) {
       const focusArea = weakAreas?.length ? weakAreas[0] : (topic || subject);
-      return `Let's practice **${focusArea}**!\n\n**Try this**: Explain ${focusArea} in your own words and give an example.\n\nAfter you respond, I'll give you feedback and a follow-up question. Ready?`;
+      const explanation = `Let's practice **${focusArea}**!\n\n**Try this**: Explain ${focusArea} in your own words and give an example.\n\nAfter you respond, I'll give you feedback and a follow-up question. Ready?`;
+      if (structured) {
+        return JSON.stringify({
+          type: 'practice_question',
+          subject: context.subject,
+          explanation,
+          practice_question: {
+            question: `Explain ${focusArea} in your own words and give an example.`,
+            difficulty: context.currentPerformance?.average != null && context.currentPerformance.average < 50 ? 'beginner' : 'intermediate',
+            topic: focusArea,
+          },
+        });
+      }
+      return explanation;
     }
 
     // Encouragement/motivation
     if (/tired|bored|demotivated|give up|hard|frustrated/.test(lower)) {
       const avg = context.currentPerformance?.average;
+      let explanation: string;
       if (avg != null && avg >= 50) {
-        return `You're actually doing well — your average is ${avg}%!${name_} Keep going, you've got this. Let's break down what you're working on into small steps. What's the first thing we can tackle?`;
+        explanation = `You're actually doing well — your average is ${avg}%!${name_} Keep going, you've got this. Let's break down what you're working on into small steps. What's the first thing we can tackle?`;
+      } else {
+        explanation = `Every expert was once a beginner${name_}. Let's take it step by step. Pick one small concept or problem and we'll work through it together. What would you like to start with?`;
       }
-      return `Every expert was once a beginner${name_}. Let's take it step by step. Pick one small concept or problem and we'll work through it together. What would you like to start with?`;
+      return wrapJson({ type: 'encouragement', explanation });
     }
 
     // Performance-based guidance
     if (weakAreas?.length && context.currentPerformance?.average != null && context.currentPerformance.average < 50) {
-      return `Let's work on improving **${weakAreas.slice(0, 2).join(' and ')}**. Your current average is ${context.currentPerformance.average}%. Would you like me to:\n\n1. Explain a concept from ${weakAreas[0]}?\n2. Give you a practice problem?\n3. Create a simple study plan?`;
+      const explanation = `Let's work on improving **${weakAreas.slice(0, 2).join(' and ')}**. Your current average is ${context.currentPerformance.average}%. Would you like me to:\n\n1. Explain a concept from ${weakAreas[0]}?\n2. Give you a practice problem?\n3. Create a simple study plan?`;
+      if (structured) {
+        return JSON.stringify({
+          type: 'performance_guidance',
+          subject: context.subject,
+          explanation,
+          steps: [
+            `Focus on improving ${weakAreas.slice(0, 2).join(' and ')}`,
+            `Review foundational concepts`,
+            `Practice with targeted exercises`,
+            `Track your progress`,
+          ],
+        });
+      }
+      return explanation;
     }
 
     // Generic — extract any noun-like words from the message
     const words = message.split(/\s+/).filter(w => w.length > 4);
     const possibleTopic = words.length > 0 ? words.slice(0, 3).join(' ') : 'this';
-    return `I understand you're asking about **${possibleTopic}** in ${subject}.\n\nHere's my guidance:\n\n1. **Start with the basics** — Make sure you understand the fundamental concepts\n2. **Practice actively** — Work through examples step by step\n3. **Review regularly** — Revisit topics to reinforce learning\n\nWhat specific aspect would you like me to explain further? I can break it down for you.`;
+    const explanation = `I understand you're asking about **${possibleTopic}** in ${subject}.\n\nHere's my guidance:\n\n1. **Start with the basics** — Make sure you understand the fundamental concepts\n2. **Practice actively** — Work through examples step by step\n3. **Review regularly** — Revisit topics to reinforce learning\n\nWhat specific aspect would you like me to explain further? I can break it down for you.`;
+    if (structured) {
+      return JSON.stringify({
+        type: 'general_guidance',
+        subject: context.subject,
+        topic: possibleTopic,
+        explanation,
+        steps: [
+          `Start with the basics — Understand fundamental concepts`,
+          `Practice actively — Work through examples step by step`,
+          `Review regularly — Revisit topics to reinforce learning`,
+        ],
+      });
+    }
+    return explanation;
   }
 
   private extractKeywords(messages: string[]): string[] {

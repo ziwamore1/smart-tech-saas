@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { classApi, levelTypeApi, enrollmentApi, studentApi, subjectApi, classSubjectApi, api } from '@/lib/api';
+import { classApi, levelTypeApi, enrollmentApi, studentApi, subjectApi, classSubjectApi, gradingSystemApi, api } from '@/lib/api';
 
 type LevelCategory = 'FORM' | 'GRADE' | 'OTHER';
 
@@ -28,7 +28,7 @@ export default function ClassesPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSubjectsModal, setShowSubjectsModal] = useState(false);
   const [selectedClass, setSelectedClass] = useState<any>(null);
-  const [editForm, setEditForm] = useState({ name: '', capacity: '' });
+  const [editForm, setEditForm] = useState({ name: '', capacity: '', gradingSystemId: '' });
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
 
   const { data: classesResponse, isLoading: classesLoading } = useQuery({
@@ -51,6 +51,16 @@ export default function ClassesPage() {
   });
 
   const teachers = Array.isArray(teachersData) ? teachersData : [];
+
+  const { data: gradingSystemsResponse } = useQuery({
+    queryKey: ['grading-systems'],
+    queryFn: () => gradingSystemApi.getAll().then((res: any) => {
+      const data = res.data?.data || res.data;
+      return Array.isArray(data) ? data : [];
+    }),
+  });
+
+  const gradingSystems = Array.isArray(gradingSystemsResponse) ? gradingSystemsResponse : [];
 
   const setClassTeacherMutation = useMutation({
     mutationFn: ({ classId, teacherId }: { classId: string; teacherId: string | null }) =>
@@ -137,6 +147,7 @@ export default function ClassesPage() {
     capacity: '',
     levelNumber: '',
     streamLetter: 'A',
+    gradingSystemId: '',
   });
 
   const createClassMutation = useMutation({
@@ -147,7 +158,7 @@ export default function ClassesPage() {
       setShowAddModal(false);
       setMessage({ type: 'success', text: `Class "${data?.data?.name || classForm.name}" created successfully!` });
       setTimeout(() => setMessage(null), 3000);
-      setClassForm({ name: '', levelTypeId: '', capacity: '', levelNumber: '', streamLetter: 'A' });
+      setClassForm({ name: '', levelTypeId: '', capacity: '', levelNumber: '', streamLetter: 'A', gradingSystemId: '' });
     },
     onError: (error: any) => {
       console.error('Failed to create class:', error);
@@ -328,6 +339,11 @@ export default function ClassesPage() {
                     <span className={`text-xs px-2 py-0.5 rounded-full ${colorSet.bg} ${colorSet.text}`}>
                       {cls.levelType?.name || 'No level'}
                     </span>
+                    {cls.gradingSystem && (
+                      <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                        {cls.gradingSystem.name}
+                      </span>
+                    )}
                   </div>
                   <span className="text-3xl opacity-50 group-hover:opacity-100 transition-opacity">{cls.name?.[0] || '📚'}</span>
                 </div>
@@ -376,7 +392,7 @@ export default function ClassesPage() {
                   <button 
                     onClick={() => {
                       setSelectedClass(cls);
-                      setEditForm({ name: cls.name, capacity: cls.capacity?.toString() || '' });
+                      setEditForm({ name: cls.name, capacity: cls.capacity?.toString() || '', gradingSystemId: cls.gradingSystem?.id || '' });
                       setShowEditModal(true);
                     }}
                     className="px-3 py-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 text-xs font-medium transition-colors"
@@ -485,6 +501,24 @@ export default function ClassesPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Grading System
+                </label>
+                <select
+                  value={classForm.gradingSystemId}
+                  onChange={(e) => setClassForm({ ...classForm, gradingSystemId: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                >
+                  <option value="">Use School Default</option>
+                  {gradingSystems.map((gs: any) => (
+                    <option key={gs.id} value={gs.id}>
+                      {gs.name} {gs.isDefault ? '(Default)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Capacity
                 </label>
                 <input
@@ -517,6 +551,7 @@ export default function ClassesPage() {
                       levelTypeId: classForm.levelTypeId,
                       order: parseInt(classForm.levelNumber),
                       capacity: classForm.capacity ? parseInt(classForm.capacity) : undefined,
+                      gradingSystemId: classForm.gradingSystemId || undefined,
                     });
                   }}
                   disabled={!classForm.name || !classForm.levelTypeId || createClassMutation.isPending}
@@ -759,6 +794,30 @@ export default function ClassesPage() {
                       </option>
                     );
                   })}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Grading System
+                </label>
+                <select
+                  value={selectedClass.gradingSystem?.id || ''}
+                  onChange={(e) => {
+                    const val = e.target.value || null;
+                    updateClassMutation.mutate({
+                      id: selectedClass.id,
+                      data: { gradingSystemId: val },
+                    });
+                  }}
+                  className="w-full px-3 py-2 border rounded-lg"
+                >
+                  <option value="">Use School Default</option>
+                  {gradingSystems.map((gs: any) => (
+                    <option key={gs.id} value={gs.id}>
+                      {gs.name} {gs.isDefault ? '(Default)' : ''}
+                    </option>
+                  ))}
                 </select>
               </div>
 

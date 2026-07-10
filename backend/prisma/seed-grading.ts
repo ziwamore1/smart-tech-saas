@@ -59,15 +59,42 @@ async function main() {
     { minScore: 0, maxScore: 49, grade: 'F', remark: 'Fail', points: 0 },
   ];
 
+  const grade7EczScales = [
+    { minScore: 80, maxScore: 100, grade: 'A', remark: 'Excellent', points: 5 },
+    { minScore: 70, maxScore: 79, grade: 'B', remark: 'Very Good', points: 4 },
+    { minScore: 60, maxScore: 69, grade: 'C', remark: 'Good', points: 3 },
+    { minScore: 50, maxScore: 59, grade: 'D', remark: 'Satisfactory', points: 2 },
+    { minScore: 40, maxScore: 49, grade: 'E', remark: 'Fair', points: 1 },
+    { minScore: 0, maxScore: 39, grade: 'F', remark: 'Fail', points: 0 },
+  ];
+
   const gradingSystems = [
-    { name: 'ECZ Primary Grading System', scales: primaryGradingScales },
+    { name: 'Primary Grading System', scales: primaryGradingScales },
+    { name: 'ECZ Grade 7 Grading System', scales: grade7EczScales },
     { name: 'ECZ Secondary Grading System', scales: secondaryGradingScales },
     { name: 'ECZ Forms Grading System', scales: formsGradingScales },
     { name: 'College GPA Grading System', scales: collegeGradingScales },
     { name: 'University CGPA Grading System', scales: universityGradingScales },
   ];
 
+  const oldToNewName: Record<string, string> = {
+    'ECZ Primary Grading System': 'Primary Grading System',
+  };
+
   for (const school of schools) {
+    for (const [oldName, newName] of Object.entries(oldToNewName)) {
+      const oldRecord = await prisma.gradingSystem.findFirst({
+        where: { schoolId: school.id, name: oldName },
+      });
+      if (oldRecord) {
+        await prisma.gradingSystem.update({
+          where: { id: oldRecord.id },
+          data: { name: newName },
+        });
+        console.log(`Renamed "${oldName}" → "${newName}" for school "${school.name}"`);
+      }
+    }
+
     for (const gs of gradingSystems) {
       const existing = await prisma.gradingSystem.findFirst({
         where: { schoolId: school.id, name: gs.name },
@@ -78,7 +105,7 @@ async function main() {
           data: {
             name: gs.name,
             schoolId: school.id,
-            isDefault: gs.name === 'ECZ Primary Grading System',
+            isDefault: gs.name === 'Primary Grading System',
           },
         });
 

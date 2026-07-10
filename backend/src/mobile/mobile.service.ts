@@ -666,10 +666,16 @@ export class MobileService {
       studentId = student?.id || null;
     }
 
+    let subjectName = options?.context?.subject || options?.subjectId;
+    if (subjectName && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subjectName)) {
+      const subjectRecord = await this.prisma.subject.findUnique({ where: { id: subjectName }, select: { name: true } }).catch(() => null);
+      if (subjectRecord) subjectName = subjectRecord.name;
+    }
+
     const contextPayload = {
       role: (options?.context?.role || roles[0]?.toLowerCase().replace(' ', '_') || 'student') as any,
       screen: options?.context?.screen,
-      subject: options?.context?.subject || options?.subjectId,
+      subject: subjectName,
       topic: options?.context?.topic || options?.topic,
       studentId: studentId || undefined,
       userId,
@@ -726,10 +732,15 @@ export class MobileService {
     }
 
     const { fileUrls, ...restContext } = context || {};
+    let subjectName = restContext.subject || session.subjectId || undefined;
+    if (subjectName && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subjectName)) {
+      const subjectRecord = await this.prisma.subject.findUnique({ where: { id: subjectName }, select: { name: true } }).catch(() => null);
+      if (subjectRecord) subjectName = subjectRecord.name;
+    }
     const contextPayload = {
       role: (restContext.role || 'student') as any,
       screen: restContext.screen,
-      subject: restContext.subject || session.subjectId || undefined,
+      subject: subjectName,
       topic: restContext.topic || session.topic || undefined,
       studentId: restContext.studentId || session.studentId || undefined,
       userId,
@@ -798,6 +809,19 @@ export class MobileService {
   }
 
   private generateGeneralTutorResponse(question: string, subjectId?: string): string {
+    if (!subjectId || subjectId === 'general') {
+      const lower = question.toLowerCase();
+      if (/^(hi|hello|hey|greetings)/.test(lower)) {
+        return `Hello! I'm your AI assistant. How can I help you today?`;
+      }
+      if (/how are you|what's up/.test(lower)) {
+        return `I'm doing great! Ready to help with any questions you have. What would you like to know?`;
+      }
+      if (/your (name|creator|purpose)|who (are|made|created) you/.test(lower)) {
+        return `I'm SMART_TECH AI, your intelligent assistant. I can help with general knowledge questions, explain concepts, and assist with learning. What's on your mind?`;
+      }
+      return `That's an interesting question! I'm here to help. Could you tell me more about what you're looking for? I can help with explanations, answer questions, or discuss ideas - just let me know what interests you!`;
+    }
     const subjectHint = subjectId ? 'this subject' : 'your studies';
     return `Based on your question about ${subjectHint}:\n\nThe key is to approach this systematically. Start with the fundamentals and build up gradually.\n\nWould you like me to:\n1. Explain a specific concept?\n2. Give you a practice problem?\n3. Provide study tips for ${subjectHint}?`;
   }
@@ -811,6 +835,7 @@ export class MobileService {
       where: { schoolId },
       include: {
         levelType: { select: { name: true } },
+        gradingSystem: { select: { id: true, name: true } },
         enrollments: {
           where: currentAcademicYear ? { academicYearId: currentAcademicYear.id } : {},
           include: { student: { select: { id: true, firstName: true, lastName: true } } },
@@ -829,6 +854,7 @@ export class MobileService {
       id: c.id,
       name: c.name,
       levelType: c.levelType?.name || null,
+      gradingSystem: c.gradingSystem || null,
       studentCount: c.enrollments.length,
       students: c.enrollments.map(e => ({
         id: e.student.id,
@@ -847,7 +873,7 @@ export class MobileService {
     return this.prisma.academicYear.findMany({
       where: { schoolId },
       orderBy: { year: 'desc' },
-      select: { id: true, name: true, year: true, isCurrent: true },
+      select: { id: true, name: true, year: true, startDate: true, endDate: true, isCurrent: true },
     });
   }
 

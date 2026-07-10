@@ -31,7 +31,7 @@ export const INSTITUTION_TYPE_FEATURES: Record<InstitutionTypeCode, {
 }> = {
   PRIMARY_SCHOOL: {
     classStructure: 'Grade (1–7)',
-    gradingSystem: 'Competency-based + ECZ Grade 7',
+    gradingSystem: 'Primary Grading System (Gr 1-4) + ECZ Grade 7 (Gr 5-7)',
     keyModules: ['primary.curriculum', 'primary.reportCards', 'primary.analytics', 'primary.ece'],
   },
   SECONDARY_SCHOOL: {

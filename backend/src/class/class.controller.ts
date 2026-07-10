@@ -28,6 +28,7 @@ export class ClassController {
       levelTypeId: string;
       order: number;
       capacity?: number;
+      gradingSystemId?: string;
     },
     @Req() req: any,
   ) {
@@ -37,6 +38,7 @@ export class ClassController {
       body.order,
       req.user.schoolId,
       body.capacity,
+      body.gradingSystemId,
     );
   }
 
@@ -50,7 +52,7 @@ export class ClassController {
   @Roles('Director')
   update(
     @Param('id') id: string,
-    @Body() body: { name?: string; capacity?: number | null; order?: number },
+    @Body() body: { name?: string; capacity?: number | null; order?: number; gradingSystemId?: string | null },
     @Req() req: any,
   ) {
     return this.service.update(id, body, req.user.schoolId);

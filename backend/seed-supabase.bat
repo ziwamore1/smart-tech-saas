@@ -36,6 +36,11 @@ echo --------------------------------------------
 call npx tsx prisma/seed-grading.ts
 
 echo.
+echo Step 3: Seeding ECZ Grade 7 rules...
+echo --------------------------------------------
+call npx tsx prisma/seed-g7-rules.ts
+
+echo.
 echo ============================================
 echo   Seeding Complete!
 echo ============================================

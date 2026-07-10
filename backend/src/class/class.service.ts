@@ -15,8 +15,8 @@ export class ClassService {
     order: number,
     schoolId: string,
     capacity?: number,
+    gradingSystemId?: string,
   ) {
-    // Ensure levelType belongs to this school
     const levelType = await this.prisma.levelType.findUnique({
       where: { id: levelTypeId },
     });
@@ -26,6 +26,14 @@ export class ClassService {
     if (levelType.schoolId !== schoolId)
       throw new ForbiddenException('Invalid level type');
 
+    if (gradingSystemId) {
+      const gs = await this.prisma.gradingSystem.findUnique({
+        where: { id: gradingSystemId },
+      });
+      if (!gs || gs.schoolId !== schoolId)
+        throw new NotFoundException('Grading system not found');
+    }
+
     return this.prisma.class.create({
       data: {
         name,
@@ -33,6 +41,7 @@ export class ClassService {
         levelTypeId,
         schoolId,
         capacity,
+        gradingSystemId: gradingSystemId || null,
       },
     });
   }
@@ -43,6 +52,9 @@ export class ClassService {
       where: { schoolId },
       include: {
         levelType: true,
+        gradingSystem: {
+          select: { id: true, name: true },
+        },
         classTeacher: {
           select: { id: true, firstName: true, lastName: true, email: true },
         },
@@ -72,6 +84,7 @@ export class ClassService {
         levelTypeId: c.levelTypeId,
         order: c.order,
         levelType: c.levelType,
+        gradingSystem: c.gradingSystem,
         classTeacher: c.classTeacher,
         totalStudents: c.enrollments.length,
         maleCount: males,
@@ -86,10 +99,15 @@ export class ClassService {
         levelTypeId,
         schoolId,
       },
+      include: {
+        gradingSystem: {
+          select: { id: true, name: true },
+        },
+      },
     });
   }
 
-  async update(id: string, data: { name?: string; capacity?: number | null; order?: number }, schoolId: string) {
+  async update(id: string, data: { name?: string; capacity?: number | null; order?: number; gradingSystemId?: string | null }, schoolId: string) {
     const classEntity = await this.prisma.class.findUnique({
       where: { id },
     });
@@ -97,10 +115,19 @@ export class ClassService {
     if (!classEntity) throw new NotFoundException('Class not found');
     if (classEntity.schoolId !== schoolId) throw new ForbiddenException('Access denied');
 
+    if (data.gradingSystemId) {
+      const gs = await this.prisma.gradingSystem.findUnique({
+        where: { id: data.gradingSystemId },
+      });
+      if (!gs || gs.schoolId !== schoolId)
+        throw new NotFoundException('Grading system not found');
+    }
+
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.capacity !== undefined) updateData.capacity = data.capacity;
     if (data.order !== undefined) updateData.order = data.order;
+    if (data.gradingSystemId !== undefined) updateData.gradingSystemId = data.gradingSystemId;
 
     return this.prisma.class.update({
       where: { id },

@@ -431,12 +431,15 @@ export const termApi = {
   update: (id: string, data: any) => api.patch(`/term/${id}`, data),
   setCurrent: (id: string) => api.patch(`/term/${id}/set-current`),
   unfinalize: (id: string) => api.patch(`/term/${id}/unfinalize`),
+  delete: (id: string) => api.delete(`/term/${id}`),
 };
 
 export const academicYearApi = {
   getAll: () => api.get('/academic-year'),
   create: (data: { name: string; startDate: string; endDate: string }) => api.post('/academic-year', data),
+  update: (id: string, data: { name?: string; startDate?: string; endDate?: string }) => api.patch(`/academic-year/${id}`, data),
   setCurrent: (id: string) => api.patch(`/academic-year/${id}/current`),
+  delete: (id: string) => api.delete(`/academic-year/${id}`),
 };
 
 export const resultApi = {

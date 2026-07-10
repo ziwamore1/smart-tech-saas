@@ -463,7 +463,7 @@ class ApiService {
   }
 
   async getTerms(academicYearId: string) {
-    const response = await this.client.get(`/term/academic-year/${academicYearId}`);
+    const response = await this.client.get(`/term/${academicYearId}`);
     return response.data;
   }
 
@@ -993,7 +993,8 @@ class ApiService {
   }
 
   async getPasswordHistory(_limit?: number) {
-    return [];
+    const response = await this.client.get('/identity/security-logs');
+    return response.data;
   }
 
   async terminateSession(_sessionId: string) {

@@ -95,7 +95,8 @@ export default function SettingsPage() {
   });
 
   const codeToName: Record<string, string> = {
-    PRIMARY_ECZ: 'ECZ Primary Grading System',
+    PRIMARY_ECZ: 'Primary Grading System',
+    GRADE7_ECZ: 'ECZ Grade 7 Grading System',
     SECONDARY_ECZ: 'ECZ Secondary Grading System',
     FORMS_ECZ: 'ECZ Forms Grading System',
     COLLEGE_GPA: 'College GPA Grading System',
@@ -103,7 +104,8 @@ export default function SettingsPage() {
   };
 
   const gradingSystemCodeToLabel: Record<string, string> = {
-    PRIMARY_ECZ: 'ECZ Primary (Grade 7)',
+    PRIMARY_ECZ: 'Primary (Grades 1-4)',
+    GRADE7_ECZ: 'ECZ Grade 7 (Grades 5-7)',
     SECONDARY_ECZ: 'ECZ Secondary (Grade 9/12)',
     FORMS_ECZ: 'ECZ Forms (Competency)',
     COLLEGE_GPA: 'College GPA',
@@ -195,6 +197,69 @@ export default function SettingsPage() {
     },
     onError: () => {
       setTermMessage({ type: 'error', text: 'Failed to update current term' });
+      setTimeout(() => setTermMessage(null), 3000);
+    },
+  });
+
+  const [editingYear, setEditingYear] = useState<{ id: string; name: string; startDate: string; endDate: string } | null>(null);
+  const [deleteYearId, setDeleteYearId] = useState<string | null>(null);
+  const [editingTerm, setEditingTerm] = useState<{ id: string; name: string; startDate: string; endDate: string; academicYearId: string } | null>(null);
+  const [deleteTermId, setDeleteTermId] = useState<string | null>(null);
+
+  const updateAcademicYearMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { name?: string; startDate?: string; endDate?: string } }) =>
+      academicYearApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['academic-years'] });
+      setEditingYear(null);
+      setAcademicYearMessage({ type: 'success', text: 'Academic year updated successfully!' });
+      setTimeout(() => setAcademicYearMessage(null), 3000);
+    },
+    onError: () => {
+      setAcademicYearMessage({ type: 'error', text: 'Failed to update academic year' });
+      setTimeout(() => setAcademicYearMessage(null), 3000);
+    },
+  });
+
+  const deleteAcademicYearMutation = useMutation({
+    mutationFn: (id: string) => academicYearApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['academic-years'] });
+      setDeleteYearId(null);
+      setAcademicYearMessage({ type: 'success', text: 'Academic year deleted!' });
+      setTimeout(() => setAcademicYearMessage(null), 3000);
+    },
+    onError: (err: any) => {
+      setAcademicYearMessage({ type: 'error', text: err?.response?.data?.message || 'Failed to delete academic year' });
+      setTimeout(() => setAcademicYearMessage(null), 5000);
+    },
+  });
+
+  const updateTermMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { name?: string; startDate?: string; endDate?: string } }) =>
+      termApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['terms'] });
+      setEditingTerm(null);
+      setTermMessage({ type: 'success', text: 'Term updated successfully!' });
+      setTimeout(() => setTermMessage(null), 3000);
+    },
+    onError: () => {
+      setTermMessage({ type: 'error', text: 'Failed to update term' });
+      setTimeout(() => setTermMessage(null), 3000);
+    },
+  });
+
+  const deleteTermMutation = useMutation({
+    mutationFn: (id: string) => termApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['terms'] });
+      setDeleteTermId(null);
+      setTermMessage({ type: 'success', text: 'Term deleted!' });
+      setTimeout(() => setTermMessage(null), 3000);
+    },
+    onError: () => {
+      setTermMessage({ type: 'error', text: 'Failed to delete term' });
       setTimeout(() => setTermMessage(null), 3000);
     },
   });
@@ -509,10 +574,18 @@ export default function SettingsPage() {
               <div className="md:col-span-2">
                 <button
                   onClick={() => createTermMutation.mutate(termForm)}
-                  disabled={!termForm.name || !termForm.startDate || !termForm.endDate}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+                  disabled={createTermMutation.isPending || !termForm.name || !termForm.startDate || !termForm.endDate}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 hover:shadow-md disabled:bg-gray-400 disabled:hover:shadow-none transition-all duration-200"
                 >
-                  Create Term
+                  {createTermMutation.isPending ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Creating...
+                    </span>
+                  ) : 'Create Term'}
                 </button>
               </div>
             </div>
@@ -550,14 +623,37 @@ export default function SettingsPage() {
                           )}
                         </td>
                         <td className="py-3 px-4">
-                          {!term.isCurrent && (
+                          <div className="flex items-center gap-2">
                             <button
-                              onClick={() => setCurrentTermMutation.mutate(term.id)}
+                              onClick={() => setEditingTerm({
+                                id: term.id,
+                                name: term.name,
+                                startDate: term.startDate?.split('T')[0] || '',
+                                endDate: term.endDate?.split('T')[0] || '',
+                                academicYearId: term.academicYearId || '',
+                              })}
                               className="text-blue-600 hover:text-blue-800 text-sm"
                             >
-                              Set as Current
+                              Edit
                             </button>
-                          )}
+                            {!term.isCurrent && (
+                              <button
+                                onClick={() => setCurrentTermMutation.mutate(term.id)}
+                                disabled={setCurrentTermMutation.isPending}
+                                className="text-blue-600 hover:text-blue-800 text-sm disabled:text-gray-400 disabled:cursor-not-allowed transition-colors duration-150"
+                              >
+                                {setCurrentTermMutation.isPending ? 'Setting...' : 'Set Current'}
+                              </button>
+                            )}
+                            {!term.isCurrent && (
+                              <button
+                                onClick={() => setDeleteTermId(term.id)}
+                                className="text-red-600 hover:text-red-800 text-sm"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -568,6 +664,121 @@ export default function SettingsPage() {
               <div className="text-center py-8 text-gray-500">No terms created yet</div>
             )}
           </div>
+
+          {/* Edit Term Modal */}
+          {editingTerm && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-4">
+                <h3 className="text-lg font-semibold mb-4">Edit Term</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Term Name</label>
+                    <input
+                      type="text"
+                      value={editingTerm.name}
+                      onChange={(e) => setEditingTerm({ ...editingTerm, name: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Academic Year</label>
+                    <select
+                      value={editingTerm.academicYearId}
+                      onChange={(e) => setEditingTerm({ ...editingTerm, academicYearId: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    >
+                      <option value="">Select Academic Year</option>
+                      {academicYearsData?.map((year: any) => (
+                        <option key={year.id} value={year.id}>{year.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                    <input
+                      type="date"
+                      value={editingTerm.startDate}
+                      onChange={(e) => setEditingTerm({ ...editingTerm, startDate: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                    <input
+                      type="date"
+                      value={editingTerm.endDate}
+                      onChange={(e) => setEditingTerm({ ...editingTerm, endDate: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    onClick={() => setEditingTerm(null)}
+                    className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => updateTermMutation.mutate({
+                      id: editingTerm.id,
+                      data: {
+                        name: editingTerm.name,
+                        startDate: editingTerm.startDate,
+                        endDate: editingTerm.endDate,
+                        academicYearId: editingTerm.academicYearId,
+                      },
+                    })}
+                    disabled={updateTermMutation.isPending}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 hover:shadow-md disabled:opacity-50 disabled:hover:shadow-none transition-all duration-200"
+                  >
+                    {updateTermMutation.isPending ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Saving...
+                      </span>
+                    ) : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Delete Term Confirmation */}
+          {deleteTermId && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-4">
+                <h3 className="text-lg font-semibold mb-2">Delete Term?</h3>
+                <p className="text-gray-600 mb-4">This action cannot be undone.</p>
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setDeleteTermId(null)}
+                    className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => deleteTermMutation.mutate(deleteTermId)}
+                    disabled={deleteTermMutation.isPending}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 hover:shadow-md disabled:opacity-50 disabled:hover:shadow-none transition-all duration-200"
+                  >
+                    {deleteTermMutation.isPending ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Deleting...
+                      </span>
+                    ) : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -745,10 +956,18 @@ export default function SettingsPage() {
             <div className="mt-6">
               <button
                 onClick={() => createAcademicYearMutation.mutate(academicYearForm)}
-                disabled={!academicYearForm.name || !academicYearForm.startDate || !academicYearForm.endDate}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+                disabled={createAcademicYearMutation.isPending || !academicYearForm.name || !academicYearForm.startDate || !academicYearForm.endDate}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 hover:shadow-md disabled:bg-gray-400 disabled:hover:shadow-none transition-all duration-200"
               >
-                Create Academic Year
+                {createAcademicYearMutation.isPending ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Creating...
+                  </span>
+                ) : 'Create Academic Year'}
               </button>
             </div>
           </div>
@@ -783,14 +1002,36 @@ export default function SettingsPage() {
                           )}
                         </td>
                         <td className="py-3 px-4">
-                          {!year.isCurrent && (
+                          <div className="flex items-center gap-2">
                             <button
-                              onClick={() => setCurrentAcademicYearMutation.mutate(year.id)}
+                              onClick={() => setEditingYear({
+                                id: year.id,
+                                name: year.name,
+                                startDate: year.startDate?.split('T')[0] || '',
+                                endDate: year.endDate?.split('T')[0] || '',
+                              })}
                               className="text-blue-600 hover:text-blue-800 text-sm"
                             >
-                              Set as Current
+                              Edit
                             </button>
-                          )}
+                            {!year.isCurrent && (
+                              <button
+                                onClick={() => setCurrentAcademicYearMutation.mutate(year.id)}
+                                disabled={setCurrentAcademicYearMutation.isPending}
+                                className="text-blue-600 hover:text-blue-800 text-sm disabled:text-gray-400 disabled:cursor-not-allowed transition-colors duration-150"
+                              >
+                                {setCurrentAcademicYearMutation.isPending ? 'Setting...' : 'Set Current'}
+                              </button>
+                            )}
+                            {!year.isCurrent && (
+                              <button
+                                onClick={() => setDeleteYearId(year.id)}
+                                className="text-red-600 hover:text-red-800 text-sm"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -801,6 +1042,103 @@ export default function SettingsPage() {
               <div className="text-center py-8 text-gray-500">No academic years created yet</div>
             )}
           </div>
+
+          {/* Edit Academic Year Modal */}
+          {editingYear && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-4">
+                <h3 className="text-lg font-semibold mb-4">Edit Academic Year</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Year Name</label>
+                    <input
+                      type="text"
+                      value={editingYear.name}
+                      onChange={(e) => setEditingYear({ ...editingYear, name: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                    <input
+                      type="date"
+                      value={editingYear.startDate}
+                      onChange={(e) => setEditingYear({ ...editingYear, startDate: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                    <input
+                      type="date"
+                      value={editingYear.endDate}
+                      onChange={(e) => setEditingYear({ ...editingYear, endDate: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    onClick={() => setEditingYear(null)}
+                    className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => updateAcademicYearMutation.mutate({
+                      id: editingYear.id,
+                      data: { name: editingYear.name, startDate: editingYear.startDate, endDate: editingYear.endDate },
+                    })}
+                    disabled={updateAcademicYearMutation.isPending}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 hover:shadow-md disabled:opacity-50 disabled:hover:shadow-none transition-all duration-200"
+                  >
+                    {updateAcademicYearMutation.isPending ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Saving...
+                      </span>
+                    ) : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Delete Academic Year Confirmation */}
+          {deleteYearId && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-4">
+                <h3 className="text-lg font-semibold mb-2">Delete Academic Year?</h3>
+                <p className="text-gray-600 mb-4">This action cannot be undone. Terms within this year must be deleted first.</p>
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setDeleteYearId(null)}
+                    className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => deleteAcademicYearMutation.mutate(deleteYearId)}
+                    disabled={deleteAcademicYearMutation.isPending}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 hover:shadow-md disabled:opacity-50 disabled:hover:shadow-none transition-all duration-200"
+                  >
+                    {deleteAcademicYearMutation.isPending ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Deleting...
+                      </span>
+                    ) : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -55,7 +55,7 @@ export const DirectorSettingsScreen: React.FC<DirectorSettingsProps> = ({ onTogg
       title: 'Account',
       items: [
         { icon: '👤', label: 'Profile Settings', action: () => handleNav('DirectorProfile') },
-        { icon: '🔒', label: 'Security & Privacy', action: () => {} },
+        { icon: '🔒', label: 'Security & Privacy', action: () => handleNav('PasswordManagement') },
         { icon: '🔔', label: 'Notification Preferences', action: () => handleNav('Notifications') },
       ],
     },

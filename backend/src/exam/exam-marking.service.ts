@@ -285,7 +285,8 @@ export class ExamMarkingService {
 
   async getGradeFromScale(score: number, schoolId: string, classId?: string): Promise<string> {
     const codeToName: Record<string, string> = {
-      PRIMARY_ECZ: 'ECZ Primary Grading System',
+      PRIMARY_ECZ: 'Primary Grading System',
+      GRADE7_ECZ: 'ECZ Grade 7 Grading System',
       SECONDARY_ECZ: 'ECZ Secondary Grading System',
       FORMS_ECZ: 'ECZ Forms Grading System',
       COLLEGE_GPA: 'College GPA Grading System',

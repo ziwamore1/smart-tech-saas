@@ -71,6 +71,16 @@ export class SubjectEngineService {
     for (const [subject, keywords] of Object.entries(subjectMap)) {
       if (keywords.some(k => lower.includes(k))) return subject;
     }
+
+    // If no academic subject matched, check if it's a general/non-academic query
+    const generalIndicators = [
+      'what is the meaning', 'tell me a joke', 'how are you', 'what do you think',
+      'what\'s your favorite', 'do you like', 'tell me about yourself',
+      'who created you', 'what can you do', 'help me with',
+      'define', 'meaning of', 'explain', 'how to', 'what does',
+    ];
+    if (generalIndicators.some(i => lower.includes(i))) return 'general';
+
     return undefined;
   }
 }

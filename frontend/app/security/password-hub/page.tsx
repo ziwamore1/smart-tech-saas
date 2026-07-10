@@ -251,27 +251,63 @@ export default function PasswordHubPage() {
                       <td className="py-3 pr-4 text-sm">{u.activeSessions || 0}</td>
                       <td className="py-3 pr-4">
                         <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                          <Button size="sm" variant="ghost" title="Generate Credentials" onClick={() => handleAction('generate', u.id)} disabled={actionLoading === `generate-${u.id}`}>
-                            <Key className="w-4 h-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" title="Reset Password" onClick={() => handleAction('reset', u.id)} disabled={actionLoading === `reset-${u.id}`}>
-                            <RefreshCw className="w-4 h-4" />
-                          </Button>
-                          {u.accountStatus === 'LOCKED' ? (
-                            <Button size="sm" variant="ghost" title="Unlock Account" onClick={() => handleAction('unlock', u.id)} disabled={actionLoading === `unlock-${u.id}`}>
-                              <Unlock className="w-4 h-4 text-green-500" />
+                          {actionLoading === `generate-${u.id}` ? (
+                            <Button size="icon" variant="outline" disabled>
+                              <Loader2 className="w-4 h-4 animate-spin" />
                             </Button>
                           ) : (
-                            <Button size="sm" variant="ghost" title="Lock Account" onClick={() => handleAction('lock', u.id)} disabled={actionLoading === `lock-${u.id}`}>
-                              <Lock className="w-4 h-4 text-red-500" />
+                            <Button size="icon" variant="outline" title="Generate Credentials" onClick={() => handleAction('generate', u.id)} className="hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition-all">
+                              <Key className="w-4 h-4" />
                             </Button>
                           )}
-                          <Button size="sm" variant="ghost" title="Force Logout" onClick={() => handleAction('force-logout', u.id)} disabled={actionLoading === `force-logout-${u.id}`}>
-                            <Monitor className="w-4 h-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" title="Resend Credentials" onClick={() => handleAction('resend', u.id)} disabled={actionLoading === `resend-${u.id}`}>
-                            <Send className="w-4 h-4" />
-                          </Button>
+                          {actionLoading === `reset-${u.id}` ? (
+                            <Button size="icon" variant="outline" disabled>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            </Button>
+                          ) : (
+                            <Button size="icon" variant="outline" title="Reset Password" onClick={() => handleAction('reset', u.id)} className="hover:bg-amber-50 hover:text-amber-600 hover:border-amber-300 transition-all">
+                              <RefreshCw className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {u.accountStatus === 'LOCKED' ? (
+                            actionLoading === `unlock-${u.id}` ? (
+                              <Button size="icon" variant="outline" disabled>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              </Button>
+                            ) : (
+                              <Button size="icon" variant="outline" title="Unlock Account" onClick={() => handleAction('unlock', u.id)} className="hover:bg-green-50 hover:text-green-600 hover:border-green-300 transition-all">
+                                <Unlock className="w-4 h-4 text-green-500" />
+                              </Button>
+                            )
+                          ) : (
+                            actionLoading === `lock-${u.id}` ? (
+                              <Button size="icon" variant="outline" disabled>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              </Button>
+                            ) : (
+                              <Button size="icon" variant="outline" title="Lock Account" onClick={() => handleAction('lock', u.id)} className="hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-all">
+                                <Lock className="w-4 h-4 text-red-500" />
+                              </Button>
+                            )
+                          )}
+                          {actionLoading === `force-logout-${u.id}` ? (
+                            <Button size="icon" variant="outline" disabled>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            </Button>
+                          ) : (
+                            <Button size="icon" variant="outline" title="Force Logout" onClick={() => handleAction('force-logout', u.id)} className="hover:bg-purple-50 hover:text-purple-600 hover:border-purple-300 transition-all">
+                              <Monitor className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {actionLoading === `resend-${u.id}` ? (
+                            <Button size="icon" variant="outline" disabled>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            </Button>
+                          ) : (
+                            <Button size="icon" variant="outline" title="Resend Credentials" onClick={() => handleAction('resend', u.id)} className="hover:bg-teal-50 hover:text-teal-600 hover:border-teal-300 transition-all">
+                              <Send className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -361,16 +397,18 @@ export default function PasswordHubPage() {
                         )}
                       </div>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => handleAction('resend', selectedUser.id)}>
-                      <Send className="w-4 h-4 mr-2" /> Resend Credentials
+                    <Button size="sm" variant="outline" onClick={() => handleAction('resend', selectedUser.id)} disabled={actionLoading === `resend-${selectedUser.id}`}>
+                      {actionLoading === `resend-${selectedUser.id}` ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                      Resend Credentials
                     </Button>
                   </div>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <Key className="w-12 h-12 mx-auto mb-2 opacity-50" />
                     <p>No credentials generated yet</p>
-                    <Button className="mt-4" size="sm" onClick={() => handleAction('generate', selectedUser.id)}>
-                      <Key className="w-4 h-4 mr-2" /> Generate Credentials
+                    <Button className="mt-4" size="sm" onClick={() => handleAction('generate', selectedUser.id)} disabled={actionLoading === `generate-${selectedUser.id}`}>
+                      {actionLoading === `generate-${selectedUser.id}` ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Key className="w-4 h-4 mr-2" />}
+                      Generate Credentials
                     </Button>
                   </div>
                 )}
@@ -380,24 +418,28 @@ export default function PasswordHubPage() {
                   <Monitor className="w-12 h-12 mx-auto mb-2 opacity-50" />
                   <p>Active Sessions: {selectedUser.activeSessions || 0}</p>
                   <p>Active Devices: {selectedUser.activeDevices || 0}</p>
-                  <Button className="mt-4" size="sm" variant="destructive" onClick={() => handleAction('force-logout', selectedUser.id)}>
-                    <Monitor className="w-4 h-4 mr-2" /> Force Logout All Devices
+                  <Button className="mt-4" size="sm" variant="destructive" onClick={() => handleAction('force-logout', selectedUser.id)} disabled={actionLoading === `force-logout-${selectedUser.id}`}>
+                    {actionLoading === `force-logout-${selectedUser.id}` ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Monitor className="w-4 h-4 mr-2" />}
+                    Force Logout All Devices
                   </Button>
                 </div>
               </TabsContent>
               <TabsContent value="security" className="space-y-4 pt-4">
                 <div className="flex gap-2">
                   {selectedUser.accountStatus === 'LOCKED' ? (
-                    <Button size="sm" onClick={() => handleAction('unlock', selectedUser.id)}>
-                      <Unlock className="w-4 h-4 mr-2" /> Unlock Account
+                    <Button size="sm" onClick={() => handleAction('unlock', selectedUser.id)} disabled={actionLoading === `unlock-${selectedUser.id}`}>
+                      {actionLoading === `unlock-${selectedUser.id}` ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Unlock className="w-4 h-4 mr-2" />}
+                      Unlock Account
                     </Button>
                   ) : (
-                    <Button size="sm" variant="destructive" onClick={() => handleAction('lock', selectedUser.id)}>
-                      <Lock className="w-4 h-4 mr-2" /> Lock Account
+                    <Button size="sm" variant="destructive" onClick={() => handleAction('lock', selectedUser.id)} disabled={actionLoading === `lock-${selectedUser.id}`}>
+                      {actionLoading === `lock-${selectedUser.id}` ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Lock className="w-4 h-4 mr-2" />}
+                      Lock Account
                     </Button>
                   )}
-                  <Button size="sm" variant="outline" onClick={() => handleAction('force-change', selectedUser.id)}>
-                    <RefreshCw className="w-4 h-4 mr-2" /> Force Password Change
+                  <Button size="sm" variant="outline" onClick={() => handleAction('force-change', selectedUser.id)} disabled={actionLoading === `force-change-${selectedUser.id}`}>
+                    {actionLoading === `force-change-${selectedUser.id}` ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                    Force Password Change
                   </Button>
                 </div>
               </TabsContent>

@@ -1,7 +1,6 @@
 // src/term/term.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ForbiddenException } from '@nestjs/common';
 
 @Injectable()
 export class TermService {
@@ -57,6 +56,29 @@ export class TermService {
       include: { academicYear: true },
       orderBy: { startDate: 'desc' },
     });
+  }
+
+  async findOne(id: string, schoolId: string) {
+    const term = await this.prisma.term.findUnique({ where: { id }, include: { academicYear: true } });
+    if (!term || term.academicYear.schoolId !== schoolId) throw new NotFoundException('Term not found');
+    return term;
+  }
+
+  async update(id: string, data: any, schoolId: string) {
+    await this.findOne(id, schoolId);
+    return this.prisma.term.update({
+      where: { id },
+      data: {
+        ...(data.name && { name: data.name }),
+        ...(data.startDate && { startDate: new Date(data.startDate) }),
+        ...(data.endDate && { endDate: new Date(data.endDate) }),
+      },
+    });
+  }
+
+  async delete(id: string, schoolId: string) {
+    await this.findOne(id, schoolId);
+    return this.prisma.term.delete({ where: { id } });
   }
 
   async setCurrent(id: string, schoolId: string) {

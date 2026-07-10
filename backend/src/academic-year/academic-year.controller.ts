@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Param,
   Body,
   Req,
@@ -27,6 +28,18 @@ export class AcademicYearController {
   @Get()
   findAll(@Req() req: any) {
     return this.service.findAll(req.user.schoolId);
+  }
+
+  @Patch(':id')
+  @Roles('DIRECTOR')
+  update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.service.update(id, body, req.user.schoolId);
+  }
+
+  @Delete(':id')
+  @Roles('DIRECTOR')
+  delete(@Param('id') id: string, @Req() req: any) {
+    return this.service.delete(id, req.user.schoolId);
   }
 
   @Patch(':id/current')

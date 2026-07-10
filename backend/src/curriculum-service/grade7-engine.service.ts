@@ -14,6 +14,7 @@ interface ConvertedSubjectScore {
   convertedScore: number;
   multiplier: number;
   standardizedMax: number;
+  performanceCategory?: string;
 }
 
 interface BestSubjectSelection {
@@ -40,6 +41,7 @@ interface Grade7ComputationResult {
   specialPapers: ConvertedSubjectScore[];
   specialPapersTotal: number;
   finalAggregate: number;
+  selectionScore: number;
   division: DivisionResult | null;
   performanceCategory: string | null;
   details: string[];
@@ -117,12 +119,14 @@ export class Grade7EngineService {
         details.push(`${r.subject.name}: ${r.score} (no conversion rule)`);
       }
 
+      const cat = this.getPerSubjectCategory(convertedScore);
       return {
         subjectName: r.subject.name,
         rawScore: r.score,
         convertedScore: Math.round(convertedScore * 10) / 10,
         multiplier,
         standardizedMax,
+        performanceCategory: cat,
       };
     });
 
@@ -149,15 +153,17 @@ export class Grade7EngineService {
     const specialPapersTotal = specialPapers.reduce((sum, s) => sum + s.convertedScore, 0);
     details.push(`Special Papers: ${specialPapers.map((s) => `${s.subjectName}=${s.convertedScore}`).join(' + ')} = ${specialPapersTotal}`);
 
-    // Step 5: Compute final aggregate
-    const finalAggregate = bestFourTotal + specialPapersTotal;
-    details.push(`Final Aggregate: ${bestFourTotal} + ${specialPapersTotal} = ${finalAggregate}`);
+    // Step 5: Compute final aggregate and selection score
+    const selectionScore = bestFourTotal + specialPapersTotal;
+    const finalAggregate = bestFourTotal; // Certification is based on best 4 only
+    details.push(`Certification (Best 4): ${bestFourTotal} (max 600)`);
+    details.push(`Selection (Best 4 + SP1 + SP2): ${selectionScore} (max 900)`);
 
-    // Step 6: Determine division
-    const division = await this.computeDivision(finalAggregate, examStructureId);
+    // Step 6: Determine division (based on best 4 total, max 600, per ECZ standard)
+    const division = await this.computeDivision(finalAggregate, student.schoolId, examStructureId);
 
-    // Step 7: Determine performance category
-    const performanceCategory = await this.computePerformanceCategory(finalAggregate, examStructure);
+    // Step 7: Determine performance category (based on selection score)
+    const performanceCategory = await this.computePerformanceCategory(selectionScore, examStructure);
 
     return {
       studentId,
@@ -170,6 +176,7 @@ export class Grade7EngineService {
       specialPapers,
       specialPapersTotal,
       finalAggregate,
+      selectionScore,
       division,
       performanceCategory,
       details,
@@ -208,10 +215,16 @@ export class Grade7EngineService {
         sp2Converted: getScore('sp2'),
         bestFourTotal: computation.bestFourTotal,
         specialPapersTotal: computation.specialPapersTotal,
-        finalAggregate: computation.finalAggregate,
+        finalAggregate: computation.selectionScore,
         division: computation.division?.division || null,
-        divisionScore: computation.division?.score || null,
+        divisionScore: computation.bestFourTotal,
+        selectionScore: computation.selectionScore,
         performanceCategory: computation.performanceCategory,
+        metadata: {
+          perSubjectCategories: Object.fromEntries(
+            computation.scores.map((s) => [s.subjectName, s.performanceCategory]),
+          ),
+        },
       },
       update: {
         englishConverted: getScore('english'),
@@ -227,10 +240,16 @@ export class Grade7EngineService {
         sp2Converted: getScore('sp2'),
         bestFourTotal: computation.bestFourTotal,
         specialPapersTotal: computation.specialPapersTotal,
-        finalAggregate: computation.finalAggregate,
+        finalAggregate: computation.selectionScore,
         division: computation.division?.division || null,
-        divisionScore: computation.division?.score || null,
+        divisionScore: computation.bestFourTotal,
+        selectionScore: computation.selectionScore,
         performanceCategory: computation.performanceCategory,
+        metadata: {
+          perSubjectCategories: Object.fromEntries(
+            computation.scores.map((s) => [s.subjectName, s.performanceCategory]),
+          ),
+        },
         computedAt: new Date(),
       },
     });
@@ -336,19 +355,21 @@ export class Grade7EngineService {
 
   private async computeDivision(
     aggregate: number,
+    schoolId?: string,
     examStructureId?: string,
   ): Promise<DivisionResult | null> {
     const rules = await this.prisma.divisionRule.findMany({
-      where: examStructureId ? { examStructureId } : {},
+      where: examStructureId ? { examStructureId } : schoolId ? { schoolId, examStructureId: null } : {},
       orderBy: { sortOrder: 'asc' },
     });
 
     if (rules.length === 0) {
-      // Default ECZ selection composite divisions (best 4 + SP1 + SP2, max 900)
-      if (aggregate >= 683) return { division: 'Division 1', score: aggregate, label: 'Excellent', color: '#16a34a' };
-      if (aggregate >= 623) return { division: 'Division 2', score: aggregate, label: 'Very Good', color: '#2563eb' };
-      if (aggregate >= 589) return { division: 'Division 3', score: aggregate, label: 'Good', color: '#ca8a04' };
-      if (aggregate >= 300) return { division: 'Division 4', score: aggregate, label: 'Average', color: '#ea580c' };
+      // ECZ Grade 7 standard: division based on best 4 subjects (max 600)
+      // Source: ECZ Annual Report - Division 1: 460-600, Division 2: 422-459, Division 3: 398-421, Division 4: ≤397
+      if (aggregate >= 460) return { division: 'Division 1', score: aggregate, label: 'Distinction', color: '#16a34a' };
+      if (aggregate >= 422) return { division: 'Division 2', score: aggregate, label: 'Merit', color: '#2563eb' };
+      if (aggregate >= 398) return { division: 'Division 3', score: aggregate, label: 'Credit', color: '#ca8a04' };
+      if (aggregate >= 0) return { division: 'Division 4', score: aggregate, label: 'Pass', color: '#ea580c' };
       return { division: 'Unclassified', score: aggregate, label: 'Below Minimum', color: '#dc2626' };
     }
 
@@ -379,11 +400,12 @@ export class Grade7EngineService {
     });
 
     if (categories.length === 0) {
-      // Fallback: use selection composite division ranges
-      if (aggregate >= 683) return 'One';
-      if (aggregate >= 623) return 'Two';
-      if (aggregate >= 589) return 'Three';
-      if (aggregate >= 300) return 'Four';
+      // ECZ per-subject performance categories (standardized to 150 scale)
+      // ONE: 112-150 (75-100%), TWO: 90-111 (60-74%), THREE: 75-89 (50-59%), FOUR: 40-74 (27-49%), F: 0-39 (0-26%)
+      if (aggregate >= 672) return 'One';    // ~75% of 900
+      if (aggregate >= 540) return 'Two';    // ~60% of 900
+      if (aggregate >= 450) return 'Three';  // ~50% of 900
+      if (aggregate >= 240) return 'Four';   // ~27% of 900
       return 'Five';
     }
 
@@ -394,6 +416,18 @@ export class Grade7EngineService {
     }
 
     return categories[categories.length - 1]?.name.replace('COMPOSITE_', '') || 'Four';
+  }
+
+  /**
+   * Get ECZ Grade 7 per-subject performance category based on standardized (150-scale) score.
+   * ONE: 112-150 (75-100%), TWO: 90-111 (60-74%), THREE: 75-89 (50-59%), FOUR: 40-74 (27-49%), Five: 0-39 (0-26%)
+   */
+  private getPerSubjectCategory(standardizedScore: number): string {
+    if (standardizedScore >= 112) return 'One';
+    if (standardizedScore >= 90) return 'Two';
+    if (standardizedScore >= 75) return 'Three';
+    if (standardizedScore >= 40) return 'Four';
+    return 'Five';
   }
 
   private async getDefaultExamStructure(schoolId: string) {
