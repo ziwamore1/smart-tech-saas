@@ -12,15 +12,20 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { GradingEngineService } from '../grading-engine/grading-engine.service';
+import { GradingSystemService } from '../grading-system/grading-system.service';
 
 @Controller('primary/grading')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PrimaryGradingController {
-  constructor(private readonly gradingEngine: GradingEngineService) {}
+  constructor(
+    private readonly gradingEngine: GradingEngineService,
+    private readonly gradingSystemService: GradingSystemService,
+  ) {}
 
   @Get('policies')
   @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
   async getPolicies(@Request() req) {
+    await this.gradingSystemService.ensureG7PolicyExists(req.user.schoolId);
     const policies = await this.gradingEngine.getGradingPolicies(req.user.schoolId);
     return { data: policies, message: 'Primary grading policies retrieved' };
   }

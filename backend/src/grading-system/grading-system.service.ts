@@ -1,20 +1,36 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
-export class GradingSystemService implements OnModuleInit {
+export class GradingSystemService {
   private readonly logger = new Logger(GradingSystemService.name);
+  private seeded = false;
   constructor(private prisma: PrismaService) {}
 
-  async onModuleInit() {
+  async ensureG7PolicyExists(schoolId: string) {
+    const existing = await this.prisma.gradingPolicy.findFirst({
+      where: { schoolId, code: 'ECZ_G7' },
+    });
+    if (existing) return true;
+    try {
+      await this.seedG7GradingPolicy(schoolId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async ensureG7PolicyForAllSchools() {
+    if (this.seeded) return;
     try {
       const schools = await this.prisma.school.findMany({ select: { id: true } });
       for (const school of schools) {
-        await this.seedG7GradingPolicy(school.id);
+        await this.ensureG7PolicyExists(school.id);
       }
-      if (schools.length > 0) this.logger.log(`ECZ Grade 7 policies seeded for ${schools.length} schools`);
-    } catch (err) {
-      this.logger.warn('Could not auto-seed ECZ Grade 7 policies (DB may not be ready yet)');
+      this.seeded = true;
+      if (schools.length > 0) this.logger.log(`ECZ Grade 7 policies ensured for ${schools.length} schools`);
+    } catch (err: any) {
+      this.logger.warn(`Could not ensure ECZ Grade 7 policies: ${err?.message}`);
     }
   }
 
