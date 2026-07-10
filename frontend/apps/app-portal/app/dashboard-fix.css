@@ -362,7 +362,7 @@ div[class*="rounded-lg shadow"] {
 .text-center { text-align: center; }
 
 /* Disabled state */
-.disabled\:opacity-50 {
+.disabled\:opacity-50:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
