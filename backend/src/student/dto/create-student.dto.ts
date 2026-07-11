@@ -71,4 +71,12 @@ export class CreateStudentDto {
   @IsString()
   @IsOptional()
   status?: string;
+
+  @IsString()
+  @IsOptional()
+  grade?: string;
+
+  @IsString()
+  @IsOptional()
+  className?: string;
 }

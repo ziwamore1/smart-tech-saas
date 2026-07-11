@@ -116,13 +116,17 @@ export default function StaffRecordsPage() {
     }
   }, [authLoading, isAuthenticated, canAccess, fetchData, router]);
 
+  const [syncingAll, setSyncingAll] = useState(false);
+
   const handleSyncAll = async () => {
+    setSyncingAll(true);
     try {
       await premiumStaffRecordsApi.syncAll();
       fetchData();
     } catch (err: any) {
       setError(err?.message || 'Sync failed');
     }
+    setSyncingAll(false);
   };
 
   if (authLoading) {
@@ -181,8 +185,8 @@ export default function StaffRecordsPage() {
           <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4 }}>Premium Enterprise HR Intelligence Layer</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={handleSyncAll} style={{ padding: '8px 16px', background: '#ea6645', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
-            <i className="fas fa-sync" style={{ marginRight: 6 }}></i>Sync All Staff
+          <button onClick={handleSyncAll} disabled={syncingAll} style={{ padding: '8px 16px', background: syncingAll ? '#d1d5db' : '#ea6645', color: '#fff', border: 'none', borderRadius: 6, cursor: syncingAll ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 500 }}>
+            <i className={`fas ${syncingAll ? 'fa-spinner fa-spin' : 'fa-sync'}`} style={{ marginRight: 6 }}></i>{syncingAll ? 'Syncing...' : 'Sync All Staff'}
           </button>
         </div>
       </div>
@@ -285,6 +289,7 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
   const [searchText, setSearchText] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const colDefs = useMemo<ColDef[]>(() => {
     const baseCols: ColDef[] = [
@@ -353,6 +358,7 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
   }, [searchText]);
 
   const handleExportExcel = async () => {
+    setExporting(true);
     try {
       const res = await premiumStaffRecordsApi.exportProfilesExcel();
       const url = window.URL.createObjectURL(new Blob([res.data]));
@@ -362,6 +368,7 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
       a.click();
       window.URL.revokeObjectURL(url);
     } catch { }
+    setExporting(false);
   };
 
   if (profiles.length === 0) {
@@ -388,8 +395,8 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
             onInput={onQuickFilterChanged}
             style={{ padding: '6px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, width: 200 }}
           />
-          <button onClick={handleExportExcel} style={{ padding: '6px 14px', background: '#059669', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
-            <i className="fas fa-file-excel" style={{ marginRight: 6 }}></i>Export Excel
+          <button onClick={handleExportExcel} disabled={exporting} style={{ padding: '6px 14px', background: exporting ? '#d1d5db' : '#059669', color: '#fff', border: 'none', borderRadius: 6, cursor: exporting ? 'not-allowed' : 'pointer', fontSize: 13 }}>
+            <i className={`fas ${exporting ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: 6 }}></i>{exporting ? 'Exporting...' : 'Export Excel'}
           </button>
         </div>
       </div>
@@ -423,6 +430,12 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
   const [templateColumns, setTemplateColumns] = useState<any[]>([]);
   const [templateName, setTemplateName] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [btnLoading, setBtnLoading] = useState<Record<string, boolean>>({});
+
+  const withBtnLoading = async (key: string, fn: () => Promise<void>) => {
+    setBtnLoading(prev => ({ ...prev, [key]: true }));
+    try { await fn(); } finally { setBtnLoading(prev => ({ ...prev, [key]: false })); }
+  };
 
   const fetchColumns = useCallback(async (templateId: string) => {
     try {
@@ -437,24 +450,24 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
     }
   }, []);
 
-  const handleCreateTemplate = async () => {
-    try {
+  const handleCreateTemplate = () => {
+    withBtnLoading('createTemplate', async () => {
       await premiumStaffRecordsApi.createTemplate({ name: 'New Return Template', returnType: 'MONTHLY', category: 'DISTRICT' });
       onRefresh();
-    } catch { }
+    });
   };
 
-  const handleSaveTemplate = async () => {
+  const handleSaveTemplate = () => {
     if (!editTemplate?.id) return;
-    try {
+    withBtnLoading('saveTemplate', async () => {
       await premiumStaffRecordsApi.updateTemplate(editTemplate.id, { name: templateName });
       onRefresh();
-    } catch { }
+    });
   };
 
-  const handleAddColumn = async () => {
+  const handleAddColumn = () => {
     if (!selectedTemplateId) return;
-    try {
+    withBtnLoading('addColumn', async () => {
       await premiumStaffRecordsApi.addColumn(selectedTemplateId, {
         columnName: `field_${Date.now()}`,
         columnLabel: 'New Field',
@@ -465,21 +478,21 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
         isVisible: true,
       });
       fetchColumns(selectedTemplateId);
-    } catch { }
+    });
   };
 
-  const handleDeleteColumn = async (columnId: string) => {
-    try {
+  const handleDeleteColumn = (columnId: string) => {
+    withBtnLoading(`deleteCol_${columnId}`, async () => {
       await premiumStaffRecordsApi.deleteColumn(columnId);
       if (selectedTemplateId) fetchColumns(selectedTemplateId);
-    } catch { }
+    });
   };
 
-  const handleColumnToggle = async (column: any) => {
-    try {
+  const handleColumnToggle = (column: any) => {
+    withBtnLoading(`toggle_${column.id}`, async () => {
       await premiumStaffRecordsApi.updateColumn(column.id, { isVisible: !column.isVisible });
       if (selectedTemplateId) fetchColumns(selectedTemplateId);
-    } catch { }
+    });
   };
 
   const handleColumnRename = async (columnId: string, newName: string) => {
@@ -489,8 +502,8 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
     } catch { }
   };
 
-  const handleExportTemplate = async (templateId: string) => {
-    try {
+  const handleExportTemplate = (templateId: string) => {
+    withBtnLoading(`export_${templateId}`, async () => {
       const res = await premiumStaffRecordsApi.exportTemplateExcel(templateId);
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const a = document.createElement('a');
@@ -498,23 +511,23 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
       a.download = `template_${templateId}.xlsx`;
       a.click();
       window.URL.revokeObjectURL(url);
-    } catch { }
+    });
   };
 
-  const handleDuplicateTemplate = async (templateId: string) => {
-    try {
+  const handleDuplicateTemplate = (templateId: string) => {
+    withBtnLoading(`dup_${templateId}`, async () => {
       await premiumStaffRecordsApi.duplicateTemplate(templateId);
       onRefresh();
-    } catch { }
+    });
   };
 
-  const handleDeleteTemplate = async (templateId: string) => {
+  const handleDeleteTemplate = (templateId: string) => {
     if (!confirm('Delete this template and all its columns?')) return;
-    try {
+    withBtnLoading(`del_${templateId}`, async () => {
       await premiumStaffRecordsApi.deleteTemplate(templateId);
       if (selectedTemplateId === templateId) { setSelectedTemplateId(null); setTemplateColumns([]); setEditTemplate(null); }
       onRefresh();
-    } catch { }
+    });
   };
 
   useEffect(() => {
@@ -537,7 +550,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
             <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e8ddd0', overflow: 'hidden' }}>
               <div style={{ padding: 12, borderBottom: '1px solid #e8ddd0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 14 }}>Templates</span>
-                <button onClick={handleCreateTemplate} style={{ padding: '4px 10px', background: '#ea6645', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}><i className="fas fa-plus"></i></button>
+                <button onClick={handleCreateTemplate} disabled={btnLoading['createTemplate']} style={{ padding: '4px 10px', background: btnLoading['createTemplate'] ? '#d1d5db' : '#ea6645', color: '#fff', border: 'none', borderRadius: 4, cursor: btnLoading['createTemplate'] ? 'not-allowed' : 'pointer', fontSize: 12 }}><i className={`fas ${btnLoading['createTemplate'] ? 'fa-spinner fa-spin' : 'fa-plus'}`}></i></button>
               </div>
               {templates.length === 0 ? (
                 <div style={{ padding: 20, textAlign: 'center', color: '#6b7280', fontSize: 13 }}>No templates yet.</div>
@@ -560,14 +573,14 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
               <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e8ddd0', padding: 16 }}>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
                   <input value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="Template name" style={{ flex: 1, padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }} />
-                  <button onClick={handleSaveTemplate} style={{ padding: '6px 14px', background: '#059669', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Save</button>
-                  <button onClick={() => handleDuplicateTemplate(editTemplate.id)} style={{ padding: '6px 14px', background: '#6b7280', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Duplicate</button>
-                  <button onClick={() => handleDeleteTemplate(editTemplate.id)} style={{ padding: '6px 14px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Delete</button>
-                  <button onClick={() => handleExportTemplate(editTemplate.id)} style={{ padding: '6px 14px', background: '#059669', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}><i className="fas fa-file-excel"></i> Excel</button>
+                  <button onClick={handleSaveTemplate} disabled={btnLoading['saveTemplate']} style={{ padding: '6px 14px', background: btnLoading['saveTemplate'] ? '#d1d5db' : '#059669', color: '#fff', border: 'none', borderRadius: 6, cursor: btnLoading['saveTemplate'] ? 'not-allowed' : 'pointer', fontSize: 13 }}>{btnLoading['saveTemplate'] ? 'Saving...' : 'Save'}</button>
+                  <button onClick={() => handleDuplicateTemplate(editTemplate.id)} disabled={btnLoading[`dup_${editTemplate.id}`]} style={{ padding: '6px 14px', background: btnLoading[`dup_${editTemplate.id}`] ? '#d1d5db' : '#6b7280', color: '#fff', border: 'none', borderRadius: 6, cursor: btnLoading[`dup_${editTemplate.id}`] ? 'not-allowed' : 'pointer', fontSize: 13 }}>{btnLoading[`dup_${editTemplate.id}`] ? 'Duplicating...' : 'Duplicate'}</button>
+                  <button onClick={() => handleDeleteTemplate(editTemplate.id)} disabled={btnLoading[`del_${editTemplate.id}`]} style={{ padding: '6px 14px', background: btnLoading[`del_${editTemplate.id}`] ? '#d1d5db' : '#dc2626', color: '#fff', border: 'none', borderRadius: 6, cursor: btnLoading[`del_${editTemplate.id}`] ? 'not-allowed' : 'pointer', fontSize: 13 }}>{btnLoading[`del_${editTemplate.id}`] ? 'Deleting...' : 'Delete'}</button>
+                  <button onClick={() => handleExportTemplate(editTemplate.id)} disabled={btnLoading[`export_${editTemplate.id}`]} style={{ padding: '6px 14px', background: btnLoading[`export_${editTemplate.id}`] ? '#d1d5db' : '#059669', color: '#fff', border: 'none', borderRadius: 6, cursor: btnLoading[`export_${editTemplate.id}`] ? 'not-allowed' : 'pointer', fontSize: 13 }}><i className={`fas ${btnLoading[`export_${editTemplate.id}`] ? 'fa-spinner fa-spin' : 'fa-file-excel'}`}></i> {btnLoading[`export_${editTemplate.id}`] ? 'Exporting...' : 'Excel'}</button>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>Columns ({templateColumns.length})</span>
-                  <button onClick={handleAddColumn} style={{ padding: '4px 10px', background: '#ea6645', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}><i className="fas fa-plus"></i> Add Column</button>
+                  <button onClick={handleAddColumn} disabled={btnLoading['addColumn']} style={{ padding: '4px 10px', background: btnLoading['addColumn'] ? '#d1d5db' : '#ea6645', color: '#fff', border: 'none', borderRadius: 4, cursor: btnLoading['addColumn'] ? 'not-allowed' : 'pointer', fontSize: 12 }}><i className={`fas ${btnLoading['addColumn'] ? 'fa-spinner fa-spin' : 'fa-plus'}`}></i> {btnLoading['addColumn'] ? 'Adding...' : 'Add Column'}</button>
                 </div>
                 {templateColumns.length === 0 ? (
                   <div style={{ textAlign: 'center', color: '#6b7280', padding: 20, fontSize: 13 }}>No columns. Add a column to start building your return template.</div>
@@ -603,10 +616,10 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                             <td style={{ padding: '6px 10px' }}>{col.isRequired ? '\u2713' : '\u2717'}</td>
                             <td style={{ padding: '6px 10px' }}>{col.isEditable !== false ? '\u2713' : '\u2717'}</td>
                             <td style={{ padding: '6px 10px' }}>
-                              <input type="checkbox" checked={col.isVisible !== false} onChange={() => handleColumnToggle(col)} />
+                              <input type="checkbox" checked={col.isVisible !== false} onChange={() => handleColumnToggle(col)} disabled={!!btnLoading[`toggle_${col.id}`]} />
                             </td>
                             <td style={{ padding: '6px 10px' }}>
-                              <button onClick={() => handleDeleteColumn(col.id)} style={{ padding: '2px 6px', background: '#fecaca', color: '#dc2626', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Delete</button>
+                              <button onClick={() => handleDeleteColumn(col.id)} disabled={btnLoading[`deleteCol_${col.id}`]} style={{ padding: '2px 6px', background: btnLoading[`deleteCol_${col.id}`] ? '#e5e7eb' : '#fecaca', color: '#dc2626', border: 'none', borderRadius: 4, cursor: btnLoading[`deleteCol_${col.id}`] ? 'not-allowed' : 'pointer', fontSize: 11 }}>{btnLoading[`deleteCol_${col.id}`] ? '...' : 'Delete'}</button>
                             </td>
                           </tr>
                         ))}
@@ -638,6 +651,12 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [submissionPeriod, setSubmissionPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(false);
+  const [subLoading, setSubLoading] = useState<Record<string, boolean>>({});
+
+  const withSubLoading = async (key: string, fn: () => Promise<void>) => {
+    setSubLoading(prev => ({ ...prev, [key]: true }));
+    try { await fn(); } finally { setSubLoading(prev => ({ ...prev, [key]: false })); }
+  };
 
   const fetchSubmissions = useCallback(async (templateId?: string) => {
     setLoading(true);
@@ -648,9 +667,9 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
     setLoading(false);
   }, []);
 
-  const handleCreateSubmission = async () => {
+  const handleCreateSubmission = () => {
     if (!selectedTemplate) return;
-    try {
+    withSubLoading('create', async () => {
       await premiumStaffRecordsApi.createSubmission({
         templateId: selectedTemplate,
         period: submissionPeriod,
@@ -658,33 +677,35 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
         term: 'Term 1',
       });
       fetchSubmissions(selectedTemplate);
-    } catch { }
+    });
   };
 
-  const handleSubmit = async (id: string) => {
-    try {
+  const handleSubmit = (id: string) => {
+    withSubLoading(`submit_${id}`, async () => {
       await premiumStaffRecordsApi.submitSubmission(id);
       fetchSubmissions(selectedTemplate);
-    } catch { }
+    });
   };
 
-  const handleApprove = async (id: string) => {
-    try {
+  const handleApprove = (id: string) => {
+    withSubLoading(`approve_${id}`, async () => {
       await premiumStaffRecordsApi.approveSubmission(id);
       fetchSubmissions(selectedTemplate);
-    } catch { }
+    });
   };
 
-  const handleExport = async (id: string) => {
-    try {
+  const handleExport = (id: string) => {
+    withSubLoading(`export_${id}`, async () => {
       const res = await premiumStaffRecordsApi.exportSubmissionExcel(id);
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const a = document.createElement('a');
       a.href = url;
       a.download = `submission_${id}.xlsx`;
+      a.href = url;
+      a.download = `submission_${id}.xlsx`;
       a.click();
       window.URL.revokeObjectURL(url);
-    } catch { }
+    });
   };
 
   useEffect(() => { fetchSubmissions(); }, [fetchSubmissions]);
@@ -697,8 +718,8 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
           {templates.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
         <input value={submissionPeriod} onChange={e => setSubmissionPeriod(e.target.value)} placeholder="Period (YYYY-MM)" style={{ width: 130, padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }} />
-        <button onClick={handleCreateSubmission} disabled={!selectedTemplate} style={{ padding: '6px 14px', background: selectedTemplate ? '#ea6645' : '#d1d5db', color: '#fff', border: 'none', borderRadius: 6, cursor: selectedTemplate ? 'pointer' : 'not-allowed', fontSize: 13 }}>
-          <i className="fas fa-plus"></i> New Submission
+        <button onClick={handleCreateSubmission} disabled={!selectedTemplate || !!subLoading['create']} style={{ padding: '6px 14px', background: selectedTemplate && !subLoading['create'] ? '#ea6645' : '#d1d5db', color: '#fff', border: 'none', borderRadius: 6, cursor: selectedTemplate && !subLoading['create'] ? 'pointer' : 'not-allowed', fontSize: 13 }}>
+          <i className={`fas ${subLoading['create'] ? 'fa-spinner fa-spin' : 'fa-plus'}`}></i> {subLoading['create'] ? 'Creating...' : 'New Submission'}
         </button>
       </div>
 
@@ -729,9 +750,9 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
                   <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 12 }}>{s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '-'}</td>
                   <td style={{ padding: '8px 12px' }}>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      {s.status === 'DRAFT' && <button onClick={() => handleSubmit(s.id)} style={{ padding: '3px 8px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Submit</button>}
-                      {s.status === 'SUBMITTED' && <button onClick={() => handleApprove(s.id)} style={{ padding: '3px 8px', background: '#059669', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Approve</button>}
-                      <button onClick={() => handleExport(s.id)} style={{ padding: '3px 8px', background: '#6b7280', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Excel</button>
+                      {s.status === 'DRAFT' && <button onClick={() => handleSubmit(s.id)} disabled={!!subLoading[`submit_${s.id}`]} style={{ padding: '3px 8px', background: subLoading[`submit_${s.id}`] ? '#93c5fd' : '#3b82f6', color: '#fff', border: 'none', borderRadius: 4, cursor: subLoading[`submit_${s.id}`] ? 'not-allowed' : 'pointer', fontSize: 11 }}>{subLoading[`submit_${s.id}`] ? '...' : 'Submit'}</button>}
+                      {s.status === 'SUBMITTED' && <button onClick={() => handleApprove(s.id)} disabled={!!subLoading[`approve_${s.id}`]} style={{ padding: '3px 8px', background: subLoading[`approve_${s.id}`] ? '#6ee7b7' : '#059669', color: '#fff', border: 'none', borderRadius: 4, cursor: subLoading[`approve_${s.id}`] ? 'not-allowed' : 'pointer', fontSize: 11 }}>{subLoading[`approve_${s.id}`] ? '...' : 'Approve'}</button>}
+                      <button onClick={() => handleExport(s.id)} disabled={!!subLoading[`export_${s.id}`]} style={{ padding: '3px 8px', background: subLoading[`export_${s.id}`] ? '#9ca3af' : '#6b7280', color: '#fff', border: 'none', borderRadius: 4, cursor: subLoading[`export_${s.id}`] ? 'not-allowed' : 'pointer', fontSize: 11 }}>{subLoading[`export_${s.id}`] ? '...' : 'Excel'}</button>
                     </div>
                   </td>
                 </tr>
@@ -793,6 +814,12 @@ function QualificationsTab({ profiles, onRefresh }: { profiles: any[]; onRefresh
 }
 
 function SyncTab({ syncStatus, syncHistory, onSyncAll }: { syncStatus: any; syncHistory: any[]; onSyncAll: () => void }) {
+  const [syncing, setSyncing] = useState(false);
+  const handleSync = () => {
+    setSyncing(true);
+    onSyncAll();
+    setTimeout(() => setSyncing(false), 2000);
+  };
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
@@ -813,8 +840,8 @@ function SyncTab({ syncStatus, syncHistory, onSyncAll }: { syncStatus: any; sync
           <p style={{ fontSize: 22, fontWeight: 700, color: '#dc2626' }}>{syncStatus?.conflict || 0}</p>
         </div>
       </div>
-      <button onClick={onSyncAll} style={{ padding: '8px 16px', background: '#ea6645', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', marginBottom: 20, fontSize: 14 }}>
-        <i className="fas fa-sync" style={{ marginRight: 6 }}></i>Run Full Sync
+      <button onClick={handleSync} disabled={syncing} style={{ padding: '8px 16px', background: syncing ? '#d1d5db' : '#ea6645', color: '#fff', border: 'none', borderRadius: 6, cursor: syncing ? 'not-allowed' : 'pointer', marginBottom: 20, fontSize: 14 }}>
+        <i className={`fas ${syncing ? 'fa-spinner fa-spin' : 'fa-sync'}`} style={{ marginRight: 6 }}></i>{syncing ? 'Syncing...' : 'Run Full Sync'}
       </button>
       <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e8ddd0', overflow: 'hidden' }}>
         <div style={{ padding: 12, borderBottom: '1px solid #e8ddd0', fontWeight: 600, fontSize: 14 }}>Sync History</div>

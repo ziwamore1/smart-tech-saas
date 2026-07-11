@@ -662,6 +662,8 @@ model Student {
   firstName            String
   lastName             String
   gender               String?
+  grade                String?
+  className            String?
   photoUrl             String?
   photoPublicId        String?
   adaptiveTestSessions AdaptiveTestSession[]

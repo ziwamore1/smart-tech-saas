@@ -38,16 +38,21 @@ export class StudentService {
       admissionNumber = await this.admissionNumberService.getNextAdmissionNumber(schoolId, academicYearId);
     }
 
+    const createData: any = {
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      admissionNumber,
+      dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
+      gender: dto.gender,
+      status: (dto.status as StudentStatus) || StudentStatus.ACTIVE,
+      schoolId,
+    };
+
+    if (dto.grade) createData.grade = dto.grade;
+    if (dto.className) createData.className = dto.className;
+
     const student = await this.prisma.student.create({
-      data: {
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        admissionNumber,
-        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
-        gender: dto.gender,
-        status: (dto.status as StudentStatus) || StudentStatus.ACTIVE,
-        schoolId,
-      },
+      data: createData,
     });
 
     await this.createAuditLog(userId, schoolId, 'ADMISSION_GENERATED', 'Student', student.id, {
@@ -451,7 +456,14 @@ export class StudentService {
         },
       },
       orderBy: { createdAt: 'desc' },
-    });
+    }).then(students => students.map(s => {
+      const latestEnrollment = s.enrollments?.[0];
+      return {
+        ...s,
+        className: s.className || latestEnrollment?.class?.name || null,
+        grade: s.grade || null,
+      };
+    }));
   }
 
   async findOne(id: string) {

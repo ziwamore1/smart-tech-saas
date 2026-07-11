@@ -266,16 +266,22 @@ export default function TeachersPage() {
   });
 
   const createAssignmentMutation = useMutation({
-    mutationFn: (data: any) => {
+    mutationFn: async (data: any) => {
       console.log('Creating assignment with data:', JSON.stringify(data, null, 2));
+      if (isPrimary) {
+        await classApi.setClassTeacher(data.classId, data.teacherId);
+        return { success: true };
+      }
       return teachingAssignmentApi.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teaching-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      queryClient.invalidateQueries({ queryKey: ['school-stats'] });
       setShowAssignmentModal(false);
       setSelectedTeacherForAssignment(null);
       setAssignmentForm({ classId: '', subjectId: '', academicYearId: '' });
-      setMessage({ type: 'success', text: 'Assignment created successfully!' });
+      setMessage({ type: 'success', text: isPrimary ? 'Class teacher assigned successfully!' : 'Assignment created successfully!' });
       setTimeout(() => setMessage(null), 3000);
     },
     onError: (error: any) => {
@@ -890,6 +896,7 @@ export default function TeachersPage() {
                 </select>
               </div>
               )}
+              {!isPrimary && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Academic Year *</label>
                 <select value={assignmentForm.academicYearId} onChange={(e) => { console.log('Academic year selected:', e.target.value); setAssignmentForm({ ...assignmentForm, academicYearId: e.target.value }); }} className="w-full px-3 py-2 border rounded-lg" required>
@@ -899,11 +906,12 @@ export default function TeachersPage() {
                   ))}
                 </select>
               </div>
+              )}
             </div>
             <div className="flex gap-3 justify-end pt-6">
               <button onClick={() => { setShowAssignmentModal(false); setSelectedTeacherForAssignment(null); setAssignmentForm({ classId: '', subjectId: '', academicYearId: '' }); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
               <button onClick={() => {
-                if (!selectedTeacherForAssignment?.id || !assignmentForm.classId || (!isPrimary && !assignmentForm.subjectId) || !assignmentForm.academicYearId) {
+                if (!selectedTeacherForAssignment?.id || !assignmentForm.classId || (!isPrimary && !assignmentForm.subjectId) || (!isPrimary && !assignmentForm.academicYearId)) {
                   alert('Please fill in all required fields');
                   return;
                 }

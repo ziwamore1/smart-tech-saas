@@ -96,6 +96,8 @@ export default function PrimaryStudentsPage() {
       status: 'ACTIVE',
     };
 
+    if (form.grade) dto.grade = form.grade;
+
     if (form.manualOverride && form.admissionNumber) {
       dto.admissionNumber = form.admissionNumber;
       dto.manualOverride = true;
