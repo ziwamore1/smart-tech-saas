@@ -143,17 +143,29 @@ export class ClassService {
     if (!classEntity) throw new NotFoundException('Class not found');
     if (classEntity.schoolId !== schoolId) throw new ForbiddenException('Access denied');
 
+    let resolvedUserId = teacherId;
+
     if (teacherId) {
-      const teacher = await this.prisma.user.findUnique({
+      const user = await this.prisma.user.findUnique({
         where: { id: teacherId },
       });
-      if (!teacher) throw new NotFoundException('Teacher not found');
-      if (teacher.schoolId !== schoolId) throw new ForbiddenException('Teacher does not belong to this school');
+
+      if (!user) {
+        const teacher = await this.prisma.teacher.findUnique({
+          where: { id: teacherId },
+          include: { user: { select: { id: true } } },
+        });
+        if (!teacher) throw new NotFoundException('Teacher not found');
+        resolvedUserId = teacher.userId;
+        if (teacher.schoolId !== schoolId) throw new ForbiddenException('Teacher does not belong to this school');
+      } else {
+        if (user.schoolId !== schoolId) throw new ForbiddenException('Teacher does not belong to this school');
+      }
     }
 
     return this.prisma.class.update({
       where: { id },
-      data: { classTeacherId: teacherId },
+      data: { classTeacherId: resolvedUserId },
       include: {
         classTeacher: {
           select: { id: true, firstName: true, lastName: true, email: true },

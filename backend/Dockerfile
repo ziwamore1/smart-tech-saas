@@ -60,5 +60,5 @@ RUN addgroup -g 1001 -S nodejs && \
     chown -R nodejs:nodejs /app/logs
 USER nodejs
 
-# Start the application
-CMD ["node", "dist/main.js"]
+# Run migrations on startup, then start the application
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]

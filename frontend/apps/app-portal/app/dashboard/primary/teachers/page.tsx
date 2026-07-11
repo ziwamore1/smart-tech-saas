@@ -234,7 +234,11 @@ export default function PrimaryTeachersPage() {
   });
 
   const createAssignmentMutation = useMutation({
-    mutationFn: (data: any) => teachingAssignmentApi.create(data),
+    mutationFn: async (data: any) => {
+      const userId = selectedTeacherForAssignment?.userId || selectedTeacherForAssignment?.user?.id || data.teacherId;
+      await classApi.setClassTeacher(data.classId, userId);
+      return { success: true };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teaching-assignments'] });
       setShowAssignmentModal(false);
@@ -892,14 +896,13 @@ export default function PrimaryTeachersPage() {
             <div className="flex gap-3 justify-end pt-6">
               <button onClick={() => { setShowAssignmentModal(false); setSelectedTeacherForAssignment(null); setAssignmentForm({ classId: '', subjectId: '', academicYearId: '' }); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
               <button onClick={() => {
-                if (!selectedTeacherForAssignment?.id || !assignmentForm.classId || !assignmentForm.academicYearId) {
+                if (!selectedTeacherForAssignment?.id || !assignmentForm.classId) {
                   alert('Please fill in all required fields');
                   return;
                 }
                 createAssignmentMutation.mutate({
-                  teacherId: selectedTeacherForAssignment.id,
+                  teacherId: selectedTeacherForAssignment.userId || selectedTeacherForAssignment.user?.id || selectedTeacherForAssignment.id,
                   classId: assignmentForm.classId,
-                  academicYearId: assignmentForm.academicYearId,
                 });
               }} disabled={createAssignmentMutation.isPending} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400">
                 {createAssignmentMutation.isPending ? 'Creating...' : 'Create Assignment'}

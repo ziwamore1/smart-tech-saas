@@ -916,7 +916,7 @@ export default function TeachersPage() {
                   return;
                 }
                 createAssignmentMutation.mutate({
-                  teacherId: selectedTeacherForAssignment.id,
+                  teacherId: selectedTeacherForAssignment.userId || selectedTeacherForAssignment.user?.id,
                   classId: assignmentForm.classId,
                   ...(isPrimary ? {} : { subjectId: assignmentForm.subjectId }),
                   academicYearId: assignmentForm.academicYearId,
