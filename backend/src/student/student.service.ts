@@ -51,9 +51,23 @@ export class StudentService {
     if (dto.grade) createData.grade = dto.grade;
     if (dto.className) createData.className = dto.className;
 
-    const student = await this.prisma.student.create({
-      data: createData,
-    });
+    let student;
+    try {
+      student = await this.prisma.student.create({
+        data: createData,
+      });
+    } catch (error: any) {
+      if (error.code === 'P2022' || error.message?.includes('column') || error.message?.includes('grade') || error.message?.includes('className')) {
+        this.logger.warn(`Student create failed with grade/className columns, retrying without: ${error.message}`);
+        delete createData.grade;
+        delete createData.className;
+        student = await this.prisma.student.create({
+          data: createData,
+        });
+      } else {
+        throw error;
+      }
+    }
 
     await this.createAuditLog(userId, schoolId, 'ADMISSION_GENERATED', 'Student', student.id, {
       admissionNumber,
@@ -444,121 +458,247 @@ export class StudentService {
       ];
     }
 
-    return this.prisma.student.findMany({
-      where,
-      include: {
-        enrollments: {
-          include: { class: true, academicYear: true },
-          orderBy: { academicYear: { startDate: 'desc' } },
+    try {
+      return await this.prisma.student.findMany({
+        where,
+        include: {
+          enrollments: {
+            include: { class: true, academicYear: true },
+            orderBy: { academicYear: { startDate: 'desc' } },
+          },
+          parents: {
+            include: { parent: true },
+          },
         },
-        parents: {
-          include: { parent: true },
+        orderBy: { createdAt: 'desc' },
+      }).then(students => students.map(s => {
+        const latestEnrollment = s.enrollments?.[0];
+        return {
+          ...s,
+          className: s.className || latestEnrollment?.class?.name || null,
+          grade: s.grade || null,
+        };
+      }));
+    } catch (error: any) {
+      this.logger.error(`findAll query failed, retrying without grade/className: ${error.message}`);
+      return await this.prisma.student.findMany({
+        where,
+        select: {
+          id: true,
+          admissionNumber: true,
+          studentUuid: true,
+          status: true,
+          dateOfBirth: true,
+          schoolId: true,
+          firstName: true,
+          lastName: true,
+          gender: true,
+          photoUrl: true,
+          photoPublicId: true,
+          createdAt: true,
+          updatedAt: true,
+          enrollments: {
+            include: { class: true, academicYear: true },
+            orderBy: { academicYear: { startDate: 'desc' } },
+          },
+          parents: {
+            include: { parent: true },
+          },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    }).then(students => students.map(s => {
-      const latestEnrollment = s.enrollments?.[0];
-      return {
-        ...s,
-        className: s.className || latestEnrollment?.class?.name || null,
-        grade: s.grade || null,
-      };
-    }));
+        orderBy: { createdAt: 'desc' },
+      }).then(students => students.map(s => {
+        const latestEnrollment = s.enrollments?.[0];
+        return {
+          ...s,
+          className: latestEnrollment?.class?.name || null,
+          grade: null,
+        };
+      }));
+    }
   }
 
   async findOne(id: string) {
-    const student = await this.prisma.student.findUnique({
-      where: { id },
-      include: {
-        enrollments: {
-          include: { class: true, academicYear: true },
-          orderBy: { academicYear: { startDate: 'desc' } },
+    try {
+      const student = await this.prisma.student.findUnique({
+        where: { id },
+        include: {
+          enrollments: {
+            include: { class: true, academicYear: true },
+            orderBy: { academicYear: { startDate: 'desc' } },
+          },
+          parents: {
+            include: { parent: true },
+          },
+          user: {
+            select: { username: true, email: true },
+          },
         },
-        parents: {
-          include: { parent: true },
+      });
+      if (!student) throw new NotFoundException('Student not found');
+      return student;
+    } catch (error: any) {
+      if (error instanceof NotFoundException) throw error;
+      this.logger.error(`findOne query failed, retrying without grade/className: ${error.message}`);
+      const student = await this.prisma.student.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          admissionNumber: true,
+          studentUuid: true,
+          status: true,
+          dateOfBirth: true,
+          schoolId: true,
+          firstName: true,
+          lastName: true,
+          gender: true,
+          photoUrl: true,
+          photoPublicId: true,
+          createdAt: true,
+          updatedAt: true,
+          enrollments: {
+            include: { class: true, academicYear: true },
+            orderBy: { academicYear: { startDate: 'desc' } },
+          },
+          parents: {
+            include: { parent: true },
+          },
+          user: {
+            select: { username: true, email: true },
+          },
         },
-        user: {
-          select: { username: true, email: true },
-        },
-      },
-    });
-    if (!student) throw new NotFoundException('Student not found');
-    return student;
+      });
+      if (!student) throw new NotFoundException('Student not found');
+      return { ...student, className: null, grade: null };
+    }
   }
 
   async findByAdmissionNumber(admissionNumber: string, schoolId: string) {
-    const student = await this.prisma.student.findUnique({
-      where: { admissionNumber_schoolId: { admissionNumber, schoolId } },
-      include: {
-        enrollments: {
-          include: { class: true, academicYear: true },
-          orderBy: { academicYear: { startDate: 'desc' } },
+    try {
+      const student = await this.prisma.student.findUnique({
+        where: { admissionNumber_schoolId: { admissionNumber, schoolId } },
+        include: {
+          enrollments: {
+            include: { class: true, academicYear: true },
+            orderBy: { academicYear: { startDate: 'desc' } },
+          },
+          parents: {
+            include: { parent: true },
+          },
+          results: {
+            include: { subject: true, term: true },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+          },
+          attendances: {
+            orderBy: { date: 'desc' },
+            take: 50,
+          },
+          FeePayment: {
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+          },
         },
-        parents: {
-          include: { parent: true },
+      });
+      if (!student) throw new NotFoundException('Student not found');
+      return student;
+    } catch (error: any) {
+      if (error instanceof NotFoundException) throw error;
+      this.logger.error(`findByAdmissionNumber query failed, retrying: ${error.message}`);
+      const student = await this.prisma.student.findUnique({
+        where: { admissionNumber_schoolId: { admissionNumber, schoolId } },
+        select: {
+          id: true, admissionNumber: true, studentUuid: true, status: true,
+          dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
+          gender: true, photoUrl: true, photoPublicId: true, createdAt: true, updatedAt: true,
+          enrollments: { include: { class: true, academicYear: true }, orderBy: { academicYear: { startDate: 'desc' } } },
+          parents: { include: { parent: true } },
+          results: { include: { subject: true, term: true }, orderBy: { createdAt: 'desc' }, take: 50 },
+          attendances: { orderBy: { date: 'desc' }, take: 50 },
+          FeePayment: { orderBy: { createdAt: 'desc' }, take: 20 },
         },
-        results: {
-          include: { subject: true, term: true },
-          orderBy: { createdAt: 'desc' },
-          take: 50,
-        },
-        attendances: {
-          orderBy: { date: 'desc' },
-          take: 50,
-        },
-        FeePayment: {
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-        },
-      },
-    });
-    if (!student) throw new NotFoundException('Student not found');
-    return student;
+      });
+      if (!student) throw new NotFoundException('Student not found');
+      return { ...student, className: null, grade: null };
+    }
   }
 
   async comprehensiveSearch(query: string, schoolId: string) {
-    const students = await this.prisma.student.findMany({
-      where: {
-        schoolId,
-        OR: [
-          { admissionNumber: { contains: query, mode: 'insensitive' } },
-          { studentUuid: { contains: query, mode: 'insensitive' } },
-          { firstName: { contains: query, mode: 'insensitive' } },
-          { lastName: { contains: query, mode: 'insensitive' } },
-        ],
-      },
-      include: {
-        enrollments: {
-          include: { class: true, academicYear: true },
-          orderBy: { academicYear: { startDate: 'desc' } },
+    try {
+      const students = await this.prisma.student.findMany({
+        where: {
+          schoolId,
+          OR: [
+            { admissionNumber: { contains: query, mode: 'insensitive' } },
+            { studentUuid: { contains: query, mode: 'insensitive' } },
+            { firstName: { contains: query, mode: 'insensitive' } },
+            { lastName: { contains: query, mode: 'insensitive' } },
+          ],
         },
-        parents: {
-          include: { parent: true },
+        include: {
+          enrollments: {
+            include: { class: true, academicYear: true },
+            orderBy: { academicYear: { startDate: 'desc' } },
+          },
+          parents: {
+            include: { parent: true },
+          },
+          user: {
+            select: { username: true, email: true },
+          },
+          results: {
+            include: { subject: true, term: true },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+          },
+          attendances: {
+            orderBy: { date: 'desc' },
+            take: 10,
+          },
+          FeePayment: {
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+          },
         },
-        user: {
-          select: { username: true, email: true },
-        },
-        results: {
-          include: { subject: true, term: true },
-          orderBy: { createdAt: 'desc' },
-          take: 10,
-        },
-        attendances: {
-          orderBy: { date: 'desc' },
-          take: 10,
-        },
-        FeePayment: {
-          orderBy: { createdAt: 'desc' },
-          take: 10,
-        },
-      },
-    });
+      });
 
-    return students;
+      return students;
+    } catch (error: any) {
+      this.logger.error(`comprehensiveSearch query failed, retrying: ${error.message}`);
+      return await this.prisma.student.findMany({
+        where: {
+          schoolId,
+          OR: [
+            { admissionNumber: { contains: query, mode: 'insensitive' } },
+            { studentUuid: { contains: query, mode: 'insensitive' } },
+            { firstName: { contains: query, mode: 'insensitive' } },
+            { lastName: { contains: query, mode: 'insensitive' } },
+          ],
+        },
+        select: {
+          id: true, admissionNumber: true, studentUuid: true, status: true,
+          dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
+          gender: true, photoUrl: true, photoPublicId: true, createdAt: true, updatedAt: true,
+          enrollments: { include: { class: true, academicYear: true }, orderBy: { academicYear: { startDate: 'desc' } } },
+          parents: { include: { parent: true } },
+          user: { select: { username: true, email: true } },
+          results: { include: { subject: true, term: true }, orderBy: { createdAt: 'desc' }, take: 10 },
+          attendances: { orderBy: { date: 'desc' }, take: 10 },
+          FeePayment: { orderBy: { createdAt: 'desc' }, take: 10 },
+        },
+      }).then(students => students.map(s => ({ ...s, className: null, grade: null })));
+    }
   }
 
   async update(id: string, dto: UpdateStudentDto, userId: string, userRoles: string[]) {
-    const student = await this.prisma.student.findUnique({ where: { id } });
+    let student;
+    try {
+      student = await this.prisma.student.findUnique({ where: { id } });
+    } catch {
+      student = await this.prisma.student.findUnique({ where: { id }, select: {
+        id: true, admissionNumber: true, studentUuid: true, status: true, schoolId: true,
+        firstName: true, lastName: true, gender: true, createdAt: true, updatedAt: true,
+      }});
+    }
     if (!student) throw new NotFoundException('Student not found');
 
     if (dto.admissionNumber && dto.admissionNumber !== student.admissionNumber) {
