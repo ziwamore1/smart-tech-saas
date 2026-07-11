@@ -61,32 +61,30 @@ async function bootstrap() {
   });
 
   // Auth middleware at Express level — runs before NestJS Router
-  // Replaces NestJS guards entirely since guard->response pipeline is broken
+  // Handles authentication for all protected routes
   const jwtService = app.get(JwtService);
   console.error('[expressAuth] JwtService initialized');
   app.use((req: Request, res: Response, next: NextFunction) => {
-    const skipAuth =
-      !req.path.startsWith('/api/v1/communications-cloud') &&
-      !req.path.startsWith('/api/v1/feature-locks');
-    if (skipAuth) return next();
+    // Skip auth for public endpoints that don't require authentication
+    const isPublicPath =
+      req.path.startsWith('/api/v1/feature-locks') ||
+      req.path.startsWith('/api/v1/auth') ||
+      req.path === '/api/v1/gallery/public/recent';
+    if (isPublicPath) return next();
 
-    console.error('[expressAuth] path:', req.method, req.path);
-    console.error('[expressAuth] auth header present:', !!req.headers.authorization);
-
+    // Skip auth for webhook delivery endpoints
     if (req.method === 'POST' && req.path.includes('/webhooks/delivery/')) {
-      console.error('[expressAuth] skipping webhook delivery');
       return next();
     }
 
+    // All other paths require JWT authentication
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
-      console.error('[expressAuth] no Bearer token');
       return res.status(401).json({ statusCode: 401, message: 'Unauthorized', timestamp: new Date().toISOString() });
     }
     const token = auth.slice(7);
     try {
       const payload = jwtService.verify(token);
-      console.error('[expressAuth] verified user:', payload.sub);
       (req as any).user = {
         id: payload.sub,
         type: payload.type || 'user',
@@ -96,7 +94,6 @@ async function bootstrap() {
       };
       next();
     } catch (err: any) {
-      console.error('[expressAuth] verify failed:', err?.message || err);
       return res.status(401).json({ statusCode: 401, message: 'Invalid token', timestamp: new Date().toISOString() });
     }
   });

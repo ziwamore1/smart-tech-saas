@@ -441,7 +441,6 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
       else setTemplateColumns([]);
       setEditTemplate(t);
       setTemplateName(t?.name || '');
-      setTemplatePeriod(t?.period || '');
       selectedTemplateIdRef.current = templateId;
     } catch {
       setTemplateColumns([]);
@@ -450,7 +449,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
 
   const handleCreateTemplate = async () => {
     try {
-      await premiumStaffRecordsApi.createTemplate({ name: 'New Return Template', period: new Date().toISOString().slice(0, 7) });
+      await premiumStaffRecordsApi.createTemplate({ name: 'New Return Template', returnType: 'MONTHLY', category: 'DISTRICT' });
       showToast('success', 'Template created');
       onRefresh();
     } catch {
@@ -461,7 +460,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
   const handleSaveTemplate = async () => {
     if (!editTemplate?.id) return;
     try {
-      await premiumStaffRecordsApi.updateTemplate(editTemplate.id, { name: templateName, period: templatePeriod });
+      await premiumStaffRecordsApi.updateTemplate(editTemplate.id, { name: templateName });
       showToast('success', 'Template saved');
       onRefresh();
     } catch {
@@ -475,12 +474,12 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
     try {
       await premiumStaffRecordsApi.addColumn(tid, {
         columnName: `field_${Date.now()}`,
-        headerName: 'New Field',
-        dataType: 'STRING',
-        order: templateColumns.length + 1,
-        active: true,
-        required: false,
-        editable: true,
+        columnLabel: 'New Field',
+        columnOrder: templateColumns.length + 1,
+        dataType: 'string',
+        isRequired: false,
+        isEditable: true,
+        isVisible: true,
       });
       showToast('success', 'Column added');
       fetchColumns(tid);
@@ -502,7 +501,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
 
   const handleColumnToggle = async (column: any) => {
     try {
-      await premiumStaffRecordsApi.updateColumn(column.id, { active: !column.active });
+      await premiumStaffRecordsApi.updateColumn(column.id, { isVisible: !column.isVisible });
       const tid = selectedTemplateIdRef.current;
       if (tid) fetchColumns(tid);
     } catch {
@@ -512,7 +511,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
 
   const handleColumnRename = async (columnId: string, newName: string) => {
     try {
-      await premiumStaffRecordsApi.updateColumn(columnId, { headerName: newName });
+      await premiumStaffRecordsApi.updateColumn(columnId, { columnLabel: newName });
       const tid = selectedTemplateIdRef.current;
       if (tid) fetchColumns(tid);
     } catch {
@@ -520,7 +519,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
     }
   };
 
-  const DATA_TYPES = ['STRING', 'NUMBER', 'DATE', 'BOOLEAN', 'EMAIL', 'PHONE', 'TEXTAREA', 'SELECT', 'CURRENCY'];
+  const DATA_TYPES = ['string', 'number', 'date', 'boolean', 'email', 'phone', 'textarea', 'select', 'currency'];
 
   const handleColumnTypeChange = async (columnId: string, dataType: string) => {
     try {
@@ -535,7 +534,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
 
   const handleToggleRequired = async (column: any) => {
     try {
-      await premiumStaffRecordsApi.updateColumn(column.id, { required: !column.required });
+      await premiumStaffRecordsApi.updateColumn(column.id, { isRequired: !column.isRequired });
       const tid = selectedTemplateIdRef.current;
       if (tid) fetchColumns(tid);
     } catch {
@@ -545,7 +544,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
 
   const handleToggleEditable = async (column: any) => {
     try {
-      await premiumStaffRecordsApi.updateColumn(column.id, { editable: !(column.editable !== false) });
+      await premiumStaffRecordsApi.updateColumn(column.id, { isEditable: !(column.isEditable !== false) });
       const tid = selectedTemplateIdRef.current;
       if (tid) fetchColumns(tid);
     } catch {
@@ -556,14 +555,14 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
   const handleReorderColumn = async (columnId: string, direction: 'up' | 'down') => {
     const tid = selectedTemplateIdRef.current;
     if (!tid) return;
-    const sorted = [...templateColumns].sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+    const sorted = [...templateColumns].sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0));
     const idx = sorted.findIndex((c: any) => c.id === columnId);
     if (idx < 0) return;
     if (direction === 'up' && idx === 0) return;
     if (direction === 'down' && idx === sorted.length - 1) return;
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-    [sorted[idx].order, sorted[swapIdx].order] = [sorted[swapIdx].order, sorted[idx].order];
-    const reordered = sorted.map((c: any) => ({ id: c.id, order: c.order }));
+    [sorted[idx].columnOrder, sorted[swapIdx].columnOrder] = [sorted[swapIdx].columnOrder, sorted[idx].columnOrder];
+    const reordered = sorted.map((c: any) => ({ id: c.id, order: c.columnOrder }));
     try {
       await premiumStaffRecordsApi.reorderColumns(tid, reordered);
       showToast('success', 'Column reordered');
@@ -633,7 +632,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                     fontWeight: selectedTemplateId === t.id ? 600 : 400, fontSize: 13
                   }}>
                     <div>{t.name || 'Unnamed Template'}</div>
-                    <div style={{ fontSize: 11, color: '#6b7280' }}>{t.period} · {t.columns?.length || 0} cols</div>
+                    <div style={{ fontSize: 11, color: '#6b7280' }}>{t.returnType || 'MONTHLY'} · {t.columns?.length || 0} cols</div>
                   </div>
                 ))
               )}
@@ -644,7 +643,6 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
               <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e8ddd0', padding: 16 }}>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
                   <input value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="Template name" style={{ flex: 1, padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }} />
-                  <input value={templatePeriod} onChange={e => setTemplatePeriod(e.target.value)} placeholder="Period (YYYY-MM)" style={{ width: 120, padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }} />
                   <button onClick={handleSaveTemplate} style={{ padding: '6px 14px', background: '#059669', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Save</button>
                   <button onClick={() => handleDuplicateTemplate(editTemplate.id)} style={{ padding: '6px 14px', background: '#6b7280', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Duplicate</button>
                   <button onClick={() => handleDeleteTemplate(editTemplate.id)} style={{ padding: '6px 14px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Delete</button>
@@ -672,13 +670,13 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                         </tr>
                       </thead>
                       <tbody>
-                        {templateColumns.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)).map((col: any, idx: number) => (
+                        {templateColumns.sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0)).map((col: any, idx: number) => (
                           <tr key={col.id} style={{ borderTop: '1px solid #f3eee8' }}>
                             <td style={{ padding: '6px 10px', color: '#6b7280', fontSize: 11 }}>{idx + 1}</td>
                             <td style={{ padding: '6px 10px', fontFamily: 'monospace', fontSize: 12 }}>{col.columnName}</td>
                             <td style={{ padding: '6px 10px' }}>
                               <input
-                                defaultValue={col.headerName}
+                                defaultValue={col.columnLabel}
                                 onBlur={e => handleColumnRename(col.id, e.target.value)}
                                 style={{ width: '100%', border: '1px solid transparent', padding: '2px 4px', borderRadius: 4, fontSize: 13, background: 'transparent' }}
                                 onFocus={e => (e.target.style.borderColor = '#d1d5db')}
@@ -686,7 +684,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                             </td>
                             <td style={{ padding: '6px 10px' }}>
                               <select
-                                defaultValue={col.dataType || 'STRING'}
+                                defaultValue={col.dataType || 'string'}
                                 onChange={e => handleColumnTypeChange(col.id, e.target.value)}
                                 style={{ padding: '2px 4px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
                               >
@@ -698,20 +696,20 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                             <td style={{ padding: '6px 10px' }}>
                               <button
                                 onClick={() => handleToggleRequired(col)}
-                                style={{ padding: '2px 8px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, background: col.required ? '#dcfce7' : '#f3f4f6', color: col.required ? '#16a34a' : '#6b7280' }}
-                              >{col.required ? 'Yes' : 'No'}</button>
+                                style={{ padding: '2px 8px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, background: col.isRequired ? '#dcfce7' : '#f3f4f6', color: col.isRequired ? '#16a34a' : '#6b7280' }}
+                              >{col.isRequired ? 'Yes' : 'No'}</button>
                             </td>
                             <td style={{ padding: '6px 10px' }}>
                               <button
                                 onClick={() => handleToggleEditable(col)}
-                                style={{ padding: '2px 8px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, background: col.editable !== false ? '#dcfce7' : '#f3f4f6', color: col.editable !== false ? '#16a34a' : '#6b7280' }}
-                              >{col.editable !== false ? 'Yes' : 'No'}</button>
+                                style={{ padding: '2px 8px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, background: col.isEditable !== false ? '#dcfce7' : '#f3f4f6', color: col.isEditable !== false ? '#16a34a' : '#6b7280' }}
+                              >{col.isEditable !== false ? 'Yes' : 'No'}</button>
                             </td>
                             <td style={{ padding: '6px 10px' }}>
                               <button
                                 onClick={() => handleColumnToggle(col)}
-                                style={{ padding: '2px 8px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, background: col.active !== false ? '#dcfce7' : '#f3f4f6', color: col.active !== false ? '#16a34a' : '#6b7280' }}
-                              >{col.active !== false ? 'Active' : 'Off'}</button>
+                                style={{ padding: '2px 8px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, background: col.isVisible !== false ? '#dcfce7' : '#f3f4f6', color: col.isVisible !== false ? '#16a34a' : '#6b7280' }}
+                              >{col.isVisible !== false ? 'Active' : 'Off'}</button>
                             </td>
                             <td style={{ padding: '6px 10px' }}>
                               <div style={{ display: 'flex', gap: 2 }}>
@@ -735,7 +733,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                         <button
                           onClick={() => {
                             const newRow: any = {};
-                            const sorted = [...templateColumns].sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+                            const sorted = [...templateColumns].sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0));
                             sorted.forEach((col: any) => {
                               if (col.dataType === 'NUMBER') newRow[col.columnName] = 0;
                               else if (col.dataType === 'DATE') newRow[col.columnName] = new Date().toISOString().slice(0, 10);
@@ -759,10 +757,10 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                         <thead>
                           <tr style={{ background: '#f9f5f0', textAlign: 'left' }}>
                             <th style={{ padding: '6px 8px', fontWeight: 600, width: 30 }}>#</th>
-                            {templateColumns.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)).map((col: any) => (
+                            {templateColumns.sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0)).map((col: any) => (
                               <th key={col.id} style={{ padding: '6px 8px', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                {col.headerName || col.columnName}
-                                {col.required && <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span>}
+                                {col.columnLabel || col.columnName}
+                                {col.isRequired && <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span>}
                                 <span style={{ color: '#9ca3af', fontSize: 10, marginLeft: 4, fontWeight: 400 }}>{col.dataType}</span>
                               </th>
                             ))}
@@ -780,7 +778,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                             sampleRows.map((row: any, rIdx: number) => (
                               <tr key={rIdx} style={{ borderTop: '1px solid #f3eee8' }}>
                                 <td style={{ padding: '4px 8px', color: '#6b7280', fontSize: 11 }}>{rIdx + 1}</td>
-                                {templateColumns.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)).map((col: any) => (
+                                {templateColumns.sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0)).map((col: any) => (
                                   <td key={col.id} style={{ padding: '4px 8px' }}>
                                     <input
                                       value={row[col.columnName] ?? ''}
@@ -789,7 +787,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                                         updated[rIdx] = { ...updated[rIdx], [col.columnName]: e.target.value };
                                         setSampleRows(updated);
                                       }}
-                                      placeholder={`Enter ${col.headerName || col.columnName}`}
+                                      placeholder={`Enter ${col.columnLabel || col.columnName}`}
                                       style={{ width: '100%', minWidth: 100, border: '1px solid #d1d5db', padding: '3px 6px', borderRadius: 4, fontSize: 12 }}
                                     />
                                   </td>
@@ -842,6 +840,7 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
   const [selectedSub, setSelectedSub] = useState<any>(null);
   const [subData, setSubData] = useState<any[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [submissionPeriod, setSubmissionPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(false);
 
   const fetchSubmissions = useCallback(async (templateId?: string) => {
@@ -856,7 +855,12 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
   const handleCreateSubmission = async () => {
     if (!selectedTemplate) return;
     try {
-      await premiumStaffRecordsApi.createSubmission({ templateId: selectedTemplate });
+      await premiumStaffRecordsApi.createSubmission({
+        templateId: selectedTemplate,
+        period: submissionPeriod,
+        academicYear: new Date().getFullYear().toString(),
+        term: 'Term 1',
+      });
       fetchSubmissions(selectedTemplate);
     } catch { }
   };
@@ -896,6 +900,7 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
           <option value="">All Templates</option>
           {templates.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
+        <input value={submissionPeriod} onChange={e => setSubmissionPeriod(e.target.value)} placeholder="Period (YYYY-MM)" style={{ width: 130, padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }} />
         <button onClick={handleCreateSubmission} disabled={!selectedTemplate} style={{ padding: '6px 14px', background: selectedTemplate ? '#ea6645' : '#d1d5db', color: '#fff', border: 'none', borderRadius: 6, cursor: selectedTemplate ? 'pointer' : 'not-allowed', fontSize: 13 }}>
           <i className="fas fa-plus"></i> New Submission
         </button>
@@ -922,7 +927,7 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
               {submissions.map((s: any) => (
                 <tr key={s.id} style={{ borderTop: '1px solid #f3eee8' }}>
                   <td style={{ padding: '8px 12px', fontWeight: 500 }}>{s.template?.name || s.templateId}</td>
-                  <td style={{ padding: '8px 12px' }}>{s.template?.period || '-'}</td>
+                  <td style={{ padding: '8px 12px' }}>{s.period || '-'}</td>
                   <td style={{ padding: '8px 12px' }}><StatusBadge status={s.status} /></td>
                   <td style={{ padding: '8px 12px' }}>{s.data?.length || 0}</td>
                   <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 12 }}>{s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '-'}</td>
