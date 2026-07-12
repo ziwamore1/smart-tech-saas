@@ -11,6 +11,8 @@ interface User {
   fullName?: string;
   schoolId?: string | null;
   roles: string[];
+  platformRoles?: string[];
+  schoolRoles?: string[];
   role?: string;
   teacherId?: string;
   classTeacherOf?: string;
@@ -105,6 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           lastName: responseData?.user?.lastName || payload.lastName || '',
           schoolId: payload.schoolId,
           roles: payload.roles || [],
+          platformRoles: payload.platformRoles || responseData?.user?.platformRoles || [],
+          schoolRoles: payload.schoolRoles || responseData?.user?.schoolRoles || [],
           teacherId: payload.teacherId,
           classTeacherOf: payload.classTeacherOf,
           institutionType: payload.institutionType || null,

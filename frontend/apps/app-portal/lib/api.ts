@@ -2296,7 +2296,37 @@ export const landingMockupApi = {
   update: (id: string, data: any) => api.patch(`/landing-mockups/${id}`, data),
   delete: (id: string) => api.delete(`/landing-mockups/${id}`),
   upload: (formData: FormData) =>
-    api.post('/landing-mockups/upload', formData, {
+    api.post('/landing-mocks/upload', formData, {
       timeout: 180000,
     }),
+};
+
+export const schoolMembershipApi = {
+  getMembers: () => api.get('/school-membership/members'),
+  getTeachingStaff: () => api.get('/school-membership/teaching-staff'),
+  getMembersByRole: (role: string) => api.get(`/school-membership/members/role/${role}`),
+  addMember: (userId: string, isPrimary?: boolean) => api.post('/school-membership/members', { userId, isPrimary }),
+  removeMember: (userId: string) => api.delete(`/school-membership/members/${userId}`),
+  assignRole: (userId: string, role: string) => api.post('/school-membership/roles', { userId, role }),
+  removeRole: (userId: string, role: string) => api.delete('/school-membership/roles', { data: { userId, role } }),
+  getUserRoles: (userId: string) => api.get(`/school-membership/user/${userId}/roles`),
+};
+
+export const platformRoleApi = {
+  getAll: () => api.get('/platform-roles'),
+  assign: (userId: string, role: string) => api.post('/platform-roles/assign', { userId, role }),
+  remove: (userId: string, role: string) => api.delete('/platform-roles/remove', { data: { userId, role } }),
+  getUserRoles: (userId: string) => api.get(`/platform-roles/user/${userId}`),
+  getUsersByRole: (role: string) => api.get(`/platform-roles/role/${role}/users`),
+};
+
+export const classTeacherAssignmentApi = {
+  assign: (data: { teacherId: string; classId: string; academicYearId: string; isPrimary?: boolean }) =>
+    api.post('/class-teacher-assignments', data),
+  remove: (id: string) => api.delete(`/class-teacher-assignments/${id}`),
+  findByClass: (classId: string, academicYearId?: string) =>
+    api.get(`/class-teacher-assignments/class/${classId}`, { params: { academicYearId } }),
+  findByTeacher: (teacherId: string) => api.get(`/class-teacher-assignments/teacher/${teacherId}`),
+  findBySchool: (academicYearId?: string) =>
+    api.get('/class-teacher-assignments/school', { params: { academicYearId } }),
 };

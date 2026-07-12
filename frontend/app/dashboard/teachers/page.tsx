@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { teacherApi, api, teachingAssignmentApi, classApi, subjectApi, academicYearApi, roleApi, enrollmentApi } from '@/lib/api';
+import { teacherApi, api, teachingAssignmentApi, classApi, subjectApi, academicYearApi, roleApi, enrollmentApi, schoolMembershipApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
 export default function TeachersPage() {
@@ -91,6 +91,20 @@ export default function TeachersPage() {
       let data = res.data?.data || res.data || [];
       return Array.isArray(data) ? data : [];
     }),
+  });
+
+  // Fetch teaching staff from school-membership (includes Directors, SuperAdmins with teaching assignments)
+  const { data: membershipTeachingStaff } = useQuery({
+    queryKey: ['membership-teaching-staff'],
+    queryFn: async () => {
+      try {
+        const res = await schoolMembershipApi.getTeachingStaff();
+        let data = res.data?.data || res.data || [];
+        return Array.isArray(data) ? data : [];
+      } catch {
+        return [];
+      }
+    },
   });
 
   const teachers = Array.isArray(teachersData) ? teachersData : [];
