@@ -102,14 +102,30 @@ Currently, frontend pages use legacy `user.roles` array for permission checks. T
 | Update Class Management page | ✅ | `classes/page.tsx` |
 | Update all duplicate `frontend/app/dashboard/` copies | ✅ | Same files in `frontend/app/dashboard/` |
 
-### 3.2 Phase 5 — School Membership Management UI 🔲
+### 3.1a Phase 4a — Add Lower Primary Senior Teacher & Upper Primary Senior Teacher ✅
+
+| Task | Status | Commit | Files |
+|------|--------|--------|-------|
+| Add both roles to backend seed files | ✅ | `7411c5e` | `seed-roles.ts`, `seed.ts`, `seed_production.sql` |
+| Add to backend school roles whitelist | ✅ | `7411c5e` | `role.controller.ts`, `health.controller.ts`, `migrate-identity.ts` |
+| Add RoleKey + DEFAULT_ROLE_PERMISSIONS | ✅ | `7411c5e` | `permissions.ts` (frontend + mobile) |
+| Add to UserRole types (role-guard, useRole) | ✅ | `7411c5e` | Both copies |
+| Add to user/teacher dropdowns for PRIMARY_SCHOOL | ✅ | `7411c5e` | users/page.tsx, teachers/page.tsx (both copies) |
+| Add to primary/teachers page, institution-types, dashboard ROLE_MAP | ✅ | `7411c5e` | Multiple files |
+| Add to supervisor/admin role lists (performance, assessment, staff) | ✅ | `7411c5e` | 4 pages (both copies) |
+| Add to permissions/page.tsx MANAGED_ROLES | ✅ | `7411c5e` | permissions/page.tsx |
+| Add to shared types + constants | ✅ | `7411c5e` | shared/types, shared/constants |
+| Mobile: AppNavigator.tsx navigation fix | ✅ | `7411c5e` | Critical navigation fix |
+| Mobile: ExamDetailScreen.tsx, usePermissions.ts | ✅ | `7411c5e` | Role checks |
+
+### 3.2 Phase 5 — School Membership Management UI 🟡
 
 | Task | Status | Files to Create/Modify |
 |------|--------|----------------------|
-| "School Members" page — list all members with roles | 🔲 | New page or tab in users section |
-| "Add Member" — search users and assign to school | 🔲 | Modal/dialog on members page |
-| "Assign School Role" — dropdown to assign/remove roles | 🔲 | Inline edit on members page |
-| "Remove Member" — remove user from school | 🔲 | Confirmation dialog |
+| "School Members" page — list all members with roles | ✅ | New page at `dashboard/school-members/page.tsx` |
+| "Add Member" — search users and assign to school | ✅ | Modal on school-members page using `schoolMembershipApi` |
+| "Assign School Role" — dropdown to assign/remove roles | ✅ | Inline dropdown + role removal on school-members page |
+| "Remove Member" — remove user from school | ✅ | Confirmation dialog on school-members page |
 | "Manage Teaching Staff" — assign classes, departments | 🔲 | Extension of teachers page |
 
 ### 3.3 Phase 6 — Platform Role Management UI 🔲
@@ -270,9 +286,9 @@ When checking if a user has a role, the system checks in this order:
 ```
 1. Open this file: IMPLEMENTATION_PLAN.md
 2. Check "Remaining Work" section (Section 3)
-3. Start with Phase 4: Frontend Permission Gating
+3. Start with Phase 5: School Membership Management UI
 4. Run `git log --oneline -5` to verify current HEAD
-5. Create a new branch if needed: git checkout -b feat/phase-4-permission-gating
+5. Create a new branch if needed: git checkout -b feat/phase-5-membership-ui
 6. Test login at https://app.smarttechsaas.com
 7. Verify JWT payload includes platformRoles + schoolRoles in browser DevTools
 ```

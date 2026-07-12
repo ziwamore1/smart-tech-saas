@@ -528,6 +528,14 @@ const regularNav: NavItem[] = [
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
+    name: 'School Members', 
+    href: '/dashboard/school-members', 
+    icon: 'fa-user-plus',
+    color: '#0891b2',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
+  },
+  { 
     name: 'Parents', 
     href: '/dashboard/parents', 
     icon: 'fa-user-friends',
