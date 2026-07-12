@@ -798,9 +798,12 @@ export default function ClassesPage() {
                   <option value="">— None —</option>
                   {teachers.map((t: any) => {
                     const user = t.user || {};
+                    const displayName = user.firstName || user.lastName
+                      ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+                      : `Staff (${t.employeeNo || 'Unknown'})`;
                     return (
-                      <option key={t.id} value={user.id}>
-                        {user.firstName || ''} {user.lastName || ''} ({t.employeeNo || 'No ID'})
+                      <option key={t.id} value={user.id || t.id}>
+                        {displayName} ({t.employeeNo || 'No ID'})
                       </option>
                     );
                   })}

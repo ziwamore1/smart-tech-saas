@@ -235,8 +235,8 @@ export default function PrimaryTeachersPage() {
 
   const createAssignmentMutation = useMutation({
     mutationFn: async (data: any) => {
-      const userId = selectedTeacherForAssignment?.userId || selectedTeacherForAssignment?.user?.id || data.teacherId;
-      await classApi.setClassTeacher(data.classId, userId);
+      const teacherRecordId = selectedTeacherForAssignment?.id || data.teacherId;
+      await classApi.setClassTeacher(data.classId, teacherRecordId);
       return { success: true };
     },
     onSuccess: () => {
@@ -249,8 +249,10 @@ export default function PrimaryTeachersPage() {
       setTimeout(() => setMessage(null), 3000);
     },
     onError: (error: any) => {
-      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to create assignment.' });
-      setTimeout(() => setMessage(null), 5000);
+      const msg = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to create assignment.';
+      console.error('[Assignment Error]', error?.response?.status, error?.response?.data || error?.message);
+      setMessage({ type: 'error', text: typeof msg === 'string' ? msg : JSON.stringify(msg) });
+      setTimeout(() => setMessage(null), 8000);
     },
   });
 
@@ -907,7 +909,7 @@ export default function PrimaryTeachersPage() {
                   return;
                 }
                 createAssignmentMutation.mutate({
-                  teacherId: selectedTeacherForAssignment.userId || selectedTeacherForAssignment.user?.id || selectedTeacherForAssignment.id,
+                  teacherId: selectedTeacherForAssignment.id,
                   classId: assignmentForm.classId,
                 });
               }} disabled={createAssignmentMutation.isPending} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400">

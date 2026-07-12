@@ -236,6 +236,60 @@ export class HealthController {
     return results;
   }
 
+  @Get('fix-orphaned-teacher')
+  async fixOrphanedTeacher() {
+    const schoolId = '40a1039f-e292-4e91-948d-05848ac2ad89';
+    const results: Record<string, any> = {};
+
+    try {
+      const orphaned = await this.prisma.teacher.findMany({
+        where: { schoolId },
+        select: { id: true, userId: true, employeeNo: true, schoolId: true },
+      });
+
+      for (const t of orphaned) {
+        const user = await this.prisma.user.findUnique({ where: { id: t.userId } });
+        if (!user) {
+          const email = `teacher_${t.employeeNo || t.id.slice(0, 8)}@smarttech.edu`;
+          const bcrypt = require('bcrypt');
+          const hashedPassword = await bcrypt.hash('Teacher123!', 10);
+
+          const newUser = await this.prisma.user.create({
+            data: {
+              id: t.userId,
+              email,
+              password: hashedPassword,
+              firstName: 'JACKSON',
+              lastName: 'MWANZA',
+              schoolId,
+            },
+          });
+
+          const teacherRole = await this.prisma.role.findFirst({
+            where: { name: { equals: 'Teacher', mode: 'insensitive' } },
+          });
+          if (teacherRole) {
+            await this.prisma.userRole.create({
+              data: { userId: newUser.id, roleId: teacherRole.id },
+            });
+          }
+
+          results.repaired = { teacherId: t.id, userId: t.userId, email, name: 'JACKSON MWANZA' };
+        } else {
+          results.repaired = { teacherId: t.id, userId: t.userId, status: 'user already exists' };
+        }
+      }
+
+      if (orphaned.length === 0) {
+        results.repaired = 'no teachers found';
+      }
+    } catch (e: any) {
+      results.error = e.message;
+    }
+
+    return results;
+  }
+
   @Head()
   async head() {
     const health = await this.healthService.check();

@@ -268,8 +268,8 @@ export default function TeachersPage() {
   const createAssignmentMutation = useMutation({
     mutationFn: async (data: any) => {
       if (isPrimary) {
-        const userId = selectedTeacherForAssignment?.userId || selectedTeacherForAssignment?.user?.id || data.teacherId;
-        await classApi.setClassTeacher(data.classId, userId);
+        const teacherRecordId = selectedTeacherForAssignment?.id || data.teacherId;
+        await classApi.setClassTeacher(data.classId, teacherRecordId);
         return { success: true };
       }
       return teachingAssignmentApi.create(data);
