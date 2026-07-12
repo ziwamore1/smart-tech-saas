@@ -136,13 +136,13 @@ Currently, frontend pages use legacy `user.roles` array for permission checks. T
 | Assign/Revoke platform roles | ✅ | Assign modal + remove button on platform-roles page |
 | View users by platform role | ✅ | Role sidebar + user table filtered by selected role |
 
-### 3.4 Phase 7 — Class Teacher Assignment UI 🔲
+### 3.4 Phase 7 — Class Teacher Assignment UI ✅
 
 | Task | Status | Files to Create/Modify |
 |------|--------|----------------------|
-| Assign class teacher from Class Management page | 🔲 | `classes/page.tsx` |
-| View class teacher assignment history | 🔲 | New tab or section |
-| Auto-populate ClassTeacherAssignment from existing Class.classTeacherId | 🔲 | Data migration (done ✅) |
+| Assign class teacher from Class Management page | ✅ | `classes/page.tsx` — 🏫 button on class cards + modal |
+| View class teacher assignment history | ✅ | Modal shows current assignments with teacher, year, type |
+| Auto-populate ClassTeacherAssignment from existing Class.classTeacherId | ✅ | Data migration (done previously) |
 
 ---
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { classApi, levelTypeApi, enrollmentApi, studentApi, subjectApi, classSubjectApi, gradingSystemApi, api } from '@/lib/api';
+import { classApi, levelTypeApi, enrollmentApi, studentApi, subjectApi, classSubjectApi, gradingSystemApi, api, classTeacherAssignmentApi, academicYearApi } from '@/lib/api';
 import { usePermissions } from '@/lib/permission-context';
 
 type LevelCategory = 'FORM' | 'GRADE' | 'OTHER';
@@ -33,6 +33,8 @@ export default function ClassesPage() {
   const [selectedClass, setSelectedClass] = useState<any>(null);
   const [editForm, setEditForm] = useState({ name: '', capacity: '', gradingSystemId: '' });
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [showClassTeacherModal, setShowClassTeacherModal] = useState(false);
+  const [classTeacherForm, setClassTeacherForm] = useState({ teacherId: '', academicYearId: '', isPrimary: true });
 
   const { data: classesResponse, isLoading: classesLoading } = useQuery({
     queryKey: ['classes'],
@@ -63,6 +65,28 @@ export default function ClassesPage() {
     }),
   });
 
+  const { data: academicYearsData } = useQuery({
+    queryKey: ['academic-years'],
+    queryFn: async () => {
+      try {
+        const res = await academicYearApi.getAll();
+        let data = res.data?.data || res.data || [];
+        return Array.isArray(data) ? data : [];
+      } catch { return []; }
+    },
+  });
+
+  const { data: classTeacherAssignments } = useQuery({
+    queryKey: ['class-teacher-assignments'],
+    queryFn: async () => {
+      try {
+        const res = await classTeacherAssignmentApi.findBySchool();
+        let data = res.data?.data || res.data || [];
+        return Array.isArray(data) ? data : [];
+      } catch { return []; }
+    },
+  });
+
   const gradingSystems = Array.isArray(gradingSystemsResponse) ? gradingSystemsResponse : [];
 
   const setClassTeacherMutation = useMutation({
@@ -75,6 +99,35 @@ export default function ClassesPage() {
     },
     onError: (error: any) => {
       setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to update class teacher.' });
+      setTimeout(() => setMessage(null), 5000);
+    },
+  });
+
+  const createClassTeacherAssignmentMutation = useMutation({
+    mutationFn: (data: { teacherId: string; classId: string; academicYearId: string; isPrimary?: boolean }) =>
+      classTeacherAssignmentApi.assign(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['class-teacher-assignments'] });
+      setShowClassTeacherModal(false);
+      setClassTeacherForm({ teacherId: '', academicYearId: '', isPrimary: true });
+      setMessage({ type: 'success', text: 'Class teacher assigned!' });
+      setTimeout(() => setMessage(null), 3000);
+    },
+    onError: (error: any) => {
+      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to assign class teacher.' });
+      setTimeout(() => setMessage(null), 5000);
+    },
+  });
+
+  const removeClassTeacherAssignmentMutation = useMutation({
+    mutationFn: (id: string) => classTeacherAssignmentApi.remove(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['class-teacher-assignments'] });
+      setMessage({ type: 'success', text: 'Class teacher assignment removed!' });
+      setTimeout(() => setMessage(null), 3000);
+    },
+    onError: (error: any) => {
+      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to remove assignment.' });
       setTimeout(() => setMessage(null), 5000);
     },
   });
@@ -396,6 +449,19 @@ export default function ClassesPage() {
                   >
                     📚
                   </button>
+                  {canManageClasses && (
+                  <button 
+                    onClick={() => {
+                      setSelectedClass(cls);
+                      setClassTeacherForm({ teacherId: '', academicYearId: academicYearsData?.[0]?.id || '', isPrimary: true });
+                      setShowClassTeacherModal(true);
+                    }}
+                    className="px-3 py-2 bg-teal-50 text-teal-600 rounded-xl hover:bg-teal-100 text-xs font-medium transition-colors"
+                    title="Manage Class Teacher"
+                  >
+                    🏫
+                  </button>
+                  )}
                   {canManageClasses && (
                   <button 
                     onClick={() => {
@@ -768,6 +834,16 @@ export default function ClassesPage() {
               </button>
             </div>
             
+            {setClassTeacherMutation.isError && (
+              <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
+                {setClassTeacherMutation.error?.response?.data?.message || 'Failed to update class teacher.'}
+              </div>
+            )}
+            {setClassTeacherMutation.isSuccess && (
+              <div className="mb-4 px-4 py-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm">
+                Class teacher updated!
+              </div>
+            )}
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -797,9 +873,12 @@ export default function ClassesPage() {
                   <option value="">— None —</option>
                   {teachers.map((t: any) => {
                     const user = t.user || {};
+                    const displayName = user.firstName || user.lastName
+                      ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+                      : `Staff (${t.employeeNo || 'Unknown'})`;
                     return (
-                      <option key={t.id} value={user.id}>
-                        {user.firstName || ''} {user.lastName || ''} ({t.employeeNo || 'No ID'})
+                      <option key={t.id} value={user.id || t.id}>
+                        {displayName} ({t.employeeNo || 'No ID'})
                       </option>
                     );
                   })}
@@ -981,6 +1060,96 @@ export default function ClassesPage() {
                 className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showClassTeacherModal && selectedClass && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+            <h2 className="text-2xl font-bold mb-2">Class Teacher — {selectedClass.name}</h2>
+            <p className="text-gray-500 text-sm mb-4">Manage class teacher assignments for this class</p>
+
+            {(classTeacherAssignments || []).filter((cta: any) => cta.classId === selectedClass.id).length > 0 && (
+              <div className="mb-6">
+                <h3 className="font-semibold text-gray-700 mb-2">Current Assignments</h3>
+                <div className="space-y-2">
+                  {(classTeacherAssignments || [])
+                    .filter((cta: any) => cta.classId === selectedClass.id)
+                    .map((cta: any) => (
+                      <div key={cta.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <div className="font-medium">{cta.teacher?.firstName} {cta.teacher?.lastName}</div>
+                          <div className="text-sm text-gray-500">
+                            {cta.academicYear?.name} · {cta.isPrimary ? '⭐ Primary' : '👤 Secondary'}
+                            {cta.startDate && ` · Since ${new Date(cta.startDate).toLocaleDateString()}`}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Remove ${cta.teacher?.firstName} as class teacher?`)) {
+                              removeClassTeacherAssignmentMutation.mutate(cta.id);
+                            }
+                          }}
+                          className="px-3 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            <div className="border-t pt-4">
+              <h3 className="font-semibold text-gray-700 mb-3">Assign New Class Teacher</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Teacher *</label>
+                  <select value={classTeacherForm.teacherId} onChange={(e) => setClassTeacherForm({ ...classTeacherForm, teacherId: e.target.value })} className="w-full px-3 py-2 border rounded-lg">
+                    <option value="">Select Teacher</option>
+                    {teachers.map((t: any) => (
+                      <option key={t.id} value={t.user?.id || t.id}>{t.user?.firstName} {t.user?.lastName}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Academic Year *</label>
+                  <select value={classTeacherForm.academicYearId} onChange={(e) => setClassTeacherForm({ ...classTeacherForm, academicYearId: e.target.value })} className="w-full px-3 py-2 border rounded-lg">
+                    <option value="">Select Academic Year</option>
+                    {(academicYearsData || []).map((y: any) => (
+                      <option key={y.id} value={y.id}>{y.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="ctaIsPrimary" checked={classTeacherForm.isPrimary} onChange={(e) => setClassTeacherForm({ ...classTeacherForm, isPrimary: e.target.checked })} className="rounded border-gray-300" />
+                  <label htmlFor="ctaIsPrimary" className="text-sm text-gray-700">Primary class teacher (homeroom)</label>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end mt-6 pt-4 border-t">
+              <button onClick={() => { setShowClassTeacherModal(false); setSelectedClass(null); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
+              <button
+                onClick={() => {
+                  if (!classTeacherForm.teacherId || !classTeacherForm.academicYearId) {
+                    alert('Please select a teacher and academic year');
+                    return;
+                  }
+                  createClassTeacherAssignmentMutation.mutate({
+                    teacherId: classTeacherForm.teacherId,
+                    classId: selectedClass.id,
+                    academicYearId: classTeacherForm.academicYearId,
+                    isPrimary: classTeacherForm.isPrimary,
+                  });
+                }}
+                disabled={createClassTeacherAssignmentMutation.isPending}
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-gray-400"
+              >
+                {createClassTeacherAssignmentMutation.isPending ? 'Assigning...' : 'Assign'}
               </button>
             </div>
           </div>
