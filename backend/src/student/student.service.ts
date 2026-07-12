@@ -311,7 +311,7 @@ export class StudentService {
   async getStudentCredentials(studentId: string, requesterId: string) {
     const student = await this.prisma.student.findUnique({ where: { id: studentId }, select: {
       id: true, admissionNumber: true, studentUuid: true, status: true, schoolId: true,
-      firstName: true, lastName: true, gender: true, photoUrl: true, createdAt: true, updatedAt: true,
+      firstName: true, lastName: true, gender: true, photoUrl: true,
     }});
     if (!student) throw new NotFoundException('Student not found');
 
@@ -343,7 +343,7 @@ export class StudentService {
   ) {
     const student = await this.prisma.student.findUnique({ where: { id: studentId }, select: {
       id: true, admissionNumber: true, studentUuid: true, status: true, schoolId: true,
-      firstName: true, lastName: true, gender: true, photoUrl: true, createdAt: true, updatedAt: true,
+      firstName: true, lastName: true, gender: true, photoUrl: true,
     }});
     if (!student) throw new NotFoundException('Student not found');
 
@@ -467,11 +467,10 @@ export class StudentService {
       select: {
         id: true, admissionNumber: true, studentUuid: true, status: true,
         dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
-        gender: true, photoUrl: true, photoPublicId: true, createdAt: true, updatedAt: true,
+        gender: true, photoUrl: true, photoPublicId: true,
         enrollments: enrollmentIncludes,
         parents: { include: { parent: true } },
       },
-      orderBy: { createdAt: 'desc' },
     }).then(students => students.map(s => {
       const latestEnrollment = (s as any).enrollments?.[0];
       return {
@@ -488,7 +487,7 @@ export class StudentService {
       select: {
         id: true, admissionNumber: true, studentUuid: true, status: true,
         dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
-        gender: true, photoUrl: true, photoPublicId: true, createdAt: true, updatedAt: true,
+        gender: true, photoUrl: true, photoPublicId: true,
         enrollments: {
           include: { class: true, academicYear: true },
           orderBy: { academicYear: { startDate: 'desc' } },
@@ -507,11 +506,9 @@ export class StudentService {
       select: {
         id: true, admissionNumber: true, studentUuid: true, status: true,
         dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
-        gender: true, photoUrl: true, photoPublicId: true, createdAt: true, updatedAt: true,
+        gender: true, photoUrl: true, photoPublicId: true,
         enrollments: { include: { class: true, academicYear: true }, orderBy: { academicYear: { startDate: 'desc' } } },
         parents: { include: { parent: true } },
-        results: { include: { subject: true, term: true }, orderBy: { createdAt: 'desc' }, take: 50 },
-        attendances: { orderBy: { date: 'desc' }, take: 50 },
         FeePayment: { orderBy: { createdAt: 'desc' }, take: 20 },
       },
     });
@@ -533,7 +530,7 @@ export class StudentService {
       select: {
         id: true, admissionNumber: true, studentUuid: true, status: true,
         dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
-        gender: true, photoUrl: true, photoPublicId: true, createdAt: true, updatedAt: true,
+        gender: true, photoUrl: true, photoPublicId: true,
         enrollments: { include: { class: true, academicYear: true }, orderBy: { academicYear: { startDate: 'desc' } } },
         parents: { include: { parent: true } },
         user: { select: { username: true, email: true } },
@@ -547,7 +544,7 @@ export class StudentService {
   async update(id: string, dto: UpdateStudentDto, userId: string, userRoles: string[]) {
     const student = await this.prisma.student.findUnique({ where: { id }, select: {
       id: true, admissionNumber: true, studentUuid: true, status: true, schoolId: true,
-      firstName: true, lastName: true, gender: true, createdAt: true, updatedAt: true,
+      firstName: true, lastName: true, gender: true,
     }});
     if (!student) throw new NotFoundException('Student not found');
 
@@ -607,7 +604,7 @@ export class StudentService {
   async uploadPhoto(id: string, photoUrl: string, photoPublicId: string, schoolId: string): Promise<string | null> {
     const student = await this.prisma.student.findUnique({ where: { id }, select: {
       id: true, admissionNumber: true, studentUuid: true, status: true, schoolId: true,
-      firstName: true, lastName: true, gender: true, photoUrl: true, createdAt: true, updatedAt: true,
+      firstName: true, lastName: true, gender: true, photoUrl: true,
     }});
     if (!student) throw new NotFoundException('Student not found');
     if (student.schoolId !== schoolId) throw new ForbiddenException('Invalid student');
@@ -622,7 +619,7 @@ export class StudentService {
   async delete(id: string) {
     const student = await this.prisma.student.findUnique({ where: { id }, select: {
       id: true, admissionNumber: true, studentUuid: true, status: true, schoolId: true,
-      firstName: true, lastName: true, gender: true, photoUrl: true, createdAt: true, updatedAt: true,
+      firstName: true, lastName: true, gender: true, photoUrl: true,
     }});
     if (!student) throw new NotFoundException('Student not found');
     try {
@@ -701,7 +698,7 @@ export class StudentService {
   async changeStatus(studentId: string, newStatus: StudentStatus, userId: string) {
     const student = await this.prisma.student.findUnique({ where: { id: studentId }, select: {
       id: true, admissionNumber: true, studentUuid: true, status: true, schoolId: true,
-      firstName: true, lastName: true, gender: true, photoUrl: true, createdAt: true, updatedAt: true,
+      firstName: true, lastName: true, gender: true, photoUrl: true,
     }});
     if (!student) throw new NotFoundException('Student not found');
 
@@ -733,7 +730,7 @@ export class StudentService {
   async getStatusHistory(studentId: string) {
     const student = await this.prisma.student.findUnique({ where: { id: studentId }, select: {
       id: true, admissionNumber: true, studentUuid: true, status: true, schoolId: true,
-      firstName: true, lastName: true, gender: true, photoUrl: true, createdAt: true, updatedAt: true,
+      firstName: true, lastName: true, gender: true, photoUrl: true,
     }});
     if (!student) throw new NotFoundException('Student not found');
 

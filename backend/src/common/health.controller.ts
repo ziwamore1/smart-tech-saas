@@ -133,6 +133,30 @@ export class HealthController {
       results.fullFindAll = { ok: false, error: e.message };
     }
 
+    try {
+      const rows = await this.prisma.$queryRawUnsafe<any[]>(
+        `SELECT DISTINCT status, COUNT(*)::int as count FROM "Student" WHERE "schoolId" = $1 GROUP BY status`, schoolId
+      );
+      results.statusBreakdown = rows;
+    } catch (e: any) {
+      results.statusBreakdown = 'ERROR: ' + e.message;
+    }
+
+    try {
+      const t = Date.now();
+      const rows = await Promise.race([
+        this.prisma.student.findMany({
+          where: { schoolId, status: 'ACTIVE' as any },
+          take: 3,
+          select: { id: true, firstName: true, status: true },
+        }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), 8000)),
+      ]);
+      results.activeFilter = { ok: true, ms: Date.now() - t, count: (rows as any[]).length, rows };
+    } catch (e: any) {
+      results.activeFilter = { ok: false, error: e.message };
+    }
+
     return results;
   }
 
