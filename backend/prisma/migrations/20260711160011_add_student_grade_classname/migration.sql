@@ -1,3 +1,3 @@
 -- AlterTable
-ALTER TABLE "Student" ADD COLUMN     "className" TEXT,
-ADD COLUMN     "grade" TEXT;
+ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "className" TEXT;
+ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "grade" TEXT;

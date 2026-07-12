@@ -21,9 +21,24 @@ export class PrismaService
       this.logger.log(
         'Database connection established with security middleware',
       );
+      await this.ensureStudentColumns();
     } catch (error) {
       this.logger.error('Failed to connect to database', error);
       throw error;
+    }
+  }
+
+  private async ensureStudentColumns() {
+    try {
+      await this.$executeRawUnsafe(
+        `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "grade" TEXT`,
+      );
+      await this.$executeRawUnsafe(
+        `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "className" TEXT`,
+      );
+      this.logger.log('Student grade/className columns verified');
+    } catch (error: any) {
+      this.logger.warn(`Could not ensure Student columns: ${error.message}`);
     }
   }
 

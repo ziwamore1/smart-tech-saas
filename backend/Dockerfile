@@ -61,4 +61,4 @@ RUN addgroup -g 1001 -S nodejs && \
 USER nodejs
 
 # Run migrations on startup, then start the application
-CMD ["sh", "-c", "echo 'Running migrations...' && npx prisma migrate deploy --schema=./prisma/schema.prisma 2>&1 || echo 'WARN: migration deploy failed (columns may already exist)' && node dist/main.js"]
+CMD ["sh", "-c", "echo 'Running migrations...' && npx prisma migrate deploy --schema=./prisma/schema.prisma 2>&1 && echo 'Migrations OK' || echo 'WARN: Some migrations failed (continuing anyway)' && node dist/main.js"]
