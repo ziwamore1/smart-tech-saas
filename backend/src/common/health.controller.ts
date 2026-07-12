@@ -107,6 +107,32 @@ export class HealthController {
       results.findManyAll = { ok: false, error: e.message };
     }
 
+    const schoolId = '40a1039f-e292-4e91-948d-05848ac2ad89';
+
+    try {
+      const t = Date.now();
+      const rows = await Promise.race([
+        this.prisma.student.findMany({
+          where: { schoolId, AND: [{ OR: [{ status: 'ACTIVE' as any }, { status: null }] }] },
+          select: {
+            id: true, admissionNumber: true, studentUuid: true, status: true,
+            dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
+            gender: true, photoUrl: true, photoPublicId: true, createdAt: true, updatedAt: true,
+            enrollments: {
+              include: { class: true, academicYear: true },
+              orderBy: { academicYear: { startDate: 'desc' } as any },
+            },
+            parents: { include: { parent: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), 10000)),
+      ]);
+      results.fullFindAll = { ok: true, ms: Date.now() - t, count: (rows as any[]).length };
+    } catch (e: any) {
+      results.fullFindAll = { ok: false, error: e.message };
+    }
+
     return results;
   }
 
