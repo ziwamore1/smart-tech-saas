@@ -107,6 +107,20 @@ export class TeacherService {
       include: { user: true },
     });
 
+    // Ensure SchoolUser membership exists
+    const existingMembership = await this.prisma.schoolUser.findFirst({
+      where: { userId: teacher.user.id, schoolId },
+    });
+    if (!existingMembership) {
+      const membership = await this.prisma.schoolUser.create({
+        data: { userId: teacher.user.id, schoolId, isPrimary: true },
+      });
+      // Create SchoolRoleAssignment for Teacher
+      await this.prisma.schoolRoleAssignment.create({
+        data: { schoolMembershipId: membership.id, role: 'Teacher', isActive: true },
+      });
+    }
+
     const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
       select: { name: true },

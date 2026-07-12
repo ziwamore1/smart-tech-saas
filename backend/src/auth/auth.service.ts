@@ -222,6 +222,32 @@ export class AuthService {
       },
     });
 
+    // Auto-create Teacher record so Director appears in staff register and analytics
+    const existingTeacher = await this.prisma.teacher.findUnique({ where: { userId: user.id } });
+    if (!existingTeacher) {
+      await this.prisma.teacher.create({
+        data: {
+          userId: user.id,
+          schoolId: data.schoolId,
+          staffType: 'TEACHING',
+        },
+      });
+    }
+
+    // Also ensure SchoolUser membership exists
+    const existingMembership = await this.prisma.schoolUser.findFirst({
+      where: { userId: user.id, schoolId: data.schoolId },
+    });
+    if (!existingMembership) {
+      const membership = await this.prisma.schoolUser.create({
+        data: { userId: user.id, schoolId: data.schoolId, isPrimary: true },
+      });
+      // Create SchoolRoleAssignment for Director
+      await this.prisma.schoolRoleAssignment.create({
+        data: { schoolMembershipId: membership.id, role: 'Director', isActive: true },
+      });
+    }
+
     const directorSchoolUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?school=${data.schoolId}`;
 
     await this.notificationService.sendCredentials({
@@ -389,10 +415,35 @@ export class AuthService {
     const roles = user.userRoles.map((ur) => ur.role.name);
     const primaryRole = roles[0] || 'USER';
 
+    // Fetch platform roles
+    const platformRoles = await this.prisma.platformRoleAssignment.findMany({
+      where: { userId: user.id, isActive: true },
+      select: { role: true },
+    });
+    const platformRoleNames = platformRoles.map((pr) => pr.role);
+
+    // Fetch school roles for the effective school
     const resolvedSchoolId = user.schoolId
       || user.schoolUsers?.find(su => su.isPrimary)?.schoolId
       || user.schoolUsers?.[0]?.schoolId
       || null;
+
+    let schoolRoleNames: string[] = [];
+    if (resolvedSchoolId) {
+      const membership = await this.prisma.schoolUser.findFirst({
+        where: { userId: user.id, schoolId: resolvedSchoolId },
+      });
+      if (membership) {
+        const schoolRoles = await this.prisma.schoolRoleAssignment.findMany({
+          where: { schoolMembershipId: membership.id, isActive: true },
+          select: { role: true },
+        });
+        schoolRoleNames = schoolRoles.map((sr) => sr.role);
+      }
+    }
+
+    // Merge all roles for backward compatibility
+    const allRoles = [...new Set([...roles, ...schoolRoleNames, ...platformRoleNames])];
 
     const institutionType = user.school?.institutionType?.code || null;
 
@@ -417,12 +468,14 @@ export class AuthService {
       sub: user.id,
       schoolId: effectiveSchoolId,
       institutionType: effectiveInstitutionType,
-      roles,
+      roles: allRoles,
+      platformRoles: platformRoleNames,
+      schoolRoles: schoolRoleNames,
       type: 'user',
     };
 
     this.logger.log(
-      `Login successful for ${identifier}, roles: ${roles.join(', ')}, schoolId: ${payload.schoolId}, type: ${effectiveInstitutionType}`,
+      `Login successful for ${identifier}, roles: ${allRoles.join(', ')}, schoolId: ${payload.schoolId}, type: ${effectiveInstitutionType}`,
     );
 
     return {
@@ -433,7 +486,9 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        roles,
+        roles: allRoles,
+        platformRoles: platformRoleNames,
+        schoolRoles: schoolRoleNames,
         primaryRole,
         schoolId: effectiveSchoolId,
         institutionType: effectiveInstitutionType,

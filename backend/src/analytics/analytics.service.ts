@@ -314,23 +314,9 @@ export class AnalyticsService {
       },
     });
 
-    // Get user IDs that have Director role
-    const directorRoles = await this.prisma.userRole.findMany({
-      where: { 
-        role: { name: 'Director' }
-      },
-      select: { userId: true },
-    });
-    const directorIds = new Set(directorRoles.map(r => r.userId));
-
     const teachers: Record<string, any> = {};
 
     for (const r of results) {
-      // Skip if user is a Director
-      if (directorIds.has(r.teacherId)) {
-        continue;
-      }
-      
       if (!teachers[r.teacherId]) {
         teachers[r.teacherId] = {
           teacherId: r.teacherId,

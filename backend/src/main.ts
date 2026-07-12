@@ -92,6 +92,8 @@ async function bootstrap() {
         id: payload.sub,
         type: payload.type || 'user',
         roles: payload.roles || [],
+        platformRoles: payload.platformRoles || [],
+        schoolRoles: payload.schoolRoles || [],
         isSuperAdmin: payload.type === 'super_admin',
         schoolId: payload.type === 'super_admin' ? null : (payload.schoolId || null),
       };

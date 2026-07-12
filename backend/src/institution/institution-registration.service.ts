@@ -86,6 +86,32 @@ export class InstitutionRegistrationService {
 
     await this.provisioningService.provisionInstitution(school.id, dto.institutionType);
 
+    // Auto-create Teacher record for Director so they appear in staff register and analytics
+    const existingTeacher = await this.prisma.teacher.findUnique({ where: { userId: user.id } });
+    if (!existingTeacher) {
+      await this.prisma.teacher.create({
+        data: {
+          userId: user.id,
+          schoolId: school.id,
+          staffType: 'TEACHING',
+        },
+      });
+    }
+
+    // Ensure SchoolUser membership exists
+    const existingMembership = await this.prisma.schoolUser.findFirst({
+      where: { userId: user.id, schoolId: school.id },
+    });
+    if (!existingMembership) {
+      const membership = await this.prisma.schoolUser.create({
+        data: { userId: user.id, schoolId: school.id, isPrimary: true },
+      });
+      // Create SchoolRoleAssignment for Director
+      await this.prisma.schoolRoleAssignment.create({
+        data: { schoolMembershipId: membership.id, role: 'Director', isActive: true },
+      });
+    }
+
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId: user.id },
       include: { role: true },
