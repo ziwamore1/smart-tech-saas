@@ -85,6 +85,28 @@ export class HealthController {
       results.alterClassName = { ok: false, error: e.message };
     }
 
+    try {
+      const t = Date.now();
+      const rows = await Promise.race([
+        this.prisma.student.findMany({ where: { schoolId: '40a1039f-e292-4e91-948d-05848ac2ad89' }, take: 3, select: { id: true, firstName: true } }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), 8000)),
+      ]);
+      results.findManySelect = { ok: true, ms: Date.now() - t, count: (rows as any[]).length };
+    } catch (e: any) {
+      results.findManySelect = { ok: false, error: e.message };
+    }
+
+    try {
+      const t = Date.now();
+      const rows = await Promise.race([
+        this.prisma.student.findMany({ where: { schoolId: '40a1039f-e292-4e91-948d-05848ac2ad89' }, take: 3 }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), 8000)),
+      ]);
+      results.findManyAll = { ok: true, ms: Date.now() - t, count: (rows as any[]).length };
+    } catch (e: any) {
+      results.findManyAll = { ok: false, error: e.message };
+    }
+
     return results;
   }
 
