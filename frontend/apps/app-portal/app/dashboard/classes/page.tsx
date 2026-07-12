@@ -759,6 +759,16 @@ export default function ClassesPage() {
               </button>
             </div>
             
+            {setClassTeacherMutation.isError && (
+              <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
+                {setClassTeacherMutation.error?.response?.data?.message || 'Failed to update class teacher.'}
+              </div>
+            )}
+            {setClassTeacherMutation.isSuccess && (
+              <div className="mb-4 px-4 py-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm">
+                Class teacher updated!
+              </div>
+            )}
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

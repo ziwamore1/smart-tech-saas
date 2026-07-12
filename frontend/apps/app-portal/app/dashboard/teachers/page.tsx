@@ -266,12 +266,17 @@ export default function TeachersPage() {
   });
 
   const createAssignmentMutation = useMutation({
-    mutationFn: (data: any) => {
-      console.log('Creating assignment with data:', JSON.stringify(data, null, 2));
+    mutationFn: async (data: any) => {
+      if (isPrimary) {
+        const userId = selectedTeacherForAssignment?.userId || selectedTeacherForAssignment?.user?.id || data.teacherId;
+        await classApi.setClassTeacher(data.classId, userId);
+        return { success: true };
+      }
       return teachingAssignmentApi.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teaching-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
       setShowAssignmentModal(false);
       setSelectedTeacherForAssignment(null);
       setAssignmentForm({ classId: '', subjectId: '', academicYearId: '' });
@@ -860,6 +865,11 @@ export default function TeachersPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-2xl font-bold mb-6">{isPrimary ? 'Assign Teacher to Class' : 'Assign Teacher to Class & Subject'}</h2>
+            {createAssignmentMutation.isError && (
+              <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
+                {createAssignmentMutation.error?.response?.data?.message || 'Failed to create assignment.'}
+              </div>
+            )}
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Teacher *</label>
