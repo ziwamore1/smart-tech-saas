@@ -276,7 +276,14 @@ export class HealthController {
 
           results.repaired = { teacherId: t.id, userId: t.userId, email, name: 'JACKSON MWANZA' };
         } else {
-          results.repaired = { teacherId: t.id, userId: t.userId, status: 'user already exists' };
+          const updates: any = {};
+          if (!user.schoolId) updates.schoolId = schoolId;
+          if (Object.keys(updates).length > 0) {
+            await this.prisma.user.update({ where: { id: t.userId }, data: updates });
+            results.repaired = { teacherId: t.id, userId: t.userId, fixed: updates };
+          } else {
+            results.repaired = { teacherId: t.id, userId: t.userId, status: 'user exists and is healthy' };
+          }
         }
       }
 
