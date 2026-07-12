@@ -91,6 +91,9 @@ import { CommunicationsCloudModule } from './communications-cloud/communications
 import { AdmissionNumberModule } from './admission-number/admission-number.module';
 import { HealthModule } from './common/health.module';
 import { ProductionLogger } from './common/production-logger';
+import { SchoolMembershipModule } from './school-membership/school-membership.module';
+import { PlatformRoleModule } from './platform-role/platform-role.module';
+import { ClassTeacherAssignmentModule } from './class-teacher-assignment/class-teacher-assignment.module';
 
 @Module({
   imports: [
@@ -207,6 +210,9 @@ import { ProductionLogger } from './common/production-logger';
     ContactModule,
     CloudinaryModule,
     CommunicationsCloudModule,
+    SchoolMembershipModule,
+    PlatformRoleModule,
+    ClassTeacherAssignmentModule,
   ],
   providers: [ProductionLogger],
 })

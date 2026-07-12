@@ -266,6 +266,11 @@ model School {
   longitudinalRecords          LongitudinalRecord[]
   departments                  Department[]
   actingPositions              ActingPosition[]
+  schoolRoleAssignments        SchoolRoleAssignment[]
+  classTeacherAssignments      ClassTeacherAssignment[]
+  departmentAssignments        DepartmentAssignment[]
+  clubAssignments              ClubAssignment[]
+  committeeAssignments         CommitteeAssignment[]
   aiContextMemories            AiContextMemory[]
   aiRecommendations            AiRecommendation[]
   aiTopicMasteries             AiTopicMastery[]
@@ -310,21 +315,22 @@ model School {
 }
 
 model AcademicYear {
-  id                   String                 @id @default(uuid())
-  name                 String
-  startDate            DateTime
-  endDate              DateTime
-  isCurrent            Boolean                @default(false)
-  schoolId             String
-  createdAt            DateTime               @default(now())
-  school               School                 @relation(fields: [schoolId], references: [id])
-  admissionSeqs        AdmissionSequence[]
-  enrollments          Enrollment[]
-  FeeCategory          FeeCategory[]
-  teachingAssignments  TeachingAssignment[]
-  terms                Term[]
-  grade7Results        Grade7Result[]
-  CurriculumLessonPlan CurriculumLessonPlan[]
+  id                      String                   @id @default(uuid())
+  name                    String
+  startDate               DateTime
+  endDate                 DateTime
+  isCurrent               Boolean                  @default(false)
+  schoolId                String
+  createdAt               DateTime                 @default(now())
+  school                  School                   @relation(fields: [schoolId], references: [id])
+  admissionSeqs           AdmissionSequence[]
+  enrollments             Enrollment[]
+  FeeCategory             FeeCategory[]
+  teachingAssignments     TeachingAssignment[]
+  terms                   Term[]
+  grade7Results           Grade7Result[]
+  CurriculumLessonPlan    CurriculumLessonPlan[]
+  classTeacherAssignments ClassTeacherAssignment[]
 
   @@index([schoolId])
   @@index([isCurrent])
@@ -366,66 +372,72 @@ model Term {
 }
 
 model User {
-  id                   String                  @id @default(uuid())
-  firstName            String
-  lastName             String
-  email                String                  @unique
-  phone                String?
-  username             String?                 @unique
-  password             String
-  photoUrl             String?
-  photoPublicId        String?
-  isActive             Boolean                 @default(true)
-  accountStatus        String                  @default("ACTIVE")
-  mustChangePassword   Boolean                 @default(false)
-  failedAttempts       Int                     @default(0)
-  mfaEnabled           Boolean                 @default(false)
-  mfaSecret            String?
-  lastLogin            DateTime?
-  lastPasswordChange   DateTime?
-  resetToken           String?
-  resetTokenExpiry     DateTime?
-  lockoutUntil         DateTime?
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime?               @updatedAt
-  schoolId             String?
-  studentId            String?                 @unique
-  auditLogs            AuditLog[]
-  communications       Communication[]
-  deviceTokens         DeviceToken[]
-  notificationDevices  NotificationDevice[]
-  createdExams         Exam[]
-  createdTemplates     ExamTemplate[]
-  createdBankQuestions QuestionBank[]
-  uploadedExams        UploadedExam[]
-  createdHomeworks     Homework[]
-  lessonPlans          LessonPlan[]
-  NoticeBoard          NoticeBoard[]
-  notifications        Notification[]
-  readingSessions      ReadingSession[]
-  results              Result[]                @relation("TeacherResults")
-  schoolUsers          SchoolUser[]
-  teacher              Teacher?
-  teachingAssignments  TeachingAssignment[]
-  school               School?                 @relation(fields: [schoolId], references: [id])
-  student              Student?                @relation(fields: [studentId], references: [id])
-  studentPhotos        StudentPhoto[]
-  userRoles            UserRole[]
-  aiTutorSessions      AiTutorSession[]
-  appliedStamps        DocumentStamp[]         @relation("DocumentStampAppliedBy")
-  requestedApprovals   ApprovalRequest[]       @relation("ApprovalRequestRequestedBy")
-  approvedRequests     ApprovalRequest[]       @relation("ApprovalRequestApprover")
-  createdWorkflows     ApprovalWorkflow[]      @relation("ApprovalWorkflowCreatedBy")
-  auditTrailLogs       ApprovalAuditLog[]      @relation("ApprovalAuditLogUser")
-  userCredentials      UserCredential[]        @relation("UserCredentials")
-  passwordHistory      PasswordHistory[]       @relation("UserPasswordHistory")
-  securityLogs         AccountSecurityLog[]    @relation("AccountSecurityLogs")
-  loginSessions        LoginSession[]
-  otpVerifications     OtpVerification[]
-  deviceSessions       DeviceSession[]
-  credentialDeliveries CredentialDeliveryLog[] @relation("CredentialDeliveries")
-  generatedCredentials UserCredential[]        @relation("GeneratedByUser")
-  classTeacherOf       Class[]
+  id                      String                   @id @default(uuid())
+  firstName               String
+  lastName                String
+  email                   String                   @unique
+  phone                   String?
+  username                String?                  @unique
+  password                String
+  photoUrl                String?
+  photoPublicId           String?
+  isActive                Boolean                  @default(true)
+  accountStatus           String                   @default("ACTIVE")
+  mustChangePassword      Boolean                  @default(false)
+  failedAttempts          Int                      @default(0)
+  mfaEnabled              Boolean                  @default(false)
+  mfaSecret               String?
+  lastLogin               DateTime?
+  lastPasswordChange      DateTime?
+  resetToken              String?
+  resetTokenExpiry        DateTime?
+  lockoutUntil            DateTime?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime?                @updatedAt
+  schoolId                String?
+  studentId               String?                  @unique
+  auditLogs               AuditLog[]
+  communications          Communication[]
+  deviceTokens            DeviceToken[]
+  notificationDevices     NotificationDevice[]
+  createdExams            Exam[]
+  createdTemplates        ExamTemplate[]
+  createdBankQuestions    QuestionBank[]
+  uploadedExams           UploadedExam[]
+  createdHomeworks        Homework[]
+  lessonPlans             LessonPlan[]
+  NoticeBoard             NoticeBoard[]
+  notifications           Notification[]
+  readingSessions         ReadingSession[]
+  results                 Result[]                 @relation("TeacherResults")
+  schoolUsers             SchoolUser[]
+  teacher                 Teacher?
+  teachingAssignments     TeachingAssignment[]
+  school                  School?                  @relation(fields: [schoolId], references: [id])
+  student                 Student?                 @relation(fields: [studentId], references: [id])
+  studentPhotos           StudentPhoto[]
+  userRoles               UserRole[]
+  aiTutorSessions         AiTutorSession[]
+  appliedStamps           DocumentStamp[]          @relation("DocumentStampAppliedBy")
+  requestedApprovals      ApprovalRequest[]        @relation("ApprovalRequestRequestedBy")
+  approvedRequests        ApprovalRequest[]        @relation("ApprovalRequestApprover")
+  createdWorkflows        ApprovalWorkflow[]       @relation("ApprovalWorkflowCreatedBy")
+  auditTrailLogs          ApprovalAuditLog[]       @relation("ApprovalAuditLogUser")
+  userCredentials         UserCredential[]         @relation("UserCredentials")
+  passwordHistory         PasswordHistory[]        @relation("UserPasswordHistory")
+  securityLogs            AccountSecurityLog[]     @relation("AccountSecurityLogs")
+  loginSessions           LoginSession[]
+  otpVerifications        OtpVerification[]
+  deviceSessions          DeviceSession[]
+  credentialDeliveries    CredentialDeliveryLog[]  @relation("CredentialDeliveries")
+  generatedCredentials    UserCredential[]         @relation("GeneratedByUser")
+  classTeacherOf          Class[]
+  platformRoleAssignments PlatformRoleAssignment[]
+  schoolRoleAssignments   SchoolRoleAssignment[]   @relation("SchoolRoleUser")
+  classTeacherAssignments ClassTeacherAssignment[]
+  departmentAssignments   DepartmentAssignment[]
+  clubAssignments         ClubAssignment[]
+  committeeAssignments    CommitteeAssignment[]
 
   @@index([schoolId])
   @@index([isActive])
@@ -461,85 +473,86 @@ model LevelType {
 }
 
 model Class {
-  id                   String                        @id @default(uuid())
-  name                 String
-  capacity             Int?
-  schoolId             String
-  levelTypeId          String
-  gradingSystemId      String?
-  order                Int
-  classTeacherId       String?
-  levelType            LevelType                     @relation(fields: [levelTypeId], references: [id])
-  gradingSystem        GradingSystem?                @relation(fields: [gradingSystemId], references: [id])
-  school               School                        @relation(fields: [schoolId], references: [id])
-  classTeacher         User?                         @relation(fields: [classTeacherId], references: [id])
-  classSubjects        ClassSubject[]
-  enrollments          Enrollment[]
-  exams                Exam[]
-  homeworks            Homework[]
-  lessonPlans          LessonPlan[]
-  lessonRequirements   LessonRequirement[]
-  resultPublications   ResultPublication[]
-  teachingAssignments  TeachingAssignment[]
-  timetables           Timetable[]
-  uploadedExams        UploadedExam[]
-  actingPositions      ActingPosition[]
-  assessmentConfigs    TermAssessmentConfiguration[]
-  assessmentResults    StudentAssessmentResult[]
-  assessmentBatches    AssessmentBatch[]
-  computedResults      ComputedResult[]
-  resultSheets         ResultSheet[]
-  classGradingPolicies ClassGradingPolicy[]
-  termSummaries        TermSummary[]
-  longitudinalRecords  LongitudinalRecord[]
-  CurriculumLessonPlan CurriculumLessonPlan[]
-  CurriculumCoverage   CurriculumCoverage[]
-}
-
-model Subject {
   id                      String                        @id @default(uuid())
   name                    String
-  code                    String?
-  isCore                  Boolean                       @default(false)
+  capacity                Int?
   schoolId                String
-  category                String?
-  credits                 Int?
-  description             String?
-  adaptiveTestSessions    AdaptiveTestSession[]
-  assessments             AssessmentType[]
+  levelTypeId             String
+  gradingSystemId         String?
+  order                   Int
+  classTeacherId          String?
+  levelType               LevelType                     @relation(fields: [levelTypeId], references: [id])
+  gradingSystem           GradingSystem?                @relation(fields: [gradingSystemId], references: [id])
+  school                  School                        @relation(fields: [schoolId], references: [id])
+  classTeacher            User?                         @relation(fields: [classTeacherId], references: [id])
   classSubjects           ClassSubject[]
+  enrollments             Enrollment[]
   exams                   Exam[]
   homeworks               Homework[]
-  learningAreas           LearningArea[]
   lessonPlans             LessonPlan[]
   lessonRequirements      LessonRequirement[]
-  nationalBenchmarks      NationalBenchmark[]
-  results                 Result[]
-  school                  School                        @relation(fields: [schoolId], references: [id])
-  assignments             TeachingAssignment[]
-  timetableSlots          TimetableSlot[]
+  resultPublications      ResultPublication[]
+  teachingAssignments     TeachingAssignment[]
+  timetables              Timetable[]
   uploadedExams           UploadedExam[]
-  questionBankCategories  QuestionBankCategory[]
-  questionBankQuestions   QuestionBank[]
-  examTemplates           ExamTemplate[]
+  actingPositions         ActingPosition[]
   assessmentConfigs       TermAssessmentConfiguration[]
   assessmentResults       StudentAssessmentResult[]
   assessmentBatches       AssessmentBatch[]
   computedResults         ComputedResult[]
+  resultSheets            ResultSheet[]
   classGradingPolicies    ClassGradingPolicy[]
-  remarks                 Remark[]
+  termSummaries           TermSummary[]
   longitudinalRecords     LongitudinalRecord[]
-  subjectGroupLinks       SubjectGroupSubject[]
-  conversionRules         SubjectConversionRule[]
-  Topic                   Topic[]
-  Competency              Competency[]
-  ElementOfConstruct      ElementOfConstruct[]
-  LearningOutcome         LearningOutcome[]
-  AssessmentObjective     AssessmentObjective[]
-  SyllabusDocumentSubject SyllabusDocumentSubject[]
-  SbaTask                 SbaTask[]
   CurriculumLessonPlan    CurriculumLessonPlan[]
   CurriculumCoverage      CurriculumCoverage[]
+  classTeacherAssignments ClassTeacherAssignment[]
+}
+
+model Subject {
+  id                         String                        @id @default(uuid())
+  name                       String
+  code                       String?
+  isCore                     Boolean                       @default(false)
+  schoolId                   String
+  category                   String?
+  credits                    Int?
+  description                String?
+  adaptiveTestSessions       AdaptiveTestSession[]
+  assessments                AssessmentType[]
+  classSubjects              ClassSubject[]
+  exams                      Exam[]
+  homeworks                  Homework[]
+  learningAreas              LearningArea[]
+  lessonPlans                LessonPlan[]
+  lessonRequirements         LessonRequirement[]
+  nationalBenchmarks         NationalBenchmark[]
+  results                    Result[]
+  school                     School                        @relation(fields: [schoolId], references: [id])
+  assignments                TeachingAssignment[]
+  timetableSlots             TimetableSlot[]
+  uploadedExams              UploadedExam[]
+  questionBankCategories     QuestionBankCategory[]
+  questionBankQuestions      QuestionBank[]
+  examTemplates              ExamTemplate[]
+  assessmentConfigs          TermAssessmentConfiguration[]
+  assessmentResults          StudentAssessmentResult[]
+  assessmentBatches          AssessmentBatch[]
+  computedResults            ComputedResult[]
+  classGradingPolicies       ClassGradingPolicy[]
+  remarks                    Remark[]
+  longitudinalRecords        LongitudinalRecord[]
+  subjectGroupLinks          SubjectGroupSubject[]
+  conversionRules            SubjectConversionRule[]
+  Topic                      Topic[]
+  Competency                 Competency[]
+  ElementOfConstruct         ElementOfConstruct[]
+  LearningOutcome            LearningOutcome[]
+  AssessmentObjective        AssessmentObjective[]
+  SyllabusDocumentSubject    SyllabusDocumentSubject[]
+  SbaTask                    SbaTask[]
+  CurriculumLessonPlan       CurriculumLessonPlan[]
+  CurriculumCoverage         CurriculumCoverage[]
   compositeSubjectComponents CompositeSubjectComponent[]
 
   @@unique([name, schoolId])
@@ -617,9 +630,10 @@ model Department {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  school    School           @relation(fields: [schoolId], references: [id])
-  teachers  Teacher[]
-  positions ActingPosition[]
+  school                School                 @relation(fields: [schoolId], references: [id])
+  teachers              Teacher[]
+  positions             ActingPosition[]
+  departmentAssignments DepartmentAssignment[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -717,13 +731,13 @@ model StudentPhoto {
 }
 
 model AdmissionSequence {
-  id              String       @id @default(uuid())
+  id              String   @id @default(uuid())
   schoolId        String
   academicYearId  String
   year            Int
-  currentSequence Int          @default(0)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  currentSequence Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   school       School       @relation(fields: [schoolId], references: [id])
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
@@ -1379,46 +1393,46 @@ enum CommCloudMessageStatus {
 }
 
 model CommCloudProvider {
-  id           String   @id @default(uuid())
+  id           String           @id @default(uuid())
   name         String
   channel      CommCloudChannel
-  providerType String   // beem, twilio, zoho, sendgrid, firebase, etc.
-  isActive     Boolean  @default(true)
-  priority     Int      @default(0)
-  weight       Float    @default(1.0)
-  
-  // Connection credentials (encrypted at application level)
-  credentials  Json?
-  
-  // Provider capabilities
-  capabilities Json?    // { countries: ["TZ","KE"], maxLength: 160, supportsUnicode: true, etc. }
-  
-  // Health & status
-  status       String   @default("active") // active, degraded, down, maintenance
-  lastHealthCheckAt DateTime?
-  lastError     String?
-  successRate  Float    @default(100.0)
-  avgLatencyMs Int      @default(0)
-  totalSent    Int      @default(0)
-  totalFailed  Int      @default(0)
-  
-  // Cost configuration
-  costPerMessage Float   @default(0.0)
-  currency       String  @default("USD")
-  
-  // Rate limiting
-  rateLimit      Int     @default(10)  // messages per second
-  maxConcurrent  Int     @default(5)
-  
-  // Metadata
-  config        Json?
-  notes         String?
-  createdById   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  providerType String // beem, twilio, zoho, sendgrid, firebase, etc.
+  isActive     Boolean          @default(true)
+  priority     Int              @default(0)
+  weight       Float            @default(1.0)
 
-  routingRules  CommCloudRoutingRule[]
-  deliveryLogs  CommCloudDeliveryLog[]
+  // Connection credentials (encrypted at application level)
+  credentials Json?
+
+  // Provider capabilities
+  capabilities Json? // { countries: ["TZ","KE"], maxLength: 160, supportsUnicode: true, etc. }
+
+  // Health & status
+  status            String    @default("active") // active, degraded, down, maintenance
+  lastHealthCheckAt DateTime?
+  lastError         String?
+  successRate       Float     @default(100.0)
+  avgLatencyMs      Int       @default(0)
+  totalSent         Int       @default(0)
+  totalFailed       Int       @default(0)
+
+  // Cost configuration
+  costPerMessage Float  @default(0.0)
+  currency       String @default("USD")
+
+  // Rate limiting
+  rateLimit     Int @default(10) // messages per second
+  maxConcurrent Int @default(5)
+
+  // Metadata
+  config      Json?
+  notes       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  routingRules CommCloudRoutingRule[]
+  deliveryLogs CommCloudDeliveryLog[]
 
   @@unique([name, channel])
   @@index([channel])
@@ -1429,102 +1443,102 @@ model CommCloudProvider {
 }
 
 model CommCloudRoutingRule {
-  id              String   @id @default(uuid())
-  name            String
-  channel         CommCloudChannel
-  ruleType        String   // preferred, cheapest, highest_delivery, country_based, school_preferred, priority_based, fallback
-  priority        Int      @default(0)
-  isActive        Boolean  @default(true)
-  
+  id       String           @id @default(uuid())
+  name     String
+  channel  CommCloudChannel
+  ruleType String // preferred, cheapest, highest_delivery, country_based, school_preferred, priority_based, fallback
+  priority Int              @default(0)
+  isActive Boolean          @default(true)
+
   // Conditions
-  conditions      Json?    // { countries: ["TZ","KE"], schoolId: "...", messageType: "OTP", minSuccessRate: 95 }
-  
+  conditions Json? // { countries: ["TZ","KE"], schoolId: "...", messageType: "OTP", minSuccessRate: 95 }
+
   // Action: which providers to use in order
-  providerOrder   String[] // ordered list of provider IDs for failover
+  providerOrder       String[] // ordered list of provider IDs for failover
   preferredProviderId String?
   fallbackProviderIds String[]
-  
+
   // Settings
-  maxRetries      Int      @default(3)
-  retryDelayMs    Int      @default(2000)
-  retryBackoff    String   @default("exponential") // exponential, linear, fixed
-  
+  maxRetries   Int    @default(3)
+  retryDelayMs Int    @default(2000)
+  retryBackoff String @default("exponential") // exponential, linear, fixed
+
   // Usage tracking
-  timesUsed       Int      @default(0)
-  lastUsedAt      DateTime?
-  
-  createdById     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  timesUsed  Int       @default(0)
+  lastUsedAt DateTime?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   preferredProvider CommCloudProvider? @relation(fields: [preferredProviderId], references: [id])
-  
+
   @@index([channel])
   @@index([ruleType])
   @@index([isActive])
 }
 
 model CommCloudMessage {
-  id                String                @id @default(uuid())
-  channel           CommCloudChannel
-  messageType       String                // transactional, bulk, OTP, marketing, emergency, etc.
-  status            CommCloudMessageStatus @default(QUEUED)
-  
+  id          String                 @id @default(uuid())
+  channel     CommCloudChannel
+  messageType String // transactional, bulk, OTP, marketing, emergency, etc.
+  status      CommCloudMessageStatus @default(QUEUED)
+
   // Sender/Recipient
-  senderId          String?               // CommCloudSenderIdentity ID
-  senderIdentity    String?               // From address, sender ID, etc.
-  recipient         String                // phone, email, device token, user ID
+  senderId          String? // CommCloudSenderIdentity ID
+  senderIdentity    String? // From address, sender ID, etc.
+  recipient         String // phone, email, device token, user ID
   recipientName     String?
-  recipientMetadata Json?                 // { userId, schoolId, role, etc. }
-  
+  recipientMetadata Json? // { userId, schoolId, role, etc. }
+
   // Content
-  subject           String?
-  body              String?
-  htmlBody          String?
-  templateId        String?
-  templateData      Json?
-  attachments       Json?                 // [{ filename, url, type }]
-  metadata          Json?                 // custom metadata
-  
+  subject      String?
+  body         String?
+  htmlBody     String?
+  templateId   String?
+  templateData Json?
+  attachments  Json? // [{ filename, url, type }]
+  metadata     Json? // custom metadata
+
   // Media (for WhatsApp, etc.)
-  mediaUrl          String?
-  mediaType         String?
-  
+  mediaUrl  String?
+  mediaType String?
+
   // Scheduling
-  scheduledAt       DateTime?
-  sentAt            DateTime?
-  deliveredAt       DateTime?
-  readAt            DateTime?
-  openedAt          DateTime?
-  clickedAt         DateTime?
-  
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  openedAt    DateTime?
+  clickedAt   DateTime?
+
   // Delivery tracking
   providerId        String?
   providerName      String?
-  providerMessageId String?               // External provider's message ID
+  providerMessageId String? // External provider's message ID
   cost              Float?
   currency          String?
-  creditsUsed       Int       @default(0)
-  
+  creditsUsed       Int     @default(0)
+
   // Retry handling
-  retryCount        Int       @default(0)
-  maxRetries        Int       @default(3)
-  lastError         String?
-  
+  retryCount Int     @default(0)
+  maxRetries Int     @default(3)
+  lastError  String?
+
   // Relations
-  schoolId          String?
-  userId            String?
-  createdById       String?
-  batchId           String?               // For bulk messages
-  
+  schoolId    String?
+  userId      String?
+  createdById String?
+  batchId     String? // For bulk messages
+
   // Notifications
-  inAppNotificationId String?              // Link to in-app notification if generated
-  
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  deliveryLogs      CommCloudDeliveryLog[]
-  
+  inAppNotificationId String? // Link to in-app notification if generated
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deliveryLogs CommCloudDeliveryLog[]
+
   @@index([channel])
   @@index([status])
   @@index([schoolId])
@@ -1537,29 +1551,29 @@ model CommCloudMessage {
 }
 
 model CommCloudDeliveryLog {
-  id                String   @id @default(uuid())
+  id                String  @id @default(uuid())
   messageId         String
   providerId        String?
   providerName      String
   providerMessageId String?
-  
-  event             String   // queued, sent, delivered, failed, read, opened, clicked, bounced, rejected
-  status            String
-  statusCode        String?
-  description       String?
-  
-  cost              Float?
-  latencyMs         Int?
-  attempt           Int      @default(1)
-  
-  rawResponse       Json?    // raw response from provider
-  errorDetails      Json?
-  
-  loggedAt          DateTime @default(now())
-  
-  message           CommCloudMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  provider          CommCloudProvider? @relation(fields: [providerId], references: [id])
-  
+
+  event       String // queued, sent, delivered, failed, read, opened, clicked, bounced, rejected
+  status      String
+  statusCode  String?
+  description String?
+
+  cost      Float?
+  latencyMs Int?
+  attempt   Int    @default(1)
+
+  rawResponse  Json? // raw response from provider
+  errorDetails Json?
+
+  loggedAt DateTime @default(now())
+
+  message  CommCloudMessage   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  provider CommCloudProvider? @relation(fields: [providerId], references: [id])
+
   @@index([messageId])
   @@index([providerId])
   @@index([event])
@@ -1568,58 +1582,58 @@ model CommCloudDeliveryLog {
 }
 
 model CommCloudCreditWallet {
-  id            String   @id @default(uuid())
-  ownerType     String   // platform, school
-  ownerId       String   // 'platform' or schoolId
-  
+  id        String @id @default(uuid())
+  ownerType String // platform, school
+  ownerId   String // 'platform' or schoolId
+
   // Balances per channel
-  smsBalance    Int      @default(0)
-  emailBalance  Int      @default(0)
-  whatsappBalance Int    @default(0)
-  pushBalance   Int      @default(0)
-  
+  smsBalance      Int @default(0)
+  emailBalance    Int @default(0)
+  whatsappBalance Int @default(0)
+  pushBalance     Int @default(0)
+
   // Financial
-  prepaidBalance Float   @default(0)
-  currency      String   @default("USD")
-  
+  prepaidBalance Float  @default(0)
+  currency       String @default("USD")
+
   // Spending limits
-  monthlyLimit  Float?
+  monthlyLimit   Float?
   overageAllowed Boolean @default(false)
-  
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  transactions  CommCloudBillingTransaction[]
-  
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions CommCloudBillingTransaction[]
+
   @@unique([ownerType, ownerId])
   @@index([ownerType])
   @@index([ownerId])
 }
 
 model CommCloudBillingTransaction {
-  id              String   @id @default(uuid())
-  walletId        String
-  
-  transactionType String   // credit, debit, refund, recharge, subscription
+  id       String @id @default(uuid())
+  walletId String
+
+  transactionType String // credit, debit, refund, recharge, subscription
   channel         CommCloudChannel?
-  units           Int?     // number of messages
-  amount          Float    @default(0)
-  currency        String   @default("USD")
+  units           Int? // number of messages
+  amount          Float             @default(0)
+  currency        String            @default("USD")
   balanceBefore   Float
   balanceAfter    Float
-  
-  description     String?
-  reference       String?  // external payment reference
-  invoiceId       String?
-  
-  status          String   @default("completed") // pending, completed, failed, refunded
-  performedById   String?
-  
-  createdAt       DateTime @default(now())
-  
-  wallet          CommCloudCreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  
+
+  description String?
+  reference   String? // external payment reference
+  invoiceId   String?
+
+  status        String  @default("completed") // pending, completed, failed, refunded
+  performedById String?
+
+  createdAt DateTime @default(now())
+
+  wallet CommCloudCreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
   @@index([walletId])
   @@index([transactionType])
   @@index([channel])
@@ -1628,38 +1642,38 @@ model CommCloudBillingTransaction {
 }
 
 model CommCloudTemplate {
-  id              String   @id @default(uuid())
-  name            String
-  channel         CommCloudChannel
-  type            String   // attendance, results, fees, admissions, registration, password_reset, OTP, marketing, system, etc.
-  subject         String?
-  body            String
-  htmlBody        String?
-  
+  id       String           @id @default(uuid())
+  name     String
+  channel  CommCloudChannel
+  type     String // attendance, results, fees, admissions, registration, password_reset, OTP, marketing, system, etc.
+  subject  String?
+  body     String
+  htmlBody String?
+
   // Variables
-  variables       Json?    // [{ name: "studentName", type: "string", required: true }]
-  
+  variables Json? // [{ name: "studentName", type: "string", required: true }]
+
   // WhatsApp template specific
-  whatsappTemplateId    String?
-  whatsappNamespace     String?
-  whatsappLanguage     String   @default("en_US")
-  headerType           String?  // text, image, video, document
-  headerMediaUrl       String?
-  footerText           String?
-  
+  whatsappTemplateId String?
+  whatsappNamespace  String?
+  whatsappLanguage   String  @default("en_US")
+  headerType         String? // text, image, video, document
+  headerMediaUrl     String?
+  footerText         String?
+
   // Scoping
-  scope           String   @default("platform") // platform, school
-  schoolId        String?
-  isDefault       Boolean  @default(false)
-  isActive        Boolean  @default(true)
-  
-  category        String?
-  tags            String[]
-  
-  createdById     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  scope     String  @default("platform") // platform, school
+  schoolId  String?
+  isDefault Boolean @default(false)
+  isActive  Boolean @default(true)
+
+  category String?
+  tags     String[]
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
   @@unique([name, channel, scope, schoolId])
   @@index([channel])
   @@index([type])
@@ -1669,33 +1683,33 @@ model CommCloudTemplate {
 }
 
 model CommCloudSenderIdentity {
-  id              String   @id @default(uuid())
-  name            String
-  channel         CommCloudChannel
-  
+  id      String           @id @default(uuid())
+  name    String
+  channel CommCloudChannel
+
   // Sender details
-  senderId        String?  // SMS sender ID (e.g., "SMARTTECH")
-  senderName      String?  // Email sender name
-  senderEmail     String?  // Email sender address
-  senderPhone     String?  // WhatsApp sender phone number
+  senderId          String? // SMS sender ID (e.g., "SMARTTECH")
+  senderName        String? // Email sender name
+  senderEmail       String? // Email sender address
+  senderPhone       String? // WhatsApp sender phone number
   businessAccountId String? // WhatsApp Business Account ID
-  
+
   // Verification
-  isVerified      Boolean  @default(false)
+  isVerified         Boolean   @default(false)
   verificationStatus String? // pending, verified, rejected
-  verifiedAt      DateTime?
-  
+  verifiedAt         DateTime?
+
   // Scoping
-  scope           String   @default("platform") // platform, school
-  schoolId        String?
-  
-  isActive        Boolean  @default(true)
-  isDefault       Boolean  @default(false)
-  
-  createdById     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  scope    String  @default("platform") // platform, school
+  schoolId String?
+
+  isActive  Boolean @default(true)
+  isDefault Boolean @default(false)
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
   @@unique([name, channel, scope, schoolId])
   @@index([channel])
   @@index([scope])
@@ -1704,42 +1718,42 @@ model CommCloudSenderIdentity {
 }
 
 model CommCloudAnalytics {
-  id              String   @id @default(uuid())
-  
-  period          String   // daily, weekly, monthly, yearly
-  periodStart     DateTime
-  periodEnd       DateTime
-  
-  channel         CommCloudChannel
-  schoolId        String?
-  
+  id String @id @default(uuid())
+
+  period      String // daily, weekly, monthly, yearly
+  periodStart DateTime
+  periodEnd   DateTime
+
+  channel  CommCloudChannel
+  schoolId String?
+
   // Counters
-  totalSent       Int      @default(0)
-  totalDelivered  Int      @default(0)
-  totalFailed     Int      @default(0)
-  totalBounced    Int      @default(0)
-  totalRead       Int      @default(0)
-  totalOpened     Int      @default(0)
-  totalClicked    Int      @default(0)
-  
+  totalSent      Int @default(0)
+  totalDelivered Int @default(0)
+  totalFailed    Int @default(0)
+  totalBounced   Int @default(0)
+  totalRead      Int @default(0)
+  totalOpened    Int @default(0)
+  totalClicked   Int @default(0)
+
   // Financial
-  totalCost       Float    @default(0)
-  totalCreditsUsed Int     @default(0)
-  
+  totalCost        Float @default(0)
+  totalCreditsUsed Int   @default(0)
+
   // Performance
-  avgLatencyMs    Float?
-  deliveryRate    Float?
-  failureRate     Float?
-  
+  avgLatencyMs Float?
+  deliveryRate Float?
+  failureRate  Float?
+
   // Provider breakdown
-  byProvider      Json?    // { "twilio": { sent: 100, delivered: 95, failed: 5 } }
-  
+  byProvider Json? // { "twilio": { sent: 100, delivered: 95, failed: 5 } }
+
   // Country breakdown
-  byCountry       Json?    // { "TZ": { sent: 50 }, "KE": { sent: 30 } }
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  byCountry Json? // { "TZ": { sent: 50 }, "KE": { sent: 30 } }
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([period, periodStart, channel, schoolId])
   @@index([period])
   @@index([periodStart])
@@ -1748,28 +1762,28 @@ model CommCloudAnalytics {
 }
 
 model CommCloudWebhookEvent {
-  id              String   @id @default(uuid())
-  providerId      String
-  providerName    String
-  eventType       String   // delivery_receipt, message_received, status_callback, etc.
-  
+  id           String @id @default(uuid())
+  providerId   String
+  providerName String
+  eventType    String // delivery_receipt, message_received, status_callback, etc.
+
   // Raw payload
-  rawPayload      Json?
-  
+  rawPayload Json?
+
   // Parsed data
-  messageId       String?
+  messageId         String?
   providerMessageId String?
-  status          String?
-  statusCode      String?
-  errorCode       String?
-  errorMessage    String?
-  
-  processed       Boolean  @default(false)
+  status            String?
+  statusCode        String?
+  errorCode         String?
+  errorMessage      String?
+
+  processed       Boolean   @default(false)
   processedAt     DateTime?
   processingError String?
-  
-  createdAt       DateTime @default(now())
-  
+
+  createdAt DateTime @default(now())
+
   @@index([providerId])
   @@index([eventType])
   @@index([processed])
@@ -1777,37 +1791,37 @@ model CommCloudWebhookEvent {
 }
 
 model CommCloud {
-  id              String   @id @default(uuid())
-  
+  id String @id @default(uuid())
+
   // Platform settings
-  platformName    String   @default("SmartTech Communications Cloud")
+  platformName    String  @default("SmartTech Communications Cloud")
   platformEmail   String?
   platformPhone   String?
   platformWebsite String?
-  
+
   // Default sender identities
   defaultSmsSenderId    String?
   defaultEmailSender    String?
   defaultEmailName      String?
   defaultWhatsAppSender String?
-  
+
   // Routing default
   defaultRoutingStrategy String @default("priority") // priority, cheapest, highest_delivery
-  
+
   // Branding
-  brandingConfig  Json?
-  
+  brandingConfig Json?
+
   // Feature flags
   allowSchoolProviders Boolean @default(false)
   requireApproval      Boolean @default(true)
   autoRetryFailed      Boolean @default(true)
   maxRetryAttempts     Int     @default(3)
-  
+
   // Audit
-  updatedById     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
   @@index([platformName])
 }
 
@@ -2397,17 +2411,135 @@ model TeacherAbsence {
 }
 
 model SchoolUser {
-  id        String   @id @default(uuid())
-  userId    String
-  schoolId  String
-  isPrimary Boolean  @default(false)
-  createdAt DateTime @default(now())
-  school    School   @relation(fields: [schoolId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+  id                   String                 @id @default(uuid())
+  userId               String
+  schoolId             String
+  isPrimary            Boolean                @default(false)
+  createdAt            DateTime               @default(now())
+  school               School                 @relation(fields: [schoolId], references: [id])
+  user                 User                   @relation(fields: [userId], references: [id])
+  SchoolRoleAssignment SchoolRoleAssignment[]
 
   @@unique([userId, schoolId])
   @@index([userId])
   @@index([schoolId])
+}
+
+model SchoolRoleAssignment {
+  id                 String    @id @default(uuid())
+  schoolMembershipId String
+  role               String
+  startDate          DateTime  @default(now())
+  endDate            DateTime?
+  isActive           Boolean   @default(true)
+  assignedBy         String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  membership SchoolUser @relation(fields: [schoolMembershipId], references: [id], onDelete: Cascade)
+  assigner   User?      @relation("SchoolRoleUser", fields: [assignedBy], references: [id])
+  School     School?    @relation(fields: [schoolId], references: [id])
+  schoolId   String?
+
+  @@index([schoolMembershipId])
+  @@index([role])
+  @@index([isActive])
+}
+
+model PlatformRoleAssignment {
+  id        String    @id @default(uuid())
+  userId    String
+  role      String
+  startDate DateTime  @default(now())
+  endDate   DateTime?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@index([userId])
+}
+
+model ClassTeacherAssignment {
+  id             String    @id @default(uuid())
+  teacherId      String
+  classId        String
+  academicYearId String
+  schoolId       String
+  isPrimary      Boolean   @default(true)
+  startDate      DateTime  @default(now())
+  endDate        DateTime?
+  isActive       Boolean   @default(true)
+  assignedBy     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  teacher      User         @relation(fields: [teacherId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  school       School       @relation(fields: [schoolId], references: [id])
+
+  @@unique([teacherId, classId, academicYearId])
+  @@index([classId, academicYearId])
+  @@index([teacherId])
+}
+
+model DepartmentAssignment {
+  id           String    @id @default(uuid())
+  teacherId    String
+  departmentId String
+  schoolId     String
+  position     String?
+  startDate    DateTime  @default(now())
+  endDate      DateTime?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  teacher    User       @relation(fields: [teacherId], references: [id])
+  department Department @relation(fields: [departmentId], references: [id])
+  school     School     @relation(fields: [schoolId], references: [id])
+
+  @@index([teacherId, schoolId])
+  @@index([departmentId])
+}
+
+model ClubAssignment {
+  id        String    @id @default(uuid())
+  teacherId String
+  clubName  String
+  schoolId  String
+  role      String?
+  startDate DateTime  @default(now())
+  endDate   DateTime?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  teacher User   @relation(fields: [teacherId], references: [id])
+  school  School @relation(fields: [schoolId], references: [id])
+
+  @@index([teacherId, schoolId])
+}
+
+model CommitteeAssignment {
+  id            String    @id @default(uuid())
+  teacherId     String
+  committeeName String
+  schoolId      String
+  role          String?
+  startDate     DateTime  @default(now())
+  endDate       DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  teacher User   @relation(fields: [teacherId], references: [id])
+  school  School @relation(fields: [schoolId], references: [id])
+
+  @@index([teacherId, schoolId])
 }
 
 model DeviceToken {
@@ -2444,25 +2576,25 @@ model NotificationDevice {
 }
 
 model Notification {
-  id          String            @id @default(uuid())
-  userId      String
-  title       String
-  body        String
-  data        Json?
-  isRead      Boolean           @default(false)
-  type        String            @default("general")
-  role        String?
-  category    String            @default("System Notifications")
-  status      String            @default("sent")
-  sentAt      DateTime?
-  deliveredAt DateTime?
-  openedAt    DateTime?
-  failedAt    DateTime?
-  failedError String?
+  id           String    @id @default(uuid())
+  userId       String
+  title        String
+  body         String
+  data         Json?
+  isRead       Boolean   @default(false)
+  type         String    @default("general")
+  role         String?
+  category     String    @default("System Notifications")
+  status       String    @default("sent")
+  sentAt       DateTime?
+  deliveredAt  DateTime?
+  openedAt     DateTime?
+  failedAt     DateTime?
+  failedError  String?
   scheduledFor DateTime?
-  createdBy   String?
-  createdAt   DateTime          @default(now())
-  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdBy    String?
+  createdAt    DateTime  @default(now())
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([isRead])
@@ -4057,18 +4189,18 @@ model LongitudinalRecord {
 }
 
 model CompositeSubject {
-  id                  String                       @id @default(uuid())
-  name                String
-  code                String
-  curriculumId        String
-  calculationMethod   String                       @default("WEIGHTED_AVERAGE")
-  isActive            Boolean                      @default(true)
-  schoolId            String?
-  createdAt           DateTime                     @default(now())
-  updatedAt           DateTime                     @updatedAt
-  curriculum          CurriculumVersion            @relation(fields: [curriculumId], references: [id])
-  school              School?                      @relation(fields: [schoolId], references: [id])
-  components          CompositeSubjectComponent[]
+  id                String                      @id @default(uuid())
+  name              String
+  code              String
+  curriculumId      String
+  calculationMethod String                      @default("WEIGHTED_AVERAGE")
+  isActive          Boolean                     @default(true)
+  schoolId          String?
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  curriculum        CurriculumVersion           @relation(fields: [curriculumId], references: [id])
+  school            School?                     @relation(fields: [schoolId], references: [id])
+  components        CompositeSubjectComponent[]
 
   @@unique([code, curriculumId])
   @@index([curriculumId])
@@ -4076,13 +4208,13 @@ model CompositeSubject {
 }
 
 model CompositeSubjectComponent {
-  id                  String            @id @default(uuid())
-  compositeSubjectId  String
-  subjectId           String
-  weight              Float             @default(1.0)
-  createdAt           DateTime          @default(now())
-  compositeSubject    CompositeSubject  @relation(fields: [compositeSubjectId], references: [id], onDelete: Cascade)
-  subject             Subject           @relation(fields: [subjectId], references: [id])
+  id                 String           @id @default(uuid())
+  compositeSubjectId String
+  subjectId          String
+  weight             Float            @default(1.0)
+  createdAt          DateTime         @default(now())
+  compositeSubject   CompositeSubject @relation(fields: [compositeSubjectId], references: [id], onDelete: Cascade)
+  subject            Subject          @relation(fields: [subjectId], references: [id])
 
   @@unique([compositeSubjectId, subjectId])
   @@index([compositeSubjectId])
@@ -4470,7 +4602,7 @@ model CurriculumVersion {
   grade7Results         Grade7Result[]
   schoolCurricula       SchoolCurriculum[]
   schoolEducationLevels SchoolEducationLevel[]
-  compositeSubjects      CompositeSubject[]
+  compositeSubjects     CompositeSubject[]
   createdAt             DateTime                   @default(now())
   updatedAt             DateTime                   @updatedAt
 
