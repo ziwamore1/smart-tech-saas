@@ -118,7 +118,7 @@ Currently, frontend pages use legacy `user.roles` array for permission checks. T
 | Mobile: AppNavigator.tsx navigation fix | ✅ | `7411c5e` | Critical navigation fix |
 | Mobile: ExamDetailScreen.tsx, usePermissions.ts | ✅ | `7411c5e` | Role checks |
 
-### 3.2 Phase 5 — School Membership Management UI 🟡
+### 3.2 Phase 5 — School Membership Management UI ✅
 
 | Task | Status | Files to Create/Modify |
 |------|--------|----------------------|
@@ -126,7 +126,7 @@ Currently, frontend pages use legacy `user.roles` array for permission checks. T
 | "Add Member" — search users and assign to school | ✅ | Modal on school-members page using `schoolMembershipApi` |
 | "Assign School Role" — dropdown to assign/remove roles | ✅ | Inline dropdown + role removal on school-members page |
 | "Remove Member" — remove user from school | ✅ | Confirmation dialog on school-members page |
-| "Manage Teaching Staff" — assign classes, departments | 🔲 | Extension of teachers page |
+| "Manage Teaching Staff" — assign classes, departments | ✅ | Class teacher assignment modal + table on teachers page |
 
 ### 3.3 Phase 6 — Platform Role Management UI 🔲
 

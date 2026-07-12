@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { teacherApi, api, teachingAssignmentApi, classApi, subjectApi, academicYearApi, roleApi, enrollmentApi, schoolMembershipApi } from '@/lib/api';
+import { teacherApi, api, teachingAssignmentApi, classApi, subjectApi, academicYearApi, roleApi, enrollmentApi, schoolMembershipApi, classTeacherAssignmentApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permission-context';
 
@@ -12,6 +12,7 @@ export default function TeachersPage() {
   const queryClient = useQueryClient();
   const isPrimary = user?.institutionType === 'PRIMARY_SCHOOL';
   const canManageStaff = can('staff.manage');
+  const canViewStaff = can('staff.view');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -24,6 +25,8 @@ export default function TeachersPage() {
   const [filterStatus, setFilterStatus] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [assignmentForm, setAssignmentForm] = useState({ classId: '', subjectId: '', academicYearId: '' });
+  const [showClassTeacherModal, setShowClassTeacherModal] = useState(false);
+  const [classTeacherForm, setClassTeacherForm] = useState({ teacherId: '', classId: '', academicYearId: '', isPrimary: true });
 
   const { data: teachersData, isLoading: teachersLoading, error: teachersError } = useQuery({
     queryKey: ['teachers'],
@@ -94,6 +97,19 @@ export default function TeachersPage() {
       let data = res.data?.data || res.data || [];
       return Array.isArray(data) ? data : [];
     }),
+  });
+
+  const { data: classTeacherAssignments, isLoading: ctaLoading } = useQuery({
+    queryKey: ['class-teacher-assignments'],
+    queryFn: async () => {
+      try {
+        const res = await classTeacherAssignmentApi.findBySchool();
+        let data = res.data?.data || res.data || [];
+        return Array.isArray(data) ? data : [];
+      } catch {
+        return [];
+      }
+    },
   });
 
   // Fetch teaching staff from school-membership (includes Directors, SuperAdmins with teaching assignments)
@@ -286,9 +302,9 @@ export default function TeachersPage() {
 
   const createAssignmentMutation = useMutation({
     mutationFn: async (data: any) => {
-      console.log('Creating assignment with data:', JSON.stringify(data, null, 2));
       if (isPrimary) {
-        await classApi.setClassTeacher(data.classId, data.teacherId);
+        const teacherRecordId = selectedTeacherForAssignment?.id || data.teacherId;
+        await classApi.setClassTeacher(data.classId, teacherRecordId);
         return { success: true };
       }
       return teachingAssignmentApi.create(data);
@@ -296,11 +312,10 @@ export default function TeachersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teaching-assignments'] });
       queryClient.invalidateQueries({ queryKey: ['classes'] });
-      queryClient.invalidateQueries({ queryKey: ['school-stats'] });
       setShowAssignmentModal(false);
       setSelectedTeacherForAssignment(null);
       setAssignmentForm({ classId: '', subjectId: '', academicYearId: '' });
-      setMessage({ type: 'success', text: isPrimary ? 'Class teacher assigned successfully!' : 'Assignment created successfully!' });
+      setMessage({ type: 'success', text: 'Assignment created successfully!' });
       setTimeout(() => setMessage(null), 3000);
     },
     onError: (error: any) => {
@@ -318,6 +333,36 @@ export default function TeachersPage() {
     },
     onError: (error: any) => {
       setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to delete assignment.' });
+      setTimeout(() => setMessage(null), 5000);
+    },
+  });
+
+  const createClassTeacherMutation = useMutation({
+    mutationFn: async (data: { teacherId: string; classId: string; academicYearId: string; isPrimary?: boolean }) => {
+      return classTeacherAssignmentApi.assign(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['class-teacher-assignments'] });
+      setShowClassTeacherModal(false);
+      setClassTeacherForm({ teacherId: '', classId: '', academicYearId: '', isPrimary: true });
+      setMessage({ type: 'success', text: 'Class teacher assigned successfully!' });
+      setTimeout(() => setMessage(null), 3000);
+    },
+    onError: (error: any) => {
+      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to assign class teacher.' });
+      setTimeout(() => setMessage(null), 5000);
+    },
+  });
+
+  const removeClassTeacherMutation = useMutation({
+    mutationFn: (id: string) => classTeacherAssignmentApi.remove(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['class-teacher-assignments'] });
+      setMessage({ type: 'success', text: 'Class teacher assignment removed!' });
+      setTimeout(() => setMessage(null), 3000);
+    },
+    onError: (error: any) => {
+      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to remove assignment.' });
       setTimeout(() => setMessage(null), 5000);
     },
   });
@@ -353,6 +398,12 @@ export default function TeachersPage() {
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             + {isPrimary ? 'Assign Classes' : 'Assign Subjects'}
+          </button>
+          <button
+            onClick={() => setShowClassTeacherModal(true)}
+            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+          >
+            + Assign Class Teacher
           </button>
           <button
             onClick={() => setShowAddModal(true)}
@@ -755,6 +806,63 @@ export default function TeachersPage() {
         </div>
       )}
 
+      {classTeacherAssignments && classTeacherAssignments.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div className="p-4 border-b bg-gradient-to-r from-teal-50 to-emerald-50">
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              🏫 Class Teacher Assignments
+              <span className="bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full text-xs">{classTeacherAssignments.length}</span>
+            </h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Teacher</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Class</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Academic Year</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Since</th>
+                  {canManageStaff && <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {classTeacherAssignments.map((cta: any) => (
+                  <tr key={cta.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-3">
+                      <div className="font-medium text-gray-900">{cta.teacher?.firstName} {cta.teacher?.lastName}</div>
+                      <div className="text-sm text-gray-500">{cta.teacher?.email}</div>
+                    </td>
+                    <td className="px-6 py-3 font-medium text-gray-900">{cta.class?.name}</td>
+                    <td className="px-6 py-3 text-sm text-gray-600">{cta.academicYear?.name}</td>
+                    <td className="px-6 py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${cta.isPrimary ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {cta.isPrimary ? '⭐ Primary' : '👤 Secondary'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3 text-sm text-gray-500">{cta.startDate ? new Date(cta.startDate).toLocaleDateString() : '—'}</td>
+                    {canManageStaff && (
+                      <td className="px-6 py-3">
+                        <button
+                          onClick={() => {
+                            if (confirm(`Remove ${cta.teacher?.firstName} as class teacher for ${cta.class?.name}?`)) {
+                              removeClassTeacherMutation.mutate(cta.id);
+                            }
+                          }}
+                          className="px-3 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {showProfileModal && selectedTeacher && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -893,6 +1001,11 @@ export default function TeachersPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-2xl font-bold mb-6">{isPrimary ? 'Assign Teacher to Class' : 'Assign Teacher to Class & Subject'}</h2>
+            {createAssignmentMutation.isError && (
+              <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
+                {createAssignmentMutation.error?.response?.data?.message || 'Failed to create assignment.'}
+              </div>
+            )}
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Teacher *</label>
@@ -923,7 +1036,6 @@ export default function TeachersPage() {
                 </select>
               </div>
               )}
-              {!isPrimary && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Academic Year *</label>
                 <select value={assignmentForm.academicYearId} onChange={(e) => { console.log('Academic year selected:', e.target.value); setAssignmentForm({ ...assignmentForm, academicYearId: e.target.value }); }} className="w-full px-3 py-2 border rounded-lg" required>
@@ -933,23 +1045,81 @@ export default function TeachersPage() {
                   ))}
                 </select>
               </div>
-              )}
             </div>
             <div className="flex gap-3 justify-end pt-6">
               <button onClick={() => { setShowAssignmentModal(false); setSelectedTeacherForAssignment(null); setAssignmentForm({ classId: '', subjectId: '', academicYearId: '' }); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
               <button onClick={() => {
-                if (!selectedTeacherForAssignment?.id || !assignmentForm.classId || (!isPrimary && !assignmentForm.subjectId) || (!isPrimary && !assignmentForm.academicYearId)) {
+                if (!selectedTeacherForAssignment?.id || !assignmentForm.classId || (!isPrimary && !assignmentForm.subjectId) || !assignmentForm.academicYearId) {
                   alert('Please fill in all required fields');
                   return;
                 }
                 createAssignmentMutation.mutate({
-                  teacherId: selectedTeacherForAssignment.userId || selectedTeacherForAssignment.user?.id,
+                  teacherId: selectedTeacherForAssignment.id,
                   classId: assignmentForm.classId,
                   ...(isPrimary ? {} : { subjectId: assignmentForm.subjectId }),
                   academicYearId: assignmentForm.academicYearId,
                 });
               }} disabled={createAssignmentMutation.isPending} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400">
                 {createAssignmentMutation.isPending ? 'Creating...' : 'Create Assignment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showClassTeacherModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+            <h2 className="text-2xl font-bold mb-2">Assign Class Teacher</h2>
+            <p className="text-gray-500 text-sm mb-6">Assign a teacher as the primary class teacher for a class</p>
+            {createClassTeacherMutation.isError && (
+              <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
+                {createClassTeacherMutation.error?.response?.data?.message || 'Failed to assign class teacher.'}
+              </div>
+            )}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Teacher *</label>
+                <select value={classTeacherForm.teacherId} onChange={(e) => setClassTeacherForm({ ...classTeacherForm, teacherId: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required>
+                  <option value="">Select Teacher</option>
+                  {teachers.map((teacher: any) => (
+                    <option key={teacher.id} value={teacher.id}>{teacher.user?.firstName} {teacher.user?.lastName}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Class *</label>
+                <select value={classTeacherForm.classId} onChange={(e) => setClassTeacherForm({ ...classTeacherForm, classId: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required>
+                  <option value="">Select Class</option>
+                  {classesData?.map((cls: any) => (
+                    <option key={cls.id} value={cls.id}>{cls.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Academic Year *</label>
+                <select value={classTeacherForm.academicYearId} onChange={(e) => setClassTeacherForm({ ...classTeacherForm, academicYearId: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required>
+                  <option value="">Select Academic Year</option>
+                  {academicYearsData?.map((year: any) => (
+                    <option key={year.id} value={year.id}>{year.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="isPrimary" checked={classTeacherForm.isPrimary} onChange={(e) => setClassTeacherForm({ ...classTeacherForm, isPrimary: e.target.checked })} className="rounded border-gray-300" />
+                <label htmlFor="isPrimary" className="text-sm text-gray-700">Primary class teacher (homeroom teacher)</label>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end pt-6">
+              <button onClick={() => { setShowClassTeacherModal(false); setClassTeacherForm({ teacherId: '', classId: '', academicYearId: '', isPrimary: true }); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
+              <button onClick={() => {
+                if (!classTeacherForm.teacherId || !classTeacherForm.classId || !classTeacherForm.academicYearId) {
+                  alert('Please fill in all required fields');
+                  return;
+                }
+                createClassTeacherMutation.mutate(classTeacherForm);
+              }} disabled={createClassTeacherMutation.isPending} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-gray-400">
+                {createClassTeacherMutation.isPending ? 'Assigning...' : 'Assign Class Teacher'}
               </button>
             </div>
           </div>
