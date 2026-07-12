@@ -128,13 +128,13 @@ Currently, frontend pages use legacy `user.roles` array for permission checks. T
 | "Remove Member" — remove user from school | ✅ | Confirmation dialog on school-members page |
 | "Manage Teaching Staff" — assign classes, departments | ✅ | Class teacher assignment modal + table on teachers page |
 
-### 3.3 Phase 6 — Platform Role Management UI 🔲
+### 3.3 Phase 6 — Platform Role Management UI ✅
 
 | Task | Status | Files to Create/Modify |
 |------|--------|----------------------|
-| SuperAdmin panel — list all platform role assignments | 🔲 | New admin page |
-| Assign/Revoke platform roles | 🔲 | UI controls on admin page |
-| View users by platform role | 🔲 | Filtered list view |
+| SuperAdmin panel — list all platform role assignments | ✅ | New page at `super-admin/platform-roles/page.tsx` |
+| Assign/Revoke platform roles | ✅ | Assign modal + remove button on platform-roles page |
+| View users by platform role | ✅ | Role sidebar + user table filtered by selected role |
 
 ### 3.4 Phase 7 — Class Teacher Assignment UI 🔲
 

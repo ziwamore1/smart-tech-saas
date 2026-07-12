@@ -643,6 +643,12 @@ const superAdminNav = [
     color: '#059669'
   },
   { 
+    name: 'Platform Roles', 
+    href: '/super-admin/platform-roles', 
+    icon: 'fa-user-shield',
+    color: '#7c3aed'
+  },
+  { 
     name: 'Feature Locks', 
     href: '/super-admin/model-locks', 
     icon: 'fa-lock',
