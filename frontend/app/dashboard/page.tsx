@@ -732,6 +732,7 @@ export default function DashboardPage() {
             </Link>
           ))}
         </div>
+      </div>
       )}
 
       {/* Institution Type Modules */}
