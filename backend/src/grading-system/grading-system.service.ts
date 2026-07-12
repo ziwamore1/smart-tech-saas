@@ -209,8 +209,8 @@ export class GradingSystemService {
     { grade: 'One', points: 1, minScore: 75, maxScore: 100, remark: 'Excellent' },
     { grade: 'Two', points: 2, minScore: 60, maxScore: 74, remark: 'Very Good' },
     { grade: 'Three', points: 3, minScore: 50, maxScore: 59, remark: 'Good' },
-    { grade: 'Four', points: 4, minScore: 25, maxScore: 49, remark: 'Satisfactory' },
-    { grade: 'Five', points: 5, minScore: 0, maxScore: 24, remark: 'Fail' },
+    { grade: 'Four', points: 4, minScore: 40, maxScore: 49, remark: 'Satisfactory' },
+    { grade: 'Five', points: 5, minScore: 0, maxScore: 39, remark: 'Fail' },
   ];
 
   private secondaryEczScales = [
@@ -289,7 +289,7 @@ export class GradingSystemService {
       where: { schoolId, code: 'ECZ_G7' },
     });
     if (existing) return;
-    await this.prisma.gradingPolicy.create({
+      await this.prisma.gradingPolicy.create({
       data: {
         schoolId,
         name: 'ECZ Grade 7 National Examination Grading',
@@ -302,8 +302,8 @@ export class GradingSystemService {
             { minScore: 75, maxScore: 100, grade: 'One', remark: 'Excellent', points: 1, gpa: 5.0, sortOrder: 1 },
             { minScore: 60, maxScore: 74, grade: 'Two', remark: 'Very Good', points: 2, gpa: 4.0, sortOrder: 2 },
             { minScore: 50, maxScore: 59, grade: 'Three', remark: 'Good', points: 3, gpa: 3.0, sortOrder: 3 },
-            { minScore: 25, maxScore: 49, grade: 'Four', remark: 'Satisfactory', points: 4, gpa: 2.0, sortOrder: 4 },
-            { minScore: 0, maxScore: 24, grade: 'Five', remark: 'Fail', points: 5, gpa: 0, sortOrder: 5 },
+            { minScore: 40, maxScore: 49, grade: 'Four', remark: 'Satisfactory', points: 4, gpa: 2.0, sortOrder: 4 },
+            { minScore: 0, maxScore: 39, grade: 'Five', remark: 'Fail', points: 5, gpa: 0, sortOrder: 5 },
           ],
         },
       },

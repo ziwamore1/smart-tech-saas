@@ -297,6 +297,86 @@ export class HealthController {
     return results;
   }
 
+  @Get('fix-ecz-g7-grading')
+  async fixEczG7Grading() {
+    const results: Record<string, any> = { updated: [], skipped: [], errors: [] };
+
+    const correctScales = [
+      { grade: 'One', points: 1, minScore: 75, maxScore: 100, remark: 'Excellent' },
+      { grade: 'Two', points: 2, minScore: 60, maxScore: 74, remark: 'Very Good' },
+      { grade: 'Three', points: 3, minScore: 50, maxScore: 59, remark: 'Good' },
+      { grade: 'Four', points: 4, minScore: 40, maxScore: 49, remark: 'Satisfactory' },
+      { grade: 'Five', points: 5, minScore: 0, maxScore: 39, remark: 'Fail' },
+    ];
+
+    try {
+      const systems = await this.prisma.gradingSystem.findMany({
+        where: { name: 'ECZ Grade 7 Grading System' },
+        include: { gradeScales: true },
+      });
+
+      for (const system of systems) {
+        const needsUpdate = system.gradeScales.some((s) => {
+          const correct = correctScales.find((c) => c.grade === s.grade);
+          return !correct || s.minScore !== correct.minScore || s.maxScore !== correct.maxScore || s.points !== correct.points;
+        });
+
+        if (!needsUpdate) {
+          results.skipped.push({ schoolId: system.schoolId, systemId: system.id });
+          continue;
+        }
+
+        try {
+          await this.prisma.gradeScale.deleteMany({ where: { gradingSystemId: system.id } });
+          await this.prisma.gradeScale.createMany({
+            data: correctScales.map((s) => ({ gradingSystemId: system.id, ...s })),
+          });
+          results.updated.push({ schoolId: system.schoolId, systemId: system.id });
+        } catch (e: any) {
+          results.errors.push({ schoolId: system.schoolId, error: e.message });
+        }
+      }
+
+      const policies = await this.prisma.gradingPolicy.findMany({
+        where: { code: 'ECZ_G7' },
+        include: { scales: true },
+      });
+
+      for (const policy of policies) {
+        const needsUpdate = policy.scales.some((s) => {
+          const correct = correctScales.find((c) => c.grade === s.grade);
+          return !correct || s.minScore !== correct.minScore || s.maxScore !== correct.maxScore || s.points !== correct.points;
+        });
+
+        if (!needsUpdate) continue;
+
+        try {
+          await this.prisma.gradingScale.deleteMany({ where: { gradingPolicyId: policy.id } });
+          await this.prisma.gradingScale.createMany({
+            data: correctScales.map((s, i) => ({
+              gradingPolicyId: policy.id,
+              minScore: s.minScore,
+              maxScore: s.maxScore,
+              grade: s.grade,
+              remark: s.remark,
+              points: s.points,
+              gpa: [5.0, 4.0, 3.0, 2.0, 0][i],
+              sortOrder: i + 1,
+            })),
+          });
+          results.updated.push({ policyId: policy.id, schoolId: policy.schoolId });
+        } catch (e: any) {
+          results.errors.push({ policyId: policy.id, error: e.message });
+        }
+      }
+    } catch (e: any) {
+      results.fatalError = e.message;
+    }
+
+    results.summary = `${results.updated.length} updated, ${results.skipped.length} skipped, ${results.errors.length} errors`;
+    return results;
+  }
+
   @Head()
   async head() {
     const health = await this.healthService.check();

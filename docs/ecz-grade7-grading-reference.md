@@ -38,7 +38,7 @@ Classification is based on the **best 4 subjects** (max 600 standardised points)
 | 4        | 0–397              | ≤65%         | Pass (fail under non-automatic progression) |
 
 From 2023, **non-automatic progression** means only Divisions 1–3 qualify for selection to
-Grade 8. Division 4 is a fail.
+Form 1. Division 4 is a fail.
 
 ---
 
@@ -98,7 +98,7 @@ This is separate from the actual ECZ examination standardisation pipeline.
 
 ## Composite Score (Selection)
 
-Used for **selection** to Grade 8 (not certification).
+Used for **selection** to From 1 (not certification).
 
 ```
 Composite = best4Subjects + Sp1 + Sp2
