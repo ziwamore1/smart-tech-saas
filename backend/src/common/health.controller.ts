@@ -45,84 +45,47 @@ export class HealthController {
   @Get('student-query-test')
   async studentQueryTest() {
     const results: Record<string, any> = {};
-    const schoolId = '40a1039f-e292-4e91-948d-05848ac2ad89';
 
-    const step = async (name: string, fn: () => Promise<any>) => {
+    try {
+      const colCheck = await this.prisma.$queryRawUnsafe<{column_name: string}[]>(
+        `SELECT column_name FROM information_schema.columns WHERE table_name = 'Student' AND column_name IN ('grade', 'className')`
+      );
+      results.columns = colCheck.map(c => c.column_name);
+    } catch (e: any) {
+      results.columns = 'ERROR: ' + e.message;
+    }
+
+    try {
       const t = Date.now();
-      try {
-        results[name] = { status: 'ok', ms: 0, count: 0 };
-        const data = await Promise.race([
-          fn(),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), 8000)),
-        ]);
-        results[name] = { status: 'ok', ms: Date.now() - t, count: Array.isArray(data) ? data.length : 1 };
-      } catch (error: any) {
-        results[name] = { status: 'error', ms: Date.now() - t, message: error?.message?.slice(0, 200) };
-      }
-    };
+      const rows = await this.prisma.$queryRawUnsafe<any[]>(
+        `SELECT id, "firstName", "lastName" FROM "Student" LIMIT 3`
+      );
+      results.rawSql = { ok: true, ms: Date.now() - t, rows };
+    } catch (e: any) {
+      results.rawSql = { ok: false, error: e.message };
+    }
 
-    await step('1_simple_findMany', () =>
-      this.prisma.student.findMany({ where: { schoolId }, take: 5 })
-    );
+    try {
+      const t = Date.now();
+      const alter = await this.prisma.$executeRawUnsafe(
+        `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "grade" TEXT`
+      );
+      results.alterGrade = { ok: true, ms: Date.now() - t, result: alter };
+    } catch (e: any) {
+      results.alterGrade = { ok: false, error: e.message };
+    }
 
-    await step('2_select_scalars_only', () =>
-      this.prisma.student.findMany({
-        where: { schoolId },
-        select: {
-          id: true, firstName: true, lastName: true, admissionNumber: true,
-          gender: true, status: true, createdAt: true,
-        },
-        take: 5,
-      })
-    );
+    try {
+      const t = Date.now();
+      const alter = await this.prisma.$executeRawUnsafe(
+        `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "className" TEXT`
+      );
+      results.alterClassName = { ok: true, ms: Date.now() - t, result: alter };
+    } catch (e: any) {
+      results.alterClassName = { ok: false, error: e.message };
+    }
 
-    await step('3_select_with_enrollments', () =>
-      this.prisma.student.findMany({
-        where: { schoolId },
-        select: {
-          id: true, firstName: true, lastName: true,
-          enrollments: {
-            include: { class: true, academicYear: true },
-          },
-        },
-        take: 5,
-      })
-    );
-
-    await step('4_select_with_parents', () =>
-      this.prisma.student.findMany({
-        where: { schoolId },
-        select: {
-          id: true, firstName: true, lastName: true,
-          parents: { include: { parent: true } },
-        },
-        take: 5,
-      })
-    );
-
-    await step('5_full_findAll', () =>
-      this.prisma.student.findMany({
-        where: { schoolId },
-        select: {
-          id: true, admissionNumber: true, studentUuid: true, status: true,
-          dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
-          gender: true, photoUrl: true, photoPublicId: true, createdAt: true, updatedAt: true,
-          enrollments: {
-            include: { class: true, academicYear: true },
-            orderBy: { academicYear: { startDate: 'desc' } as any },
-          },
-          parents: { include: { parent: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      })
-    );
-
-    return {
-      status: 'ok',
-      totalMs: Date.now() - start,
-      steps: results,
-    };
+    return results;
   }
 
   @Head()
