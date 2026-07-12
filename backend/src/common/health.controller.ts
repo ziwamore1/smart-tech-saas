@@ -351,10 +351,10 @@ export class HealthController {
         if (!needsUpdate) continue;
 
         try {
-          await this.prisma.gradingScale.deleteMany({ where: { gradingPolicyId: policy.id } });
+          await this.prisma.gradingScale.deleteMany({ where: { policyId: policy.id } });
           await this.prisma.gradingScale.createMany({
             data: correctScales.map((s, i) => ({
-              gradingPolicyId: policy.id,
+              policyId: policy.id,
               minScore: s.minScore,
               maxScore: s.maxScore,
               grade: s.grade,
