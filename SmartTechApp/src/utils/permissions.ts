@@ -63,7 +63,7 @@ const ALL_PERMISSIONS: Permission[] = [
   'grading-policies.manage',
 ];
 
-export type RoleKey = 'Director' | 'Deputy Director' | 'Head Teacher' | 'Deputy Head' | 'HOD' | 'Teacher' | 'Class Teacher';
+export type RoleKey = 'Director' | 'Deputy Director' | 'Head Teacher' | 'Deputy Head' | 'HOD' | 'Teacher' | 'Class Teacher' | 'Lower Primary Senior Teacher' | 'Upper Primary Senior Teacher';
 
 const VIEW_ONLY: Permission[] = ALL_PERMISSIONS.filter(p => p.endsWith('.view') || p === 'analytics.view');
 
@@ -102,6 +102,25 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     'lesson-plans.view', 'lesson-plans.manage',
     'library.view', 'gallery.view', 'stamps.view', 'stamps.manage',
     'reports.view', 'reports.manage', 'curriculum.view',
+  ],
+  'Lower Primary Senior Teacher': [
+    'assessments.view', 'assessments.create', 'results.view', 'results.manage',
+    'attendance.view', 'attendance.manage', 'timetable.view',
+    'students.view', 'students.manage', 'classes.view', 'classes.manage',
+    'subjects.view', 'communications.view', 'communications.send',
+    'analytics.view', 'lesson-plans.view', 'lesson-plans.manage',
+    'library.view', 'gallery.view', 'stamps.view', 'stamps.manage',
+    'reports.view', 'reports.manage', 'curriculum.view', 'staff.view',
+  ],
+  'Upper Primary Senior Teacher': [
+    'assessments.view', 'assessments.create', 'assessments.approve',
+    'results.view', 'results.manage', 'results.approve',
+    'attendance.view', 'attendance.manage', 'timetable.view',
+    'students.view', 'students.manage', 'classes.view', 'classes.manage',
+    'subjects.view', 'communications.view', 'communications.send',
+    'analytics.view', 'lesson-plans.view', 'lesson-plans.manage',
+    'library.view', 'gallery.view', 'stamps.view', 'stamps.manage',
+    'reports.view', 'reports.manage', 'curriculum.view', 'staff.view',
   ],
 };
 

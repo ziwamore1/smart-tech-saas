@@ -12,7 +12,7 @@ import {
 } from '@/lib/permissions';
 import { useAuth } from '@/lib/auth-context';
 
-const MANAGED_ROLES = ['Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher'] as const;
+const MANAGED_ROLES = ['Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'] as const;
 
 export default function PermissionsPage() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();

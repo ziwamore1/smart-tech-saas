@@ -48,6 +48,12 @@ export type Permission =
   | 'grading-policies.manage'
   | 'grading-policies.view';
 
+export interface RoleSource {
+  roles: string[];
+  platformRoles?: string[];
+  schoolRoles?: string[];
+}
+
 export const PERMISSION_LABELS: Record<Permission, string> = {
   'settings.edit': 'Edit School Settings',
   'settings.view': 'View Settings',
@@ -197,10 +203,10 @@ export const PERMISSION_CATEGORIES: Record<string, { label: string; permissions:
 export const ALL_PERMISSIONS: Permission[] = Object.values(PERMISSION_CATEGORIES)
   .flatMap(c => c.permissions) as Permission[];
 
-type RoleKey = 'Director' | 'Deputy Director' | 'Head Teacher' | 'Deputy Head' | 'HOD' | 'Teacher' | 'Class Teacher';
+type RoleKey = 'SuperAdmin' | 'Director' | 'Deputy Director' | 'Head Teacher' | 'Deputy Head' | 'HOD' | 'Teacher' | 'Class Teacher' | 'Lower Primary Senior Teacher' | 'Upper Primary Senior Teacher';
 
 export function isRoleKey(role: string): role is RoleKey {
-  return ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher'].includes(role);
+  return ['SuperAdmin', 'Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'].includes(role);
 }
 
 const ALL: Permission[] = ALL_PERMISSIONS;
@@ -210,6 +216,7 @@ const FULL_ACCESS: Permission[] = ALL;
 const VIEW_ONLY: Permission[] = ALL_PERMISSIONS.filter(p => p.endsWith('.view') || p === 'analytics.view');
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
+  'SuperAdmin': FULL_ACCESS,
   'Director': FULL_ACCESS,
   'Deputy Director': [
     ...FULL_ACCESS,
@@ -288,6 +295,62 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
     'reports.manage',
     'curriculum.view',
   ],
+  'Lower Primary Senior Teacher': [
+    'assessments.view',
+    'assessments.create',
+    'results.view',
+    'results.manage',
+    'attendance.view',
+    'attendance.manage',
+    'timetable.view',
+    'students.view',
+    'students.manage',
+    'classes.view',
+    'classes.manage',
+    'subjects.view',
+    'communications.view',
+    'communications.send',
+    'analytics.view',
+    'lesson-plans.view',
+    'lesson-plans.manage',
+    'library.view',
+    'gallery.view',
+    'stamps.view',
+    'stamps.manage',
+    'reports.view',
+    'reports.manage',
+    'curriculum.view',
+    'staff.view',
+  ],
+  'Upper Primary Senior Teacher': [
+    'assessments.view',
+    'assessments.create',
+    'assessments.approve',
+    'results.view',
+    'results.manage',
+    'results.approve',
+    'attendance.view',
+    'attendance.manage',
+    'timetable.view',
+    'students.view',
+    'students.manage',
+    'classes.view',
+    'classes.manage',
+    'subjects.view',
+    'communications.view',
+    'communications.send',
+    'analytics.view',
+    'lesson-plans.view',
+    'lesson-plans.manage',
+    'library.view',
+    'gallery.view',
+    'stamps.view',
+    'stamps.manage',
+    'reports.view',
+    'reports.manage',
+    'curriculum.view',
+    'staff.view',
+  ],
 };
 
 export function getDefaultPermissions(roles: string[]): Permission[] {
@@ -300,6 +363,41 @@ export function getDefaultPermissions(roles: string[]): Permission[] {
     }
   }
   return Array.from(permissions);
+}
+
+export function getMergedRoles(source: RoleSource): string[] {
+  const seen = new Set<string>();
+  const merged: string[] = [];
+
+  const addRole = (role: string) => {
+    const normalized = normalizeRoleName(role);
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      merged.push(role);
+    }
+  };
+
+  for (const role of source.roles || []) addRole(role);
+  for (const role of source.platformRoles || []) addRole(role);
+  for (const role of source.schoolRoles || []) addRole(role);
+
+  return merged;
+}
+
+function normalizeRoleName(role: string): string {
+  const lower = role.toLowerCase();
+  if (lower === 'classteacher' || lower === 'class teacher') return 'ClassTeacher';
+  if (lower === 'deputydirector' || lower === 'deputy director') return 'DeputyDirector';
+  if (lower === 'headteacher' || lower === 'head teacher') return 'HeadTeacher';
+  if (lower === 'deputyhead' || lower === 'deputy head') return 'DeputyHead';
+  return lower;
+}
+
+export function hasPermission(user: { roles?: string[]; platformRoles?: string[]; schoolRoles?: string[] } | null | undefined, permission: Permission): boolean {
+  if (!user) return false;
+  const merged = getMergedRoles(user);
+  const defaults = getDefaultPermissions(merged);
+  return defaults.includes(permission);
 }
 
 export function can(

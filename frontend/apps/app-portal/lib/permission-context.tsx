@@ -5,6 +5,7 @@ import { useAuth } from './auth-context';
 import {
   Permission,
   getDefaultPermissions,
+  getMergedRoles,
   can,
   canAny,
   canAll,
@@ -66,8 +67,12 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
   const [overrides, setOverrides] = useState<PermissionOverride[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const userRoles = user?.roles || [];
-  const isDirector = userRoles.includes('Director');
+  const userRoles = getMergedRoles({
+    roles: user?.roles || [],
+    platformRoles: user?.platformRoles,
+    schoolRoles: user?.schoolRoles,
+  });
+  const isDirector = userRoles.includes('Director') || userRoles.includes('SuperAdmin');
 
   const computedPermissions: Permission[] = (() => {
     const defaults = getDefaultPermissions(userRoles);

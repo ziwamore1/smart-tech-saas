@@ -9,7 +9,7 @@ import Icon3D from '@/components/Icon3D';
 import { INSTITUTION_TYPE_LABELS, INSTITUTION_TYPE_FEATURES, InstitutionTypeCode } from '@/lib/institution-types';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, allRoles, isSuperAdmin, isDirector } = useAuth();
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
 
@@ -142,7 +142,7 @@ export default function DashboardPage() {
           marginBottom: '24px',
           color: 'white'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px', flexWrap: 'wrap' }}>
             <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>{school.name}</h1>
             {school.institutionType && (
               <span style={{
@@ -155,6 +155,22 @@ export default function DashboardPage() {
               }}>
                 {INSTITUTION_TYPE_LABELS[school.institutionType as InstitutionTypeCode] || school.institutionType}
               </span>
+            )}
+            {allRoles && allRoles.length > 0 && (
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {allRoles.filter((r, i, arr) => arr.indexOf(r) === i).map((role) => (
+                  <span key={role} style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    background: role === 'SuperAdmin' ? 'rgba(239,68,68,0.3)' : role === 'Director' ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.15)',
+                    padding: '3px 10px',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(255,255,255,0.25)'
+                  }}>
+                    {role}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
           <p style={{ fontSize: '14px', opacity: 0.9, margin: '0 0 8px' }}>
@@ -644,7 +660,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Intelligence Modules */}
+      {/* Intelligence Modules - Admin only */}
+      {(isSuperAdmin || isDirector) && (
       <div style={{
         background: '#fefcf9',
         borderRadius: '12px',
@@ -715,7 +732,7 @@ export default function DashboardPage() {
             </Link>
           ))}
         </div>
-      </div>
+      )}
 
       {/* Institution Type Modules */}
       {school?.institutionType && (

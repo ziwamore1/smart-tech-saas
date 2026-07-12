@@ -18,6 +18,8 @@ export type UserRole =
   | 'Lecturer'
   | 'Research Supervisor'
   | 'Primary Teacher'
+  | 'Lower Primary Senior Teacher'
+  | 'Upper Primary Senior Teacher'
   | 'Learner'
 
 export type InstitutionType =

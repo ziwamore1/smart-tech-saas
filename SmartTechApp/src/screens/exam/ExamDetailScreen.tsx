@@ -23,7 +23,7 @@ export const ExamDetailScreen: React.FC = () => {
   }, [examId]);
 
   const isTeacher = user?.roles?.some((r: string) =>
-    ['Teacher', 'Class Teacher', 'Director', 'Head Teacher', 'Deputy'].includes(r)
+    ['Teacher', 'Class Teacher', 'Director', 'Head Teacher', 'Deputy', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'].includes(r)
   );
 
   if (loading && !currentExam) return <Loading fullScreen message="Loading exam..." />;

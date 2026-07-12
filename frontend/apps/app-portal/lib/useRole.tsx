@@ -13,6 +13,8 @@ export type UserRole =
   | 'Secretary'
   | 'Teacher'
   | 'Class Teacher'
+  | 'Lower Primary Senior Teacher'
+  | 'Upper Primary Senior Teacher'
   | 'Student'
   | 'Parent';
 
@@ -64,14 +66,17 @@ export function useAuth() {
   };
 
   const hasRole = (...roles: UserRole[]): boolean => {
-    if (!user?.roles || roles.length === 0) return true;
-    return roles.some(role => user.roles.includes(role as any));
+    if (!user || roles.length === 0) return true;
+    const userAll = (user as any).allRoles || user.roles || [];
+    return roles.some(role =>
+      userAll.some((ur: string) => ur.toLowerCase().replace(/\s+/g, '') === role.toLowerCase().replace(/\s+/g, ''))
+    );
   };
 
   const isDirector = (): boolean => hasRole('Director');
   const isSuperAdmin = (): boolean => hasRole('SuperAdmin');
   const isTeacher = (): boolean => hasRole('Teacher', 'Class Teacher');
-  const isAdmin = (): boolean => hasRole('Director', 'SuperAdmin', 'Head Teacher', 'Deputy');
+  const isAdmin = (): boolean => hasRole('Director', 'SuperAdmin', 'Head Teacher', 'Deputy', 'HOD');
 
   return {
     user,
@@ -161,7 +166,10 @@ export function RoleGuard({
 
   if (isLoading) return null;
   
-  if (!user?.roles?.includes(role)) {
+  const userAll = (user as any)?.allRoles || user?.roles || [];
+  const hasRole = userAll.some((ur: string) => ur.toLowerCase().replace(/\s+/g, '') === role.toLowerCase().replace(/\s+/g, ''));
+  
+  if (!hasRole) {
     return <>{fallback}</>;
   }
 

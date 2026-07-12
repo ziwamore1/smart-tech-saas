@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { classApi, levelTypeApi, enrollmentApi, studentApi, subjectApi, classSubjectApi, gradingSystemApi, api } from '@/lib/api';
+import { usePermissions } from '@/lib/permission-context';
 
 type LevelCategory = 'FORM' | 'GRADE' | 'OTHER';
 
@@ -16,6 +17,8 @@ const PRESET_LEVELS: Record<LevelCategory, string[]> = {
 
 export default function ClassesPage() {
   const queryClient = useQueryClient();
+  const { can } = usePermissions();
+  const canManageClasses = can('classes.manage');
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterLevel, setFilterLevel] = useState('');
@@ -240,6 +243,8 @@ export default function ClassesPage() {
           <p className="text-gray-600 mt-1">Manage Form, Grade, or other class types with streams</p>
         </div>
         <div className="flex gap-2">
+          {canManageClasses && (
+          <>
           <button
             onClick={() => setShowLevelTypeModal(true)}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
@@ -254,6 +259,8 @@ export default function ClassesPage() {
           >
             + Add Class
           </button>
+          </>
+          )}
         </div>
       </div>
 
@@ -389,6 +396,7 @@ export default function ClassesPage() {
                   >
                     📚
                   </button>
+                  {canManageClasses && (
                   <button 
                     onClick={() => {
                       setSelectedClass(cls);
@@ -399,6 +407,7 @@ export default function ClassesPage() {
                   >
                     ✏️
                   </button>
+                  )}
                 </div>
               </div>
             </div>

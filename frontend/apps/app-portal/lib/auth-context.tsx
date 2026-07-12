@@ -29,12 +29,27 @@ interface AuthContextType {
   isDirector: boolean;
   isTeacher: boolean;
   isClassTeacher: boolean;
+  allRoles: string[];
   login: (identifier: string, password: string, isSuperAdmin?: boolean, schoolId?: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function mergeAllRoles(user: User | null): string[] {
+  if (!user) return [];
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  const add = (r: string) => {
+    const key = r.toLowerCase().replace(/\s+/g, '');
+    if (!seen.has(key)) { seen.add(key); merged.push(r); }
+  };
+  (user.roles || []).forEach(add);
+  (user.platformRoles || []).forEach(add);
+  (user.schoolRoles || []).forEach(add);
+  return merged;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -142,10 +157,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  const isSuperAdmin = user?.roles?.includes('SuperAdmin') || false;
-  const isDirector = user?.roles?.includes('Director') || false;
-  const isTeacher = user?.roles?.includes('Teacher') || user?.roles?.includes('ClassTeacher') || false;
-  const isClassTeacher = user?.roles?.includes('ClassTeacher') || !!user?.classTeacherOf;
+  const allRoles = mergeAllRoles(user);
+  const isSuperAdmin = allRoles.includes('SuperAdmin');
+  const isDirector = allRoles.includes('Director') || allRoles.includes('SuperAdmin');
+  const isTeacher = allRoles.includes('Teacher') || allRoles.includes('Class Teacher') || allRoles.includes('ClassTeacher');
+  const isClassTeacher = allRoles.includes('Class Teacher') || allRoles.includes('ClassTeacher') || !!user?.classTeacherOf;
 
   return (
     <AuthContext.Provider
@@ -157,6 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isDirector,
         isTeacher,
         isClassTeacher,
+        allRoles,
         login,
         logout,
         isAuthenticated: !!token && !!user,
@@ -176,34 +193,34 @@ export function useAuth() {
 }
 
 export function useUserRoles() {
-  const { user } = useAuth();
-  return user?.roles || [];
+  const { allRoles } = useAuth();
+  return allRoles;
 }
 
 export function useIsSuperAdmin() {
-  const { user } = useAuth();
-  return user?.roles?.includes('SuperAdmin') || false;
+  const { isSuperAdmin } = useAuth();
+  return isSuperAdmin;
 }
 
 export function useIsDirector() {
-  const { user } = useAuth();
-  return user?.roles?.includes('Director') || false;
+  const { isDirector } = useAuth();
+  return isDirector;
 }
 
 export function useIsTeacher() {
-  const { user } = useAuth();
-  return user?.roles?.includes('Teacher') || user?.roles?.includes('ClassTeacher') || false;
+  const { isTeacher } = useAuth();
+  return isTeacher;
 }
 
 export function useIsClassTeacher() {
-  const { user } = useAuth();
-  return user?.roles?.includes('ClassTeacher') || !!user?.classTeacherOf;
+  const { isClassTeacher } = useAuth();
+  return isClassTeacher;
 }
 
 export function hasRole(roles: string[], requiredRole: string): boolean {
-  return roles.includes(requiredRole);
+  return roles.some(r => r.toLowerCase().replace(/\s+/g, '') === requiredRole.toLowerCase().replace(/\s+/g, ''));
 }
 
 export function hasAnyRole(roles: string[], requiredRoles: string[]): boolean {
-  return requiredRoles.some(role => roles.includes(role));
+  return requiredRoles.some(role => hasRole(roles, role));
 }

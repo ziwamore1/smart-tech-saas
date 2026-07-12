@@ -59,7 +59,7 @@ export function usePermissions() {
   })();
 
   const isDirector = userRoles.some(r => r === 'Director' || r === 'Deputy Director');
-  const isHeadTeacher = userRoles.some(r => r === 'Head Teacher' || r === 'Deputy Head');
+  const isHeadTeacher = userRoles.some(r => r === 'Head Teacher' || r === 'Deputy Head' || r === 'Lower Primary Senior Teacher' || r === 'Upper Primary Senior Teacher');
 
   return {
     permissions: computedPermissions,

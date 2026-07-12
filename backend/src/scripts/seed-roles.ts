@@ -16,6 +16,8 @@ async function main() {
     'Student',
     'Parent',
     'SuperAdmin',
+    'Lower Primary Senior Teacher',
+    'Upper Primary Senior Teacher',
   ];
 
   for (const role of roles) {

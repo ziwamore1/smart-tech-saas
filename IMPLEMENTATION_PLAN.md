@@ -87,20 +87,20 @@
 
 ## 3. Remaining Work
 
-### 3.1 Phase 4 — Frontend Permission Gating 🔲
+### 3.1 Phase 4 — Frontend Permission Gating ✅
 
 Currently, frontend pages use legacy `user.roles` array for permission checks. They need to be updated to use the new `platformRoles` and `schoolRoles` from the auth context.
 
 | Task | Status | Files to Modify |
 |------|--------|-----------------|
-| Create `hasPermission(user, permission)` utility that checks all 4 role sources | 🔲 | New file: `frontend/apps/app-portal/lib/permissions.ts` (update existing) |
-| Update `PermissionsGate` / role-check components to use new utility | 🔲 | `components/PermissionsGate.tsx` or equivalent |
-| Update Dashboard page to use new role fields for conditional rendering | 🔲 | `dashboard/page.tsx` |
-| Update Teachers page role-based filtering | 🔲 | `teachers/page.tsx` |
-| Update Users page to show platform roles and school roles separately | 🔲 | `users/page.tsx` |
-| Update Student Enrollments page | 🔲 | `student-enrollments/page.tsx` |
-| Update Class Management page | 🔲 | `classes/page.tsx` |
-| Update all duplicate `frontend/app/dashboard/` copies | 🔲 | Same files in `frontend/app/dashboard/` |
+| Create `hasPermission(user, permission)` utility that checks all 4 role sources | ✅ | `frontend/apps/app-portal/lib/permissions.ts` |
+| Update `PermissionsGate` / role-check components to use new utility | ✅ | `permissions.ts`, `permission-context.tsx` |
+| Update Dashboard page to use new role fields for conditional rendering | ✅ | `dashboard/page.tsx` |
+| Update Teachers page role-based filtering | ✅ | `teachers/page.tsx` |
+| Update Users page to show platform roles and school roles separately | ✅ | `users/page.tsx` |
+| Update Student Enrollments page | ✅ | Already uses `isClassTeacher` from auth context |
+| Update Class Management page | ✅ | `classes/page.tsx` |
+| Update all duplicate `frontend/app/dashboard/` copies | ✅ | Same files in `frontend/app/dashboard/` |
 
 ### 3.2 Phase 5 — School Membership Management UI 🔲
 
@@ -258,7 +258,7 @@ When checking if a user has a role, the system checks in this order:
 | # | Issue | Severity | Status |
 |---|-------|----------|--------|
 | 1 | Login endpoint times out on Railway cold starts | Low | 🟡 Railway infrastructure — not a code issue |
-| 2 | Frontend permission checks still use legacy `user.roles` only | Medium | 🔲 Phase 4 |
+| 2 | Frontend permission checks still use legacy `user.roles` only | Medium | ✅ Phase 4 |
 | 3 | Duplicate frontend copies (`apps/app-portal/` vs `app/`) need syncing | Low | 🟡 Ongoing — both copies updated each time |
 | 4 | `DepartmentAssignment` migration found 0 records — may need re-check after teachers get departments assigned | Low | 🔲 |
 | 5 | No `SchoolUser` records created by migration (all users already had them) | Info | ✅ Expected |

@@ -34,7 +34,7 @@ async function main() {
   });
 
   // School-level roles that should become SchoolRoleAssignment
-  const schoolRoles = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy', 'Teacher', 'Class Teacher', 'HOD', 'Accountant', 'Secretary'];
+  const schoolRoles = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy', 'Teacher', 'Class Teacher', 'HOD', 'Accountant', 'Secretary', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
   let schoolRoleCount = 0;
 
   for (const ur of userRoles) {

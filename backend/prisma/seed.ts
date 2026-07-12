@@ -16,6 +16,8 @@ async function main() {
     'Student',
     'Parent',
     'SuperAdmin',
+    'Lower Primary Senior Teacher',
+    'Upper Primary Senior Teacher',
   ];
 
   for (const role of roles) {
@@ -215,6 +217,8 @@ async function main() {
     // Primary School Roles
     { code: 'PRIMARY_HEAD_TEACHER', name: 'Head Teacher', category: 'PRIMARY', description: 'Primary school head teacher' },
     { code: 'PRIMARY_DEPUTY_HEAD', name: 'Deputy Head', category: 'PRIMARY', description: 'Primary school deputy head' },
+    { code: 'PRIMARY_LOWER_SENIOR_TEACHER', name: 'Lower Primary Senior Teacher', category: 'PRIMARY', description: 'Lower Primary Senior Teacher — monitors Pre-School to Grade 4' },
+    { code: 'PRIMARY_UPPER_SENIOR_TEACHER', name: 'Upper Primary Senior Teacher', category: 'PRIMARY', description: 'Upper Primary Senior Teacher — monitors Grade 5 to Grade 7' },
     { code: 'PRIMARY_TEACHER', name: 'Primary Teacher', category: 'PRIMARY', description: 'Primary school teacher' },
     { code: 'PRIMARY_PARENT', name: 'Parent', category: 'PRIMARY', description: 'Primary school parent/guardian' },
     { code: 'PRIMARY_LEARNER', name: 'Learner', category: 'PRIMARY', description: 'Primary school learner/student' },
@@ -458,7 +462,7 @@ async function main() {
   // PROVISION INSTITUTION TYPE ROLES
   // =============================================
 
-  const primaryRoleCodes = ['PRIMARY_HEAD_TEACHER', 'PRIMARY_DEPUTY_HEAD', 'PRIMARY_TEACHER', 'PRIMARY_PARENT', 'PRIMARY_LEARNER'];
+  const primaryRoleCodes = ['PRIMARY_HEAD_TEACHER', 'PRIMARY_DEPUTY_HEAD', 'PRIMARY_LOWER_SENIOR_TEACHER', 'PRIMARY_UPPER_SENIOR_TEACHER', 'PRIMARY_TEACHER', 'PRIMARY_PARENT', 'PRIMARY_LEARNER'];
   const secondaryRoleCodes = ['SECONDARY_DIRECTOR', 'SECONDARY_DEPUTY_DIRECTOR', 'SECONDARY_HOD', 'SECONDARY_TEACHER', 'SECONDARY_CLASS_TEACHER', 'SECONDARY_PARENT', 'SECONDARY_STUDENT'];
   const advancedRoleCodes = ['ADVANCED_DIRECTOR', 'ADVANCED_DEPUTY_DIRECTOR', 'ADVANCED_HOD', 'ADVANCED_TEACHER', 'ADVANCED_CLASS_TEACHER', 'ADVANCED_PARENT', 'ADVANCED_STUDENT'];
   const collegeRoleCodes = ['COLLEGE_PRINCIPAL', 'COLLEGE_REGISTRAR', 'COLLEGE_LECTURER', 'COLLEGE_STUDENT'];

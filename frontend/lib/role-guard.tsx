@@ -15,6 +15,8 @@ export type UserRole =
   | 'Teacher'
   | 'Class Teacher'
   | 'HOD'
+  | 'Lower Primary Senior Teacher'
+  | 'Upper Primary Senior Teacher'
   | 'Student'
   | 'Parent';
 
@@ -39,8 +41,10 @@ export function RoleGuard({ children, requiredRoles, redirectTo = '/dashboard' }
     }
 
     if (requiredRoles && requiredRoles.length > 0) {
-      const userRoles = user?.roles || [];
-      const hasRequiredRole = requiredRoles.some(role => userRoles.includes(role));
+      const userRoles = user?.allRoles || user?.roles || [];
+      const hasRequiredRole = requiredRoles.some(role =>
+        userRoles.some((ur: string) => ur.toLowerCase().replace(/\s+/g, '') === role.toLowerCase().replace(/\s+/g, ''))
+      );
       
       if (!hasRequiredRole) {
         setIsAllowed(false);

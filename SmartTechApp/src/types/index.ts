@@ -32,7 +32,7 @@ export const INSTITUTION_TYPE_LABELS: Record<InstitutionTypeCode, string> = {
 };
 
 export const INSTITUTION_TYPE_ROLES: Record<InstitutionTypeCode, string[]> = {
-  PRIMARY_SCHOOL: ['Head Teacher', 'Deputy Head', 'Director', 'Primary Teacher', 'Parent', 'Learner'],
+  PRIMARY_SCHOOL: ['Head Teacher', 'Deputy Head', 'Director', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Primary Teacher', 'Parent', 'Learner'],
   SECONDARY_SCHOOL: ['Head Teacher', 'Deputy Head', 'Director', 'Deputy Director', 'HOD', 'Teacher', 'Class Teacher', 'Parent', 'Student'],
   ADVANCED_SECONDARY: ['Head Teacher', 'Deputy Head', 'Director', 'Deputy Director', 'HOD', 'Teacher', 'Class Teacher', 'Parent', 'Student'],
   COLLEGE: ['Principal', 'Registrar', 'Lecturer', 'Student'],

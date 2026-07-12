@@ -102,7 +102,7 @@ function useRoleCheck(user: any) {
 
   const isClassTeacher = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && hasRole('Class Teacher');
 
-  const isPrimaryTeacher = institutionType === 'PRIMARY_SCHOOL' && (hasRole('Primary Teacher'));
+  const isPrimaryTeacher = institutionType === 'PRIMARY_SCHOOL' && (hasRole('Primary Teacher') || hasRole('Lower Primary Senior Teacher') || hasRole('Upper Primary Senior Teacher'));
   const isSecTeacher = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && (hasRole('Teacher') || hasRole('Class Teacher'));
   const isCollegeTeacher = institutionType === 'COLLEGE' && (hasRole('Lecturer'));
   const isUniTeacher = institutionType === 'UNIVERSITY' && (hasRole('Lecturer') || hasRole('Research Supervisor'));

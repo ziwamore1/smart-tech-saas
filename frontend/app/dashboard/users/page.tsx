@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, roleApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { usePermissions } from '@/lib/permission-context';
 
 interface User {
   id: string;
@@ -15,8 +16,10 @@ interface User {
 }
 
 export default function UserManagementPage() {
-  const { user } = useAuth();
+  const { user, allRoles } = useAuth();
   const queryClient = useQueryClient();
+  const { can } = usePermissions();
+  const canManageUsers = can('users.manage');
 
   const isPrimary = user?.institutionType === 'PRIMARY_SCHOOL';
 
@@ -25,6 +28,8 @@ export default function UserManagementPage() {
     { name: 'Deputy Director', color: 'bg-rose-100 text-rose-700', icon: '🏅' },
     { name: 'Head Teacher', color: 'bg-purple-100 text-purple-700', icon: '🎓' },
     { name: 'Senior Teacher', color: 'bg-cyan-100 text-cyan-700', icon: '🌟' },
+    { name: 'Lower Primary Senior Teacher', color: 'bg-orange-100 text-orange-700', icon: '📗' },
+    { name: 'Upper Primary Senior Teacher', color: 'bg-blue-100 text-blue-700', icon: '📘' },
     { name: 'Class Teacher', color: 'bg-amber-100 text-amber-700', icon: '🏫' },
     { name: 'Deputy', color: 'bg-indigo-100 text-indigo-700', icon: '⭐' },
     { name: 'Accountant', color: 'bg-green-100 text-green-700', icon: '💰' },
@@ -335,6 +340,7 @@ return (
                                       }}
                                       className="w-5 h-5 bg-gray-800 text-white rounded-full text-xs flex items-center justify-center hover:bg-gray-700 opacity-0 group-hover:opacity-100 transition-opacity"
                                       title="Change role"
+                                      style={{ display: canManageUsers ? undefined : 'none' }}
                                     >
                                       &#9998;
                                     </button>
@@ -349,7 +355,7 @@ return (
                       </td>
                       <td className="px-6 py-4">
                         <div className="relative role-dropdown">
-                          {getAvailableRolesForUser(user).length > 0 ? (
+                          {canManageUsers && getAvailableRolesForUser(user).length > 0 ? (
                             <>
                               <button
                                 onClick={() => setActiveDropdown(activeDropdown === user.id ? null : user.id)}

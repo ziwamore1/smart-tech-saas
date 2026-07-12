@@ -17,7 +17,7 @@ export class RoleController {
   findSchoolRoles(@Req() req: any) {
     return this.prisma.role.findMany({
       where: {
-        name: { in: ['Director', 'Deputy Director', 'SuperAdmin', 'Teacher', 'Head Teacher', 'Deputy', 'Accountant', 'Secretary', 'Class Teacher', 'HOD'] },
+        name: { in: ['Director', 'Deputy Director', 'SuperAdmin', 'Teacher', 'Head Teacher', 'Deputy', 'Accountant', 'Secretary', 'Class Teacher', 'HOD', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'] },
       },
       orderBy: { name: 'asc' },
     });

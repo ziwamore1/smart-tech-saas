@@ -9,6 +9,8 @@ const PRIMARY_ROLES = [
   { name: 'Head Teacher', icon: '🎓', color: '#059669' },
   { name: 'Deputy Head', icon: '⭐', color: '#3b82f6' },
   { name: 'Senior Teacher', icon: '🌟', color: '#8b5cf6' },
+  { name: 'Lower Primary Senior Teacher', icon: '📗', color: '#ea580c' },
+  { name: 'Upper Primary Senior Teacher', icon: '📘', color: '#2563eb' },
   { name: 'Class Teacher', icon: '🏫', color: '#10b981' },
   { name: 'Primary Teacher', icon: '👨‍🏫', color: '#6b7280' },
   { name: 'ECE Teacher', icon: '👶', color: '#ec4899' },

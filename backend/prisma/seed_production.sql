@@ -21,7 +21,9 @@ INSERT INTO "Role" ("id", "name") VALUES
   (gen_random_uuid(), 'HOD'),
   (gen_random_uuid(), 'Student'),
   (gen_random_uuid(), 'Parent'),
-  (gen_random_uuid(), 'SuperAdmin')
+  (gen_random_uuid(), 'SuperAdmin'),
+  (gen_random_uuid(), 'Lower Primary Senior Teacher'),
+  (gen_random_uuid(), 'Upper Primary Senior Teacher')
 ON CONFLICT ("name") DO NOTHING;
 
 -- =============================================================================

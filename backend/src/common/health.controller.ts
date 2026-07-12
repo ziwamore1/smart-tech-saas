@@ -403,7 +403,7 @@ export class HealthController {
       }
 
       // Step 2: Create SchoolRoleAssignment from existing UserRole
-      const schoolRoleNames = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy', 'Teacher', 'Class Teacher', 'HOD', 'Accountant', 'Secretary'];
+      const schoolRoleNames = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy', 'Teacher', 'Class Teacher', 'HOD', 'Accountant', 'Secretary', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
       const userRoles = await this.prisma.userRole.findMany({
         include: { role: true, user: { select: { schoolId: true } } },
         where: { user: { schoolId: { not: null } } },

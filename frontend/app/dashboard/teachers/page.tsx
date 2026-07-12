@@ -4,11 +4,14 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { teacherApi, api, teachingAssignmentApi, classApi, subjectApi, academicYearApi, roleApi, enrollmentApi, schoolMembershipApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { usePermissions } from '@/lib/permission-context';
 
 export default function TeachersPage() {
   const { user } = useAuth();
+  const { can } = usePermissions();
   const queryClient = useQueryClient();
   const isPrimary = user?.institutionType === 'PRIMARY_SCHOOL';
+  const canManageStaff = can('staff.manage');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -190,6 +193,8 @@ export default function TeachersPage() {
     { name: 'Class Teacher', icon: '🏫' },
     { name: 'Head Teacher', icon: '🎓' },
     { name: 'Senior Teacher', icon: '🌟' },
+    { name: 'Lower Primary Senior Teacher', icon: '📗' },
+    { name: 'Upper Primary Senior Teacher', icon: '📘' },
     { name: 'Teacher', icon: '👨‍🏫' },
     { name: 'Deputy', icon: '⭐' },
     { name: 'Accountant', icon: '💰' },
@@ -341,6 +346,8 @@ export default function TeachersPage() {
           >
             Manage Roles
           </a>
+          {canManageStaff && (
+          <>
           <button
             onClick={() => setShowAssignmentModal(true)}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
@@ -353,6 +360,8 @@ export default function TeachersPage() {
           >
             + Add Teacher
           </button>
+          </>
+          )}
         </div>
       </div>
 
@@ -494,6 +503,8 @@ export default function TeachersPage() {
                         <button onClick={() => { setSelectedTeacher(teacher); setShowProfileModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
                           👁️ View
                         </button>
+                        {canManageStaff && (
+                        <>
                         <button onClick={() => {
                           setSelectedTeacher(teacher);
                           setEditForm({
@@ -513,6 +524,8 @@ export default function TeachersPage() {
                         <button onClick={() => { if (confirm(`Delete ${teacherUser.firstName} ${teacherUser.lastName}?`)) { deleteTeacherMutation.mutate(teacher.id); } }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors">
                           🗑️ Delete
                         </button>
+                        </>
+                        )}
                       </div>
                     </td>
                   </tr>

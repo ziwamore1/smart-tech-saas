@@ -13,7 +13,7 @@ interface DirectorUsersProps {
   stackNavigation?: NativeStackNavigationProp<any>;
 }
 
-const ROLE_OPTIONS = ['Director', 'Teacher', 'Class Teacher', 'Student', 'Parent', 'Deputy', 'Head Teacher'];
+const ROLE_OPTIONS = ['Director', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Student', 'Parent', 'Deputy', 'Head Teacher'];
 
 export const DirectorUsersScreen: React.FC<DirectorUsersProps> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();

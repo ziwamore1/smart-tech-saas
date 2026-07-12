@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { staffPositionApi } from '@/lib/api';
 
 type AdminRole = 'Director' | 'SuperAdmin' | 'Head Teacher' | 'Deputy' | 'HOD';
-const ADMIN_ROLES: AdminRole[] = ['Director', 'SuperAdmin', 'Head Teacher', 'Deputy', 'HOD'];
+const ADMIN_ROLES: AdminRole[] = ['Director', 'SuperAdmin', 'Head Teacher', 'Deputy', 'HOD', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
 
 const getSupervisorLabel = (posType: string) => {
   if (posType === 'LOWER_PRIMARY_SENIOR_TEACHER') return 'Lower Primary Senior Teacher';

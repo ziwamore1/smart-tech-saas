@@ -54,7 +54,7 @@ function generateHtmlReport(teachers: any[], date: string) {
   `;
 }
 
-const SUPERVISOR_ROLES = ['Director', 'Deputy Director', 'HOD', 'Head Teacher', 'Deputy', 'SuperAdmin'];
+const SUPERVISOR_ROLES = ['Director', 'Deputy Director', 'HOD', 'Head Teacher', 'Deputy', 'SuperAdmin', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
 
 function exportToCSV(rows: Array<Record<string, any>>, filename: string) {
   if (rows.length === 0) return;

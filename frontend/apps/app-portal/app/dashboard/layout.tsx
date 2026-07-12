@@ -21,14 +21,14 @@ type NavItem = {
 
 const ROLE_MAP: Record<string, Record<string, string[]>> = {
   admin: {
-    PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head'],
+    PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'],
     SECONDARY_SCHOOL: ['Director', 'Deputy Director'],
     ADVANCED_SECONDARY: ['Director', 'Deputy Director'],
     COLLEGE: ['Principal', 'Registrar'],
     UNIVERSITY: ['Vice Chancellor', 'Dean'],
   },
   teaching: {
-    PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Primary Teacher'],
+    PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Primary Teacher'],
     SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'HOD', 'Teacher', 'Class Teacher'],
     ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'HOD', 'Teacher', 'Class Teacher'],
     COLLEGE: ['Principal', 'Lecturer'],
@@ -56,7 +56,7 @@ const ROLE_MAP: Record<string, Record<string, string[]>> = {
     UNIVERSITY: [],
   },
   everyone: {
-    PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Primary Teacher', 'Parent', 'Learner'],
+    PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Primary Teacher', 'Parent', 'Learner'],
     SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'HOD', 'Teacher', 'Class Teacher', 'Parent', 'Student'],
     ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'HOD', 'Teacher', 'Class Teacher', 'Parent', 'Student'],
     COLLEGE: ['Principal', 'Registrar', 'Lecturer', 'Student'],
