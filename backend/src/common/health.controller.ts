@@ -113,7 +113,7 @@ export class HealthController {
       const t = Date.now();
       const rows = await Promise.race([
         this.prisma.student.findMany({
-          where: { schoolId, AND: [{ OR: [{ status: 'ACTIVE' as any }, { status: null }] }] },
+          where: { schoolId },
           select: {
             id: true, admissionNumber: true, studentUuid: true, status: true,
             dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
