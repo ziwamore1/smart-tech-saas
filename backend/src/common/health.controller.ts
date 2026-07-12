@@ -177,18 +177,18 @@ export class HealthController {
 
     try {
       const users = await this.prisma.user.findMany({
-        where: { schoolId, userRoles: { some: { role: { name: { in: ['Teacher', 'Class Teacher'] } } } } },
-        select: { id: true, firstName: true, lastName: true, email: true, schoolId: true },
+        where: { schoolId },
+        select: { id: true, firstName: true, lastName: true, email: true },
       });
-      results.teachers = users;
+      results.users = users.map((u: any) => ({ id: u.id, name: `${u.firstName} ${u.lastName}`, email: u.email }));
     } catch (e: any) {
-      results.teachers = 'ERROR: ' + e.message;
+      results.users = 'ERROR: ' + e.message;
     }
 
     try {
       const teachers = await this.prisma.teacher.findMany({
         where: { schoolId },
-        select: { id: true, userId: true, employeeNo: true, schoolId: true },
+        select: { id: true, userId: true, employeeNo: true },
       });
       results.teacherRecords = teachers;
     } catch (e: any) {
@@ -196,13 +196,41 @@ export class HealthController {
     }
 
     try {
-      const roles = await this.prisma.userRole.findMany({
-        where: { user: { schoolId } },
-        select: { id: true, userId: true, role: { select: { name: true } } },
+      const roles = await this.prisma.role.findMany({
+        select: { id: true, name: true },
       });
-      results.userRoles = roles;
+      results.roles = roles;
+    } catch (e: any) {
+      results.roles = 'ERROR: ' + e.message;
+    }
+
+    try {
+      const userRoles = await this.prisma.userRole.findMany({
+        where: { user: { schoolId } },
+        select: { id: true, userId: true, role: { select: { id: true, name: true } } },
+      });
+      results.userRoles = userRoles;
     } catch (e: any) {
       results.userRoles = 'ERROR: ' + e.message;
+    }
+
+    if (results.classes?.length > 0 && results.users?.length > 0) {
+      const testClassId = results.classes[0].id;
+      const testUserId = results.users[0].id;
+      try {
+        const testResult = await this.prisma.class.update({
+          where: { id: testClassId },
+          data: { classTeacherId: testUserId },
+          include: { classTeacher: { select: { id: true, firstName: true, lastName: true } } },
+        });
+        results.testUpdate = { ok: true, classId: testClassId, teacherId: testUserId, classTeacher: testResult.classTeacher };
+        await this.prisma.class.update({
+          where: { id: testClassId },
+          data: { classTeacherId: null },
+        });
+      } catch (e: any) {
+        results.testUpdate = { ok: false, error: e.message, code: e.code };
+      }
     }
 
     return results;
