@@ -160,6 +160,54 @@ export class HealthController {
     return results;
   }
 
+  @Get('class-teacher-test')
+  async classTeacherTest() {
+    const schoolId = '40a1039f-e292-4e91-948d-05848ac2ad89';
+    const results: Record<string, any> = {};
+
+    try {
+      const classes = await this.prisma.class.findMany({
+        where: { schoolId },
+        select: { id: true, name: true, classTeacherId: true },
+      });
+      results.classes = classes;
+    } catch (e: any) {
+      results.classes = 'ERROR: ' + e.message;
+    }
+
+    try {
+      const users = await this.prisma.user.findMany({
+        where: { schoolId, userRoles: { some: { role: { name: { in: ['Teacher', 'Class Teacher'] } } } } },
+        select: { id: true, firstName: true, lastName: true, email: true, schoolId: true },
+      });
+      results.teachers = users;
+    } catch (e: any) {
+      results.teachers = 'ERROR: ' + e.message;
+    }
+
+    try {
+      const teachers = await this.prisma.teacher.findMany({
+        where: { schoolId },
+        select: { id: true, userId: true, employeeNo: true, schoolId: true },
+      });
+      results.teacherRecords = teachers;
+    } catch (e: any) {
+      results.teacherRecords = 'ERROR: ' + e.message;
+    }
+
+    try {
+      const roles = await this.prisma.userRole.findMany({
+        where: { user: { schoolId } },
+        select: { id: true, userId: true, role: { select: { name: true } } },
+      });
+      results.userRoles = roles;
+    } catch (e: any) {
+      results.userRoles = 'ERROR: ' + e.message;
+    }
+
+    return results;
+  }
+
   @Head()
   async head() {
     const health = await this.healthService.check();
