@@ -95,6 +95,7 @@ export class TeacherService {
             password: hashedPassword,
             firstName,
             lastName,
+            schoolId,
             userRoles: directorRole ? {
               create: {
                 roleId: directorRole.id,
