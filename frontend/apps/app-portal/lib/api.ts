@@ -63,7 +63,6 @@ api.interceptors.response.use(
         '/term/current',
         '/classrooms',
         '/school',
-        '/class',
         '/rooms',
         '/auth/',
         '/public/',

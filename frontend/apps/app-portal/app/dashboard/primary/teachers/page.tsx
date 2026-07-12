@@ -241,6 +241,7 @@ export default function PrimaryTeachersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teaching-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
       setShowAssignmentModal(false);
       setSelectedTeacherForAssignment(null);
       setAssignmentForm({ classId: '', subjectId: '', academicYearId: '' });
