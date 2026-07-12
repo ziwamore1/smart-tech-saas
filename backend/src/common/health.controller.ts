@@ -377,6 +377,115 @@ export class HealthController {
     return results;
   }
 
+  @Get('migrate-identity')
+  async migrateIdentity() {
+    const results: Record<string, any> = {
+      schoolUsers: { created: 0, skipped: 0 },
+      schoolRoleAssignments: { created: 0, skipped: 0 },
+      platformRoleAssignments: { created: 0, skipped: 0 },
+      classTeacherAssignments: { created: 0, skipped: 0 },
+      errors: [],
+    };
+
+    try {
+      // Step 1: Create SchoolUser records for users with schoolId
+      const usersWithSchool = await this.prisma.user.findMany({
+        where: { schoolId: { not: null }, schoolUsers: { none: {} } },
+        select: { id: true, schoolId: true },
+      });
+      for (const user of usersWithSchool) {
+        try {
+          await this.prisma.schoolUser.create({
+            data: { userId: user.id, schoolId: user.schoolId!, isPrimary: true },
+          });
+          results.schoolUsers.created++;
+        } catch { results.schoolUsers.skipped++; }
+      }
+
+      // Step 2: Create SchoolRoleAssignment from existing UserRole
+      const schoolRoleNames = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy', 'Teacher', 'Class Teacher', 'HOD', 'Accountant', 'Secretary'];
+      const userRoles = await this.prisma.userRole.findMany({
+        include: { role: true, user: { select: { schoolId: true } } },
+        where: { user: { schoolId: { not: null } } },
+      });
+      for (const ur of userRoles) {
+        if (!schoolRoleNames.includes(ur.role.name) || !ur.user.schoolId) continue;
+        const membership = await this.prisma.schoolUser.findFirst({
+          where: { userId: ur.userId, schoolId: ur.user.schoolId },
+        });
+        if (!membership) continue;
+        const existing = await this.prisma.schoolRoleAssignment.findFirst({
+          where: { schoolMembershipId: membership.id, role: ur.role.name },
+        });
+        if (existing) { results.schoolRoleAssignments.skipped++; continue; }
+        try {
+          await this.prisma.schoolRoleAssignment.create({
+            data: { schoolMembershipId: membership.id, role: ur.role.name, isActive: true },
+          });
+          results.schoolRoleAssignments.created++;
+        } catch { results.schoolRoleAssignments.skipped++; }
+      }
+
+      // Step 3: PlatformRoleAssignment for SuperAdmin
+      const superAdminRole = await this.prisma.role.findFirst({
+        where: { name: { equals: 'SuperAdmin', mode: 'insensitive' } },
+      });
+      if (superAdminRole) {
+        const superAdmins = await this.prisma.userRole.findMany({
+          where: { roleId: superAdminRole.id },
+          select: { userId: true },
+        });
+        for (const ur of superAdmins) {
+          const existing = await this.prisma.platformRoleAssignment.findFirst({
+            where: { userId: ur.userId, role: 'SuperAdmin' },
+          });
+          if (existing) { results.platformRoleAssignments.skipped++; continue; }
+          try {
+            await this.prisma.platformRoleAssignment.create({
+              data: { userId: ur.userId, role: 'SuperAdmin', isActive: true },
+            });
+            results.platformRoleAssignments.created++;
+          } catch { results.platformRoleAssignments.skipped++; }
+        }
+      }
+
+      // Step 4: ClassTeacherAssignment from Class.classTeacherId
+      const classesWithTeacher = await this.prisma.class.findMany({
+        where: { classTeacherId: { not: null } },
+        select: { id: true, classTeacherId: true, schoolId: true },
+      });
+      for (const cls of classesWithTeacher) {
+        if (!cls.classTeacherId) continue;
+        const currentYear = await this.prisma.academicYear.findFirst({
+          where: { schoolId: cls.schoolId, isCurrent: true },
+        });
+        if (!currentYear) continue;
+        const existing = await this.prisma.classTeacherAssignment.findFirst({
+          where: { teacherId: cls.classTeacherId, classId: cls.id, academicYearId: currentYear.id },
+        });
+        if (existing) { results.classTeacherAssignments.skipped++; continue; }
+        try {
+          await this.prisma.classTeacherAssignment.create({
+            data: {
+              teacherId: cls.classTeacherId,
+              classId: cls.id,
+              academicYearId: currentYear.id,
+              schoolId: cls.schoolId,
+              isPrimary: true,
+              isActive: true,
+            },
+          });
+          results.classTeacherAssignments.created++;
+        } catch { results.classTeacherAssignments.skipped++; }
+      }
+
+    } catch (e: any) {
+      results.fatalError = e.message;
+    }
+
+    return results;
+  }
+
   @Head()
   async head() {
     const health = await this.healthService.check();
