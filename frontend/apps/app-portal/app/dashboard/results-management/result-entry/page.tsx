@@ -532,6 +532,7 @@ export default function ResultEntryPage() {
                         textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 600,
                         fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.3px',
                         minWidth: '80px', maxWidth: '100px',
+                        background: '#5f4b3a',
                         borderLeft: idx > 0 ? '1px solid rgba(255,255,255,0.15)' : 'none'
                       }}>
                         <div>{short}</div>
