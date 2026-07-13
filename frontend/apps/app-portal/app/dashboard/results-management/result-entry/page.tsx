@@ -96,26 +96,34 @@ export default function ResultEntryPage() {
         const sr = await api.get(`/results-management/sheets/${sheetId}/students`);
         const sd = sr.data?.data || sr.data;
         const students = Array.isArray(sd) ? sd : [];
-        // If there are no results in the response, try getting students from class-subjects endpoint
+        // If there are no results in the response, try getting students from enrollment endpoint
         const hasResults = students.some((s: any) => s.results?.length > 0);
         if (!hasResults) {
           // Fetch enrollment-based student list
-          const er = await api.get(`/class/${selectedClass}/students`);
+          const er = await api.get(`/enrollments/class/${selectedClass}`);
           const ed = er.data?.data || er.data || [];
-          return Array.isArray(ed) ? ed.map((s: any) => ({
-            id: s.id, firstName: s.firstName, lastName: s.lastName,
-            admissionNumber: s.admissionNumber, gender: s.gender, results: [],
-          })) : [];
+          const enrollments = Array.isArray(ed) ? ed : [];
+          return enrollments.map((enr: any) => {
+            const s = enr.student || enr;
+            return {
+              id: s.id, firstName: s.firstName, lastName: s.lastName,
+              admissionNumber: s.admissionNumber, gender: s.gender, results: [],
+            };
+          });
         }
         return students;
       }
       // No sheet yet, try direct student enrollment
-      const er = await api.get(`/class/${selectedClass}/students`);
+      const er = await api.get(`/enrollments/class/${selectedClass}`);
       const ed = er.data?.data || er.data || [];
-      return Array.isArray(ed) ? ed.map((s: any) => ({
-        id: s.id, firstName: s.firstName, lastName: s.lastName,
-        admissionNumber: s.admissionNumber, gender: s.gender, results: [],
-      })) : [];
+      const enrollments = Array.isArray(ed) ? ed : [];
+      return enrollments.map((enr: any) => {
+        const s = enr.student || enr;
+        return {
+          id: s.id, firstName: s.firstName, lastName: s.lastName,
+          admissionNumber: s.admissionNumber, gender: s.gender, results: [],
+        };
+      });
     },
     enabled: !!selectedClass && !!selectedTerm,
   });
