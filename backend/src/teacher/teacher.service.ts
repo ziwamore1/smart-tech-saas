@@ -149,13 +149,42 @@ export class TeacherService {
   }
 
   async update(id: string, data: any) {
-    const { user, ...teacherData } = data;
-    
-    const updateData: any = { ...teacherData };
-    if (user) {
-      updateData.user = { update: user };
+    const { user, dateOfBirth, address, ...rest } = data;
+
+    const allowedTeacherFields: Record<string, any> = {};
+    const validKeys = [
+      'employeeNo', 'hireDate', 'department', 'departmentId', 'gender',
+      'staffType', 'qualification', 'specialization', 'yearsOfExperience',
+      'emergencyContact', 'emergencyPhone', 'photoUrl', 'photoPublicId',
+    ];
+    for (const key of Object.keys(rest)) {
+      if (validKeys.includes(key)) {
+        allowedTeacherFields[key] = rest[key];
+      }
     }
-    
+
+    if (allowedTeacherFields.yearsOfExperience !== undefined && allowedTeacherFields.yearsOfExperience !== null) {
+      allowedTeacherFields.yearsOfExperience = parseInt(allowedTeacherFields.yearsOfExperience) || null;
+    }
+    if (allowedTeacherFields.hireDate) {
+      allowedTeacherFields.hireDate = new Date(allowedTeacherFields.hireDate);
+    }
+
+    const updateData: any = { ...allowedTeacherFields };
+
+    if (user) {
+      const allowedUserFields: Record<string, any> = {};
+      const validUserKeys = ['firstName', 'lastName', 'email', 'phone'];
+      for (const key of Object.keys(user)) {
+        if (validUserKeys.includes(key)) {
+          allowedUserFields[key] = user[key];
+        }
+      }
+      if (Object.keys(allowedUserFields).length > 0) {
+        updateData.user = { update: allowedUserFields };
+      }
+    }
+
     return this.prisma.teacher.update({
       where: { id },
       data: updateData,

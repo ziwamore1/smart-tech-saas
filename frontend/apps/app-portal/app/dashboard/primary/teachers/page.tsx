@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { teacherApi, api, teachingAssignmentApi, classApi, subjectApi, academicYearApi, roleApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { usePermissions } from '@/lib/permission-context';
 
 const PRIMARY_ROLES = [
   { name: 'Head Teacher', icon: '🎓', color: '#059669' },
@@ -40,7 +41,9 @@ const STAFF_TYPES = [
 
 export default function PrimaryTeachersPage() {
   const { user } = useAuth();
+  const { can } = usePermissions();
   const queryClient = useQueryClient();
+  const canManageStaff = can('staff.manage');
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -177,8 +180,11 @@ export default function PrimaryTeachersPage() {
       }
       return teacher;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['primary-teachers'] });
+    onSuccess: (response) => {
+      const newTeacher = response?.data?.data;
+      if (newTeacher?.id) {
+        queryClient.setQueryData<any[]>(['primary-teachers'], (old) => [newTeacher, ...(old || [])]);
+      }
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
       queryClient.invalidateQueries({ queryKey: ['school-users'] });
       queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -200,15 +206,28 @@ export default function PrimaryTeachersPage() {
 
   const deleteTeacherMutation = useMutation({
     mutationFn: (id: string) => teacherApi.delete(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['primary-teachers'] });
+      const previousTeachers = queryClient.getQueryData<any[]>(['primary-teachers']);
+      queryClient.setQueryData<any[]>(['primary-teachers'], (old) =>
+        (old || []).filter((t: any) => t.id !== id)
+      );
+      return { previousTeachers };
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['primary-teachers'] });
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
       setMessage({ type: 'success', text: 'Staff member deleted successfully!' });
       setTimeout(() => setMessage(null), 3000);
     },
-    onError: (error: any) => {
+    onError: (error: any, _id, context) => {
+      if (context?.previousTeachers) {
+        queryClient.setQueryData(['primary-teachers'], context.previousTeachers);
+      }
       setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to delete staff member.' });
       setTimeout(() => setMessage(null), 5000);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['primary-teachers'] });
     },
   });
 
@@ -221,17 +240,40 @@ export default function PrimaryTeachersPage() {
 
   const updateTeacherMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => teacherApi.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['primary-teachers'] });
-      queryClient.invalidateQueries({ queryKey: ['school-stats'] });
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: ['primary-teachers'] });
+      const previousTeachers = queryClient.getQueryData<any[]>(['primary-teachers']);
+      queryClient.setQueryData<any[]>(['primary-teachers'], (old) =>
+        (old || []).map((t: any) => {
+          if (t.id !== id) return t;
+          const updatedUser = data.user ? { ...t.user, ...data.user } : t.user;
+          return { ...t, ...data, user: updatedUser, id: t.id, userId: t.userId, schoolId: t.schoolId };
+        })
+      );
+      return { previousTeachers };
+    },
+    onSuccess: (response) => {
+      const updated = response?.data?.data || response?.data;
+      if (updated?.id) {
+        queryClient.setQueryData<any[]>(['primary-teachers'], (old) =>
+          (old || []).map((t: any) => t.id === updated.id ? { ...t, ...updated } : t)
+        );
+      }
       setShowEditModal(false);
       setSelectedTeacher(null);
       setMessage({ type: 'success', text: 'Staff member updated successfully!' });
       setTimeout(() => setMessage(null), 3000);
     },
-    onError: (error: any) => {
+    onError: (error: any, _variables, context) => {
+      if (context?.previousTeachers) {
+        queryClient.setQueryData(['primary-teachers'], context.previousTeachers);
+      }
       setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to update staff member.' });
       setTimeout(() => setMessage(null), 5000);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['primary-teachers'] });
+      queryClient.invalidateQueries({ queryKey: ['school-stats'] });
     },
   });
 
@@ -289,6 +331,8 @@ export default function PrimaryTeachersPage() {
           <p className="text-gray-600 mt-1">Manage Head Teacher, Deputy Head, Teachers, and Support Staff</p>
         </div>
         <div className="flex gap-2">
+          {canManageStaff && (
+          <>
           <button
             onClick={() => setShowAssignmentModal(true)}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
@@ -301,6 +345,8 @@ export default function PrimaryTeachersPage() {
           >
             + Add Staff Member
           </button>
+          </>
+          )}
         </div>
       </div>
 
@@ -468,6 +514,8 @@ export default function PrimaryTeachersPage() {
                         <button onClick={() => { setSelectedTeacher(teacher); setShowProfileModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
                           👁️ View
                         </button>
+                        {canManageStaff && (
+                        <>
                         <button onClick={() => {
                           setSelectedTeacher(teacher);
                           setEditForm({
@@ -487,6 +535,8 @@ export default function PrimaryTeachersPage() {
                         <button onClick={() => { if (confirm(`Delete ${teacherUser.firstName} ${teacherUser.lastName}?`)) { deleteTeacherMutation.mutate(teacher.id); } }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors">
                           🗑️ Delete
                         </button>
+                        </>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Body,
   Param,
   Req,
@@ -66,6 +67,12 @@ export class ClassController {
     @Req() req: any,
   ) {
     return this.service.setClassTeacher(id, body.teacherId, req.user.schoolId);
+  }
+
+  @Delete(':id')
+  @Roles('Director')
+  delete(@Param('id') id: string, @Req() req: any) {
+    return this.service.delete(id, req.user.schoolId);
   }
 
   @Get('by-level')

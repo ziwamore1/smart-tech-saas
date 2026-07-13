@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -172,5 +173,33 @@ export class ClassService {
         },
       },
     });
+  }
+
+  async delete(id: string, schoolId: string) {
+    const classEntity = await this.prisma.class.findUnique({
+      where: { id },
+      include: {
+        enrollments: { where: { status: 'ACTIVE' }, select: { id: true } },
+        teachingAssignments: { select: { id: true } },
+        timetableSlots: { select: { id: true } },
+      },
+    });
+
+    if (!classEntity) throw new NotFoundException('Class not found');
+    if (classEntity.schoolId !== schoolId) throw new ForbiddenException('Access denied');
+
+    if (classEntity.enrollments.length > 0) {
+      throw new BadRequestException(
+        `Cannot delete "${classEntity.name}" — it has ${classEntity.enrollments.length} active student(s). Remove or transfer them first.`,
+      );
+    }
+
+    await this.prisma.classTeacherAssignment.deleteMany({ where: { classId: id } });
+    await this.prisma.teachingAssignment.deleteMany({ where: { classId: id } });
+    await this.prisma.timetableSlot.deleteMany({ where: { classId: id } });
+
+    await this.prisma.class.delete({ where: { id } });
+
+    return { message: `Class "${classEntity.name}" deleted successfully` };
   }
 }

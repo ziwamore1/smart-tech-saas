@@ -242,8 +242,11 @@ export default function TeachersPage() {
       }
       return teacher;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teachers'] });
+    onSuccess: (response) => {
+      const newTeacher = response?.data?.data;
+      if (newTeacher?.id) {
+        queryClient.setQueryData<any[]>(['teachers'], (old) => [newTeacher, ...(old || [])]);
+      }
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
       queryClient.invalidateQueries({ queryKey: ['school-users'] });
       queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -265,15 +268,28 @@ export default function TeachersPage() {
 
   const deleteTeacherMutation = useMutation({
     mutationFn: (id: string) => teacherApi.delete(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['teachers'] });
+      const previousTeachers = queryClient.getQueryData<any[]>(['teachers']);
+      queryClient.setQueryData<any[]>(['teachers'], (old) =>
+        (old || []).filter((t: any) => t.id !== id)
+      );
+      return { previousTeachers };
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teachers'] });
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
       setMessage({ type: 'success', text: 'Teacher deleted successfully!' });
       setTimeout(() => setMessage(null), 3000);
     },
-    onError: (error: any) => {
+    onError: (error: any, _id, context) => {
+      if (context?.previousTeachers) {
+        queryClient.setQueryData(['teachers'], context.previousTeachers);
+      }
       setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to delete teacher.' });
       setTimeout(() => setMessage(null), 5000);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['teachers'] });
     },
   });
 
@@ -286,17 +302,40 @@ export default function TeachersPage() {
 
   const updateTeacherMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => teacherApi.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teachers'] });
-      queryClient.invalidateQueries({ queryKey: ['school-stats'] });
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: ['teachers'] });
+      const previousTeachers = queryClient.getQueryData<any[]>(['teachers']);
+      queryClient.setQueryData<any[]>(['teachers'], (old) =>
+        (old || []).map((t: any) => {
+          if (t.id !== id) return t;
+          const updatedUser = data.user ? { ...t.user, ...data.user } : t.user;
+          return { ...t, ...data, user: updatedUser, id: t.id, userId: t.userId, schoolId: t.schoolId };
+        })
+      );
+      return { previousTeachers };
+    },
+    onSuccess: (response) => {
+      const updated = response?.data?.data || response?.data;
+      if (updated?.id) {
+        queryClient.setQueryData<any[]>(['teachers'], (old) =>
+          (old || []).map((t: any) => t.id === updated.id ? { ...t, ...updated } : t)
+        );
+      }
       setShowEditModal(false);
       setSelectedTeacher(null);
       setMessage({ type: 'success', text: 'Teacher updated successfully!' });
       setTimeout(() => setMessage(null), 3000);
     },
-    onError: (error: any) => {
+    onError: (error: any, _variables, context) => {
+      if (context?.previousTeachers) {
+        queryClient.setQueryData(['teachers'], context.previousTeachers);
+      }
       setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to update teacher.' });
       setTimeout(() => setMessage(null), 5000);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      queryClient.invalidateQueries({ queryKey: ['school-stats'] });
     },
   });
 
