@@ -179,7 +179,7 @@ export default function ResultEntryPage() {
       toast.error('Score must be between 0 and 100');
       return;
     }
-    const key = `${studentId}-${subjectId}`;
+    const key = `${studentId}::${subjectId}`;
     setScores(prev => ({
       ...prev,
       [studentId]: { ...(prev[studentId] || {}), [subjectId]: score },
@@ -196,7 +196,7 @@ export default function ResultEntryPage() {
     }
     const scoreList: Array<{ studentId: string; subjectId: string; termId: string; score: number }> = [];
     dirtyCells.forEach(key => {
-      const [studentId, subjectId] = key.split('-');
+      const [studentId, subjectId] = key.split('::');
       const score = scores[studentId]?.[subjectId];
       if (score != null && score >= 0) {
         scoreList.push({ studentId, subjectId, termId: selectedTerm, score });
@@ -577,8 +577,8 @@ export default function ResultEntryPage() {
                         const effectiveScore = pendingScore != null ? pendingScore : dbScore;
                         const isEmpty = effectiveScore == null && (!editingCell || editingCell.studentId !== student.id || editingCell.subjectId !== subjId);
                         const isEditing = editingCell?.studentId === student.id && editingCell?.subjectId === subjId;
-                        const isDirty = dirtyCells.has(`${student.id}-${subjId}`);
-                        const cellKey = `${student.id}-${subjId}`;
+                        const isDirty = dirtyCells.has(`${student.id}::${subjId}`);
+                        const cellKey = `${student.id}::${subjId}`;
                         const colors = getGradeColor(effectiveScore);
 
                         let cellBg = 'transparent';
