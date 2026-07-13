@@ -81,10 +81,20 @@ export default function AssessmentConfigPage() {
       return;
     }
 
+    if (configs.length === 0) {
+      toast.error('Please add at least one assessment');
+      return;
+    }
+
+    const hasEmptyDef = configs.some(c => !c.assessmentDefId);
+    if (hasEmptyDef) {
+      toast.error('Please select an assessment type for all entries');
+      return;
+    }
+
     const totalWeight = configs.reduce((sum, c) => sum + c.weightPercentage, 0);
     if (totalWeight !== 100) {
-      toast.error(`Total weight must be 100%. Current: ${totalWeight}%`);
-      return;
+      toast.warning(`Total weight is ${totalWeight}% (expected 100%). Saving anyway.`);
     }
 
     configureMutation.mutate({
@@ -254,7 +264,7 @@ export default function AssessmentConfigPage() {
             <div className="mt-6 flex justify-end">
               <button
                 onClick={handleSave}
-                disabled={configureMutation.isPending || totalWeight !== 100}
+                disabled={configureMutation.isPending}
                 className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {configureMutation.isPending ? (
