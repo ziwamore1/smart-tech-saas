@@ -329,8 +329,10 @@ export class ResultService {
 
   async calculateGrade(score: number, schoolId: string, classId?: string) {
     const codeToName: Record<string, string> = {
-      PRIMARY_ECZ: 'ECZ Primary Grading System',
+      PRIMARY_ECZ: 'Primary Grading System',
+      GRADE7_ECZ: 'ECZ Grade 7 Grading System',
       SECONDARY_ECZ: 'ECZ Secondary Grading System',
+      ADVANCED_A_LEVEL: 'ECZ Secondary Grading System',
       FORMS_ECZ: 'ECZ Forms Grading System',
       COLLEGE_GPA: 'College GPA Grading System',
       UNIVERSITY_CGPA: 'University CGPA Grading System',

@@ -274,21 +274,48 @@ export class CompositeSubjectService {
     schoolId: string,
   ): Promise<string | null> {
     try {
-      const config = await this.prisma.termAssessmentConfiguration.findFirst({
-        where: { classId, subjectId, termId },
-      });
-
-      const maxScore = config?.maxScore || 100;
-      const rawScore = (percentage / 100) * maxScore;
-
-      const policies = await this.prisma.gradingPolicy.findMany({
-        where: { schoolId, isActive: true },
-        orderBy: { minPercentage: 'desc' },
-      });
-
-      for (const policy of policies) {
-        if (percentage >= policy.minPercentage) return policy.grade;
+      // 1. Class-specific grading system (highest priority)
+      if (classId) {
+        const cls = await this.prisma.class.findUnique({
+          where: { id: classId },
+          include: {
+            gradingSystem: {
+              include: { gradeScales: { orderBy: { minScore: 'asc' } } },
+            },
+          },
+        });
+        if (cls?.gradingSystem?.gradeScales?.length > 0) {
+          const scale = cls.gradingSystem.gradeScales.find(
+            s => percentage >= s.minScore && percentage <= s.maxScore,
+          );
+          if (scale) return scale.grade;
+        }
       }
+
+      // 2. School default grading system
+      const defaultSystem = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId, isDefault: true },
+        include: { gradeScales: { orderBy: { minScore: 'asc' } } },
+      });
+      if (defaultSystem?.gradeScales?.length > 0) {
+        const scale = defaultSystem.gradeScales.find(
+          s => percentage >= s.minScore && percentage <= s.maxScore,
+        );
+        if (scale) return scale.grade;
+      }
+
+      // 3. Any grading system for the school
+      const anySystem = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId },
+        include: { gradeScales: { orderBy: { minScore: 'asc' } } },
+      });
+      if (anySystem?.gradeScales?.length > 0) {
+        const scale = anySystem.gradeScales.find(
+          s => percentage >= s.minScore && percentage <= s.maxScore,
+        );
+        if (scale) return scale.grade;
+      }
+
       return null;
     } catch {
       return null;
