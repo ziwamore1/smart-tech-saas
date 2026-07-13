@@ -192,7 +192,7 @@ export class ResultController {
     }
 
     return this.resultService.createBulk(
-      teacherId,
+      userId,
       req.user.schoolId,
       body.results,
     );

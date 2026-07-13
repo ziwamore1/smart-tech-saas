@@ -159,7 +159,7 @@ export default function ResultEntryPage() {
   });
 
   const bulkSaveMutation = useMutation({
-    mutationFn: (scoreList: Array<{ studentId: string; subjectId: string; score: number }>) =>
+    mutationFn: (scoreList: Array<{ studentId: string; subjectId: string; termId: string; score: number }>) =>
       api.post('/results/bulk', { results: scoreList }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sheet-students'] });
@@ -194,18 +194,18 @@ export default function ResultEntryPage() {
       toast.error('No changes to save');
       return;
     }
-    const scoreList: Array<{ studentId: string; subjectId: string; score: number }> = [];
+    const scoreList: Array<{ studentId: string; subjectId: string; termId: string; score: number }> = [];
     dirtyCells.forEach(key => {
       const [studentId, subjectId] = key.split('-');
       const score = scores[studentId]?.[subjectId];
       if (score != null && score >= 0) {
-        scoreList.push({ studentId, subjectId, score });
+        scoreList.push({ studentId, subjectId, termId: selectedTerm, score });
       }
     });
     if (scoreList.length > 0) {
       bulkSaveMutation.mutate(scoreList);
     }
-  }, [dirtyCells, scores, bulkSaveMutation]);
+  }, [dirtyCells, scores, selectedTerm, bulkSaveMutation]);
 
   const handlePasteFromExcel = useCallback(async () => {
     try {
