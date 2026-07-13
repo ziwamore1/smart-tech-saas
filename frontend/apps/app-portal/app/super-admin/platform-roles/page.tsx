@@ -296,9 +296,12 @@ export default function PlatformRolesPage() {
                                   removeMutation.mutate({ userId: u.userId, role: selectedRole });
                                 }
                               }}
-                              className="px-3 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm font-medium"
+                              disabled={removeMutation.isPending}
+                              className="px-3 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              Remove
+                              {removeMutation.isPending ? (
+                                <><svg className="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Removing...</>
+                              ) : 'Remove'}
                             </button>
                           </td>
                         </tr>
@@ -313,7 +316,7 @@ export default function PlatformRolesPage() {
       </div>
 
       {showAssignModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg transform transition-all">
             <div className="p-6 border-b bg-gradient-to-r from-indigo-50 to-blue-50 rounded-t-2xl">
               <div className="flex items-center justify-between">

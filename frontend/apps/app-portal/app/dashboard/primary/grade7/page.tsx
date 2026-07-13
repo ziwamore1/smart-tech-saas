@@ -163,7 +163,7 @@ export default function Grade7Page() {
   );
 
   const renderCreateModal = () => (
-    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center" onClick={() => setShowCreate(false)}>
+    <div className="fixed inset-0 z-50 bg-gray-600 flex items-center justify-center" onClick={() => setShowCreate(false)}>
       <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-gray-800">Create Grade 7 Mock Exam</h3>
@@ -222,7 +222,7 @@ export default function Grade7Page() {
     const exam = mockExams.find((e: any) => e.id === scoreEntryExam);
     const students = grade7Students;
     return (
-      <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center" onClick={() => { setScoreEntryExam(null); setScores({}); }}>
+      <div className="fixed inset-0 z-50 bg-gray-600 flex items-center justify-center" onClick={() => { setScoreEntryExam(null); setScores({}); }}>
         <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-6">
             <div>

@@ -280,7 +280,7 @@ export default function SbaTasksPage() {
 
       {/* Add Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-lg">
             <h2 className="text-2xl font-bold mb-2">Add SBA Task</h2>
             <p className="text-sm text-gray-500 mb-6">{selectedSubject?.name}</p>
@@ -347,7 +347,7 @@ export default function SbaTasksPage() {
 
       {/* Edit Modal */}
       {showEditModal && selectedTask && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-lg">
             <h2 className="text-2xl font-bold mb-2">Edit SBA Task</h2>
             <p className="text-sm text-gray-500 mb-6">{selectedSubject?.name}</p>

@@ -263,7 +263,7 @@ export function Modal({ open, onClose, title, children, footer }: {
   if (!open) return null;
   
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden">
         <div className="p-4 border-b bg-gradient-to-r from-indigo-50 to-blue-50 flex items-center justify-between">
           <h3 className="text-lg font-bold text-gray-900">{title}</h3>

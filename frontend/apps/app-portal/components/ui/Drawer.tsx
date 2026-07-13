@@ -14,7 +14,7 @@ export default function Drawer({ open, onClose, title, children, width = "400px"
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-gray-600 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />

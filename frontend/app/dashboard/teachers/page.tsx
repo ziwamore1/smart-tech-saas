@@ -688,7 +688,7 @@ export default function TeachersPage() {
       </div>
 
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-6">Add New Teacher</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -864,7 +864,7 @@ export default function TeachersPage() {
       )}
 
       {showProfileModal && selectedTeacher && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-6">
               <h2 className="text-2xl font-bold">Teacher Profile</h2>
@@ -906,7 +906,7 @@ export default function TeachersPage() {
       )}
 
       {showEditModal && selectedTeacher && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-6">Edit Teacher: {selectedTeacher.user?.firstName} {selectedTeacher.user?.lastName}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -998,7 +998,7 @@ export default function TeachersPage() {
       )}
 
       {showAssignmentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-2xl font-bold mb-6">{isPrimary ? 'Assign Teacher to Class' : 'Assign Teacher to Class & Subject'}</h2>
             {createAssignmentMutation.isError && (
@@ -1054,7 +1054,7 @@ export default function TeachersPage() {
                   return;
                 }
                 createAssignmentMutation.mutate({
-                  teacherId: selectedTeacherForAssignment.id,
+                  teacherId: selectedTeacherForAssignment.user?.id || selectedTeacherForAssignment.userId || selectedTeacherForAssignment.id,
                   classId: assignmentForm.classId,
                   ...(isPrimary ? {} : { subjectId: assignmentForm.subjectId }),
                   academicYearId: assignmentForm.academicYearId,
@@ -1068,7 +1068,7 @@ export default function TeachersPage() {
       )}
 
       {showClassTeacherModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-lg">
             <h2 className="text-2xl font-bold mb-2">Assign Class Teacher</h2>
             <p className="text-gray-500 text-sm mb-6">Assign a teacher as the primary class teacher for a class</p>

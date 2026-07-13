@@ -127,7 +127,7 @@ export default function AssessmentDefinitionsPage() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center" onClick={() => setShowForm(false)}>
+        <div className="fixed inset-0 z-50 bg-gray-600 flex items-center justify-center" onClick={() => setShowForm(false)}>
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-800">

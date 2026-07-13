@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -429,7 +429,7 @@ return (
       </div>
 
       {showRoleModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all">
             <div className="p-6 border-b bg-gradient-to-r from-indigo-50 to-blue-50 rounded-t-2xl">
               <div className="flex items-center justify-between">
@@ -501,7 +501,7 @@ return (
       )}
 
       {changeRoleUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all">
             <div className="p-6 border-b bg-gradient-to-r from-indigo-50 to-blue-50 rounded-t-2xl">
               <div className="flex items-center justify-between">
@@ -530,13 +530,16 @@ return (
                       assignRoleMutation.mutate({ userId: changeRoleUser.userId, roleName: role.name });
                       setChangeRoleUser(null);
                     }}
-                    className="w-full p-4 rounded-xl text-left flex items-center justify-between transition-all bg-white border-2 border-gray-100 hover:border-indigo-300 hover:shadow-md text-gray-700"
+                    disabled={removeRoleMutation.isPending || assignRoleMutation.isPending}
+                    className="w-full p-4 rounded-xl text-left flex items-center justify-between transition-all bg-white border-2 border-gray-100 hover:border-indigo-300 hover:shadow-md text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">{role.icon}</span>
-                      <span className="font-medium">{role.name}</span>
+                      <span className="font-medium">{removeRoleMutation.isPending || assignRoleMutation.isPending ? (
+                        <><svg className="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Assigning...</>
+                      ) : role.name}</span>
                     </div>
-                    <span className="text-indigo-600 text-sm">Click to change</span>
+                    <span className="text-indigo-600 text-sm">{removeRoleMutation.isPending || assignRoleMutation.isPending ? '' : 'Click to change'}</span>
                   </button>
                 ))}
                 {AVAILABLE_ROLES.filter(r => r.name !== changeRoleUser.currentRole).length === 0 && (

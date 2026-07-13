@@ -158,7 +158,7 @@ export default function WorkflowsPage() {
 
       {/* Detail Modal */}
       {showDetailModal && selectedWorkflow && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDetailModal(false)}>
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4" onClick={() => setShowDetailModal(false)}>
           <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-gray-900 mb-1">Workflow Details</h3>
             <p className="text-sm text-gray-500 mb-4">{selectedWorkflow.documentName} • {selectedWorkflow.documentType}</p>

@@ -16,16 +16,27 @@ export class TeachingAssignmentService {
     academicYearId: string,
     schoolId: string,
   ) {
+    let resolvedUserId = teacherId;
+    let teacher;
+
     const user = await this.prisma.user.findUnique({
       where: { id: teacherId },
     });
 
-    if (!user) throw new NotFoundException('Teacher not found');
-
-    const teacher = await this.prisma.teacher.findFirst({
-      where: { userId: user.id },
-      include: { user: true },
-    });
+    if (user) {
+      teacher = await this.prisma.teacher.findFirst({
+        where: { userId: user.id },
+        include: { user: true },
+      });
+    } else {
+      teacher = await this.prisma.teacher.findUnique({
+        where: { id: teacherId },
+        include: { user: true },
+      });
+      if (teacher) {
+        resolvedUserId = teacher.userId;
+      }
+    }
 
     if (!teacher) throw new NotFoundException('Teacher not found');
     if (teacher.schoolId !== schoolId) throw new ForbiddenException('Teacher does not belong to this school');
@@ -53,7 +64,7 @@ export class TeachingAssignmentService {
 
     return this.prisma.teachingAssignment.create({
       data: {
-        teacherId,
+        teacherId: resolvedUserId,
         subjectId,
         classId,
         academicYearId,

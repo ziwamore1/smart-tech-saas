@@ -278,7 +278,7 @@ export default function CompetenciesPage() {
 
       {/* Add Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-lg">
             <h2 className="text-2xl font-bold mb-2">Add Competency</h2>
             <p className="text-sm text-gray-500 mb-6">{selectedSubject?.name}</p>
@@ -354,7 +354,7 @@ export default function CompetenciesPage() {
 
       {/* Edit Modal */}
       {showEditModal && selectedCompetency && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-lg">
             <h2 className="text-2xl font-bold mb-2">Edit Competency</h2>
             <p className="text-sm text-gray-500 mb-6">{selectedSubject?.name}</p>

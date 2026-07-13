@@ -300,7 +300,7 @@ export default function PrimaryClassesPage() {
       </div>
 
       {showCreateForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowCreateForm(false)}>
+        <div className="fixed inset-0 bg-gray-600 z-50 flex items-center justify-center p-4" onClick={() => setShowCreateForm(false)}>
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-lg font-bold text-gray-900">Create New Class</h2>
@@ -390,7 +390,7 @@ export default function PrimaryClassesPage() {
       )}
 
       {showEditModal && selectedClass && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => { setShowEditModal(false); setSelectedClass(null); }}>
+        <div className="fixed inset-0 bg-gray-600 z-50 flex items-center justify-center p-4" onClick={() => { setShowEditModal(false); setSelectedClass(null); }}>
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-lg font-bold text-gray-900">Edit Class: {selectedClass.name}</h2>

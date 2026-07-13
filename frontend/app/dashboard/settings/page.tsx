@@ -665,7 +665,7 @@ export default function SettingsPage() {
 
           {/* Edit Term Modal */}
           {editingTerm && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50">
               <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-4">
                 <h3 className="text-lg font-semibold mb-4">Edit Term</h3>
                 <div className="space-y-4">
@@ -747,7 +747,7 @@ export default function SettingsPage() {
 
           {/* Delete Term Confirmation */}
           {deleteTermId && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50">
               <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-4">
                 <h3 className="text-lg font-semibold mb-2">Delete Term?</h3>
                 <p className="text-gray-600 mb-4">This action cannot be undone.</p>
@@ -1014,7 +1014,7 @@ export default function SettingsPage() {
 
           {/* Edit Academic Year Modal */}
           {editingYear && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50">
               <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-4">
                 <h3 className="text-lg font-semibold mb-4">Edit Academic Year</h3>
                 <div className="space-y-4">
@@ -1078,7 +1078,7 @@ export default function SettingsPage() {
 
           {/* Delete Academic Year Confirmation */}
           {deleteYearId && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50">
               <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-4">
                 <h3 className="text-lg font-semibold mb-2">Delete Academic Year?</h3>
                 <p className="text-gray-600 mb-4">This action cannot be undone. Terms within this year must be deleted first.</p>

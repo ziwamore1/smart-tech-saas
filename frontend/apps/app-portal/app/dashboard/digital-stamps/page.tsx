@@ -291,7 +291,7 @@ export default function DigitalStampsPage() {
 
       {/* Verification Modal */}
       {showVerifyModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => { setShowVerifyModal(false); setVerificationResult(null); }}>
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4" onClick={() => { setShowVerifyModal(false); setVerificationResult(null); }}>
           <div className="bg-white rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-gray-900 mb-1">Verify Document</h3>
             <p className="text-sm text-gray-500 mb-4">Enter the verification hash from the stamped document</p>

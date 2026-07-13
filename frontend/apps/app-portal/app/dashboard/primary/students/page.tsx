@@ -312,7 +312,7 @@ export default function PrimaryStudentsPage() {
 
       {/* View Modal */}
       {showViewModal && viewingStudent && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowViewModal(false)}>
+        <div className="fixed inset-0 bg-gray-600 z-50 flex items-center justify-center p-4" onClick={() => setShowViewModal(false)}>
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-lg font-bold text-gray-900">Pupil Details</h2>
@@ -381,7 +381,7 @@ export default function PrimaryStudentsPage() {
 
       {/* Register Form Modal */}
       {showRegisterForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowRegisterForm(false)}>
+        <div className="fixed inset-0 bg-gray-600 z-50 flex items-center justify-center p-4" onClick={() => setShowRegisterForm(false)}>
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-lg font-bold text-gray-900">Register New Pupil</h2>

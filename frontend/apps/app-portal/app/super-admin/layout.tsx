@@ -32,6 +32,12 @@ const superAdminNav = [
     color: '#3b82f6'
   },
   { 
+    name: 'School Members', 
+    href: '/dashboard/school-members', 
+    icon: 'fa-user-plus',
+    color: '#0891b2'
+  },
+  { 
     name: 'Subscription Plans', 
     href: '/super-admin/subscription-plans', 
     icon: 'fa-credit-card',

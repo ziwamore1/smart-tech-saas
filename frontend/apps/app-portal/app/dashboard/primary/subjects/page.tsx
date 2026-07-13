@@ -148,7 +148,7 @@ export default function PrimarySubjectsPage() {
       </div>
 
       {showAddForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowAddForm(false)}>
+        <div className="fixed inset-0 bg-gray-600 z-50 flex items-center justify-center p-4" onClick={() => setShowAddForm(false)}>
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-lg font-bold text-gray-900">Add Subject</h2>

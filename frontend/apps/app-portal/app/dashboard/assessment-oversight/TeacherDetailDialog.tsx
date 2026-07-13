@@ -26,7 +26,7 @@ export default function TeacherDetailDialog({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 animate-fadeIn" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-600 animate-fadeIn" onClick={onClose}>
       <div
         className="bg-white rounded-2xl w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto shadow-2xl animate-scaleIn"
         onClick={(e) => e.stopPropagation()}

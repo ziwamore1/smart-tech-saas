@@ -271,7 +271,7 @@ export default function GalleryPage() {
       </div>
 
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
           <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-gray-900">Create New Event</h2>
@@ -335,7 +335,7 @@ export default function GalleryPage() {
 
       {viewingPhoto && (
         <div 
-          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4"
           onClick={() => setViewingPhoto(null)}
         >
           <button 

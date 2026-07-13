@@ -99,7 +99,7 @@ export default function SubjectGroupsPage() {
       )}
 
       {showModal === 'group' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">Create Subject Group</h2>
             <div className="space-y-3">
@@ -123,14 +123,14 @@ export default function SubjectGroupsPage() {
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={() => setShowModal(null)} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
-              <button onClick={() => createMutation.mutate(form)} disabled={!form.code || !form.name} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">Create</button>
+              <button onClick={() => createMutation.mutate(form)} disabled={createMutation.isPending || !form.code || !form.name} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{createMutation.isPending && <svg className="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>}{createMutation.isPending ? 'Creating...' : 'Create'}</button>
             </div>
           </div>
         </div>
       )}
 
       {showModal === 'assign' && selectedGroup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">Assign Subject to {selectedGroup.name}</h2>
             <div className="space-y-3">
@@ -143,7 +143,7 @@ export default function SubjectGroupsPage() {
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={() => setShowModal(null)} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
-              <button onClick={() => assignMutation.mutate({ groupId: selectedGroup.id, subjectId: assignForm.subjectId, data: { isCompulsory: assignForm.isCompulsory, sortOrder: assignForm.sortOrder } })} disabled={!assignForm.subjectId} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">Assign</button>
+              <button onClick={() => assignMutation.mutate({ groupId: selectedGroup.id, subjectId: assignForm.subjectId, data: { isCompulsory: assignForm.isCompulsory, sortOrder: assignForm.sortOrder } })} disabled={assignMutation.isPending || !assignForm.subjectId} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">{assignMutation.isPending && <svg className="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>}{assignMutation.isPending ? 'Assigning...' : 'Assign'}</button>
             </div>
           </div>
         </div>

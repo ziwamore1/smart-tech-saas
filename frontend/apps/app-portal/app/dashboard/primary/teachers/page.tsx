@@ -642,7 +642,7 @@ export default function PrimaryTeachersPage() {
       </div>
 
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-6">Add New Staff Member</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -766,7 +766,7 @@ export default function PrimaryTeachersPage() {
       )}
 
       {showProfileModal && selectedTeacher && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-6">
               <h2 className="text-2xl font-bold">Staff Profile</h2>
@@ -815,7 +815,7 @@ export default function PrimaryTeachersPage() {
       )}
 
       {showEditModal && selectedTeacher && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-6">Edit Staff Member: {selectedTeacher.user?.firstName} {selectedTeacher.user?.lastName}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -916,7 +916,7 @@ export default function PrimaryTeachersPage() {
       )}
 
       {showAssignmentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-2xl font-bold mb-6">Assign Teacher to Class</h2>
             {createAssignmentMutation.isError && (
@@ -961,7 +961,7 @@ export default function PrimaryTeachersPage() {
                   return;
                 }
                 createAssignmentMutation.mutate({
-                  teacherId: selectedTeacherForAssignment.id,
+                  teacherId: selectedTeacherForAssignment.user?.id || selectedTeacherForAssignment.userId || selectedTeacherForAssignment.id,
                   classId: assignmentForm.classId,
                 });
               }} disabled={createAssignmentMutation.isPending} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400">
