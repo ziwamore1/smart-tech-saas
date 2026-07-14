@@ -193,7 +193,8 @@ export default function TeacherResultsPage() {
     return 'bg-red-100 text-red-800';
   };
 
-  const getGrade = (score: number) => {
+  const getGrade = (result: any, score: number) => {
+    if (result?.grade) return result.grade;
     if (score >= 75) return 'A';
     if (score >= 60) return 'B';
     if (score >= 50) return 'C';
@@ -380,7 +381,7 @@ export default function TeacherResultsPage() {
                         <td className="py-3 px-4 text-center">
                           {currentScore > 0 ? (
                             <span className={`px-2 py-1 rounded text-sm font-medium ${getGradeColor(currentScore)}`}>
-                              {getGrade(currentScore)}
+                              {getGrade(existing, currentScore)}
                             </span>
                           ) : (
                             <span className="text-gray-400">-</span>

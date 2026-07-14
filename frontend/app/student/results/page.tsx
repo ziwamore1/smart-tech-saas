@@ -39,7 +39,11 @@ export default function StudentResultsPage() {
     return 'bg-red-100 text-red-800 border-red-200';
   };
 
-  const getGrade = (score: number) => {
+  const getGrade = (result: any) => {
+    if (result?.grade) {
+      return { letter: result.grade, remark: result.remark || '' };
+    }
+    const score = result?.score ?? 0;
     if (score >= 75) return { letter: 'A', remark: 'Distinction' };
     if (score >= 70) return { letter: 'B+', remark: 'Very Good' };
     if (score >= 65) return { letter: 'B', remark: 'Good' };
@@ -60,7 +64,7 @@ export default function StudentResultsPage() {
   const calculateTotalPoints = () => {
     if (results.length === 0) return 0;
     return results.reduce((sum: number, r: any) => {
-      const points = getGrade(r.score).letter;
+      const points = getGrade(r).letter;
       const pointValues: Record<string, number> = { 'A': 4, 'B+': 3.5, 'B': 3, 'B-': 2.75, 'C+': 2.5, 'C': 2, 'D': 1, 'E': 0.5, 'F': 0 };
       return sum + (pointValues[points] || 0);
     }, 0);
@@ -250,7 +254,7 @@ export default function StudentResultsPage() {
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {results.map((result: any, index: number) => {
-                          const gradeInfo = getGrade(result.score);
+                          const gradeInfo = getGrade(result);
                           return (
                             <tr key={result.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                               <td className="px-6 py-4 whitespace-nowrap">

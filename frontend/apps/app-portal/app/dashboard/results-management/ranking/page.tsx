@@ -115,7 +115,9 @@ export default function RankingPage() {
     return '#dc2626';
   };
 
-  const getGrade = (pct: number) => {
+  const getGrade = (item: any) => {
+    if (item?.grade) return item.grade;
+    const pct = typeof item === 'number' ? item : (item?.percentage || 0);
     if (pct >= 75) return 'A';
     if (pct >= 65) return 'B';
     if (pct >= 50) return 'C';
@@ -125,10 +127,9 @@ export default function RankingPage() {
 
   const gradeDistribution = useMemo(() => {
     if (!filteredRankings.length) return [];
-    const dist: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, E: 0 };
+    const dist: Record<string, number> = {};
     filteredRankings.forEach((s: any) => {
-      const pct = s.percentage || s.totalPercentage || 0;
-      const g = getGrade(pct);
+      const g = getGrade(s);
       dist[g] = (dist[g] || 0) + 1;
     });
     return Object.entries(dist).map(([grade, count]) => ({ grade, count }));
@@ -357,7 +358,7 @@ export default function RankingPage() {
                             color: 'white',
                             background: getGradeColor(student.percentage || student.totalPercentage || 0)
                           }}>
-                            {getGrade(student.percentage || student.totalPercentage || 0)}
+                            {getGrade(student)}
                           </span>
                         </td>
                         <td style={{ padding: '12px 16px', textAlign: 'center' }}>

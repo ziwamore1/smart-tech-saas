@@ -15,7 +15,8 @@ function getGradeColor(score: number) {
   return 'bg-red-100 text-red-800';
 }
 
-function getGrade(score: number) {
+function getGrade(result: any, score: number) {
+  if (result?.grade) return result.grade;
   if (score >= 75) return 'A';
   if (score >= PASS_THRESHOLD) return 'C';
   return 'F';
@@ -455,7 +456,7 @@ export default function TeacherResultsPage() {
                             {currentScore > 0 && !isMissing && (
                               <div className="mb-1">
                                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${getGradeColor(currentScore)}`}>
-                                  {getGrade(currentScore)}
+                                  {getGrade(existing, currentScore)}
                                 </span>
                               </div>
                             )}

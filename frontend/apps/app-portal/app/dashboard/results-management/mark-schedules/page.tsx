@@ -76,7 +76,8 @@ export default function MarkSchedulesPage() {
     window.print();
   };
 
-  const getGrade = (total: number, totalPossible: number): string => {
+  const getGrade = (total: number, totalPossible: number, student: any): string => {
+    if (student?.grade) return student.grade;
     const pct = totalPossible > 0 ? (total / totalPossible) * 100 : 0;
     if (pct >= 75) return 'A';
     if (pct >= 65) return 'B';
@@ -254,7 +255,7 @@ export default function MarkSchedulesPage() {
                   const total = subjectScores.reduce((sum: number, s: number) => sum + (s || 0), 0);
                   const maxPossible = subjects.length * 100;
                   const pct = maxPossible > 0 ? ((total / maxPossible) * 100).toFixed(1) : '0.0';
-                  const grade = getGrade(total, maxPossible);
+                  const grade = getGrade(total, maxPossible, student);
                   return (
                     <tr key={student.id || student.studentId || idx} style={{
                       background: idx % 2 === 0 ? 'white' : '#f9fafb'

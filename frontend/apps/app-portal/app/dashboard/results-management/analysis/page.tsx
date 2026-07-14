@@ -82,9 +82,16 @@ export default function AnalysisPage() {
   };
 
   const gradeDistribution = useMemo(() => {
+    if (analysis?.gradeDistribution && Object.keys(analysis.gradeDistribution).length > 0) {
+      return Object.entries(analysis.gradeDistribution).map(([grade, count]) => ({ grade, count: count as number }));
+    }
     if (!analysis?.students) return [];
     const dist: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, E: 0 };
     analysis.students.forEach((s: any) => {
+      if (s.grade) {
+        dist[s.grade] = (dist[s.grade] || 0) + 1;
+        return;
+      }
       const pct = s.percentage || s.totalPercentage || 0;
       if (pct >= 75) dist.A++;
       else if (pct >= 65) dist.B++;

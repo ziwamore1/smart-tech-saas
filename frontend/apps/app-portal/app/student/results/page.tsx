@@ -39,7 +39,11 @@ export default function StudentResultsPage() {
     return 'bg-red-100 text-red-800 border-red-200';
   };
 
-  const getGrade = (score: number) => {
+  const getGrade = (result: any) => {
+    if (result?.grade) {
+      return { letter: result.grade, remark: result.remark || '' };
+    }
+    const score = result?.score ?? 0;
     if (score >= 75) return { letter: 'A', remark: 'Distinction' };
     if (score >= 70) return { letter: 'B+', remark: 'Very Good' };
     if (score >= 65) return { letter: 'B', remark: 'Good' };
@@ -60,7 +64,7 @@ export default function StudentResultsPage() {
   const calculateTotalPoints = () => {
     if (results.length === 0) return 0;
     return results.reduce((sum: number, r: any) => {
-      const points = getGrade(r.score).letter;
+      const points = getGrade(r).letter;
       const pointValues: Record<string, number> = { 'A': 4, 'B+': 3.5, 'B': 3, 'B-': 2.75, 'C+': 2.5, 'C': 2, 'D': 1, 'E': 0.5, 'F': 0 };
       return sum + (pointValues[points] || 0);
     }, 0);
@@ -257,7 +261,7 @@ export default function StudentResultsPage() {
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {results.map((result: any, index: number) => {
-                          const gradeInfo = getGrade(result.score);
+                          const gradeInfo = getGrade(result);
                           return (
                             <tr key={result.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                               <td className="px-6 py-4 whitespace-nowrap">
@@ -282,29 +286,6 @@ export default function StudentResultsPage() {
                         })}
                       </tbody>
                     </table>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-xl p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold mb-4">Grading Scale Reference</h3>
-                  <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-                    {[
-                      { grade: 'A', range: '75-100', remark: 'Distinction' },
-                      { grade: 'B+', range: '70-74', remark: 'Very Good' },
-                      { grade: 'B', range: '65-69', remark: 'Good' },
-                      { grade: 'B-', range: '60-64', remark: 'Above Average' },
-                      { grade: 'C+', range: '55-59', remark: 'Credit' },
-                      { grade: 'C', range: '50-54', remark: 'Satisfactory' },
-                      { grade: 'D', range: '45-49', remark: 'Pass' },
-                      { grade: 'E', range: '40-44', remark: 'Borderline' },
-                      { grade: 'F', range: '0-39', remark: 'Fail' },
-                    ].map((g) => (
-                      <div key={g.grade} className="text-center p-2 bg-gray-50 rounded">
-                        <span className="font-bold text-lg">{g.grade}</span>
-                        <p className="text-xs text-gray-500">{g.range}</p>
-                        <p className="text-xs text-gray-600">{g.remark}</p>
-                      </div>
-                    ))}
                   </div>
                 </div>
               </div>

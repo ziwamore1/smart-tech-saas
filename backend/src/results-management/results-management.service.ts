@@ -162,10 +162,38 @@ export class ResultsManagementService {
       orderBy: [{ studentId: 'asc' }, { subject: { name: 'asc' } }],
     });
 
+    const rawResults = await this.prisma.result.findMany({
+      where: {
+        studentId: { in: students.map((s) => s.id) },
+        termId: sheet.termId,
+        schoolId: sheet.schoolId,
+      },
+      select: {
+        studentId: true,
+        subjectId: true,
+        score: true,
+        grade: true,
+        remark: true,
+      },
+    });
+
+    const rawResultMap = new Map<string, { score: number; grade: string | null; remark: string | null }>();
+    for (const r of rawResults) {
+      rawResultMap.set(`${r.studentId}::${r.subjectId}`, { score: r.score, grade: r.grade, remark: r.remark });
+    }
+
     return {
       students: students.map((student) => ({
         ...student,
-        results: computedResults.filter((r) => r.studentId === student.id),
+        results: computedResults.filter((r) => r.studentId === student.id).map((cr) => {
+          const raw = rawResultMap.get(`${cr.studentId}::${cr.subjectId}`);
+          return {
+            ...cr,
+            score: raw?.score ?? cr.totalRawScore ?? cr.finalPercentage ?? null,
+            grade: raw?.grade ?? cr.finalGrade ?? null,
+            remark: raw?.remark ?? cr.finalRemark ?? null,
+          };
+        }),
       })),
     };
   }

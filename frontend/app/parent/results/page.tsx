@@ -42,7 +42,9 @@ export default function ParentResultsPage() {
     return 'bg-red-100 text-red-800';
   };
 
-  const getGrade = (score: number) => {
+  const getGrade = (result: any) => {
+    if (result?.grade) return result.grade;
+    const score = result?.score ?? 0;
     if (score >= 75) return 'A';
     if (score >= 60) return 'B';
     if (score >= 50) return 'C';
@@ -247,7 +249,7 @@ export default function ParentResultsPage() {
                           </td>
                           <td className="py-4 px-4 text-center">
                             <span className={`px-3 py-1 rounded-full font-bold ${getGradeColor(result.score)}`}>
-                              {getGrade(result.score)}
+                              {getGrade(result)}
                             </span>
                           </td>
                           <td className="py-4 px-4 text-center">

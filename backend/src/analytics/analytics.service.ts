@@ -486,47 +486,24 @@ export class AnalyticsService {
 
     const results = await this.prisma.result.findMany({ where });
 
-    const gradeDistribution: Record<string, number> = {
-      A: 0,
-      B: 0,
-      C: 0,
-      D: 0,
-      F: 0,
-    };
+    const gradeDistribution: Record<string, number> = {};
 
     for (const r of results) {
-      const score = r.score;
-      if (score >= 80) gradeDistribution['A']++;
-      else if (score >= 70) gradeDistribution['B']++;
-      else if (score >= 60) gradeDistribution['C']++;
-      else if (score >= 50) gradeDistribution['D']++;
-      else gradeDistribution['F']++;
+      const grade = r.grade || 'Unknown';
+      gradeDistribution[grade] = (gradeDistribution[grade] || 0) + 1;
     }
 
+    const sortedGrades = Object.entries(gradeDistribution)
+      .sort(([a], [b]) => a.localeCompare(b));
+
+    const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#f97316', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
     return {
-      labels: [
-        'A (80-100)',
-        'B (70-79)',
-        'C (60-69)',
-        'D (50-59)',
-        'F (Below 50)',
-      ],
+      labels: sortedGrades.map(([grade, count]) => `${grade} (${count})`),
       datasets: [
         {
-          data: [
-            gradeDistribution['A'],
-            gradeDistribution['B'],
-            gradeDistribution['C'],
-            gradeDistribution['D'],
-            gradeDistribution['F'],
-          ],
-          backgroundColor: [
-            '#22c55e',
-            '#3b82f6',
-            '#f59e0b',
-            '#f97316',
-            '#ef4444',
-          ],
+          data: sortedGrades.map(([, count]) => count),
+          backgroundColor: sortedGrades.map((_, i) => colors[i % colors.length]),
         },
       ],
     };

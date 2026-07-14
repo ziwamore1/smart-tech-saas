@@ -16,11 +16,10 @@ function getGradeColor(score: number | null) {
   return { bg: '#fee2e2', text: '#dc2626' };
 }
 
-function getGrade(score: number | null) {
+function getGrade(result: any, score: number | null) {
+  if (result?.grade) return result.grade;
   if (score == null) return '-';
-  if (score >= 75) return 'A';
-  if (score >= 50) return 'C';
-  return 'F';
+  return '-';
 }
 
 export default function ResultEntryPage() {
@@ -635,7 +634,7 @@ export default function ResultEntryPage() {
                                     padding: '1px 8px', borderRadius: '10px',
                                     background: colors.bg, color: colors.text
                                   }}>
-                                    {getGrade(effectiveScore)}
+                                    {getGrade(result, effectiveScore)}
                                   </span>
                                 )}
                               </div>
