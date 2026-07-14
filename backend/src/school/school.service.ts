@@ -490,4 +490,75 @@ export class SchoolService {
     console.log('[SchoolService] Upsert result:', JSON.stringify(result));
     return result;
   }
+
+  async fixClassGradingSystems() {
+    const codeToName: Record<string, string> = {
+      PRIMARY_ECZ: 'Primary Grading System',
+      GRADE7_ECZ: 'ECZ Grade 7 Grading System',
+      SECONDARY_ECZ: 'ECZ Secondary Grading System',
+      ADVANCED_A_LEVEL: 'ECZ Secondary Grading System',
+      FORMS_ECZ: 'ECZ Forms Grading System',
+      COLLEGE_GPA: 'College GPA Grading System',
+      UNIVERSITY_CGPA: 'University CGPA Grading System',
+    };
+
+    const schools = await this.prisma.school.findMany({
+      select: { id: true, name: true },
+    });
+
+    let totalFixed = 0;
+    const results: string[] = [];
+
+    for (const school of schools) {
+      const classesWithoutGS = await this.prisma.class.findMany({
+        where: { schoolId: school.id, gradingSystemId: null },
+        select: { id: true, name: true },
+      });
+
+      if (classesWithoutGS.length === 0) continue;
+
+      const schoolSetting = await this.prisma.schoolSetting.findUnique({
+        where: { schoolId: school.id },
+      });
+
+      const preferredName = schoolSetting?.gradingSystem
+        ? codeToName[schoolSetting.gradingSystem]
+        : null;
+
+      let gradingSystem: any = null;
+
+      if (preferredName) {
+        gradingSystem = await this.prisma.gradingSystem.findFirst({
+          where: { schoolId: school.id, name: preferredName },
+        });
+      }
+
+      if (!gradingSystem) {
+        gradingSystem = await this.prisma.gradingSystem.findFirst({
+          where: { schoolId: school.id, isDefault: true },
+        });
+      }
+
+      if (!gradingSystem) {
+        gradingSystem = await this.prisma.gradingSystem.findFirst({
+          where: { schoolId: school.id },
+        });
+      }
+
+      if (!gradingSystem) {
+        results.push(`${school.name}: SKIP - no grading system found`);
+        continue;
+      }
+
+      const result = await this.prisma.class.updateMany({
+        where: { schoolId: school.id, gradingSystemId: null },
+        data: { gradingSystemId: gradingSystem.id },
+      });
+
+      results.push(`${school.name}: ${result.count} class(es) → "${gradingSystem.name}"`);
+      totalFixed += result.count;
+    }
+
+    return { totalFixed, schools: schools.length, details: results };
+  }
 }

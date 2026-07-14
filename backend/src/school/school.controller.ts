@@ -109,4 +109,11 @@ export class SchoolController {
   updateGradingSystem(@Req() req: any, @Body() body: { gradingSystem: string }) {
     return this.schoolService.updateTimeSettings(req.user.schoolId, { gradingSystem: body.gradingSystem });
   }
+
+  @Post('fix-class-grading-systems')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin', 'SuperAdmin')
+  async fixClassGradingSystems() {
+    return this.schoolService.fixClassGradingSystems();
+  }
 }
