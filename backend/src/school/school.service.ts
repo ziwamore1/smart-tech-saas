@@ -561,4 +561,45 @@ export class SchoolService {
 
     return { totalFixed, schools: schools.length, details: results };
   }
+
+  async diagnoseGradingForClass(className: string) {
+    const classes = await this.prisma.class.findMany({
+      where: { name: { contains: className, mode: 'insensitive' } },
+      include: {
+        gradingSystem: {
+          include: { gradeScales: { orderBy: { minScore: 'asc' } } },
+        },
+        school: { select: { id: true, name: true, institutionType: { select: { code: true } } } },
+      },
+    });
+
+    const results = [];
+    for (const cls of classes) {
+      const schoolSetting = await this.prisma.schoolSetting.findUnique({
+        where: { schoolId: cls.schoolId },
+      });
+      results.push({
+        className: cls.name,
+        schoolName: cls.school.name,
+        institutionType: cls.school.institutionType?.code,
+        schoolSettingGradingCode: schoolSetting?.gradingSystem,
+        assignedGradingSystem: cls.gradingSystem
+          ? {
+              id: cls.gradingSystem.id,
+              name: cls.gradingSystem.name,
+              isDefault: cls.gradingSystem.isDefault,
+              gradeScales: cls.gradingSystem.gradeScales.map(s => ({
+                grade: s.grade,
+                min: s.minScore,
+                max: s.maxScore,
+                remark: s.remark,
+                points: s.points,
+              })),
+            }
+          : null,
+      });
+    }
+
+    return { count: results.length, classes: results };
+  }
 }

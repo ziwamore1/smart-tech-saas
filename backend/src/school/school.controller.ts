@@ -116,4 +116,11 @@ export class SchoolController {
   async fixClassGradingSystems() {
     return this.schoolService.fixClassGradingSystems();
   }
+
+  @Get('diagnose-grading/:className')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin', 'SuperAdmin')
+  async diagnoseGrading(@Param('className') className: string) {
+    return this.schoolService.diagnoseGradingForClass(className);
+  }
 }
