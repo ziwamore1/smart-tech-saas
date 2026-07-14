@@ -2296,7 +2296,7 @@ export const landingMockupApi = {
   update: (id: string, data: any) => api.patch(`/landing-mockups/${id}`, data),
   delete: (id: string) => api.delete(`/landing-mockups/${id}`),
   upload: (formData: FormData) =>
-    api.post('/landing-mocks/upload', formData, {
+    api.post('/landing-mockups/upload', formData, {
       timeout: 180000,
     }),
 };

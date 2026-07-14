@@ -4,7 +4,38 @@ import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { galleryApi } from '@/lib/api';
+import PhoneMockup from './PhoneMockup';
 import '@/app/landing/landing.css';
+
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1').replace(/\/+$/, '');
+const API_URL = API_BASE.includes('/api/v1') ? API_BASE : `${API_BASE}/api/v1`;
+const PUBLIC_MOCKUPS_URL = `${API_URL}/public/landing-mockups`;
+
+interface MockupImage {
+  id: string;
+  label: string;
+  role: string;
+  category: string;
+  imageUrl: string;
+  thumbnailUrl?: string;
+}
+
+async function fetchMockups(): Promise<MockupImage[]> {
+  try {
+    const res = await fetch(PUBLIC_MOCKUPS_URL);
+    if (!res.ok) return [];
+    const body = await res.json();
+    return body.data || [];
+  } catch {
+    return [];
+  }
+}
+
+const fallbackScreenshots = [
+  { label: 'Student Dashboard', gradient: 'linear-gradient(135deg, #0F4C81, #00AEEF)' },
+  { label: 'Parent Dashboard', gradient: 'linear-gradient(135deg, #00C896, #00AEEF)' },
+  { label: 'Teacher Dashboard', gradient: 'linear-gradient(135deg, #0B1220, #0F4C81)' },
+];
 
 type Language = 'en' | 'de' | 'es';
 
@@ -74,6 +105,7 @@ export default function LandingContent() {
   const [scrolled, setScrolled] = useState(false);
   const [galleryEvents, setGalleryEvents] = useState<GalleryEvent[]>(FALLBACK_EVENTS);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [mockups, setMockups] = useState<MockupImage[]>([]);
   const trackRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -97,6 +129,10 @@ export default function LandingContent() {
         setLoadingEvents(false);
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    fetchMockups().then(setMockups);
   }, []);
 
   const scrollEvents = (dir: 'left' | 'right') => {
@@ -234,30 +270,13 @@ export default function LandingContent() {
               </div>
             </div>
             <div className="landing-hero-image">
-              <div className="landing-hero-visual">
-                <div className="landing-hero-features">
-                  <div className="landing-feature-card">
-                    <span className="landing-feature-icon">📊</span>
-                    <div className="landing-feature-title">Analytics</div>
-                    <div className="landing-feature-desc">Real-time insights</div>
-                  </div>
-                  <div className="landing-feature-card">
-                    <span className="landing-feature-icon">📅</span>
-                    <div className="landing-feature-title">Timetables</div>
-                    <div className="landing-feature-desc">Smart scheduling</div>
-                  </div>
-                  <div className="landing-feature-card">
-                    <span className="landing-feature-icon">📱</span>
-                    <div className="landing-feature-title">Mobile</div>
-                    <div className="landing-feature-desc">Access anywhere</div>
-                  </div>
-                  <div className="landing-feature-card">
-                    <span className="landing-feature-icon">🔒</span>
-                    <div className="landing-feature-title">Secure</div>
-                    <div className="landing-feature-desc">Protected data</div>
-                  </div>
-                </div>
-              </div>
+              <PhoneMockup
+                screenshots={
+                  mockups.length > 0
+                    ? mockups.map((m) => ({ label: m.label, imageUrl: m.imageUrl }))
+                    : fallbackScreenshots
+                }
+              />
             </div>
           </div>
         </div>
