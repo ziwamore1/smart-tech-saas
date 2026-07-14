@@ -69,6 +69,7 @@ async function bootstrap() {
     const isPublicPath =
       req.path.startsWith('/api/v1/feature-locks') ||
       req.path.startsWith('/api/v1/auth') ||
+      req.path.startsWith('/api/v1/public/') ||
       req.path === '/api/v1/gallery/public/recent' ||
       req.path === '/api/v1/health' ||
       req.path === '/api/v1/health/detailed' ||
