@@ -295,6 +295,7 @@ export class ExamMarkingService {
 
     let system: any;
 
+    // Level 1: Check class-level grading system
     if (classId) {
       const cls = await this.prisma.class.findUnique({
         where: { id: classId },
@@ -308,6 +309,13 @@ export class ExamMarkingService {
       }
     }
 
+    // Level 2: Check school's default grading system (isDefault = true)
+    system ??= await this.prisma.gradingSystem.findFirst({
+      where: { schoolId, isDefault: true },
+      include: { gradeScales: true },
+    });
+
+    // Level 3: Check SchoolSetting.gradingSystem code mapping
     if (!system) {
       const schoolSetting = await this.prisma.schoolSetting.findUnique({
         where: { schoolId },
@@ -323,11 +331,7 @@ export class ExamMarkingService {
         : undefined;
     }
 
-    system ??= await this.prisma.gradingSystem.findFirst({
-      where: { schoolId, isDefault: true },
-      include: { gradeScales: true },
-    });
-
+    // Level 4: Any grading system for the school
     system ??= await this.prisma.gradingSystem.findFirst({
       where: { schoolId },
       include: { gradeScales: true },
@@ -340,16 +344,7 @@ export class ExamMarkingService {
       if (scale) return scale.grade;
     }
 
-    return this.calculateGrade(score);
-  }
-
-  private calculateGrade(percentage: number): string {
-    if (percentage >= 80) return 'A';
-    if (percentage >= 70) return 'B';
-    if (percentage >= 60) return 'C';
-    if (percentage >= 50) return 'D';
-    if (percentage >= 40) return 'E';
-    return 'F';
+    return 'N/A';
   }
 
   async computeExamStats(examId: string) {

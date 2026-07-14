@@ -48,11 +48,36 @@ export class GradingEngineService {
       }
     }
 
+    // Check school's default grading system
+    const schoolDefault = await this.prisma.gradingSystem.findFirst({
+      where: { schoolId, isDefault: true },
+      include: { gradeScales: { orderBy: { minScore: 'asc' } } },
+    });
+    if (schoolDefault?.gradeScales?.length > 0) {
+      const scale = schoolDefault.gradeScales.find(
+        s => percentage >= s.minScore && percentage <= s.maxScore,
+      );
+      if (scale) return scale.grade;
+    }
+
+    // Check any grading system for the school
+    const anySystem = await this.prisma.gradingSystem.findFirst({
+      where: { schoolId },
+      include: { gradeScales: { orderBy: { minScore: 'asc' } } },
+    });
+    if (anySystem?.gradeScales?.length > 0) {
+      const scale = anySystem.gradeScales.find(
+        s => percentage >= s.minScore && percentage <= s.maxScore,
+      );
+      if (scale) return scale.grade;
+    }
+
     // Fallback: old GradingPolicy via ClassGradingPolicy
     const policy = await this.getActiveGradingPolicy(classId, subjectId, termId, schoolId);
 
     if (!policy) {
-      return this.getDefaultGradeForSchool(percentage, schoolId);
+      this.logger.warn(`No grading system found for school ${schoolId}, classId ${classId}`);
+      return null;
     }
 
     const scale = await this.prisma.gradingScale.findFirst({
@@ -64,7 +89,7 @@ export class GradingEngineService {
       orderBy: { sortOrder: 'asc' },
     });
 
-    return scale?.grade || this.getDefaultGradeForSchool(percentage, schoolId);
+    return scale?.grade || null;
   }
 
   async computeGradeFull(
@@ -100,16 +125,50 @@ export class GradingEngineService {
       }
     }
 
+    // Check school's default grading system
+    const schoolDefault = await this.prisma.gradingSystem.findFirst({
+      where: { schoolId, isDefault: true },
+      include: { gradeScales: { orderBy: { minScore: 'asc' } } },
+    });
+    if (schoolDefault?.gradeScales?.length > 0) {
+      const scale = schoolDefault.gradeScales.find(
+        s => percentage >= s.minScore && percentage <= s.maxScore,
+      );
+      if (scale) {
+        return {
+          grade: scale.grade,
+          remark: scale.remark,
+          points: scale.points ?? undefined,
+          gpa: undefined,
+        };
+      }
+    }
+
+    // Check any grading system for the school
+    const anySystem = await this.prisma.gradingSystem.findFirst({
+      where: { schoolId },
+      include: { gradeScales: { orderBy: { minScore: 'asc' } } },
+    });
+    if (anySystem?.gradeScales?.length > 0) {
+      const scale = anySystem.gradeScales.find(
+        s => percentage >= s.minScore && percentage <= s.maxScore,
+      );
+      if (scale) {
+        return {
+          grade: scale.grade,
+          remark: scale.remark,
+          points: scale.points ?? undefined,
+          gpa: undefined,
+        };
+      }
+    }
+
     // Fallback: old GradingPolicy via ClassGradingPolicy
     const policy = await this.getActiveGradingPolicy(classId, subjectId, termId, schoolId);
 
     if (!policy) {
-      const defaultGrade = this.getDefaultGradeForSchool(percentage, schoolId);
-      return {
-        grade: defaultGrade,
-        remark: this.getDefaultRemarkForSchool(percentage, schoolId),
-        points: this.getDefaultPointsForSchool(percentage, schoolId),
-      };
+      this.logger.warn(`No grading system found for school ${schoolId}, classId ${classId}`);
+      return { grade: 'N/A', remark: 'No grading system configured', points: undefined, gpa: undefined };
     }
 
     const scale = await this.prisma.gradingScale.findFirst({
@@ -121,8 +180,8 @@ export class GradingEngineService {
     });
 
     return {
-      grade: scale?.grade || this.getDefaultGradeForSchool(percentage, schoolId),
-      remark: scale?.remark || this.getDefaultRemarkForSchool(percentage, schoolId),
+      grade: scale?.grade || 'N/A',
+      remark: scale?.remark || 'No grade scale match',
       points: scale?.points ?? undefined,
       gpa: scale?.gpa ?? undefined,
     };

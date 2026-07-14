@@ -179,6 +179,20 @@ export class SchoolService {
     await this.gradingSystemService.seedG7GradingPolicy(schoolId);
 
     const gradingSystemCode = this.getGradingSystemForInstitutionType(institutionTypeCode);
+    const gradingSystemName = this.getGradingSystemNameForCode(gradingSystemCode);
+
+    // Assign the appropriate grading system to all seeded classes
+    if (gradingSystemName) {
+      const gradingSystem = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId, name: gradingSystemName },
+      });
+      if (gradingSystem) {
+        await this.prisma.class.updateMany({
+          where: { schoolId },
+          data: { gradingSystemId: gradingSystem.id },
+        });
+      }
+    }
 
     await this.prisma.schoolSetting.create({
       data: {
@@ -204,6 +218,19 @@ export class SchoolService {
       case 'UNIVERSITY': return 'UNIVERSITY_CGPA';
       default: return 'SECONDARY_ECZ';
     }
+  }
+
+  private getGradingSystemNameForCode(code: string): string | null {
+    const codeToName: Record<string, string> = {
+      PRIMARY_ECZ: 'Primary Grading System',
+      GRADE7_ECZ: 'ECZ Grade 7 Grading System',
+      SECONDARY_ECZ: 'ECZ Secondary Grading System',
+      ADVANCED_A_LEVEL: 'ECZ Secondary Grading System',
+      FORMS_ECZ: 'ECZ Forms Grading System',
+      COLLEGE_GPA: 'College GPA Grading System',
+      UNIVERSITY_CGPA: 'University CGPA Grading System',
+    };
+    return codeToName[code] || null;
   }
 
   private getLabelForInstitutionType(typeCode: string): string {

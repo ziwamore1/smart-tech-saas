@@ -339,20 +339,33 @@ export class ResultService {
     };
 
     let gradingSystem: any;
+    let resolvedVia = 'none';
 
+    // Level 1: Check class-level grading system
     if (classId) {
       const cls = await this.prisma.class.findUnique({
         where: { id: classId },
-        select: { gradingSystemId: true },
+        select: { gradingSystemId: true, name: true },
       });
       if (cls?.gradingSystemId) {
         gradingSystem = await this.prisma.gradingSystem.findUnique({
           where: { id: cls.gradingSystemId },
           include: { gradeScales: true },
         });
+        if (gradingSystem) resolvedVia = `class (${cls.name})`;
       }
     }
 
+    // Level 2: Check school's default grading system (isDefault = true)
+    if (!gradingSystem) {
+      gradingSystem = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId, isDefault: true },
+        include: { gradeScales: true },
+      });
+      if (gradingSystem) resolvedVia = 'school default (isDefault)';
+    }
+
+    // Level 3: Check SchoolSetting.gradingSystem code mapping
     if (!gradingSystem) {
       const schoolSetting = await this.prisma.schoolSetting.findUnique({
         where: { schoolId },
@@ -366,31 +379,35 @@ export class ResultService {
             include: { gradeScales: true },
           })
         : undefined;
+      if (gradingSystem) resolvedVia = `school setting (${schoolSetting?.gradingSystem})`;
     }
 
-    if (!gradingSystem) {
-      gradingSystem = await this.prisma.gradingSystem.findFirst({
-        where: { schoolId, isDefault: true },
-        include: { gradeScales: true },
-      });
-    }
-
+    // Level 4: Any grading system for the school
     if (!gradingSystem) {
       gradingSystem = await this.prisma.gradingSystem.findFirst({
         where: { schoolId },
         include: { gradeScales: true },
       });
+      if (gradingSystem) resolvedVia = 'any school grading system';
     }
 
     if (!gradingSystem) {
+      this.logger.warn(`No grading system found for school ${schoolId}, classId ${classId}`);
       return { grade: 'N/A', remark: 'No grading system configured' };
     }
+
+    this.logger.debug(
+      `Grading resolved via "${resolvedVia}" (system: ${gradingSystem.name}), score: ${score}, schoolId: ${schoolId}, classId: ${classId}`,
+    );
 
     const scale = gradingSystem.gradeScales.find(
       (s) => score >= s.minScore && score <= s.maxScore,
     );
 
     if (!scale) {
+      this.logger.warn(
+        `Score ${score} not covered by any grade scale in "${gradingSystem.name}" (${gradingSystem.gradeScales.map(s => `${s.minScore}-${s.maxScore}=${s.grade}`).join(', ')})`,
+      );
       return { grade: 'N/A', remark: 'Score out of range' };
     }
 

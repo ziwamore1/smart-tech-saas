@@ -78,6 +78,7 @@ export class ReportCardService {
 
     let gradingSystem: any;
 
+    // Level 1: Check class-level grading system
     if (classId) {
       const cls = await this.prisma.class.findUnique({
         where: { id: classId },
@@ -86,10 +87,20 @@ export class ReportCardService {
       if (cls?.gradingSystemId) {
         gradingSystem = await this.prisma.gradingSystem.findUnique({
           where: { id: cls.gradingSystemId },
+          include: { gradeScales: true },
         });
       }
     }
 
+    // Level 2: Check school's default grading system (isDefault = true)
+    if (!gradingSystem) {
+      gradingSystem = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId, isDefault: true },
+        include: { gradeScales: true },
+      });
+    }
+
+    // Level 3: Check SchoolSetting.gradingSystem code mapping
     if (!gradingSystem) {
       const schoolSetting = await this.prisma.schoolSetting.findUnique({
         where: { schoolId },
@@ -100,19 +111,16 @@ export class ReportCardService {
       gradingSystem = preferredName
         ? await this.prisma.gradingSystem.findFirst({
             where: { schoolId, name: preferredName },
+            include: { gradeScales: true },
           })
         : undefined;
     }
 
-    if (!gradingSystem) {
-      gradingSystem = await this.prisma.gradingSystem.findFirst({
-        where: { schoolId, isDefault: true },
-      });
-    }
-
+    // Level 4: Any grading system for the school
     if (!gradingSystem) {
       gradingSystem = await this.prisma.gradingSystem.findFirst({
         where: { schoolId },
+        include: { gradeScales: true },
       });
     }
 
@@ -120,13 +128,9 @@ export class ReportCardService {
       throw new Error('No grading system configured');
     }
 
-    const gradeScale = await this.prisma.gradeScale.findFirst({
-      where: {
-        gradingSystemId: gradingSystem.id,
-        minScore: { lte: score },
-        maxScore: { gte: score },
-      },
-    });
+    const gradeScale = gradingSystem.gradeScales.find(
+      (s) => score >= s.minScore && score <= s.maxScore,
+    );
 
     if (!gradeScale) {
       throw new Error('Score not covered by grading scale');
