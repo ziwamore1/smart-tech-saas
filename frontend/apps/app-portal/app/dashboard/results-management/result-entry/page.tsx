@@ -19,7 +19,7 @@ function getGradeColor(score: number | null) {
 function getGrade(result: any, score: number | null) {
   if (result?.grade) return result.grade;
   if (score == null) return '-';
-  return '-';
+  return String(score);
 }
 
 export default function ResultEntryPage() {
@@ -145,13 +145,6 @@ export default function ResultEntryPage() {
       (s.admissionNumber?.toLowerCase() || '').includes(q)
     );
   }, [students, searchFilter]);
-
-  const updateScoreMutation = useMutation({
-    mutationFn: ({ studentId, subjectId, score }: { studentId: string; subjectId: string; score: number }) =>
-      api.post('/results', { studentId, subjectId, termId: selectedTerm, score }),
-    onSuccess: () => {},
-    onError: () => {},
-  });
 
   const [bulkSaving, setBulkSaving] = useState(false);
 
