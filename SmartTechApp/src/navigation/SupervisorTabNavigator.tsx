@@ -8,6 +8,7 @@ import { MonitoringDashboardScreen } from '../screens/monitoring/MonitoringDashb
 import { DepartmentTeachersScreen } from '../screens/monitoring/DepartmentTeachersScreen';
 import { TeacherMarksScreen } from '../screens/teacher/MarksScreen';
 import { TeacherClassesScreen } from '../screens/teacher/ClassesScreen';
+import { ResultsManagementScreen } from '../screens/director/ResultsManagementScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
 import { colors, spacing, borderRadius, shadows } from '../theme';
 
@@ -28,6 +29,7 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'SupervisorPendingAssessments', label: 'Pending Assessments', icon: '📋', stackScreen: 'PendingAssessments' },
   { name: 'SupervisorClasses', label: 'Classes', icon: '🏫', component: TeacherClassesScreen },
   { name: 'SupervisorMarks', label: 'Marks', icon: '✏️', component: TeacherMarksScreen },
+  { name: 'SupervisorResultsMgmt', label: 'Results Management', icon: '📊', component: ResultsManagementScreen },
   { name: 'SupervisorExams', label: 'Exams', icon: '📋', stackScreen: 'ExamList' },
   { name: 'SupervisorAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor' },
   { name: 'SupervisorProfile', label: 'Profile', icon: '👤', component: ProfileScreen },

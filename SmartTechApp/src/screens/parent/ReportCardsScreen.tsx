@@ -7,6 +7,7 @@ import * as Print from 'expo-print';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useAppStore } from '../../store';
 import { apiService } from '../../services/api';
+import { getGradeTextColor, getGradeBgColor, getScoreTextColor, getScoreBgColor } from '../../utils/gradeColors';
 
 export const ParentReportCardsScreen: React.FC = () => {
   const { dashboard } = useAppStore();
@@ -95,8 +96,9 @@ export const ParentReportCardsScreen: React.FC = () => {
       const school = dashboard?.school?.name || 'SmartTech School';
       const rows = results.map((r: any) => {
         const score = r.score || r.finalPercentage || 0;
-        const bgColor = score >= 75 ? '#d1fae5' : score >= 50 ? '#fef3c7' : '#fee2e2';
-        const textColor = score >= 75 ? '#059669' : score >= 50 ? '#d97706' : '#dc2626';
+        const hasGrade = !!r.grade;
+        const bgColor = hasGrade ? getGradeBgColor(r.grade) : getScoreBgColor(score);
+        const textColor = hasGrade ? getGradeTextColor(r.grade) : getScoreTextColor(score);
         return `<tr><td style="padding:10px;border-bottom:1px solid #e5e7eb">${r.subject?.name || r.subject || 'Subject'}</td><td style="padding:10px;border-bottom:1px solid #e5e7eb">${r.grade || '-'}</td><td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:center"><span style="background:${bgColor};color:${textColor};padding:4px 12px;border-radius:8px;font-weight:700">${Math.round(score)}%</span></td></tr>`;
       }).join('');
 
@@ -160,8 +162,8 @@ export const ParentReportCardsScreen: React.FC = () => {
                 <View key={r.id || i} style={styles.resultCard}>
                   <View style={styles.resultRow}>
                     <Text style={styles.subjectName}>{r.subject?.name || r.subject || 'Subject'}</Text>
-                    <View style={[styles.scoreBadge, { backgroundColor: score >= 75 ? '#d1fae5' : score >= 50 ? '#fef3c7' : '#fee2e2' }]}>
-                      <Text style={[styles.scoreValue, { color: score >= 75 ? '#059669' : score >= 50 ? '#d97706' : '#dc2626' }]}>{Math.round(score)}%</Text>
+                    <View style={[styles.scoreBadge, { backgroundColor: getGradeBgColor(r.grade) }]}>
+                      <Text style={[styles.scoreValue, { color: getGradeTextColor(r.grade) }]}>{r.grade || `${Math.round(score)}%`}</Text>
                     </View>
                   </View>
                   <Text style={styles.gradeText}>Grade: {r.grade || '-'} {r.remark ? `- ${r.remark}` : ''}</Text>

@@ -7,6 +7,7 @@ import { useAuthStore } from '../store';
 import { TeacherDashboardScreen } from '../screens/teacher/DashboardScreen';
 import { TeacherClassesScreen } from '../screens/teacher/ClassesScreen';
 import { TeacherMarksScreen } from '../screens/teacher/MarksScreen';
+import { ResultsManagementScreen } from '../screens/director/ResultsManagementScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
 import { colors, spacing, borderRadius, shadows } from '../theme';
 
@@ -25,6 +26,7 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'TeacherHome', label: 'Dashboard', icon: '🏠', component: TeacherDashboardScreen },
   { name: 'TeacherClasses', label: 'Classes', icon: '🏫', component: TeacherClassesScreen },
   { name: 'TeacherMarks', label: 'Marks', icon: '✏️', component: TeacherMarksScreen },
+  { name: 'TeacherResultsMgmt', label: 'Results Management', icon: '📊', component: ResultsManagementScreen },
   { name: 'TeacherExams', label: 'Exams', icon: '📋', stackScreen: 'ExamList' },
   { name: 'TeacherAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor' },
   { name: 'TeacherAnalytics', label: 'Analytics', icon: '📊', stackScreen: 'Analytics' },

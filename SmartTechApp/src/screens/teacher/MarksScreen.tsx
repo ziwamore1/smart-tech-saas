@@ -8,6 +8,7 @@ import { Card, Button, Loading, HeaderBar } from '../../components';
 import { colors, spacing, borderRadius } from '../../theme';
 import { apiService } from '../../services/api';
 import { useAppStore } from '../../store';
+import { getScoreTextColor, getScoreBgColor } from '../../utils/gradeColors';
 
 interface TeacherMarksProps {
   onToggleDrawer?: () => void;
@@ -123,8 +124,8 @@ export const TeacherMarksScreen: React.FC<TeacherMarksProps> = ({ onToggleDrawer
     let rows = students.map((s: any) => {
       const raw = scores[s.id];
       const score = raw ? parseFloat(raw) : null;
-      const bgColor = score !== null && score >= 75 ? '#d1fae5' : score !== null && score >= 50 ? '#fef3c7' : score !== null ? '#fee2e2' : '#f3f4f6';
-      const textColor = score !== null && score >= 75 ? '#059669' : score !== null && score >= 50 ? '#d97706' : score !== null ? '#dc2626' : '#9ca3af';
+      const bgColor = score !== null ? getScoreBgColor(score) : '#f3f4f6';
+      const textColor = score !== null ? getScoreTextColor(score) : '#9ca3af';
       return `<tr><td style="padding:12px;border-bottom:1px solid #e5e7eb">${s.firstName} ${s.lastName}</td><td style="padding:12px;border-bottom:1px solid #e5e7eb">${s.admissionNumber || '—'}</td><td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center"><span style="background:${bgColor};color:${textColor};padding:4px 12px;border-radius:8px;font-weight:700">${score !== null ? score + '%' : '—'}</span></td></tr>`;
     }).join('');
 
@@ -256,8 +257,8 @@ export const TeacherMarksScreen: React.FC<TeacherMarksProps> = ({ onToggleDrawer
             {students.map((student: any) => {
               const raw = scores[student.id];
               const score = raw ? parseFloat(raw) : null;
-              const bgColor = score !== null && score >= 75 ? '#d1fae5' : score !== null && score >= 50 ? '#fef3c7' : score !== null ? '#fee2e2' : '#f3f4f6';
-              const textColor = score !== null && score >= 75 ? '#059669' : score !== null && score >= 50 ? '#d97706' : score !== null ? '#dc2626' : '#9ca3af';
+              const bgColor = score !== null ? getScoreBgColor(score) : '#f3f4f6';
+              const textColor = score !== null ? getScoreTextColor(score) : '#9ca3af';
               return (
                 <Card key={student.id} variant="outlined" style={{ padding: spacing.md, marginBottom: spacing.xs }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>

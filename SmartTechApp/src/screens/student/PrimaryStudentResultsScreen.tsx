@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useAuthStore, useAppStore } from '../../store';
 import { apiService } from '../../services/api';
+import { getGradeTextColor, getGradeBgColor, getScoreTextColor, getScoreBgColor } from '../../utils/gradeColors';
 
 interface SubjectResult {
   subjectId: string;
@@ -96,22 +97,6 @@ export const PrimaryStudentResultsScreen: React.FC = () => {
     } finally { setLoading(false); }
   };
 
-  const getScoreColor = (pct?: number | null) => {
-    if (pct == null) return '#9CA3AF';
-    if (pct >= 80) return '#10B981';
-    if (pct >= 60) return '#3B82F6';
-    if (pct >= 40) return '#F59E0B';
-    return '#EF4444';
-  };
-
-  const getScoreBg = (pct?: number | null) => {
-    if (pct == null) return '#F3F4F6';
-    if (pct >= 80) return '#ECFDF5';
-    if (pct >= 60) return '#EFF6FF';
-    if (pct >= 40) return '#FEFCE8';
-    return '#FEF2F2';
-  };
-
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
@@ -169,22 +154,23 @@ export const PrimaryStudentResultsScreen: React.FC = () => {
         <View style={styles.subjectGrid}>
           {subjects.map((s, i) => {
             const pct = s.finalPercentage ?? s.score;
+            const hasGrade = !!s.finalGrade;
+            const cardColor = hasGrade ? getGradeTextColor(s.finalGrade) : getScoreTextColor(pct);
             return (
               <TouchableOpacity
                 key={s.subjectId || i}
-                style={[styles.subjectCard, { borderLeftColor: getScoreColor(pct), borderLeftWidth: 4 }]}
+                style={[styles.subjectCard, { borderLeftColor: cardColor, borderLeftWidth: 4 }]}
                 onPress={() => setSelectedSubject(selectedSubject?.subjectId === s.subjectId ? null : s)}
               >
                 <View style={styles.subjectTop}>
                   <Text style={styles.subjectCode}>{s.subjectCode || s.subjectName?.slice(0, 3).toUpperCase()}</Text>
-                  <View style={[styles.scorePill, { backgroundColor: getScoreBg(pct) }]}>
-                    <Text style={[styles.scorePillText, { color: getScoreColor(pct) }]}>
-                      {pct != null ? `${pct}%` : '—'}
+                  <View style={[styles.scorePill, { backgroundColor: hasGrade ? getGradeBgColor(s.finalGrade) : getScoreBgColor(pct) }]}>
+                    <Text style={[styles.scorePillText, { color: hasGrade ? getGradeTextColor(s.finalGrade) : getScoreTextColor(pct) }]}>
+                      {s.finalGrade || (pct != null ? `${pct}%` : '—')}
                     </Text>
                   </View>
                 </View>
                 <Text style={styles.subjectName} numberOfLines={1}>{s.subjectName}</Text>
-                {s.finalGrade && <Text style={styles.subjectGrade}>Grade: {s.finalGrade}</Text>}
                 {s.performanceCategory && (
                   <View style={[styles.perfBadge, { backgroundColor: (s.performanceCategory.color || '#E5E7EB') + '30' }]}>
                     <Text style={[styles.perfBadgeText, { color: s.performanceCategory.color || '#6B7280' }]}>
@@ -205,13 +191,13 @@ export const PrimaryStudentResultsScreen: React.FC = () => {
               <View key={i} style={styles.assessRow}>
                 <Text style={styles.assessName}>{a.name}</Text>
                 <View style={styles.assessScoreRow}>
-                  <View style={[styles.assessScoreBadge, { backgroundColor: getScoreBg(a.percentage) }]}>
-                    <Text style={[styles.assessScore, { color: getScoreColor(a.percentage) }]}>
+                  <View style={[styles.assessScoreBadge, { backgroundColor: getScoreBgColor(a.percentage) }]}>
+                    <Text style={[styles.assessScore, { color: getScoreTextColor(a.percentage) }]}>
                       {a.rawScore ?? '—'}/{a.maxScore}
                     </Text>
                   </View>
                   {a.percentage != null && (
-                    <Text style={[styles.assessPct, { color: getScoreColor(a.percentage) }]}>
+                    <Text style={[styles.assessPct, { color: getScoreTextColor(a.percentage) }]}>
                       {a.percentage.toFixed(1)}%
                     </Text>
                   )}

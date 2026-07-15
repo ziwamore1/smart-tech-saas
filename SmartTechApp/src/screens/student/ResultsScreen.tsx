@@ -7,6 +7,7 @@ import { Card, Loading } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useAuthStore, useAppStore } from '../../store';
 import { apiService } from '../../services/api';
+import { getGradeTextColor, getGradeBgColor } from '../../utils/gradeColors';
 
 export const StudentResultsScreen: React.FC = () => {
   const { user } = useAuthStore();
@@ -127,9 +128,9 @@ export const StudentResultsScreen: React.FC = () => {
                   <Text style={styles.subjectName}>{r.subject?.name || r.subject || 'Subject'}</Text>
                   <Text style={styles.resultMeta}>{r.grade ? `Grade: ${r.grade}` : ''} {r.remark ? `- ${r.remark}` : ''}</Text>
                 </View>
-                <View style={[styles.scoreBadge, { backgroundColor: (r.score || 0) >= 75 ? '#d1fae5' : (r.score || 0) >= 50 ? '#fef3c7' : '#fee2e2' }]}>
-                  <Text style={[styles.scoreText, { color: (r.score || 0) >= 75 ? '#059669' : (r.score || 0) >= 50 ? '#d97706' : '#dc2626' }]}>
-                    {r.score || 0}%
+                <View style={[styles.scoreBadge, { backgroundColor: getGradeBgColor(r.grade) }]}>
+                  <Text style={[styles.scoreText, { color: getGradeTextColor(r.grade) }]}>
+                    {r.grade || `${r.score || 0}%`}
                   </Text>
                 </View>
               </View>

@@ -10,6 +10,7 @@ import * as Print from 'expo-print';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { apiService } from '../../services/api';
 import { useAuthStore, useAppStore } from '../../store';
+import { getGradeTextColor, getGradeBgColor, getScoreTextColor, getScoreBgColor } from '../../utils/gradeColors';
 
 type Tab = 'overview' | 'attendance' | 'results';
 
@@ -215,8 +216,8 @@ export const PrimaryClassTeacherScreen: React.FC<Props> = ({ onToggleDrawer, onN
       const raw = scores[s.id];
       const score = raw ? parseFloat(raw) : null;
       const pct = score != null && maxScore ? Math.round((score / parseFloat(maxScore)) * 100) : null;
-      const bgColor = pct != null && pct >= 75 ? '#d1fae5' : pct != null && pct >= 50 ? '#fef3c7' : pct != null ? '#fee2e2' : '#f3f4f6';
-      const textColor = pct != null && pct >= 75 ? '#059669' : pct != null && pct >= 50 ? '#d97706' : pct != null ? '#dc2626' : '#9ca3af';
+      const bgColor = pct != null ? getScoreBgColor(pct) : '#f3f4f6';
+      const textColor = pct != null ? getScoreTextColor(pct) : '#9ca3af';
       return `<tr><td style="padding:10px;border-bottom:1px solid #e5e7eb">${s.firstName} ${s.lastName}</td><td style="padding:10px;border-bottom:1px solid #e5e7eb">${s.admissionNumber || '—'}</td><td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:center"><span style="background:${bgColor};color:${textColor};padding:3px 10px;border-radius:6px;font-weight:700">${score != null ? score + '/' + maxScore + ' (' + pct + '%)' : '—'}</span></td></tr>`;
     }).join('');
 
@@ -501,8 +502,8 @@ export const PrimaryClassTeacherScreen: React.FC<Props> = ({ onToggleDrawer, onN
                   const raw = scores[s.id];
                   const score = raw ? parseFloat(raw) : null;
                   const pct = score != null && maxScore ? Math.round((score / parseFloat(maxScore)) * 100) : null;
-                  const bgColor = pct != null && pct >= 75 ? '#d1fae5' : pct != null && pct >= 50 ? '#fef3c7' : pct != null ? '#fee2e2' : '#f3f4f6';
-                  const textColor = pct != null && pct >= 75 ? '#059669' : pct != null && pct >= 50 ? '#d97706' : pct != null ? '#dc2626' : '#9ca3af';
+                  const bgColor = pct != null ? getScoreBgColor(pct) : '#f3f4f6';
+                  const textColor = pct != null ? getScoreTextColor(pct) : '#9ca3af';
                   return (
                     <View key={s.id} style={styles.scoreRow}>
                       <View style={styles.scoreInfo}>

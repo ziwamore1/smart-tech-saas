@@ -10,6 +10,7 @@ import { useAppStore } from '../../store';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { apiService } from '../../services/api';
+import { getScoreTextColor, getScoreBgColor } from '../../utils/gradeColors';
 
 const statusColors = {
   top: colors.success,
@@ -133,8 +134,9 @@ export const ClassTeacherStudentsScreen: React.FC<Props> = ({ onToggleDrawer, on
     const sorted = [...students].sort((a, b) => (b.score || 0) - (a.score || 0));
     let rows = sorted.map((s) => {
       const score = s.score;
-      const bgColor = score != null && score >= 75 ? '#d1fae5' : score != null && score >= 50 ? '#fef3c7' : score != null ? '#fee2e2' : '#f3f4f6';
-      const textColor = score != null && score >= 75 ? '#059669' : score != null && score >= 50 ? '#d97706' : score != null ? '#dc2626' : '#9ca3af';
+      const hasGrade = !!s.grade;
+      const bgColor = score != null ? (hasGrade ? getScoreBgColor(score) : getScoreBgColor(score)) : '#f3f4f6';
+      const textColor = score != null ? (hasGrade ? getScoreTextColor(score) : getScoreTextColor(score)) : '#9ca3af';
       return `<tr><td style="padding:10px;border-bottom:1px solid #e5e7eb">${s.firstName} ${s.lastName}</td><td style="padding:10px;border-bottom:1px solid #e5e7eb">${s.admissionNumber || '—'}</td><td style="padding:10px;border-bottom:1px solid #e5e7eb">${s.className || '—'}</td><td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:center"><span style="background:${bgColor};color:${textColor};padding:3px 10px;border-radius:6px;font-weight:700">${score != null ? score + '%' : '—'}</span></td><td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:center">${s.grade || '—'}</td><td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:center">${s.attendance ?? '—'}%</td></tr>`;
     }).join('');
 

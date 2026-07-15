@@ -2292,6 +2292,341 @@ class ApiService {
     const response = await this.client.get(`/intelligence/recommendations/student/${studentId}`, { params: { termId } });
     return response.data;
   }
+
+  // ===== School Membership =====
+  async getSchoolMembers() {
+    const response = await this.client.get('/school-membership/members');
+    return response.data;
+  }
+
+  async getSchoolTeachingStaff() {
+    const response = await this.client.get('/school-membership/teaching-staff');
+    return response.data;
+  }
+
+  async getMembersByRole(role: string) {
+    const response = await this.client.get(`/school-membership/members/role/${role}`);
+    return response.data;
+  }
+
+  async addSchoolMember(data: { userId: string; role?: string }) {
+    const response = await this.client.post('/school-membership/members', data);
+    return response.data;
+  }
+
+  async removeSchoolMember(userId: string) {
+    const response = await this.client.delete(`/school-membership/members/${userId}`);
+    return response.data;
+  }
+
+  async assignSchoolRole(data: { userId: string; role: string }) {
+    const response = await this.client.post('/school-membership/roles', data);
+    return response.data;
+  }
+
+  async removeSchoolRole(data: { userId: string; role: string }) {
+    const response = await this.client.delete('/school-membership/roles', { data });
+    return response.data;
+  }
+
+  async getUserRoles(userId: string) {
+    const response = await this.client.get(`/school-membership/user/${userId}/roles`);
+    return response.data;
+  }
+
+  // ===== Classes CRUD =====
+  async getClasses() {
+    const response = await this.client.get('/class');
+    return response.data;
+  }
+
+  async getClassById(id: string) {
+    const response = await this.client.get(`/class/${id}`);
+    return response.data;
+  }
+
+  async createClass(data: { name: string; section?: string; capacity?: number; academicYearId?: string; classTeacherId?: string; gradingSystemId?: string }) {
+    const response = await this.client.post('/class', data);
+    return response.data;
+  }
+
+  async updateClass(id: string, data: { name?: string; section?: string; capacity?: number; classTeacherId?: string; gradingSystemId?: string }) {
+    const response = await this.client.patch(`/class/${id}`, data);
+    return response.data;
+  }
+
+  async deleteClass(id: string) {
+    const response = await this.client.delete(`/class/${id}`);
+    return response.data;
+  }
+
+  async setClassTeacher(classId: string, teacherId: string | null) {
+    const response = await this.client.patch(`/class/${classId}/class-teacher`, { teacherId });
+    return response.data;
+  }
+
+  async getClassSubjects(classId: string) {
+    const response = await this.client.get(`/class-subjects/class/${classId}`);
+    return response.data;
+  }
+
+  async addClassSubject(classId: string, subjectId: string) {
+    const response = await this.client.post('/class-subjects', { classId, subjectId });
+    return response.data;
+  }
+
+  async removeClassSubject(classId: string, subjectId: string) {
+    const response = await this.client.delete(`/class-subjects/${classId}/${subjectId}`);
+    return response.data;
+  }
+
+  async getEnrollmentsByClass(classId: string) {
+    const response = await this.client.get(`/enrollments/class/${classId}`);
+    return response.data;
+  }
+
+  async createEnrollment(data: { studentId: string; classId: string; academicYearId: string }) {
+    const response = await this.client.post('/enrollments', data);
+    return response.data;
+  }
+
+  // ===== Results Management =====
+  async getResultSheets(params: { classId: string; termId: string; examType?: string }) {
+    const response = await this.client.get('/results-management/sheets', { params });
+    return response.data;
+  }
+
+  async getResultSheet(sheetId: string) {
+    const response = await this.client.get(`/results-management/sheets/${sheetId}`);
+    return response.data;
+  }
+
+  async createResultSheet(data: { classId: string; termId: string; examType?: string; name?: string }) {
+    const response = await this.client.post('/results-management/sheets', data);
+    return response.data;
+  }
+
+  async getSheetStudents(sheetId: string) {
+    const response = await this.client.get(`/results-management/sheets/${sheetId}/students`);
+    return response.data;
+  }
+
+  async getSheetSubjects(sheetId: string) {
+    const response = await this.client.get(`/results-management/sheets/${sheetId}/subjects`);
+    return response.data;
+  }
+
+  async submitResultSheet(sheetId: string) {
+    const response = await this.client.post(`/results-management/sheets/${sheetId}/submit`);
+    return response.data;
+  }
+
+  async verifyResultSheet(sheetId: string) {
+    const response = await this.client.post(`/results-management/sheets/${sheetId}/verify`);
+    return response.data;
+  }
+
+  async publishResultSheet(sheetId: string) {
+    const response = await this.client.post(`/results-management/sheets/${sheetId}/publish`);
+    return response.data;
+  }
+
+  async lockResultSheet(sheetId: string) {
+    const response = await this.client.post(`/results-management/sheets/${sheetId}/lock`);
+    return response.data;
+  }
+
+  async getSheetRankings(sheetId: string, type?: string) {
+    const response = await this.client.get(`/results-management/sheets/${sheetId}/rankings`, { params: { type } });
+    return response.data;
+  }
+
+  async getSheetAnalysis(sheetId: string) {
+    const response = await this.client.get(`/results-management/sheets/${sheetId}/analysis`);
+    return response.data;
+  }
+
+  async getMarkSchedule(sheetId: string) {
+    const response = await this.client.get(`/results-management/sheets/${sheetId}/mark-schedule`);
+    return response.data;
+  }
+
+  // ===== Ranking =====
+  async computeClassRankings(classId: string, termId: string) {
+    const response = await this.client.post('/ranking/class', { classId, termId });
+    return response.data;
+  }
+
+  async getTopPerformers(params?: { schoolId?: string; classId?: string; limit?: number }) {
+    const response = await this.client.get('/ranking/top-performers', { params });
+    return response.data;
+  }
+
+  async getStudentRanking(studentId: string, termId: string) {
+    const response = await this.client.get(`/ranking/student/${studentId}`, { params: { termId } });
+    return response.data;
+  }
+
+  // ===== Grading Systems =====
+  async getGradingSystems() {
+    const response = await this.client.get('/grading-systems');
+    return response.data;
+  }
+
+  async getGradingSystemById(id: string) {
+    const response = await this.client.get(`/grading-systems/${id}`);
+    return response.data;
+  }
+
+  async createGradingSystem(data: { name: string; scales: { grade: string; minScore: number; maxScore: number; remark?: string; points?: number }[] }) {
+    const response = await this.client.post('/grading-systems', data);
+    return response.data;
+  }
+
+  async updateGradingSystem(id: string, data: { name?: string; scales?: { grade: string; minScore: number; maxScore: number; remark?: string; points?: number }[] }) {
+    const response = await this.client.patch(`/grading-systems/${id}`, data);
+    return response.data;
+  }
+
+  async deleteGradingSystem(id: string) {
+    const response = await this.client.delete(`/grading-systems/${id}`);
+    return response.data;
+  }
+
+  async setDefaultGradingSystem(id: string) {
+    const response = await this.client.patch(`/grading-systems/${id}/set-default`);
+    return response.data;
+  }
+
+  async updateSchoolGradingSystem(data: { gradingSystem: string }) {
+    const response = await this.client.patch('/school/grading-system', data);
+    return response.data;
+  }
+
+  // ===== School Subscription =====
+  async getMySubscription() {
+    const response = await this.client.get('/subscription/my-subscription');
+    return response.data;
+  }
+
+  async checkSubscriptionStatus() {
+    const response = await this.client.get('/subscription/status');
+    return response.data;
+  }
+
+  async createPayment(data: { planId: string; paymentMethod?: string }) {
+    const response = await this.client.post('/subscription/create-payment', data);
+    return response.data;
+  }
+
+  async cancelSubscription() {
+    const response = await this.client.post('/subscription/cancel');
+    return response.data;
+  }
+
+  async changePlan(data: { planId: string }) {
+    const response = await this.client.post('/subscription/change-plan', data);
+    return response.data;
+  }
+
+  async getSubscriptionReceipts() {
+    const response = await this.client.get('/subscription/receipts');
+    return response.data;
+  }
+
+  // ===== Result Analytics =====
+  async getClassAnalytics(classId: string, termId: string) {
+    const response = await this.client.get('/result-analytics/class', { params: { classId, termId } });
+    return response.data;
+  }
+
+  async getAtRiskStudents(classId: string, termId: string) {
+    const response = await this.client.get('/result-analytics/at-risk', { params: { classId, termId } });
+    return response.data;
+  }
+
+  async getStudentTrend(studentId: string) {
+    const response = await this.client.get('/result-analytics/student/trend', { params: { studentId } });
+    return response.data;
+  }
+
+  // ===== Class Teacher Assignments =====
+  async assignClassTeacher(data: { teacherId: string; classId: string }) {
+    const response = await this.client.post('/class-teacher-assignments', data);
+    return response.data;
+  }
+
+  async removeClassTeacher(assignmentId: string) {
+    const response = await this.client.delete(`/class-teacher-assignments/${assignmentId}`);
+    return response.data;
+  }
+
+  async getClassTeacherAssignment(classId: string) {
+    const response = await this.client.get(`/class-teacher-assignments/class/${classId}`);
+    return response.data;
+  }
+
+  async getTeacherClassAssignment(teacherId: string) {
+    const response = await this.client.get(`/class-teacher-assignments/teacher/${teacherId}`);
+    return response.data;
+  }
+
+  // ===== Assessment Engine (synced with web) =====
+  async getAssessmentDefinitions() {
+    const response = await this.client.get('/assessment-engine/definitions');
+    return response.data;
+  }
+
+  async getAssessmentConfigurations() {
+    const response = await this.client.get('/assessment-engine/configurations');
+    return response.data;
+  }
+
+  async enterAssessmentScore(data: { studentId: string; subjectId: string; assessmentDefinitionId: string; score: number; termId: string; classId: string }) {
+    const response = await this.client.post('/assessment-engine/scores', data);
+    return response.data;
+  }
+
+  async enterBulkAssessmentScores(data: { results: Array<{ studentId: string; subjectId: string; assessmentDefinitionId: string; score: number; termId: string; classId: string }> }) {
+    const response = await this.client.post('/assessment-engine/scores/bulk', data);
+    return response.data;
+  }
+
+  async getAssessmentClassResults(classId: string, termId: string) {
+    const response = await this.client.get('/assessment-engine/results/class', { params: { classId, termId } });
+    return response.data;
+  }
+
+  async getPendingAssessments() {
+    const response = await this.client.get('/assessment-engine/teacher/pending');
+    return response.data;
+  }
+
+  async getAssessmentCompletionStats(classId: string, termId: string) {
+    const response = await this.client.get('/assessment-engine/completion-stats', { params: { classId, termId } });
+    return response.data;
+  }
+
+  // ===== Grading Engine (synced with web) =====
+  async getGradingPolicies() {
+    const response = await this.client.get('/grading-engine/policies');
+    return response.data;
+  }
+
+  async assignGradingPolicy(data: { policyId: string; classId: string; schoolId: string }) {
+    const response = await this.client.post('/grading-engine/assign', data);
+    return response.data;
+  }
+
+  async getActiveGradingPolicy(schoolId: string) {
+    const response = await this.client.get('/grading-engine/active-policy', { params: { schoolId } });
+    return response.data;
+  }
+
+  async computeClassGrades(classId: string, termId: string) {
+    const response = await this.client.post('/grading-engine/compute/class', { classId, termId });
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

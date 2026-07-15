@@ -10,6 +10,7 @@ import { useAppStore } from '../../store';
 import { useAuthStore } from '../../store';
 import { apiService } from '../../services/api';
 import { useRoute, RouteProp } from '@react-navigation/native';
+import { getGradeTextColor, getGradeBgColor, getScoreTextColor, getScoreBgColor } from '../../utils/gradeColors';
 
 export const ParentChildResultsScreen: React.FC = () => {
   const route = useRoute<RouteProp<any>>();
@@ -98,8 +99,9 @@ export const ParentChildResultsScreen: React.FC = () => {
 
     let rows = results.map((r: any) => {
       const score = r.score || 0;
-      const bgColor = score >= 75 ? '#d1fae5' : score >= 50 ? '#fef3c7' : '#fee2e2';
-      const textColor = score >= 75 ? '#059669' : score >= 50 ? '#d97706' : '#dc2626';
+      const hasGrade = !!r.grade;
+      const bgColor = hasGrade ? getGradeBgColor(r.grade) : getScoreBgColor(score);
+      const textColor = hasGrade ? getGradeTextColor(r.grade) : getScoreTextColor(score);
       return `<tr><td style="padding:12px;border-bottom:1px solid #e5e7eb">${r.subject?.name || r.subject || 'Subject'}</td><td style="padding:12px;border-bottom:1px solid #e5e7eb">${r.grade || '-'}</td><td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center"><span style="background:${bgColor};color:${textColor};padding:4px 12px;border-radius:8px;font-weight:700">${score}%</span></td><td style="padding:12px;border-bottom:1px solid #e5e7eb">${r.remark || '-'}</td></tr>`;
     }).join('');
 
@@ -218,8 +220,8 @@ export const ParentChildResultsScreen: React.FC = () => {
                   <Text style={styles.subject}>{r.subject?.name || r.subject || 'Subject'}</Text>
                   <Text style={styles.meta}>Grade: {r.grade || '-'} {r.remark ? `- ${r.remark}` : ''}</Text>
                 </View>
-                <View style={[styles.badge, { backgroundColor: (r.score || 0) >= 75 ? '#d1fae5' : (r.score || 0) >= 50 ? '#fef3c7' : '#fee2e2' }]}>
-                  <Text style={[styles.score, { color: (r.score || 0) >= 75 ? '#059669' : (r.score || 0) >= 50 ? '#d97706' : '#dc2626' }]}>{r.score || 0}%</Text>
+                <View style={[styles.badge, { backgroundColor: getGradeBgColor(r.grade) }]}>
+                  <Text style={[styles.score, { color: getGradeTextColor(r.grade) }]}>{r.grade || `${r.score || 0}%`}</Text>
                 </View>
               </View>
             </Card>
