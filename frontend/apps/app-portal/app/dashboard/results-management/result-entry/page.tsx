@@ -149,22 +149,20 @@ export default function ResultEntryPage() {
   const updateScoreMutation = useMutation({
     mutationFn: ({ studentId, subjectId, score }: { studentId: string; subjectId: string; score: number }) =>
       api.post('/results', { studentId, subjectId, termId: selectedTerm, score }),
-    onSuccess: (_data: any, variables: any) => {
-      queryClient.invalidateQueries({ queryKey: ['sheet-students'] });
-      toast.success('Score saved');
-    },
-    onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to save score');
-    },
+    onSuccess: () => {},
+    onError: () => {},
   });
+
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const bulkSaveMutation = useMutation({
     mutationFn: (scoreList: Array<{ studentId: string; subjectId: string; termId: string; score: number }>) =>
-      api.post('/results/bulk', { results: scoreList }),
+      api.post('/results/bulk', { results: scoreList }, { timeout: 120000 }),
     onSuccess: (_data: any, variables: any) => {
       queryClient.invalidateQueries({ queryKey: ['sheet-students'] });
       queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
       setDirtyCells(new Set());
+      setBulkSaving(false);
       const count = variables?.length || 0;
       toast.success(`${count} score${count !== 1 ? 's' : ''} saved successfully`, {
         description: `${count} result${count !== 1 ? 's' : ''} have been recorded. You can now view the full results.`,
@@ -176,7 +174,8 @@ export default function ResultEntryPage() {
       });
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to save scores');
+      setBulkSaving(false);
+      toast.error(err?.response?.data?.message || 'Failed to save scores. Please try again.');
     },
   });
 
@@ -194,15 +193,15 @@ export default function ResultEntryPage() {
       [studentId]: { ...(prev[studentId] || {}), [subjectId]: score },
     }));
     setDirtyCells(prev => new Set(prev).add(key));
-    updateScoreMutation.mutate({ studentId, subjectId, score });
     setEditingCell(null);
-  }, [selectedTerm, updateScoreMutation]);
+  }, []);
 
   const handleBulkSaveAll = useCallback(() => {
     if (dirtyCells.size === 0) {
       toast.error('No changes to save');
       return;
     }
+    if (bulkSaving || bulkSaveMutation.isPending) return;
     const scoreList: Array<{ studentId: string; subjectId: string; termId: string; score: number }> = [];
     dirtyCells.forEach(key => {
       const [studentId, subjectId] = key.split('::');
@@ -212,9 +211,11 @@ export default function ResultEntryPage() {
       }
     });
     if (scoreList.length > 0) {
+      setBulkSaving(true);
+      toast.info(`Saving ${scoreList.length} score${scoreList.length !== 1 ? 's' : ''}...`);
       bulkSaveMutation.mutate(scoreList);
     }
-  }, [dirtyCells, scores, selectedTerm, bulkSaveMutation]);
+  }, [dirtyCells, scores, selectedTerm, bulkSaveMutation, bulkSaving]);
 
   const handlePasteFromExcel = useCallback(async () => {
     try {
@@ -482,7 +483,7 @@ export default function ResultEntryPage() {
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
               onClick={handleBulkSaveAll}
-              disabled={dirtyCells.size === 0 || bulkSaveMutation.isPending}
+              disabled={dirtyCells.size === 0 || bulkSaveMutation.isPending || bulkSaving}
               style={{
                 padding: '10px 20px', fontSize: '13px', fontWeight: 600, color: 'white',
                 background: dirtyCells.size === 0 ? '#d1d5db' : '#059669',
