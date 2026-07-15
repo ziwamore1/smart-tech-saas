@@ -356,6 +356,21 @@ export class ResultService {
       }
     }
 
+    if (created.length > 0) {
+      const firstTermId = results[0].termId;
+      const classIds = [...new Set(created.map(r => enrollmentMap.get(r.studentId)).filter(Boolean))] as string[];
+      for (const classId of classIds) {
+        const enrolled = await this.prisma.enrollment.count({
+          where: { classId, academicYearId: term.academicYearId, status: 'ACTIVE' },
+        });
+        const entered = created.filter(r => enrollmentMap.get(r.studentId) === classId).length;
+        await this.prisma.resultSheet.updateMany({
+          where: { classId, termId: firstTermId, examType: 'END_TERM' },
+          data: { totalStudents: enrolled, enteredCount: { increment: entered } },
+        });
+      }
+    }
+
     return {
       created: created.length,
       errors: errors.length,
