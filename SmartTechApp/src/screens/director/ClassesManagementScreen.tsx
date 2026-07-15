@@ -58,6 +58,11 @@ export const ClassesManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const [allSubjects, setAllSubjects] = useState<any[]>([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [addingSubject, setAddingSubject] = useState(false);
+  const [removingSubjectId, setRemovingSubjectId] = useState<string | null>(null);
+
   const loadData = async () => {
     try {
       const [classesData, staffData] = await Promise.all([
@@ -214,13 +219,16 @@ export const ClassesManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
     setDetailLoading(true);
     setDetailEnrollments([]);
     setDetailSubjects([]);
+    setSelectedSubjectId('');
     try {
-      const [enrollments, subjects] = await Promise.all([
+      const [enrollments, subjects, allSubjectsData] = await Promise.all([
         apiService.getEnrollmentsByClass(cls.id).catch(() => []),
         apiService.getClassSubjects(cls.id).catch(() => []),
+        apiService.getSubjects().catch(() => []),
       ]);
       setDetailEnrollments(enrollments || []);
       setDetailSubjects(subjects || []);
+      setAllSubjects(allSubjectsData || []);
     } catch {
     } finally {
       setDetailLoading(false);
@@ -239,6 +247,35 @@ export const ClassesManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
       s.lastName.toLowerCase().includes(q)
     );
   });
+
+  const handleAddSubject = async () => {
+    if (!detailClass || !selectedSubjectId) return;
+    setAddingSubject(true);
+    try {
+      await apiService.addClassSubject(detailClass.id, selectedSubjectId);
+      setSelectedSubjectId('');
+      const updated = await apiService.getClassSubjects(detailClass.id).catch(() => []);
+      setDetailSubjects(updated || []);
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data?.message || 'Failed to add subject');
+    } finally {
+      setAddingSubject(false);
+    }
+  };
+
+  const handleRemoveSubject = async (subjectId: string) => {
+    if (!detailClass) return;
+    setRemovingSubjectId(subjectId);
+    try {
+      await apiService.removeClassSubject(detailClass.id, subjectId);
+      const updated = await apiService.getClassSubjects(detailClass.id).catch(() => []);
+      setDetailSubjects(updated || []);
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data?.message || 'Failed to remove subject');
+    } finally {
+      setRemovingSubjectId(null);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -529,17 +566,67 @@ export const ClassesManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
 
               <View style={styles.detailSection}>
                 <Text style={styles.detailSectionTitle}>Subjects ({detailSubjects.length})</Text>
+
+                <View style={styles.subjectAddRow}>
+                  <TouchableOpacity
+                    style={[styles.subjectPicker, addingSubject && styles.disabledBtn]}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      const available = allSubjects.filter((s: any) => !detailSubjects.some((ds: any) => ds.id === s.id));
+                      if (available.length === 0) {
+                        Alert.alert('No Subjects', 'All subjects are already assigned to this class.');
+                        return;
+                      }
+                      Alert.alert(
+                        'Add Subject',
+                        'Select a subject to add:',
+                        [
+                          ...available.slice(0, 10).map((s: any) => ({
+                            text: s.name,
+                            onPress: () => { setSelectedSubjectId(s.id); setTimeout(() => handleAddSubject(), 50); },
+                          })),
+                          { text: 'Cancel', style: 'cancel' as const },
+                        ]
+                      );
+                    }}
+                  >
+                    {addingSubject ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <Text style={styles.subjectPickerText}>➕ Add Subject</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
                 {detailLoading ? (
                   <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: spacing.md }} />
                 ) : detailSubjects.length > 0 ? (
                   detailSubjects.map((sub: any, idx: number) => (
-                    <View key={sub.id || idx} style={styles.detailListItem}>
-                      <View style={styles.detailBullet} />
-                      <Text style={styles.detailListItemText}>{sub.name}</Text>
+                    <View key={sub.id || idx} style={styles.subjectRow}>
+                      <View style={styles.subjectInfo}>
+                        <View style={[styles.detailBullet, { backgroundColor: colors.primary }]} />
+                        <Text style={styles.detailListItemText}>{sub.name}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.removeSubjectBtn, removingSubjectId === sub.id && styles.disabledBtn]}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          Alert.alert('Remove Subject', `Remove ${sub.name} from this class?`, [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Remove', style: 'destructive', onPress: () => handleRemoveSubject(sub.id) },
+                          ]);
+                        }}
+                      >
+                        {removingSubjectId === sub.id ? (
+                          <ActivityIndicator size="small" color={colors.danger} />
+                        ) : (
+                          <Text style={styles.removeSubjectText}>✕</Text>
+                        )}
+                      </TouchableOpacity>
                     </View>
                   ))
                 ) : (
-                  <Text style={styles.emptyText}>No subjects assigned</Text>
+                  <Text style={styles.emptyText}>No subjects assigned — tap "Add Subject" above</Text>
                 )}
               </View>
 
@@ -664,4 +751,12 @@ const styles = StyleSheet.create({
   detailListItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.xs },
   detailBullet: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginRight: spacing.sm },
   detailListItemText: { fontSize: 14, color: colors.text, flex: 1 },
+  subjectAddRow: { marginBottom: spacing.sm },
+  subjectPicker: { backgroundColor: colors.primaryLight + '15', borderRadius: borderRadius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.primaryLight + '40', borderStyle: 'dashed', alignItems: 'center' },
+  subjectPickerText: { fontSize: 13, fontWeight: '600', color: colors.primaryLight },
+  subjectRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  subjectInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  removeSubjectBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.errorLight, justifyContent: 'center', alignItems: 'center' },
+  removeSubjectText: { fontSize: 14, fontWeight: '700', color: colors.error },
+  disabledBtn: { opacity: 0.5 },
 });

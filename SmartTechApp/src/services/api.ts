@@ -530,11 +530,6 @@ class ApiService {
     return response.data;
   }
 
-  async getSubjects() {
-    const response = await this.client.get('/mobile/subjects');
-    return response.data;
-  }
-
   async getUsers(role?: string) {
     const params = role ? { role } : {};
     const response = await this.client.get('/mobile/users', { params });
@@ -2365,21 +2360,6 @@ class ApiService {
     return response.data;
   }
 
-  async getClassSubjects(classId: string) {
-    const response = await this.client.get(`/class-subjects/class/${classId}`);
-    return response.data;
-  }
-
-  async addClassSubject(classId: string, subjectId: string) {
-    const response = await this.client.post('/class-subjects', { classId, subjectId });
-    return response.data;
-  }
-
-  async removeClassSubject(classId: string, subjectId: string) {
-    const response = await this.client.delete(`/class-subjects/${classId}/${subjectId}`);
-    return response.data;
-  }
-
   async getEnrollmentsByClass(classId: string) {
     const response = await this.client.get(`/enrollments/class/${classId}`);
     return response.data;
@@ -2625,6 +2605,69 @@ class ApiService {
 
   async computeClassGrades(classId: string, termId: string) {
     const response = await this.client.post('/grading-engine/compute/class', { classId, termId });
+    return response.data;
+  }
+
+  // ===== Teaching Assignments (subject-teacher-class) =====
+  async getTeachingAssignments() {
+    const response = await this.client.get('/teaching-assignment');
+    return response.data;
+  }
+
+  async getTeachingAssignmentsByTeacher(teacherId: string) {
+    const response = await this.client.get(`/teaching-assignment/teacher/${teacherId}`);
+    return response.data;
+  }
+
+  async createTeachingAssignment(data: { teacherId: string; subjectId: string; classId: string; academicYearId: string }) {
+    const response = await this.client.post('/teaching-assignment', data);
+    return response.data;
+  }
+
+  async deleteTeachingAssignment(id: string) {
+    const response = await this.client.delete(`/teaching-assignment/${id}`);
+    return response.data;
+  }
+
+  // ===== Subjects CRUD =====
+  async getSubjects() {
+    const response = await this.client.get('/subject');
+    return response.data;
+  }
+
+  async createSubject(data: { name: string; code?: string; category?: string; description?: string; credits?: string }) {
+    const response = await this.client.post('/subject', data);
+    return response.data;
+  }
+
+  async updateSubject(id: string, data: { name?: string; code?: string; category?: string; description?: string; credits?: string }) {
+    const response = await this.client.patch(`/subject/${id}`, data);
+    return response.data;
+  }
+
+  async deleteSubject(id: string) {
+    const response = await this.client.delete(`/subject/${id}`);
+    return response.data;
+  }
+
+  // ===== Class Subjects (manage subjects per class) =====
+  async getAllClassSubjects() {
+    const response = await this.client.get('/class-subjects');
+    return response.data;
+  }
+
+  async getClassSubjects(classId: string) {
+    const response = await this.client.get(`/class-subjects/class/${classId}`);
+    return response.data;
+  }
+
+  async addClassSubject(data: { classId: string; subjectId: string }) {
+    const response = await this.client.post('/class-subjects', data);
+    return response.data;
+  }
+
+  async removeClassSubject(classId: string, subjectId: string) {
+    const response = await this.client.delete(`/class-subjects/${classId}/${subjectId}`);
     return response.data;
   }
 }

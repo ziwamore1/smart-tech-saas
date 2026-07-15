@@ -18,6 +18,7 @@ import { SchoolMembershipScreen } from '../screens/director/SchoolMembershipScre
 import { ResultsManagementScreen } from '../screens/director/ResultsManagementScreen';
 import { GradingSystemsScreen } from '../screens/director/GradingSystemsScreen';
 import { SchoolSubscriptionScreen } from '../screens/director/SchoolSubscriptionScreen';
+import { TeachingAssignmentsScreen } from '../screens/director/TeachingAssignmentsScreen';
 import { DirectorLibraryScreen } from '../screens/director/LibraryScreen';
 import { DirectorTimetableScreen } from '../screens/director/TimetableScreen';
 import { DirectorCommunicationScreen } from '../screens/director/CommunicationScreen';
@@ -55,6 +56,7 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'DirectorMembership', label: 'School Members', icon: '🔑', component: SchoolMembershipScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorResultsMgmt', label: 'Results Management', icon: '📊', component: ResultsManagementScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorGradingSystems', label: 'Grading Systems', icon: '⚖️', component: GradingSystemsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
+  { name: 'DirectorTeachingAssignments', label: 'Teaching Assignments', icon: '👨‍🏫', component: TeachingAssignmentsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorSubscription', label: 'Subscription', icon: '💳', component: SchoolSubscriptionScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorMonitoring', label: 'Departments', icon: '🏛️', component: MonitoringDashboardScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorLibrary', label: 'Library', icon: '📚', component: DirectorLibraryScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },

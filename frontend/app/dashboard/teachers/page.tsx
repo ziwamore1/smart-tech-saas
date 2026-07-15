@@ -152,6 +152,8 @@ export default function TeachersPage() {
 
   const teachers = Array.isArray(teachersData) ? teachersData : [];
   const totalTeachers = teachers.length;
+  const maleTeachers = teachers.filter((t: any) => t.gender?.toUpperCase() === 'MALE').length;
+  const femaleTeachers = teachers.filter((t: any) => t.gender?.toUpperCase() === 'FEMALE').length;
 
   const filteredTeachers = teachers.filter((teacher: any) => {
     const teacherUser = teacher.user || {};
@@ -445,6 +447,21 @@ export default function TeachersPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+          <div className="text-2xl font-bold text-blue-700">{totalTeachers}</div>
+          <div className="text-sm text-blue-600">Total Staff</div>
+        </div>
+        <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+          <div className="text-2xl font-bold text-indigo-700">{maleTeachers}</div>
+          <div className="text-sm text-indigo-600">Male</div>
+        </div>
+        <div className="bg-pink-50 rounded-xl p-4 border border-pink-100">
+          <div className="text-2xl font-bold text-pink-700">{femaleTeachers}</div>
+          <div className="text-sm text-pink-600">Female</div>
+        </div>
+      </div>
+
       <div className="bg-white rounded-lg shadow p-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
@@ -496,9 +513,15 @@ export default function TeachersPage() {
               <option value="ON_LEAVE">On Leave</option>
             </select>
           </div>
-          <div className="flex items-end">
+          <div className="flex items-end gap-4">
             <div className="text-sm text-gray-600">
-              Total Staff: <span className="font-bold text-gray-900">{totalTeachers}</span>
+              Total: <span className="font-bold text-gray-900">{totalTeachers}</span>
+            </div>
+            <div className="text-sm text-blue-600">
+              Male: <span className="font-bold">{maleTeachers}</span>
+            </div>
+            <div className="text-sm text-pink-600">
+              Female: <span className="font-bold">{femaleTeachers}</span>
             </div>
           </div>
         </div>
