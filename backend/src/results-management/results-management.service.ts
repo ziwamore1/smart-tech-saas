@@ -82,7 +82,7 @@ export class ResultsManagementService {
     if (filters.termId) where.termId = filters.termId;
     if (filters.examType) where.examType = filters.examType;
 
-    return this.prisma.resultSheet.findMany({
+    let sheets = await this.prisma.resultSheet.findMany({
       where,
       include: {
         class: { select: { id: true, name: true } },
@@ -90,6 +90,37 @@ export class ResultsManagementService {
       },
       orderBy: [{ term: { startDate: 'desc' } }, { class: { name: 'asc' } }],
     });
+
+    // Auto-create sheet if none exists for the requested class+term
+    if (sheets.length === 0 && filters.classId && targetTermId) {
+      const term = await this.prisma.term.findUnique({
+        where: { id: targetTermId },
+        include: { academicYear: { select: { id: true } } },
+      });
+      if (term && term.academicYear) {
+        const totalStudents = await this.prisma.enrollment.count({
+          where: { classId: filters.classId, academicYearId: term.academicYear.id, status: 'ACTIVE' },
+        });
+        const newSheet = await this.prisma.resultSheet.create({
+          data: {
+            schoolId,
+            classId: filters.classId,
+            termId: targetTermId,
+            academicYearId: term.academicYear.id,
+            examType,
+            createdBy: 'SYSTEM',
+            totalStudents,
+          },
+          include: {
+            class: { select: { id: true, name: true } },
+            term: { select: { id: true, name: true } },
+          },
+        });
+        sheets = [newSheet];
+      }
+    }
+
+    return sheets;
   }
 
   async getResultSheet(id: string) {

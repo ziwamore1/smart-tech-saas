@@ -176,11 +176,10 @@ export class ResultService {
 
       await this.prisma.computedResult.upsert({
         where: {
-          studentId_subjectId_termId_classId: {
+          studentId_subjectId_termId: {
             studentId,
             subjectId,
             termId,
-            classId: enrollment.classId,
           },
         },
         update: {
@@ -332,11 +331,10 @@ export class ResultService {
 
         await this.prisma.computedResult.upsert({
           where: {
-            studentId_subjectId_termId_classId: {
+            studentId_subjectId_termId: {
               studentId: item.studentId,
               subjectId: item.subjectId,
               termId: item.termId,
-              classId: classId || '',
             },
           },
           update: {
