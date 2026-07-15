@@ -127,20 +127,34 @@ export default function ResultsManagementPage() {
             Manage all result sheets, create new entries, and track status
           </p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '12px 24px', background: '#ea6645', color: 'white',
-            border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600,
-            cursor: 'pointer', transition: 'all 0.2s'
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = '#d55a3d'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = '#ea6645'; }}
-        >
-          <i className="fa fa-plus"></i>
-          Create Sheet
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <a
+            href="/dashboard/results-management/view-results"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '12px 24px', background: '#5f4b3a', color: 'white',
+              border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600,
+              cursor: 'pointer', textDecoration: 'none'
+            }}
+          >
+            <i className="fa fa-eye"></i>
+            View Results
+          </a>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '12px 24px', background: '#ea6645', color: 'white',
+              border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600,
+              cursor: 'pointer', transition: 'all 0.2s'
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#d55a3d'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#ea6645'; }}
+          >
+            <i className="fa fa-plus"></i>
+            Create Sheet
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -307,6 +321,16 @@ export default function ResultsManagementPage() {
                       <td style={{ padding: '14px 20px', textAlign: 'center', color: '#374151' }}>{sheet.entriesCount || 0}</td>
                       <td style={{ padding: '14px 20px', textAlign: 'right', position: 'relative' }}>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <a
+                            href={`/dashboard/results-management/view-results?classId=${sheet.classId}&termId=${sheet.termId}`}
+                            style={{
+                              padding: '6px 12px', fontSize: '12px', color: '#059669',
+                              background: '#d1fae5', border: 'none', borderRadius: '6px',
+                              textDecoration: 'none', fontWeight: 500
+                            }}
+                          >
+                            <i className="fa fa-eye" style={{ marginRight: '4px' }}></i>View
+                          </a>
                           <a
                             href={`/dashboard/results-management/result-entry?sheetId=${sheet.id}`}
                             style={{

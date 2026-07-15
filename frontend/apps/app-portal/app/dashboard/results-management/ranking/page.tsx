@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api, classApi, termApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
+import { openRankingReport, RankingStudent, ReportMeta } from '@/lib/report-utils';
 
 type RankingType = 'class' | 'subject' | 'gender';
 
@@ -141,11 +142,46 @@ export default function RankingPage() {
 
   return (
     <div>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#1f2937', margin: 0 }}>Rankings</h1>
-        <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0 0' }}>
-          View student rankings by class, subject, or gender
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#1f2937', margin: 0 }}>Rankings</h1>
+          <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0 0' }}>
+            View student rankings by class, subject, or gender
+          </p>
+        </div>
+        {filteredRankings.length > 0 && (
+          <button
+            onClick={() => {
+              const cls = classes.find((c: any) => c.id === selectedClass);
+              const term = terms.find((t: any) => t.id === selectedTerm);
+              const meta: ReportMeta = {
+                schoolName: user?.schoolName || (user as any)?.school?.name || 'Smart Tech School',
+                className: cls?.name || 'Class',
+                termName: term?.name || 'Term',
+                academicYear: term?.academicYear?.name || '',
+                examType: selectedExamType,
+              };
+              const rankStudents: RankingStudent[] = filteredRankings.map((s: any, i: number) => ({
+                firstName: s.firstName || s.name?.split(' ')[0] || '',
+                lastName: s.lastName || s.name?.split(' ').slice(1).join(' ') || '',
+                admissionNumber: s.admissionNumber || '',
+                gender: s.gender || '',
+                average: s.percentage || s.average || s.totalPercentage || 0,
+                grade: s.grade || null,
+                rank: s.rank || i + 1,
+                totalPoints: s.totalPoints || undefined,
+              }));
+              openRankingReport(rankStudents, meta, `Rankings - ${rankingType.charAt(0).toUpperCase() + rankingType.slice(1)}`);
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '10px 20px', fontSize: '14px', fontWeight: 600, color: 'white',
+              background: '#5f4b3a', border: 'none', borderRadius: '8px', cursor: 'pointer'
+            }}
+          >
+            <i className="fa fa-print"></i> Print Report
+          </button>
+        )}
       </div>
 
       {/* Controls */}

@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api, classApi, termApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
+import { openMarkScheduleReport, ReportStudent, ReportMeta } from '@/lib/report-utils';
 
 export default function MarkSchedulesPage() {
   const { user } = useAuth();
-  const scheduleRef = useRef<HTMLDivElement>(null);
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
   const [selectedExamType, setSelectedExamType] = useState('Exam');
@@ -73,7 +73,40 @@ export default function MarkSchedulesPage() {
   }, [selectedClass, selectedTerm, selectedExamType]);
 
   const handlePrint = () => {
-    window.print();
+    if (!schedule?.students?.length) {
+      toast.error('No schedule data to print');
+      return;
+    }
+    const students: ReportStudent[] = schedule.students.map((s: any) => {
+      const results = subjects.map((subj: string) => ({
+        subject: subj,
+        score: s[subj] ?? null,
+        grade: null,
+        remark: null,
+      }));
+      const validScores = results.filter(r => r.score != null);
+      const avg = validScores.length > 0 ? validScores.reduce((sum, r) => sum + (r.score || 0), 0) / validScores.length : null;
+      return {
+        firstName: s.firstName || '',
+        lastName: s.lastName || '',
+        admissionNumber: s.admissionNumber || '',
+        gender: s.gender || '',
+        results,
+        average: avg,
+        grade: s.grade || null,
+        rank: s.rank || null,
+      };
+    });
+    const meta: ReportMeta = {
+      schoolName: schedule.schoolName || user?.schoolName || 'Smart Tech School',
+      schoolAddress: schedule.schoolAddress || '',
+      schoolPhone: schedule.schoolPhone || '',
+      schoolEmail: schedule.schoolEmail || '',
+      className: schedule.className || 'Class',
+      termName: schedule.termName || 'Term',
+      examType: schedule.examType || selectedExamType,
+    };
+    openMarkScheduleReport(students, meta);
   };
 
   const getGrade = (total: number, totalPossible: number, student: any): string => {
@@ -351,11 +384,7 @@ export default function MarkSchedulesPage() {
 
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          .main-content, .main-content * { visibility: visible; }
-          .main-content { position: absolute; left: 0; top: 0; margin-left: 0 !important; }
           .desktop-sidebar, .mobile-header { display: none !important; }
-          button { display: none !important; }
         }
       `}</style>
     </div>

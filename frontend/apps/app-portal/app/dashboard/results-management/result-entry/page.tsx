@@ -160,10 +160,19 @@ export default function ResultEntryPage() {
   const bulkSaveMutation = useMutation({
     mutationFn: (scoreList: Array<{ studentId: string; subjectId: string; termId: string; score: number }>) =>
       api.post('/results/bulk', { results: scoreList }),
-    onSuccess: () => {
+    onSuccess: (_data: any, variables: any) => {
       queryClient.invalidateQueries({ queryKey: ['sheet-students'] });
+      queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
       setDirtyCells(new Set());
-      toast.success('All scores saved');
+      const count = variables?.length || 0;
+      toast.success(`${count} score${count !== 1 ? 's' : ''} saved successfully`, {
+        description: `${count} result${count !== 1 ? 's' : ''} have been recorded. You can now view the full results.`,
+        action: {
+          label: 'View Results',
+          onClick: () => window.location.href = '/dashboard/results-management/view-results',
+        },
+        duration: 8000,
+      });
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || 'Failed to save scores');
@@ -652,7 +661,7 @@ export default function ResultEntryPage() {
       )}
 
       {/* Keyboard shortcuts help */}
-      <div style={{ marginTop: '16px', background: '#fdfaf7', border: '1px solid #e8ddd0', borderRadius: '10px', padding: '12px 20px', display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+      <div style={{ marginTop: '16px', background: '#fdfaf7', border: '1px solid #e8ddd0', borderRadius: '10px', padding: '12px 20px', display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
         <span style={{ fontSize: '12px', color: '#6b7280' }}>
           <kbd style={{ padding: '2px 6px', background: '#f5efe8', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>Enter</kbd> Move down
         </span>
@@ -672,6 +681,11 @@ export default function ResultEntryPage() {
         <span style={{ fontSize: '12px', color: '#6b7280' }}>
           Yellow cells = Missing marks, <span style={{ color: '#dc2626' }}>Red background</span> = Failed ({'<'}50%)
         </span>
+        {stats.entered > 0 && (
+          <a href="/dashboard/results-management/view-results" style={{ marginLeft: 'auto', padding: '6px 14px', fontSize: '12px', fontWeight: 600, color: '#059669', background: '#d1fae5', borderRadius: '6px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <i className="fa fa-eye"></i> View Results
+          </a>
+        )}
       </div>
     </div>
   );

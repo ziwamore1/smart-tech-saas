@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api, classApi, termApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
+import { openAnalysisReport, AnalysisData, ReportMeta } from '@/lib/report-utils';
 
 export default function AnalysisPage() {
   const { user } = useAuth();
@@ -12,6 +13,7 @@ export default function AnalysisPage() {
   const [selectedTerm, setSelectedTerm] = useState('');
   const [selectedExamType, setSelectedExamType] = useState('Exam');
   const [analysis, setAnalysis] = useState<any>(null);
+  const [sheetInfo, setSheetInfo] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   const { data: classesData } = useQuery({
@@ -66,6 +68,7 @@ export default function AnalysisPage() {
       const ar = await api.get(`/results-management/sheets/${sheetId}/analysis`);
       const analysisData = ar.data?.data || ar.data;
       setAnalysis(analysisData);
+      setSheetInfo(sheetArr[sheetArr.length - 1]);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to load analysis');
     } finally {
@@ -129,11 +132,36 @@ export default function AnalysisPage() {
 
   return (
     <div>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#1f2937', margin: 0 }}>Analysis</h1>
-        <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0 0' }}>
-          Performance analytics and insights for class results
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#1f2937', margin: 0 }}>Analysis</h1>
+          <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0 0' }}>
+            Performance analytics and insights for class results
+          </p>
+        </div>
+        {analysis && (
+          <button
+            onClick={() => {
+              const cls = classes.find((c: any) => c.id === selectedClass);
+              const term = terms.find((t: any) => t.id === selectedTerm);
+              const meta: ReportMeta = {
+                schoolName: user?.schoolName || (user as any)?.school?.name || 'Smart Tech School',
+                className: cls?.name || 'Class',
+                termName: term?.name || 'Term',
+                academicYear: term?.academicYear?.name || '',
+                examType: selectedExamType,
+              };
+              openAnalysisReport(analysis as AnalysisData, meta);
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '10px 20px', fontSize: '14px', fontWeight: 600, color: 'white',
+              background: '#5f4b3a', border: 'none', borderRadius: '8px', cursor: 'pointer'
+            }}
+          >
+            <i className="fa fa-print"></i> Print Report
+          </button>
+        )}
       </div>
 
       {/* Controls */}
