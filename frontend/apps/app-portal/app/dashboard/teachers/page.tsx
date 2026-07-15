@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { teacherApi, api, teachingAssignmentApi, classApi, subjectApi, academicYearApi, roleApi, enrollmentApi, schoolMembershipApi, classTeacherAssignmentApi } from '@/lib/api';
+import { teacherApi, api, teachingAssignmentApi, classApi, subjectApi, academicYearApi, roleApi, enrollmentApi, schoolMembershipApi, classTeacherAssignmentApi, classSubjectApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permission-context';
 
@@ -96,6 +96,22 @@ export default function TeachersPage() {
         return [];
       }
     },
+  });
+
+  const { data: classSubjectsData, isLoading: classSubjectsLoading } = useQuery({
+    queryKey: ['class-subjects-for-assignment', assignmentForm.classId],
+    queryFn: async () => {
+      if (!assignmentForm.classId) return [];
+      try {
+        const res = await classSubjectApi.getByClass(assignmentForm.classId);
+        let data = res.data?.data || res.data || [];
+        return Array.isArray(data) ? data : [];
+      } catch (error: any) {
+        console.error('Failed to fetch class subjects:', error);
+        return [];
+      }
+    },
+    enabled: !!assignmentForm.classId,
   });
 
   const { data: academicYearsData } = useQuery({
@@ -1064,7 +1080,7 @@ export default function TeachersPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Class *</label>
-                <select value={assignmentForm.classId} onChange={(e) => { console.log('Class selected:', e.target.value); setAssignmentForm({ ...assignmentForm, classId: e.target.value }); }} className="w-full px-3 py-2 border rounded-lg" required>
+                <select value={assignmentForm.classId} onChange={(e) => { console.log('Class selected:', e.target.value); setAssignmentForm({ ...assignmentForm, classId: e.target.value, subjectId: '' }); }} className="w-full px-3 py-2 border rounded-lg" required>
                   <option value="">Select Class</option>
                   {classesData?.map((cls: any) => (
                     <option key={cls.id} value={cls.id}>{cls.name}</option>
@@ -1074,16 +1090,25 @@ export default function TeachersPage() {
               {!isPrimary && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Subject *</label>
-                <select value={assignmentForm.subjectId} onChange={(e) => { console.log('Subject selected:', e.target.value); setAssignmentForm({ ...assignmentForm, subjectId: e.target.value }); }} className="w-full px-3 py-2 border rounded-lg" required>
-                  <option value="">Select Subject</option>
-                  {subjectsData && subjectsData.length > 0 ? (
-                    subjectsData.map((subject: any) => (
-                      <option key={subject.id} value={subject.id}>{subject.name}</option>
-                    ))
+                {assignmentForm.classId ? (
+                  classSubjectsLoading ? (
+                    <div className="w-full px-3 py-2 border rounded-lg bg-gray-50 text-gray-500 text-sm">Loading subjects for this class...</div>
+                  ) : classSubjectsData && classSubjectsData.length > 0 ? (
+                    <select value={assignmentForm.subjectId} onChange={(e) => { console.log('Subject selected:', e.target.value); setAssignmentForm({ ...assignmentForm, subjectId: e.target.value }); }} className="w-full px-3 py-2 border rounded-lg" required>
+                      <option value="">Select Subject</option>
+                      {classSubjectsData.map((cs: any) => (
+                        <option key={cs.subjectId || cs.subject?.id} value={cs.subjectId || cs.subject?.id}>{cs.subject?.name}{cs.subject?.code ? ` (${cs.subject.code})` : ''}</option>
+                      ))}
+                    </select>
                   ) : (
-                    <option value="" disabled>No subjects found — create subjects first</option>
-                  )}
-                </select>
+                    <div className="w-full px-3 py-3 border rounded-lg bg-amber-50 border-amber-200">
+                      <p className="text-amber-700 text-sm font-medium">No subjects assigned to this class yet.</p>
+                      <p className="text-amber-600 text-xs mt-1">Go to <a href="/dashboard/classes" className="underline font-semibold hover:text-amber-800">Classes</a> page and click the 📚 icon to add subjects to this class.</p>
+                    </div>
+                  )
+                ) : (
+                  <div className="w-full px-3 py-2 border rounded-lg bg-gray-50 text-gray-400 text-sm">Select a class first to see available subjects</div>
+                )}
               </div>
               )}
               <div>

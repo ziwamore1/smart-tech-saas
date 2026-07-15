@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { classApi, levelTypeApi, enrollmentApi, studentApi, subjectApi, classSubjectApi, gradingSystemApi, api, classTeacherAssignmentApi, academicYearApi } from '@/lib/api';
 import { usePermissions } from '@/lib/permission-context';
+import TooltipWrap from '@/components/timetable/TooltipWrap';
 
 type LevelCategory = 'FORM' | 'GRADE' | 'OTHER';
 
@@ -332,13 +333,13 @@ export default function ClassesPage() {
           <>
           <button
             onClick={() => setShowLevelTypeModal(true)}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all active:scale-95"
           >
             + Manage Levels
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all active:scale-95"
             disabled={levelTypes.length === 0}
             title={levelTypes.length === 0 ? 'Create level types first' : ''}
           >
@@ -404,7 +405,7 @@ export default function ClassesPage() {
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No Classes Found</h3>
             <p className="text-gray-500 mb-4">Create your first class to get started.</p>
             {levelTypes.length > 0 && (
-              <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+              <button onClick={() => setShowAddModal(true)}                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all active:scale-95">
                 + Add Class
               </button>
             )}
@@ -463,6 +464,7 @@ export default function ClassesPage() {
                 </div>
 
                 <div className="flex gap-2 mt-4 pt-4 border-t">
+                  <TooltipWrap text="View students enrolled in this class">
                   <button 
                     onClick={() => {
                       setSelectedClass(cls);
@@ -472,6 +474,8 @@ export default function ClassesPage() {
                   >
                     👥 Students
                   </button>
+                  </TooltipWrap>
+                  <TooltipWrap text="Add or remove subjects for this class">
                   <button 
                     onClick={() => {
                       setSelectedClass(cls);
@@ -481,7 +485,9 @@ export default function ClassesPage() {
                   >
                     📚
                   </button>
+                  </TooltipWrap>
                   {canManageClasses && (
+                  <TooltipWrap text="Manage class teacher assignment">
                   <button 
                     onClick={() => {
                       setSelectedClass(cls);
@@ -489,12 +495,13 @@ export default function ClassesPage() {
                       setShowClassTeacherModal(true);
                     }}
                     className="px-3 py-2 bg-teal-50 text-teal-600 rounded-xl hover:bg-teal-100 text-xs font-medium transition-colors"
-                    title="Manage Class Teacher"
                   >
                     🏫
                   </button>
+                  </TooltipWrap>
                   )}
                   {canManageClasses && (
+                  <TooltipWrap text="Edit class details">
                   <button 
                     onClick={() => {
                       setSelectedClass(cls);
@@ -505,8 +512,10 @@ export default function ClassesPage() {
                   >
                     ✏️
                   </button>
+                  </TooltipWrap>
                   )}
                   {canManageClasses && (
+                  <TooltipWrap text="Delete this class permanently">
                   <button 
                     onClick={() => {
                       if (confirm(`Delete class "${cls.name}"? This cannot be undone.`)) {
@@ -514,10 +523,10 @@ export default function ClassesPage() {
                       }
                     }}
                     className="px-3 py-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 text-xs font-medium transition-colors"
-                    title="Delete Class"
                   >
                     🗑️
                   </button>
+                  </TooltipWrap>
                   )}
                 </div>
               </div>
@@ -796,7 +805,7 @@ export default function ClassesPage() {
             <div className="flex justify-end mt-6">
               <button
                 onClick={() => setShowLevelTypeModal(false)}
-                className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all active:scale-95"
               >
                 Done
               </button>
@@ -1005,7 +1014,7 @@ export default function ClassesPage() {
 
       {showSubjectsModal && selectedClass && (
         <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold">Subjects for {selectedClass.name}</h2>
               <button
@@ -1053,28 +1062,56 @@ export default function ClassesPage() {
                     }
                   }}
                   disabled={!selectedSubjectId || addSubjectToClassMutation.isPending}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-all active:scale-95"
                 >
-                  Add
+                  {addSubjectToClassMutation.isPending ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                      Adding...
+                    </span>
+                  ) : 'Add'}
                 </button>
               </div>
+              {addSubjectToClassMutation.isSuccess && (
+                <div className="mt-2 px-3 py-2 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+                  Subject added successfully!
+                </div>
+              )}
+              {addSubjectToClassMutation.isError && (
+                <div className="mt-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                  {addSubjectToClassMutation.error?.response?.data?.message || 'Failed to add subject.'}
+                </div>
+              )}
             </div>
 
-            <div className="flex-1 overflow-y-auto">
-              <h3 className="font-semibold mb-3">Assigned Subjects ({(classSubjectsData || []).length || 0})</h3>
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                Assigned Subjects
+                <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+                  {(classSubjectsData || []).length} total
+                </span>
+              </h3>
               {!(classSubjectsData && classSubjectsData.length > 0) ? (
                 <div className="text-center py-8 text-gray-500">
-                  No subjects assigned to this class yet.
+                  <div className="text-4xl mb-3">📚</div>
+                  <p className="font-medium">No subjects assigned to this class yet.</p>
+                  <p className="text-sm mt-1">Select a subject from the dropdown above and click "Add" to assign it.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {(classSubjectsData || []).map((cs: any) => (
-                    <div key={cs.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <span className="font-medium">{cs.subject?.name}</span>
-                        {cs.subject?.code && (
-                          <span className="ml-2 text-sm text-gray-500">({cs.subject.code})</span>
-                        )}
+                    <div key={cs.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <span className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center text-sm font-bold">
+                          {cs.subject?.name?.[0] || '?'}
+                        </span>
+                        <div>
+                          <span className="font-medium">{cs.subject?.name}</span>
+                          {cs.subject?.code && (
+                            <span className="ml-2 text-sm text-gray-500">({cs.subject.code})</span>
+                          )}
+                        </div>
                       </div>
                       <button
                         onClick={() => {
@@ -1086,9 +1123,9 @@ export default function ClassesPage() {
                           }
                         }}
                         disabled={removeSubjectFromClassMutation.isPending}
-                        className="text-red-600 hover:text-red-800 text-sm disabled:opacity-50"
+                        className="px-3 py-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg text-sm transition-colors disabled:opacity-50 active:scale-95"
                       >
-                        Remove
+                        {removeSubjectFromClassMutation.isPending ? 'Removing...' : 'Remove'}
                       </button>
                     </div>
                   ))}
@@ -1102,7 +1139,7 @@ export default function ClassesPage() {
                   setShowSubjectsModal(false);
                   setSelectedClass(null);
                 }}
-                className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all active:scale-95"
               >
                 Done
               </button>
@@ -1192,7 +1229,7 @@ export default function ClassesPage() {
                   });
                 }}
                 disabled={createClassTeacherAssignmentMutation.isPending}
-                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-gray-400"
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-gray-400 transition-all active:scale-95"
               >
                 {createClassTeacherAssignmentMutation.isPending ? 'Assigning...' : 'Assign'}
               </button>
