@@ -198,10 +198,6 @@ export class ResultService {
           finalPercentage: score,
           finalGrade: gradeData.grade,
           finalRemark: gradeData.remark,
-          totalScore: score,
-          percentageScore: score,
-          grade: gradeData.grade,
-          remark: gradeData.remark,
           status: 'COMPLETED',
         },
       });
@@ -228,11 +224,10 @@ export class ResultService {
 
     await this.prisma.computedResult.upsert({
       where: {
-        studentId_subjectId_termId_classId: {
+        studentId_subjectId_termId: {
           studentId,
           subjectId,
           termId,
-          classId: enrollment.classId,
         },
       },
       update: {
@@ -251,10 +246,6 @@ export class ResultService {
         finalPercentage: score,
         finalGrade: gradeData.grade,
         finalRemark: gradeData.remark,
-        totalScore: score,
-        percentageScore: score,
-        grade: gradeData.grade,
-        remark: gradeData.remark,
         status: 'COMPLETED',
       },
     });
@@ -353,10 +344,6 @@ export class ResultService {
             finalPercentage: item.score,
             finalGrade: gradeData.grade,
             finalRemark: gradeData.remark,
-            totalScore: item.score,
-            percentageScore: item.score,
-            grade: gradeData.grade,
-            remark: gradeData.remark,
             status: 'COMPLETED',
           },
         });
