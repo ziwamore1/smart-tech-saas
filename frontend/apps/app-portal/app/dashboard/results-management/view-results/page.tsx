@@ -22,7 +22,7 @@ export default function ViewResultsPage() {
   const { user } = useAuth();
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
-  const [selectedExamType, setSelectedExamType] = useState('Exam');
+  const [selectedExamType, setSelectedExamType] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'summary'>('table');
   const [sortField, setSortField] = useState<'name' | 'average' | 'grade' | 'rank'>('rank');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -51,9 +51,9 @@ export default function ViewResultsPage() {
     queryKey: ['view-results-sheet', selectedClass, selectedTerm, selectedExamType],
     queryFn: async () => {
       if (!selectedClass || !selectedTerm) return null;
-      const r = await api.get('/results-management/sheets', {
-        params: { classId: selectedClass, termId: selectedTerm, examType: selectedExamType }
-      });
+      const params: any = { classId: selectedClass, termId: selectedTerm };
+      if (selectedExamType) params.examType = selectedExamType;
+      const r = await api.get('/results-management/sheets', { params });
       const sheets = r.data?.data || r.data;
       const sheetArr = Array.isArray(sheets) ? sheets : [];
       return sheetArr.length > 0 ? sheetArr[0] : null;
@@ -230,6 +230,7 @@ export default function ViewResultsPage() {
           <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#6b7280', marginBottom: '6px' }}>Exam Type</label>
           <select value={selectedExamType} onChange={e => setSelectedExamType(e.target.value)}
             style={{ width: '100%', padding: '10px 14px', fontSize: '14px', border: '1px solid #e8ddd0', borderRadius: '8px', background: '#fefcf9' }}>
+            <option value="">All Types</option>
             {examTypes.map(et => <option key={et} value={et}>{et}</option>)}
           </select>
         </div>
