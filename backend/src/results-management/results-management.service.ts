@@ -1192,10 +1192,16 @@ export class ResultsManagementService {
       return existing;
     }
 
+    let academicYearId = data.academicYearId;
+    if (!academicYearId) {
+      const term = await this.prisma.term.findUnique({ where: { id: data.termId }, select: { academicYearId: true } });
+      if (term) academicYearId = term.academicYearId;
+    }
+
     const totalStudents = await this.prisma.enrollment.count({
       where: {
         classId: data.classId,
-        academicYearId: data.academicYearId,
+        academicYearId,
         status: 'ACTIVE',
       },
     });
@@ -1205,7 +1211,7 @@ export class ResultsManagementService {
         schoolId: data.schoolId,
         classId: data.classId,
         termId: data.termId,
-        academicYearId: data.academicYearId,
+        academicYearId,
         examType: data.examType || 'END_TERM',
         title: data.title,
         description: data.description,

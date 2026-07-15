@@ -84,6 +84,7 @@ export default function ResultsManagementPage() {
     mutationFn: (data: any) => api.post('/results-management/sheets', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
+      queryClient.refetchQueries({ queryKey: ['result-sheets'] });
       setShowCreateModal(false);
       setCreateForm({ classId: '', termId: '', examType: 'Exam', academicYearId: '', title: '' });
       toast.success('Result sheet created successfully');
@@ -141,7 +142,11 @@ export default function ResultsManagementPage() {
             View Results
           </a>
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => {
+              const currentYear = academicYears?.find((y: any) => y.isCurrent);
+              setCreateForm(prev => ({ ...prev, academicYearId: currentYear?.id || '' }));
+              setShowCreateModal(true);
+            }}
             style={{
               display: 'flex', alignItems: 'center', gap: '8px',
               padding: '12px 24px', background: '#ea6645', color: 'white',
