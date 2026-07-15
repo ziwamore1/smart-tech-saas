@@ -149,8 +149,9 @@ export default function ResultEntryPage() {
   const updateScoreMutation = useMutation({
     mutationFn: ({ studentId, subjectId, score }: { studentId: string; subjectId: string; score: number }) =>
       api.post('/results', { studentId, subjectId, termId: selectedTerm, score }),
-    onSuccess: () => {
+    onSuccess: (_data: any, variables: any) => {
       queryClient.invalidateQueries({ queryKey: ['sheet-students'] });
+      toast.success('Score saved');
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || 'Failed to save score');
@@ -251,7 +252,7 @@ export default function ResultEntryPage() {
           if (!cs) { errors++; continue; }
 
           const subjectId = cs.subject?.id || cs.subjectId;
-          const key = `${student.id}-${subjectId}`;
+          const key = `${student.id}::${subjectId}`;
           setScores(prev => ({
             ...prev,
             [student.id]: { ...(prev[student.id] || {}), [subjectId]: score },

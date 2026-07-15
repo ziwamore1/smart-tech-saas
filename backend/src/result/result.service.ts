@@ -153,26 +153,34 @@ export class ResultService {
       }
     }
 
-    if (!assignment) {
-      throw new ForbiddenException('Teacher not assigned to this subject/class');
-    }
+    // For directors, teaching assignment is not required — use userId as fallback
+    const teacherId = assignment?.teacherId || userId;
+
+    const gradeData = await this.calculateGrade(score, schoolId, enrollment.classId);
 
     const existing = await this.prisma.result.findFirst({
       where: { studentId, subjectId, termId },
     });
 
     if (existing) {
-      throw new BadRequestException('Result already recorded. Use update instead.');
+      return this.prisma.result.update({
+        where: { id: existing.id },
+        data: {
+          score,
+          grade: gradeData.grade,
+          remark: gradeData.remark,
+          teacherId,
+        },
+        include: { student: true, subject: true },
+      });
     }
-
-    const gradeData = await this.calculateGrade(score, schoolId, enrollment.classId);
 
     return this.prisma.result.create({
       data: {
         studentId,
         subjectId,
         termId,
-        teacherId: assignment.teacherId,
+        teacherId,
         schoolId,
         score,
         grade: gradeData.grade,
@@ -731,6 +739,7 @@ export class ResultService {
         const gradeData = await this.calculateGrade(score, schoolId, enrollment?.classId);
 
         const existing = await this.prisma.result.findFirst({
+          where: { studentId: student.id, subjectId, termId },
         });
 
         if (existing) {
