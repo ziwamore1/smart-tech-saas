@@ -85,10 +85,17 @@ export default function TeachersPage() {
 
   const { data: subjectsData } = useQuery({
     queryKey: ['subjects'],
-    queryFn: () => subjectApi.getAll().then(res => {
-      let data = res.data?.data || res.data || [];
-      return Array.isArray(data) ? data : [];
-    }),
+    queryFn: async () => {
+      try {
+        const res = await subjectApi.getAll();
+        let data = res.data?.data || res.data || [];
+        return Array.isArray(data) ? data : [];
+      } catch (error: any) {
+        console.error('Failed to fetch subjects:', error);
+        console.error('Subjects error response:', error.response?.data);
+        return [];
+      }
+    },
   });
 
   const { data: academicYearsData } = useQuery({
@@ -1030,9 +1037,13 @@ export default function TeachersPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Subject *</label>
                 <select value={assignmentForm.subjectId} onChange={(e) => { console.log('Subject selected:', e.target.value); setAssignmentForm({ ...assignmentForm, subjectId: e.target.value }); }} className="w-full px-3 py-2 border rounded-lg" required>
                   <option value="">Select Subject</option>
-                  {subjectsData?.map((subject: any) => (
-                    <option key={subject.id} value={subject.id}>{subject.name}</option>
-                  ))}
+                  {subjectsData && subjectsData.length > 0 ? (
+                    subjectsData.map((subject: any) => (
+                      <option key={subject.id} value={subject.id}>{subject.name}</option>
+                    ))
+                  ) : (
+                    <option value="" disabled>No subjects found — create subjects first</option>
+                  )}
                 </select>
               </div>
               )}
