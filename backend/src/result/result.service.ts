@@ -163,7 +163,7 @@ export class ResultService {
     });
 
     if (existing) {
-      return this.prisma.result.update({
+      const updated = await this.prisma.result.update({
         where: { id: existing.id },
         data: {
           score,
@@ -173,9 +173,44 @@ export class ResultService {
         },
         include: { student: true, subject: true },
       });
+
+      await this.prisma.computedResult.upsert({
+        where: {
+          studentId_subjectId_termId_classId: {
+            studentId,
+            subjectId,
+            termId,
+            classId: enrollment.classId,
+          },
+        },
+        update: {
+          totalRawScore: score,
+          finalPercentage: score,
+          finalGrade: gradeData.grade,
+          finalRemark: gradeData.remark,
+        },
+        create: {
+          studentId,
+          subjectId,
+          termId,
+          classId: enrollment.classId,
+          schoolId,
+          totalRawScore: score,
+          finalPercentage: score,
+          finalGrade: gradeData.grade,
+          finalRemark: gradeData.remark,
+          totalScore: score,
+          percentageScore: score,
+          grade: gradeData.grade,
+          remark: gradeData.remark,
+          status: 'COMPLETED',
+        },
+      });
+
+      return updated;
     }
 
-    return this.prisma.result.create({
+    const created = await this.prisma.result.create({
       data: {
         studentId,
         subjectId,
@@ -191,6 +226,41 @@ export class ResultService {
         subject: true,
       },
     });
+
+    await this.prisma.computedResult.upsert({
+      where: {
+        studentId_subjectId_termId_classId: {
+          studentId,
+          subjectId,
+          termId,
+          classId: enrollment.classId,
+        },
+      },
+      update: {
+        totalRawScore: score,
+        finalPercentage: score,
+        finalGrade: gradeData.grade,
+        finalRemark: gradeData.remark,
+      },
+      create: {
+        studentId,
+        subjectId,
+        termId,
+        classId: enrollment.classId,
+        schoolId,
+        totalRawScore: score,
+        finalPercentage: score,
+        finalGrade: gradeData.grade,
+        finalRemark: gradeData.remark,
+        totalScore: score,
+        percentageScore: score,
+        grade: gradeData.grade,
+        remark: gradeData.remark,
+        status: 'COMPLETED',
+      },
+    });
+
+    return created;
   }
 
   async createBulk(
@@ -259,6 +329,39 @@ export class ResultService {
           },
         });
         created.push(result);
+
+        await this.prisma.computedResult.upsert({
+          where: {
+            studentId_subjectId_termId_classId: {
+              studentId: item.studentId,
+              subjectId: item.subjectId,
+              termId: item.termId,
+              classId: classId || '',
+            },
+          },
+          update: {
+            totalRawScore: item.score,
+            finalPercentage: item.score,
+            finalGrade: gradeData.grade,
+            finalRemark: gradeData.remark,
+          },
+          create: {
+            studentId: item.studentId,
+            subjectId: item.subjectId,
+            termId: item.termId,
+            classId: classId || '',
+            schoolId,
+            totalRawScore: item.score,
+            finalPercentage: item.score,
+            finalGrade: gradeData.grade,
+            finalRemark: gradeData.remark,
+            totalScore: item.score,
+            percentageScore: item.score,
+            grade: gradeData.grade,
+            remark: gradeData.remark,
+            status: 'COMPLETED',
+          },
+        });
       } catch (error: any) {
         errors.push({
           studentId: item.studentId,
