@@ -268,6 +268,34 @@ export default function ClassesPage() {
     },
   });
 
+  const deleteClassMutation = useMutation({
+    mutationFn: (id: string) => classApi.delete(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['classes'] });
+      const previousClasses = queryClient.getQueryData(['classes']);
+      queryClient.setQueryData(['classes'], (old: any) => {
+        if (!old?.data) return old;
+        return { ...old, data: (old.data || []).filter((c: any) => c.id !== id) };
+      });
+      return { previousClasses };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['school-stats'] });
+      setMessage({ type: 'success', text: 'Class deleted successfully!' });
+      setTimeout(() => setMessage(null), 3000);
+    },
+    onError: (error: any, _id, context) => {
+      if (context?.previousClasses) {
+        queryClient.setQueryData(['classes'], context.previousClasses);
+      }
+      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to delete class.' });
+      setTimeout(() => setMessage(null), 5000);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+    },
+  });
+
   let classesData = classesResponse;
   if (classesData?.data) classesData = classesData.data;
   if (classesData?.classes) classesData = classesData.classes;
@@ -479,6 +507,20 @@ export default function ClassesPage() {
                     className="px-3 py-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 text-xs font-medium transition-colors"
                   >
                     ✏️
+                  </button>
+                  </TooltipWrap>
+                  )}
+                  {canManageClasses && (
+                  <TooltipWrap text="Delete this class permanently">
+                  <button 
+                    onClick={() => {
+                      if (confirm(`Delete class "${cls.name}"? This cannot be undone.`)) {
+                        deleteClassMutation.mutate(cls.id);
+                      }
+                    }}
+                    className="px-3 py-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 text-xs font-medium transition-colors"
+                  >
+                    🗑️
                   </button>
                   </TooltipWrap>
                   )}

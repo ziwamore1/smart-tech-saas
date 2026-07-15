@@ -25,6 +25,7 @@ export default function TeachersPage() {
   const [filterStatus, setFilterStatus] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [assignmentForm, setAssignmentForm] = useState({ classId: '', subjectId: '', academicYearId: '' });
+  const [editingAssignment, setEditingAssignment] = useState<any>(null);
   const [showClassTeacherModal, setShowClassTeacherModal] = useState(false);
   const [classTeacherForm, setClassTeacherForm] = useState({ teacherId: '', classId: '', academicYearId: '', isPrimary: true });
 
@@ -330,6 +331,10 @@ export default function TeachersPage() {
         await classApi.setClassTeacher(data.classId, teacherRecordId);
         return { success: true };
       }
+      // If editing, delete old assignment first
+      if (editingAssignment?.id) {
+        await teachingAssignmentApi.delete(editingAssignment.id);
+      }
       return teachingAssignmentApi.create(data);
     },
     onSuccess: () => {
@@ -338,11 +343,12 @@ export default function TeachersPage() {
       setShowAssignmentModal(false);
       setSelectedTeacherForAssignment(null);
       setAssignmentForm({ classId: '', subjectId: '', academicYearId: '' });
-      setMessage({ type: 'success', text: 'Assignment created successfully!' });
+      setEditingAssignment(null);
+      setMessage({ type: 'success', text: editingAssignment ? 'Assignment updated successfully!' : 'Assignment created successfully!' });
       setTimeout(() => setMessage(null), 3000);
     },
     onError: (error: any) => {
-      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to create assignment.' });
+      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to save assignment.' });
       setTimeout(() => setMessage(null), 5000);
     },
   });
@@ -694,6 +700,21 @@ export default function TeachersPage() {
                     <td className="py-4 px-6">
                       <div className="flex items-center justify-end gap-2">
                         <button 
+                          onClick={() => {
+                            setEditingAssignment(assignment);
+                            setSelectedTeacherForAssignment(teachers.find((t: any) => (t.user?.id || t.userId || t.id) === assignment.teacherId) || null);
+                            setAssignmentForm({
+                              classId: assignment.classId || assignment.class?.id || '',
+                              subjectId: assignment.subjectId || assignment.subject?.id || '',
+                              academicYearId: assignment.academicYearId || assignment.academicYear?.id || '',
+                            });
+                            setShowAssignmentModal(true);
+                          }} 
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button 
                           onClick={() => { if (confirm('Delete this assignment?')) { deleteAssignmentMutation.mutate(assignment.id); } }} 
                           className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                         >
@@ -1023,7 +1044,7 @@ export default function TeachersPage() {
       {showAssignmentModal && (
         <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-2xl font-bold mb-6">{isPrimary ? 'Assign Teacher to Class' : 'Assign Teacher to Class & Subject'}</h2>
+            <h2 className="text-2xl font-bold mb-6">{editingAssignment ? 'Edit' : isPrimary ? 'Assign Teacher to Class' : 'Assign Teacher to Class & Subject'}</h2>
             {createAssignmentMutation.isError && (
               <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
                 {createAssignmentMutation.error?.response?.data?.message || 'Failed to create assignment.'}
@@ -1083,7 +1104,7 @@ export default function TeachersPage() {
               </div>
             </div>
             <div className="flex gap-3 justify-end pt-6">
-              <button onClick={() => { setShowAssignmentModal(false); setSelectedTeacherForAssignment(null); setAssignmentForm({ classId: '', subjectId: '', academicYearId: '' }); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
+              <button onClick={() => { setShowAssignmentModal(false); setSelectedTeacherForAssignment(null); setAssignmentForm({ classId: '', subjectId: '', academicYearId: '' }); setEditingAssignment(null); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
               <button onClick={() => {
                 if (!selectedTeacherForAssignment?.id || !assignmentForm.classId || (!isPrimary && !assignmentForm.subjectId) || !assignmentForm.academicYearId) {
                   alert('Please fill in all required fields');
@@ -1095,8 +1116,8 @@ export default function TeachersPage() {
                   ...(isPrimary ? {} : { subjectId: assignmentForm.subjectId }),
                   academicYearId: assignmentForm.academicYearId,
                 });
-              }} disabled={createAssignmentMutation.isPending} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400">
-                {createAssignmentMutation.isPending ? 'Creating...' : 'Create Assignment'}
+              }} disabled={createAssignmentMutation.isPending} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-all active:scale-95">
+                {createAssignmentMutation.isPending ? (editingAssignment ? 'Updating...' : 'Creating...') : (editingAssignment ? 'Update Assignment' : 'Create Assignment')}
               </button>
             </div>
           </div>
