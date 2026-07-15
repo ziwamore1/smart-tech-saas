@@ -66,7 +66,8 @@ export default function ViewResultsPage() {
     queryFn: async () => {
       if (!sheetData?.id) return [];
       const r = await api.get(`/results-management/sheets/${sheetData.id}/students`);
-      const d = r.data?.data || r.data;
+      let d = r.data?.data || r.data;
+      if (d && !Array.isArray(d) && d.students) d = d.students;
       return Array.isArray(d) ? d : [];
     },
     enabled: !!sheetData?.id,

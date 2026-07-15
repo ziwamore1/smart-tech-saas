@@ -93,7 +93,8 @@ export default function ResultEntryPage() {
       const sheetId = sheetArr.length > 0 ? sheetArr[0].id : null;
       if (sheetId) {
         const sr = await api.get(`/results-management/sheets/${sheetId}/students`);
-        const sd = sr.data?.data || sr.data;
+        let sd = sr.data?.data || sr.data;
+        if (sd && !Array.isArray(sd) && sd.students) sd = sd.students;
         const students = Array.isArray(sd) ? sd : [];
         // If there are no results in the response, try getting students from enrollment endpoint
         const hasResults = students.some((s: any) => s.results?.length > 0);
