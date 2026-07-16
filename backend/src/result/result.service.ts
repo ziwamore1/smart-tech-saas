@@ -187,6 +187,8 @@ export class ResultService {
           finalPercentage: score,
           finalGrade: gradeData.grade,
           finalRemark: gradeData.remark,
+          status: 'COMPUTED',
+          computedAt: new Date(),
         },
         create: {
           studentId,
@@ -198,7 +200,8 @@ export class ResultService {
           finalPercentage: score,
           finalGrade: gradeData.grade,
           finalRemark: gradeData.remark,
-          status: 'COMPLETED',
+          status: 'COMPUTED',
+          computedAt: new Date(),
         },
       });
 
@@ -222,36 +225,45 @@ export class ResultService {
       },
     });
 
-    await this.prisma.computedResult.upsert({
-      where: {
-        studentId_subjectId_termId: {
+      await this.prisma.computedResult.upsert({
+        where: {
+          studentId_subjectId_termId: {
+            studentId,
+            subjectId,
+            termId,
+          },
+        },
+        update: {
+          totalRawScore: score,
+          finalPercentage: score,
+          finalGrade: gradeData.grade,
+          finalRemark: gradeData.remark,
+          status: 'COMPUTED',
+          computedAt: new Date(),
+        },
+        create: {
           studentId,
           subjectId,
           termId,
+          classId: enrollment.classId,
+          schoolId,
+          totalRawScore: score,
+          finalPercentage: score,
+          finalGrade: gradeData.grade,
+          finalRemark: gradeData.remark,
+          status: 'COMPUTED',
+          computedAt: new Date(),
         },
-      },
-      update: {
-        totalRawScore: score,
-        finalPercentage: score,
-        finalGrade: gradeData.grade,
-        finalRemark: gradeData.remark,
-      },
-      create: {
-        studentId,
-        subjectId,
-        termId,
-        classId: enrollment.classId,
-        schoolId,
-        totalRawScore: score,
-        finalPercentage: score,
-        finalGrade: gradeData.grade,
-        finalRemark: gradeData.remark,
-        status: 'COMPLETED',
-      },
-    });
+      });
 
-    return created;
-  }
+      // Update ResultSheet enteredCount
+      await this.prisma.resultSheet.updateMany({
+        where: { classId: enrollment.classId, termId, schoolId },
+        data: { enteredCount: { increment: 1 } },
+      }).catch(() => {});
+
+      return created;
+    }
 
   async createBulk(
     teacherId: string,
@@ -333,6 +345,8 @@ export class ResultService {
             finalPercentage: item.score,
             finalGrade: gradeData.grade,
             finalRemark: gradeData.remark,
+            status: 'COMPUTED',
+            computedAt: new Date(),
           },
           create: {
             studentId: item.studentId,
@@ -344,7 +358,8 @@ export class ResultService {
             finalPercentage: item.score,
             finalGrade: gradeData.grade,
             finalRemark: gradeData.remark,
-            status: 'COMPLETED',
+            status: 'COMPUTED',
+            computedAt: new Date(),
           },
         });
       } catch (error: any) {
@@ -404,7 +419,7 @@ export class ResultService {
 
     const gradeData = await this.calculateGrade(score, schoolId, enrollment?.classId);
 
-    return this.prisma.result.update({
+    const updated = await this.prisma.result.update({
       where: { id },
       data: {
         score,
@@ -417,6 +432,39 @@ export class ResultService {
         subject: true,
       },
     });
+
+    await this.prisma.computedResult.upsert({
+      where: {
+        studentId_subjectId_termId: {
+          studentId: result.studentId,
+          subjectId: result.subjectId,
+          termId: result.termId,
+        },
+      },
+      update: {
+        totalRawScore: score,
+        finalPercentage: score,
+        finalGrade: gradeData.grade,
+        finalRemark: gradeData.remark,
+        status: 'COMPUTED',
+        computedAt: new Date(),
+      },
+      create: {
+        studentId: result.studentId,
+        subjectId: result.subjectId,
+        termId: result.termId,
+        classId: enrollment?.classId || '',
+        schoolId,
+        totalRawScore: score,
+        finalPercentage: score,
+        finalGrade: gradeData.grade,
+        finalRemark: gradeData.remark,
+        status: 'COMPUTED',
+        computedAt: new Date(),
+      },
+    });
+
+    return updated;
   }
 
   async delete(id: string, schoolId: string) {

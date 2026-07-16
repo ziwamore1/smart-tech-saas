@@ -437,7 +437,10 @@ export class AssessmentEngineService {
 
     await this.prisma.resultSheet.update({
       where: { id: sheet.id },
-      data: { totalStudents },
+      data: {
+        totalStudents,
+        enteredCount: scoredStudents.size,
+      },
     });
 
     try {
@@ -540,7 +543,7 @@ export class AssessmentEngineService {
           grade,
           remarks: remarks || null,
           enteredBy,
-          status: 'DRAFT',
+          status: 'SUBMITTED',
           batchId: batch.id,
         },
         create: {
@@ -556,7 +559,7 @@ export class AssessmentEngineService {
           grade,
           remarks: remarks || null,
           enteredBy,
-          status: 'DRAFT',
+          status: 'SUBMITTED',
           batchId: batch.id,
         },
       });
@@ -663,7 +666,7 @@ export class AssessmentEngineService {
         grade,
         remarks: data.remarks || null,
         enteredBy: data.enteredBy,
-        status: 'DRAFT',
+        status: 'SUBMITTED',
       },
       create: {
         studentId: data.studentId,
@@ -678,7 +681,7 @@ export class AssessmentEngineService {
         grade,
         remarks: data.remarks || null,
         enteredBy: data.enteredBy,
-        status: 'DRAFT',
+        status: 'SUBMITTED',
       },
     });
 
