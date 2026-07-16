@@ -48,7 +48,7 @@ const LABEL_MAP: Record<string, string> = {
 };
 
 export default function StaffRecordsPage() {
-  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user, allRoles } = useAuth();
   const isDirector = useIsDirector();
   const isSuperAdmin = useIsSuperAdmin();
   const { hasAccess } = useFeatureAccess();
@@ -85,11 +85,26 @@ export default function StaffRecordsPage() {
         ]);
 
       if (profilesRes.status === 'fulfilled') setProfiles(profilesRes.value.data?.data || profilesRes.value.data || []);
+      else console.error('Profiles API failed:', profilesRes.reason?.response?.data || profilesRes.reason?.message);
       if (returnsRes.status === 'fulfilled') setReturns(returnsRes.value.data?.data || returnsRes.value.data || []);
+      else console.error('Returns API failed:', returnsRes.reason?.response?.data || returnsRes.reason?.message);
       if (transfersRes.status === 'fulfilled') setTransfers(transfersRes.value.data?.data || transfersRes.value.data || []);
+      else console.error('Transfers API failed:', transfersRes.reason?.response?.data || transfersRes.reason?.message);
       if (analyticsRes.status === 'fulfilled') setAnalytics(analyticsRes.value.data || null);
+      else console.error('Analytics API failed:', analyticsRes.reason?.response?.data || analyticsRes.reason?.message);
       if (syncStatusRes.status === 'fulfilled') setSyncStatus(syncStatusRes.value.data || null);
+      else console.error('SyncStatus API failed:', syncStatusRes.reason?.response?.data || syncStatusRes.reason?.message);
       if (syncHistoryRes.status === 'fulfilled') setSyncHistory(syncHistoryRes.value.data?.data || syncHistoryRes.value.data || []);
+      else console.error('SyncHistory API failed:', syncHistoryRes.reason?.response?.data || syncHistoryRes.reason?.message);
+
+      const failures = [profilesRes, returnsRes, transfersRes, analyticsRes, syncStatusRes, syncHistoryRes].filter(r => r.status === 'rejected');
+      if (failures.length > 0) {
+        const firstErr = (failures[0] as PromiseRejectedResult).reason;
+        const status = firstErr?.response?.status;
+        if (status === 403) setError('Access denied. Your subscription may not include this premium feature.');
+        else if (status === 401) setError('Please log in again.');
+        else setError(`Failed to load ${failures.length} data source(s). Check console for details.`);
+      }
     } catch (err: any) {
       setError(err?.message || 'Failed to load staff records data');
     } finally {
@@ -163,7 +178,7 @@ export default function StaffRecordsPage() {
   ];
 
   const authorizedRoles = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'SuperAdmin', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
-  const userRoles = user?.roles || [];
+  const userRoles = allRoles?.length ? allRoles : (user?.roles || []);
   const isAuthorized = userRoles.some(r => authorizedRoles.includes(r));
 
   if (!isAuthorized) {

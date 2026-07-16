@@ -625,8 +625,8 @@ export default function TeachersPage() {
                           });
                           try {
                             const rolesRes = await roleApi.getUserRoles(teacherUser.id || teacher.userId);
-                            const roles = rolesRes.data || [];
-                            setEditCurrentRoles(roles.map((r: any) => r.roleName || r.role?.name || ''));
+                            const roles = rolesRes.data?.data || rolesRes.data || [];
+                            setEditCurrentRoles(Array.isArray(roles) ? roles.map((r: any) => r.roleName || r.role?.name || '') : []);
                           } catch { setEditCurrentRoles([]); }
                           setShowEditModal(true);
                         }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors">
