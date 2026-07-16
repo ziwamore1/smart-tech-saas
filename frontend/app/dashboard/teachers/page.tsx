@@ -264,8 +264,9 @@ export default function TeachersPage() {
               await classApi.setClassTeacher(data.classAssignment, newUserId);
             }
           }
-        } catch (roleError) {
+        } catch (roleError: any) {
           console.error('Failed to assign role:', roleError);
+          throw new Error(`Teacher created but role assignment failed: ${roleError?.response?.data?.message || roleError?.message || 'Unknown error'}`);
         }
       }
       return teacher;

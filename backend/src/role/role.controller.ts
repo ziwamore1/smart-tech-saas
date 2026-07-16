@@ -43,12 +43,14 @@ export class RoleController {
   ) {
     const schoolId = req.user?.schoolId;
     
-    // Find the role
-    const role = await this.prisma.role.findFirst({
+    // Find or create the role
+    let role = await this.prisma.role.findFirst({
       where: { name: body.roleName },
     });
     if (!role) {
-      throw new Error(`Role ${body.roleName} not found`);
+      role = await this.prisma.role.create({
+        data: { name: body.roleName },
+      });
     }
 
     // Check if assignment exists

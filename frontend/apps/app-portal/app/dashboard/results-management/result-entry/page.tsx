@@ -94,7 +94,7 @@ export default function ResultEntryPage() {
   const classSubjects = useMemo(() => Array.isArray(classSubjectsData) ? classSubjectsData : [], [classSubjectsData]);
 
   const selectedClassObj = useMemo(() => classes.find((c: any) => c.id === selectedClass), [classes, selectedClass]);
-  const gradingSystemId = selectedClassObj?.gradingSystemId;
+  const gradingSystemId = selectedClassObj?.gradingSystemId || selectedClassObj?.gradingSystem?.id;
 
   const { data: gradeScales } = useQuery({
     queryKey: ['grade-scales', gradingSystemId],

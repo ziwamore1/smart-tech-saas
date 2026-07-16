@@ -14,6 +14,11 @@ export class GradingSystemController {
     return this.service.findAll(req.user.schoolId);
   }
 
+  @Get('default')
+  findDefault(@Req() req: any) {
+    return this.service.findDefault(req.user.schoolId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @Req() req: any) {
     return this.service.findOne(id, req.user.schoolId);

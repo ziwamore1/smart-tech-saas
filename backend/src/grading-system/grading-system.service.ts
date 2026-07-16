@@ -42,6 +42,22 @@ export class GradingSystemService {
     });
   }
 
+  async findDefault(schoolId: string) {
+    const system = await this.prisma.gradingSystem.findFirst({
+      where: { schoolId, isDefault: true },
+      include: { gradeScales: { orderBy: { minScore: 'desc' } } },
+    });
+    if (!system) {
+      const any = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId },
+        include: { gradeScales: { orderBy: { minScore: 'desc' } } },
+      });
+      if (!any) throw new NotFoundException('No grading system found for this school');
+      return any;
+    }
+    return system;
+  }
+
   async findOne(id: string, schoolId: string) {
     const system = await this.prisma.gradingSystem.findUnique({
       where: { id },

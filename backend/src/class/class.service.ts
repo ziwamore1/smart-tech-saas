@@ -83,6 +83,7 @@ export class ClassService {
         capacity: c.capacity,
         schoolId: c.schoolId,
         levelTypeId: c.levelTypeId,
+        gradingSystemId: c.gradingSystemId,
         order: c.order,
         levelType: c.levelType,
         gradingSystem: c.gradingSystem,
