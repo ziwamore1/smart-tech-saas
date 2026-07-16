@@ -179,9 +179,32 @@ export class ResultsManagementService {
       orderBy: { student: { lastName: 'asc' } },
     });
 
-    const students = enrollments.map((e) => e.student);
+    let students = enrollments.map((e) => e.student);
 
-    const computedResults = await this.prisma.computedResult.findMany({
+    // Fallback: if no enrollments found, get students from Result table
+    if (students.length === 0) {
+      const resultsWithStudents = await this.prisma.result.findMany({
+        where: {
+          termId: sheet.termId,
+          schoolId: sheet.schoolId,
+        },
+        select: {
+          student: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              admissionNumber: true,
+              gender: true,
+            },
+          },
+        },
+        distinct: ['studentId'],
+      });
+      students = resultsWithStudents.map((r) => r.student).filter(Boolean);
+    }
+
+    let computedResults = await this.prisma.computedResult.findMany({
       where: {
         studentId: { in: students.map((s) => s.id) },
         termId: sheet.termId,
@@ -192,6 +215,20 @@ export class ResultsManagementService {
       },
       orderBy: [{ studentId: 'asc' }, { subject: { name: 'asc' } }],
     });
+
+    // Fallback: if no computed results for this class, try without classId filter
+    if (computedResults.length === 0 && students.length > 0) {
+      computedResults = await this.prisma.computedResult.findMany({
+        where: {
+          studentId: { in: students.map((s) => s.id) },
+          termId: sheet.termId,
+        },
+        include: {
+          subject: { select: { id: true, name: true, code: true } },
+        },
+        orderBy: [{ studentId: 'asc' }, { subject: { name: 'asc' } }],
+      });
+    }
 
     const rawResults = await this.prisma.result.findMany({
       where: {
