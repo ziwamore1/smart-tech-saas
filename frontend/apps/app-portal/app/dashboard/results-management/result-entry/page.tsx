@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, classApi, termApi } from '@/lib/api';
+import { api, classApi, termApi, gradingSystemApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import { socket } from '@/lib/socket';
@@ -16,10 +16,20 @@ function getGradeColor(score: number | null) {
   return { bg: '#fee2e2', text: '#dc2626' };
 }
 
-function getGrade(result: any, score: number | null) {
+function computeGradeFromScales(score: number, scales: any[]): string | null {
+  if (!scales || scales.length === 0) return null;
+  const match = scales.find((s: any) => score >= s.minScore && score <= s.maxScore);
+  return match?.grade || null;
+}
+
+function getGrade(result: any, score: number | null, gradeScales?: any[]) {
   if (result?.grade) return result.grade;
   if (score == null) return '-';
-  return String(score);
+  if (gradeScales && gradeScales.length > 0) {
+    const computed = computeGradeFromScales(score, gradeScales);
+    if (computed) return computed;
+  }
+  return '-';
 }
 
 export default function ResultEntryPage() {
@@ -82,6 +92,25 @@ export default function ResultEntryPage() {
     enabled: !!selectedClass,
   });
   const classSubjects = useMemo(() => Array.isArray(classSubjectsData) ? classSubjectsData : [], [classSubjectsData]);
+
+  const selectedClassObj = useMemo(() => classes.find((c: any) => c.id === selectedClass), [classes, selectedClass]);
+  const gradingSystemId = selectedClassObj?.gradingSystemId;
+
+  const { data: gradeScales } = useQuery({
+    queryKey: ['grade-scales', gradingSystemId],
+    queryFn: async () => {
+      if (!gradingSystemId) {
+        const r = await gradingSystemApi.getDefault();
+        const d = r.data?.data || r.data;
+        return d?.gradeScales || [];
+      }
+      const r = await gradingSystemApi.getById(gradingSystemId);
+      const d = r.data?.data || r.data;
+      return d?.gradeScales || [];
+    },
+    enabled: !!selectedClass,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const { data: studentsData, isLoading: studentsLoading } = useQuery({
     queryKey: ['sheet-students', selectedClass, selectedTerm],
@@ -639,7 +668,7 @@ export default function ResultEntryPage() {
                                     padding: '1px 8px', borderRadius: '10px',
                                     background: colors.bg, color: colors.text
                                   }}>
-                                    {getGrade(result, effectiveScore)}
+                                    {getGrade(result, effectiveScore, gradeScales)}
                                   </span>
                                 )}
                               </div>
