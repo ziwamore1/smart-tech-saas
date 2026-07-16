@@ -39,6 +39,7 @@ export class TeacherController {
   }
 
   @Get()
+  @Roles('Director', 'Deputy Director', 'SuperAdmin', 'Head Teacher')
   findAll(@Query('schoolId') schoolId?: string, @Req() req?: any) {
     const targetSchoolId = schoolId || req?.user?.schoolId;
     return this.teacherService.findAll(targetSchoolId);
@@ -50,7 +51,7 @@ export class TeacherController {
   }
 
   @Post()
-  @Roles('Director')
+  @Roles('Director', 'Deputy Director')
   create(@Body() body: any, @Req() req: any) {
     const schoolId = req.user?.schoolId;
     if (!schoolId) {
@@ -61,13 +62,13 @@ export class TeacherController {
   }
 
   @Put(':id')
-  @Roles('Director')
+  @Roles('Director', 'Deputy Director')
   update(@Param('id') id: string, @Body() body: any) {
     return this.teacherService.update(id, body);
   }
 
   @Delete(':id')
-  @Roles('Director')
+  @Roles('Director', 'Deputy Director')
   delete(@Param('id') id: string) {
     return this.teacherService.delete(id);
   }

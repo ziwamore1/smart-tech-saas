@@ -48,8 +48,8 @@ export default function StudentLayout({
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="hidden md:block text-right">
+            <div className="flex items-center gap-3">
+              <div className="text-right">
                 <p className="text-sm font-medium text-gray-900">
                   {user?.firstName} {user?.lastName}
                 </p>
@@ -57,7 +57,7 @@ export default function StudentLayout({
               </div>
               <button
                 onClick={logout}
-                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg"
+                className="px-3 py-2 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg border border-red-200"
               >
                 Logout
               </button>

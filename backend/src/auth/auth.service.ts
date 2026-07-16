@@ -16,6 +16,7 @@ import { RegisterSuperAdminDto, CreateSchoolDto, CreateDirectorDto, RegisterTeac
 import { InstitutionRegistrationService } from '../institution/institution-registration.service';
 import { InstitutionProvisioningService } from '../institution/institution-provisioning.service';
 import { RegisterInstitutionDto, InstitutionTypeCodeEnum } from '../institution/dto/institution-type.dto';
+import { StaffSyncEngineService } from '../shared/staff-sync-engine/staff-sync-engine.service';
 
 @Injectable()
 export class AuthService {
@@ -29,6 +30,7 @@ export class AuthService {
     private emailService: EmailService,
     private institutionRegistrationService: InstitutionRegistrationService,
     private provisioningService: InstitutionProvisioningService,
+    private syncEngine: StaffSyncEngineService,
   ) {}
 
   async registerSuperAdmin(data: RegisterSuperAdminDto) {
@@ -225,13 +227,17 @@ export class AuthService {
     // Auto-create Teacher record so Director appears in staff register and analytics
     const existingTeacher = await this.prisma.teacher.findUnique({ where: { userId: user.id } });
     if (!existingTeacher) {
-      await this.prisma.teacher.create({
+      const teacher = await this.prisma.teacher.create({
         data: {
           userId: user.id,
           schoolId: data.schoolId,
           staffType: 'TEACHING',
         },
       });
+      // Auto-sync to StaffHrProfile for Staff Return Hub
+      this.syncEngine.syncStaffProfile(teacher.id, data.schoolId)
+        .then(result => this.logger.log(`Auto-sync to HR profile for director: created=${result.created}`))
+        .catch(err => this.logger.error(`Auto-sync to HR profile failed for director: ${err.message}`));
     }
 
     // Also ensure SchoolUser membership exists
@@ -388,6 +394,7 @@ export class AuthService {
           OR: [
             { phone: { equals: cleanedPhone, mode: 'insensitive' } },
             { username: { equals: cleanedPhone, mode: 'insensitive' } },
+            { student: { admissionNumber: identifier.trim() } },
           ],
         },
         include: {

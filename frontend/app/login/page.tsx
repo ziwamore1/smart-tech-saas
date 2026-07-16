@@ -8,7 +8,8 @@ import Link from 'next/link';
 import '../super-admin-fix.css';
 
 function LoginForm() {
-  const [email, setEmail] = useState('');
+  const [loginMode, setLoginMode] = useState<'email' | 'phone' | 'student'>('email');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -28,7 +29,7 @@ function LoginForm() {
     setIsLoading(true);
 
     try {
-      await login(email, password, loginAsSuperAdmin, schoolId || undefined);
+      await login(identifier, password, loginAsSuperAdmin, schoolId || undefined);
       
       if (loginAsSuperAdmin) {
         router.push('/super-admin');
@@ -141,8 +142,42 @@ function LoginForm() {
                     color: '#374151', 
                     marginBottom: '6px' 
                   }}>
-                    Email Address
+                    {loginMode === 'email' ? 'Email Address' : loginMode === 'phone' ? 'Phone Number' : 'Admission Number'}
                   </label>
+                  {!loginAsSuperAdmin && (
+                    <div style={{ display: 'flex', gap: '4px', marginBottom: '8px', background: '#f3f4f6', borderRadius: '8px', padding: '4px' }}>
+                      {[
+                        { mode: 'email' as const, label: 'Email', icon: 'fa-envelope' },
+                        { mode: 'phone' as const, label: 'Phone', icon: 'fa-phone' },
+                        { mode: 'student' as const, label: 'Student No.', icon: 'fa-graduation-cap' },
+                      ].map((opt) => (
+                        <button
+                          key={opt.mode}
+                          type="button"
+                          onClick={() => { setLoginMode(opt.mode); setIdentifier(''); }}
+                          style={{
+                            flex: 1,
+                            padding: '8px',
+                            fontSize: '12px',
+                            fontWeight: loginMode === opt.mode ? '600' : '500',
+                            color: loginMode === opt.mode ? '#ea6645' : '#6b7280',
+                            background: loginMode === opt.mode ? '#fefcf9' : 'transparent',
+                            border: loginMode === opt.mode ? '1px solid #e8ddd0' : '1px solid transparent',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <i className={`fa ${opt.icon}`} style={{ fontSize: '11px' }}></i>
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <div style={{ position: 'relative' }}>
                     <span style={{
                       position: 'absolute',
@@ -151,12 +186,12 @@ function LoginForm() {
                       transform: 'translateY(-50%)',
                       color: '#9ca3af'
                     }}>
-                      <i className="fa fa-envelope"></i>
+                      <i className={`fa fa-${loginMode === 'email' ? 'envelope' : loginMode === 'phone' ? 'phone' : 'graduation-cap'}`}></i>
                     </span>
                     <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      type={loginMode === 'email' ? 'email' : 'text'}
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
                       style={{
                         width: '100%',
                         padding: '12px 12px 12px 40px',
@@ -166,7 +201,11 @@ function LoginForm() {
                         outline: 'none',
                         transition: 'all 0.2s'
                       }}
-                      placeholder="you@school.com"
+                      placeholder={
+                        loginMode === 'email' ? 'you@school.com' :
+                        loginMode === 'phone' ? '+260XXXXXXXXX' :
+                        'e.g. STD/2025/001'
+                      }
                       required
                     />
                   </div>

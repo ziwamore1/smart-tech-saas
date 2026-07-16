@@ -242,7 +242,13 @@ export default function StaffRecordsPage() {
       )}
 
       {!loading && activeTab === 'profiles' && (
-        <ProfilesGrid profiles={profiles} onRefresh={fetchData} />
+        <div>
+          <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: 10, marginBottom: 16, fontSize: 13, color: '#16a34a' }}>
+            <i className="fas fa-sync-alt" style={{ marginRight: 6 }}></i>
+            Profiles are auto-synced from the Staff Register. New staff members appear here instantly.
+          </div>
+          <ProfilesGrid profiles={profiles} onRefresh={fetchData} />
+        </div>
       )}
 
       {!loading && activeTab === 'returns' && (
@@ -502,6 +508,23 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
     } catch { }
   };
 
+  const handleMoveColumn = async (columnId: string, direction: 'up' | 'down') => {
+    const sorted = [...templateColumns].sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0));
+    const idx = sorted.findIndex((c: any) => c.id === columnId);
+    if (idx < 0) return;
+    if (direction === 'up' && idx === 0) return;
+    if (direction === 'down' && idx === sorted.length - 1) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    const tempOrder = sorted[idx].columnOrder || 0;
+    sorted[idx].columnOrder = sorted[swapIdx].columnOrder || 0;
+    sorted[swapIdx].columnOrder = tempOrder;
+    const reorderPayload = sorted.map((c: any, i: number) => ({ id: c.id, order: i + 1 }));
+    try {
+      await premiumStaffRecordsApi.reorderColumns(selectedTemplateId!, reorderPayload);
+      if (selectedTemplateId) fetchColumns(selectedTemplateId);
+    } catch { }
+  };
+
   const handleExportTemplate = (templateId: string) => {
     withBtnLoading(`export_${templateId}`, async () => {
       const res = await premiumStaffRecordsApi.exportTemplateExcel(templateId);
@@ -619,7 +642,11 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                               <input type="checkbox" checked={col.isVisible !== false} onChange={() => handleColumnToggle(col)} disabled={!!btnLoading[`toggle_${col.id}`]} />
                             </td>
                             <td style={{ padding: '6px 10px' }}>
-                              <button onClick={() => handleDeleteColumn(col.id)} disabled={btnLoading[`deleteCol_${col.id}`]} style={{ padding: '2px 6px', background: btnLoading[`deleteCol_${col.id}`] ? '#e5e7eb' : '#fecaca', color: '#dc2626', border: 'none', borderRadius: 4, cursor: btnLoading[`deleteCol_${col.id}`] ? 'not-allowed' : 'pointer', fontSize: 11 }}>{btnLoading[`deleteCol_${col.id}`] ? '...' : 'Delete'}</button>
+                              <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                <button onClick={() => handleMoveColumn(col.id, 'up')} title="Move up" style={{ padding: '2px 6px', background: '#dbeafe', color: '#1d4ed8', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>&#9650;</button>
+                                <button onClick={() => handleMoveColumn(col.id, 'down')} title="Move down" style={{ padding: '2px 6px', background: '#dbeafe', color: '#1d4ed8', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>&#9660;</button>
+                                <button onClick={() => handleDeleteColumn(col.id)} disabled={btnLoading[`deleteCol_${col.id}`]} style={{ padding: '2px 6px', background: btnLoading[`deleteCol_${col.id}`] ? '#e5e7eb' : '#fecaca', color: '#dc2626', border: 'none', borderRadius: 4, cursor: btnLoading[`deleteCol_${col.id}`] ? 'not-allowed' : 'pointer', fontSize: 11 }}>{btnLoading[`deleteCol_${col.id}`] ? '...' : 'Del'}</button>
+                              </div>
                             </td>
                           </tr>
                         ))}

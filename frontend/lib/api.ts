@@ -84,8 +84,8 @@ api.interceptors.response.use(
 );
 
 export const authApi = {
-  login: (email: string, password: string, schoolId?: string) =>
-    api.post('/auth/login', { email, password, schoolId }),
+  login: (identifier: string, password: string, schoolId?: string) =>
+    api.post('/auth/login', { identifier, password, ...(schoolId ? { schoolId } : {}) }),
   
   superAdminLogin: (email: string, password: string) =>
     api.post('/auth/super-admin/login', { email, password }),
@@ -1996,6 +1996,7 @@ export const schoolMembershipApi = {
   assignRole: (userId: string, role: string) => api.post('/school-membership/roles', { userId, role }),
   removeRole: (userId: string, role: string) => api.delete('/school-membership/roles', { data: { userId, role } }),
   getUserRoles: (userId: string) => api.get(`/school-membership/user/${userId}/roles`),
+  searchUsers: (q: string) => api.get('/school-membership/users/search', { params: { q } }),
 };
 
 export const platformRoleApi = {

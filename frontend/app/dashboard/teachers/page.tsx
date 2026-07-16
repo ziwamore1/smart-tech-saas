@@ -234,6 +234,7 @@ export default function TeachersPage() {
   const AVAILABLE_ROLES_FOR_STAFF = isPrimary ? [
     { name: 'Class Teacher', icon: '🏫' },
     { name: 'Head Teacher', icon: '🎓' },
+    { name: 'Deputy Director', icon: '⭐' },
     { name: 'Senior Teacher', icon: '🌟' },
     { name: 'Lower Primary Senior Teacher', icon: '📗' },
     { name: 'Upper Primary Senior Teacher', icon: '📘' },
@@ -245,6 +246,7 @@ export default function TeachersPage() {
     { name: 'Teacher', icon: '👨‍🏫' },
     { name: 'Class Teacher', icon: '🏫' },
     { name: 'Head Teacher', icon: '🎓' },
+    { name: 'Deputy Director', icon: '⭐' },
     { name: 'Deputy', icon: '⭐' },
     { name: 'Accountant', icon: '💰' },
     { name: 'Secretary', icon: '📋' },
@@ -307,8 +309,9 @@ export default function TeachersPage() {
     firstName: '', lastName: '', email: '', phone: '', gender: '',
     dateOfBirth: '', department: '', staffType: 'TEACHING', qualification: '', specialization: '',
     yearsOfExperience: '', employeeId: '', hireDate: '', address: '',
-    emergencyContact: '', emergencyPhone: '',
+    emergencyContact: '', emergencyPhone: '', role: '',
   });
+  const [editCurrentRoles, setEditCurrentRoles] = useState<string[]>([]);
 
   const updateTeacherMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => teacherApi.update(id, data),
@@ -608,7 +611,7 @@ export default function TeachersPage() {
                         </button>
                         {canManageStaff && (
                         <>
-                        <button onClick={() => {
+                        <button onClick={async () => {
                           setSelectedTeacher(teacher);
                           setEditForm({
                             firstName: teacherUser.firstName || '', lastName: teacherUser.lastName || '',
@@ -618,8 +621,13 @@ export default function TeachersPage() {
                             specialization: teacher.specialization || '', yearsOfExperience: teacher.yearsOfExperience || '',
                             employeeId: teacher.employeeNo || '', hireDate: teacher.hireDate ? teacher.hireDate.split('T')[0] : '',
                             address: teacher.address || '', emergencyContact: teacher.emergencyContact || '',
-                            emergencyPhone: teacher.emergencyPhone || '',
+                            emergencyPhone: teacher.emergencyPhone || '', role: '',
                           });
+                          try {
+                            const rolesRes = await roleApi.getUserRoles(teacherUser.id || teacher.userId);
+                            const roles = rolesRes.data || [];
+                            setEditCurrentRoles(roles.map((r: any) => r.roleName || r.role?.name || ''));
+                          } catch { setEditCurrentRoles([]); }
                           setShowEditModal(true);
                         }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors">
                           ✏️ Edit
@@ -1050,12 +1058,42 @@ export default function TeachersPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Specialization</label>
                 <input type="text" value={editForm.specialization} onChange={(e) => setEditForm({ ...editForm, specialization: e.target.value })} className="w-full px-3 py-2 border rounded-lg" />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Assign Role</label>
+                <select value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })} className="w-full px-3 py-2 border rounded-lg">
+                  <option value="">-- Keep Current Role --</option>
+                  {AVAILABLE_ROLES_FOR_STAFF.map(r => (
+                    <option key={r.name} value={r.name}>{r.icon} {r.name}</option>
+                  ))}
+                </select>
+                {editCurrentRoles.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">Current: {editCurrentRoles.join(', ')}</p>
+                )}
+              </div>
             </div>
             <div className="flex gap-3 justify-end pt-6">
               <button onClick={() => { setShowEditModal(false); setSelectedTeacher(null); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
-              <button onClick={() => {
+              <button onClick={async () => {
                 if (!editForm.firstName || !editForm.lastName) { alert('First and last name required'); return; }
-                updateTeacherMutation.mutate({ id: selectedTeacher.id, data: { user: { firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email, phone: editForm.phone || null }, department: editForm.department, staffType: editForm.staffType, gender: editForm.gender, qualification: editForm.qualification, specialization: editForm.specialization, yearsOfExperience: editForm.yearsOfExperience ? parseInt(editForm.yearsOfExperience) : null, emergencyContact: editForm.emergencyContact || null, emergencyPhone: editForm.emergencyPhone || null, employeeNo: editForm.employeeId, hireDate: editForm.hireDate || null } });
+                await updateTeacherMutation.mutateAsync({ id: selectedTeacher.id, data: { user: { firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email, phone: editForm.phone || null }, department: editForm.department, staffType: editForm.staffType, gender: editForm.gender, qualification: editForm.qualification, specialization: editForm.specialization, yearsOfExperience: editForm.yearsOfExperience ? parseInt(editForm.yearsOfExperience) : null, emergencyContact: editForm.emergencyContact || null, emergencyPhone: editForm.emergencyPhone || null, employeeNo: editForm.employeeId, hireDate: editForm.hireDate || null } });
+                if (editForm.role) {
+                  try {
+                    const userId = selectedTeacher.user?.id || selectedTeacher.userId;
+                    const oldRoles = editCurrentRoles.filter(r => AVAILABLE_ROLES_FOR_STAFF.some(ar => ar.name === r));
+                    for (const oldRole of oldRoles) {
+                      if (oldRole !== editForm.role) {
+                        await roleApi.removeRole(userId, oldRole).catch(() => {});
+                      }
+                    }
+                    await roleApi.assignRole(userId, editForm.role);
+                  } catch (roleErr) {
+                    console.error('Role assignment error:', roleErr);
+                  }
+                }
+                queryClient.invalidateQueries({ queryKey: ['teachers'] });
+                queryClient.invalidateQueries({ queryKey: ['school-users'] });
+                setShowEditModal(false);
+                setSelectedTeacher(null);
               }} disabled={updateTeacherMutation.isPending} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400">
                 {updateTeacherMutation.isPending ? 'Saving...' : 'Save Changes'}
               </button>

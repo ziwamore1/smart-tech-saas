@@ -193,6 +193,45 @@ export class SchoolMembershipService {
     return { message: `Role ${role} removed` };
   }
 
+  async searchAllUsers(schoolId: string, query: string) {
+    const q = query.trim();
+    if (q.length < 2) return [];
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        OR: [
+          { firstName: { contains: q, mode: 'insensitive' } },
+          { lastName: { contains: q, mode: 'insensitive' } },
+          { email: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        isActive: true,
+        schoolUsers: {
+          where: { schoolId },
+          select: { id: true },
+        },
+      },
+      take: 20,
+      orderBy: { firstName: 'asc' },
+    });
+
+    return users.map(u => ({
+      id: u.id,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      email: u.email,
+      phone: u.phone,
+      isActive: u.isActive,
+      isMember: u.schoolUsers.length > 0,
+    }));
+  }
+
   async getUserSchoolRoles(userId: string) {
     return this.prisma.schoolUser.findMany({
       where: { userId },

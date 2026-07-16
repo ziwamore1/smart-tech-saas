@@ -13,7 +13,6 @@ import { DirectorClassesScreen } from '../screens/director/ClassesScreen';
 import { ClassesManagementScreen } from '../screens/director/ClassesManagementScreen';
 import { DirectorStudentsScreen } from '../screens/director/StudentsScreen';
 import { RegisterStudentScreen } from '../screens/registration/RegisterStudentScreen';
-import { DirectorStaffScreen } from '../screens/director/StaffScreen';
 import { SchoolMembershipScreen } from '../screens/director/SchoolMembershipScreen';
 import { ResultsManagementScreen } from '../screens/director/ResultsManagementScreen';
 import { GradingSystemsScreen } from '../screens/director/GradingSystemsScreen';

@@ -5,6 +5,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('roles')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class RoleController {
   constructor(private prisma: PrismaService) {}
 
@@ -55,21 +56,42 @@ export class RoleController {
       where: { userId: body.userId, roleId: role.id },
     });
 
-    if (existing) {
-      return { message: 'Role already assigned' };
+    if (!existing) {
+      // Create legacy UserRole assignment
+      await this.prisma.userRole.create({
+        data: { userId: body.userId, roleId: role.id },
+      });
     }
 
-    // Create assignment
-    const userRole = await this.prisma.userRole.create({
-      data: { userId: body.userId, roleId: role.id },
-    });
+    // Also create SchoolRoleAssignment for school-level authorization
+    if (schoolId) {
+      const membership = await this.prisma.schoolUser.findFirst({
+        where: { userId: body.userId, schoolId },
+      });
+      if (membership) {
+        const existingSchoolRole = await this.prisma.schoolRoleAssignment.findFirst({
+          where: { schoolMembershipId: membership.id, role: body.roleName },
+        });
+        if (!existingSchoolRole) {
+          await this.prisma.schoolRoleAssignment.create({
+            data: { schoolMembershipId: membership.id, role: body.roleName, isActive: true },
+          });
+        } else if (!existingSchoolRole.isActive) {
+          await this.prisma.schoolRoleAssignment.update({
+            where: { id: existingSchoolRole.id },
+            data: { isActive: true },
+          });
+        }
+      }
+    }
 
-    return { message: 'Role assigned', userRole };
+    return { message: 'Role assigned successfully' };
   }
 
   @Post('remove')
   async removeRole(
     @Body() body: { userId: string; roleName: string },
+    @Req() req: any,
   ) {
     const role = await this.prisma.role.findFirst({
       where: { name: body.roleName },
@@ -78,14 +100,30 @@ export class RoleController {
       throw new Error(`Role ${body.roleName} not found`);
     }
 
+    // Remove legacy UserRole
     await this.prisma.userRole.deleteMany({
       where: { userId: body.userId, roleId: role.id },
     });
 
-    return { message: 'Role removed' };
+    // Also deactivate SchoolRoleAssignment
+    const schoolId = req.user?.schoolId;
+    if (schoolId) {
+      const membership = await this.prisma.schoolUser.findFirst({
+        where: { userId: body.userId, schoolId },
+      });
+      if (membership) {
+        await this.prisma.schoolRoleAssignment.updateMany({
+          where: { schoolMembershipId: membership.id, role: body.roleName },
+          data: { isActive: false },
+        });
+      }
+    }
+
+    return { message: 'Role removed successfully' };
   }
 
   @Get('school/users')
+  @Roles('Director', 'Deputy Director', 'SuperAdmin', 'Head Teacher')
   async getSchoolUsersWithRoles(@Req() req: any) {
     const schoolId = req.user?.schoolId;
     if (!schoolId) {

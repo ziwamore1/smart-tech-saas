@@ -9,8 +9,15 @@ import { Roles } from '../auth/decorators/roles.decorator';
 export class SchoolMembershipController {
   constructor(private readonly membershipService: SchoolMembershipService) {}
 
+  @Get('users/search')
+  @Roles('Director', 'Deputy Director', 'SuperAdmin', 'Head Teacher')
+  async searchUsers(@Req() req: any, @Query('q') q: string) {
+    const schoolId = req.user.schoolId;
+    return this.membershipService.searchAllUsers(schoolId, q || '');
+  }
+
   @Get('members')
-  @Roles('Director', 'SuperAdmin')
+  @Roles('Director', 'Deputy Director', 'SuperAdmin', 'Head Teacher')
   async getMembers(@Req() req: any) {
     const schoolId = req.user.schoolId;
     return this.membershipService.getMembers(schoolId);
@@ -24,35 +31,35 @@ export class SchoolMembershipController {
   }
 
   @Get('members/role/:role')
-  @Roles('Director', 'SuperAdmin')
+  @Roles('Director', 'Deputy Director', 'SuperAdmin', 'Head Teacher')
   async getMembersByRole(@Req() req: any, @Param('role') role: string) {
     const schoolId = req.user.schoolId;
     return this.membershipService.getMembersByRole(schoolId, role);
   }
 
   @Post('members')
-  @Roles('Director', 'SuperAdmin')
+  @Roles('Director', 'Deputy Director', 'SuperAdmin', 'Head Teacher')
   async addMember(@Req() req: any, @Body() body: { userId: string; isPrimary?: boolean }) {
     const schoolId = req.user.schoolId;
     return this.membershipService.addMember(schoolId, body.userId, body.isPrimary);
   }
 
   @Delete('members/:userId')
-  @Roles('Director', 'SuperAdmin')
+  @Roles('Director', 'Deputy Director', 'SuperAdmin', 'Head Teacher')
   async removeMember(@Req() req: any, @Param('userId') userId: string) {
     const schoolId = req.user.schoolId;
     return this.membershipService.removeMember(schoolId, userId);
   }
 
   @Post('roles')
-  @Roles('Director', 'SuperAdmin')
+  @Roles('Director', 'Deputy Director', 'SuperAdmin', 'Head Teacher')
   async assignRole(@Req() req: any, @Body() body: { userId: string; role: string }) {
     const schoolId = req.user.schoolId;
     return this.membershipService.assignSchoolRole(schoolId, body.userId, body.role, req.user.sub);
   }
 
   @Delete('roles')
-  @Roles('Director', 'SuperAdmin')
+  @Roles('Director', 'Deputy Director', 'SuperAdmin', 'Head Teacher')
   async removeRole(@Req() req: any, @Body() body: { userId: string; role: string }) {
     const schoolId = req.user.schoolId;
     return this.membershipService.removeSchoolRole(schoolId, body.userId, body.role);

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UnifiedMessagingService } from '../messaging/unified-messaging.service';
 import { SocketGateway } from '../messaging/socket.gateway';
 import { GradingEngineService } from '../grading-engine/grading-engine.service';
+import { StaffSyncEngineService } from '../shared/staff-sync-engine/staff-sync-engine.service';
 import { Teacher } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
@@ -15,6 +16,7 @@ export class TeacherService {
     private unifiedMessaging: UnifiedMessagingService,
     private socketGateway: SocketGateway,
     private gradingEngine: GradingEngineService,
+    private syncEngine: StaffSyncEngineService,
   ) {}
 
   async findAll(schoolId?: string) {
@@ -119,12 +121,27 @@ export class TeacherService {
       await this.prisma.schoolRoleAssignment.create({
         data: { schoolMembershipId: membership.id, role: 'Teacher', isActive: true },
       });
+    } else {
+      // Ensure Teacher SchoolRoleAssignment exists even if membership already exists
+      const existingTeacherRole = await this.prisma.schoolRoleAssignment.findFirst({
+        where: { schoolMembershipId: existingMembership.id, role: 'Teacher' },
+      });
+      if (!existingTeacherRole) {
+        await this.prisma.schoolRoleAssignment.create({
+          data: { schoolMembershipId: existingMembership.id, role: 'Teacher', isActive: true },
+        });
+      }
     }
 
     const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
       select: { name: true },
     });
+
+    // Auto-sync to StaffHrProfile for Staff Return Hub
+    this.syncEngine.syncStaffProfile(teacher.id, schoolId)
+      .then(result => this.logger.log(`Auto-sync to HR profile for teacher ${teacher.id}: created=${result.created}, updated=${result.updated}`))
+      .catch(err => this.logger.error(`Auto-sync to HR profile failed for teacher ${teacher.id}:`, err.message));
 
     const plainPassword = password || 'Teacher123!';
     const teacherWithUser = teacher as any;
@@ -185,11 +202,18 @@ export class TeacherService {
       }
     }
 
-    return this.prisma.teacher.update({
+    const updated = await this.prisma.teacher.update({
       where: { id },
       data: updateData,
       include: { user: true },
     });
+
+    // Auto-sync updated data to StaffHrProfile for Staff Return Hub
+    this.syncEngine.syncStaffProfile(id, updated.schoolId)
+      .then(result => this.logger.log(`Auto-sync after teacher update ${id}: updated=${result.updated}`))
+      .catch(err => this.logger.error(`Auto-sync after teacher update failed for ${id}:`, err.message));
+
+    return updated;
   }
 
   async delete(id: string) {

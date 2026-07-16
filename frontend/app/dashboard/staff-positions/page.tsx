@@ -130,6 +130,7 @@ function DepartmentsTab({ departments, isDirector, onRefresh, setSuccess, setErr
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [category, setCategory] = useState('');
+  const [customCategory, setCustomCategory] = useState('');
   const [description, setDescription] = useState('');
 
   const CATEGORIES = [
@@ -137,25 +138,30 @@ function DepartmentsTab({ departments, isDirector, onRefresh, setSuccess, setErr
     'BUSINESS_STUDIES', 'TECHNICAL', 'VOCATIONAL', 'CREATIVE_ARTS', 'SPORTS',
     'COUNSELING', 'ADMINISTRATION', 'FINANCE', 'LIBRARY', 'EARLY_CHILDHOOD',
     'LOWER_PRIMARY', 'UPPER_PRIMARY', 'SPECIAL_EDUCATION', 'LITERACY_NUMERACY',
+    'Other (Custom)',
   ];
 
   const resetForm = () => {
-    setName(''); setCode(''); setCategory(''); setDescription(''); setEditDept(null); setShowForm(false);
+    setName(''); setCode(''); setCategory(''); setCustomCategory(''); setDescription(''); setEditDept(null); setShowForm(false);
   };
 
   const handleEdit = (dept: any) => {
     setEditDept(dept); setName(dept.name); setCode(dept.code || '');
-    setCategory(dept.category); setDescription(dept.description || ''); setShowForm(true);
+    const isCustom = !CATEGORIES.slice(0, -1).includes(dept.category);
+    setCategory(isCustom ? 'Other (Custom)' : dept.category);
+    setCustomCategory(isCustom ? dept.category : '');
+    setDescription(dept.description || ''); setShowForm(true);
   };
 
   const handleSubmit = async () => {
     if (!name || !category) return;
+    const finalCategory = category === 'Other (Custom)' ? (customCategory.trim() || 'CUSTOM') : category;
     try {
       if (editDept) {
-        await staffPositionApi.updateDepartment(editDept.id, { name, code, category, description });
+        await staffPositionApi.updateDepartment(editDept.id, { name, code, category: finalCategory, description });
         setSuccess('Department updated');
       } else {
-        await staffPositionApi.createDepartment({ name, code, category, description });
+        await staffPositionApi.createDepartment({ name, code, category: finalCategory, description });
         setSuccess('Department created');
       }
       resetForm(); onRefresh();
@@ -205,6 +211,12 @@ function DepartmentsTab({ departments, isDirector, onRefresh, setSuccess, setErr
                 {CATEGORIES.map(c => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
               </select>
             </div>
+            {category === 'Other (Custom)' && (
+              <div>
+                <label style={{ fontSize: 12, color: '#374151', display: 'block', marginBottom: 4 }}>Custom Category *</label>
+                <input value={customCategory} onChange={e => setCustomCategory(e.target.value)} placeholder="e.g. AGRICULTURE, HEALTH" style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }} />
+              </div>
+            )}
             <div>
               <label style={{ fontSize: 12, color: '#374151', display: 'block', marginBottom: 4 }}>Description</label>
               <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description" style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }} />

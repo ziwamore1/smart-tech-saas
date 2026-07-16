@@ -1784,6 +1784,36 @@ class ApiService {
     return response.data;
   }
 
+  async createDepartment(data: { name: string; description?: string; category?: string }) {
+    const response = await this.client.post('/staff-positions/departments', data);
+    return response.data;
+  }
+
+  async updateDepartment(id: string, data: { name?: string; description?: string; category?: string }) {
+    const response = await this.client.put(`/staff-positions/departments/${id}`, data);
+    return response.data;
+  }
+
+  async deleteDepartment(id: string) {
+    const response = await this.client.delete(`/staff-positions/departments/${id}`);
+    return response.data;
+  }
+
+  async createStaffPosition(data: any) {
+    const response = await this.client.post('/staff-positions/positions', data);
+    return response.data;
+  }
+
+  async updateStaffPosition(id: string, data: any) {
+    const response = await this.client.put(`/staff-positions/positions/${id}`, data);
+    return response.data;
+  }
+
+  async deleteStaffPosition(id: string) {
+    const response = await this.client.delete(`/staff-positions/positions/${id}`);
+    return response.data;
+  }
+
   // ===== System Communications API (SuperAdmin) =====
 
   async getSystemCommunicationsDashboard() {
@@ -2326,6 +2356,11 @@ class ApiService {
 
   async getUserRoles(userId: string) {
     const response = await this.client.get(`/school-membership/user/${userId}/roles`);
+    return response.data;
+  }
+
+  async searchUsers(q: string) {
+    const response = await this.client.get('/school-membership/users/search', { params: { q } });
     return response.data;
   }
 

@@ -14,7 +14,7 @@ interface Props {
 }
 
 const TAB_OPTIONS = ['All', 'Teaching Staff', 'Admin', 'By Role'];
-const ROLE_OPTIONS = ['Director', 'Teacher', 'Class Teacher', 'HOD', 'Accountant', 'Deputy', 'Head Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
+const ROLE_OPTIONS = ['Director', 'Deputy Director', 'Teacher', 'Class Teacher', 'HOD', 'Accountant', 'Secretary', 'Deputy', 'Head Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
 
 export const SchoolMembershipScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
@@ -76,14 +76,14 @@ export const SchoolMembershipScreen: React.FC<Props> = ({ onToggleDrawer, onNavi
     if (!matchesSearch) return false;
     if (activeTab === 'All') return true;
     if (activeTab === 'Teaching Staff') return m.roles?.some((r: string) => r.toLowerCase().includes('teacher'));
-    if (activeTab === 'Admin') return m.roles?.some((r: string) => ['director', 'deputy', 'hod', 'accountant', 'head teacher'].includes(r.toLowerCase()));
+    if (activeTab === 'Admin') return m.roles?.some((r: string) => ['director', 'deputy director', 'deputy', 'hod', 'accountant', 'secretary', 'head teacher'].includes(r.toLowerCase()));
     return true;
   }, members);
 
   const totalMembers = members.length;
   const activeCount = members.filter((m) => m.isActive !== false).length;
   const teacherCount = members.filter((m) => m.roles?.some((r: string) => r.toLowerCase().includes('teacher'))).length;
-  const adminCount = members.filter((m) => m.roles?.some((r: string) => ['director', 'deputy', 'hod', 'accountant', 'head teacher'].includes(r.toLowerCase()))).length;
+  const adminCount = members.filter((m) => m.roles?.some((r: string) => ['director', 'deputy director', 'deputy', 'hod', 'accountant', 'secretary', 'head teacher'].includes(r.toLowerCase()))).length;
 
   const handleSearchAddMember = async (query: string) => {
     setAddSearchQuery(query);

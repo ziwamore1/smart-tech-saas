@@ -28,7 +28,7 @@ interface AuthContextType {
   isTeacher: boolean;
   isClassTeacher: boolean;
   allRoles: string[];
-  login: (email: string, password: string, isSuperAdmin?: boolean, schoolId?: string) => Promise<void>;
+  login: (identifier: string, password: string, isSuperAdmin?: boolean, schoolId?: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -82,11 +82,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string, isSuperAdmin: boolean = false, schoolId?: string) => {
+  const login = async (identifier: string, password: string, isSuperAdmin: boolean = false, schoolId?: string) => {
     try {
       const response = isSuperAdmin 
-        ? await authApi.superAdminLogin(email, password)
-        : await authApi.login(email, password, schoolId);
+        ? await authApi.superAdminLogin(identifier, password)
+        : await authApi.login(identifier, password, schoolId);
       
       const responseData = response.data?.data || response.data;
       const access_token = responseData?.access_token;
@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (payload.type === 'super_admin' || isSuperAdmin) {
         userData = {
           id: payload.sub,
-          email: responseData?.user?.email || email,
+          email: responseData?.user?.email || identifier,
           fullName: responseData?.user?.fullName || '',
           firstName: responseData?.user?.fullName?.split(' ')[0] || '',
           lastName: responseData?.user?.fullName?.split(' ').slice(1).join(' ') || '',
@@ -118,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         userData = {
           id: payload.sub,
-          email: responseData?.user?.email || email,
+          email: responseData?.user?.email || identifier,
           firstName: responseData?.user?.firstName || payload.firstName || '',
           lastName: responseData?.user?.lastName || payload.lastName || '',
           schoolId: payload.schoolId,

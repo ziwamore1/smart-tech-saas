@@ -920,6 +920,58 @@ export default function DashboardLayout({
                 <span className="nav-text" style={{ fontSize: '14px' }}>{item.name}</span>
               </Link>
             ))}
+            {/* Mobile User Profile & Logout */}
+            <div style={{ borderTop: '1px solid #e8ddd0', padding: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #ea6645, #f59e0b)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  flexShrink: 0
+                }}>
+                  {user?.firstName?.[0]}{user?.lastName?.[0]}
+                </div>
+                <div style={{ overflow: 'hidden' }}>
+                  <p style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', margin: 0, whiteSpace: 'nowrap' }}>
+                    {user?.firstName} {user?.lastName}
+                  </p>
+                  <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0, whiteSpace: 'nowrap' }}>
+                    {user?.roles?.[0] || 'User'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  logout();
+                  router.push('/login');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  fontSize: '13px',
+                  color: '#ef4444',
+                  background: '#fefcf9',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <i className="fa fa-sign-out-alt"></i>
+                <span>Sign Out</span>
+              </button>
+            </div>
           </nav>
         )}
       </header>

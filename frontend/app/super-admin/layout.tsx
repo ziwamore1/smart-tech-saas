@@ -436,6 +436,58 @@ export default function SuperAdminLayout({
                 </Link>
               ))}
             </div>
+            {/* Mobile User Profile & Logout */}
+            <div style={{ borderTop: '1px solid #e8ddd0', padding: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', padding: '12px', background: '#f5efe8', borderRadius: '12px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  background: 'linear-gradient(135deg, #ea6645, #f59e0b)',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                }}>
+                  {user?.firstName?.[0]}{user?.lastName?.[0]}
+                </div>
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {user?.firstName} {user?.lastName}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                    Super Admin
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  logout();
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #fecaca',
+                  background: '#fefcf9',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  color: '#ef4444',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  transition: 'all 0.2s',
+                }}
+              >
+                <i className="fa fa-sign-out-alt" style={{ fontSize: '16px' }}></i>
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
       )}

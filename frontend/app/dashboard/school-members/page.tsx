@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { schoolMembershipApi, api } from '@/lib/api';
+import { schoolMembershipApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permission-context';
 import { ReadOnlyBanner } from '@/components/permissions/ReadOnlyBanner';
@@ -35,6 +35,7 @@ interface UserSearchResult {
   email: string;
   phone?: string;
   isActive: boolean;
+  isMember?: boolean;
 }
 
 const ROLE_STYLES: Record<string, { color: string; icon: string }> = {
@@ -220,16 +221,17 @@ export default function SchoolMembersPage() {
     addSearchTimeout.current = setTimeout(async () => {
       setAddSearching(true);
       try {
-        const res = await api.get('/teacher', { params: { search: addSearchTerm } });
-        let data = res.data?.data || res.data || [];
+        const res = await schoolMembershipApi.searchUsers(addSearchTerm);
+        let data = res.data || [];
         if (!Array.isArray(data)) data = [];
-        const results: UserSearchResult[] = data.map((t: any) => ({
-          id: t.user?.id || t.userId,
-          firstName: t.user?.firstName || t.firstName || '',
-          lastName: t.user?.lastName || t.lastName || '',
-          email: t.user?.email || t.email || '',
-          phone: t.user?.phone || t.phone,
-          isActive: t.user?.isActive ?? true,
+        const results: UserSearchResult[] = data.map((u: any) => ({
+          id: u.id,
+          firstName: u.firstName || '',
+          lastName: u.lastName || '',
+          email: u.email || '',
+          phone: u.phone,
+          isActive: u.isActive ?? true,
+          isMember: u.isMember ?? false,
         })).filter((u: UserSearchResult) => u.id);
         setAddSearchResults(results);
       } catch {
@@ -522,7 +524,7 @@ export default function SchoolMembersPage() {
               {addSearchResults.length > 0 && (
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {addSearchResults.map((u) => {
-                    const existingMember = (members || []).find((m: SchoolMember) => m.user?.id === u.id);
+                    const isExistingMember = u.isMember || (members || []).some((m: SchoolMember) => m.user?.id === u.id);
                     return (
                       <div key={u.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                         <div className="flex items-center gap-3">
@@ -534,7 +536,7 @@ export default function SchoolMembersPage() {
                             <div className="text-sm text-gray-500">{u.email}</div>
                           </div>
                         </div>
-                        {existingMember ? (
+                        {isExistingMember ? (
                           <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">✅ Already a member</span>
                         ) : (
                           <button
