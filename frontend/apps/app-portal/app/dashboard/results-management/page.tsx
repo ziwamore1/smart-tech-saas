@@ -103,7 +103,7 @@ export default function ResultsManagementPage() {
       toast.success(r.data?.message || 'Status updated');
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to update status');
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to update status');
     },
   });
 

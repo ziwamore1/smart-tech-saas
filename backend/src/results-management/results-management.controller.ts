@@ -92,7 +92,7 @@ export class ResultsManagementController {
   }
 
   @Post('sheets/:id/submit')
-  @Roles('CLASS_TEACHER', 'TEACHER')
+  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
   async submitSheet(@Param('id') id: string, @Request() req) {
     const data = await this.resultsManagement.submitSheet(id, req.user.id);
     return { data, message: 'Result sheet submitted successfully' };
