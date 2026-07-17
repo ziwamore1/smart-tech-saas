@@ -75,33 +75,30 @@ export default function StudentsPage() {
 
   const { data: studentsData, isLoading: studentsLoading, error: studentsError } = useQuery({
     queryKey: ['students', includeInactive, filterStatus, filterClass],
+    keepPreviousData: true,
+    retry: 2,
     queryFn: async () => {
-      try {
-        const params: any = {};
-        if (includeInactive) params.includeInactive = 'true';
-        if (filterStatus) params.status = filterStatus;
-        if (filterClass) params.classId = filterClass;
-        const res = await api.get('/student', { params });
-        console.log('Students API response:', res.data);
-        console.log('Response status:', res.status);
-        let data = res.data?.data || res.data?.students || res.data;
-        if (data && typeof data === 'object' && !Array.isArray(data)) {
-          if (data.result) data = data.result;
-          if (data.items) data = data.items;
-          if (data.students) data = data.students;
-          if (data.total !== undefined && Array.isArray(data.data)) data = data.data;
-        }
-        if (!Array.isArray(data)) {
-          console.warn('Students data is not an array:', data);
-          data = [];
-        }
-        return data;
-      } catch (error: any) {
-        console.error('Failed to fetch students:', error);
-        console.error('Error response:', error.response?.data);
-        console.error('Error status:', error.response?.status);
-        return [];
+      const params: any = {};
+      if (includeInactive) params.includeInactive = 'true';
+      if (filterStatus) params.status = filterStatus;
+      if (filterClass) params.classId = filterClass;
+      const res = await api.get('/student', { params });
+      console.log('Students API response:', res.data);
+      console.log('Response status:', res.status);
+      let data = res.data?.data || res.data?.students || res.data;
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        if (data.result) data = data.result;
+        if (data.items) data = data.items;
+        if (data.students) data = data.students;
+        if (data.total !== undefined && Array.isArray(data.data)) data = data.data;
       }
+      if (!Array.isArray(data)) {
+        console.warn('Students data is not an array:', data);
+        data = [];
+      }
+      return data;
+    },
+  });
     },
   });
 
@@ -407,20 +404,31 @@ export default function StudentsPage() {
         ) : filteredStudents.length === 0 ? (
           <div className="p-12 text-center">
             <div className="text-6xl mb-4">👨‍🎓</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Students Found</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {studentsError ? 'Failed to Load Students' : 'No Students Found'}
+            </h3>
             <p className="text-gray-500 mb-4">
-              {searchTerm || filterClass || filterStatus 
-                ? 'Try adjusting your filters.' 
-                : 'Add your first student to get started.'}
+              {studentsError
+                ? 'A network error occurred. Your data is safe — click retry to try again.'
+                : searchTerm || filterClass || filterStatus 
+                  ? 'Try adjusting your filters.' 
+                  : 'Add your first student to get started.'}
             </p>
-            {!searchTerm && !filterClass && !filterStatus && (
+            {studentsError ? (
+              <button
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['students'] })}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+              >
+                Retry
+              </button>
+            ) : !searchTerm && !filterClass && !filterStatus ? (
               <button
                 onClick={() => setShowAddModal(true)}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
               >
                 + Add Student
               </button>
-            )}
+            ) : null}
           </div>
         ) : (
           <div className="overflow-x-auto">

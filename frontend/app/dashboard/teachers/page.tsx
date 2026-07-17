@@ -31,40 +31,30 @@ export default function TeachersPage() {
 
   const { data: teachersData, isLoading: teachersLoading, error: teachersError } = useQuery({
     queryKey: ['teachers'],
+    keepPreviousData: true,
+    retry: 2,
     queryFn: async () => {
-      try {
-        const res = await api.get('/teacher');
-        console.log('Teachers API response:', res.data);
-        let data = res.data;
-        // Handle the nested data structure
-        if (data?.data !== undefined && Array.isArray(data.data)) {
-          data = data.data;
-        } else if (data?.data !== undefined && data?.data?.data !== undefined && Array.isArray(data.data.data)) {
-          data = data.data.data;
-        } else if (data?.teachers !== undefined) {
-          data = data.teachers;
-        } else if (data?.result !== undefined && Array.isArray(data.result)) {
-          data = data.result;
-        } else if (data?.items !== undefined && Array.isArray(data.items)) {
-          data = data.items;
-        }
-        
-        if (!Array.isArray(data)) {
-          console.warn('Teachers data is not an array:', data);
-          data = [];
-        }
-        console.log('Processed teachers data:', data);
-        return data;
-      } catch (error: any) {
-        console.error('Failed to fetch teachers:', error);
-        console.error('Error response:', error.response?.data);
-        if (error.response?.status === 403) {
-          setMessage({ type: 'error', text: 'Access denied. You need Director role.' });
-        } else if (error.response?.status === 401) {
-          setMessage({ type: 'error', text: 'Please log in again.' });
-        }
-        return [];
+      const res = await api.get('/teacher');
+      console.log('Teachers API response:', res.data);
+      let data = res.data;
+      if (data?.data !== undefined && Array.isArray(data.data)) {
+        data = data.data;
+      } else if (data?.data !== undefined && data?.data?.data !== undefined && Array.isArray(data.data.data)) {
+        data = data.data.data;
+      } else if (data?.teachers !== undefined) {
+        data = data.teachers;
+      } else if (data?.result !== undefined && Array.isArray(data.result)) {
+        data = data.result;
+      } else if (data?.items !== undefined && Array.isArray(data.items)) {
+        data = data.items;
       }
+      
+      if (!Array.isArray(data)) {
+        console.warn('Teachers data is not an array:', data);
+        data = [];
+      }
+      console.log('Processed teachers data:', data);
+      return data;
     },
   });
 
@@ -542,11 +532,23 @@ export default function TeachersPage() {
         ) : filteredTeachers.length === 0 ? (
           <div className="p-12 text-center">
             <div className="text-6xl mb-4">👨‍🏫</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Staff Members Found</h3>
-            <p className="text-gray-500 mb-4">Add your first teacher to get started.</p>
-            <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-              + Add Teacher
-            </button>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {teachersError ? 'Failed to Load Staff' : 'No Staff Members Found'}
+            </h3>
+            <p className="text-gray-500 mb-4">
+              {teachersError
+                ? 'A network error occurred. Your data is safe — click retry to try again.'
+                : 'Add your first teacher to get started.'}
+            </p>
+            {teachersError ? (
+              <button onClick={() => queryClient.invalidateQueries({ queryKey: ['teachers'] })} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                Retry
+              </button>
+            ) : (
+              <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                + Add Teacher
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
