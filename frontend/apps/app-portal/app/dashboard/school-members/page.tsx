@@ -363,7 +363,76 @@ export default function SchoolMembersPage() {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            {/* Mobile Card View */}
+            <div className="sm:hidden divide-y divide-gray-100">
+              {filteredMembers.map((member: SchoolMember) => {
+                const activeRoles = getActiveRoles(member);
+                return (
+                  <div key={member.id} className="p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ${getAvatarColor(member.user?.firstName || '')}`}>
+                        {getInitials(member.user?.firstName, member.user?.lastName)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 truncate">{member.user?.firstName} {member.user?.lastName}</div>
+                        <div className="text-sm text-gray-500 truncate">{member.user?.email}</div>
+                      </div>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                        member.user?.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {member.user?.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {activeRoles.length > 0 ? activeRoles.map((role: string) => {
+                        const style = getRoleStyle(role);
+                        return (
+                          <span key={role} className={`px-2 py-0.5 rounded-full text-xs font-medium ${style.color}`}>
+                            {style.icon} {role}
+                          </span>
+                        );
+                      }) : <span className="text-gray-400 text-xs italic">No roles</span>}
+                    </div>
+                    {canManage && getAvailableRolesForMember(member).length > 0 && (
+                      <div className="flex gap-2">
+                        <div className="relative role-dropdown">
+                          <button
+                            onClick={() => setActiveDropdown(activeDropdown === member.user.id ? null : member.user.id)}
+                            className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium"
+                          >
+                            + Role
+                          </button>
+                          {activeDropdown === member.user.id && (
+                            <div className="absolute left-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-2 max-h-64 overflow-y-auto">
+                              <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b">Add Role</div>
+                              {getAvailableRolesForMember(member).map(r => (
+                                <button
+                                  key={r.name}
+                                  onClick={() => assignRoleMutation.mutate({ userId: member.user.id, role: r.name })}
+                                  className="w-full px-4 py-2.5 text-left hover:bg-indigo-50 transition-colors flex items-center gap-3 text-sm"
+                                >
+                                  <span>{r.icon}</span>
+                                  <span className="font-medium text-gray-700">{r.name}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setRemoveConfirm({ userId: member.user.id, name: `${member.user.firstName} ${member.user.lastName}` })}
+                          className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-sm font-medium"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {/* Desktop Table View */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b">
                   <tr>
@@ -472,6 +541,7 @@ export default function SchoolMembersPage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
 

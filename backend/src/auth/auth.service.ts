@@ -265,7 +265,6 @@ export class AuthService {
       role: 'Director',
       schoolName: school.name,
       schoolUrl: directorSchoolUrl,
-      appDownloadUrl: process.env.APP_DOWNLOAD_URL || 'https://play.google.com/store/apps',
     });
 
     return {
@@ -355,7 +354,6 @@ export class AuthService {
       role: 'Teacher',
       schoolName: school?.name,
       schoolUrl: teacherSchoolUrl,
-      appDownloadUrl: process.env.APP_DOWNLOAD_URL || 'https://play.google.com/store/apps',
     });
 
     return {

@@ -27,6 +27,8 @@ import { CurriculumScreen } from '../screens/director/CurriculumScreen';
 import { DirectorCurriculumScreen } from '../screens/director/CurriculumComplianceScreen';
 import { ECEScreen } from '../screens/director/ECEScreen';
 import { PrimaryGradingScreen } from '../screens/director/PrimaryGradingScreen';
+import { StaffPositionsScreen } from '../screens/director/StaffPositionsScreen';
+import { StaffReturnsScreen } from '../screens/director/StaffReturnsScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
 import { colors, spacing, borderRadius, shadows } from '../theme';
 import { usePermissions } from '../utils/usePermissions';
@@ -52,6 +54,8 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'DirectorStudents', label: 'Students', icon: '👨‍🎓', component: DirectorStudentsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'], requiredPermission: 'students.manage' },
   { name: 'DirectorRegister', label: 'Register Student', icon: '➕', component: RegisterStudentScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorStaff', label: 'Staff', icon: '👥', component: DirectorStaffScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'], requiredPermission: 'staff.manage' },
+  { name: 'DirectorStaffPositions', label: 'Staff Positions', icon: '🏛️', component: StaffPositionsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
+  { name: 'DirectorStaffReturns', label: 'Staff Returns Hub', icon: '📋', component: StaffReturnsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
   { name: 'DirectorMembership', label: 'School Members', icon: '🔑', component: SchoolMembershipScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorResultsMgmt', label: 'Results Management', icon: '📊', component: ResultsManagementScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorGradingSystems', label: 'Grading Systems', icon: '⚖️', component: GradingSystemsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },

@@ -14,8 +14,13 @@ export default function ParentLayout({
 
   const navItems = [
     { href: '/parent', label: 'Dashboard', icon: '🏠' },
-    { href: '/parent/timetable', label: "Children's Timetable", icon: '📅' },
-    { href: '/parent/results', label: "Children's Results", icon: '📝' },
+    { href: '/parent/timetable', label: "Timetable", icon: '📅' },
+    { href: '/parent/results', label: "Results", icon: '📝' },
+    { href: '/parent/homework', label: "Homework", icon: '📚' },
+    { href: '/parent/report-cards', label: "Reports", icon: '📄' },
+    { href: '/parent/assessments', label: "Assessments", icon: '📊' },
+    { href: '/parent/attendance', label: "Attendance", icon: '✅' },
+    { href: '/parent/analytics', label: "Analytics", icon: '📈' },
   ];
 
   return (

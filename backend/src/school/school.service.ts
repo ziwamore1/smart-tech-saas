@@ -99,7 +99,6 @@ export class SchoolService {
         role: 'Director',
         schoolName: school.name,
         schoolUrl,
-        appDownloadUrl: this.configService.get<string>('APP_DOWNLOAD_URL') || 'https://play.google.com/store/apps',
       }).catch((err) => this.logger.error('Failed to send credentials:', err));
 
       return {

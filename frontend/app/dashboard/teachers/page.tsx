@@ -243,11 +243,13 @@ export default function TeachersPage() {
     { name: 'Accountant', icon: '💰' },
     { name: 'Secretary', icon: '📋' },
   ] : [
+    { name: 'Director', icon: '👑' },
+    { name: 'Deputy Director', icon: '🏅' },
+    { name: 'Head Teacher', icon: '🎓' },
+    { name: 'Deputy', icon: '⭐' },
+    { name: 'HOD', icon: '📚' },
     { name: 'Teacher', icon: '👨‍🏫' },
     { name: 'Class Teacher', icon: '🏫' },
-    { name: 'Head Teacher', icon: '🎓' },
-    { name: 'Deputy Director', icon: '⭐' },
-    { name: 'Deputy', icon: '⭐' },
     { name: 'Accountant', icon: '💰' },
     { name: 'Secretary', icon: '📋' },
   ];

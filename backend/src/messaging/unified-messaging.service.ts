@@ -28,7 +28,7 @@ interface NotificationResult {
   errors: string[];
 }
 
-const APP_DOWNLOAD_URL = 'https://play.google.com/store/apps/details?id=com.smarttech.app';
+const WEB_LOGIN_URL = process.env.FRONTEND_URL || 'https://smarttechsaas.com';
 
 const templates = {
   directorWelcome: (data: { username: string; password: string; schoolName: string; schoolUrl: string; schoolType?: string }) =>
@@ -45,8 +45,8 @@ Password: ${data.password}
 School URL:
 ${data.schoolUrl}
 
-Download App:
-${APP_DOWNLOAD_URL}
+Login at:
+${data.schoolUrl || WEB_LOGIN_URL}
 
 Best regards,
 Smart Tech Team`,
@@ -62,8 +62,8 @@ Login Details:
 Username: ${data.username}
 Password: ${data.password}
 
-Download App:
-${APP_DOWNLOAD_URL}
+Login at:
+${WEB_LOGIN_URL}
 
 Best regards,
 Smart Tech Team`,
@@ -80,8 +80,8 @@ Login Details:
 Username: ${data.username}
 Password: ${data.password}
 
-Download App:
-${APP_DOWNLOAD_URL}
+Login at:
+${WEB_LOGIN_URL}
 
 Best regards,
 Smart Tech Team`,
@@ -98,8 +98,8 @@ Login Details:
 Username: ${data.username}
 Password: ${data.password}
 
-Download App:
-${APP_DOWNLOAD_URL}
+Login at:
+${WEB_LOGIN_URL}
 
 Best regards,
 Smart Tech Team`,

@@ -722,11 +722,12 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const userRoles = user?.roles || [];
   const institutionType = user?.institutionType || null;
+  const resolvedInstitutionType = institutionType || schoolData?.institutionType?.code || null;
   const navigation = isSuperAdmin ? superAdminNav : regularNav.filter(item => {
-    const typeMatch = !item.institutionTypes || !institutionType || item.institutionTypes.includes(institutionType);
+    const typeMatch = !item.institutionTypes || !resolvedInstitutionType || item.institutionTypes.includes(resolvedInstitutionType);
     if (!typeMatch) return false;
-    if (item.typeRoles && institutionType) {
-      const allowedRoles = item.typeRoles[institutionType];
+    if (item.typeRoles && resolvedInstitutionType) {
+      const allowedRoles = item.typeRoles[resolvedInstitutionType];
       if (allowedRoles && allowedRoles.length > 0) {
         return allowedRoles.some(role => userRoles.includes(role));
       }
@@ -778,8 +779,8 @@ export default function DashboardLayout({
     UNIVERSITY: '/dashboard/university',
   };
 
-  const typeDashboardPath = institutionType
-    ? TYPE_ROUTE_MAP[institutionType] || null
+  const typeDashboardPath = resolvedInstitutionType
+    ? TYPE_ROUTE_MAP[resolvedInstitutionType] || null
     : null;
 
   useEffect(() => {
@@ -884,17 +885,33 @@ export default function DashboardLayout({
         </div>
 
         {mobileMenuOpen && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 100,
+            backdropFilter: 'blur(4px)',
+          }} onClick={() => setMobileMenuOpen(false)}>
           <nav style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
+            position: 'fixed',
+            top: 0,
             right: 0,
+            bottom: 0,
+            width: '280px',
             background: '#fdfaf7',
-            borderBottom: '1px solid #e8ddd0',
-            boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
-            maxHeight: '70vh',
-            overflowY: 'auto'
-          }}>
+            boxShadow: '-4px 0 20px rgba(0,0,0,0.15)',
+            overflowY: 'auto',
+            zIndex: 101,
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: '16px', borderBottom: '1px solid #e8ddd0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontWeight: 600, color: '#1f2937', fontSize: '16px' }}>Menu</span>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                style={{ background: '#f3f4f6', border: 'none', borderRadius: '8px', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <i className="fa fa-times" style={{ fontSize: '14px', color: '#6b7280' }}></i>
+              </button>
+            </div>
             {navigation.map((item) => (
               <Link
                 key={item.name}
@@ -973,6 +990,7 @@ export default function DashboardLayout({
               </button>
             </div>
           </nav>
+          </div>
         )}
       </header>
 
@@ -1248,7 +1266,7 @@ export default function DashboardLayout({
           </header>
 
           {/* Page Content */}
-          <div style={{ padding: '32px' }}>
+          <div className="page-content" style={{ padding: '32px' }}>
             {children}
           </div>
         </main>
@@ -1264,6 +1282,9 @@ export default function DashboardLayout({
           }
           .main-content {
             margin-left: 0 !important;
+          }
+          .page-content {
+            padding: 16px !important;
           }
         }
       `}</style>

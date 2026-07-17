@@ -13,10 +13,23 @@ interface DirectorStaffProps {
   stackNavigation?: NativeStackNavigationProp<any>;
 }
 
+const POSITION_TYPES = ['All', 'Director', 'Deputy Director', 'HOD', 'Head Teacher', 'Class Teacher', 'Teacher', 'Support'];
+
+const POSITION_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
+  Director: { bg: '#FEE2E2', text: '#DC2626' },
+  'Deputy Director': { bg: '#FCE7F3', text: '#DB2777' },
+  HOD: { bg: '#D1FAE5', text: '#059669' },
+  'Head Teacher': { bg: '#EDE9FE', text: '#7C3AED' },
+  'Class Teacher': { bg: '#FEF3C7', text: '#D97706' },
+  Teacher: { bg: '#DBEAFE', text: '#2563EB' },
+  Support: { bg: '#F3F4F6', text: '#6B7280' },
+};
+
 export const DirectorStaffScreen: React.FC<DirectorStaffProps> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [staff, setStaff] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [positionFilter, setPositionFilter] = useState('All');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -40,12 +53,24 @@ export const DirectorStaffScreen: React.FC<DirectorStaffProps> = ({ onToggleDraw
   };
 
   const filtered = staff.filter(
-    (s) => s.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (s) => (s.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
            s.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
            s.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
            s.roles?.some((r: string) => r.toLowerCase().includes(searchQuery.toLowerCase())) ||
-           (s.gender || '').toLowerCase().includes(searchQuery.toLowerCase())
+           (s.gender || '').toLowerCase().includes(searchQuery.toLowerCase())) &&
+           (positionFilter === 'All' || s.roles?.some((r: string) => r === positionFilter))
   );
+
+  const getPositionType = (roles: string[]): string => {
+    if (!roles || roles.length === 0) return 'Support';
+    if (roles.includes('Director')) return 'Director';
+    if (roles.includes('Deputy Director')) return 'Deputy Director';
+    if (roles.includes('HOD')) return 'HOD';
+    if (roles.includes('Head Teacher')) return 'Head Teacher';
+    if (roles.includes('Class Teacher')) return 'Class Teacher';
+    if (roles.includes('Teacher') || roles.includes('Primary Teacher') || roles.includes('Lecturer')) return 'Teacher';
+    return 'Support';
+  };
 
   const activeCount = staff.filter((s) => s.isActive).length;
   const maleCount = staff.filter((s) => s.gender?.toLowerCase() === 'male').length;
@@ -91,6 +116,10 @@ export const DirectorStaffScreen: React.FC<DirectorStaffProps> = ({ onToggleDraw
           </View>
         </View>
 
+        <TouchableOpacity style={styles.positionsLink} onPress={() => onNavigate?.('DirectorStaffPositions')}>
+          <Text style={styles.positionsLinkText}>🏛️ Manage Staff Positions & Departments →</Text>
+        </TouchableOpacity>
+
         <View style={styles.searchContainer}>
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
@@ -101,26 +130,47 @@ export const DirectorStaffScreen: React.FC<DirectorStaffProps> = ({ onToggleDraw
           />
         </View>
 
-        <WidgetCard title="All Staff">
-          {filtered.map((member) => (
-            <TouchableOpacity key={member.id} style={styles.staffCard}>
-              <View style={styles.staffAvatar}>
-                <Text style={styles.staffAvatarText}>{member.firstName.charAt(0)}{member.lastName.charAt(0)}</Text>
-              </View>
-              <View style={styles.staffInfo}>
-                <View style={styles.staffNameRow}>
-                  <Text style={styles.staffName}>{member.firstName} {member.lastName}</Text>
-                  {member.gender && (
-                    <Text style={[styles.genderBadge, member.gender.toLowerCase() === 'male' ? styles.genderMale : styles.genderFemale]}>
-                      {member.gender.toLowerCase() === 'male' ? '♂' : '♀'}
-                    </Text>
-                  )}
-                </View>
-                <Text style={styles.staffRole}>{member.roles?.join(', ') || 'Staff'}{member.employeeNo ? ` • ${member.employeeNo}` : ''}</Text>
-              </View>
-              <View style={[styles.statusDot, member.isActive ? styles.statusActive : styles.statusInactive]} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterContent}>
+          {POSITION_TYPES.map(type => (
+            <TouchableOpacity
+              key={type}
+              style={[styles.filterChip, positionFilter === type && styles.filterChipActive]}
+              onPress={() => setPositionFilter(type)}
+            >
+              <Text style={[styles.filterChipText, positionFilter === type && styles.filterChipTextActive]}>{type}</Text>
             </TouchableOpacity>
           ))}
+        </ScrollView>
+
+        <WidgetCard title="All Staff">
+          {filtered.map((member) => {
+            const posType = getPositionType(member.roles || []);
+            const posColor = POSITION_TYPE_COLORS[posType] || POSITION_TYPE_COLORS.Support;
+            return (
+              <TouchableOpacity key={member.id} style={styles.staffCard}>
+                <View style={styles.staffAvatar}>
+                  <Text style={styles.staffAvatarText}>{member.firstName.charAt(0)}{member.lastName.charAt(0)}</Text>
+                </View>
+                <View style={styles.staffInfo}>
+                  <View style={styles.staffNameRow}>
+                    <Text style={styles.staffName}>{member.firstName} {member.lastName}</Text>
+                    {member.gender && (
+                      <Text style={[styles.genderBadge, member.gender.toLowerCase() === 'male' ? styles.genderMale : styles.genderFemale]}>
+                        {member.gender.toLowerCase() === 'male' ? '♂' : '♀'}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={styles.positionTypeRow}>
+                    <View style={[styles.positionTypeBadge, { backgroundColor: posColor.bg }]}>
+                      <Text style={[styles.positionTypeText, { color: posColor.text }]}>{posType}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.staffRole}>{member.roles?.join(', ') || 'Staff'}{member.employeeNo ? ` • ${member.employeeNo}` : ''}</Text>
+                </View>
+                <View style={[styles.statusDot, member.isActive ? styles.statusActive : styles.statusInactive]} />
+              </TouchableOpacity>
+            );
+          })}
           {filtered.length === 0 && !loading && (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>👥</Text>
@@ -157,6 +207,17 @@ const styles = StyleSheet.create({
   genderMale: { backgroundColor: colors.tealLight, color: colors.teal },
   genderFemale: { backgroundColor: colors.purpleLight, color: colors.purple },
   staffRole: { fontSize: 13, color: colors.textLight, marginTop: 2 },
+  filterRow: { marginBottom: spacing.md },
+  filterContent: { gap: spacing.sm },
+  filterChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.lg, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
+  filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  filterChipText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  filterChipTextActive: { color: colors.white },
+  positionTypeRow: { flexDirection: 'row', marginTop: 4 },
+  positionTypeBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: borderRadius.sm, alignSelf: 'flex-start' },
+  positionTypeText: { fontSize: 11, fontWeight: '700' },
+  positionsLink: { backgroundColor: colors.infoLight, padding: spacing.md, borderRadius: borderRadius.lg, marginBottom: spacing.md, alignItems: 'center' },
+  positionsLinkText: { fontSize: 14, fontWeight: '600', color: colors.primary },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   statusActive: { backgroundColor: colors.success },
   statusInactive: { backgroundColor: colors.textMuted },

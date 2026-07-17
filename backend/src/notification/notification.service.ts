@@ -13,7 +13,6 @@ export interface CredentialNotificationData {
   role: string;
   schoolName?: string;
   schoolUrl?: string;
-  appDownloadUrl?: string;
 }
 
 export interface AttendanceNotificationData {
@@ -234,12 +233,6 @@ export class NotificationService {
 
     if (data.schoolUrl) {
       lines.push(`Login URL: ${data.schoolUrl}`);
-    }
-
-    if (data.appDownloadUrl) {
-      lines.push('');
-      lines.push(`Download App:`);
-      lines.push(`Google Play: ${data.appDownloadUrl}`);
     }
 
     lines.push('');

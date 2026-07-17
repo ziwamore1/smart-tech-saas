@@ -1814,6 +1814,53 @@ class ApiService {
     return response.data;
   }
 
+  // ========== STAFF RECORDS (PREMIUM) ==========
+
+  async getStaffRecordProfiles() {
+    const response = await this.client.get('/premium/staff-records/profiles');
+    return response.data;
+  }
+
+  async getStaffRecordProfileById(id: string) {
+    const response = await this.client.get(`/premium/staff-records/profiles/${id}`);
+    return response.data;
+  }
+
+  async createStaffRecordProfile(data: any) {
+    const response = await this.client.post('/premium/staff-records/profiles', data);
+    return response.data;
+  }
+
+  async updateStaffRecordProfile(id: string, data: any) {
+    const response = await this.client.put(`/premium/staff-records/profiles/${id}`, data);
+    return response.data;
+  }
+
+  async deleteStaffRecordProfile(id: string) {
+    const response = await this.client.delete(`/premium/staff-records/profiles/${id}`);
+    return response.data;
+  }
+
+  async getStaffRecordReturns() {
+    const response = await this.client.get('/premium/staff-records/submissions');
+    return response.data;
+  }
+
+  async getStaffRecordAnalytics() {
+    const response = await this.client.get('/premium/staff-records/analytics');
+    return response.data;
+  }
+
+  async getStaffRecordColumns() {
+    const response = await this.client.get('/premium/staff-records/columns');
+    return response.data;
+  }
+
+  async reorderStaffRecordColumns(columns: string[]) {
+    const response = await this.client.post('/premium/staff-records/reorder-columns', { columns });
+    return response.data;
+  }
+
   // ===== System Communications API (SuperAdmin) =====
 
   async getSystemCommunicationsDashboard() {
