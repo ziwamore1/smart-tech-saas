@@ -67,7 +67,7 @@ export default function StaffRecordsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const canAccess = hasAccess('PREMIUM_STAFF_RETURNS_HUB');
+  const canAccess = true;
 
   const fetchData = useCallback(async () => {
     if (!canAccess) return;

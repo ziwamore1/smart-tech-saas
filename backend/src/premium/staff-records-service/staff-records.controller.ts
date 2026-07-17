@@ -9,8 +9,6 @@ import { StaffExcelService } from './staff-excel.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { PremiumFeatureGuard } from './guards/premium-feature.guard';
-import { PremiumFeature } from './guards/premium-feature.decorator';
 
 const ADMIN_ROLES = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'SuperAdmin'];
 

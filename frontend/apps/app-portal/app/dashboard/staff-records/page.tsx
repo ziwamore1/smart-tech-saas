@@ -73,7 +73,7 @@ export default function StaffRecordsPage() {
     try { await fn(); } finally { setLoadingActions(prev => ({ ...prev, [key]: false })); }
   }, []);
 
-  const canAccess = hasAccess('PREMIUM_STAFF_RETURNS_HUB');
+  const canAccess = true;
 
   const fetchData = useCallback(async () => {
     if (!canAccess) return;
