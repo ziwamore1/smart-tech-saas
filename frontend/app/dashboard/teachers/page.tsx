@@ -997,6 +997,18 @@ export default function TeachersPage() {
                 <input type="text" value={editForm.lastName} onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Assign Role</label>
+                <select value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })} className="w-full px-3 py-2 border rounded-lg">
+                  <option value="">-- Keep Current Role --</option>
+                  {AVAILABLE_ROLES_FOR_STAFF.map(r => (
+                    <option key={r.name} value={r.name}>{r.icon} {r.name}</option>
+                  ))}
+                </select>
+                {editCurrentRoles.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">Current: {editCurrentRoles.join(', ')}</p>
+                )}
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Employee ID</label>
                 <input type="text" value={editForm.employeeId} onChange={(e) => setEditForm({ ...editForm, employeeId: e.target.value })} className="w-full px-3 py-2 border rounded-lg" />
               </div>
@@ -1060,18 +1072,6 @@ export default function TeachersPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Specialization</label>
                 <input type="text" value={editForm.specialization} onChange={(e) => setEditForm({ ...editForm, specialization: e.target.value })} className="w-full px-3 py-2 border rounded-lg" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Assign Role</label>
-                <select value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })} className="w-full px-3 py-2 border rounded-lg">
-                  <option value="">-- Keep Current Role --</option>
-                  {AVAILABLE_ROLES_FOR_STAFF.map(r => (
-                    <option key={r.name} value={r.name}>{r.icon} {r.name}</option>
-                  ))}
-                </select>
-                {editCurrentRoles.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">Current: {editCurrentRoles.join(', ')}</p>
-                )}
               </div>
             </div>
             <div className="flex gap-3 justify-end pt-6">
