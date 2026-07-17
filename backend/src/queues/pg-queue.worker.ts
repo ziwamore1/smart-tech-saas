@@ -16,7 +16,7 @@ export class PgQueueWorker {
     private readonly prisma: PrismaService,
   ) {}
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron('0/3 * * * *')
   async processEmailQueue() {
     try {
       const count = await this.emailQueue.processBatch();
@@ -28,7 +28,7 @@ export class PgQueueWorker {
     }
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron('1/3 * * * *')
   async processSmsQueue() {
     try {
       const count = await this.smsQueue.processBatch();
@@ -40,7 +40,7 @@ export class PgQueueWorker {
     }
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron('2/3 * * * *')
   async processWhatsAppQueue() {
     try {
       const count = await this.whatsAppQueue.processBatch();
