@@ -16,11 +16,70 @@ export class StaffRecordsService {
   // ══════════════════════════════════════════
 
   async findAllProfiles(schoolId: string) {
-    return this.prisma.staffHrProfile.findMany({
+    let profiles = await this.prisma.staffHrProfile.findMany({
       where: { schoolId },
       include: { qualifications: true, employmentRecords: true, positions: true },
       orderBy: { createdAt: 'desc' },
     });
+
+    if (profiles.length === 0) {
+      await this.autoSyncFromTeachers(schoolId);
+      profiles = await this.prisma.staffHrProfile.findMany({
+        where: { schoolId },
+        include: { qualifications: true, employmentRecords: true, positions: true },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    return profiles;
+  }
+
+  async autoSyncFromTeachers(schoolId: string) {
+    const teachers = await this.prisma.teacher.findMany({
+      where: { schoolId },
+      include: { user: true },
+    });
+
+    let created = 0;
+    for (const teacher of teachers) {
+      const existing = await this.prisma.staffHrProfile.findUnique({
+        where: { staffId: teacher.id },
+      });
+      if (existing) continue;
+
+      const fullName = teacher.user
+        ? `${teacher.user.firstName || ''} ${teacher.user.lastName || ''}`.trim()
+        : 'Unknown';
+
+      try {
+        await this.prisma.staffHrProfile.create({
+          data: {
+            staffId: teacher.id,
+            schoolId,
+            teacherName: fullName,
+            employeeNumber: teacher.employeeNo || null,
+            gender: teacher.gender || null,
+            emailAddress: teacher.user?.email || null,
+            phoneNumber: teacher.user?.phone || null,
+            substantivePosition: teacher.department || null,
+            academicQualification: teacher.qualification || null,
+            specialization: teacher.specialization || null,
+            employmentStatus: 'ACTIVE',
+            employmentType: teacher.staffType === 'NON_TEACHING' ? 'NON_TEACHING' : 'TEACHING',
+            syncStatus: 'SYNCED',
+            lastSyncedAt: new Date(),
+          },
+        });
+        created++;
+      } catch (err: any) {
+        this.logger.warn(`Failed to auto-sync teacher ${teacher.id}: ${err.message}`);
+      }
+    }
+
+    if (created > 0) {
+      this.logger.log(`Auto-synced ${created} teacher(s) to HR profiles for school ${schoolId}`);
+    }
+    return { created };
   }
 
   async findProfileById(id: string) {

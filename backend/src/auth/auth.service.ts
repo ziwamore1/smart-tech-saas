@@ -483,6 +483,12 @@ export class AuthService {
       `Login successful for ${identifier}, roles: ${allRoles.join(', ')}, schoolId: ${payload.schoolId}, type: ${effectiveInstitutionType}`,
     );
 
+    if (effectiveSchoolId && allRoles.includes('Director')) {
+      this.ensureTeacherRecord(user.id, effectiveSchoolId).catch(err =>
+        this.logger.warn(`Failed to ensure Teacher record for Director ${user.id}: ${err.message}`),
+      );
+    }
+
     return {
       message: 'Login successful',
       access_token: await this.jwtService.signAsync(payload),
@@ -601,6 +607,12 @@ export class AuthService {
     this.logger.log(
       `Mobile login successful for ${email || username}, roles: ${roles.join(', ')}`,
     );
+
+    if (user.schoolId && roles.includes('Director')) {
+      this.ensureTeacherRecord(user.id, user.schoolId).catch(err =>
+        this.logger.warn(`Failed to ensure Teacher record for Director ${user.id}: ${err.message}`),
+      );
+    }
 
     return {
       message: 'Login successful',
@@ -775,5 +787,19 @@ export class AuthService {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return password;
+  }
+
+  private async ensureTeacherRecord(userId: string, schoolId: string) {
+    const existing = await this.prisma.teacher.findUnique({ where: { userId } });
+    if (existing) return;
+
+    await this.prisma.teacher.create({
+      data: {
+        userId,
+        schoolId,
+        staffType: 'TEACHING',
+      },
+    });
+    this.logger.log(`Auto-created Teacher record for Director ${userId} at school ${schoolId}`);
   }
 }

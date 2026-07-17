@@ -15,8 +15,7 @@ import { PremiumFeature } from './guards/premium-feature.decorator';
 const ADMIN_ROLES = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'SuperAdmin'];
 
 @Controller('premium/staff-records')
-@UseGuards(JwtAuthGuard, RolesGuard, PremiumFeatureGuard)
-@PremiumFeature('PREMIUM_STAFF_RETURNS_HUB')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class StaffRecordsController {
   private readonly logger = new Logger(StaffRecordsController.name);
 
