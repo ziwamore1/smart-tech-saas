@@ -57,8 +57,6 @@ export default function TeachersPage() {
       return data;
     },
   });
-    },
-  });
 
   const { data: assignmentsData, isLoading: assignmentsLoading } = useQuery({
     queryKey: ['teaching-assignments'],

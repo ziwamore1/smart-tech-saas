@@ -99,8 +99,6 @@ export default function StudentsPage() {
       return data;
     },
   });
-    },
-  });
 
   const { data: classesResponse } = useQuery({
     queryKey: ['classes'],
