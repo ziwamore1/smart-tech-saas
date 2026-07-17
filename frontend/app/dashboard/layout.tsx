@@ -568,21 +568,6 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const userRoles = user?.roles || [];
   const institutionType = user?.institutionType || null;
-  const navigation = isSuperAdmin ? superAdminNav : regularNav.filter(item => {
-    const typeMatch = !item.institutionTypes || !resolvedInstitutionType || item.institutionTypes.includes(resolvedInstitutionType);
-    if (!typeMatch) return false;
-    if (item.typeRoles && resolvedInstitutionType) {
-      const allowedRoles = item.typeRoles[resolvedInstitutionType];
-      if (allowedRoles && allowedRoles.length > 0) {
-        return allowedRoles.some(role => userRoles.includes(role));
-      }
-      return false;
-    }
-    if (item.roles) {
-      return item.roles.some(role => userRoles.includes(role));
-    }
-    return true;
-  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -625,6 +610,22 @@ export default function DashboardLayout({
   };
 
   const resolvedInstitutionType = institutionType || schoolData?.institutionType?.code || null;
+
+  const navigation = isSuperAdmin ? superAdminNav : regularNav.filter(item => {
+    const typeMatch = !item.institutionTypes || !resolvedInstitutionType || item.institutionTypes.includes(resolvedInstitutionType);
+    if (!typeMatch) return false;
+    if (item.typeRoles && resolvedInstitutionType) {
+      const allowedRoles = item.typeRoles[resolvedInstitutionType];
+      if (allowedRoles && allowedRoles.length > 0) {
+        return allowedRoles.some(role => userRoles.includes(role));
+      }
+      return false;
+    }
+    if (item.roles) {
+      return item.roles.some(role => userRoles.includes(role));
+    }
+    return true;
+  });
 
   const typeDashboardPath = resolvedInstitutionType
     ? TYPE_ROUTE_MAP[resolvedInstitutionType] || null
