@@ -531,6 +531,7 @@ export class AuthService {
         },
         include: {
           userRoles: { include: { role: true } },
+          schoolUsers: { select: { schoolId: true, isPrimary: true } },
           school: {
             select: {
               id: true, name: true, logo: true, primaryColor: true,
@@ -546,6 +547,7 @@ export class AuthService {
         where: { email: email.trim().toLowerCase() },
         include: {
           userRoles: { include: { role: true } },
+          schoolUsers: { select: { schoolId: true, isPrimary: true } },
           school: {
             select: {
               id: true, name: true, logo: true, primaryColor: true,
@@ -575,6 +577,33 @@ export class AuthService {
     const roles = user.userRoles.map((ur) => ur.role.name);
     const primaryRole = roles[0] || 'USER';
 
+    const platformRoles = await this.prisma.platformRoleAssignment.findMany({
+      where: { userId: user.id, isActive: true },
+      select: { role: true },
+    });
+    const platformRoleNames = platformRoles.map((pr) => pr.role);
+
+    const resolvedSchoolId = user.schoolId
+      || user.schoolUsers?.find((su: any) => su.isPrimary)?.schoolId
+      || user.schoolUsers?.[0]?.schoolId
+      || null;
+
+    let schoolRoleNames: string[] = [];
+    if (resolvedSchoolId) {
+      const membership = await this.prisma.schoolUser.findFirst({
+        where: { userId: user.id, schoolId: resolvedSchoolId },
+      });
+      if (membership) {
+        const schoolRoles = await this.prisma.schoolRoleAssignment.findMany({
+          where: { schoolMembershipId: membership.id, isActive: true },
+          select: { role: true },
+        });
+        schoolRoleNames = schoolRoles.map((sr) => sr.role);
+      }
+    }
+
+    const allRoles = [...new Set([...roles, ...schoolRoleNames, ...platformRoleNames])];
+
     if (deviceToken) {
       await this.pushNotificationService.registerDeviceToken(
         user.id,
@@ -588,9 +617,11 @@ export class AuthService {
 
     const payload = {
       sub: user.id,
-      schoolId: user.schoolId,
+      schoolId: resolvedSchoolId,
       institutionType,
-      roles,
+      roles: allRoles,
+      platformRoles: platformRoleNames,
+      schoolRoles: schoolRoleNames,
       type: 'user',
     };
 
@@ -605,11 +636,11 @@ export class AuthService {
       : null;
 
     this.logger.log(
-      `Mobile login successful for ${email || username}, roles: ${roles.join(', ')}`,
+      `Mobile login successful for ${email || username}, roles: ${allRoles.join(', ')}`,
     );
 
-    if (user.schoolId && roles.includes('Director')) {
-      this.ensureTeacherRecord(user.id, user.schoolId).catch(err =>
+    if (resolvedSchoolId && allRoles.includes('Director')) {
+      this.ensureTeacherRecord(user.id, resolvedSchoolId).catch(err =>
         this.logger.warn(`Failed to ensure Teacher record for Director ${user.id}: ${err.message}`),
       );
     }
