@@ -145,6 +145,12 @@ export default function CommunicationsPage() {
         </div>
         <div className="flex gap-3">
           <Link
+            href="/dashboard/communications/results-sms"
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+          >
+            <i className="fa fa-file-text"></i> Results SMS
+          </Link>
+          <Link
             href="/dashboard/communications/wallet"
             className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2"
           >

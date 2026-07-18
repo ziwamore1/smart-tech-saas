@@ -211,16 +211,11 @@ export class ParentService {
   }
 
   async getChildResults(studentId: string) {
-    const currentTerm = await this.prisma.term.findFirst({
+    const results = await this.prisma.computedResult.findMany({
       where: {
-        isCurrent: true,
-        academicYear: { isCurrent: true },
+        studentId,
+        status: 'PUBLISHED',
       },
-      include: { academicYear: true },
-    });
-
-    const results = await this.prisma.result.findMany({
-      where: { studentId },
       include: {
         subject: { select: { id: true, name: true } },
         term: { select: { id: true, name: true, academicYearId: true } },
@@ -233,9 +228,15 @@ export class ParentService {
       subject: r.subject.name,
       term: r.term.name,
       academicYear: r.term.academicYearId,
-      score: r.score,
-      grade: r.grade,
-      remark: r.remark,
+      score: r.finalPercentage,
+      grade: r.finalGrade,
+      remark: r.finalRemark,
+      points: r.points,
+      gpa: r.gpa,
+      classRank: r.classRank,
+      subjectRank: r.subjectRank,
+      totalRawScore: r.totalRawScore,
+      totalWeightedScore: r.totalWeightedScore,
     }));
   }
 

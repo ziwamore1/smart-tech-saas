@@ -94,6 +94,7 @@ import { ProductionLogger } from './common/production-logger';
 import { SchoolMembershipModule } from './school-membership/school-membership.module';
 import { PlatformRoleModule } from './platform-role/platform-role.module';
 import { ClassTeacherAssignmentModule } from './class-teacher-assignment/class-teacher-assignment.module';
+import { ResultsSmsModule } from './results-sms/results-sms.module';
 
 @Module({
   imports: [
@@ -213,6 +214,7 @@ import { ClassTeacherAssignmentModule } from './class-teacher-assignment/class-t
     SchoolMembershipModule,
     PlatformRoleModule,
     ClassTeacherAssignmentModule,
+    ResultsSmsModule,
   ],
   providers: [ProductionLogger],
 })

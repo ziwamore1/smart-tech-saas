@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ResultsManagementController } from './results-management.controller';
 import { ResultsManagementService } from './results-management.service';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -7,6 +7,7 @@ import { RankingModule } from '../ranking-service/ranking.module';
 import { ResultAnalyticsModule } from '../result-analytics/result-analytics.module';
 import { ReportCardEngineModule } from '../report-card-engine/report-card-engine.module';
 import { AssessmentEngineModule } from '../assessment-engine/assessment-engine.module';
+import { ResultsSmsModule } from '../results-sms/results-sms.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AssessmentEngineModule } from '../assessment-engine/assessment-engine.m
     ResultAnalyticsModule,
     ReportCardEngineModule,
     AssessmentEngineModule,
+    forwardRef(() => ResultsSmsModule),
   ],
   controllers: [ResultsManagementController],
   providers: [ResultsManagementService],

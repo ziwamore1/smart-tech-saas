@@ -61,6 +61,46 @@ export class ResultController {
     return this.resultService.findByStudent(studentId, termId, req.user.schoolId);
   }
 
+  @Get(':studentId/:termId')
+  async findByStudentAlt(
+    @Param('studentId') studentId: string,
+    @Param('termId') termId: string,
+    @Req() req: any,
+  ) {
+    const results = await this.prisma.computedResult.findMany({
+      where: {
+        studentId,
+        termId,
+        schoolId: req.user.schoolId,
+        status: 'PUBLISHED',
+      },
+      include: {
+        subject: { select: { id: true, name: true, code: true } },
+      },
+      orderBy: { subject: { name: 'asc' } },
+    });
+
+    return {
+      studentId,
+      termId,
+      results: results.map(r => ({
+        id: r.id,
+        subjectId: r.subjectId,
+        subject: { name: r.subject.name, code: r.subject.code },
+        score: r.finalPercentage,
+        totalRawScore: r.totalRawScore,
+        totalWeightedScore: r.totalWeightedScore,
+        finalPercentage: r.finalPercentage,
+        grade: r.finalGrade,
+        remark: r.finalRemark,
+        points: r.points,
+        gpa: r.gpa,
+        classRank: r.classRank,
+        subjectRank: r.subjectRank,
+      })),
+    };
+  }
+
   @Get('template/:termId')
   @Roles('TEACHER', 'DIRECTOR')
   async downloadTemplate(

@@ -19,20 +19,16 @@ export class AnalyticsService {
   }
 
   async getClassPerformance(schoolId: string, classId: string, termId: string) {
-    const results = await this.prisma.result.findMany({
+    const results = await this.prisma.computedResult.findMany({
       where: {
+        classId,
         termId,
         schoolId,
-        student: {
-          enrollments: {
-            some: {
-              classId,
-            },
-          },
-        },
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        finalPercentage: { not: null },
       },
       include: {
-        student: true,
+        student: { select: { id: true } },
       },
     });
 
@@ -40,7 +36,7 @@ export class AnalyticsService {
       return null;
     }
 
-    const scores = results.map((r) => r.score);
+    const scores = results.map((r) => r.finalPercentage ?? 0);
 
     const total = scores.reduce((a, b) => a + b, 0);
 
@@ -76,69 +72,57 @@ export class AnalyticsService {
     termId: string,
     gradingSystem: 'ECZ' | 'GPA' = 'ECZ',
   ) {
-    const results = await this.prisma.result.findMany({
+    const computedResults = await this.prisma.computedResult.findMany({
       where: {
+        classId,
         termId,
         schoolId,
-        student: { enrollments: { some: { classId } } },
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        finalPercentage: { not: null },
       },
-      include: { student: true, subject: true },
+      include: {
+        student: { select: { id: true, firstName: true, lastName: true, admissionNumber: true } },
+      },
     });
 
-    if (!results.length) return [];
+    if (!computedResults.length) return [];
 
-    const studentMap = new Map<
-      string,
-      { total: number; subjects: number; student: any }
-    >();
+    const studentMap = new Map<string, { totalPoints: number; totalPercentage: number; subjects: number; student: any }>();
 
-    for (const r of results) {
+    for (const r of computedResults) {
       const key = r.studentId;
       const existing = studentMap.get(key);
-
-      const scoreValue = gradingSystem === 'ECZ' ? r.score : r.score; // for now ECZ uses score; could also map to points
-
       if (existing) {
-        existing.total += scoreValue;
+        existing.totalPoints += r.points ?? 0;
+        existing.totalPercentage += r.finalPercentage ?? 0;
         existing.subjects += 1;
       } else {
         studentMap.set(key, {
-          total: scoreValue,
+          totalPoints: r.points ?? 0,
+          totalPercentage: r.finalPercentage ?? 0,
           subjects: 1,
           student: r.student,
         });
       }
     }
 
-    const ranking = Array.from(studentMap.values()).map((s) => {
-      let totalScore = s.total;
-      let count = s.subjects;
+    const ranking = Array.from(studentMap.values()).map((s) => ({
+      studentId: s.student.id,
+      name: `${s.student.firstName} ${s.student.lastName}`,
+      admissionNumber: s.student.admissionNumber,
+      totalPoints: s.totalPoints,
+      average: Number((s.totalPercentage / s.subjects).toFixed(2)),
+      subjects: s.subjects,
+    }));
 
-      if (gradingSystem === 'ECZ' && count > 6) {
-        const studentResults = results
-          .filter((r) => r.studentId === s.student.id)
-          .map((r) => r.score)
-          .sort((a, b) => b - a);
-        totalScore = studentResults.slice(0, 6).reduce((sum, p) => sum + p, 0);
-        count = 6;
-      }
+    ranking.sort((a, b) => b.totalPoints - a.totalPoints);
 
-      return {
-        studentId: s.student.id,
-        name: `${s.student.firstName} ${s.student.lastName}`,
-        total: totalScore,
-        average: Number((totalScore / count).toFixed(2)),
-      };
-    });
-
-    ranking.sort((a, b) => b.average - a.average);
-
-    let examScore: number | null = null;
+    let lastPoints: number | null = null;
     let position = 0;
     return ranking.map((s, i) => {
-      if (s.average !== examScore) {
+      if (s.totalPoints !== lastPoints) {
         position = i + 1;
-        examScore = s.average;
+        lastPoints = s.totalPoints;
       }
       return { position, ...s };
     });
@@ -152,8 +136,8 @@ export class AnalyticsService {
     termId: string,
     gradingSystem: 'ECZ' | 'GPA' = 'ECZ',
   ) {
-    const results = await this.prisma.result.findMany({
-      where: { studentId, termId, schoolId },
+    const results = await this.prisma.computedResult.findMany({
+      where: { studentId, termId, schoolId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
     });
 
     if (!results.length) return { comment: 'No results available.' };
@@ -161,15 +145,15 @@ export class AnalyticsService {
     let average = 0;
     if (gradingSystem === 'ECZ') {
       const scores = results
-        .map((r) => r.score)
+        .map((r) => r.finalPercentage ?? 0)
         .sort((a, b) => b - a)
         .slice(0, 6);
       average = scores.reduce((sum, s) => sum + s, 0) / scores.length;
     } else {
-      average = results.reduce((sum, r) => sum + r.score, 0) / results.length;
+      average = results.reduce((sum, r) => sum + (r.finalPercentage ?? 0), 0) / results.length;
     }
 
-    const failedSubjects = results.filter((r) => r.score < 50).length;
+    const failedSubjects = results.filter((r) => (r.finalPercentage ?? 0) < 50).length;
 
     const teacherComment = this.generateReportComment(average, failedSubjects);
     const headComment = this.generateHeadTeacherComment(average);
@@ -205,20 +189,15 @@ export class AnalyticsService {
     return 'Academic performance needs serious improvement.';
   }
   async getSubjectPerformance(classId: string, termId: string) {
-    const results = await this.prisma.result.findMany({
+    const results = await this.prisma.computedResult.findMany({
       where: {
+        classId,
         termId,
-        student: {
-          enrollments: {
-            some: {
-              classId,
-            },
-          },
-        },
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        finalPercentage: { not: null },
       },
       include: {
         subject: true,
-        student: true,
       },
     });
 
@@ -228,38 +207,35 @@ export class AnalyticsService {
       if (!subjects[r.subjectId]) {
         subjects[r.subjectId] = {
           subject: r.subject.name,
+          subjectId: r.subjectId,
           total: 0,
           count: 0,
         };
       }
 
-      subjects[r.subjectId].total += r.score;
+      subjects[r.subjectId].total += r.finalPercentage ?? 0;
       subjects[r.subjectId].count += 1;
     }
 
     return Object.values(subjects).map((s: any) => ({
       subject: s.subject,
+      subjectId: s.subjectId,
       average: s.total / s.count,
     }));
   }
   async getGradeDistribution(classId: string, termId: string) {
-    const results = await this.prisma.result.findMany({
+    const results = await this.prisma.computedResult.findMany({
       where: {
+        classId,
         termId,
-        student: {
-          enrollments: {
-            some: {
-              classId,
-            },
-          },
-        },
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
       },
     });
 
     const distribution: Record<string, number> = {};
 
     for (const r of results) {
-      const grade = r.grade || 'Unknown';
+      const grade = r.finalGrade || 'Unknown';
 
       if (!distribution[grade]) {
         distribution[grade] = 0;
@@ -271,32 +247,28 @@ export class AnalyticsService {
     return distribution;
   }
   async getGenderPerformance(classId: string, termId: string) {
-    const results = await this.prisma.result.findMany({
+    const results = await this.prisma.computedResult.findMany({
       where: {
+        classId,
         termId,
-        student: {
-          enrollments: {
-            some: {
-              classId,
-            },
-          },
-        },
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        finalPercentage: { not: null },
       },
       include: {
-        student: true,
+        student: { select: { id: true, gender: true } },
       },
     });
 
     const genderTotals: Record<string, any> = {};
 
     for (const r of results) {
-      const gender = r.student.gender ?? 'Unknown';
+      const gender = r.student?.gender ?? 'Unknown';
 
       if (!genderTotals[gender]) {
         genderTotals[gender] = { total: 0, count: 0 };
       }
 
-      genderTotals[gender].total += r.score;
+      genderTotals[gender].total += r.finalPercentage ?? 0;
       genderTotals[gender].count++;
     }
 
@@ -667,13 +639,13 @@ export class AnalyticsService {
       };
     }
 
-    const results = await this.prisma.result.findMany({
-      where: { schoolId, termId },
-      include: { student: true, subject: true },
+    const results = await this.prisma.computedResult.findMany({
+      where: { schoolId, termId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null } },
+      include: { student: { select: { id: true, firstName: true, lastName: true } }, subject: { select: { id: true, name: true } } },
     });
 
     const totalExams = results.length;
-    const passedExams = results.filter((r) => r.score >= 50).length;
+    const passedExams = results.filter((r) => (r.finalPercentage ?? 0) >= 50).length;
     const failedExams = totalExams - passedExams;
     const passRate = totalExams > 0 ? (passedExams / totalExams) * 100 : 0;
 
@@ -690,7 +662,7 @@ export class AnalyticsService {
           totalExams > 0
             ? Number(
                 (
-                  results.reduce((sum, r) => sum + r.score, 0) / totalExams
+                  results.reduce((sum, r) => sum + (r.finalPercentage ?? 0), 0) / totalExams
                 ).toFixed(2),
               )
             : 0,
@@ -709,9 +681,9 @@ export class AnalyticsService {
   }
 
   private async getTopPerformers(schoolId: string, termId: string) {
-    const results = await this.prisma.result.findMany({
-      where: { schoolId, termId },
-      include: { student: true },
+    const results = await this.prisma.computedResult.findMany({
+      where: { schoolId, termId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null } },
+      include: { student: { select: { id: true, firstName: true, lastName: true, admissionNumber: true } } },
     });
 
     const studentAverages = new Map<
@@ -722,12 +694,12 @@ export class AnalyticsService {
     for (const r of results) {
       const existing = studentAverages.get(r.studentId);
       if (existing) {
-        existing.total += r.score;
+        existing.total += r.finalPercentage ?? 0;
         existing.count++;
       } else {
         studentAverages.set(r.studentId, {
           student: r.student,
-          total: r.score,
+          total: r.finalPercentage ?? 0,
           count: 1,
         });
       }
@@ -744,9 +716,9 @@ export class AnalyticsService {
   }
 
   private async getImprovementAreas(schoolId: string, termId: string) {
-    const results = await this.prisma.result.findMany({
-      where: { schoolId, termId },
-      include: { subject: true },
+    const results = await this.prisma.computedResult.findMany({
+      where: { schoolId, termId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null } },
+      include: { subject: { select: { id: true, name: true } } },
     });
 
     const subjectStats = new Map<
@@ -757,12 +729,12 @@ export class AnalyticsService {
     for (const r of results) {
       const existing = subjectStats.get(r.subjectId);
       if (existing) {
-        existing.total += r.score;
+        existing.total += r.finalPercentage ?? 0;
         existing.count++;
       } else {
         subjectStats.set(r.subjectId, {
           subject: r.subject,
-          total: r.score,
+          total: r.finalPercentage ?? 0,
           count: 1,
         });
       }
@@ -776,7 +748,7 @@ export class AnalyticsService {
         passRate: Number(
           (
             (results.filter(
-              (r) => r.subjectId === s.subject.id && r.score >= 50,
+              (r) => r.subjectId === s.subject.id && (r.finalPercentage ?? 0) >= 50,
             ).length /
               s.count) *
             100
@@ -784,7 +756,7 @@ export class AnalyticsService {
         ),
       }))
       .filter((s) => s.average < 50 || s.passRate < 50)
-      .sort((a, b) => a.average - b.average);
+      .sort((a, b) => a.average - a.average);
   }
 
   async getSubscriptionStats(schoolId: string) {

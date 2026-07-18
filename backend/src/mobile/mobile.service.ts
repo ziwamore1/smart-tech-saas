@@ -499,10 +499,11 @@ export class MobileService {
       include: { academicYear: true },
     });
 
-    const results = await this.prisma.result.findMany({
+    const results = await this.prisma.computedResult.findMany({
       where: {
         studentId: student.id,
         termId: currentTerm?.id,
+        status: 'PUBLISHED',
       },
       include: {
         subject: { select: { id: true, name: true } },
@@ -515,9 +516,11 @@ export class MobileService {
       subject: r.subject.name,
       subjectId: r.subject.id,
       term: r.term.name,
-      score: r.score,
-      grade: r.grade,
-      remark: r.remark,
+      score: r.finalPercentage,
+      grade: r.finalGrade,
+      remark: r.finalRemark,
+      points: r.points,
+      status: r.status,
     }));
   }
 

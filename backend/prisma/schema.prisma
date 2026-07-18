@@ -5734,3 +5734,32 @@ model WhatsAppQueue {
   @@index([status])
   @@index([scheduledAt])
 }
+
+model ResultSmsLog {
+  id               String   @id @default(uuid())
+  schoolId         String
+  classId          String
+  termId           String
+  studentId        String
+  parentId         String?
+  parentName       String?
+  studentName      String
+  admissionNumber  String?
+  phoneNumber      String?
+  message          String
+  status           String   @default("PENDING") // PENDING, SENT, FAILED, SKIPPED
+  provider         String?  // twilio, beem
+  providerMessageId String?
+  errorMessage     String?
+  errorSuggestion  String?  // Recommended action for the error
+  batchId          String?  // Groups messages sent together
+  sentAt           DateTime?
+  createdAt        DateTime @default(now())
+
+  @@index([schoolId])
+  @@index([classId])
+  @@index([termId])
+  @@index([batchId])
+  @@index([status])
+  @@index([createdAt])
+}

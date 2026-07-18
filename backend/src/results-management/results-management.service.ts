@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, Inject, Optional, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { RankingService } from '../ranking-service/ranking.service';
 import { ResultAnalyticsService } from '../result-analytics/result-analytics.service';
 import { ReportCardEngineService } from '../report-card-engine/report-card-engine.service';
 import { AssessmentEngineService } from '../assessment-engine/assessment-engine.service';
+import { ResultsSmsService } from '../results-sms/results-sms.service';
 import { Prisma } from '@prisma/client';
 import * as XLSX from 'xlsx';
 
@@ -19,6 +20,8 @@ export class ResultsManagementService {
     private resultAnalytics: ResultAnalyticsService,
     private reportCardEngine: ReportCardEngineService,
     private assessmentEngine: AssessmentEngineService,
+    @Optional() @Inject(forwardRef(() => ResultsSmsService))
+    private resultsSmsService?: ResultsSmsService,
   ) {}
 
   async getResultSheets(
@@ -351,8 +354,8 @@ export class ResultsManagementService {
         where: { id },
         data: {
           status: 'SUBMITTED',
-          submittedBy: userId,
           submittedAt: new Date(),
+          submittedBy: userId,
         },
       });
 
@@ -411,10 +414,19 @@ export class ResultsManagementService {
         },
       });
 
+      await tx.computedResult.updateMany({
+        where: {
+          classId: sheet.classId,
+          termId: sheet.termId,
+          schoolId: sheet.schoolId,
+        },
+        data: { status: 'VERIFIED' },
+      });
+
       await tx.resultAuditLog.create({
         data: {
           schoolId: sheet.schoolId,
-          action: 'VERIFIED',
+          action: 'PUBLISHED',
           entityType: 'RESULT_SHEET',
           entityId: id,
           classId: sheet.classId,
@@ -423,8 +435,20 @@ export class ResultsManagementService {
         },
       });
 
-      return { ...updated, computationSummary: computationResults };
+      return updated;
     });
+  }
+
+  private async triggerAutoSms(schoolId: string, classId: string, termId: string, userId: string) {
+    if (!this.resultsSmsService) return;
+    try {
+      const result = await this.resultsSmsService.autoSendOnPublish(schoolId, classId, termId, userId);
+      if (result) {
+        this.logger.log(`[Auto SMS] ${result.message}`);
+      }
+    } catch (error: any) {
+      this.logger.error(`[Auto SMS] Failed: ${error.message}`);
+    }
   }
 
   async publishSheet(id: string, userId: string) {
@@ -438,7 +462,7 @@ export class ResultsManagementService {
       throw new BadRequestException('Only verified sheets can be published');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.resultSheet.update({
         where: { id },
         data: {
@@ -467,6 +491,15 @@ export class ResultsManagementService {
         },
       });
 
+      await tx.computedResult.updateMany({
+        where: {
+          classId: sheet.classId,
+          termId: sheet.termId,
+          schoolId: sheet.schoolId,
+        },
+        data: { status: 'PUBLISHED' },
+      });
+
       await tx.resultAuditLog.create({
         data: {
           schoolId: sheet.schoolId,
@@ -481,27 +514,51 @@ export class ResultsManagementService {
 
       return updated;
     });
+
+    this.triggerAutoSms(sheet.schoolId, sheet.classId, sheet.termId, userId);
+
+    return result;
   }
 
-  async lockSheet(id: string, userId: string) {
+  private async triggerAutoSms(schoolId: string, classId: string, termId: string, userId: string) {
+    if (!this.resultsSmsService) return;
+    try {
+      const result = await this.resultsSmsService.autoSendOnPublish(schoolId, classId, termId, userId);
+      if (result) {
+        this.logger.log(`[Auto SMS] ${result.message}`);
+      }
+    } catch (error: any) {
+      this.logger.error(`[Auto SMS] Failed: ${error.message}`);
+    }
+  }
+
+  async publishSheet(id: string, userId: string) {
     const sheet = await this.prisma.resultSheet.findUnique({ where: { id } });
 
     if (!sheet) {
       throw new NotFoundException('Result sheet not found');
     }
 
-    if (sheet.status !== 'PUBLISHED') {
-      throw new BadRequestException('Only published sheets can be locked');
+    if (sheet.status !== 'VERIFIED') {
+      throw new BadRequestException('Only verified sheets can be published');
     }
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.resultSheet.update({
         where: { id },
         data: {
-          status: 'LOCKED',
-          lockedAt: new Date(),
-          lockedBy: userId,
+          status: 'PUBLISHED',
+          publishedAt: new Date(),
         },
+      });
+
+      await tx.computedResult.updateMany({
+        where: {
+          classId: sheet.classId,
+          termId: sheet.termId,
+          schoolId: sheet.schoolId,
+        },
+        data: { status: 'LOCKED' },
       });
 
       await tx.resultAuditLog.create({
@@ -539,6 +596,15 @@ export class ResultsManagementService {
           lockedAt: null,
           lockedBy: null,
         },
+      });
+
+      await tx.computedResult.updateMany({
+        where: {
+          classId: sheet.classId,
+          termId: sheet.termId,
+          schoolId: sheet.schoolId,
+        },
+        data: { status: 'PUBLISHED' },
       });
 
       await tx.resultAuditLog.create({
@@ -771,7 +837,11 @@ export class ResultsManagementService {
         totalSubjects: validSubjects.length,
         totalPoints: validSubjects.reduce((sum, s) => sum + (s.points ?? 0), 0),
       };
-    });
+    }).sort((a, b) => {
+      if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+      if (b.average !== null && a.average !== null) return b.average - a.average;
+      return 0;
+    }).map((entry, index) => ({ ...entry, rank: index + 1 }));
 
     const className = await this.prisma.class.findUnique({
       where: { id: sheet.classId },
@@ -829,6 +899,7 @@ export class ResultsManagementService {
         : null;
 
       return `<tr>
+        <td style="text-align:center;padding:6px 12px;border:1px solid #e8ddd0;font-weight:600;color:#5f4b3a">${s.rank || '-'}</td>
         <td style="padding:6px 12px;border:1px solid #e8ddd0;font-weight:600">${s.student?.firstName || ''} ${s.student?.lastName || ''}</td>
         <td style="padding:6px 12px;border:1px solid #e8ddd0;color:#6b7280;font-size:12px">${s.student?.admissionNumber || '-'}</td>
         <td style="padding:6px 12px;border:1px solid #e8ddd0;color:#6b7280;font-size:12px">${s.student?.gender || '-'}</td>
@@ -891,7 +962,8 @@ export class ResultsManagementService {
   <table>
     <thead>
       <tr>
-        <th style="min-width:160px;position:sticky;left:0;z-index:2">Student Name</th>
+        <th style="min-width:40px;position:sticky;left:0;z-index:2">Rank</th>
+        <th style="min-width:160px">Student Name</th>
         <th style="min-width:100px">Admission No.</th>
         <th style="min-width:60px">Gender</th>
         ${subjectHeaders}

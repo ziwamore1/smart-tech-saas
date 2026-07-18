@@ -649,6 +649,32 @@ export const communicationApi = {
     api.post('/communications/alerts/sms', data),
 };
 
+export const resultsSmsApi = {
+  preview: (classId: string, termId: string) =>
+    api.get('/results-sms/preview', { params: { classId, termId } }),
+
+  send: (data: { classId: string; termId: string; parentIds?: string[] }) =>
+    api.post('/results-sms/send', data),
+
+  autoSend: (data: { classId: string; termId: string }) =>
+    api.post('/results-sms/auto-send', data),
+
+  getHistory: (classId?: string, termId?: string) =>
+    api.get('/results-sms/history', { params: { classId, termId } }),
+
+  getBatchLogs: (batchId: string) =>
+    api.get(`/results-sms/batches/${batchId}`),
+
+  getLogById: (id: string) =>
+    api.get(`/results-sms/logs/${id}`),
+
+  getFailedLogs: (batchId?: string) =>
+    api.get('/results-sms/failed', { params: { batchId } }),
+
+  getSettings: () =>
+    api.get('/results-sms/settings'),
+};
+
 export const enrollmentApi = {
   getByStudent: (studentId: string) => api.get(`/enrollments/student/${studentId}`),
   getByClass: (classId: string) => api.get(`/enrollments/class/${classId}`),
