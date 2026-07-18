@@ -10,6 +10,7 @@ import {
   UseGuards,
   Query,
   Res,
+  Logger,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ReportTemplateBuilderService } from './report-template-builder.service';
@@ -29,6 +30,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 @Controller('template-builder')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ReportTemplateBuilderController {
+  private readonly logger = new Logger(ReportTemplateBuilderController.name);
+
   constructor(
     private readonly builderService: ReportTemplateBuilderService,
     private readonly certificateService: CertificateTemplateService,

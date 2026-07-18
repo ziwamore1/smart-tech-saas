@@ -56,27 +56,9 @@ export class TemplateMarketplaceService {
 
     const template = await this.prisma.reportTemplate.findUnique({
       where: { id: item.templateId },
-      select: {
-        id: true, name: true, templateType: true, pageSize: true,
-        orientation: true, fontFamily: true, fontSize: true,
-        primaryColor: true, secondaryColor: true, layoutJson: true,
-      },
+      select: { id: true, name: true, templateType: true, pageSize: true, orientation: true, fontFamily: true, fontSize: true, primaryColor: true, secondaryColor: true },
     });
     if (!template) throw new NotFoundException('Source template not found');
-
-    const [components] = await Promise.all([
-      this.prisma.templateComponent.findMany({
-        where: { templateId: template.id },
-        select: {
-          type: true, label: true, content: true, styles: true,
-          position: true, size: true, settings: true, sortOrder: true, isRequired: true,
-        },
-      }),
-      this.prisma.templateMarketplace.update({
-        where: { id: marketplaceId },
-        data: { downloads: { increment: 1 } },
-      }),
-    ]);
 
     const copy = await this.prisma.reportTemplate.create({
       data: {
@@ -89,10 +71,15 @@ export class TemplateMarketplaceService {
         fontSize: template.fontSize || 12,
         primaryColor: template.primaryColor || '#1a365d',
         secondaryColor: template.secondaryColor || '#f5f5f5',
-        layoutJson: ((template.layoutJson || {}) as any),
+        layoutJson: {},
         status: 'DRAFT',
         version: 1,
       },
+    });
+
+    const components = await this.prisma.templateComponent.findMany({
+      where: { templateId: template.id },
+      select: { type: true, label: true, content: true, styles: true, position: true, size: true, settings: true, sortOrder: true, isRequired: true },
     });
 
     if (components.length > 0) {
@@ -111,6 +98,11 @@ export class TemplateMarketplaceService {
         })),
       });
     }
+
+    await this.prisma.templateMarketplace.update({
+      where: { id: marketplaceId },
+      data: { downloads: { increment: 1 } },
+    });
 
     return copy;
   }
