@@ -160,6 +160,7 @@ export function generateMarkScheduleReport(students: ReportStudent[], meta: Repo
       <td class="text-center" style="color:#6b7280">${s.gender || '-'}</td>
       ${cells}
       <td class="text-center font-bold" style="color:${avgColor}">${avg != null ? avg.toFixed(1) + '%' : '-'}</td>
+      <td class="text-center font-semibold" style="color:#059669">${s.totalPoints != null ? s.totalPoints : '-'}</td>
       <td class="text-center">
         <span class="grade-badge" style="background:${gradeColor.bg};color:${gradeColor.text}">${s.grade || '-'}</span>
       </td>
@@ -176,6 +177,7 @@ export function generateMarkScheduleReport(students: ReportStudent[], meta: Repo
         <th class="text-center" style="width:50px">Gender</th>
         ${subjectHeaders}
         <th class="text-center" style="min-width:60px">Average</th>
+        <th class="text-center" style="width:50px">Points</th>
         <th class="text-center" style="width:50px">Grade</th>
         <th class="text-center" style="width:40px">Rank</th>
       </tr></thead>

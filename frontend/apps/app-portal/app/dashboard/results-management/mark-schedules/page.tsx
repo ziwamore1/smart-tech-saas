@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, classApi, termApi } from '@/lib/api';
 import { toast } from 'sonner';
@@ -78,23 +78,22 @@ export default function MarkSchedulesPage() {
       return;
     }
     const students: ReportStudent[] = schedule.students.map((s: any) => {
-      const results = subjects.map((subj: string) => ({
-        subject: subj,
-        score: s[subj] ?? null,
-        grade: null,
-        remark: null,
+      const results = (s.subjects || []).map((sr: any) => ({
+        subject: sr.subjectName || sr.subjectCode || '',
+        score: sr.finalPercentage ?? null,
+        grade: sr.finalGrade || null,
+        remark: sr.finalRemark || null,
       }));
-      const validScores = results.filter(r => r.score != null);
-      const avg = validScores.length > 0 ? validScores.reduce((sum, r) => sum + (r.score || 0), 0) / validScores.length : null;
       return {
-        firstName: s.firstName || '',
-        lastName: s.lastName || '',
-        admissionNumber: s.admissionNumber || '',
-        gender: s.gender || '',
+        firstName: s.student?.firstName || s.firstName || '',
+        lastName: s.student?.lastName || s.lastName || '',
+        admissionNumber: s.student?.admissionNumber || s.admissionNumber || '',
+        gender: s.student?.gender || s.gender || '',
         results,
-        average: avg,
-        grade: s.grade || null,
-        rank: s.rank || null,
+        average: s.average ?? null,
+        grade: null,
+        rank: s.rank ?? null,
+        totalPoints: s.totalPoints ?? null,
       };
     });
     const meta: ReportMeta = {
@@ -120,13 +119,8 @@ export default function MarkSchedulesPage() {
   };
 
   const subjects = useMemo(() => {
-    if (!schedule?.students?.length) return [];
-    const firstStudent = schedule.students[0];
-    return Object.keys(firstStudent).filter(k =>
-      k !== 'id' && k !== 'rank' && k !== 'total' && k !== 'percentage' && k !== 'grade' &&
-      k !== 'firstName' && k !== 'lastName' && k !== 'admissionNumber' && k !== 'gender' &&
-      k !== 'studentId' && k !== 'rowNumber' && k !== '#'
-    );
+    if (!schedule?.subjects?.length) return [];
+    return schedule.subjects.map((s: any) => s.name || s.code || '');
   }, [schedule]);
 
   return (
@@ -277,52 +271,63 @@ export default function MarkSchedulesPage() {
                     </th>
                   ))}
                   <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #374151', width: '60px' }}>Total</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #374151', width: '60px' }}>%</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #374151', width: '60px' }}>Average</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #374151', width: '55px' }}>Points</th>
                   <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #374151', width: '50px' }}>Grade</th>
                   <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #374151', width: '50px' }}>Rank</th>
                 </tr>
               </thead>
               <tbody>
                 {schedule.students?.map((student: any, idx: number) => {
-                  const subjectScores = subjects.map(s => student[s]);
-                  const total = subjectScores.reduce((sum: number, s: number) => sum + (s || 0), 0);
-                  const maxPossible = subjects.length * 100;
-                  const pct = maxPossible > 0 ? ((total / maxPossible) * 100).toFixed(1) : '0.0';
-                  const grade = getGrade(total, maxPossible, student);
+                  const pcts = (student.subjects || []).map((sr: any) => sr.finalPercentage);
+                  const validPcts = pcts.filter((p: number | null) => p != null) as number[];
+                  const total = validPcts.reduce((sum: number, p: number) => sum + p, 0);
+                  const avg = validPcts.length > 0 ? total / validPcts.length : 0;
+                  const grade = getGrade(total, subjects.length * 100, { grade: null });
                   return (
-                    <tr key={student.id || student.studentId || idx} style={{
+                    <tr key={student.student?.id || student.studentId || idx} style={{
                       background: idx % 2 === 0 ? 'white' : '#f9fafb'
                     }}>
                       <td style={{ padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb', color: '#6b7280' }}>{idx + 1}</td>
                       <td style={{ padding: '8px 12px', border: '1px solid #e5e7eb', color: '#374151' }}>
-                        {student.admissionNumber || '-'}
+                        {student.student?.admissionNumber || student.admissionNumber || '-'}
                       </td>
                       <td style={{ padding: '8px 12px', border: '1px solid #e5e7eb', fontWeight: 600, color: '#1f2937' }}>
-                        {student.firstName} {student.lastName}
+                        {student.student?.firstName || student.firstName || ''} {student.student?.lastName || student.lastName || ''}
                       </td>
                       <td style={{ padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb', color: '#374151' }}>
-                        {student.gender || '-'}
+                        {student.student?.gender || student.gender || '-'}
                       </td>
-                      {subjects.map((subj: string) => (
-                        <td key={subj} style={{
-                          padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb',
-                          color: student[subj] != null ? '#374151' : '#d1d5db',
-                          fontWeight: student[subj] != null ? 500 : 400
-                        }}>
-                          {student[subj] != null ? student[subj] : '-'}
-                        </td>
-                      ))}
+                      {subjects.map((subjName: string) => {
+                        const sr = (student.subjects || []).find((s: any) => s.subjectName === subjName);
+                        const pct = sr?.finalPercentage;
+                        return (
+                          <td key={subjName} style={{
+                            padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb',
+                            color: pct != null ? '#374151' : '#d1d5db',
+                            fontWeight: pct != null ? 500 : 400
+                          }}>
+                            {pct != null ? pct : '-'}
+                          </td>
+                        );
+                      })}
                       <td style={{
                         padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb',
                         fontWeight: 700, color: '#1f2937', background: '#f5efe8'
                       }}>
-                        {total}
+                        {validPcts.length > 0 ? total.toFixed(1) : '-'}
                       </td>
                       <td style={{
                         padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb',
                         fontWeight: 600, color: '#1f2937', background: '#f5efe8'
                       }}>
-                        {pct}
+                        {avg ? avg.toFixed(1) : '-'}
+                      </td>
+                      <td style={{
+                        padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb',
+                        fontWeight: 700, color: '#059669', background: '#f0fdf4'
+                      }}>
+                        {student.totalPoints ?? '-'}
                       </td>
                       <td style={{
                         padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb',
@@ -332,7 +337,7 @@ export default function MarkSchedulesPage() {
                         {grade}
                       </td>
                       <td style={{ padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb', fontWeight: 600, color: '#1f2937' }}>
-                        {idx + 1}
+                        {student.rank || idx + 1}
                       </td>
                     </tr>
                   );
