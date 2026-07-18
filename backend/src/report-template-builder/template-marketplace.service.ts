@@ -50,71 +50,67 @@ export class TemplateMarketplaceService {
   async downloadTemplate(schoolId: string, marketplaceId: string) {
     const item = await this.prisma.templateMarketplace.findUnique({
       where: { id: marketplaceId },
-      select: {
-        id: true,
-        template: {
-          select: {
-            id: true, name: true, templateType: true, pageSize: true,
-            orientation: true, fontFamily: true, fontSize: true,
-            primaryColor: true, secondaryColor: true, layoutJson: true,
-          },
-        },
-      },
+      select: { id: true, templateId: true },
     });
     if (!item) throw new NotFoundException('Marketplace item not found');
-    if (!item.template) throw new NotFoundException('Source template not found for this marketplace item');
 
-    const { template } = item;
-    const components = await this.prisma.templateComponent.findMany({
-      where: { templateId: template.id },
+    const template = await this.prisma.reportTemplate.findUnique({
+      where: { id: item.templateId },
       select: {
-        type: true, label: true, content: true, styles: true,
-        position: true, size: true, settings: true, sortOrder: true, isRequired: true,
+        id: true, name: true, templateType: true, pageSize: true,
+        orientation: true, fontFamily: true, fontSize: true,
+        primaryColor: true, secondaryColor: true, layoutJson: true,
+      },
+    });
+    if (!template) throw new NotFoundException('Source template not found');
+
+    const [components] = await Promise.all([
+      this.prisma.templateComponent.findMany({
+        where: { templateId: template.id },
+        select: {
+          type: true, label: true, content: true, styles: true,
+          position: true, size: true, settings: true, sortOrder: true, isRequired: true,
+        },
+      }),
+      this.prisma.templateMarketplace.update({
+        where: { id: marketplaceId },
+        data: { downloads: { increment: 1 } },
+      }),
+    ]);
+
+    const copy = await this.prisma.reportTemplate.create({
+      data: {
+        name: `${template.name || 'Template'} (from Marketplace)`,
+        schoolId,
+        templateType: template.templateType || 'REPORT_CARD',
+        pageSize: template.pageSize || 'A4',
+        orientation: template.orientation || 'PORTRAIT',
+        fontFamily: template.fontFamily || 'Arial',
+        fontSize: template.fontSize || 12,
+        primaryColor: template.primaryColor || '#1a365d',
+        secondaryColor: template.secondaryColor || '#f5f5f5',
+        layoutJson: ((template.layoutJson || {}) as any),
+        status: 'DRAFT',
+        version: 1,
       },
     });
 
-    const copy = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.reportTemplate.create({
-        data: {
-          name: `${template.name || 'Template'} (from Marketplace)`,
-          schoolId,
-          templateType: template.templateType || 'REPORT_CARD',
-          pageSize: template.pageSize || 'A4',
-          orientation: template.orientation || 'PORTRAIT',
-          fontFamily: template.fontFamily || 'Arial',
-          fontSize: template.fontSize || 12,
-          primaryColor: template.primaryColor || '#1a365d',
-          secondaryColor: template.secondaryColor || '#f5f5f5',
-          layoutJson: (template.layoutJson || {}) as any,
-          status: 'DRAFT',
-          version: 1,
-        },
+    if (components.length > 0) {
+      await this.prisma.templateComponent.createMany({
+        data: components.map((c) => ({
+          templateId: copy.id,
+          type: c.type || 'TEXT',
+          label: c.label || '',
+          content: (c.content || {}) as any,
+          styles: (c.styles || {}) as any,
+          position: (c.position || { x: 0, y: 0 }) as any,
+          size: (c.size || { width: 100, height: 50 }) as any,
+          settings: (c.settings || {}) as any,
+          sortOrder: c.sortOrder || 0,
+          isRequired: c.isRequired || false,
+        })),
       });
-
-      if (components.length > 0) {
-        await tx.templateComponent.createMany({
-          data: components.map((c) => ({
-            templateId: created.id,
-            type: c.type || 'TEXT',
-            label: c.label || '',
-            content: (c.content || {}) as any,
-            styles: (c.styles || {}) as any,
-            position: (c.position || { x: 0, y: 0 }) as any,
-            size: (c.size || { width: 100, height: 50 }) as any,
-            settings: (c.settings || {}) as any,
-            sortOrder: c.sortOrder || 0,
-            isRequired: c.isRequired || false,
-          })),
-        });
-      }
-
-      await tx.templateMarketplace.update({
-        where: { id: marketplaceId },
-        data: { downloads: { increment: 1 } },
-      });
-
-      return created;
-    });
+    }
 
     return copy;
   }

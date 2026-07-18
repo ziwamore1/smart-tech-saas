@@ -145,16 +145,21 @@ export default function TemplatePersonalizationPage() {
     }
   };
 
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
   const handleDownloadTemplate = async (marketplaceId: string) => {
+    if (downloadingId) return;
+    setDownloadingId(marketplaceId);
     try {
-      const res = await api.post(`/template-builder/marketplace/download/${marketplaceId}`, undefined, { timeout: 60000 });
+      const res = await api.post(`/template-builder/marketplace/download/${marketplaceId}`, undefined, { timeout: 120000 });
       const tpl = res.data?.data || res.data;
       alert(`Template "${tpl?.name || 'downloaded from marketplace'}" is ready! Check the "Your Templates" section below.`);
       loadData();
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Download failed';
       alert(`Failed to download: ${msg}`);
-      console.error('Download failed:', err);
+    } finally {
+      setDownloadingId(null);
     }
   };
 
@@ -480,8 +485,11 @@ export default function TemplatePersonalizationPage() {
                     <span><i className="fa fa-heart" style={{ marginRight: '4px', color: '#ef4444' }}></i> {tpl.likes || 0}</span>
                     <span><i className="fa fa-building" style={{ marginRight: '4px' }}></i> {tpl.school?.name || 'System'}</span>
                   </div>
-                  <button onClick={() => handleDownloadTemplate(tpl.id)} style={{ width: '100%', padding: '8px 16px', background: gradPurple, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                    <i className="fa fa-download"></i> Download Template
+                  <button
+                    onClick={() => handleDownloadTemplate(tpl.id)}
+                    disabled={downloadingId === tpl.id}
+                    style={{ width: '100%', padding: '8px 16px', background: downloadingId === tpl.id ? '#9ca3af' : gradPurple, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: downloadingId === tpl.id ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                    {downloadingId === tpl.id ? <><i className="fa fa-spinner fa-spin"></i> Downloading...</> : <><i className="fa fa-download"></i> Download Template</>}
                   </button>
                 </div>
               ))}
