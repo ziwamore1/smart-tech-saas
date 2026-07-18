@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, RequestTimeoutException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -16,11 +16,14 @@ export class TemplateMarketplaceService {
         { tags: { has: filters.search } },
       ];
     }
-    return this.prisma.templateMarketplace.findMany({
-      where,
-      include: { template: { select: { id: true, name: true, templateType: true, pageSize: true } }, school: { select: { name: true } } },
-      orderBy: [{ featured: 'desc' }, { downloads: 'desc' }],
-    });
+    return withTimeout(
+      this.prisma.templateMarketplace.findMany({
+        where,
+        include: { template: { select: { id: true, name: true, templateType: true, pageSize: true } }, school: { select: { name: true } } },
+        orderBy: [{ featured: 'desc' }, { downloads: 'desc' }],
+      }),
+      15000,
+    );
   }
 
   async publishToMarketplace(schoolId: string, templateId: string, data: {
@@ -48,6 +51,10 @@ export class TemplateMarketplaceService {
   }
 
   async downloadTemplate(schoolId: string, marketplaceId: string) {
+    return withTimeout(this._downloadTemplate(schoolId, marketplaceId), 30000);
+  }
+
+  private async _downloadTemplate(schoolId: string, marketplaceId: string) {
     const item = await this.prisma.templateMarketplace.findUnique({
       where: { id: marketplaceId },
       select: { id: true, templateId: true },
@@ -114,4 +121,11 @@ export class TemplateMarketplaceService {
   async getCategories() {
     return ['Report Cards', 'Certificates', 'Transcripts', 'Attendance', 'Progress Reports', 'Analytics', 'ID Cards', 'Letters', 'Other'];
   }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new RequestTimeoutException(`Query timed out after ${ms}ms`)), ms)),
+  ]);
 }

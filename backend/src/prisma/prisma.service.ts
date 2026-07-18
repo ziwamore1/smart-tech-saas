@@ -12,12 +12,14 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger(PrismaService.name);
+  private readonly queryTimeout = 10000;
 
   async onModuleInit() {
     try {
       await this.$connect();
       this.$use(this.schoolIsolationMiddleware);
       this.$use(this.auditLogMiddleware);
+      await this.$executeRawUnsafe(`SET statement_timeout = '30s'`);
       this.logger.log(
         'Database connection established with security middleware',
       );
