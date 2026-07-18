@@ -181,7 +181,12 @@ export default function StaffRecordsPage() {
 
   return (
     <div style={{ padding: '24px 32px' }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .staff-records-grid .ag-root-wrapper { border: 1px solid #e5e7eb; border-radius: 8px; }
+        .staff-records-grid .ag-header { background: #f9f5f0; border-bottom: 1px solid #e8ddd0; }
+        .staff-records-grid .ag-row { border-bottom: 1px solid #f3eee8; }
+      `}</style>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
@@ -289,6 +294,7 @@ function StatCard({ icon, label, value, color }: { icon: string; label: string; 
 }
 
 function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () => void }) {
+  console.log('[ProfilesGrid] profiles:', profiles);
   const gridRef = useRef<AgGridReact>(null);
   const [searchText, setSearchText] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -339,10 +345,6 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
   const onGridReady = useCallback((params: GridReadyEvent) => {
     params.api.sizeColumnsToFit();
   }, []);
-
-  const onQuickFilterChanged = useCallback(() => {
-    gridRef.current?.api.setGridOption('quickFilterText', searchText);
-  }, [searchText]);
 
   const handleExportExcel = async () => {
     setExporting(true);
@@ -493,8 +495,10 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
             type="text"
             placeholder="Search profiles..."
             value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            onInput={onQuickFilterChanged}
+            onChange={e => {
+              setSearchText(e.target.value);
+              gridRef.current?.api.setGridOption('quickFilterText', e.target.value);
+            }}
             style={{ padding: '6px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, width: 200 }}
           />
           <button onClick={openCreate} style={{ padding: '6px 14px', background: '#ea6645', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
@@ -506,22 +510,25 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
         </div>
       </div>
       <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e8ddd0', overflow: 'hidden' }}>
-        <div className="ag-theme-quartz" style={{ height: 'calc(100vh - 280px)', width: '100%' }}>
+        <div className="ag-theme-quartz staff-records-grid" style={{ height: 'calc(100vh - 280px)', width: '100%', minHeight: 300 }}>
           <AgGridReact
             ref={gridRef}
             rowData={profiles}
             columnDefs={colDefs}
             defaultColDef={defaultColDef}
             onGridReady={onGridReady}
+            getRowId={(params) => params.data.id || params.data.staffId}
             animateRows={true}
             enableCellTextSelection={true}
             ensureDomOrder={true}
             rowSelection="single"
             pagination={true}
-            paginationPageSize={100}
+            paginationPageSize={50}
             paginationPageSizeSelector={[50, 100, 200, 500]}
             quickFilterText={searchText}
             onRowDoubleClicked={(e) => openEdit(e.data)}
+            onGridSizeChanged={() => gridRef.current?.api.sizeColumnsToFit()}
+            onFirstDataRendered={(p) => p.api.sizeColumnsToFit()}
           />
         </div>
       </div>
