@@ -166,9 +166,9 @@ export default function StaffRecordsPage() {
     { key: 'analytics', label: 'Analytics', icon: 'fa-chart-bar' },
   ];
 
-  const authorizedRoles = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'SuperAdmin', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
-  const userRoles = user?.roles || [];
-  const isAuthorized = userRoles.some(r => authorizedRoles.includes(r));
+  const authorizedRoles = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'SuperAdmin'];
+  const userAllRoles = user?.allRoles || user?.roles || [];
+  const isAuthorized = userAllRoles.some((r: string) => authorizedRoles.includes(r));
 
   if (!isAuthorized) {
     return (

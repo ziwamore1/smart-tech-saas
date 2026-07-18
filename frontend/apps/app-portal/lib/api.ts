@@ -1227,7 +1227,7 @@ export const templateBuilderApi = {
     api.post(`/template-builder/marketplace/${templateId}`, data),
 
   downloadFromMarketplace: (marketplaceId: string) =>
-    api.post(`/template-builder/marketplace/download/${marketplaceId}`),
+    api.post(`/template-builder/marketplace/download/${marketplaceId}`, undefined, { timeout: 60000 }),
 
   getMarketplaceCategories: () => api.get('/template-builder/marketplace/categories'),
 

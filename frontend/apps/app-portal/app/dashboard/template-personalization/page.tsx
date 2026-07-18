@@ -147,7 +147,7 @@ export default function TemplatePersonalizationPage() {
 
   const handleDownloadTemplate = async (marketplaceId: string) => {
     try {
-      const res = await api.post(`/template-builder/marketplace/download/${marketplaceId}`);
+      const res = await api.post(`/template-builder/marketplace/download/${marketplaceId}`, undefined, { timeout: 60000 });
       const tpl = res.data?.data || res.data;
       alert(`Template "${tpl?.name || 'downloaded from marketplace'}" is ready! Check the "Your Templates" section below.`);
       loadData();
