@@ -835,10 +835,14 @@ export class ResultsManagementService {
         subjects,
         average,
         totalSubjects: validSubjects.length,
-        totalPoints: validSubjects.reduce((sum, s) => sum + (s.points ?? 0), 0),
+        totalPoints: validSubjects
+          .filter((s) => s.points != null)
+          .sort((a, b) => (a.points ?? 99) - (b.points ?? 99))
+          .slice(0, 6)
+          .reduce((sum, s) => sum + (s.points ?? 0), 0),
       };
     }).sort((a, b) => {
-      if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+      if (a.totalPoints !== b.totalPoints) return a.totalPoints - b.totalPoints;
       if (b.average !== null && a.average !== null) return b.average - a.average;
       return 0;
     }).map((entry, index) => ({ ...entry, rank: index + 1 }));
