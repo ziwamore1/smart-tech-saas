@@ -91,7 +91,7 @@ export default function MarkSchedulesPage() {
         gender: s.student?.gender || s.gender || '',
         results,
         average: s.average ?? null,
-        grade: null,
+        grade: getGrade(s.average ?? null),
         rank: s.rank ?? null,
         totalPoints: s.totalPoints ?? null,
       };
@@ -108,13 +108,12 @@ export default function MarkSchedulesPage() {
     openMarkScheduleReport(students, meta);
   };
 
-  const getGrade = (total: number, totalPossible: number, student: any): string => {
-    if (student?.grade) return student.grade;
-    const pct = totalPossible > 0 ? (total / totalPossible) * 100 : 0;
-    if (pct >= 75) return 'A';
-    if (pct >= 65) return 'B';
-    if (pct >= 50) return 'C';
-    if (pct >= 40) return 'D';
+  const getGrade = (avg: number | null): string => {
+    if (avg == null) return '-';
+    if (avg >= 75) return 'A';
+    if (avg >= 65) return 'B';
+    if (avg >= 55) return 'C';
+    if (avg >= 40) return 'D';
     return 'E';
   };
 
@@ -282,8 +281,8 @@ export default function MarkSchedulesPage() {
                   const pcts = (student.subjects || []).map((sr: any) => sr.finalPercentage);
                   const validPcts = pcts.filter((p: number | null) => p != null) as number[];
                   const total = validPcts.reduce((sum: number, p: number) => sum + p, 0);
-                  const avg = validPcts.length > 0 ? total / validPcts.length : 0;
-                  const grade = getGrade(total, subjects.length * 100, { grade: null });
+                  const avg = validPcts.length > 0 ? total / validPcts.length : null;
+                  const grade = getGrade(avg);
                   return (
                     <tr key={student.student?.id || student.studentId || idx} style={{
                       background: idx % 2 === 0 ? 'white' : '#f9fafb'
