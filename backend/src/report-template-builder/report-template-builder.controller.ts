@@ -409,7 +409,11 @@ export class ReportTemplateBuilderController {
   @Post('marketplace/download/:marketplaceId')
   @Roles('Director', 'Teacher')
   async downloadFromMarketplace(@Req() req, @Param('marketplaceId') marketplaceId: string) {
-    return this.marketplaceService.downloadTemplate(req.user.schoolId, marketplaceId);
+    const start = Date.now();
+    this.logger.log(`downloadTemplate start - marketplaceId=${marketplaceId} schoolId=${req.user.schoolId}`);
+    const result = await this.marketplaceService.downloadTemplate(req.user.schoolId, marketplaceId);
+    this.logger.log(`downloadTemplate done - took ${Date.now() - start}ms`);
+    return result;
   }
 
   @Post('marketplace/like/:marketplaceId')

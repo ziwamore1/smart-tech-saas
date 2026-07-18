@@ -6,7 +6,7 @@ import { useAuth, useIsDirector, useIsSuperAdmin } from '@/lib/auth-context';
 import { useFeatureAccess } from '@/lib/useFeatureAccess';
 import { premiumStaffRecordsApi } from '@/lib/api';
 import { AgGridReact } from 'ag-grid-react';
-import type { ColDef, CellValueChangedEvent, ICellRendererParams, GridReadyEvent } from 'ag-grid-community';
+import type { ColDef, CellValueChangedEvent, ICellRendererParams, GridReadyEvent, GridApi } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-quartz.css';
 
@@ -303,6 +303,7 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [gridError, setGridError] = useState<string | null>(null);
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToast({ type, text });
@@ -510,27 +511,64 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
         </div>
       </div>
       <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e8ddd0', overflow: 'hidden' }}>
-        <div className="ag-theme-quartz staff-records-grid" style={{ height: 'calc(100vh - 280px)', width: '100%', minHeight: 300 }}>
-          <AgGridReact
-            ref={gridRef}
-            rowData={profiles}
-            columnDefs={colDefs}
-            defaultColDef={defaultColDef}
-            onGridReady={onGridReady}
-            getRowId={(params) => params.data.id || params.data.staffId}
-            animateRows={true}
-            enableCellTextSelection={true}
-            ensureDomOrder={true}
-            rowSelection="single"
-            pagination={true}
-            paginationPageSize={50}
-            paginationPageSizeSelector={[50, 100, 200, 500]}
-            quickFilterText={searchText}
-            onRowDoubleClicked={(e) => openEdit(e.data)}
-            onGridSizeChanged={() => gridRef.current?.api.sizeColumnsToFit()}
-            onFirstDataRendered={(p) => p.api.sizeColumnsToFit()}
-          />
-        </div>
+        {gridError ? (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: '#f9f5f0', textAlign: 'left' }}>
+                  <th style={{ padding: '8px 12px', fontWeight: 600 }}>Staff ID</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600 }}>Employee No</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600 }}>Teacher Name</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600 }}>Gender</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600 }}>Status</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600 }}>Type</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600 }}>Grade</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {profiles.map((p: any) => (
+                  <tr key={p.id || p.staffId} style={{ borderTop: '1px solid #f3eee8', cursor: 'pointer' }} onDoubleClick={() => openEdit(p)}>
+                    <td style={{ padding: '8px 12px' }}>{p.staffId?.slice(0, 8) || '-'}</td>
+                    <td style={{ padding: '8px 12px' }}>{p.employeeNumber || '-'}</td>
+                    <td style={{ padding: '8px 12px', fontWeight: 500 }}>{p.teacherName || '-'}</td>
+                    <td style={{ padding: '8px 12px' }}>{p.gender || '-'}</td>
+                    <td style={{ padding: '8px 12px' }}><StatusBadge status={p.employmentStatus} /></td>
+                    <td style={{ padding: '8px 12px' }}>{p.employmentType || '-'}</td>
+                    <td style={{ padding: '8px 12px' }}>{p.gradeLevel || '-'}</td>
+                    <td style={{ padding: '8px 12px' }}>
+                      <button onClick={() => openEdit(p)} style={{ padding: '4px 8px', background: '#fef3c7', color: '#92400e', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, marginRight: 4 }}>Edit</button>
+                      <button onClick={() => handleDelete(p.id, p.teacherName)} style={{ padding: '4px 8px', background: '#fecaca', color: '#dc2626', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {profiles.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No profiles found.</div>}
+          </div>
+        ) : (
+          <div className="ag-theme-quartz staff-records-grid" style={{ height: 'calc(100vh - 280px)', width: '100%', minHeight: 300 }}>
+            <AgGridReact
+              ref={gridRef}
+              rowData={profiles}
+              columnDefs={colDefs}
+              defaultColDef={defaultColDef}
+              onGridReady={onGridReady}
+              getRowId={(params) => params.data.id || params.data.staffId}
+              animateRows={true}
+              enableCellTextSelection={true}
+              ensureDomOrder={true}
+              rowSelection="single"
+              pagination={true}
+              paginationPageSize={50}
+              paginationPageSizeSelector={[50, 100, 200, 500]}
+              quickFilterText={searchText}
+              onRowDoubleClicked={(e) => openEdit(e.data)}
+              onGridSizeChanged={() => gridRef.current?.api.sizeColumnsToFit()}
+              onFirstDataRendered={(p) => p.api.sizeColumnsToFit()}
+            />
+          </div>
+        )}
       </div>
 
 
