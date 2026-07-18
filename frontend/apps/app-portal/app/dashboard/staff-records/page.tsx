@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth, useIsDirector, useIsSuperAdmin } from '@/lib/auth-context';
 import { useFeatureAccess } from '@/lib/useFeatureAccess';
 import { premiumStaffRecordsApi } from '@/lib/api';
+import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
+ModuleRegistry.registerModules([AllCommunityModule]);
 import { AgGridReact } from 'ag-grid-react';
 import type { ColDef, CellValueChangedEvent, ICellRendererParams, GridReadyEvent, GridApi } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
