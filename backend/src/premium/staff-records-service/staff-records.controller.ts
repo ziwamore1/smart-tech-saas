@@ -54,6 +54,7 @@ export class StaffRecordsController {
   @Put('profiles/:id')
   @Roles(...ADMIN_ROLES)
   updateProfile(@Param('id') id: string, @Body() body: any) {
+    this.logger.log(`updateProfile start - id=${id}`);
     return this.staffRecordsService.updateProfile(id, body);
   }
 

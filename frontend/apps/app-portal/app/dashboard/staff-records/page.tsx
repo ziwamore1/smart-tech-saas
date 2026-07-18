@@ -5,11 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useAuth, useIsDirector, useIsSuperAdmin } from '@/lib/auth-context';
 import { useFeatureAccess } from '@/lib/useFeatureAccess';
 import { premiumStaffRecordsApi } from '@/lib/api';
-import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
+import { AllCommunityModule, ModuleRegistry, themeQuartz } from 'ag-grid-community';
 ModuleRegistry.registerModules([AllCommunityModule]);
 import { AgGridReact } from 'ag-grid-react';
 import type { ColDef, CellValueChangedEvent, ICellRendererParams, GridReadyEvent, GridApi } from 'ag-grid-community';
-import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-quartz.css';
 
 type TabType = 'overview' | 'profiles' | 'returns' | 'transfers' | 'qualifications' | 'sync' | 'analytics';
@@ -549,18 +548,19 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
             {profiles.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No profiles found.</div>}
           </div>
         ) : (
-          <div className="ag-theme-quartz staff-records-grid" style={{ height: 'calc(100vh - 280px)', width: '100%', minHeight: 300 }}>
+          <div className="staff-records-grid" style={{ height: 'calc(100vh - 280px)', width: '100%', minHeight: 300 }}>
             <AgGridReact
               ref={gridRef}
               rowData={profiles}
               columnDefs={colDefs}
               defaultColDef={defaultColDef}
+              theme={themeQuartz}
               onGridReady={onGridReady}
               getRowId={(params) => params.data.id || params.data.staffId}
               animateRows={true}
               enableCellTextSelection={true}
               ensureDomOrder={true}
-              rowSelection="single"
+              rowSelection={{ type: 'single' }}
               pagination={true}
               paginationPageSize={50}
               paginationPageSizeSelector={[50, 100, 200, 500]}
