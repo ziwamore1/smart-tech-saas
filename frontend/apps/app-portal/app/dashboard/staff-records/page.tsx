@@ -403,7 +403,9 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
       setShowModal(false);
       onRefresh();
     } catch (err: any) {
-      showToast('error', err?.response?.data?.message || 'Failed to save profile');
+      const msg = err?.response?.data?.message || err?.code || err?.message || 'Failed to save profile';
+      showToast('error', msg);
+      console.error('handleSave error:', { code: err?.code, message: err?.message, response: err?.response });
     } finally {
       setSaving(false);
     }

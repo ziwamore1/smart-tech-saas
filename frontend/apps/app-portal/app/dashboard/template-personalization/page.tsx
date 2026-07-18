@@ -156,8 +156,9 @@ export default function TemplatePersonalizationPage() {
       alert(`Template "${tpl?.name || 'downloaded from marketplace'}" is ready! Check the "Your Templates" section below.`);
       loadData();
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Download failed';
+      const msg = err?.response?.data?.message || err?.code || err?.message || 'Download failed';
       alert(`Failed to download: ${msg}`);
+      console.error('handleDownloadTemplate error:', { code: err?.code, message: err?.message, response: err?.response });
     } finally {
       setDownloadingId(null);
     }
