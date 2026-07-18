@@ -21,6 +21,7 @@ import { TeachingAssignmentsScreen } from '../screens/director/TeachingAssignmen
 import { DirectorLibraryScreen } from '../screens/director/LibraryScreen';
 import { DirectorTimetableScreen } from '../screens/director/TimetableScreen';
 import { DirectorCommunicationScreen } from '../screens/director/CommunicationScreen';
+import { ResultsSmsScreen } from '../screens/director/ResultsSmsScreen';
 import { DirectorUsersScreen } from '../screens/director/UsersScreen';
 import { Grade7Screen } from '../screens/director/Grade7Screen';
 import { CurriculumScreen } from '../screens/director/CurriculumScreen';
@@ -65,6 +66,7 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'DirectorLibrary', label: 'Library', icon: '📚', component: DirectorLibraryScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorTimetable', label: 'Timetable', icon: '📅', component: DirectorTimetableScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
   { name: 'DirectorCommunication', label: 'Communication', icon: '💬', component: DirectorCommunicationScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
+  { name: 'DirectorResultsSms', label: 'Results SMS', icon: '📨', component: ResultsSmsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'], requiredPermission: 'results.manage' },
   { name: 'DirectorUsers', label: 'Users', icon: '👤', component: DirectorUsersScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'], requiredPermission: 'users.manage' },
   { name: 'DirectorExams', label: 'Exams', icon: '📋', stackScreen: 'ExamList', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'], requiredPermission: 'exams.manage' },
   { name: 'DirectorTemplates', label: 'Templates', icon: '📄', stackScreen: 'TemplateMarketplace', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'], requiredPermission: 'template-personalization.manage' },

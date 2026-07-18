@@ -1647,6 +1647,43 @@ class ApiService {
     return response.data;
   }
 
+  // ===== Results SMS API =====
+
+  async getResultsSmsPreview(classId: string, termId: string) {
+    const response = await this.client.get('/results-sms/preview', { params: { classId, termId } });
+    return response.data;
+  }
+
+  async sendResultsSms(data: { classId: string; termId: string; parentIds?: string[] }) {
+    const response = await this.client.post('/results-sms/send', data);
+    return response.data;
+  }
+
+  async autoSendResultsSms(data: { classId: string; termId: string }) {
+    const response = await this.client.post('/results-sms/auto-send', data);
+    return response.data;
+  }
+
+  async getResultsSmsHistory(params?: { classId?: string; termId?: string }) {
+    const response = await this.client.get('/results-sms/history', { params });
+    return response.data;
+  }
+
+  async getResultsSmsBatchLogs(batchId: string) {
+    const response = await this.client.get(`/results-sms/batches/${batchId}`);
+    return response.data;
+  }
+
+  async getResultsSmsLogById(id: string) {
+    const response = await this.client.get(`/results-sms/logs/${id}`);
+    return response.data;
+  }
+
+  async getResultsSmsFailedLogs(params?: { batchId?: string }) {
+    const response = await this.client.get('/results-sms/failed', { params });
+    return response.data;
+  }
+
   // ===== Curriculum API =====
 
   async getEducationLevels(schoolId?: string) {
