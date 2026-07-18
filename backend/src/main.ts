@@ -15,6 +15,7 @@ import { SentryInterceptor } from './common/sentry.interceptor';
 import { isSentryEnabled, getSentryConfig } from './common/sentry.config';
 import { setupSecurity } from './common/security.middleware';
 import { ProductionLogger } from './common/production-logger';
+import { json } from 'express';
 
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
@@ -104,6 +105,7 @@ async function bootstrap() {
     }
   });
 
+  app.use(json({ limit: '10mb' }));
   app.use(compression());
 
   app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads/' });

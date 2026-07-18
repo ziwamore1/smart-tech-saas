@@ -198,7 +198,17 @@ export default function ResultEntryPage() {
     },
     onError: (err: any) => {
       setBulkSaving(false);
-      toast.error(err?.response?.data?.message || 'Failed to save scores. Please try again.');
+      const status = err?.response?.status;
+      const serverMessage = err?.response?.data?.message;
+      if (!err?.response) {
+        toast.error('Network error — the request did not reach the server. Check your connection or the payload may be too large.');
+      } else if (status === 413) {
+        toast.error('Payload too large. Save fewer scores at a time.');
+      } else if (status === 401) {
+        toast.error('Session expired. Please refresh and login again.');
+      } else {
+        toast.error(serverMessage || `Server error (${status || 'unknown'}). Please try again.`);
+      }
     },
   });
 
