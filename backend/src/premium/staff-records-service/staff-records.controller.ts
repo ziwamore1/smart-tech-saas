@@ -58,7 +58,7 @@ export class StaffRecordsController {
   }
 
   @Delete('profiles/:id')
-  @Roles('SuperAdmin')
+  @Roles(...ADMIN_ROLES)
   deleteProfile(@Param('id') id: string) {
     return this.staffRecordsService.deleteProfile(id);
   }

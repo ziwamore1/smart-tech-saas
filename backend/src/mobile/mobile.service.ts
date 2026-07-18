@@ -877,6 +877,53 @@ export class MobileService {
     });
   }
 
+  async getTerms(academicYearId: string) {
+    return this.prisma.term.findMany({
+      where: { academicYearId },
+      orderBy: { startDate: 'asc' },
+    });
+  }
+
+  async createTerm(data: any, schoolId: string) {
+    const academicYear = await this.prisma.academicYear.findUnique({
+      where: { id: data.academicYearId },
+    });
+    if (!academicYear || academicYear.schoolId !== schoolId) {
+      throw new Error('Invalid academic year');
+    }
+    return this.prisma.term.create({
+      data: {
+        name: data.name,
+        startDate: new Date(data.startDate),
+        endDate: new Date(data.endDate),
+        academicYearId: data.academicYearId,
+      },
+    });
+  }
+
+  async updateTerm(id: string, data: any) {
+    return this.prisma.term.update({ where: { id }, data });
+  }
+
+  async deleteTerm(id: string) {
+    return this.prisma.term.delete({ where: { id } });
+  }
+
+  async setCurrentTerm(id: string, schoolId: string) {
+    const term = await this.prisma.term.findUnique({
+      where: { id },
+      include: { academicYear: true },
+    });
+    if (!term || term.academicYear.schoolId !== schoolId) {
+      throw new Error('Term not found');
+    }
+    await this.prisma.term.updateMany({
+      where: { academicYearId: term.academicYearId, isCurrent: true },
+      data: { isCurrent: false },
+    });
+    return this.prisma.term.update({ where: { id }, data: { isCurrent: true } });
+  }
+
   async getStudents(schoolId: string, classId?: string) {
     const currentAcademicYear = await this.prisma.academicYear.findFirst({
       where: { schoolId, isCurrent: true },

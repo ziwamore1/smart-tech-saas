@@ -203,6 +203,33 @@ export class MobileController {
     return this.mobileService.getAcademicYears(schoolId);
   }
 
+  @Get('terms/:academicYearId')
+  async getTerms(@Param('academicYearId') academicYearId: string) {
+    return this.mobileService.getTerms(academicYearId);
+  }
+
+  @Post('terms')
+  async createTerm(@Body() body: any, @Req() req: any) {
+    const { schoolId } = req.user;
+    return this.mobileService.createTerm(body, schoolId);
+  }
+
+  @Patch('terms/:id')
+  async updateTerm(@Param('id') id: string, @Body() body: any) {
+    return this.mobileService.updateTerm(id, body);
+  }
+
+  @Delete('terms/:id')
+  async deleteTerm(@Param('id') id: string) {
+    return this.mobileService.deleteTerm(id);
+  }
+
+  @Patch('terms/:id/set-current')
+  async setCurrentTerm(@Param('id') id: string, @Req() req: any) {
+    const { schoolId } = req.user;
+    return this.mobileService.setCurrentTerm(id, schoolId);
+  }
+
   @Get('classes')
   async getClasses(@Req() req: any) {
     const { schoolId } = req.user;

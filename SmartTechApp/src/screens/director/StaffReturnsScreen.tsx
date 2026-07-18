@@ -15,6 +15,78 @@ interface StaffReturnsProps {
 
 type Tab = 'profiles' | 'returns' | 'overview';
 
+const ALL_FIELDS = [
+  { key: 'teacherName', label: 'Teacher Name *', type: 'text', section: 'Personal Info' },
+  { key: 'employeeNumber', label: 'Employee No', type: 'text', section: 'Personal Info' },
+  { key: 'gender', label: 'Gender', type: 'select', options: ['Male', 'Female'], section: 'Personal Info' },
+  { key: 'dateOfBirth', label: 'Date of Birth', type: 'date', section: 'Personal Info' },
+  { key: 'maritalStatus', label: 'Marital Status', type: 'select', options: ['Single', 'Married', 'Divorced', 'Widowed'], section: 'Personal Info' },
+  { key: 'nationality', label: 'Nationality', type: 'text', section: 'Personal Info' },
+
+  { key: 'nrcNumber', label: 'NRC Number', type: 'text', section: 'IDs & Numbers' },
+  { key: 'tsNumber', label: 'TS Number', type: 'text', section: 'IDs & Numbers' },
+  { key: 'aesNumber', label: 'AES Number', type: 'text', section: 'IDs & Numbers' },
+
+  { key: 'emailAddress', label: 'Email', type: 'email', section: 'Contact' },
+  { key: 'phoneNumber', label: 'Phone', type: 'phone', section: 'Contact' },
+
+  { key: 'substantivePosition', label: 'Substantive Position', type: 'text', section: 'Position' },
+  { key: 'substantiveScale', label: 'Substantive Scale', type: 'text', section: 'Position' },
+  { key: 'currentPosition', label: 'Current Position', type: 'text', section: 'Position' },
+  { key: 'actingPosition', label: 'Acting Position', type: 'text', section: 'Position' },
+  { key: 'administration', label: 'Administration', type: 'text', section: 'Position' },
+  { key: 'actingType', label: 'Acting Type', type: 'text', section: 'Position' },
+  { key: 'gradeLevel', label: 'Grade Level', type: 'text', section: 'Position' },
+  { key: 'step', label: 'Step', type: 'text', section: 'Position' },
+  { key: 'province', label: 'Province', type: 'text', section: 'Position' },
+  { key: 'district', label: 'District', type: 'text', section: 'Position' },
+  { key: 'station', label: 'Station', type: 'text', section: 'Position' },
+
+  { key: 'employmentStatus', label: 'Status', type: 'select', options: ['ACTIVE', 'INACTIVE', 'SUSPENDED', 'RETIRED', 'TRANSFERRED'], section: 'Employment' },
+  { key: 'employmentType', label: 'Type', type: 'select', options: ['TEACHING', 'NON_TEACHING', 'PERMANENT', 'CONTRACT', 'TEMPORARY'], section: 'Employment' },
+  { key: 'dateOfFirstAppointment', label: 'First Appointment', type: 'date', section: 'Employment' },
+  { key: 'dateOfPresentAppointment', label: 'Present Appointment', type: 'date', section: 'Employment' },
+  { key: 'dateOfActingAppointment', label: 'Acting Appointment', type: 'date', section: 'Employment' },
+  { key: 'confirmed', label: 'Confirmed', type: 'bool', section: 'Employment' },
+  { key: 'expectedConfirmationDate', label: 'Expected Confirmation', type: 'date', section: 'Employment' },
+  { key: 'allowancesEntitled', label: 'Allowances Entitled', type: 'text', section: 'Employment' },
+  { key: 'payrollPoint', label: 'Payroll Point', type: 'text', section: 'Employment' },
+
+  { key: 'contractEffectiveDate', label: 'Contract Effective', type: 'date', section: 'Contract' },
+  { key: 'contractNormalised', label: 'Contract Normalised', type: 'bool', section: 'Contract' },
+  { key: 'contractEnd', label: 'Contract End', type: 'date', section: 'Contract' },
+  { key: 'retirementDate', label: 'Retirement Date', type: 'date', section: 'Contract' },
+
+  { key: 'academicQualification', label: 'Academic Qualification', type: 'text', section: 'Qualifications' },
+  { key: 'professionalQualification', label: 'Professional Qualification', type: 'text', section: 'Qualifications' },
+  { key: 'yearOfQualification', label: 'Qualification Year', type: 'text', section: 'Qualifications' },
+  { key: 'specialization', label: 'Specialization', type: 'text', section: 'Qualifications' },
+
+  { key: 'taxId', label: 'Tax ID', type: 'text', section: 'Financial' },
+  { key: 'pensionNumber', label: 'Pension No', type: 'text', section: 'Financial' },
+  { key: 'bankName', label: 'Bank Name', type: 'text', section: 'Financial' },
+  { key: 'bankBranch', label: 'Bank Branch', type: 'text', section: 'Financial' },
+  { key: 'bankAccount', label: 'Bank Account', type: 'text', section: 'Financial' },
+  { key: 'socialSecurityNumber', label: 'SSN', type: 'text', section: 'Financial' },
+
+  { key: 'nextOfKin', label: 'Next of Kin', type: 'text', section: 'Emergency' },
+  { key: 'nextOfKinContact', label: 'Next of Kin Contact', type: 'phone', section: 'Emergency' },
+  { key: 'nextOfKinRelationship', label: 'Next of Kin Relationship', type: 'text', section: 'Emergency' },
+];
+
+const SECTIONS = ['Personal Info', 'IDs & Numbers', 'Contact', 'Position', 'Employment', 'Contract', 'Qualifications', 'Financial', 'Emergency'];
+
+function emptyForm(): any {
+  const f: any = {};
+  ALL_FIELDS.forEach(field => { f[field.key] = ''; });
+  f.employmentStatus = 'ACTIVE';
+  f.employmentType = 'TEACHING';
+  f.gender = 'Male';
+  f.confirmed = 'false';
+  f.contractNormalised = 'false';
+  return f;
+}
+
 export const StaffReturnsScreen: React.FC<StaffReturnsProps> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -26,10 +98,8 @@ export const StaffReturnsScreen: React.FC<StaffReturnsProps> = ({ onToggleDrawer
   const [refreshing, setRefreshing] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [editingProfile, setEditingProfile] = useState<any>(null);
-  const [newProfile, setNewProfile] = useState({
-    teacherName: '', employeeNumber: '', gender: '', substantivePosition: '',
-    province: '', district: '', station: '', emailAddress: '', phoneNumber: '',
-  });
+  const [form, setForm] = useState<any>(emptyForm());
+  const [saving, setSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -54,21 +124,33 @@ export const StaffReturnsScreen: React.FC<StaffReturnsProps> = ({ onToggleDrawer
   const handleRefresh = () => { setRefreshing(true); loadData(); };
 
   const handleSaveProfile = async () => {
-    if (!newProfile.teacherName) { Alert.alert('Error', 'Teacher name is required'); return; }
+    if (!form.teacherName) { Alert.alert('Error', 'Teacher name is required'); return; }
+    setSaving(true);
     try {
+      const payload: any = {};
+      ALL_FIELDS.forEach(f => {
+        const val = form[f.key];
+        if (val !== '' && val !== null && val !== undefined) {
+          if (f.type === 'bool') payload[f.key] = val === 'true' || val === true;
+          else payload[f.key] = val;
+        }
+      });
+
       if (editingProfile) {
-        await apiService.updateStaffRecordProfile(editingProfile.id, newProfile);
+        await apiService.updateStaffRecordProfile(editingProfile.id, payload);
         Alert.alert('Success', 'Profile updated');
       } else {
-        await apiService.createStaffRecordProfile(newProfile);
+        await apiService.createStaffRecordProfile(payload);
         Alert.alert('Success', 'Profile created');
       }
       setShowProfileModal(false);
       setEditingProfile(null);
-      setNewProfile({ teacherName: '', employeeNumber: '', gender: '', substantivePosition: '', province: '', district: '', station: '', emailAddress: '', phoneNumber: '' });
+      setForm(emptyForm());
       loadData();
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.message || 'Failed to save profile');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -80,6 +162,27 @@ export const StaffReturnsScreen: React.FC<StaffReturnsProps> = ({ onToggleDrawer
         catch { Alert.alert('Error', 'Failed to delete profile'); }
       }},
     ]);
+  };
+
+  const openCreate = () => {
+    setEditingProfile(null);
+    setForm(emptyForm());
+    setShowProfileModal(true);
+  };
+
+  const openEdit = (profile: any) => {
+    setEditingProfile(profile);
+    const f: any = {};
+    ALL_FIELDS.forEach(field => {
+      const val = profile[field.key];
+      f[field.key] = val !== null && val !== undefined ? String(val) : '';
+    });
+    setForm(f);
+    setShowProfileModal(true);
+  };
+
+  const updateField = (key: string, value: any) => {
+    setForm((prev: any) => ({ ...prev, [key]: value }));
   };
 
   const filteredProfiles = profiles.filter(p =>
@@ -144,7 +247,7 @@ export const StaffReturnsScreen: React.FC<StaffReturnsProps> = ({ onToggleDrawer
 
   const renderProfiles = () => (
     <WidgetCard title={`HR Profiles (${filteredProfiles.length})`}>
-      <TouchableOpacity style={styles.addBtn} onPress={() => { setEditingProfile(null); setNewProfile({ teacherName: '', employeeNumber: '', gender: '', substantivePosition: '', province: '', district: '', station: '', emailAddress: '', phoneNumber: '' }); setShowProfileModal(true); }}>
+      <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
         <Text style={styles.addBtnText}>+ Add Profile</Text>
       </TouchableOpacity>
       {filteredProfiles.map(profile => {
@@ -166,7 +269,7 @@ export const StaffReturnsScreen: React.FC<StaffReturnsProps> = ({ onToggleDrawer
                   </View>
                 </View>
               </View>
-              <TouchableOpacity style={styles.editBtn} onPress={() => { setEditingProfile(profile); setNewProfile({ teacherName: profile.teacherName || '', employeeNumber: profile.employeeNumber || '', gender: profile.gender || '', substantivePosition: profile.substantivePosition || '', province: profile.province || '', district: profile.district || '', station: profile.station || '', emailAddress: profile.emailAddress || '', phoneNumber: profile.phoneNumber || '' }); setShowProfileModal(true); }}>
+              <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(profile)}>
                 <Text style={styles.editBtnText}>Edit</Text>
               </TouchableOpacity>
             </View>
@@ -212,6 +315,56 @@ export const StaffReturnsScreen: React.FC<StaffReturnsProps> = ({ onToggleDrawer
     </WidgetCard>
   );
 
+  const renderFormField = (fieldDef: typeof ALL_FIELDS[0]) => {
+    const val = form[fieldDef.key] || '';
+
+    if (fieldDef.type === 'select') {
+      return (
+        <View key={fieldDef.key} style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>{fieldDef.label}</Text>
+          <View style={styles.selectRow}>
+            {(fieldDef.options || []).map(opt => (
+              <TouchableOpacity
+                key={opt}
+                style={[styles.selectOpt, form[fieldDef.key] === opt && styles.selectOptActive]}
+                onPress={() => updateField(fieldDef.key, opt)}
+              >
+                <Text style={[styles.selectOptText, form[fieldDef.key] === opt && styles.selectOptTextActive]}>{opt}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      );
+    }
+
+    if (fieldDef.type === 'bool') {
+      return (
+        <View key={fieldDef.key} style={styles.fieldGroup}>
+          <TouchableOpacity style={styles.boolRow} onPress={() => updateField(fieldDef.key, val === 'true' ? 'false' : 'true')}>
+            <View style={[styles.checkbox, (val === 'true' || val === true) && styles.checkboxActive]}>
+              {(val === 'true' || val === true) && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={styles.fieldLabel}>{fieldDef.label}</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <View key={fieldDef.key} style={styles.fieldGroup}>
+        <Text style={styles.fieldLabel}>{fieldDef.label}</Text>
+        <TextInput
+          style={styles.fieldInput}
+          value={val}
+          onChangeText={v => updateField(fieldDef.key, v)}
+          placeholder={fieldDef.label}
+          placeholderTextColor={colors.textMuted}
+          keyboardType={fieldDef.type === 'email' ? 'email-address' : fieldDef.type === 'phone' ? 'phone-pad' : 'default'}
+        />
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <HeaderBar
@@ -240,27 +393,33 @@ export const StaffReturnsScreen: React.FC<StaffReturnsProps> = ({ onToggleDrawer
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
 
-      {/* Profile Modal */}
       <Modal visible={showProfileModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalTitle}>{editingProfile ? 'Edit Profile' : 'New Profile'}</Text>
-              <TextInput style={styles.modalInput} placeholder="Teacher name *" value={newProfile.teacherName} onChangeText={v => setNewProfile(p => ({ ...p, teacherName: v }))} />
-              <TextInput style={styles.modalInput} placeholder="Employee number" value={newProfile.employeeNumber} onChangeText={v => setNewProfile(p => ({ ...p, employeeNumber: v }))} />
-              <TextInput style={styles.modalInput} placeholder="Gender" value={newProfile.gender} onChangeText={v => setNewProfile(p => ({ ...p, gender: v }))} />
-              <TextInput style={styles.modalInput} placeholder="Substantive position" value={newProfile.substantivePosition} onChangeText={v => setNewProfile(p => ({ ...p, substantivePosition: v }))} />
-              <TextInput style={styles.modalInput} placeholder="Province" value={newProfile.province} onChangeText={v => setNewProfile(p => ({ ...p, province: v }))} />
-              <TextInput style={styles.modalInput} placeholder="District" value={newProfile.district} onChangeText={v => setNewProfile(p => ({ ...p, district: v }))} />
-              <TextInput style={styles.modalInput} placeholder="Station" value={newProfile.station} onChangeText={v => setNewProfile(p => ({ ...p, station: v }))} />
-              <TextInput style={styles.modalInput} placeholder="Email address" value={newProfile.emailAddress} onChangeText={v => setNewProfile(p => ({ ...p, emailAddress: v }))} keyboardType="email-address" />
-              <TextInput style={styles.modalInput} placeholder="Phone number" value={newProfile.phoneNumber} onChangeText={v => setNewProfile(p => ({ ...p, phoneNumber: v }))} keyboardType="phone-pad" />
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={styles.modalTitle}>{editingProfile ? 'Edit HR Profile' : 'New HR Profile'}</Text>
+
+              {SECTIONS.map(section => {
+                const sectionFields = ALL_FIELDS.filter(f => f.section === section);
+                return (
+                  <View key={section} style={styles.sectionCard}>
+                    <Text style={styles.sectionTitle}>{section}</Text>
+                    {sectionFields.map(renderFormField)}
+                  </View>
+                );
+              })}
+
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => { setShowProfileModal(false); setEditingProfile(null); }}>
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProfile}>
-                  <Text style={styles.saveBtnText}>{editingProfile ? 'Update' : 'Create'}</Text>
+                {editingProfile && (
+                  <TouchableOpacity style={styles.deleteBtn} onPress={() => { setShowProfileModal(false); handleDeleteProfile(editingProfile); }}>
+                    <Text style={styles.deleteBtnText}>Delete</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSaveProfile} disabled={saving}>
+                  <Text style={styles.saveBtnText}>{saving ? 'Saving...' : editingProfile ? 'Update' : 'Create'}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -305,13 +464,28 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingVertical: spacing.xl },
   emptyIcon: { fontSize: 40, marginBottom: spacing.sm },
   emptyText: { fontSize: 14, color: colors.textLight },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: spacing.lg, maxHeight: '80%' },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: spacing.lg, textAlign: 'center' },
-  modalInput: { borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md, padding: spacing.md, fontSize: 15, marginBottom: spacing.md, color: colors.text },
-  modalActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
-  cancelBtn: { flex: 1, paddingVertical: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.background, alignItems: 'center' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', paddingTop: 80 },
+  modalContent: { backgroundColor: colors.white, borderRadius: 20, padding: spacing.lg, maxHeight: '85%', marginHorizontal: spacing.md },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: spacing.md, textAlign: 'center' },
+  sectionCard: { backgroundColor: colors.background, borderRadius: borderRadius.md, padding: spacing.md, marginBottom: spacing.md },
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.primary, marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
+  fieldGroup: { marginBottom: spacing.sm },
+  fieldLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 4 },
+  fieldInput: { borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md, padding: spacing.sm, fontSize: 14, color: colors.text, backgroundColor: colors.white },
+  selectRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  selectOpt: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
+  selectOptActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  selectOptText: { fontSize: 12, fontWeight: '500', color: colors.textLight },
+  selectOptTextActive: { color: colors.white },
+  boolRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
+  checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.white },
+  checkboxActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkmark: { color: colors.white, fontSize: 14, fontWeight: '700' },
+  modalActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, paddingBottom: spacing.lg },
+  cancelBtn: { flex: 1, paddingVertical: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.border, alignItems: 'center' },
   cancelBtnText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
+  deleteBtn: { flex: 1, paddingVertical: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.errorLight, alignItems: 'center' },
+  deleteBtnText: { fontSize: 15, fontWeight: '600', color: colors.error },
   saveBtn: { flex: 1, paddingVertical: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.primary, alignItems: 'center' },
   saveBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
 });

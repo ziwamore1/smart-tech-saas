@@ -291,47 +291,38 @@ function StatCard({ icon, label, value, color }: { icon: string; label: string; 
 function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () => void }) {
   const gridRef = useRef<AgGridReact>(null);
   const [searchText, setSearchText] = useState('');
-  const [selectedProfile, setSelectedProfile] = useState<any>(null);
-  const [showDetail, setShowDetail] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<any>(null);
+  const [form, setForm] = useState<any>({});
+  const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const showToast = (type: 'success' | 'error', text: string) => {
+    setToast({ type, text });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const colDefs = useMemo<ColDef[]>(() => {
     const baseCols: ColDef[] = [
       { field: 'staffId', headerName: 'Staff ID', width: 100, pinned: 'left', filter: 'agTextColumnFilter' },
-      { field: 'employeeNumber', headerName: 'Employee No', width: 110, editable: true, filter: 'agTextColumnFilter' },
-      { field: 'teacherName', headerName: 'Teacher Name', width: 150, editable: true, filter: 'agTextColumnFilter' },
-      { field: 'gender', headerName: 'Gender', width: 80, editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Male', 'Female'] } },
-      { field: 'employmentStatus', headerName: 'Status', width: 90, editable: true, cellRenderer: (p: ICellRendererParams) => <StatusBadge status={p.value} /> },
-      { field: 'employmentType', headerName: 'Type', width: 100, editable: true },
-      { field: 'gradeLevel', headerName: 'Grade', width: 70, editable: true },
-      { field: 'step', headerName: 'Step', width: 60, editable: true, type: 'numericColumn' },
-      { field: 'province', headerName: 'Province', width: 100, editable: true },
-      { field: 'district', headerName: 'District', width: 100, editable: true },
-      { field: 'station', headerName: 'Station', width: 120, editable: true },
-      { field: 'substantivePosition', headerName: 'Substantive Position', width: 140, editable: true },
-      { field: 'substantiveScale', headerName: 'Substantive Scale', width: 110, editable: true },
-      { field: 'actingPosition', headerName: 'Acting Position', width: 130, editable: true },
-      { field: 'currentPosition', headerName: 'Current Position', width: 140, editable: true },
-      { field: 'academicQualification', headerName: 'Academic Qualification', width: 140, editable: true },
-      { field: 'professionalQualification', headerName: 'Professional Qualification', width: 150, editable: true },
-      { field: 'specialization', headerName: 'Specialization', width: 130, editable: true },
-      { field: 'dateOfBirth', headerName: 'Date of Birth', width: 110, editable: true, cellEditor: 'agDateCellEditor' },
-      { field: 'maritalStatus', headerName: 'Marital Status', width: 100, editable: true },
-      { field: 'nrcNumber', headerName: 'NRC', width: 120, editable: true },
-      { field: 'tsNumber', headerName: 'TS No', width: 100, editable: true },
-      { field: 'aesNumber', headerName: 'AES No', width: 100, editable: true },
-      { field: 'emailAddress', headerName: 'Email', width: 160, editable: true },
-      { field: 'phoneNumber', headerName: 'Phone', width: 120, editable: true },
-      { field: 'nationality', headerName: 'Nationality', width: 100, editable: true },
-      { field: 'payrollPoint', headerName: 'Payroll Point', width: 100, editable: true },
-      { field: 'taxId', headerName: 'Tax ID', width: 100, editable: true },
-      { field: 'pensionNumber', headerName: 'Pension No', width: 100, editable: true },
-      { field: 'bankName', headerName: 'Bank Name', width: 120, editable: true },
-      { field: 'bankAccount', headerName: 'Bank Account', width: 120, editable: true },
-      { field: 'socialSecurityNumber', headerName: 'SSN', width: 100, editable: true },
-      { field: 'contractEffectiveDate', headerName: 'Contract Effective', width: 120, editable: true },
-      { field: 'contractEnd', headerName: 'Contract End', width: 110, editable: true },
-      { field: 'retirementDate', headerName: 'Retirement', width: 100, editable: true },
+      { field: 'employeeNumber', headerName: 'Employee No', width: 110, filter: 'agTextColumnFilter' },
+      { field: 'teacherName', headerName: 'Teacher Name', width: 150, filter: 'agTextColumnFilter' },
+      { field: 'gender', headerName: 'Gender', width: 80 },
+      { field: 'employmentStatus', headerName: 'Status', width: 90, cellRenderer: (p: ICellRendererParams) => <StatusBadge status={p.value} /> },
+      { field: 'employmentType', headerName: 'Type', width: 100 },
+      { field: 'gradeLevel', headerName: 'Grade', width: 70 },
+      { field: 'step', headerName: 'Step', width: 60, type: 'numericColumn' },
+      { field: 'province', headerName: 'Province', width: 100 },
+      { field: 'district', headerName: 'District', width: 100 },
+      { field: 'station', headerName: 'Station', width: 120 },
+      { field: 'substantivePosition', headerName: 'Substantive Position', width: 140 },
+      { field: 'currentPosition', headerName: 'Current Position', width: 140 },
+      { field: 'academicQualification', headerName: 'Academic Qualification', width: 140 },
+      { field: 'professionalQualification', headerName: 'Professional Qualification', width: 150 },
+      { field: 'emailAddress', headerName: 'Email', width: 160 },
+      { field: 'phoneNumber', headerName: 'Phone', width: 120 },
+      { field: 'nrcNumber', headerName: 'NRC', width: 120 },
       { field: 'syncStatus', headerName: 'Sync', width: 80, cellRenderer: (p: ICellRendererParams) => <StatusBadge status={p.value} /> },
     ];
     return baseCols;
@@ -344,14 +335,6 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
     floatingFilter: true,
     minWidth: 60,
   }), []);
-
-  const onCellValueChanged = useCallback(async (event: CellValueChangedEvent) => {
-    try {
-      await premiumStaffRecordsApi.updateProfile(event.data.id, { [event.colDef.field!]: event.newValue });
-    } catch {
-      event.node.setDataValue(event.colDef.field!, event.oldValue);
-    }
-  }, []);
 
   const onGridReady = useCallback((params: GridReadyEvent) => {
     params.api.sizeColumnsToFit();
@@ -375,16 +358,131 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
     setExporting(false);
   };
 
-  if (profiles.length === 0) {
+  const openCreate = () => {
+    setEditingProfile(null);
+    const empty: any = {};
+    ALL_PROFILE_FIELDS.forEach(f => { empty[f] = ''; });
+    empty.employmentStatus = 'ACTIVE';
+    empty.employmentType = 'TEACHING';
+    empty.gender = 'Male';
+    setForm(empty);
+    setShowModal(true);
+  };
+
+  const openEdit = (profile: any) => {
+    setEditingProfile(profile);
+    const f: any = {};
+    ALL_PROFILE_FIELDS.forEach(field => {
+      f[field] = profile[field] !== null && profile[field] !== undefined ? profile[field] : '';
+    });
+    setForm(f);
+    setShowModal(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const payload: any = {};
+      ALL_PROFILE_FIELDS.forEach(f => {
+        if (form[f] !== '' && form[f] !== null && form[f] !== undefined) {
+          payload[f] = form[f];
+        }
+      });
+
+      if (editingProfile) {
+        await premiumStaffRecordsApi.updateProfile(editingProfile.id, payload);
+        showToast('success', 'Profile updated successfully');
+      } else {
+        await premiumStaffRecordsApi.createProfile(payload);
+        showToast('success', 'Profile created successfully');
+      }
+      setShowModal(false);
+      onRefresh();
+    } catch (err: any) {
+      showToast('error', err?.response?.data?.message || 'Failed to save profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Delete HR profile for "${name}"? This cannot be undone.`)) return;
+    try {
+      await premiumStaffRecordsApi.deleteProfile(id);
+      showToast('success', 'Profile deleted');
+      onRefresh();
+    } catch (err: any) {
+      showToast('error', err?.response?.data?.message || 'Failed to delete profile');
+    }
+  };
+
+  const modalFieldRows: { fields: string[]; cols?: number }[] = [
+    { fields: ['teacherName', 'employeeNumber', 'gender'] },
+    { fields: ['dateOfBirth', 'maritalStatus', 'nationality'] },
+    { fields: ['nrcNumber', 'tsNumber', 'aesNumber'] },
+    { fields: ['emailAddress', 'phoneNumber'] },
+    { fields: ['substantivePosition', 'substantiveScale', 'currentPosition'] },
+    { fields: ['actingPosition', 'administration', 'actingType'] },
+    { fields: ['province', 'district', 'station'] },
+    { fields: ['employmentStatus', 'employmentType', 'gradeLevel', 'step'] },
+    { fields: ['dateOfFirstAppointment', 'dateOfPresentAppointment', 'dateOfActingAppointment'] },
+    { fields: ['confirmed', 'expectedConfirmationDate'] },
+    { fields: ['allowancesEntitled', 'payrollPoint'] },
+    { fields: ['contractEffectiveDate', 'contractNormalised', 'contractEnd'] },
+    { fields: ['retirementDate'] },
+    { fields: ['academicQualification', 'professionalQualification', 'yearOfQualification', 'specialization'] },
+    { fields: ['taxId', 'pensionNumber'] },
+    { fields: ['bankName', 'bankBranch', 'bankAccount'] },
+    { fields: ['socialSecurityNumber'] },
+    { fields: ['nextOfKin', 'nextOfKinContact', 'nextOfKinRelationship'] },
+  ];
+
+  const renderField = (field: string, val: any) => {
+    const isDate = field.toLowerCase().includes('date');
+    const isBool = field === 'confirmed' || field === 'contractNormalised';
+    const isSelect = ['gender', 'employmentStatus', 'employmentType', 'maritalStatus'].includes(field);
+
+    if (isBool) {
+      return (
+        <label key={field} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <input type="checkbox" checked={val === true || val === 'true'} onChange={e => setForm((p: any) => ({ ...p, [field]: e.target.checked }))} />
+          <span style={{ fontSize: 13, color: '#374151' }}>{LABEL_MAP[field] || field}</span>
+        </label>
+      );
+    }
+
+    if (isSelect) {
+      return (
+        <div key={field} style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4, display: 'block' }}>{LABEL_MAP[field] || field}</label>
+          <select
+            value={val || ''}
+            onChange={e => setForm((p: any) => ({ ...p, [field]: e.target.value }))}
+            style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, background: '#fff' }}
+          >
+            <option value="">Select...</option>
+            {field === 'gender' && ['Male', 'Female'].map(o => <option key={o} value={o}>{o}</option>)}
+            {field === 'employmentStatus' && ['ACTIVE', 'INACTIVE', 'SUSPENDED', 'RETIRED', 'TRANSFERRED'].map(o => <option key={o} value={o}>{o}</option>)}
+            {field === 'employmentType' && ['TEACHING', 'NON_TEACHING', 'PERMANENT', 'CONTRACT', 'TEMPORARY'].map(o => <option key={o} value={o}>{o}</option>)}
+            {field === 'maritalStatus' && ['Single', 'Married', 'Divorced', 'Widowed'].map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
+      );
+    }
+
     return (
-      <div style={{ textAlign: 'center', padding: 40, background: '#fff', borderRadius: 12, border: '1px solid #e8ddd0' }}>
-        <p style={{ color: '#6b7280', marginBottom: 12 }}>No HR profiles yet. Sync your staff to create profiles.</p>
-        <button onClick={onRefresh} style={{ padding: '8px 16px', background: '#ea6645', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-          <i className="fas fa-sync" style={{ marginRight: 6 }}></i>Refresh
-        </button>
+      <div key={field} style={{ marginBottom: 12 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4, display: 'block' }}>{LABEL_MAP[field] || field}</label>
+        <input
+          type={isDate ? 'date' : 'text'}
+          value={val || ''}
+          onChange={e => setForm((p: any) => ({ ...p, [field]: e.target.value }))}
+          placeholder={LABEL_MAP[field] || field}
+          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }}
+        />
       </div>
     );
-  }
+  };
 
   return (
     <div>
@@ -399,6 +497,9 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
             onInput={onQuickFilterChanged}
             style={{ padding: '6px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, width: 200 }}
           />
+          <button onClick={openCreate} style={{ padding: '6px 14px', background: '#ea6645', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
+            <i className="fas fa-plus" style={{ marginRight: 6 }}></i>New Profile
+          </button>
           <button onClick={handleExportExcel} disabled={exporting} style={{ padding: '6px 14px', background: exporting ? '#d1d5db' : '#059669', color: '#fff', border: 'none', borderRadius: 6, cursor: exporting ? 'not-allowed' : 'pointer', fontSize: 13 }}>
             <i className={`fas ${exporting ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: 6 }}></i>{exporting ? 'Exporting...' : 'Export Excel'}
           </button>
@@ -411,7 +512,6 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
             rowData={profiles}
             columnDefs={colDefs}
             defaultColDef={defaultColDef}
-            onCellValueChanged={onCellValueChanged}
             onGridReady={onGridReady}
             animateRows={true}
             enableCellTextSelection={true}
@@ -421,9 +521,60 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
             paginationPageSize={100}
             paginationPageSizeSelector={[50, 100, 200, 500]}
             quickFilterText={searchText}
+            onRowDoubleClicked={(e) => openEdit(e.data)}
           />
         </div>
       </div>
+
+
+      {showModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16, width: '90%', maxWidth: 800, maxHeight: '90vh',
+            overflow: 'hidden', display: 'flex', flexDirection: 'column'
+          }}>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid #e8ddd0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1a1a2e', margin: 0 }}>
+                <i className="fas fa-id-badge" style={{ marginRight: 8, color: '#ea6645' }}></i>
+                {editingProfile ? 'Edit HR Profile' : 'Create HR Profile'}
+              </h3>
+              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#6b7280' }}>&times;</button>
+            </div>
+            <div style={{ padding: '16px 24px', overflowY: 'auto', flex: 1 }}>
+              {modalFieldRows.map((row, ri) => (
+                <div key={ri} style={{ borderBottom: ri < modalFieldRows.length - 1 ? '1px solid #f3eee8' : 'none', paddingBottom: ri < modalFieldRows.length - 1 ? 4 : 0, marginBottom: ri < modalFieldRows.length - 1 ? 4 : 0 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${row.cols || row.fields.length}, 1fr)`, gap: 12 }}>
+                    {row.fields.map(f => renderField(f, form[f]))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ padding: '12px 24px', borderTop: '1px solid #e8ddd0', display: 'flex', justifyContent: 'flex-end', gap: 8, background: '#f9fafb' }}>
+              <button onClick={() => setShowModal(false)} style={{ padding: '8px 20px', background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>Cancel</button>
+              {editingProfile && (
+                <button onClick={() => handleDelete(editingProfile.id, editingProfile.teacherName)} style={{ padding: '8px 20px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>Delete</button>
+              )}
+              <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: saving ? '#d1d5db' : '#ea6645', color: '#fff', border: 'none', borderRadius: 6, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 600 }}>
+                <i className={`fas ${saving ? 'fa-spinner fa-spin' : 'fa-save'}`} style={{ marginRight: 6 }}></i>{saving ? 'Saving...' : editingProfile ? 'Update Profile' : 'Create Profile'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 99999,
+          padding: '12px 20px', borderRadius: 8, fontSize: 14, fontWeight: 500,
+          background: toast.type === 'success' ? '#059669' : '#dc2626',
+          color: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        }}>
+          {toast.type === 'success' ? '✓ ' : '✕ '}{toast.text}
+        </div>
+      )}
     </div>
   );
 }

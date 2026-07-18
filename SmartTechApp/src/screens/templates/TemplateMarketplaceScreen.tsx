@@ -100,8 +100,8 @@ export function TemplateMarketplaceScreen({ navigation }: any) {
     if (!selectedItem || downloading) return;
     setDownloading(true);
     try {
-      await apiService.downloadFromMarketplace(selectedItem.id);
-      Alert.alert('Success', 'Template downloaded successfully');
+      const result = await apiService.downloadFromMarketplace(selectedItem.id);
+      Alert.alert('Download Complete', `"${selectedItem.title}" is now available in your templates.`);
       setItems((prev) =>
         prev.map((i) =>
           i.id === selectedItem.id ? { ...i, downloads: i.downloads + 1 } : i
@@ -109,7 +109,8 @@ export function TemplateMarketplaceScreen({ navigation }: any) {
       );
       setSelectedItem((prev) => prev ? { ...prev, downloads: prev.downloads + 1 } : null);
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to download');
+      const msg = err?.response?.data?.message || err?.message || 'Failed to download';
+      Alert.alert('Download Failed', msg);
     } finally {
       setDownloading(false);
     }

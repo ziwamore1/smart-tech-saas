@@ -50,6 +50,7 @@ export class TemplateMarketplaceService {
   async downloadTemplate(schoolId: string, marketplaceId: string) {
     const item = await this.prisma.templateMarketplace.findUnique({ where: { id: marketplaceId }, include: { template: true } });
     if (!item) throw new NotFoundException('Marketplace item not found');
+    if (!item.template) throw new NotFoundException('Source template not found for this marketplace item');
 
     await this.prisma.templateMarketplace.update({ where: { id: marketplaceId }, data: { downloads: { increment: 1 } } });
 
@@ -58,16 +59,16 @@ export class TemplateMarketplaceService {
 
     const copy = await this.prisma.reportTemplate.create({
       data: {
-        name: `${template.name} (from Marketplace)`,
+        name: `${template.name || 'Template'} (from Marketplace)`,
         schoolId,
-        templateType: template.templateType,
-        pageSize: template.pageSize,
-        orientation: template.orientation,
-        fontFamily: template.fontFamily,
-        fontSize: template.fontSize,
-        primaryColor: template.primaryColor,
-        secondaryColor: template.secondaryColor,
-        layoutJson: template.layoutJson as any,
+        templateType: template.templateType || 'REPORT_CARD',
+        pageSize: template.pageSize || 'A4',
+        orientation: template.orientation || 'PORTRAIT',
+        fontFamily: template.fontFamily || 'Arial',
+        fontSize: template.fontSize || 12,
+        primaryColor: template.primaryColor || '#1a365d',
+        secondaryColor: template.secondaryColor || '#f5f5f5',
+        layoutJson: (template.layoutJson || {}) as any,
         status: 'DRAFT',
         version: 1,
       },
@@ -76,11 +77,11 @@ export class TemplateMarketplaceService {
     for (const c of components) {
       await this.prisma.templateComponent.create({
         data: {
-          templateId: copy.id, type: c.type, label: c.label,
-          content: c.content as any, styles: c.styles as any,
-          position: c.position as any, size: c.size as any,
-          settings: c.settings as any, sortOrder: c.sortOrder,
-          isRequired: c.isRequired,
+          templateId: copy.id, type: c.type || 'TEXT', label: c.label || '',
+          content: (c.content || {}) as any, styles: (c.styles || {}) as any,
+          position: (c.position || { x: 0, y: 0 }) as any, size: (c.size || { width: 100, height: 50 }) as any,
+          settings: (c.settings || {}) as any, sortOrder: c.sortOrder || 0,
+          isRequired: c.isRequired || false,
         },
       });
     }

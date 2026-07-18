@@ -147,10 +147,13 @@ export default function TemplatePersonalizationPage() {
 
   const handleDownloadTemplate = async (marketplaceId: string) => {
     try {
-      await api.post(`/template-builder/marketplace/download/${marketplaceId}`);
-      alert('Template downloaded from marketplace!');
+      const res = await api.post(`/template-builder/marketplace/download/${marketplaceId}`);
+      const tpl = res.data?.data || res.data;
+      alert(`Template "${tpl?.name || 'downloaded from marketplace'}" is ready! Check the "Your Templates" section below.`);
       loadData();
-    } catch (err) {
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Download failed';
+      alert(`Failed to download: ${msg}`);
       console.error('Download failed:', err);
     }
   };
