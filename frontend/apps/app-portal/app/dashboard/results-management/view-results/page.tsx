@@ -357,28 +357,28 @@ export default function ViewResultsPage() {
 
       {/* Results Table */}
       {!sheetLoading && !studentsLoading && students.length > 0 && viewMode === 'table' && (
-        <div style={{ background: '#fdfaf7', border: '1px solid #e8ddd0', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ background: '#fdfaf7', border: '1px solid #e8ddd0', borderRadius: '12px' }}>
           <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 420px)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
-                <tr style={{ background: '#5f4b3a', position: 'sticky', top: 0, zIndex: 10 }}>
-                  <th style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '40px' }}>#</th>
-                  <th onClick={() => handleSort('name')} style={{ textAlign: 'left', padding: '10px 12px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '160px' }}>
+                <tr style={{ background: '#5f4b3a' }}>
+                  <th style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '40px', background: '#5f4b3a' }}>#</th>
+                  <th onClick={() => handleSort('name')} style={{ textAlign: 'left', padding: '10px 12px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '160px', background: '#5f4b3a' }}>
                     Student {sortField === 'name' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                   </th>
-                  <th style={{ textAlign: 'left', padding: '10px 12px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '100px' }}>Admission</th>
+                  <th style={{ textAlign: 'left', padding: '10px 12px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '100px', background: '#5f4b3a' }}>Admission</th>
                   {subjects.map(subj => (
-                    <th key={subj} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '70px' }}>
+                    <th key={subj} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '70px', background: '#5f4b3a' }}>
                       {subj.length > 10 ? subj.slice(0, 8) + '..' : subj}
                     </th>
                   ))}
-                  <th onClick={() => handleSort('average')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '70px', background: '#4a3a2d' }}>
+                  <th onClick={() => handleSort('average')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '70px', background: '#5f4b3a' }}>
                     Average {sortField === 'average' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                   </th>
-                  <th onClick={() => handleSort('grade')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '50px', background: '#4a3a2d' }}>
+                  <th onClick={() => handleSort('grade')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '50px', background: '#5f4b3a' }}>
                     Grade {sortField === 'grade' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                   </th>
-                  <th onClick={() => handleSort('rank')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '50px', background: '#4a3a2d' }}>
+                  <th onClick={() => handleSort('rank')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '50px', background: '#5f4b3a' }}>
                     Rank {sortField === 'rank' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                   </th>
                 </tr>
