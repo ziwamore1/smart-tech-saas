@@ -883,43 +883,73 @@ export class ResultsManagementService {
     const students = enrollments.map((e) => e.student);
     const studentIds = students.map((s) => s.id);
 
-    const computedResults = await this.prisma.computedResult.findMany({
+    let computedResults = await this.prisma.computedResult.findMany({
       where: {
         classId: sheet.classId,
         termId: sheet.termId,
         studentId: { in: studentIds },
-        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
       },
     });
+
+    if (computedResults.length === 0 && studentIds.length > 0) {
+      computedResults = await this.prisma.computedResult.findMany({
+        where: {
+          termId: sheet.termId,
+          studentId: { in: studentIds },
+        },
+      });
+    }
+
+    const rawResults = await this.prisma.result.findMany({
+      where: {
+        studentId: { in: studentIds },
+        termId: sheet.termId,
+        schoolId: sheet.schoolId,
+      },
+      select: {
+        studentId: true,
+        subjectId: true,
+        score: true,
+        grade: true,
+        remark: true,
+      },
+    });
+
+    const rawResultMap = new Map<string, { score: number; grade: string | null; remark: string | null }>();
+    for (const r of rawResults) {
+      rawResultMap.set(`${r.studentId}::${r.subjectId}`, { score: r.score, grade: r.grade, remark: r.remark });
+    }
 
     const schedule = students.map((student) => {
       const subjects = classSubjects.map((cs) => {
         const cr = computedResults.find(
           (r) => r.studentId === student.id && r.subjectId === cs.subjectId,
         );
-        const points = cr?.points ?? (cr?.finalPercentage != null
-          ? cr.finalPercentage >= 75 ? 1
-            : cr.finalPercentage >= 65 ? 2
-            : cr.finalPercentage >= 50 ? 3
-            : cr.finalPercentage >= 40 ? 4
+        const raw = rawResultMap.get(`${student.id}::${cs.subjectId}`);
+        const finalPercentage = cr?.finalPercentage ?? raw?.score ?? null;
+        const points = cr?.points ?? (finalPercentage != null
+          ? finalPercentage >= 75 ? 1
+            : finalPercentage >= 65 ? 2
+            : finalPercentage >= 50 ? 3
+            : finalPercentage >= 40 ? 4
             : 5
           : null);
-        const grade = cr?.finalGrade ?? (cr?.finalPercentage != null
-          ? cr.finalPercentage >= 75 ? 'A'
-            : cr.finalPercentage >= 65 ? 'B'
-            : cr.finalPercentage >= 50 ? 'C'
-            : cr.finalPercentage >= 40 ? 'D'
+        const grade = cr?.finalGrade ?? raw?.grade ?? (finalPercentage != null
+          ? finalPercentage >= 75 ? 'A'
+            : finalPercentage >= 65 ? 'B'
+            : finalPercentage >= 50 ? 'C'
+            : finalPercentage >= 40 ? 'D'
             : 'E'
           : null);
         return {
           subjectId: cs.subjectId,
           subjectName: cs.subject.name,
           subjectCode: cs.subject.code,
-          totalRawScore: cr?.totalRawScore ?? null,
+          totalRawScore: cr?.totalRawScore ?? raw?.score ?? null,
           totalWeightedScore: cr?.totalWeightedScore ?? null,
-          finalPercentage: cr?.finalPercentage ?? null,
+          finalPercentage,
           finalGrade: grade,
-          finalRemark: cr?.finalRemark ?? null,
+          finalRemark: cr?.finalRemark ?? raw?.remark ?? null,
           points,
           gpa: cr?.gpa ?? null,
           classRank: cr?.classRank ?? null,

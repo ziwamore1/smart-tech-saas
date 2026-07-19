@@ -137,7 +137,7 @@ export class ResultsManagementController {
   }
 
   @Get('sheets/:id/analysis')
-  @Roles('DIRECTOR', 'CLASS_TEACHER')
+  @Roles('DIRECTOR', 'TEACHER', 'CLASS_TEACHER')
   async getAnalysis(@Param('id') id: string) {
     const data = await this.resultsManagement.getAnalysis(id);
     return { data, message: 'Analysis retrieved successfully' };

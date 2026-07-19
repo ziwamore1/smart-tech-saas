@@ -77,8 +77,13 @@ export default function ViewResultsPage() {
     queryKey: ['view-results-analysis', sheetData?.id],
     queryFn: async () => {
       if (!sheetData?.id) return null;
-      const r = await api.get(`/results-management/sheets/${sheetData.id}/analysis`);
-      return r.data?.data || r.data;
+      try {
+        const r = await api.get(`/results-management/sheets/${sheetData.id}/analysis`);
+        const d = r.data?.data || r.data;
+        return d && Object.keys(d).length > 0 ? d : null;
+      } catch {
+        return null;
+      }
     },
     enabled: !!sheetData?.id,
   });
@@ -87,8 +92,13 @@ export default function ViewResultsPage() {
     queryKey: ['view-results-rankings', sheetData?.id],
     queryFn: async () => {
       if (!sheetData?.id) return null;
-      const r = await api.get(`/results-management/sheets/${sheetData.id}/rankings`);
-      return r.data?.data || r.data;
+      try {
+        const r = await api.get(`/results-management/sheets/${sheetData.id}/rankings`);
+        const d = r.data?.data || r.data;
+        return d && Object.keys(d).length > 0 ? d : null;
+      } catch {
+        return null;
+      }
     },
     enabled: !!sheetData?.id,
   });
