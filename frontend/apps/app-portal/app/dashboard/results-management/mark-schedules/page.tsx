@@ -56,12 +56,12 @@ export default function MarkSchedulesPage() {
       }
       const sheetId = sheetArr[sheetArr.length - 1].id;
       const sr = await api.get(`/results-management/sheets/${sheetId}/mark-schedule`);
-      const schedData = sr.data?.data || sr.data;
+      const schedData = sr.data?.data?.data || sr.data?.data || sr.data;
       setSchedule({
         ...schedData,
         sheet: sheetArr[sheetArr.length - 1],
-        className: sheetArr[sheetArr.length - 1].class?.name || 'Class',
-        termName: sheetArr[sheetArr.length - 1].term?.name || 'Term',
+        className: sheetArr[sheetArr.length - 1].class?.name || schedData.className || 'Class',
+        termName: sheetArr[sheetArr.length - 1].term?.name || schedData.termName || 'Term',
         examType: selectedExamType,
       });
       toast.success('Schedule generated');
