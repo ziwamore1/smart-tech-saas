@@ -95,11 +95,11 @@ export default function ViewResultsPage() {
 
   const students = useMemo(() => {
     if (!Array.isArray(studentsData)) return [];
-    return studentsData.map((s: any) => {
+    const mapped = studentsData.map((s: any) => {
       const results = (s.results || []).map((r: any) => ({
         subject: r.subject?.name || r.subjectName || 'Subject',
-        score: r.score ?? null,
-        grade: r.grade || null,
+        score: r.score ?? r.finalPercentage ?? null,
+        grade: r.grade || r.finalGrade || null,
         remark: r.remark || null,
         maxScore: r.maxScore || 100,
       }));
@@ -123,10 +123,14 @@ export default function ViewResultsPage() {
         results,
         average: avg,
         grade,
-        rank: s.ComputedResult?.classRank || s.rank || null,
         totalPoints: s.ComputedResult?.totalPoints || null,
       };
     });
+    const withAvg = mapped.filter(s => s.average != null).sort((a, b) => (b.average || 0) - (a.average || 0));
+    const withoutAvg = mapped.filter(s => s.average == null);
+    withAvg.forEach((s, i) => { (s as any).rank = i + 1; });
+    withoutAvg.forEach((s, i) => { (s as any).rank = withAvg.length + i + 1; });
+    return [...withAvg, ...withoutAvg];
   }, [studentsData]);
 
   const subjects = useMemo(() => {
@@ -140,9 +144,9 @@ export default function ViewResultsPage() {
     const sorted = [...students];
     sorted.sort((a, b) => {
       if (sortField === 'name') return `${a.firstName}${a.lastName}`.localeCompare(`${b.firstName}${b.lastName}`);
-      if (sortField === 'average') return (a.average || 0) - (b.average || 0);
+      if (sortField === 'average') return (b.average || 0) - (a.average || 0);
       if (sortField === 'grade') return (a.grade || 'Z').localeCompare(b.grade || 'Z');
-      return (a.rank || 999) - (b.rank || 999);
+      return ((a as any).rank || 999) - ((b as any).rank || 999);
     });
     if (sortDir === 'desc') sorted.reverse();
     return sorted;
@@ -417,8 +421,8 @@ export default function ViewResultsPage() {
                           {student.grade || '-'}
                         </span>
                       </td>
-                      <td style={{ textAlign: 'center', padding: '8px', fontWeight: 600, borderBottom: '1px solid #e8ddd0', background: '#f5efe8', color: student.rank != null && student.rank <= 3 ? '#d97706' : '#1f2937' }}>
-                        {student.rank || idx + 1}
+                      <td style={{ textAlign: 'center', padding: '8px', fontWeight: 600, borderBottom: '1px solid #e8ddd0', background: '#f5efe8', color: (student as any).rank != null && (student as any).rank <= 3 ? '#d97706' : '#1f2937' }}>
+                        {(student as any).rank || idx + 1}
                       </td>
                     </tr>
                   );
