@@ -152,6 +152,7 @@ export function generateMarkScheduleReport(students: ReportStudent[], meta: Repo
     const avg = s.average ?? (s.results.filter(r => r.score != null).reduce((sum, r) => sum + (r.score || 0), 0) / (s.results.filter(r => r.score != null).length || 1));
     const avgColor = scoreColor(avg);
     const gradeColor = getGradeColor(s.grade);
+    const grade = s.grade || (avg != null ? (avg >= 75 ? 'A' : avg >= 65 ? 'B' : avg >= 50 ? 'C' : avg >= 40 ? 'D' : 'E') : '-');
 
     return `<tr>
       <td class="text-center" style="color:#6b7280;width:30px">${i + 1}</td>
@@ -162,7 +163,7 @@ export function generateMarkScheduleReport(students: ReportStudent[], meta: Repo
       <td class="text-center font-bold" style="color:${avgColor}">${avg != null ? avg.toFixed(1) + '%' : '-'}</td>
       <td class="text-center font-semibold" style="color:#059669">${s.totalPoints != null ? s.totalPoints : '-'}</td>
       <td class="text-center">
-        <span class="grade-badge" style="background:${gradeColor.bg};color:${gradeColor.text}">${s.grade || '-'}</span>
+        <span class="grade-badge" style="background:${gradeColor.bg};color:${gradeColor.text}">${grade}</span>
       </td>
       <td class="text-center font-semibold">${s.rank || i + 1}</td>
     </tr>`;
@@ -221,11 +222,13 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
 
   const subjectRows = (analysis.subjectAnalysis || []).map((s, i) => {
     const avgColor = scoreColor(s.average);
+    const highest = (s as any).highest || (s as any).max || 0;
+    const lowest = (s as any).lowest || (s as any).min || 0;
     return `<tr>
       <td style="font-weight:600">${s.subjectName}</td>
       <td class="text-center font-semibold" style="color:${avgColor}">${s.average.toFixed(1)}%</td>
-      <td class="text-center pass">${s.highest.toFixed(1)}</td>
-      <td class="text-center fail">${s.lowest.toFixed(1)}</td>
+      <td class="text-center pass">${typeof highest === 'number' ? highest.toFixed(1) : highest}</td>
+      <td class="text-center fail">${typeof lowest === 'number' ? lowest.toFixed(1) : lowest}</td>
       <td class="text-center">
         <span class="grade-badge" style="background:${s.passRate >= 70 ? '#d1fae5' : s.passRate >= 40 ? '#fef3c7' : '#fee2e2'};color:${s.passRate >= 70 ? '#059669' : s.passRate >= 40 ? '#d97706' : '#dc2626'}">${s.passRate.toFixed(1)}%</span>
       </td>
@@ -233,11 +236,11 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
     </tr>`;
   }).join('');
 
-  const atRiskRows = (analysis.students || []).filter(s => s.percentage < 40).sort((a, b) => a.percentage - b.percentage).slice(0, 25).map((s, i) => `<tr>
+  const atRiskRows = (analysis.students || []).filter(s => (s.percentage || (s as any).avgPercentage || 0) < 40).sort((a, b) => (a.percentage || (a as any).avgPercentage || 0) - (b.percentage || (b as any).avgPercentage || 0)).slice(0, 25).map((s, i) => `<tr>
     <td class="text-center" style="color:#6b7280">${i + 1}</td>
     <td style="font-weight:600">${s.firstName} ${s.lastName}</td>
     <td style="color:#6b7280;font-size:11px">${s.admissionNumber || '-'}</td>
-    <td class="text-center font-bold fail">${s.percentage.toFixed(1)}%</td>
+    <td class="text-center font-bold fail">${(s.percentage || (s as any).avgPercentage || 0).toFixed(1)}%</td>
     <td class="text-center"><span class="grade-badge" style="background:#fee2e2;color:#dc2626">${s.grade || '-'}</span></td>
   </tr>`).join('');
 
@@ -286,14 +289,17 @@ export interface RankingStudent {
 
 export function generateRankingReport(rankings: RankingStudent[], meta: ReportMeta, title?: string): string {
   const rows = rankings.map((s, i) => {
-    const avgColor = scoreColor(s.average);
+    const firstName = s.firstName || (s as any).studentName?.split(' ')[0] || '';
+    const lastName = s.lastName || (s as any).studentName?.split(' ').slice(1).join(' ') || '';
+    const avg = s.average || (s as any).percentage || (s as any).totalPercentage || 0;
+    const avgColor = scoreColor(avg);
     const gc = getGradeColor(s.grade);
     return `<tr>
       <td class="text-center font-bold" style="font-size:14px;color:${i < 3 ? '#d97706' : '#6b7280'}">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : s.rank}</td>
-      <td style="font-weight:600">${s.firstName} ${s.lastName}</td>
+      <td style="font-weight:600">${firstName} ${lastName}</td>
       <td style="color:#6b7280;font-size:11px">${s.admissionNumber || '-'}</td>
       <td class="text-center" style="color:#6b7280">${s.gender || '-'}</td>
-      <td class="text-center font-bold" style="color:${avgColor}">${s.average.toFixed(1)}%</td>
+      <td class="text-center font-bold" style="color:${avgColor}">${avg.toFixed(1)}%</td>
       <td class="text-center"><span class="grade-badge" style="background:${gc.bg};color:${gc.text}">${s.grade || '-'}</span></td>
       <td class="text-center font-bold" style="color:${i < 3 ? '#d97706' : '#1f2937'}">${s.rank}</td>
       ${s.totalPoints != null ? `<td class="text-center font-semibold">${s.totalPoints}</td>` : ''}
@@ -303,8 +309,8 @@ export function generateRankingReport(rankings: RankingStudent[], meta: ReportMe
   const content = `
     <div class="summary-grid">
       <div class="summary-card"><div class="summary-value">${rankings.length}</div><div class="summary-label">Total Students</div></div>
-      <div class="summary-card"><div class="summary-value">${rankings.length > 0 ? rankings[0].average.toFixed(1) + '%' : '-'}</div><div class="summary-label">Top Score</div></div>
-      <div class="summary-card"><div class="summary-value">${rankings.length > 0 ? (rankings.reduce((sum, s) => sum + s.average, 0) / rankings.length).toFixed(1) + '%' : '-'}</div><div class="summary-label">Class Average</div></div>
+      <div class="summary-card"><div class="summary-value">${rankings.length > 0 ? (rankings[0].average || (rankings[0] as any).percentage || 0).toFixed(1) + '%' : '-'}</div><div class="summary-label">Top Score</div></div>
+      <div class="summary-card"><div class="summary-value">${rankings.length > 0 ? (rankings.reduce((sum, s) => sum + (s.average || (s as any).percentage || 0), 0) / rankings.length).toFixed(1) + '%' : '-'}</div><div class="summary-label">Class Average</div></div>
     </div>
     <table>
       <thead><tr>
@@ -328,7 +334,18 @@ export function openMarkScheduleReport(students: ReportStudent[], meta: ReportMe
 }
 
 export function openAnalysisReport(analysis: AnalysisData, meta: ReportMeta) {
-  openReport(generateAnalysisReport(analysis, meta), `Analysis - ${meta.className}`);
+  if (!analysis) return;
+  const normalizedAnalysis: AnalysisData = {
+    totalStudents: analysis.totalStudents || 0,
+    passRate: analysis.passRate || 0,
+    averagePercentage: analysis.averagePercentage || (analysis as any).classAverage || 0,
+    distinctionRate: analysis.distinctionRate || 0,
+    atRiskCount: analysis.atRiskCount || (analysis.atRiskStudents?.length || 0),
+    gradeDistribution: analysis.gradeDistribution || {},
+    subjectAnalysis: analysis.subjectAnalysis || (analysis as any).subjectStats || [],
+    students: analysis.students || [],
+  };
+  openReport(generateAnalysisReport(normalizedAnalysis, meta), `Analysis - ${meta.className}`);
 }
 
 export function openRankingReport(rankings: RankingStudent[], meta: ReportMeta, title?: string) {

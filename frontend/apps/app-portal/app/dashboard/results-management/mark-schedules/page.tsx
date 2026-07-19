@@ -91,7 +91,7 @@ export default function MarkSchedulesPage() {
         gender: s.student?.gender || s.gender || '',
         results,
         average: s.average ?? null,
-        grade: getGrade(s.average ?? null),
+        grade: s.grade || getGrade(s.average ?? null),
         rank: s.rank ?? null,
         totalPoints: s.totalPoints ?? null,
       };
@@ -259,30 +259,27 @@ export default function MarkSchedulesPage() {
               width: '100%', borderCollapse: 'collapse', fontSize: '12px'
             }}>
               <thead>
-                <tr style={{ background: '#1f2937', color: 'white' }}>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #374151', width: '40px' }}>#</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'left', border: '1px solid #374151', minWidth: '120px' }}>Admission No</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'left', border: '1px solid #374151', minWidth: '180px' }}>Student Name</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #374151', width: '60px' }}>Gender</th>
+                <tr style={{ background: '#5f4b3a' }}>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '40px', color: 'white', fontSize: '12px', fontWeight: 700 }}>#</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'left', border: '1px solid #7a6b5a', minWidth: '120px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Admission No</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'left', border: '1px solid #7a6b5a', minWidth: '180px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Student Name</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '60px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Gender</th>
                   {subjects.map((subj: string) => (
-                    <th key={subj} style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #374151', minWidth: '70px' }}>
+                    <th key={subj} style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', minWidth: '70px', color: 'white', fontSize: '12px', fontWeight: 700 }}>
                       {subj.replace(/([A-Z])/g, ' $1').trim()}
                     </th>
                   ))}
-                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #374151', width: '60px' }}>Total</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #374151', width: '60px' }}>Average</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #374151', width: '55px' }}>Points</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #374151', width: '50px' }}>Grade</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #374151', width: '50px' }}>Rank</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '60px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Total</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '60px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Average</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '55px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Points</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '50px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Grade</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '50px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Rank</th>
                 </tr>
               </thead>
               <tbody>
                 {schedule.students?.map((student: any, idx: number) => {
-                  const pcts = (student.subjects || []).map((sr: any) => sr.finalPercentage);
-                  const validPcts = pcts.filter((p: number | null) => p != null) as number[];
-                  const total = validPcts.reduce((sum: number, p: number) => sum + p, 0);
-                  const avg = validPcts.length > 0 ? total / validPcts.length : null;
-                  const grade = getGrade(avg);
+                  const avg = student.average ?? null;
+                  const grade = student.grade || getGrade(avg);
                   return (
                     <tr key={student.student?.id || student.studentId || idx} style={{
                       background: idx % 2 === 0 ? 'white' : '#f9fafb'
@@ -306,7 +303,7 @@ export default function MarkSchedulesPage() {
                             color: pct != null ? '#374151' : '#d1d5db',
                             fontWeight: pct != null ? 500 : 400
                           }}>
-                            {pct != null ? pct : '-'}
+                            {pct != null ? `${pct.toFixed(1)}%` : '-'}
                           </td>
                         );
                       })}
@@ -314,26 +311,26 @@ export default function MarkSchedulesPage() {
                         padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb',
                         fontWeight: 700, color: '#1f2937', background: '#f5efe8'
                       }}>
-                        {validPcts.length > 0 ? total.toFixed(1) : '-'}
+                        {avg != null ? `${avg.toFixed(1)}%` : '-'}
                       </td>
                       <td style={{
                         padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb',
                         fontWeight: 600, color: '#1f2937', background: '#f5efe8'
                       }}>
-                        {avg ? avg.toFixed(1) : '-'}
+                        {avg != null ? avg.toFixed(1) : '-'}
                       </td>
                       <td style={{
                         padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb',
-                        fontWeight: 700, color: '#059669', background: '#f0fdf4'
+                        fontWeight: 700, color: student.totalPoints > 0 ? '#059669' : '#9ca3af', background: student.totalPoints > 0 ? '#f0fdf4' : 'transparent'
                       }}>
-                        {student.totalPoints ?? '-'}
+                        {student.totalPoints ?? 0}
                       </td>
                       <td style={{
                         padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb',
                         fontWeight: 700,
-                        color: grade === 'A' ? '#059669' : grade === 'B' ? '#3b82f6' : grade === 'C' ? '#d97706' : '#dc2626'
+                        color: grade === 'A' ? '#059669' : grade === 'B' ? '#3b82f6' : grade === 'C' ? '#d97706' : grade === 'D' ? '#ea580c' : '#dc2626'
                       }}>
-                        {grade}
+                        {grade || '-'}
                       </td>
                       <td style={{ padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb', fontWeight: 600, color: '#1f2937' }}>
                         {student.rank || idx + 1}

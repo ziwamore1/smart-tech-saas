@@ -85,8 +85,17 @@ export default function RankingPage() {
   }, [selectedClass, selectedTerm, selectedExamType, rankingType]);
 
   const filteredRankings = useMemo(() => {
-    if (!rankings?.students && !rankings?.rankings) return [];
-    const list = rankings.students || rankings.rankings || [];
+    if (!rankings) return [];
+    let list: any[] = [];
+    if (Array.isArray(rankings)) {
+      list = rankings;
+    } else if (rankings.students && Array.isArray(rankings.students)) {
+      list = rankings.students;
+    } else if (rankings.rankings && Array.isArray(rankings.rankings)) {
+      list = rankings.rankings;
+    } else if (rankings.male || rankings.female) {
+      list = [...(rankings.male || []), ...(rankings.female || [])];
+    }
     let filtered = [...list];
 
     if (searchStudent) {
@@ -346,25 +355,28 @@ export default function RankingPage() {
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: '#5f4b3a', color: 'white' }}>
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>#</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Admission No</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Student Name</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Total</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>%</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Grade</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Prev Rank</th>
+                  <tr style={{ background: '#5f4b3a' }}>
+                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>#</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>Admission No</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>Student Name</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>Total</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>%</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>Grade</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>Prev Rank</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredRankings.map((student: any, idx: number) => {
+                    const firstName = student.firstName || (student.studentName ? student.studentName.split(' ')[0] : '');
+                    const lastName = student.lastName || (student.studentName ? student.studentName.split(' ').slice(1).join(' ') : '');
+                    const pct = student.percentage || student.totalPercentage || student.average || 0;
                     const prevRank = student.previousRank || student.prevRank;
                     const rankChange = prevRank ? (student.rank || idx + 1) - prevRank : null;
                     return (
                       <tr key={student.id || student.studentId || idx} style={{
                         borderBottom: '1px solid #e8ddd0',
                         background: student.isCurrentUser || (searchStudent && (
-                          `${student.firstName} ${student.lastName}`.toLowerCase().includes(searchStudent.toLowerCase())
+                          `${firstName} ${lastName}`.toLowerCase().includes(searchStudent.toLowerCase())
                         )) ? '#fffbeb' : idx % 2 === 0 ? '#fefcf9' : '#faf7f4'
                       }}>
                         <td style={{
@@ -377,22 +389,22 @@ export default function RankingPage() {
                           {student.admissionNumber || student.admissionNo || '-'}
                         </td>
                         <td style={{ padding: '12px 16px', fontWeight: 600, color: '#1f2937' }}>
-                          {student.firstName} {student.lastName}
+                          {firstName} {lastName}
                         </td>
                         <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#374151' }}>
                           {student.total || student.totalScore || 0}
                         </td>
                         <td style={{
                           padding: '12px 16px', textAlign: 'center', fontWeight: 700,
-                          color: getGradeColor(student.percentage || student.totalPercentage || 0)
+                          color: getGradeColor(pct)
                         }}>
-                          {(student.percentage || student.totalPercentage || 0).toFixed(1)}
+                          {pct.toFixed(1)}
                         </td>
                         <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                           <span style={{
                             padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 700,
                             color: 'white',
-                            background: getGradeColor(student.percentage || student.totalPercentage || 0)
+                            background: getGradeColor(pct)
                           }}>
                             {getGrade(student)}
                           </span>

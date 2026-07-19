@@ -196,7 +196,26 @@ export default function ViewResultsPage() {
               <i className="fa fa-chart-bar"></i> Analysis Report
             </button>
             <button
-              onClick={() => openRankingReport(rankingData?.rankings || rankingData?.students || [], buildMeta())}
+              onClick={() => {
+                let rankList: any[] = [];
+                if (rankingData?.students && Array.isArray(rankingData.students)) {
+                  rankList = rankingData.students;
+                } else if (rankingData?.rankings && Array.isArray(rankingData.rankings)) {
+                  rankList = rankingData.rankings;
+                } else if (Array.isArray(rankingData)) {
+                  rankList = rankingData;
+                }
+                openRankingReport(rankList.map((r: any) => ({
+                  firstName: r.firstName || (r.studentName ? r.studentName.split(' ')[0] : ''),
+                  lastName: r.lastName || (r.studentName ? r.studentName.split(' ').slice(1).join(' ') : ''),
+                  admissionNumber: r.admissionNumber || '',
+                  gender: r.gender || '',
+                  average: r.percentage || r.totalPercentage || r.average || 0,
+                  grade: r.grade || null,
+                  rank: r.rank || 0,
+                  totalPoints: r.totalPoints || undefined,
+                })), buildMeta());
+              }}
               disabled={!rankingData}
               style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 600, background: rankingData ? '#059669' : '#d1d5db', color: 'white', border: 'none', borderRadius: '8px', cursor: rankingData ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
@@ -335,23 +354,23 @@ export default function ViewResultsPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ background: '#5f4b3a', position: 'sticky', top: 0, zIndex: 10 }}>
-                  <th style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', minWidth: '40px' }}>#</th>
-                  <th onClick={() => handleSort('name')} style={{ textAlign: 'left', padding: '10px 12px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '160px' }}>
+                  <th style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '40px' }}>#</th>
+                  <th onClick={() => handleSort('name')} style={{ textAlign: 'left', padding: '10px 12px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '160px' }}>
                     Student {sortField === 'name' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                   </th>
-                  <th style={{ textAlign: 'left', padding: '10px 12px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', minWidth: '100px' }}>Admission</th>
+                  <th style={{ textAlign: 'left', padding: '10px 12px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '100px' }}>Admission</th>
                   {subjects.map(subj => (
-                    <th key={subj} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 600, fontSize: '10px', textTransform: 'uppercase', minWidth: '70px' }}>
+                    <th key={subj} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '70px' }}>
                       {subj.length > 10 ? subj.slice(0, 8) + '..' : subj}
                     </th>
                   ))}
-                  <th onClick={() => handleSort('average')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '70px', background: '#4a3a2d' }}>
+                  <th onClick={() => handleSort('average')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '70px', background: '#4a3a2d' }}>
                     Average {sortField === 'average' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                   </th>
-                  <th onClick={() => handleSort('grade')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '50px', background: '#4a3a2d' }}>
+                  <th onClick={() => handleSort('grade')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '50px', background: '#4a3a2d' }}>
                     Grade {sortField === 'grade' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                   </th>
-                  <th onClick={() => handleSort('rank')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '50px', background: '#4a3a2d' }}>
+                  <th onClick={() => handleSort('rank')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '50px', background: '#4a3a2d' }}>
                     Rank {sortField === 'rank' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                   </th>
                 </tr>

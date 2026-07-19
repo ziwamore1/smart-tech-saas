@@ -110,13 +110,13 @@ export default function AnalysisPage() {
   const atRiskStudents = useMemo(() => {
     if (!analysis?.students) return [];
     return analysis.students
-      .filter((s: any) => (s.percentage || s.totalPercentage || 0) < 40)
-      .sort((a: any, b: any) => (a.percentage || a.totalPercentage || 0) - (b.percentage || b.totalPercentage || 0));
+      .filter((s: any) => (s.percentage || s.totalPercentage || s.avgPercentage || 0) < 40)
+      .sort((a: any, b: any) => (a.percentage || a.totalPercentage || a.avgPercentage || 0) - (b.percentage || b.totalPercentage || b.avgPercentage || 0));
   }, [analysis]);
 
   const subjectBreakdown = useMemo(() => {
-    if (!analysis?.subjectAnalysis && !analysis?.subjects) return [];
-    return analysis.subjectAnalysis || analysis.subjects || [];
+    if (!analysis?.subjectAnalysis && !analysis?.subjects && !analysis?.subjectStats) return [];
+    return analysis.subjectAnalysis || analysis.subjects || analysis.subjectStats || [];
   }, [analysis]);
 
   const summaryCards = useMemo(() => {
@@ -315,10 +315,10 @@ export default function AnalysisPage() {
                           {(subj.average || subj.classAverage || 0).toFixed(1)}
                         </td>
                         <td style={{ padding: '12px 20px', textAlign: 'center', fontWeight: 600, color: '#059669' }}>
-                          {subj.highest || subj.maxScore || 0}
+                          {(subj.highest || subj.max || subj.maxScore || 0).toFixed ? (subj.highest || subj.max || subj.maxScore || 0).toFixed(1) : (subj.highest || subj.max || subj.maxScore || 0)}
                         </td>
                         <td style={{ padding: '12px 20px', textAlign: 'center', fontWeight: 600, color: '#dc2626' }}>
-                          {subj.lowest || subj.minScore || 0}
+                          {(subj.lowest || subj.min || subj.minScore || 0).toFixed ? (subj.lowest || subj.min || subj.minScore || 0).toFixed(1) : (subj.lowest || subj.min || subj.minScore || 0)}
                         </td>
                         <td style={{ padding: '12px 20px', textAlign: 'center' }}>
                           <span style={{
@@ -362,7 +362,7 @@ export default function AnalysisPage() {
               </div>
               <div style={{ padding: '16px 24px' }}>
                 {atRiskStudents.slice(0, 20).map((student: any, idx: number) => (
-                  <div key={student.id || student.studentId || idx} style={{
+                  <div key={student.studentId || student.id || idx} style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     padding: '10px 0', borderBottom: idx < Math.min(atRiskStudents.length, 20) - 1 ? '1px solid #fecaca' : 'none'
                   }}>
@@ -380,7 +380,7 @@ export default function AnalysisPage() {
                         padding: '3px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 700,
                         background: '#fee2e2', color: '#dc2626'
                       }}>
-                        {(student.percentage || student.totalPercentage || 0).toFixed(1)}%
+                        {(student.percentage || student.totalPercentage || student.avgPercentage || 0).toFixed(1)}%
                       </span>
                     </div>
                   </div>

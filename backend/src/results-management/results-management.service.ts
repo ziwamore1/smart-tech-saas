@@ -520,35 +520,24 @@ export class ResultsManagementService {
     return result;
   }
 
-  private async triggerAutoSms(schoolId: string, classId: string, termId: string, userId: string) {
-    if (!this.resultsSmsService) return;
-    try {
-      const result = await this.resultsSmsService.autoSendOnPublish(schoolId, classId, termId, userId);
-      if (result) {
-        this.logger.log(`[Auto SMS] ${result.message}`);
-      }
-    } catch (error: any) {
-      this.logger.error(`[Auto SMS] Failed: ${error.message}`);
-    }
-  }
-
-  async publishSheet(id: string, userId: string) {
+  async lockSheet(id: string, userId: string) {
     const sheet = await this.prisma.resultSheet.findUnique({ where: { id } });
 
     if (!sheet) {
       throw new NotFoundException('Result sheet not found');
     }
 
-    if (sheet.status !== 'VERIFIED') {
-      throw new BadRequestException('Only verified sheets can be published');
+    if (sheet.status !== 'PUBLISHED') {
+      throw new BadRequestException('Only published sheets can be locked');
     }
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.resultSheet.update({
         where: { id },
         data: {
-          status: 'PUBLISHED',
-          publishedAt: new Date(),
+          status: 'LOCKED',
+          lockedAt: new Date(),
+          lockedBy: userId,
         },
       });
 
@@ -710,7 +699,25 @@ export class ResultsManagementService {
       };
     }
 
-    return this.rankingService.computeClassRankings(sheet.classId, sheet.termId, sheet.schoolId);
+    const rawRankings = await this.rankingService.computeClassRankings(sheet.classId, sheet.termId, sheet.schoolId);
+    const rankingsList = Array.isArray(rawRankings) ? rawRankings : [];
+    return {
+      students: rankingsList.map((r: any) => {
+        const nameParts = (r.studentName || '').split(' ');
+        return {
+          studentId: r.studentId,
+          firstName: nameParts[0] || '',
+          lastName: nameParts.slice(1).join(' ') || '',
+          admissionNumber: r.admissionNumber || '',
+          percentage: r.percentage || r.totalPercentage || 0,
+          totalPercentage: r.percentage || r.totalPercentage || 0,
+          average: r.percentage || r.totalPercentage || 0,
+          grade: r.grade || null,
+          rank: r.rank || 0,
+          totalPoints: r.totalPoints || undefined,
+        };
+      }),
+    };
   }
 
   async getAnalysis(sheetId: string) {
@@ -723,12 +730,95 @@ export class ResultsManagementService {
       throw new NotFoundException('Result sheet not found');
     }
 
-    const [classAnalytics, atRiskStudents] = await Promise.all([
+    const [classAnalytics, atRiskData] = await Promise.all([
       this.resultAnalytics.getClassAnalytics(sheet.classId, sheet.termId, sheet.schoolId),
       this.resultAnalytics.getAtRiskStudents(sheet.classId, sheet.termId, sheet.schoolId),
     ]);
 
-    return { ...classAnalytics, atRiskStudents };
+    const computedResults = await this.prisma.computedResult.findMany({
+      where: {
+        classId: sheet.classId,
+        termId: sheet.termId,
+        schoolId: sheet.schoolId,
+        status: 'COMPUTED',
+        finalPercentage: { not: null },
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            admissionNumber: true,
+          },
+        },
+      },
+    });
+
+    const studentAverages = new Map<string, { studentId: string; firstName: string; lastName: string; admissionNumber: string; totalPercentage: number; count: number }>();
+    for (const cr of computedResults) {
+      const existing = studentAverages.get(cr.studentId);
+      if (existing) {
+        existing.totalPercentage += cr.finalPercentage ?? 0;
+        existing.count += 1;
+      } else {
+        studentAverages.set(cr.studentId, {
+          studentId: cr.studentId,
+          firstName: cr.student.firstName,
+          lastName: cr.student.lastName,
+          admissionNumber: cr.student.admissionNumber,
+          totalPercentage: cr.finalPercentage ?? 0,
+          count: 1,
+        });
+      }
+    }
+
+    const students = Array.from(studentAverages.values()).map(s => ({
+      studentId: s.studentId,
+      firstName: s.firstName,
+      lastName: s.lastName,
+      admissionNumber: s.admissionNumber,
+      percentage: s.count > 0 ? parseFloat((s.totalPercentage / s.count).toFixed(2)) : 0,
+      grade: null as string | null,
+    }));
+
+    students.forEach(s => {
+      if (s.percentage >= 75) s.grade = 'A';
+      else if (s.percentage >= 65) s.grade = 'B';
+      else if (s.percentage >= 50) s.grade = 'C';
+      else if (s.percentage >= 40) s.grade = 'D';
+      else s.grade = 'E';
+    });
+
+    const overallScores = computedResults.map(r => r.finalPercentage ?? 0);
+    const totalStudents = new Set(computedResults.map(r => r.studentId)).size;
+    const overallAvg = overallScores.length > 0 ? overallScores.reduce((a, b) => a + b, 0) / overallScores.length : 0;
+    const passCount = overallScores.filter(s => s >= 50).length;
+    const passRate = overallScores.length > 0 ? parseFloat(((passCount / overallScores.length) * 100).toFixed(2)) : 0;
+    const distinctionCount = overallScores.filter(s => s >= 75).length;
+    const distinctionRate = overallScores.length > 0 ? parseFloat(((distinctionCount / overallScores.length) * 100).toFixed(2)) : 0;
+
+    const gradeDistribution: Record<string, number> = {};
+    computedResults.forEach(r => {
+      const grade = r.finalGrade || 'Unknown';
+      gradeDistribution[grade] = (gradeDistribution[grade] || 0) + 1;
+    });
+
+    const subjectAnalysis = (classAnalytics as any).subjectStats || [];
+
+    const atRiskStudents = students.filter(s => s.percentage < 40).sort((a, b) => a.percentage - b.percentage);
+
+    return {
+      totalStudents,
+      passRate,
+      averagePercentage: parseFloat(overallAvg.toFixed(2)),
+      distinctionRate,
+      atRiskCount: atRiskStudents.length,
+      gradeDistribution,
+      subjectAnalysis,
+      students,
+      atRiskStudents,
+    };
   }
 
   async getAuditLogs(
@@ -802,6 +892,20 @@ export class ResultsManagementService {
         const cr = computedResults.find(
           (r) => r.studentId === student.id && r.subjectId === cs.subjectId,
         );
+        const points = cr?.points ?? (cr?.finalPercentage != null
+          ? cr.finalPercentage >= 75 ? 1
+            : cr.finalPercentage >= 65 ? 2
+            : cr.finalPercentage >= 50 ? 3
+            : cr.finalPercentage >= 40 ? 4
+            : 5
+          : null);
+        const grade = cr?.finalGrade ?? (cr?.finalPercentage != null
+          ? cr.finalPercentage >= 75 ? 'A'
+            : cr.finalPercentage >= 65 ? 'B'
+            : cr.finalPercentage >= 50 ? 'C'
+            : cr.finalPercentage >= 40 ? 'D'
+            : 'E'
+          : null);
         return {
           subjectId: cs.subjectId,
           subjectName: cs.subject.name,
@@ -809,9 +913,9 @@ export class ResultsManagementService {
           totalRawScore: cr?.totalRawScore ?? null,
           totalWeightedScore: cr?.totalWeightedScore ?? null,
           finalPercentage: cr?.finalPercentage ?? null,
-          finalGrade: cr?.finalGrade ?? null,
+          finalGrade: grade,
           finalRemark: cr?.finalRemark ?? null,
-          points: cr?.points ?? null,
+          points,
           gpa: cr?.gpa ?? null,
           classRank: cr?.classRank ?? null,
           subjectRank: cr?.subjectRank ?? null,
@@ -824,6 +928,23 @@ export class ResultsManagementService {
         ? parseFloat((totalPercentage / validSubjects.length).toFixed(2))
         : null;
 
+      const sortedPoints = validSubjects
+        .filter((s) => s.points != null)
+        .sort((a, b) => (a.points ?? 99) - (b.points ?? 99));
+      const bestSix = sortedPoints.slice(0, 6);
+      const totalPoints = bestSix.length > 0
+        ? bestSix.reduce((sum, s) => sum + (s.points ?? 0), 0)
+        : 0;
+
+      let grade: string | null = null;
+      if (average != null) {
+        if (average >= 75) grade = 'A';
+        else if (average >= 65) grade = 'B';
+        else if (average >= 50) grade = 'C';
+        else if (average >= 40) grade = 'D';
+        else grade = 'E';
+      }
+
       return {
         student: {
           id: student.id,
@@ -834,15 +955,12 @@ export class ResultsManagementService {
         },
         subjects,
         average,
+        grade,
         totalSubjects: validSubjects.length,
-        totalPoints: validSubjects
-          .filter((s) => s.points != null)
-          .sort((a, b) => (a.points ?? 99) - (b.points ?? 99))
-          .slice(0, 6)
-          .reduce((sum, s) => sum + (s.points ?? 0), 0),
+        totalPoints,
       };
     }).sort((a, b) => {
-      if (a.totalPoints !== b.totalPoints) return a.totalPoints - b.totalPoints;
+      if (a.totalPoints !== b.totalPoints) return b.totalPoints - a.totalPoints;
       if (b.average !== null && a.average !== null) return b.average - a.average;
       return 0;
     }).map((entry, index) => ({ ...entry, rank: index + 1 }));
