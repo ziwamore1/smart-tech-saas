@@ -13,7 +13,7 @@ export class RankingService {
         classId,
         termId,
         schoolId,
-        status: 'COMPUTED',
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
       },
       include: {
@@ -28,33 +28,75 @@ export class RankingService {
       },
     });
 
-    const sortedByPercentage = [...computedResults]
-      .filter(r => r.finalPercentage !== null)
-      .sort((a, b) => (b.finalPercentage ?? 0) - (a.finalPercentage ?? 0));
+    const studentMap = new Map<string, {
+      studentId: string;
+      firstName: string;
+      lastName: string;
+      admissionNumber: string;
+      totalPercentage: number;
+      subjectCount: number;
+      points: number[];
+    }>();
 
-    const rankings = sortedByPercentage.map((result, index) => ({
-      studentId: result.studentId,
-      studentName: `${result.student.firstName} ${result.student.lastName}`,
-      admissionNumber: result.student.admissionNumber,
-      percentage: result.finalPercentage,
-      grade: result.finalGrade,
+    for (const r of computedResults) {
+      const existing = studentMap.get(r.studentId);
+      const points = r.points ?? (r.finalPercentage != null
+        ? r.finalPercentage >= 75 ? 1
+          : r.finalPercentage >= 65 ? 2
+          : r.finalPercentage >= 50 ? 3
+          : r.finalPercentage >= 40 ? 4
+          : 5
+        : 0);
+      if (existing) {
+        existing.totalPercentage += r.finalPercentage ?? 0;
+        existing.subjectCount += 1;
+        if (points > 0) existing.points.push(points);
+      } else {
+        studentMap.set(r.studentId, {
+          studentId: r.studentId,
+          firstName: r.student.firstName,
+          lastName: r.student.lastName,
+          admissionNumber: r.student.admissionNumber,
+          totalPercentage: r.finalPercentage ?? 0,
+          subjectCount: 1,
+          points: points > 0 ? [points] : [],
+        });
+      }
+    }
+
+    const studentList = Array.from(studentMap.values()).map(s => {
+      const avg = s.subjectCount > 0 ? s.totalPercentage / s.subjectCount : 0;
+      const sortedPoints = [...s.points].sort((a, b) => a - b);
+      const bestSix = sortedPoints.slice(0, 6);
+      const totalPoints = bestSix.length > 0 ? bestSix.reduce((sum, p) => sum + p, 0) : 0;
+      let grade = 'E';
+      if (avg >= 75) grade = 'A';
+      else if (avg >= 65) grade = 'B';
+      else if (avg >= 50) grade = 'C';
+      else if (avg >= 40) grade = 'D';
+      return {
+        studentId: s.studentId,
+        firstName: s.firstName,
+        lastName: s.lastName,
+        admissionNumber: s.admissionNumber,
+        average: parseFloat(avg.toFixed(2)),
+        totalPercentage: parseFloat(avg.toFixed(2)),
+        percentage: parseFloat(avg.toFixed(2)),
+        grade,
+        totalPoints,
+        subjectCount: s.subjectCount,
+      };
+    });
+
+    studentList.sort((a, b) => {
+      if (a.totalPoints !== b.totalPoints) return a.totalPoints - b.totalPoints;
+      return b.average - a.average;
+    });
+
+    const rankings = studentList.map((s, index) => ({
+      ...s,
       rank: index + 1,
     }));
-
-    await this.prisma.$transaction(
-      rankings.map(ranking =>
-        this.prisma.computedResult.update({
-          where: {
-            studentId_subjectId_termId: {
-              studentId: ranking.studentId,
-              subjectId: computedResults[0].subjectId,
-              termId,
-            },
-          },
-          data: { classRank: ranking.rank },
-        }),
-      ),
-    );
 
     this.logger.log(`Computed rankings for ${rankings.length} students in class ${classId}, term ${termId}`);
 
@@ -68,7 +110,7 @@ export class RankingService {
         termId,
         classId,
         schoolId,
-        status: 'COMPUTED',
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
       },
       include: {
@@ -114,7 +156,7 @@ export class RankingService {
       where: {
         studentId,
         termId,
-        status: 'COMPUTED',
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
       },
       include: {
         subject: { select: { id: true, name: true } },
@@ -141,7 +183,7 @@ export class RankingService {
       where: {
         classId,
         termId,
-        status: 'COMPUTED',
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
       },
       _avg: {
@@ -190,7 +232,7 @@ export class RankingService {
         classId,
         termId,
         schoolId,
-        status: 'COMPUTED',
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
       },
       select: {

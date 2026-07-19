@@ -651,7 +651,7 @@ export class ResultsManagementService {
           classId: sheet.classId,
           termId: sheet.termId,
           schoolId: sheet.schoolId,
-          status: 'COMPUTED',
+          status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
           finalPercentage: { not: null },
         },
         include: {
@@ -740,7 +740,7 @@ export class ResultsManagementService {
         classId: sheet.classId,
         termId: sheet.termId,
         schoolId: sheet.schoolId,
-        status: 'COMPUTED',
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
       },
       include: {
@@ -960,7 +960,7 @@ export class ResultsManagementService {
         totalPoints,
       };
     }).sort((a, b) => {
-      if (a.totalPoints !== b.totalPoints) return b.totalPoints - a.totalPoints;
+      if (a.totalPoints !== b.totalPoints) return a.totalPoints - b.totalPoints;
       if (b.average !== null && a.average !== null) return b.average - a.average;
       return 0;
     }).map((entry, index) => ({ ...entry, rank: index + 1 }));

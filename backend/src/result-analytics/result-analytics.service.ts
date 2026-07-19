@@ -13,7 +13,7 @@ export class ResultAnalyticsService {
         classId,
         termId,
         schoolId,
-        status: 'COMPUTED',
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
       },
       include: {
@@ -100,7 +100,7 @@ export class ResultAnalyticsService {
       const whereClause: any = {
         classId: assignment.classId,
         subjectId: assignment.subjectId,
-        status: 'COMPUTED',
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
       };
 
       if (termId) {
@@ -190,7 +190,7 @@ export class ResultAnalyticsService {
         classId,
         termId,
         schoolId,
-        status: 'COMPUTED',
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
       },
       include: {
         student: {
@@ -248,7 +248,7 @@ export class ResultAnalyticsService {
   }
 
   async getSchoolPerformanceOverview(schoolId: string, termId?: string) {
-    const whereClause: any = { schoolId, status: 'COMPUTED' };
+    const whereClause: any = { schoolId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } };
     if (termId) {
       whereClause.termId = termId;
     }

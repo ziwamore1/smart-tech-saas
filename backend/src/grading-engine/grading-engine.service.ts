@@ -522,7 +522,7 @@ export class GradingEngineService {
 
   async getClassTermReport(classId: string, termId: string, schoolId: string) {
     const computedResults = await this.prisma.computedResult.findMany({
-      where: { classId, termId, schoolId, status: 'COMPUTED' },
+      where: { classId, termId, schoolId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
       include: {
         student: {
           select: { id: true, firstName: true, lastName: true, studentNumber: true },
