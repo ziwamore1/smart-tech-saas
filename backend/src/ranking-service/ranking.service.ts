@@ -128,6 +128,8 @@ export class RankingService {
 
     const rankings = computedResults.map((result, index) => ({
       studentId: result.studentId,
+      firstName: result.student.firstName,
+      lastName: result.student.lastName,
       studentName: `${result.student.firstName} ${result.student.lastName}`,
       admissionNumber: result.student.admissionNumber,
       percentage: result.finalPercentage,

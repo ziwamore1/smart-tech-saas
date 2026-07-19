@@ -107,6 +107,14 @@ export default function ViewResultsPage() {
       const avg = validScores.length > 0
         ? validScores.reduce((sum: number, r: any) => sum + r.score, 0) / validScores.length
         : null;
+      let grade = s.grade || s.ComputedResult?.finalGrade || null;
+      if (!grade && avg != null) {
+        if (avg >= 75) grade = 'A';
+        else if (avg >= 65) grade = 'B';
+        else if (avg >= 50) grade = 'C';
+        else if (avg >= 40) grade = 'D';
+        else grade = 'E';
+      }
       return {
         firstName: s.firstName,
         lastName: s.lastName,
@@ -114,7 +122,7 @@ export default function ViewResultsPage() {
         gender: s.gender,
         results,
         average: avg,
-        grade: s.grade || s.ComputedResult?.finalGrade || null,
+        grade,
         rank: s.ComputedResult?.classRank || s.rank || null,
         totalPoints: s.ComputedResult?.totalPoints || null,
       };

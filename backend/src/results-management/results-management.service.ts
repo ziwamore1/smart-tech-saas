@@ -671,6 +671,8 @@ export class ResultsManagementService {
             if (!acc[r.studentId]) {
               acc[r.studentId] = {
                 studentId: r.studentId,
+                firstName: r.student.firstName,
+                lastName: r.student.lastName,
                 studentName: `${r.student.firstName} ${r.student.lastName}`,
                 admissionNumber: r.student.admissionNumber,
                 totalPercentage: 0,
@@ -702,21 +704,18 @@ export class ResultsManagementService {
     const rawRankings = await this.rankingService.computeClassRankings(sheet.classId, sheet.termId, sheet.schoolId);
     const rankingsList = Array.isArray(rawRankings) ? rawRankings : [];
     return {
-      students: rankingsList.map((r: any) => {
-        const nameParts = (r.studentName || '').split(' ');
-        return {
-          studentId: r.studentId,
-          firstName: nameParts[0] || '',
-          lastName: nameParts.slice(1).join(' ') || '',
-          admissionNumber: r.admissionNumber || '',
-          percentage: r.percentage || r.totalPercentage || 0,
-          totalPercentage: r.percentage || r.totalPercentage || 0,
-          average: r.percentage || r.totalPercentage || 0,
-          grade: r.grade || null,
-          rank: r.rank || 0,
-          totalPoints: r.totalPoints || undefined,
-        };
-      }),
+      students: rankingsList.map((r: any) => ({
+        studentId: r.studentId,
+        firstName: r.firstName || (r.studentName ? r.studentName.split(' ')[0] : ''),
+        lastName: r.lastName || (r.studentName ? r.studentName.split(' ').slice(1).join(' ') : ''),
+        admissionNumber: r.admissionNumber || '',
+        percentage: r.average || r.percentage || r.totalPercentage || 0,
+        totalPercentage: r.average || r.percentage || r.totalPercentage || 0,
+        average: r.average || r.percentage || r.totalPercentage || 0,
+        grade: r.grade || null,
+        rank: r.rank || 0,
+        totalPoints: r.totalPoints || 0,
+      })),
     };
   }
 
@@ -730,10 +729,16 @@ export class ResultsManagementService {
       throw new NotFoundException('Result sheet not found');
     }
 
-    const [classAnalytics, atRiskData] = await Promise.all([
-      this.resultAnalytics.getClassAnalytics(sheet.classId, sheet.termId, sheet.schoolId),
-      this.resultAnalytics.getAtRiskStudents(sheet.classId, sheet.termId, sheet.schoolId),
-    ]);
+    let classAnalytics: any = { subjectStats: [] };
+    let atRiskData: any[] = [];
+    try {
+      [classAnalytics, atRiskData] = await Promise.all([
+        this.resultAnalytics.getClassAnalytics(sheet.classId, sheet.termId, sheet.schoolId).catch(() => ({ subjectStats: [] })),
+        this.resultAnalytics.getAtRiskStudents(sheet.classId, sheet.termId, sheet.schoolId).catch(() => []),
+      ]);
+    } catch (e) {
+      this.logger.warn(`Analytics sub-calls failed: ${e.message}`);
+    }
 
     const computedResults = await this.prisma.computedResult.findMany({
       where: {
@@ -892,14 +897,14 @@ export class ResultsManagementService {
         const cr = computedResults.find(
           (r) => r.studentId === student.id && r.subjectId === cs.subjectId,
         );
-        const points = cr?.points ?? (cr?.finalPercentage != null
+        const points = cr?.points || (cr?.finalPercentage != null
           ? cr.finalPercentage >= 75 ? 1
             : cr.finalPercentage >= 65 ? 2
             : cr.finalPercentage >= 50 ? 3
             : cr.finalPercentage >= 40 ? 4
             : 5
           : null);
-        const grade = cr?.finalGrade ?? (cr?.finalPercentage != null
+        const grade = cr?.finalGrade || (cr?.finalPercentage != null
           ? cr.finalPercentage >= 75 ? 'A'
             : cr.finalPercentage >= 65 ? 'B'
             : cr.finalPercentage >= 50 ? 'C'

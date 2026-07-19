@@ -14,6 +14,7 @@ export default function MarkSchedulesPage() {
   const [selectedExamType, setSelectedExamType] = useState('Exam');
   const [schedule, setSchedule] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const scheduleRef = useRef<HTMLDivElement>(null);
 
   const { data: classesData } = useQuery({
     queryKey: ['classes'],
