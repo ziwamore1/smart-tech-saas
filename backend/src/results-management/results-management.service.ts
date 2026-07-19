@@ -897,14 +897,14 @@ export class ResultsManagementService {
         const cr = computedResults.find(
           (r) => r.studentId === student.id && r.subjectId === cs.subjectId,
         );
-        const points = cr?.points || (cr?.finalPercentage != null
+        const points = cr?.points ?? (cr?.finalPercentage != null
           ? cr.finalPercentage >= 75 ? 1
             : cr.finalPercentage >= 65 ? 2
             : cr.finalPercentage >= 50 ? 3
             : cr.finalPercentage >= 40 ? 4
             : 5
           : null);
-        const grade = cr?.finalGrade || (cr?.finalPercentage != null
+        const grade = cr?.finalGrade ?? (cr?.finalPercentage != null
           ? cr.finalPercentage >= 75 ? 'A'
             : cr.finalPercentage >= 65 ? 'B'
             : cr.finalPercentage >= 50 ? 'C'
@@ -1034,7 +1034,7 @@ export class ResultsManagementService {
         <td style="text-align:center;padding:6px 12px;border:1px solid #e8ddd0;font-weight:600;${avg != null && avg >= passThreshold ? 'color:#059669' : avg != null ? 'color:#dc2626' : 'color:#d1d5db'}">
           ${avg != null ? `${avg.toFixed(1)}%` : '-'}
         </td>
-        <td style="text-align:center;padding:6px 12px;border:1px solid #e8ddd0;font-weight:600">${s.totalPoints || 0}</td>
+        <td style="text-align:center;padding:6px 12px;border:1px solid #e8ddd0;font-weight:600">${s.totalPoints ?? 0}</td>
       </tr>`;
     }).join('');
 

@@ -550,5 +550,6 @@ function getGradeDistribution(students: ReportStudent[]): { grade: string; count
     const g = s.grade || '-';
     dist[g] = (dist[g] || 0) + 1;
   });
-  return Object.entries(dist).map(([grade, count]) => ({ grade, count })).sort((a, b) => a.grade.localeCompare(b.grade));
+  const allGrades = ['A', 'B', 'C', 'D', 'E', 'F'];
+  return allGrades.map(g => ({ grade: g, count: dist[g] || 0 }));
 }
