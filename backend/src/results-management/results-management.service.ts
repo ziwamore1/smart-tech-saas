@@ -655,11 +655,12 @@ export class ResultsManagementService {
           schoolId: sheet.schoolId,
           status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         },
-        include: {
+        select: {
+          studentId: true,
+          finalPercentage: true,
           student: {
             select: { id: true, firstName: true, lastName: true, admissionNumber: true, gender: true },
           },
-          subject: { select: { id: true, name: true } },
         },
       });
 
@@ -734,39 +735,40 @@ export class ResultsManagementService {
       throw new NotFoundException('Result sheet not found');
     }
 
-    let classAnalytics: any = { subjectStats: [] };
-    let atRiskData: any[] = [];
-    try {
-      [classAnalytics, atRiskData] = await Promise.all([
-        this.resultAnalytics.getClassAnalytics(sheet.classId, sheet.termId, sheet.schoolId).catch(() => ({ subjectStats: [] })),
-        this.resultAnalytics.getAtRiskStudents(sheet.classId, sheet.termId, sheet.schoolId).catch(() => []),
-      ]);
-    } catch (e) {
-      this.logger.warn(`Analytics sub-calls failed: ${e.message}`);
-    }
-
-    let computedResults = await this.prisma.computedResult.findMany({
+    const computedResults = await this.prisma.computedResult.findMany({
       where: {
         classId: sheet.classId,
         termId: sheet.termId,
         schoolId: sheet.schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
       },
-      include: {
+      select: {
+        studentId: true,
+        finalPercentage: true,
+        finalGrade: true,
+        points: true,
         student: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            admissionNumber: true,
-          },
+          select: { id: true, firstName: true, lastName: true, admissionNumber: true },
+        },
+        subject: {
+          select: { id: true, name: true },
         },
       },
     });
 
-    // No fallback — return empty if no computed results for this class
     if (computedResults.length === 0) {
       this.logger.warn(`No computed results for class ${sheet.classId}, term ${sheet.termId}`);
+      return {
+        totalStudents: 0,
+        passRate: 0,
+        averagePercentage: 0,
+        distinctionRate: 0,
+        atRiskCount: 0,
+        gradeDistribution: {},
+        subjectAnalysis: [],
+        students: [],
+        atRiskStudents: [],
+      };
     }
 
     const studentAverages = new Map<string, { studentId: string; firstName: string; lastName: string; admissionNumber: string; totalPercentage: number; count: number }>();
@@ -818,7 +820,34 @@ export class ResultsManagementService {
       gradeDistribution[grade] = (gradeDistribution[grade] || 0) + 1;
     });
 
-    const subjectAnalysis = (classAnalytics as any).subjectStats || [];
+    const subjectAnalytics = computedResults.reduce((acc: Record<string, any>, result) => {
+      if (!acc[result.subjectId]) {
+        acc[result.subjectId] = { subjectId: result.subjectId, subjectName: result.subject.name, scores: [] };
+      }
+      acc[result.subjectId].scores.push(result.finalPercentage ?? 0);
+      return acc;
+    }, {});
+
+    const subjectAnalysis = Object.values(subjectAnalytics).map((subject: any) => {
+      const scores = subject.scores.sort((a: number, b: number) => a - b);
+      const total = scores.length;
+      const sum = scores.reduce((a: number, b: number) => a + b, 0);
+      const avg = sum / total;
+      const min = scores[0];
+      const max = scores[total - 1];
+      const passRate = (scores.filter((s: number) => s >= 50).length / total) * 100;
+      const distinctionRate = (scores.filter((s: number) => s >= 75).length / total) * 100;
+      return {
+        subjectId: subject.subjectId,
+        subjectName: subject.subjectName,
+        totalStudents: total,
+        average: parseFloat(avg.toFixed(2)),
+        highest: parseFloat(max.toFixed(2)),
+        lowest: parseFloat(min.toFixed(2)),
+        passRate: parseFloat(passRate.toFixed(2)),
+        distinctionRate: parseFloat(distinctionRate.toFixed(2)),
+      };
+    });
 
     const atRiskStudents = students.filter(s => s.percentage < 40).sort((a, b) => a.percentage - b.percentage);
 

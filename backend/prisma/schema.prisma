@@ -4049,6 +4049,7 @@ model ComputedResult {
   @@index([classId])
   @@index([schoolId])
   @@index([status])
+  @@index([classId, termId, schoolId, status])
 }
 
 model TermSummary {

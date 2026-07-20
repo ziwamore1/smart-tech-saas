@@ -15,7 +15,10 @@ export class ResultAnalyticsService {
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
       },
-      include: {
+      select: {
+        studentId: true,
+        finalPercentage: true,
+        finalGrade: true,
         subject: { select: { id: true, name: true } },
       },
     });
@@ -202,7 +205,11 @@ export class ResultAnalyticsService {
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
       },
-      include: {
+      select: {
+        studentId: true,
+        finalPercentage: true,
+        finalGrade: true,
+        points: true,
         student: {
           select: {
             id: true,

@@ -15,7 +15,10 @@ export class RankingService {
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
       },
-      include: {
+      select: {
+        studentId: true,
+        finalPercentage: true,
+        points: true,
         student: {
           select: {
             id: true,
@@ -117,7 +120,10 @@ export class RankingService {
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
       },
-      include: {
+      select: {
+        studentId: true,
+        finalPercentage: true,
+        finalGrade: true,
         student: {
           select: {
             id: true,
