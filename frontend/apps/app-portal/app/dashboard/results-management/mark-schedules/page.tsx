@@ -260,21 +260,21 @@ export default function MarkSchedulesPage() {
               width: '100%', borderCollapse: 'collapse', fontSize: '12px'
             }}>
               <thead>
-                <tr style={{ background: '#5f4b3a' }}>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '40px', color: 'white', fontSize: '12px', fontWeight: 700 }}>#</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'left', border: '1px solid #7a6b5a', minWidth: '120px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Admission No</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'left', border: '1px solid #7a6b5a', minWidth: '180px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Student Name</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '60px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Gender</th>
+                <tr>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '40px', color: 'white', fontSize: '12px', fontWeight: 700, background: '#5f4b3a' }}>#</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'left', border: '1px solid #7a6b5a', minWidth: '120px', color: 'white', fontSize: '12px', fontWeight: 700, background: '#5f4b3a' }}>Admission No</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'left', border: '1px solid #7a6b5a', minWidth: '180px', color: 'white', fontSize: '12px', fontWeight: 700, background: '#5f4b3a' }}>Student Name</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '60px', color: 'white', fontSize: '12px', fontWeight: 700, background: '#5f4b3a' }}>Gender</th>
                   {subjects.map((subj: string) => (
-                    <th key={subj} style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', minWidth: '70px', color: 'white', fontSize: '12px', fontWeight: 700 }}>
+                    <th key={subj} style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', minWidth: '70px', color: 'white', fontSize: '12px', fontWeight: 700, background: '#5f4b3a' }}>
                       {subj.replace(/([A-Z])/g, ' $1').trim()}
                     </th>
                   ))}
-                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '60px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Total</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '60px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Average</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '55px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Points</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '50px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Grade</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '50px', color: 'white', fontSize: '12px', fontWeight: 700 }}>Rank</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '60px', color: 'white', fontSize: '12px', fontWeight: 700, background: '#5f4b3a' }}>Total</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '60px', color: 'white', fontSize: '12px', fontWeight: 700, background: '#5f4b3a' }}>Average</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '55px', color: 'white', fontSize: '12px', fontWeight: 700, background: '#5f4b3a' }}>Points</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '50px', color: 'white', fontSize: '12px', fontWeight: 700, background: '#5f4b3a' }}>Grade</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', border: '1px solid #7a6b5a', width: '50px', color: 'white', fontSize: '12px', fontWeight: 700, background: '#5f4b3a' }}>Rank</th>
                 </tr>
               </thead>
               <tbody>
