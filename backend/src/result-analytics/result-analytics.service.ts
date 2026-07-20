@@ -83,12 +83,12 @@ export class ResultAnalyticsService {
       return acc;
     }, {} as Record<string, number>);
 
-    await this.saveAnalytics(classId, termId, schoolId, {
+    this.saveAnalytics(classId, termId, schoolId, {
       classAverage: parseFloat(overallAvg.toFixed(2)),
       subjectStats,
       gradeDistribution,
       totalStudents: new Set(computedResults.map(r => r.studentId)).size,
-    });
+    }).catch(err => this.logger.warn(`saveAnalytics failed: ${err.message}`));
 
     return {
       classId,

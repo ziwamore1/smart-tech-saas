@@ -73,12 +73,14 @@ export default function ViewResultsPage() {
     enabled: !!sheetData?.id,
   });
 
-  const { data: analysisData } = useQuery({
+  const { data: analysisData, isLoading: analysisLoading, refetch: refetchAnalysis } = useQuery({
     queryKey: ['view-results-analysis', sheetData?.id],
     queryFn: async () => {
       if (!sheetData?.id) return null;
       try {
-        const r = await api.get(`/results-management/sheets/${sheetData.id}/analysis`);
+        const r = await api.get(`/results-management/sheets/${sheetData.id}/analysis`, {
+          timeout: 60000,
+        });
         const d = r.data?.data || r.data;
         return d && Object.keys(d).length > 0 ? d : null;
       } catch {
@@ -86,14 +88,18 @@ export default function ViewResultsPage() {
       }
     },
     enabled: !!sheetData?.id,
+    retry: 2,
+    retryDelay: 2000,
   });
 
-  const { data: rankingData } = useQuery({
+  const { data: rankingData, isLoading: rankingLoading, refetch: refetchRanking } = useQuery({
     queryKey: ['view-results-rankings', sheetData?.id],
     queryFn: async () => {
       if (!sheetData?.id) return null;
       try {
-        const r = await api.get(`/results-management/sheets/${sheetData.id}/rankings`);
+        const r = await api.get(`/results-management/sheets/${sheetData.id}/rankings`, {
+          timeout: 60000,
+        });
         const d = r.data?.data || r.data;
         return d && Object.keys(d).length > 0 ? d : null;
       } catch {
@@ -101,6 +107,8 @@ export default function ViewResultsPage() {
       }
     },
     enabled: !!sheetData?.id,
+    retry: 2,
+    retryDelay: 2000,
   });
 
   const students = useMemo(() => {
@@ -230,14 +238,26 @@ export default function ViewResultsPage() {
               <i className="fa fa-table"></i> Mark Schedule
             </button>
             <button
-              onClick={() => openAnalysisReport(analysisData, buildMeta())}
-              disabled={!analysisData}
-              style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 600, background: analysisData ? '#ea6645' : '#d1d5db', color: 'white', border: 'none', borderRadius: '8px', cursor: analysisData ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => {
+                if (!analysisData) {
+                  toast.info('Loading analysis data...');
+                  refetchAnalysis();
+                  return;
+                }
+                openAnalysisReport(analysisData, buildMeta());
+              }}
+              disabled={analysisLoading}
+              style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 600, background: analysisData ? '#ea6645' : analysisLoading ? '#d1d5db' : '#6b7280', color: 'white', border: 'none', borderRadius: '8px', cursor: analysisLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <i className="fa fa-chart-bar"></i> Analysis Report
+              <i className={`fa ${analysisLoading ? 'fa-spinner fa-spin' : 'fa-chart-bar'}`}></i> {analysisLoading ? 'Loading...' : analysisData ? 'Analysis Report' : 'Retry Analysis'}
             </button>
             <button
               onClick={() => {
+                if (!rankingData) {
+                  toast.info('Loading ranking data...');
+                  refetchRanking();
+                  return;
+                }
                 let rankList: any[] = [];
                 if (rankingData?.students && Array.isArray(rankingData.students)) {
                   rankList = rankingData.students;
@@ -257,10 +277,10 @@ export default function ViewResultsPage() {
                   totalPoints: r.totalPoints || undefined,
                 })), buildMeta());
               }}
-              disabled={!rankingData}
-              style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 600, background: rankingData ? '#059669' : '#d1d5db', color: 'white', border: 'none', borderRadius: '8px', cursor: rankingData ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '6px' }}
+              disabled={rankingLoading}
+              style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 600, background: rankingData ? '#059669' : rankingLoading ? '#d1d5db' : '#6b7280', color: 'white', border: 'none', borderRadius: '8px', cursor: rankingLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <i className="fa fa-trophy"></i> Rankings Report
+              <i className={`fa ${rankingLoading ? 'fa-spinner fa-spin' : 'fa-trophy'}`}></i> {rankingLoading ? 'Loading...' : rankingData ? 'Rankings Report' : 'Retry Rankings'}
             </button>
           </div>
         )}

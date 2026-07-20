@@ -65,7 +65,9 @@ export default function AnalysisPage() {
         return;
       }
       const sheetId = sheetArr[sheetArr.length - 1].id;
-      const ar = await api.get(`/results-management/sheets/${sheetId}/analysis`);
+      const ar = await api.get(`/results-management/sheets/${sheetId}/analysis`, {
+        timeout: 60000,
+      });
       const analysisData = ar.data?.data || ar.data;
       setAnalysis(analysisData);
       setSheetInfo(sheetArr[sheetArr.length - 1]);

@@ -72,7 +72,8 @@ export default function RankingPage() {
       }
       const sheetId = sheetArr[sheetArr.length - 1].id;
       const rr = await api.get(`/results-management/sheets/${sheetId}/rankings`, {
-        params: { type: rankingType }
+        params: { type: rankingType },
+        timeout: 60000,
       });
       const rankData = rr.data?.data || rr.data;
       setRankings(rankData);
