@@ -110,7 +110,7 @@ export class ReportCardEngineService {
 
     // Apply composite subject transformations
     const processedBreakdown = await this.applyCompositeTransform(
-      subjectBreakdown, studentId, termId, classId, schoolId,
+      subjectBreakdown, studentId, termId, enrollment.classId, schoolId,
     );
 
     const termSummary = await this.prisma.termSummary.findFirst({
