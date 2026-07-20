@@ -65,17 +65,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
-        
-        if (parsedUser.id && !parsedUser.roles?.length) {
-          roleApi.getUserRoles(parsedUser.id).then((roleRes: any) => {
-            if (roleRes.data?.length) {
-              const roles = roleRes.data.map((r: any) => r.roleName);
-              const updatedUser = { ...parsedUser, roles };
-              localStorage.setItem('user', JSON.stringify(updatedUser));
-              setUser(updatedUser);
-            }
-          }).catch(() => {});
-        }
+
+        // Fetch fresh profile from backend to sync roles (handles role changes without re-login)
+        authApi.getMe().then((res: any) => {
+          const profile = res.data?.data || res.data;
+          if (profile) {
+            const mergedUser = {
+              ...parsedUser,
+              id: profile.id || parsedUser.id,
+              email: profile.email || parsedUser.email,
+              firstName: profile.firstName || parsedUser.firstName,
+              lastName: profile.lastName || parsedUser.lastName,
+              phone: profile.phone || parsedUser.phone,
+              roles: profile.roles || parsedUser.roles,
+              schoolRoles: profile.schoolRoles || parsedUser.schoolRoles,
+              platformRoles: profile.platformRoles || parsedUser.platformRoles,
+              schoolId: profile.schoolId ?? parsedUser.schoolId,
+              teacherId: profile.teacherId || parsedUser.teacherId,
+              classTeacherOf: profile.classTeacherOf || parsedUser.classTeacherOf,
+              institutionType: profile.institutionType || parsedUser.institutionType,
+            };
+            localStorage.setItem('user', JSON.stringify(mergedUser));
+            setUser(mergedUser);
+          }
+        }).catch(() => {
+          // Fallback: if getMe fails, try fetching roles directly
+          if (parsedUser.id && !parsedUser.roles?.length) {
+            roleApi.getUserRoles(parsedUser.id).then((roleRes: any) => {
+              if (roleRes.data?.length) {
+                const roles = roleRes.data.map((r: any) => r.roleName);
+                const updatedUser = { ...parsedUser, roles };
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+                setUser(updatedUser);
+              }
+            }).catch(() => {});
+          }
+        });
       } catch (e) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');

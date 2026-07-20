@@ -12,6 +12,17 @@ const POSITION_TYPES = [
   'LOWER_PRIMARY_SENIOR_TEACHER', 'UPPER_PRIMARY_SENIOR_TEACHER',
 ] as const;
 
+const POSITION_TO_ROLE: Record<string, string> = {
+  DIRECTOR: 'Director',
+  DEPUTY_DIRECTOR: 'Deputy Director',
+  HEAD_TEACHER: 'Head Teacher',
+  DEPUTY: 'Deputy',
+  HOD: 'HOD',
+  CLASS_TEACHER: 'Class Teacher',
+  LOWER_PRIMARY_SENIOR_TEACHER: 'Lower Primary Senior Teacher',
+  UPPER_PRIMARY_SENIOR_TEACHER: 'Upper Primary Senior Teacher',
+};
+
 @Injectable()
 export class StaffPositionService {
   private readonly logger = new Logger(StaffPositionService.name);
@@ -85,7 +96,7 @@ export class StaffPositionService {
       throw new BadRequestException('Class ID is required for Class Teacher position');
     }
 
-    return this.prisma.actingPosition.create({
+    const position = await this.prisma.actingPosition.create({
       data: {
         teacherId: dto.teacherId,
         schoolId,
@@ -102,6 +113,47 @@ export class StaffPositionService {
         class: { select: { id: true, name: true } },
       },
     });
+
+    // Auto-assign the corresponding role
+    const roleName = POSITION_TO_ROLE[dto.positionType];
+    if (roleName) {
+      try {
+        let role = await this.prisma.role.findFirst({ where: { name: roleName } });
+        if (!role) {
+          role = await this.prisma.role.create({ data: { name: roleName } });
+        }
+        const existingUr = await this.prisma.userRole.findFirst({
+          where: { userId: dto.teacherId, roleId: role.id },
+        });
+        if (!existingUr) {
+          await this.prisma.userRole.create({
+            data: { userId: dto.teacherId, roleId: role.id },
+          });
+        }
+        const membership = await this.prisma.schoolUser.findFirst({
+          where: { userId: dto.teacherId, schoolId },
+        });
+        if (membership) {
+          const existingSr = await this.prisma.schoolRoleAssignment.findFirst({
+            where: { schoolMembershipId: membership.id, role: roleName },
+          });
+          if (!existingSr) {
+            await this.prisma.schoolRoleAssignment.create({
+              data: { schoolMembershipId: membership.id, role: roleName, isActive: true },
+            });
+          } else if (!existingSr.isActive) {
+            await this.prisma.schoolRoleAssignment.update({
+              where: { id: existingSr.id },
+              data: { isActive: true },
+            });
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`Failed to auto-assign role "${roleName}" for position ${dto.positionType}: ${err.message}`);
+      }
+    }
+
+    return position;
   }
 
   async getTeacherPositions(teacherId: string) {
@@ -151,7 +203,39 @@ export class StaffPositionService {
   async deleteActingPosition(id: string) {
     const pos = await this.prisma.actingPosition.findUnique({ where: { id } });
     if (!pos) throw new NotFoundException('Acting position not found');
-    return this.prisma.actingPosition.delete({ where: { id } });
+
+    const result = await this.prisma.actingPosition.delete({ where: { id } });
+
+    // Remove the corresponding role if no other positions of the same type exist for this teacher
+    const roleName = POSITION_TO_ROLE[pos.positionType];
+    if (roleName) {
+      try {
+        const remaining = await this.prisma.actingPosition.findFirst({
+          where: { teacherId: pos.teacherId, positionType: pos.positionType, id: { not: id } },
+        });
+        if (!remaining) {
+          const role = await this.prisma.role.findFirst({ where: { name: roleName } });
+          if (role) {
+            await this.prisma.userRole.deleteMany({
+              where: { userId: pos.teacherId, roleId: role.id },
+            });
+            const membership = await this.prisma.schoolUser.findFirst({
+              where: { userId: pos.teacherId, schoolId: pos.schoolId },
+            });
+            if (membership) {
+              await this.prisma.schoolRoleAssignment.updateMany({
+                where: { schoolMembershipId: membership.id, role: roleName },
+                data: { isActive: false },
+              });
+            }
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`Failed to remove role "${roleName}" on position delete: ${err.message}`);
+      }
+    }
+
+    return result;
   }
 
   // ==================== HIERARCHY / MONITORING ====================

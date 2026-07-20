@@ -1,6 +1,3 @@
--- DropIndex
-DROP INDEX "SchoolRoleAssignment_schoolId_idx";
-
 -- CreateTable
 CREATE TABLE "ResultSmsLog" (
     "id" TEXT NOT NULL,

@@ -78,6 +78,43 @@ export class ClassTeacherAssignmentService {
       });
     }
 
+    // Auto-assign "Class Teacher" role to the teacher
+    try {
+      const roleName = 'Class Teacher';
+      let role = await this.prisma.role.findFirst({ where: { name: roleName } });
+      if (!role) {
+        role = await this.prisma.role.create({ data: { name: roleName } });
+      }
+      const existingUr = await this.prisma.userRole.findFirst({
+        where: { userId: data.teacherId, roleId: role.id },
+      });
+      if (!existingUr) {
+        await this.prisma.userRole.create({
+          data: { userId: data.teacherId, roleId: role.id },
+        });
+      }
+      const membership = await this.prisma.schoolUser.findFirst({
+        where: { userId: data.teacherId, schoolId: data.schoolId },
+      });
+      if (membership) {
+        const existingSr = await this.prisma.schoolRoleAssignment.findFirst({
+          where: { schoolMembershipId: membership.id, role: roleName },
+        });
+        if (!existingSr) {
+          await this.prisma.schoolRoleAssignment.create({
+            data: { schoolMembershipId: membership.id, role: roleName, isActive: true },
+          });
+        } else if (!existingSr.isActive) {
+          await this.prisma.schoolRoleAssignment.update({
+            where: { id: existingSr.id },
+            data: { isActive: true },
+          });
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Failed to auto-assign "Class Teacher" role: ${err.message}`);
+    }
+
     this.logger.log(`Class teacher assigned: ${data.teacherId} -> class ${data.classId}`);
     return assignment;
   }

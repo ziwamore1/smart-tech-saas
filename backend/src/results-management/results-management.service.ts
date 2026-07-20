@@ -648,13 +648,12 @@ export class ResultsManagementService {
     }
 
     if (type === 'gender') {
-      const computedResults = await this.prisma.computedResult.findMany({
+      let computedResults = await this.prisma.computedResult.findMany({
         where: {
           classId: sheet.classId,
           termId: sheet.termId,
           schoolId: sheet.schoolId,
           status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-          finalPercentage: { not: null },
         },
         include: {
           student: {
@@ -663,6 +662,22 @@ export class ResultsManagementService {
           subject: { select: { id: true, name: true } },
         },
       });
+
+      if (computedResults.length === 0) {
+        computedResults = await this.prisma.computedResult.findMany({
+          where: {
+            termId: sheet.termId,
+            schoolId: sheet.schoolId,
+            status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+          },
+          include: {
+            student: {
+              select: { id: true, firstName: true, lastName: true, admissionNumber: true, gender: true },
+            },
+            subject: { select: { id: true, name: true } },
+          },
+        });
+      }
 
       const groupByGender = (genderFilter: string[]) => {
         const filtered = computedResults.filter((r) =>
@@ -742,13 +757,12 @@ export class ResultsManagementService {
       this.logger.warn(`Analytics sub-calls failed: ${e.message}`);
     }
 
-    const computedResults = await this.prisma.computedResult.findMany({
+    let computedResults = await this.prisma.computedResult.findMany({
       where: {
         classId: sheet.classId,
         termId: sheet.termId,
         schoolId: sheet.schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-        finalPercentage: { not: null },
       },
       include: {
         student: {
@@ -761,6 +775,27 @@ export class ResultsManagementService {
         },
       },
     });
+
+    // Fallback: if no computed results for this class, try without classId filter
+    if (computedResults.length === 0) {
+      computedResults = await this.prisma.computedResult.findMany({
+        where: {
+          termId: sheet.termId,
+          schoolId: sheet.schoolId,
+          status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        },
+        include: {
+          student: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              admissionNumber: true,
+            },
+          },
+        },
+      });
+    }
 
     const studentAverages = new Map<string, { studentId: string; firstName: string; lastName: string; admissionNumber: string; totalPercentage: number; count: number }>();
     for (const cr of computedResults) {

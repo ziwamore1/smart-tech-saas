@@ -11,7 +11,7 @@ export default function AnalysisPage() {
   const { user } = useAuth();
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
-  const [selectedExamType, setSelectedExamType] = useState('Exam');
+  const [selectedExamType, setSelectedExamType] = useState('');
   const [analysis, setAnalysis] = useState<any>(null);
   const [sheetInfo, setSheetInfo] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -54,9 +54,9 @@ export default function AnalysisPage() {
     }
     setLoading(true);
     try {
-      const r = await api.get('/results-management/sheets', {
-        params: { classId: selectedClass, termId: selectedTerm, examType: selectedExamType }
-      });
+      const params: any = { classId: selectedClass, termId: selectedTerm };
+      if (selectedExamType) params.examType = selectedExamType;
+      const r = await api.get('/results-management/sheets', { params });
       const sheets = r.data?.data || r.data;
       const sheetArr = Array.isArray(sheets) ? sheets : [];
       if (sheetArr.length === 0) {

@@ -8,13 +8,12 @@ export class RankingService {
   constructor(private prisma: PrismaService) {}
 
   async computeClassRankings(classId: string, termId: string, schoolId: string) {
-    const computedResults = await this.prisma.computedResult.findMany({
+    let computedResults = await this.prisma.computedResult.findMany({
       where: {
         classId,
         termId,
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-        finalPercentage: { not: null },
       },
       include: {
         student: {
@@ -27,6 +26,27 @@ export class RankingService {
         },
       },
     });
+
+    // Fallback: if no computed results for this class, try without classId filter
+    if (computedResults.length === 0) {
+      computedResults = await this.prisma.computedResult.findMany({
+        where: {
+          termId,
+          schoolId,
+          status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        },
+        include: {
+          student: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              admissionNumber: true,
+            },
+          },
+        },
+      });
+    }
 
     const studentMap = new Map<string, {
       studentId: string;
@@ -104,14 +124,13 @@ export class RankingService {
   }
 
   async computeSubjectRankings(subjectId: string, termId: string, classId: string, schoolId: string) {
-    const computedResults = await this.prisma.computedResult.findMany({
+    let computedResults = await this.prisma.computedResult.findMany({
       where: {
         subjectId,
         termId,
         classId,
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-        finalPercentage: { not: null },
       },
       include: {
         student: {
@@ -125,6 +144,28 @@ export class RankingService {
       },
       orderBy: { finalPercentage: 'desc' },
     });
+
+    if (computedResults.length === 0) {
+      computedResults = await this.prisma.computedResult.findMany({
+        where: {
+          subjectId,
+          termId,
+          schoolId,
+          status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        },
+        include: {
+          student: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              admissionNumber: true,
+            },
+          },
+        },
+        orderBy: { finalPercentage: 'desc' },
+      });
+    }
 
     const rankings = computedResults.map((result, index) => ({
       studentId: result.studentId,

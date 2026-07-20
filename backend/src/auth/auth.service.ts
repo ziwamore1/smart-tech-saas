@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   BadRequestException,
   ForbiddenException,
+  NotFoundException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -376,14 +377,17 @@ export class AuthService {
     const isEmail = identifier.includes('@');
     let user;
 
+    const userInclude = {
+      userRoles: { include: { role: true } },
+      schoolUsers: { select: { schoolId: true, isPrimary: true } },
+      school: { include: { institutionType: true } },
+      teacher: { select: { id: true } },
+    };
+
     if (isEmail) {
       user = await this.prisma.user.findFirst({
         where: { email: identifier.trim().toLowerCase() },
-        include: {
-          userRoles: { include: { role: true } },
-          schoolUsers: { select: { schoolId: true, isPrimary: true } },
-          school: { include: { institutionType: true } },
-        },
+        include: userInclude,
       });
     } else {
       const cleanedPhone = identifier.trim().replace(/[^0-9+]/g, '');
@@ -395,11 +399,7 @@ export class AuthService {
             { student: { admissionNumber: identifier.trim() } },
           ],
         },
-        include: {
-          userRoles: { include: { role: true } },
-          schoolUsers: { select: { schoolId: true, isPrimary: true } },
-          school: { include: { institutionType: true } },
-        },
+        include: userInclude,
       });
     }
 
@@ -469,6 +469,17 @@ export class AuthService {
       }
     }
 
+    let teacherId: string | undefined;
+    let classTeacherOf: string | undefined;
+    if (user.teacher) {
+      teacherId = user.teacher.id;
+      const cta = await this.prisma.classTeacherAssignment.findFirst({
+        where: { teacherId: user.teacher.id, isActive: true, isPrimary: true },
+        select: { classId: true },
+      });
+      classTeacherOf = cta?.classId;
+    }
+
     const payload = {
       sub: user.id,
       schoolId: effectiveSchoolId,
@@ -476,6 +487,8 @@ export class AuthService {
       roles: allRoles,
       platformRoles: platformRoleNames,
       schoolRoles: schoolRoleNames,
+      teacherId,
+      classTeacherOf,
       type: 'user',
     };
 
@@ -503,7 +516,75 @@ export class AuthService {
         primaryRole,
         schoolId: effectiveSchoolId,
         institutionType: effectiveInstitutionType,
+        teacherId,
+        classTeacherOf,
       },
+    };
+  }
+
+  async getProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        userRoles: { include: { role: true } },
+        school: { include: { institutionType: true } },
+        teacher: { select: { id: true } },
+        schoolUsers: { select: { schoolId: true, isPrimary: true } },
+      },
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const roles = user.userRoles.map((ur) => ur.role.name);
+
+    const platformRoles = await this.prisma.platformRoleAssignment.findMany({
+      where: { userId, isActive: true },
+      select: { role: true },
+    });
+    const platformRoleNames = platformRoles.map((pr) => pr.role);
+
+    const schoolUsers = user.schoolUsers || [];
+    const resolvedSchoolId = user.schoolId
+      || schoolUsers.find(su => su.isPrimary)?.schoolId
+      || schoolUsers[0]?.schoolId
+      || null;
+
+    let schoolRoleNames: string[] = [];
+    if (resolvedSchoolId) {
+      const membership = await this.prisma.schoolUser.findFirst({
+        where: { userId, schoolId: resolvedSchoolId },
+      });
+      if (membership) {
+        const schoolRoles = await this.prisma.schoolRoleAssignment.findMany({
+          where: { schoolMembershipId: membership.id, isActive: true },
+          select: { role: true },
+        });
+        schoolRoleNames = schoolRoles.map((sr) => sr.role);
+      }
+    }
+
+    const allRoles = [...new Set([...roles, ...schoolRoleNames, ...platformRoleNames])];
+
+    // Fetch class teacher assignments
+    const classTeacherOf = user.teacher?.id
+      ? (await this.prisma.classTeacherAssignment.findFirst({
+          where: { teacherId: user.teacher.id, isActive: true, isPrimary: true },
+          select: { classId: true },
+        }))?.classId
+      : undefined;
+
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      roles: allRoles,
+      schoolRoles: schoolRoleNames,
+      platformRoles: platformRoleNames,
+      schoolId: resolvedSchoolId,
+      teacherId: user.teacher?.id,
+      classTeacherOf,
+      institutionType: user.school?.institutionType?.code || null,
     };
   }
 

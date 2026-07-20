@@ -8,18 +8,30 @@ export class ResultAnalyticsService {
   constructor(private prisma: PrismaService) {}
 
   async getClassAnalytics(classId: string, termId: string, schoolId: string) {
-    const computedResults = await this.prisma.computedResult.findMany({
+    let computedResults = await this.prisma.computedResult.findMany({
       where: {
         classId,
         termId,
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-        finalPercentage: { not: null },
       },
       include: {
         subject: { select: { id: true, name: true } },
       },
     });
+
+    if (computedResults.length === 0) {
+      computedResults = await this.prisma.computedResult.findMany({
+        where: {
+          termId,
+          schoolId,
+          status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        },
+        include: {
+          subject: { select: { id: true, name: true } },
+        },
+      });
+    }
 
     const subjectAnalytics = computedResults.reduce((acc, result) => {
       if (!acc[result.subjectId]) {
@@ -185,7 +197,7 @@ export class ResultAnalyticsService {
   }
 
   async getAtRiskStudents(classId: string, termId: string, schoolId: string) {
-    const computedResults = await this.prisma.computedResult.findMany({
+    let computedResults = await this.prisma.computedResult.findMany({
       where: {
         classId,
         termId,
@@ -204,6 +216,27 @@ export class ResultAnalyticsService {
         subject: { select: { name: true } },
       },
     });
+
+    if (computedResults.length === 0) {
+      computedResults = await this.prisma.computedResult.findMany({
+        where: {
+          termId,
+          schoolId,
+          status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        },
+        include: {
+          student: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              admissionNumber: true,
+            },
+          },
+          subject: { select: { name: true } },
+        },
+      });
+    }
 
     const studentPerformance = computedResults.reduce((acc, result) => {
       if (!acc[result.studentId]) {

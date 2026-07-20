@@ -66,6 +66,12 @@ export class AuthController {
     return this.authService.registerSchool(body);
   }
 
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async getProfile(@Req() req: any) {
+    return this.authService.getProfile(req.user.id);
+  }
+
   @Get('institution-types')
   async getInstitutionTypes() {
     return this.institutionTypeService.getAllTypes();

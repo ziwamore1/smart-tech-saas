@@ -13,7 +13,7 @@ export default function RankingPage() {
   const { user } = useAuth();
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
-  const [selectedExamType, setSelectedExamType] = useState('Exam');
+  const [selectedExamType, setSelectedExamType] = useState('');
   const [rankingType, setRankingType] = useState<RankingType>('class');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [showLimit, setShowLimit] = useState<'all' | 'top10' | 'bottom10'>('all');
@@ -60,9 +60,9 @@ export default function RankingPage() {
     }
     setLoading(true);
     try {
-      const r = await api.get('/results-management/sheets', {
-        params: { classId: selectedClass, termId: selectedTerm, examType: selectedExamType }
-      });
+      const params: any = { classId: selectedClass, termId: selectedTerm };
+      if (selectedExamType) params.examType = selectedExamType;
+      const r = await api.get('/results-management/sheets', { params });
       const sheets = r.data?.data || r.data;
       const sheetArr = Array.isArray(sheets) ? sheets : [];
       if (sheetArr.length === 0) {

@@ -88,6 +88,8 @@ export const authApi = {
   superAdminLogin: (email: string, password: string) =>
     api.post('/auth/super-admin/login', { email, password }),
 
+  getMe: () => api.get('/auth/me'),
+
   registerSchool: (data: {
     schoolName: string;
     directorFirstName: string;
