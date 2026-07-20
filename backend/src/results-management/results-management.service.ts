@@ -24,6 +24,38 @@ export class ResultsManagementService {
     private resultsSmsService?: ResultsSmsService,
   ) {}
 
+  private async ensureComputedResults(classId: string, termId: string, schoolId: string): Promise<void> {
+    const count = await this.prisma.computedResult.count({
+      where: {
+        classId,
+        termId,
+        schoolId,
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+      },
+    });
+    if (count > 0) return;
+
+    const hasRaw = await this.prisma.studentAssessmentResult.findFirst({
+      where: { studentId: { not: '' }, termId, status: { not: 'DRAFT' } },
+      select: { id: true },
+    });
+    if (!hasRaw) return;
+
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: { classId },
+      select: { subjectId: true },
+    });
+
+    this.logger.log(`Auto-computing results for class ${classId}, term ${termId} (${classSubjects.length} subjects)`);
+    for (const cs of classSubjects) {
+      try {
+        await this.gradingEngine.computeAllClassResults(classId, cs.subjectId, termId, schoolId);
+      } catch (err: any) {
+        this.logger.warn(`Auto-compute failed for subject ${cs.subjectId}: ${err.message}`);
+      }
+    }
+  }
+
   async getResultSheets(
     schoolId: string,
     filters: { status?: string; classId?: string; termId?: string; examType?: string },
@@ -624,6 +656,8 @@ export class ResultsManagementService {
       throw new NotFoundException('Result sheet not found');
     }
 
+    await this.ensureComputedResults(sheet.classId, sheet.termId, sheet.schoolId);
+
     if (type === 'subject') {
       const classSubjects = await this.prisma.classSubject.findMany({
         where: { classId: sheet.classId },
@@ -734,6 +768,8 @@ export class ResultsManagementService {
     if (!sheet) {
       throw new NotFoundException('Result sheet not found');
     }
+
+    await this.ensureComputedResults(sheet.classId, sheet.termId, sheet.schoolId);
 
     const computedResults = await this.prisma.computedResult.findMany({
       where: {
