@@ -112,6 +112,7 @@ export default function ViewResultsPage() {
         grade: r.grade || r.finalGrade || null,
         remark: r.remark || null,
         maxScore: r.maxScore || 100,
+        points: r.points ?? null,
       }));
       const validScores = results.filter((r: any) => r.score != null);
       const avg = validScores.length > 0
@@ -125,6 +126,20 @@ export default function ViewResultsPage() {
         else if (avg >= 40) grade = 'D';
         else grade = 'E';
       }
+      const subjectPoints = results
+        .filter((r: any) => r.score != null)
+        .map((r: any) => {
+          if (r.points != null) return r.points;
+          const pct = r.score;
+          if (pct >= 75) return 1;
+          if (pct >= 65) return 2;
+          if (pct >= 50) return 3;
+          if (pct >= 40) return 4;
+          return 5;
+        });
+      const sortedPoints = [...subjectPoints].sort((a, b) => a - b);
+      const bestSix = sortedPoints.slice(0, 6);
+      const totalPoints = bestSix.length > 0 ? bestSix.reduce((sum, p) => sum + p, 0) : 0;
       return {
         firstName: s.firstName,
         lastName: s.lastName,
@@ -133,7 +148,7 @@ export default function ViewResultsPage() {
         results,
         average: avg,
         grade,
-        totalPoints: s.ComputedResult?.totalPoints || null,
+        totalPoints: s.ComputedResult?.totalPoints || totalPoints || null,
       };
     });
     const withAvg = mapped.filter(s => s.average != null).sort((a, b) => (b.average || 0) - (a.average || 0));

@@ -1005,11 +1005,20 @@ export class ResultsManagementService {
       select: { name: true },
     });
 
+    const school = await this.prisma.school.findUnique({
+      where: { id: sheet.schoolId },
+      select: { name: true, address: true, phone: true, email: true },
+    });
+
     return {
       sheetId,
       classId: sheet.classId,
       className: className?.name,
       termId: sheet.termId,
+      schoolName: school?.name || '',
+      schoolAddress: school?.address || '',
+      schoolPhone: school?.phone || '',
+      schoolEmail: school?.email || '',
       subjects: classSubjects.map((cs) => ({
         id: cs.subjectId,
         name: cs.subject.name,
