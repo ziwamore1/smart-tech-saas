@@ -21,16 +21,14 @@ export class ResultAnalyticsService {
     });
 
     if (computedResults.length === 0) {
-      computedResults = await this.prisma.computedResult.findMany({
-        where: {
-          termId,
-          schoolId,
-          status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-        },
-        include: {
-          subject: { select: { id: true, name: true } },
-        },
-      });
+      return {
+        classId,
+        termId,
+        classAverage: 0,
+        subjectStats: [],
+        gradeDistribution: {},
+        totalStudents: 0,
+      };
     }
 
     const subjectAnalytics = computedResults.reduce((acc, result) => {
@@ -218,24 +216,7 @@ export class ResultAnalyticsService {
     });
 
     if (computedResults.length === 0) {
-      computedResults = await this.prisma.computedResult.findMany({
-        where: {
-          termId,
-          schoolId,
-          status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-        },
-        include: {
-          student: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              admissionNumber: true,
-            },
-          },
-          subject: { select: { name: true } },
-        },
-      });
+      return [];
     }
 
     const studentPerformance = computedResults.reduce((acc, result) => {

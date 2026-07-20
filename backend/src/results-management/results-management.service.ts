@@ -664,19 +664,7 @@ export class ResultsManagementService {
       });
 
       if (computedResults.length === 0) {
-        computedResults = await this.prisma.computedResult.findMany({
-          where: {
-            termId: sheet.termId,
-            schoolId: sheet.schoolId,
-            status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-          },
-          include: {
-            student: {
-              select: { id: true, firstName: true, lastName: true, admissionNumber: true, gender: true },
-            },
-            subject: { select: { id: true, name: true } },
-          },
-        });
+        return { male: [], female: [] };
       }
 
       const groupByGender = (genderFilter: string[]) => {
@@ -776,25 +764,9 @@ export class ResultsManagementService {
       },
     });
 
-    // Fallback: if no computed results for this class, try without classId filter
+    // No fallback — return empty if no computed results for this class
     if (computedResults.length === 0) {
-      computedResults = await this.prisma.computedResult.findMany({
-        where: {
-          termId: sheet.termId,
-          schoolId: sheet.schoolId,
-          status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-        },
-        include: {
-          student: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              admissionNumber: true,
-            },
-          },
-        },
-      });
+      this.logger.warn(`No computed results for class ${sheet.classId}, term ${sheet.termId}`);
     }
 
     const studentAverages = new Map<string, { studentId: string; firstName: string; lastName: string; admissionNumber: string; totalPercentage: number; count: number }>();

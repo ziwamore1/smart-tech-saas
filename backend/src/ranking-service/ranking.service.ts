@@ -27,25 +27,10 @@ export class RankingService {
       },
     });
 
-    // Fallback: if no computed results for this class, try without classId filter
+    // No fallback — return empty if no computed results for this class
     if (computedResults.length === 0) {
-      computedResults = await this.prisma.computedResult.findMany({
-        where: {
-          termId,
-          schoolId,
-          status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-        },
-        include: {
-          student: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              admissionNumber: true,
-            },
-          },
-        },
-      });
+      this.logger.warn(`No computed results found for class ${classId}, term ${termId}`);
+      return [];
     }
 
     const studentMap = new Map<string, {
@@ -146,25 +131,7 @@ export class RankingService {
     });
 
     if (computedResults.length === 0) {
-      computedResults = await this.prisma.computedResult.findMany({
-        where: {
-          subjectId,
-          termId,
-          schoolId,
-          status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-        },
-        include: {
-          student: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              admissionNumber: true,
-            },
-          },
-        },
-        orderBy: { finalPercentage: 'desc' },
-      });
+      return [];
     }
 
     const rankings = computedResults.map((result, index) => ({
