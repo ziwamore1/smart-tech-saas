@@ -196,15 +196,19 @@ export default function ViewResultsPage() {
   const buildMeta = useCallback((): ReportMeta => {
     const cls = classes.find((c: any) => c.id === selectedClass);
     const term = terms.find((t: any) => t.id === selectedTerm);
+    const school = (sheetData as any)?.school;
     return {
-      schoolName: user?.schoolName || (user as any)?.school?.name || 'Smart Tech School',
+      schoolName: school?.name || user?.schoolName || (user as any)?.school?.name || 'Smart Tech School',
+      schoolAddress: school?.address || '',
+      schoolPhone: school?.phone || '',
+      schoolEmail: school?.email || '',
       className: cls?.name || 'Class',
       termName: term?.name || 'Term',
       academicYear: term?.academicYear?.name || '',
       examType: selectedExamType,
       classTeacher: cls?.classTeacher ? `${cls.classTeacher.firstName} ${cls.classTeacher.lastName}` : undefined,
     };
-  }, [selectedClass, selectedTerm, selectedExamType, classes, terms, user]);
+  }, [selectedClass, selectedTerm, selectedExamType, classes, terms, user, sheetData]);
 
   const examTypes = ['Exam', 'Mid-Term', 'CAT', 'Assignment', 'Project', 'Practical', 'Mock'];
 

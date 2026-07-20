@@ -88,8 +88,9 @@ export class ResultsManagementService {
     let sheets = await this.prisma.resultSheet.findMany({
       where,
       include: {
-        class: { select: { id: true, name: true } },
-        term: { select: { id: true, name: true } },
+        class: { select: { id: true, name: true, classTeacher: { select: { firstName: true, lastName: true } } } },
+        term: { select: { id: true, name: true, academicYear: { select: { name: true } } } },
+        school: { select: { id: true, name: true, address: true, phone: true, email: true } },
       },
       orderBy: [{ term: { startDate: 'desc' } }, { class: { name: 'asc' } }],
     });
@@ -115,8 +116,9 @@ export class ResultsManagementService {
             totalStudents,
           },
           include: {
-            class: { select: { id: true, name: true } },
-            term: { select: { id: true, name: true } },
+            class: { select: { id: true, name: true, classTeacher: { select: { firstName: true, lastName: true } } } },
+            term: { select: { id: true, name: true, academicYear: { select: { name: true } } } },
+            school: { select: { id: true, name: true, address: true, phone: true, email: true } },
           },
         });
         sheets = [newSheet];
