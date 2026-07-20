@@ -24,36 +24,34 @@ export class ResultsManagementService {
     private resultsSmsService?: ResultsSmsService,
   ) {}
 
-  private async ensureComputedResults(classId: string, termId: string, schoolId: string): Promise<void> {
-    const count = await this.prisma.computedResult.count({
-      where: {
-        classId,
-        termId,
-        schoolId,
-        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-      },
-    });
-    if (count > 0) return;
+  private computingKeys = new Set<string>();
 
-    const hasRaw = await this.prisma.studentAssessmentResult.findFirst({
-      where: { studentId: { not: '' }, termId, status: { not: 'DRAFT' } },
-      select: { id: true },
-    });
-    if (!hasRaw) return;
+  private ensureComputedResults(classId: string, termId: string, schoolId: string): void {
+    const key = `${classId}:${termId}:${schoolId}`;
+    if (this.computingKeys.has(key)) return;
+    this.computingKeys.add(key);
 
-    const classSubjects = await this.prisma.classSubject.findMany({
-      where: { classId },
-      select: { subjectId: true },
+    this.prisma.computedResult.count({
+      where: { classId, termId, schoolId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
+    }).then(count => {
+      if (count > 0) { this.computingKeys.delete(key); return; }
+      return this.prisma.classSubject.findMany({ where: { classId }, select: { subjectId: true } });
+    }).then(classSubjects => {
+      if (!classSubjects || classSubjects.length === 0) { this.computingKeys.delete(key); return; }
+      this.logger.log(`Auto-computing results for class ${classId}, term ${termId} (${classSubjects.length} subjects)`);
+      return Promise.allSettled(
+        classSubjects.map(cs =>
+          this.gradingEngine.computeAllClassResults(classId, cs.subjectId, termId, schoolId)
+            .catch(err => this.logger.warn(`Auto-compute failed for subject ${cs.subjectId}: ${err.message}`))
+        ),
+      );
+    }).then(() => {
+      this.computingKeys.delete(key);
+      this.logger.log(`Auto-compute complete for class ${classId}, term ${termId}`);
+    }).catch(err => {
+      this.computingKeys.delete(key);
+      this.logger.warn(`Auto-compute failed: ${err.message}`);
     });
-
-    this.logger.log(`Auto-computing results for class ${classId}, term ${termId} (${classSubjects.length} subjects)`);
-    for (const cs of classSubjects) {
-      try {
-        await this.gradingEngine.computeAllClassResults(classId, cs.subjectId, termId, schoolId);
-      } catch (err: any) {
-        this.logger.warn(`Auto-compute failed for subject ${cs.subjectId}: ${err.message}`);
-      }
-    }
   }
 
   async getResultSheets(
@@ -656,7 +654,7 @@ export class ResultsManagementService {
       throw new NotFoundException('Result sheet not found');
     }
 
-    await this.ensureComputedResults(sheet.classId, sheet.termId, sheet.schoolId);
+    this.ensureComputedResults(sheet.classId, sheet.termId, sheet.schoolId);
 
     if (type === 'subject') {
       const classSubjects = await this.prisma.classSubject.findMany({
@@ -769,7 +767,7 @@ export class ResultsManagementService {
       throw new NotFoundException('Result sheet not found');
     }
 
-    await this.ensureComputedResults(sheet.classId, sheet.termId, sheet.schoolId);
+    this.ensureComputedResults(sheet.classId, sheet.termId, sheet.schoolId);
 
     const computedResults = await this.prisma.computedResult.findMany({
       where: {

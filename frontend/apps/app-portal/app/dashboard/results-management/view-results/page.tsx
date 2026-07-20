@@ -88,8 +88,12 @@ export default function ViewResultsPage() {
       }
     },
     enabled: !!sheetData?.id,
-    retry: 2,
-    retryDelay: 2000,
+    retry: 3,
+    retryDelay: 3000,
+    refetchInterval: (query) => {
+      if (query.state.data && Object.keys(query.state.data).length > 0) return false;
+      return query.state.failureCount < 5 ? 5000 : false;
+    },
   });
 
   const { data: rankingData, isLoading: rankingLoading, refetch: refetchRanking } = useQuery({
@@ -107,8 +111,12 @@ export default function ViewResultsPage() {
       }
     },
     enabled: !!sheetData?.id,
-    retry: 2,
-    retryDelay: 2000,
+    retry: 3,
+    retryDelay: 3000,
+    refetchInterval: (query) => {
+      if (query.state.data && Object.keys(query.state.data).length > 0) return false;
+      return query.state.failureCount < 5 ? 5000 : false;
+    },
   });
 
   const students = useMemo(() => {
