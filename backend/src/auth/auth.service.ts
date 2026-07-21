@@ -340,6 +340,36 @@ export class AuthService {
       },
     });
 
+    // Ensure SchoolUser membership exists
+    const existingMembership = await this.prisma.schoolUser.findFirst({
+      where: { userId: user.id, schoolId },
+    });
+    if (!existingMembership) {
+      const membership = await this.prisma.schoolUser.create({
+        data: { userId: user.id, schoolId, isPrimary: true },
+      });
+      await this.prisma.schoolRoleAssignment.create({
+        data: { schoolMembershipId: membership.id, role: 'Teacher', isActive: true },
+      });
+    } else {
+      const existingTeacherRole = await this.prisma.schoolRoleAssignment.findFirst({
+        where: { schoolMembershipId: existingMembership.id, role: 'Teacher' },
+      });
+      if (!existingTeacherRole) {
+        await this.prisma.schoolRoleAssignment.create({
+          data: { schoolMembershipId: existingMembership.id, role: 'Teacher', isActive: true },
+        });
+      }
+    }
+
+    // Auto-sync to StaffHrProfile
+    const teacher = await this.prisma.teacher.findUnique({ where: { userId: user.id } });
+    if (teacher) {
+      this.syncEngine.syncStaffProfile(teacher.id, schoolId)
+        .then(result => this.logger.log(`Auto-sync to HR profile for teacher ${teacher.id}: created=${result.created}`))
+        .catch(err => this.logger.error(`Auto-sync to HR profile failed for teacher ${teacher.id}: ${err.message}`));
+    }
+
     const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
     });
@@ -455,6 +485,15 @@ export class AuthService {
     let effectiveSchoolId = resolvedSchoolId;
     let effectiveInstitutionType = institutionType;
 
+    // If institutionType is null but we have a resolvedSchoolId, fetch it from the school
+    if (!effectiveInstitutionType && resolvedSchoolId) {
+      const resolvedSchool = await this.prisma.school.findUnique({
+        where: { id: resolvedSchoolId },
+        select: { institutionType: { select: { code: true } } },
+      });
+      effectiveInstitutionType = resolvedSchool?.institutionType?.code || null;
+    }
+
     if (schoolId) {
       const schoolFromUrl = await this.prisma.school.findUnique({
         where: { id: schoolId },
@@ -529,7 +568,9 @@ export class AuthService {
         userRoles: { include: { role: true } },
         school: { include: { institutionType: true } },
         teacher: { select: { id: true } },
-        schoolUsers: { select: { schoolId: true, isPrimary: true } },
+        schoolUsers: {
+          select: { schoolId: true, isPrimary: true },
+        },
       },
     });
     if (!user) throw new NotFoundException('User not found');
@@ -549,6 +590,8 @@ export class AuthService {
       || null;
 
     let schoolRoleNames: string[] = [];
+    let institutionType = user.school?.institutionType?.code || null;
+
     if (resolvedSchoolId) {
       const membership = await this.prisma.schoolUser.findFirst({
         where: { userId, schoolId: resolvedSchoolId },
@@ -559,6 +602,14 @@ export class AuthService {
           select: { role: true },
         });
         schoolRoleNames = schoolRoles.map((sr) => sr.role);
+      }
+
+      if (!institutionType) {
+        const resolvedSchool = await this.prisma.school.findUnique({
+          where: { id: resolvedSchoolId },
+          select: { institutionType: { select: { code: true } } },
+        });
+        institutionType = resolvedSchool?.institutionType?.code || null;
       }
     }
 
@@ -584,7 +635,7 @@ export class AuthService {
       schoolId: resolvedSchoolId,
       teacherId: user.teacher?.id,
       classTeacherOf,
-      institutionType: user.school?.institutionType?.code || null,
+      institutionType,
     };
   }
 
@@ -806,6 +857,44 @@ export class AuthService {
         roleId: teacherRole.id,
       },
     });
+
+    // Create Teacher record
+    const existingTeacher = await this.prisma.teacher.findUnique({ where: { userId: user.id } });
+    if (!existingTeacher) {
+      const teacher = await this.prisma.teacher.create({
+        data: {
+          userId: user.id,
+          schoolId,
+          staffType: 'TEACHING',
+        },
+      });
+      // Auto-sync to StaffHrProfile
+      this.syncEngine.syncStaffProfile(teacher.id, schoolId)
+        .then(result => this.logger.log(`Auto-sync to HR profile for registered teacher: created=${result.created}`))
+        .catch(err => this.logger.error(`Auto-sync to HR profile failed for registered teacher: ${err.message}`));
+    }
+
+    // Ensure SchoolUser membership exists
+    const existingMembership = await this.prisma.schoolUser.findFirst({
+      where: { userId: user.id, schoolId },
+    });
+    if (!existingMembership) {
+      const membership = await this.prisma.schoolUser.create({
+        data: { userId: user.id, schoolId, isPrimary: true },
+      });
+      await this.prisma.schoolRoleAssignment.create({
+        data: { schoolMembershipId: membership.id, role: 'Teacher', isActive: true },
+      });
+    } else {
+      const existingTeacherRole = await this.prisma.schoolRoleAssignment.findFirst({
+        where: { schoolMembershipId: existingMembership.id, role: 'Teacher' },
+      });
+      if (!existingTeacherRole) {
+        await this.prisma.schoolRoleAssignment.create({
+          data: { schoolMembershipId: existingMembership.id, role: 'Teacher', isActive: true },
+        });
+      }
+    }
 
     return {
       message: 'Teacher created successfully',

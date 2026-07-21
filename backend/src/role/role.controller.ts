@@ -133,20 +133,39 @@ export class RoleController {
     }
 
     const users = await this.prisma.user.findMany({
-      where: { schoolId },
+      where: {
+        OR: [
+          { schoolId },
+          { schoolUsers: { some: { schoolId } } },
+        ],
+      },
       include: {
         userRoles: { include: { role: true } },
+        schoolUsers: {
+          where: { schoolId },
+          include: {
+            schoolRoleAssignments: { where: { isActive: true }, select: { role: true } },
+          },
+        },
       },
       orderBy: { firstName: 'asc' },
     });
 
-    return users.map(user => ({
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      isActive: user.isActive,
-      roles: user.userRoles.map(ur => ur.role.name),
-    }));
+    return users.map(user => {
+      const legacyRoles = user.userRoles.map(ur => ur.role.name);
+      const schoolRoles = (user.schoolUsers || []).flatMap(su =>
+        su.schoolRoleAssignments.map(sra => sra.role)
+      );
+      const allRoles = [...new Set([...legacyRoles, ...schoolRoles])];
+
+      return {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        isActive: user.isActive,
+        roles: allRoles.length > 0 ? allRoles : legacyRoles,
+      };
+    });
   }
 }

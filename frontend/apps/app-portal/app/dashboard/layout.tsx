@@ -740,13 +740,15 @@ export default function DashboardLayout({
     },
     retry: 2,
     staleTime: 5 * 60 * 1000,
-    enabled: !!user?.schoolId,
+    enabled: !isSuperAdmin,
   });
 
   const resolvedInstitutionType = institutionType || schoolData?.institutionType?.code || null;
   const navigation = isSuperAdmin ? superAdminNav : regularNav.filter(item => {
-    const typeMatch = !item.institutionTypes || !resolvedInstitutionType || item.institutionTypes.includes(resolvedInstitutionType);
-    if (!typeMatch) return false;
+    if (item.institutionTypes && item.institutionTypes.length > 0) {
+      if (!resolvedInstitutionType) return false;
+      if (!item.institutionTypes.includes(resolvedInstitutionType)) return false;
+    }
     if (item.typeRoles && resolvedInstitutionType) {
       const allowedRoles = item.typeRoles[resolvedInstitutionType];
       if (allowedRoles && allowedRoles.length > 0) {

@@ -486,6 +486,98 @@ export class HealthController {
     return results;
   }
 
+  @Get('backfill-identity-data')
+  async backfillIdentityData() {
+    const results = {
+      schoolUsers: { created: 0, skipped: 0 },
+      schoolRoles: { created: 0, skipped: 0 },
+      userSchoolIds: { fixed: 0, skipped: 0 },
+    };
+
+    try {
+      // Step 1: Create SchoolUser records for users with schoolId but no SchoolUser
+      const usersNeedingSchoolUser = await this.prisma.user.findMany({
+        where: {
+          schoolId: { not: null },
+          schoolUsers: { none: {} },
+        },
+        select: { id: true, schoolId: true },
+      });
+
+      for (const user of usersNeedingSchoolUser) {
+        try {
+          const membership = await this.prisma.schoolUser.create({
+            data: { userId: user.id, schoolId: user.schoolId!, isPrimary: true },
+          });
+          results.schoolUsers.created++;
+        } catch {
+          results.schoolUsers.skipped++;
+        }
+      }
+
+      // Step 2: Create SchoolRoleAssignment from existing UserRole records
+      const userRoles = await this.prisma.userRole.findMany({
+        include: { role: true, user: { select: { schoolId: true } } },
+        where: { user: { schoolId: { not: null } } },
+      });
+
+      const schoolRoleNames = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy', 'Teacher', 'Class Teacher', 'HOD', 'Accountant', 'Secretary', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
+
+      for (const ur of userRoles) {
+        if (!schoolRoleNames.includes(ur.role.name)) continue;
+        if (!ur.user.schoolId) continue;
+
+        const membership = await this.prisma.schoolUser.findFirst({
+          where: { userId: ur.userId, schoolId: ur.user.schoolId },
+        });
+        if (!membership) continue;
+
+        const existing = await this.prisma.schoolRoleAssignment.findFirst({
+          where: { schoolMembershipId: membership.id, role: ur.role.name },
+        });
+        if (existing) { results.schoolRoles.skipped++; continue; }
+
+        try {
+          await this.prisma.schoolRoleAssignment.create({
+            data: { schoolMembershipId: membership.id, role: ur.role.name, isActive: true },
+          });
+          results.schoolRoles.created++;
+        } catch {
+          results.schoolRoles.skipped++;
+        }
+      }
+
+      // Step 3: Fix users with SchoolUser but no schoolId on User record
+      const memberships = await this.prisma.schoolUser.findMany({
+        where: { user: { schoolId: null } },
+        select: { userId: true, schoolId: true, isPrimary: true },
+      });
+
+      const primaryMemberships = new Map<string, string>();
+      for (const m of memberships) {
+        if (!primaryMemberships.has(m.userId)) {
+          primaryMemberships.set(m.userId, m.schoolId);
+        }
+        if (m.isPrimary) {
+          primaryMemberships.set(m.userId, m.schoolId);
+        }
+      }
+
+      for (const [userId, schoolId] of primaryMemberships) {
+        try {
+          await this.prisma.user.update({ where: { id: userId }, data: { schoolId } });
+          results.userSchoolIds.fixed++;
+        } catch {
+          results.userSchoolIds.skipped++;
+        }
+      }
+    } catch (e: any) {
+      (results as any).fatalError = e.message;
+    }
+
+    return results;
+  }
+
   @Head()
   async head() {
     const health = await this.healthService.check();

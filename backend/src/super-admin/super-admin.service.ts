@@ -12,6 +12,7 @@ import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 import { InstitutionProvisioningService } from '../institution/institution-provisioning.service';
 import { CacheService } from '../common/services/cache.service';
+import { StaffSyncEngineService } from '../shared/staff-sync-engine/staff-sync-engine.service';
 
 const STATS_CACHE_TTL = 300_000;
 const STATS_CACHE_KEY = 'super-admin:system-stats';
@@ -27,6 +28,7 @@ export class SuperAdminService {
     private unifiedMessaging: UnifiedMessagingService,
     private provisioningService: InstitutionProvisioningService,
     private cacheService: CacheService,
+    private syncEngine: StaffSyncEngineService,
   ) {}
 
   async getAllSchools(status?: string, page = 1, limit = 50, search?: string) {
@@ -301,6 +303,34 @@ export class SuperAdminService {
     });
 
     this.logger.log(`Director created for school ${schoolId}: ${user.id}`);
+
+    // Auto-create Teacher record so Director appears in staff register and analytics
+    const existingTeacher = await this.prisma.teacher.findUnique({ where: { userId: user.id } });
+    if (!existingTeacher) {
+      const teacher = await this.prisma.teacher.create({
+        data: {
+          userId: user.id,
+          schoolId,
+          staffType: 'TEACHING',
+        },
+      });
+      this.syncEngine.syncStaffProfile(teacher.id, schoolId)
+        .then(result => this.logger.log(`Auto-sync to HR profile for director: created=${result.created}`))
+        .catch(err => this.logger.error(`Auto-sync to HR profile failed for director: ${err.message}`));
+    }
+
+    // Ensure SchoolUser membership exists
+    const existingMembership = await this.prisma.schoolUser.findFirst({
+      where: { userId: user.id, schoolId },
+    });
+    if (!existingMembership) {
+      const membership = await this.prisma.schoolUser.create({
+        data: { userId: user.id, schoolId, isPrimary: true },
+      });
+      await this.prisma.schoolRoleAssignment.create({
+        data: { schoolMembershipId: membership.id, role: 'Director', isActive: true },
+      });
+    }
 
     this.unifiedMessaging
       .sendDirectorWelcome(

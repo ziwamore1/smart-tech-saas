@@ -1165,6 +1165,27 @@ export class MobileService {
       },
     });
 
+    // Ensure SchoolUser membership exists
+    const existingMembership = await this.prisma.schoolUser.findFirst({
+      where: { userId: user.id, schoolId },
+    });
+    if (!existingMembership) {
+      const membership = await this.prisma.schoolUser.create({
+        data: { userId: user.id, schoolId, isPrimary: true },
+      });
+      // Create SchoolRoleAssignments for assigned roles
+      for (const roleName of data.roles) {
+        const existingSr = await this.prisma.schoolRoleAssignment.findFirst({
+          where: { schoolMembershipId: membership.id, role: roleName },
+        });
+        if (!existingSr) {
+          await this.prisma.schoolRoleAssignment.create({
+            data: { schoolMembershipId: membership.id, role: roleName, isActive: true },
+          });
+        }
+      }
+    }
+
     return {
       id: user.id,
       firstName: user.firstName,

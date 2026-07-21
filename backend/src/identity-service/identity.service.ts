@@ -28,26 +28,47 @@ export class IdentityService {
   async getPasswordHubData(adminId: string, schoolId?: string, filters?: {
     role?: string; search?: string; accountStatus?: string; schoolId?: string;
   }) {
+    const effectiveSchoolId = schoolId || filters?.schoolId || null;
+
     const where: any = {};
-    if (schoolId) where.schoolId = schoolId;
-    if (filters?.schoolId) where.schoolId = filters.schoolId;
+    if (effectiveSchoolId) {
+      where.OR = [
+        { schoolId: effectiveSchoolId },
+        { schoolUsers: { some: { schoolId: effectiveSchoolId } } },
+      ];
+    }
     if (filters?.role) {
-      where.userRoles = { some: { role: { name: filters.role } } };
+      where.AND = where.AND || [];
+      where.AND.push({
+        OR: [
+          { userRoles: { some: { role: { name: filters.role } } } },
+          { schoolUsers: { some: { schoolRoleAssignments: { some: { role: filters.role, isActive: true } } } } },
+        ],
+      });
     }
     if (filters?.accountStatus) where.accountStatus = filters.accountStatus;
     if (filters?.search) {
-      where.OR = [
-        { firstName: { contains: filters.search, mode: 'insensitive' } },
-        { lastName: { contains: filters.search, mode: 'insensitive' } },
-        { email: { contains: filters.search, mode: 'insensitive' } },
-        { username: { contains: filters.search, mode: 'insensitive' } },
-      ];
+      where.AND = where.AND || [];
+      where.AND.push({
+        OR: [
+          { firstName: { contains: filters.search, mode: 'insensitive' } },
+          { lastName: { contains: filters.search, mode: 'insensitive' } },
+          { email: { contains: filters.search, mode: 'insensitive' } },
+          { username: { contains: filters.search, mode: 'insensitive' } },
+        ],
+      });
     }
 
     const users = await this.prisma.user.findMany({
       where,
       include: {
         userRoles: { include: { role: true } },
+        schoolUsers: {
+          where: effectiveSchoolId ? { schoolId: effectiveSchoolId } : undefined,
+          include: {
+            schoolRoleAssignments: { where: { isActive: true }, select: { role: true } },
+          },
+        },
         userCredentials: { orderBy: { generatedAt: 'desc' }, take: 1 },
         loginSessions: { where: { isActive: true }, select: { id: true, lastActivity: true, deviceType: true } },
         deviceSessions: { where: { isActive: true }, select: { id: true, deviceName: true, lastUsedAt: true, deviceType: true } },
@@ -55,26 +76,34 @@ export class IdentityService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return users.map(user => ({
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      phone: user.phone,
-      username: user.username,
-      roles: user.userRoles.map(ur => ur.role.name),
-      accountStatus: user.accountStatus,
-      mustChangePassword: user.mustChangePassword,
-      mfaEnabled: user.mfaEnabled,
-      failedAttempts: user.failedAttempts,
-      lastLogin: user.lastLogin,
-      lastPasswordChange: user.lastPasswordChange,
-      isActive: user.isActive,
-      createdAt: user.createdAt,
-      lastCredential: user.userCredentials[0] || null,
-      activeSessions: user.loginSessions.length,
-      activeDevices: user.deviceSessions.length,
-    }));
+    return users.map(user => {
+      const legacyRoles = user.userRoles.map(ur => ur.role.name);
+      const schoolRoles = (user.schoolUsers || []).flatMap(su =>
+        su.schoolRoleAssignments.map(sra => sra.role)
+      );
+      const allRoles = [...new Set([...legacyRoles, ...schoolRoles])];
+
+      return {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        username: user.username,
+        roles: allRoles.length > 0 ? allRoles : legacyRoles,
+        accountStatus: user.accountStatus,
+        mustChangePassword: user.mustChangePassword,
+        mfaEnabled: user.mfaEnabled,
+        failedAttempts: user.failedAttempts,
+        lastLogin: user.lastLogin,
+        lastPasswordChange: user.lastPasswordChange,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        lastCredential: user.userCredentials[0] || null,
+        activeSessions: user.loginSessions.length,
+        activeDevices: user.deviceSessions.length,
+      };
+    });
   }
 
   async generateAndDeliverCredentials(

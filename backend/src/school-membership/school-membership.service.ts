@@ -13,12 +13,25 @@ export class SchoolMembershipService {
     });
 
     if (existing) {
+      // Ensure User.schoolId is set if null
+      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { schoolId: true } });
+      if (!user?.schoolId) {
+        await this.prisma.user.update({ where: { id: userId }, data: { schoolId } });
+      }
       return existing;
     }
 
-    return this.prisma.schoolUser.create({
+    const membership = await this.prisma.schoolUser.create({
       data: { userId, schoolId, isPrimary },
     });
+
+    // Ensure User.schoolId is set if null
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { schoolId: true } });
+    if (!user?.schoolId) {
+      await this.prisma.user.update({ where: { id: userId }, data: { schoolId } });
+    }
+
+    return membership;
   }
 
   async removeMember(schoolId: string, userId: string) {
@@ -164,7 +177,7 @@ export class SchoolMembershipService {
       return existing;
     }
 
-    return this.prisma.schoolRoleAssignment.create({
+    const assignment = await this.prisma.schoolRoleAssignment.create({
       data: {
         schoolMembershipId: membership.id,
         role,
@@ -172,6 +185,24 @@ export class SchoolMembershipService {
         isActive: true,
       },
     });
+
+    // Also create legacy UserRole to ensure backward compatibility in JWT
+    try {
+      let roleRecord = await this.prisma.role.findFirst({ where: { name: role } });
+      if (!roleRecord) {
+        roleRecord = await this.prisma.role.create({ data: { name: role } });
+      }
+      const existingUr = await this.prisma.userRole.findFirst({
+        where: { userId, roleId: roleRecord.id },
+      });
+      if (!existingUr) {
+        await this.prisma.userRole.create({ data: { userId, roleId: roleRecord.id } });
+      }
+    } catch (err: any) {
+      this.logger.warn(`Failed to create legacy UserRole for role ${role}: ${err.message}`);
+    }
+
+    return assignment;
   }
 
   async removeSchoolRole(schoolId: string, userId: string, role: string) {
