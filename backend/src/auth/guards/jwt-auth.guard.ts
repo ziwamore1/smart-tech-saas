@@ -9,7 +9,7 @@ export class JwtAuthGuard {
     const request = context.switchToHttp().getRequest();
     const token = this.extractToken(request);
 
-    if (!token) return false;
+    if (!token) throw new UnauthorizedException('Missing authentication token');
 
     try {
       const payload = this.jwtService.verify(token);
@@ -17,12 +17,14 @@ export class JwtAuthGuard {
         id: payload.sub,
         type: payload.type || 'user',
         roles: payload.roles || [],
+        platformRoles: payload.platformRoles || [],
+        schoolRoles: payload.schoolRoles || [],
         isSuperAdmin: payload.type === 'super_admin',
         schoolId: payload.type === 'super_admin' ? null : (payload.schoolId || null),
       };
       return true;
     } catch {
-      return false;
+      throw new UnauthorizedException('Invalid or expired token');
     }
   }
 
