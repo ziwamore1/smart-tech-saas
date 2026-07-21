@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
@@ -7,6 +7,7 @@ import { PasswordGenerationService } from '../identity-service/password-generati
 import { UsernameGenerationService } from '../identity-service/username-generation.service';
 import { CredentialDeliveryService } from '../identity-service/credential-delivery.service';
 import { AdmissionNumberService } from '../admission-number/admission-number.service';
+import { SchoolEventsGateway } from '../common/school-events.gateway';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -19,6 +20,7 @@ export class StudentService {
     private usernameGenService: UsernameGenerationService,
     private credentialDeliveryService: CredentialDeliveryService,
     private admissionNumberService: AdmissionNumberService,
+    @Optional() private schoolEvents?: SchoolEventsGateway,
   ) {}
 
   async create(dto: CreateStudentDto, schoolId: string, userId: string, userRoles: string[]) {
@@ -136,6 +138,13 @@ export class StudentService {
       } catch (parentErr) {
         this.logger.warn(`Parent account creation skipped for student ${student.id}: ${parentErr.message}`);
       }
+    }
+
+    if (this.schoolEvents) {
+      this.schoolEvents.emitStudentEnrolled(schoolId, {
+        studentId: student.id,
+        classId: dto.classId || '',
+      });
     }
 
     return {

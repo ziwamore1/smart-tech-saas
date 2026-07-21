@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, classApi, termApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
+import { useSchoolSocket } from '@/lib/use-school-socket';
 
 export default function PublishPage() {
   const { user } = useAuth();
@@ -12,6 +13,13 @@ export default function PublishPage() {
   const [showConfirm, setShowConfirm] = useState<{ id: string; action: string; title: string; description: string } | null>(null);
 
   const isDirector = user?.roles?.includes('Director');
+
+  // Real-time: refresh when results are published elsewhere
+  useSchoolSocket({
+    'results:published': () => {
+      queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
+    },
+  });
 
   const { data: sheetsData, isLoading } = useQuery({
     queryKey: ['result-sheets', 'publish'],

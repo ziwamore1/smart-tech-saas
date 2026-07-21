@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { attendanceApi, classApi, studentApi, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useSchoolSocket } from '@/lib/use-school-socket';
 
 type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused' | 'sick' | 'suspended' | 'activity' | 'partial_attendance';
 
@@ -57,6 +58,13 @@ export default function AttendanceRegisterPage() {
   const [uploadingPhoto, setUploadingPhoto] = useState<string | null>(null);
   const [photoMap, setPhotoMap] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Real-time: refresh attendance when updated from another device
+  useSchoolSocket({
+    'attendance:updated': () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+    },
+  });
 
   const dateStr = selectedDate;
 

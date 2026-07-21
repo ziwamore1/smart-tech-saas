@@ -6,6 +6,7 @@ import { ResultAnalyticsService } from '../result-analytics/result-analytics.ser
 import { ReportCardEngineService } from '../report-card-engine/report-card-engine.service';
 import { AssessmentEngineService } from '../assessment-engine/assessment-engine.service';
 import { ResultsSmsService } from '../results-sms/results-sms.service';
+import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { Prisma } from '@prisma/client';
 import * as XLSX from 'xlsx';
 
@@ -22,6 +23,7 @@ export class ResultsManagementService {
     private assessmentEngine: AssessmentEngineService,
     @Optional() @Inject(forwardRef(() => ResultsSmsService))
     private resultsSmsService?: ResultsSmsService,
+    private schoolEvents?: SchoolEventsGateway,
   ) {}
 
   private computingKeys = new Set<string>();
@@ -548,6 +550,14 @@ export class ResultsManagementService {
     });
 
     this.triggerAutoSms(sheet.schoolId, sheet.classId, sheet.termId, userId);
+
+    if (this.schoolEvents) {
+      this.schoolEvents.emitResultsPublished(sheet.schoolId, {
+        classId: sheet.classId,
+        termId: sheet.termId,
+        publishedBy: userId,
+      });
+    }
 
     return result;
   }

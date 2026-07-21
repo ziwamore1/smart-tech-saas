@@ -1,9 +1,10 @@
-import { Injectable, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UnifiedMessagingService } from '../messaging/unified-messaging.service';
 import { SocketGateway } from '../messaging/socket.gateway';
 import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { StaffSyncEngineService } from '../shared/staff-sync-engine/staff-sync-engine.service';
+import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { Teacher } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
@@ -17,6 +18,7 @@ export class TeacherService {
     private socketGateway: SocketGateway,
     private gradingEngine: GradingEngineService,
     private syncEngine: StaffSyncEngineService,
+    @Optional() private schoolEvents?: SchoolEventsGateway,
   ) {}
 
   async findAll(schoolId?: string) {
@@ -159,6 +161,13 @@ export class TeacherService {
       )
       .catch((err) => this.logger.error('Failed to send teacher welcome message:', err));
     
+    if (this.schoolEvents) {
+      this.schoolEvents.emitTeacherCreated(schoolId, {
+        teacherId: teacher.id,
+        userId: teacher.user.id,
+      });
+    }
+
     return {
       message: 'Teacher created successfully',
       data: teacher,

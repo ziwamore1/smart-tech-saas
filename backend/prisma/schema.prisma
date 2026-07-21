@@ -4254,6 +4254,7 @@ enum ComputedResultStatus {
   COMPUTING
   COMPUTED
   VERIFIED
+  PUBLISHED
   LOCKED
 }
 

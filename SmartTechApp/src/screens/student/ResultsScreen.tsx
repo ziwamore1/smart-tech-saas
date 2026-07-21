@@ -7,6 +7,7 @@ import { Card, Loading } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useAuthStore, useAppStore } from '../../store';
 import { apiService } from '../../services/api';
+import { socketService } from '../../services/socket';
 import { getGradeTextColor, getGradeBgColor } from '../../utils/gradeColors';
 
 export const StudentResultsScreen: React.FC = () => {
@@ -17,6 +18,25 @@ export const StudentResultsScreen: React.FC = () => {
 
   useEffect(() => {
     loadResults();
+
+    // Real-time: listen for results published
+    const handleResultsPublished = (data: any) => {
+      console.log('[Results] Results published, refreshing...', data);
+      loadResults();
+    };
+
+    socketService.connect();
+    if (user?.schoolId) {
+      socketService.joinSchool(user.schoolId);
+    }
+    socketService.on('results:published', handleResultsPublished);
+
+    return () => {
+      socketService.off('results:published', handleResultsPublished);
+      if (user?.schoolId) {
+        socketService.leaveSchool(user.schoolId);
+      }
+    };
   }, [dashboard?.currentTerm?.id]);
 
   const loadResults = async () => {

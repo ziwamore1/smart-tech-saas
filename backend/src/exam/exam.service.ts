@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ExamMarkingService } from './exam-marking.service';
+import { SchoolEventsGateway } from '../common/school-events.gateway';
 
 interface ExamCreateInput {
   title: string; description?: string; type?: string;
@@ -18,6 +19,7 @@ export class ExamService {
   constructor(
     private prisma: PrismaService,
     private markingService: ExamMarkingService,
+    @Optional() private schoolEvents?: SchoolEventsGateway,
   ) {}
 
   async create(data: ExamCreateInput & { questions?: any[] }) {
@@ -131,9 +133,9 @@ export class ExamService {
     isPublished?: boolean;
     status?: string;
   }) {
-    await this.getById(id);
+    const exam = await this.getById(id);
 
-    return this.prisma.exam.update({
+    const updated = await this.prisma.exam.update({
       where: { id },
       data: {
         title: data.title,
@@ -152,6 +154,15 @@ export class ExamService {
         status: data.status,
       },
     });
+
+    if (data.isPublished && this.schoolEvents) {
+      this.schoolEvents.emitExamPublished(exam.schoolId, {
+        examId: id,
+        publishedBy: exam.createdById || '',
+      });
+    }
+
+    return updated;
   }
 
   async delete(id: string) {

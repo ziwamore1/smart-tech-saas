@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceStatus } from '@prisma/client';
+import { SchoolEventsGateway } from '../common/school-events.gateway';
 
 @Injectable()
 export class AttendanceService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Optional() private schoolEvents?: SchoolEventsGateway,
+  ) {}
 
   async getAll(schoolId: string, filters: {
     classId?: string;
@@ -196,6 +200,15 @@ export class AttendanceService {
         })
       )
     );
+
+    if (this.schoolEvents && records.length > 0) {
+      const firstRecord = records[0];
+      this.schoolEvents.emitAttendanceUpdated(schoolId, {
+        classId: '',
+        date: firstRecord.date,
+        markedBy: schoolId,
+      });
+    }
 
     return results;
   }

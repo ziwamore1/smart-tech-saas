@@ -1,13 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { resultApi, termApi, studentApi } from '@/lib/api';
 import Link from 'next/link';
 import { checkEczEligibility, scoreToEczGrade } from '@/lib/ecz-eligibility';
+import { useSchoolSocket } from '@/lib/use-school-socket';
 
 export default function StudentResultsPage() {
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  // Real-time: refresh when results are published
+  useSchoolSocket({
+    'results:published': () => {
+      queryClient.invalidateQueries({ queryKey: ['my-results'] });
+    },
+  });
 
   const { data: studentData } = useQuery({
     queryKey: ['my-profile'],

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { examApi, classApi, subjectApi, termApi } from '@/lib/api';
+import { useSchoolSocket } from '@/lib/use-school-socket';
 
 type TabType = 'exams' | 'question-bank' | 'templates' | 'uploaded';
 type QuestionType = 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER' | 'ESSAY' | 'MATCHING' | 'FILL_IN_BLANK' | 'STRUCTURED' | 'PRACTICAL';

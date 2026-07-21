@@ -712,6 +712,94 @@ export class HealthController {
     return results;
   }
 
+  @Get('backfill-published-results')
+  async backfillPublishedResults() {
+    const results: Record<string, any> = {
+      sheetsFixed: 0,
+      computedResultsUpdated: 0,
+      sheets: [],
+      errors: [],
+    };
+
+    try {
+      // Find all ResultSheets that are PUBLISHED but their ComputedResults might not be
+      const publishedSheets = await this.prisma.resultSheet.findMany({
+        where: { status: 'PUBLISHED' },
+        select: { id: true, classId: true, termId: true, schoolId: true, publishedAt: true },
+      });
+
+      for (const sheet of publishedSheets) {
+        try {
+          const updateResult = await this.prisma.computedResult.updateMany({
+            where: {
+              classId: sheet.classId,
+              termId: sheet.termId,
+              schoolId: sheet.schoolId,
+              status: { not: 'PUBLISHED' },
+            },
+            data: { status: 'PUBLISHED' },
+          });
+
+          if (updateResult.count > 0) {
+            results.sheetsFixed++;
+            results.computedResultsUpdated += updateResult.count;
+            results.sheets.push({
+              sheetId: sheet.id,
+              classId: sheet.classId,
+              termId: sheet.termId,
+              updated: updateResult.count,
+            });
+          }
+        } catch (e: any) {
+          results.errors.push({ sheetId: sheet.id, error: e.message });
+        }
+      }
+
+      // Also find VERIFIED sheets that should be PUBLISHED (from failed publish attempts)
+      // Check if there are computed results with PUBLISHED status for VERIFIED sheets
+      const verifiedSheets = await this.prisma.resultSheet.findMany({
+        where: { status: 'VERIFIED' },
+        select: { id: true, classId: true, termId: true, schoolId: true },
+      });
+
+      for (const sheet of verifiedSheets) {
+        const publishedCount = await this.prisma.computedResult.count({
+          where: {
+            classId: sheet.classId,
+            termId: sheet.termId,
+            schoolId: sheet.schoolId,
+            status: 'PUBLISHED',
+          },
+        });
+
+        if (publishedCount > 0) {
+          // This sheet has PUBLISHED computed results but is still VERIFIED - fix it
+          try {
+            await this.prisma.resultSheet.update({
+              where: { id: sheet.id },
+              data: { status: 'PUBLISHED', publishedAt: new Date() },
+            });
+            results.sheetsFixed++;
+            results.sheets.push({
+              sheetId: sheet.id,
+              classId: sheet.classId,
+              termId: sheet.termId,
+              fixed: 'sheet status updated to PUBLISHED',
+            });
+          } catch (e: any) {
+            results.errors.push({ sheetId: sheet.id, error: e.message });
+          }
+        }
+      }
+
+    } catch (e: any) {
+      results.fatalError = e.message;
+    }
+
+    results.summary = `sheetsFixed: ${results.sheetsFixed}, computedResultsUpdated: ${results.computedResultsUpdated}, errors: ${results.errors.length}`;
+    return results;
+  }
+
   @Head()
   async head() {
     const health = await this.healthService.check();

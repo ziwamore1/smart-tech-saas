@@ -9,6 +9,7 @@ import { colors, spacing, borderRadius } from '../../theme';
 import { useAppStore } from '../../store';
 import { useAuthStore } from '../../store';
 import { apiService } from '../../services/api';
+import { socketService } from '../../services/socket';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { getGradeTextColor, getGradeBgColor, getScoreTextColor, getScoreBgColor } from '../../utils/gradeColors';
 
@@ -25,6 +26,25 @@ export const ParentChildResultsScreen: React.FC = () => {
   useEffect(() => {
     if (childId) loadResults();
     else setLoading(false);
+
+    // Real-time: listen for results published
+    const handleResultsPublished = (data: any) => {
+      console.log('[ParentResults] Results published, refreshing...', data);
+      if (childId) loadResults();
+    };
+
+    socketService.connect();
+    if (user?.schoolId) {
+      socketService.joinSchool(user.schoolId);
+    }
+    socketService.on('results:published', handleResultsPublished);
+
+    return () => {
+      socketService.off('results:published', handleResultsPublished);
+      if (user?.schoolId) {
+        socketService.leaveSchool(user.schoolId);
+      }
+    };
   }, [childId]);
 
   const loadResults = async () => {

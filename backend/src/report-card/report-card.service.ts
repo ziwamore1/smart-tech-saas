@@ -2,12 +2,14 @@ import {
   Injectable,
   ForbiddenException,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as puppeteer from 'puppeteer';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { ReportCardEngineService } from '../report-card-engine/report-card-engine.service';
 import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
+import { SchoolEventsGateway } from '../common/school-events.gateway';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as handlebars from 'handlebars';
@@ -33,6 +35,7 @@ export class ReportCardService {
     private analyticsService: AnalyticsService,
     private reportCardEngineService: ReportCardEngineService,
     private cloudinary: CloudinaryService,
+    @Optional() private schoolEvents?: SchoolEventsGateway,
   ) {}
 
   private async uploadToCloudinary(buffer: Buffer, publicId: string): Promise<{ url: string | null; publicId: string | null }> {
@@ -530,6 +533,11 @@ export class ReportCardService {
 
     const buffer = Buffer.from(pdf);
     const { url, publicId } = await this.uploadToCloudinary(buffer, `class-report-cards-${classId}-${termId}`);
+
+    if (this.schoolEvents) {
+      this.schoolEvents.emitReportCardGenerated(schoolId, { classId, termId });
+    }
+
     return { buffer, url, publicId };
   }
 
