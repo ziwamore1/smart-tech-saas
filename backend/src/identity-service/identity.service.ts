@@ -42,7 +42,7 @@ export class IdentityService {
       where.AND.push({
         OR: [
           { userRoles: { some: { role: { name: filters.role } } } },
-          { schoolUsers: { some: { schoolRoleAssignments: { some: { role: filters.role, isActive: true } } } } },
+          { schoolUsers: { some: { SchoolRoleAssignment: { some: { role: filters.role, isActive: true } } } } },
         ],
       });
     }
@@ -66,7 +66,7 @@ export class IdentityService {
         schoolUsers: {
           where: effectiveSchoolId ? { schoolId: effectiveSchoolId } : undefined,
           include: {
-            schoolRoleAssignments: { where: { isActive: true }, select: { role: true } },
+            SchoolRoleAssignment: { where: { isActive: true }, select: { role: true } },
           },
         },
         userCredentials: { orderBy: { generatedAt: 'desc' }, take: 1 },
@@ -79,7 +79,7 @@ export class IdentityService {
     return users.map(user => {
       const legacyRoles = user.userRoles.map(ur => ur.role.name);
       const schoolRoles = (user.schoolUsers || []).flatMap(su =>
-        su.schoolRoleAssignments.map(sra => sra.role)
+        su.SchoolRoleAssignment.map(sra => sra.role)
       );
       const allRoles = [...new Set([...legacyRoles, ...schoolRoles])];
 
