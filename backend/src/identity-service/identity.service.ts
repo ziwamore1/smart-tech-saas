@@ -239,13 +239,6 @@ export class IdentityService {
   }
 
   async resendCredentials(userId: string, adminId: string, channel: 'SMS' | 'EMAIL' | 'WHATSAPP') {
-    const credential = await this.prisma.userCredential.findFirst({
-      where: { userId, deliveryStatus: { in: ['DELIVERED', 'PENDING'] } },
-      orderBy: { generatedAt: 'desc' },
-    });
-
-    if (!credential) throw new BadRequestException('No previous credentials found. Generate new credentials instead.');
-
     return this.generateAndDeliverCredentials(userId, adminId, channel);
   }
 
