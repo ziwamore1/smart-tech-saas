@@ -41,6 +41,13 @@ export class RolesGuard implements CanActivate {
     // Collect all roles from multiple sources
     const allRoleNames = new Set<string>();
 
+    // 0. JWT merged roles (contains all roles merged at login time)
+    if (user.roles && Array.isArray(user.roles)) {
+      for (const r of user.roles) {
+        allRoleNames.add(r.toUpperCase());
+      }
+    }
+
     // 1. Legacy UserRole table (backward compatibility)
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId: user.id },
