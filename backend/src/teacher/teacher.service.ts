@@ -225,10 +225,39 @@ export class TeacherService {
     if (!teacher) {
       throw new NotFoundException('Teacher not found');
     }
-    
-    await this.prisma.user.delete({ where: { id: teacher.userId } });
-    await this.prisma.teacher.delete({ where: { id } });
-    
+
+    const userId = teacher.userId;
+
+    // Use a transaction to ensure atomicity
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Delete Teacher-specific records (no cascade from Teacher)
+      await tx.timetableSlot.deleteMany({ where: { teacherId: id } });
+      await tx.lessonRequirement.deleteMany({ where: { teacherId: id } });
+
+      // 2. Delete StaffHrProfile (cascades its own children)
+      const staffProfile = await tx.staffHrProfile.findFirst({ where: { staffId: id } });
+      if (staffProfile) {
+        await tx.staffHrProfile.delete({ where: { id: staffProfile.id } });
+      }
+
+      // 3. Delete User-related records (no cascade from User)
+      await tx.classTeacherAssignment.deleteMany({ where: { teacherId: userId } });
+      await tx.userCredential.deleteMany({ where: { OR: [{ userId }, { generatedById: userId }] } });
+      await tx.auditLog.deleteMany({ where: { userId } });
+      await tx.readingSession.deleteMany({ where: { userId } });
+      await tx.userRole.deleteMany({ where: { userId } });
+      await tx.schoolUser.deleteMany({ where: { userId } });
+      await tx.loginSession.deleteMany({ where: { userId } });
+      await tx.otpVerification.deleteMany({ where: { userId } });
+      await tx.deviceSession.deleteMany({ where: { userId } });
+
+      // 4. Delete the Teacher record
+      await tx.teacher.delete({ where: { id } });
+
+      // 5. Delete the User record (cascades: PlatformRoleAssignment, RefreshToken, LoginSession, DeviceSession, etc.)
+      await tx.user.delete({ where: { id: userId } });
+    });
+
     return { message: 'Teacher deleted successfully' };
   }
 
