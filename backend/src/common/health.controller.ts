@@ -578,6 +578,140 @@ export class HealthController {
     return results;
   }
 
+  @Get('diagnose-identity')
+  async diagnoseIdentity() {
+    const results: Record<string, any> = {};
+
+    // 1. Count all users with schoolId vs null
+    const usersWithSchoolId = await this.prisma.user.count({ where: { schoolId: { not: null } } });
+    const usersWithoutSchoolId = await this.prisma.user.count({ where: { schoolId: null } });
+    results.userSchoolIdBreakdown = { withSchoolId: usersWithSchoolId, withoutSchoolId: usersWithoutSchoolId };
+
+    // 2. Count SchoolUser records
+    const schoolUserCount = await this.prisma.schoolUser.count();
+    results.schoolUserCount = schoolUserCount;
+
+    // 3. For each school, show user counts by different methods
+    const schools = await this.prisma.school.findMany({ select: { id: true, name: true } });
+    results.schools = [];
+
+    for (const school of schools) {
+      const userCountBySchoolId = await this.prisma.user.count({ where: { schoolId: school.id } });
+      const userCountBySchoolUser = await this.prisma.schoolUser.count({ where: { schoolId: school.id } });
+      const userCountByTeacher = await this.prisma.teacher.count({ where: { schoolId: school.id } });
+      const userCountByUserRole = await this.prisma.userRole.count({
+        where: { user: { OR: [{ schoolId: school.id }, { schoolUsers: { some: { schoolId: school.id } } }] } },
+      });
+
+      // Users who would appear in Password Hub (schoolId match OR SchoolUser match)
+      const usersInPasswordHub = await this.prisma.user.count({
+        where: { OR: [{ schoolId: school.id }, { schoolUsers: { some: { schoolId: school.id } } }] },
+      });
+
+      results.schools.push({
+        id: school.id,
+        name: school.name,
+        userCountBySchoolId,
+        userCountBySchoolUser,
+        userCountByTeacher,
+        userCountByUserRole,
+        usersInPasswordHub,
+        gap: userCountByTeacher - usersInPasswordHub,
+      });
+    }
+
+    // 4. Users with Teacher records but no User.schoolId
+    const teachersWithoutSchoolId = await this.prisma.teacher.findMany({
+      where: { user: { schoolId: null } },
+      select: { id: true, userId: true, schoolId: true, user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+    });
+    results.teachersWithUserSchoolIdNull = teachersWithoutSchoolId.length;
+    results.teachersWithUserSchoolIdNullSample = teachersWithoutSchoolId.slice(0, 10);
+
+    // 5. Users with SchoolUser but schoolId is null on User
+    const usersWithSchoolUserButNullSchoolId = await this.prisma.user.count({
+      where: { schoolId: null, schoolUsers: { some: {} } },
+    });
+    results.usersWithSchoolUserButNullSchoolId = usersWithSchoolUserButNullSchoolId;
+
+    return results;
+  }
+
+  @Get('fix-identity-comprehensive')
+  async fixIdentityComprehensive() {
+    const results: Record<string, any> = {
+      userSchoolIdsFixed: 0,
+      schoolUsersCreated: 0,
+      schoolRoleAssignmentsCreated: 0,
+      errors: [],
+    };
+
+    try {
+      // Step 1: Fix User.schoolId from Teacher records
+      const teachersWithSchool = await this.prisma.teacher.findMany({
+        where: { user: { schoolId: null } },
+        select: { userId: true, schoolId: true },
+      });
+      for (const t of teachersWithSchool) {
+        if (!t.schoolId) continue;
+        try {
+          await this.prisma.user.update({ where: { id: t.userId }, data: { schoolId: t.schoolId } });
+          results.userSchoolIdsFixed++;
+        } catch (e: any) {
+          results.errors.push({ step: 'fixUserSchoolId', userId: t.userId, error: e.message });
+        }
+      }
+
+      // Step 2: Create SchoolUser for all users with schoolId but no SchoolUser
+      const usersNeedingSchoolUser = await this.prisma.user.findMany({
+        where: { schoolId: { not: null }, schoolUsers: { none: {} } },
+        select: { id: true, schoolId: true },
+      });
+      for (const u of usersNeedingSchoolUser) {
+        try {
+          await this.prisma.schoolUser.create({
+            data: { userId: u.id, schoolId: u.schoolId!, isPrimary: true },
+          });
+          results.schoolUsersCreated++;
+        } catch (e: any) {
+          results.errors.push({ step: 'createSchoolUser', userId: u.id, error: e.message });
+        }
+      }
+
+      // Step 3: Create SchoolRoleAssignment from existing UserRole records
+      const schoolRoleNames = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy', 'Teacher', 'Class Teacher', 'HOD', 'Accountant', 'Secretary', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
+      const userRoles = await this.prisma.userRole.findMany({
+        include: { role: true, user: { select: { schoolId: true } } },
+        where: { user: { schoolId: { not: null } } },
+      });
+      for (const ur of userRoles) {
+        if (!schoolRoleNames.includes(ur.role.name)) continue;
+        const membership = await this.prisma.schoolUser.findFirst({
+          where: { userId: ur.userId, schoolId: ur.user.schoolId! },
+        });
+        if (!membership) continue;
+        const existing = await this.prisma.schoolRoleAssignment.findFirst({
+          where: { schoolMembershipId: membership.id, role: ur.role.name },
+        });
+        if (existing) continue;
+        try {
+          await this.prisma.schoolRoleAssignment.create({
+            data: { schoolMembershipId: membership.id, role: ur.role.name, isActive: true },
+          });
+          results.schoolRoleAssignmentsCreated++;
+        } catch (e: any) {
+          results.errors.push({ step: 'createSchoolRoleAssignment', membershipId: membership.id, error: e.message });
+        }
+      }
+
+    } catch (e: any) {
+      results.fatalError = e.message;
+    }
+
+    results.summary = `userSchoolIdsFixed: ${results.userSchoolIdsFixed}, schoolUsersCreated: ${results.schoolUsersCreated}, schoolRoleAssignmentsCreated: ${results.schoolRoleAssignmentsCreated}, errors: ${results.errors.length}`;
+    return results;
+  }
+
   @Head()
   async head() {
     const health = await this.healthService.check();
