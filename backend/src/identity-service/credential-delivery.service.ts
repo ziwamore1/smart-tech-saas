@@ -172,40 +172,148 @@ export class CredentialDeliveryService {
     schoolName?: string;
     loginUrl: string;
   }): Promise<string> {
-    const subject = `Your ${data.schoolName || 'SmartTech'} Login Credentials`;
+    const displayName = data.schoolName || 'SmartTech';
+    const subject = `Your ${displayName} Login Credentials — Action Required`;
     const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: #1e3a8a; padding: 20px; text-align: center;">
-          <h1 style="color: white; margin: 0;">${data.schoolName || 'SmartTech'} Portal</h1>
-        </div>
-        <div style="padding: 30px; background: #f8fafc;">
-          <h2>Welcome, ${data.parentName}!</h2>
-          <p>Your account and your child's account have been created.</p>
+      <!DOCTYPE html>
+      <html lang="en">
+      <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+      <body style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f4f8;padding:40px 20px;">
+          <tr><td align="center">
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
-          <div style="background: #e0f2fe; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #bae6fd;">
-            <h3 style="margin-top: 0; color: #0369a1;">Your Login Credentials (Parent)</h3>
-            <p><strong>Username/Email:</strong> ${data.parentUsername}</p>
-            <p><strong>Password:</strong> ${data.parentPassword}</p>
-          </div>
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #0f172a 0%, #1e40af 50%, #2563eb 100%); padding:40px 30px; border-radius:16px 16px 0 0; text-align:center;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                    <tr>
+                      <td style="width:48px;height:48px;background:#2563eb;border-radius:12px;text-align:center;vertical-align:middle;font-size:24px;color:#fff;font-weight:700;line-height:48px;">ST</td>
+                      <td style="padding-left:14px;">
+                        <div style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">Smart Tech</div>
+                        <div style="color:#93c5fd;font-size:12px;font-weight:400;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;">Education Platform</div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
 
-          <div style="background: #fef3c7; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #fde68a;">
-            <h3 style="margin-top: 0; color: #92400e;">Student Login Credentials</h3>
-            <p><strong>Student:</strong> ${data.studentName}</p>
-            <p><strong>Username:</strong> ${data.studentUsername}</p>
-            <p><strong>Password:</strong> ${data.studentPassword}</p>
-          </div>
+              <!-- Accent bar -->
+              <tr>
+                <td style="height:4px;background:linear-gradient(90deg,#2563eb,#06b6d4,#2563eb);"></td>
+              </tr>
 
-          <p style="color: #dc2626; font-weight: bold;">Both accounts require a password change on first login.</p>
+              <!-- Body -->
+              <tr>
+                <td style="background:#ffffff;padding:40px 36px;">
+                  <h1 style="margin:0 0 8px;font-size:22px;color:#0f172a;font-weight:700;">Welcome, ${data.parentName}</h1>
+                  <p style="margin:0 0 28px;font-size:15px;color:#64748b;line-height:1.6;">
+                    Your parent account and your child <strong style="color:#1e40af;">${data.studentName}</strong>'s account have been created for <strong>${displayName}</strong>.
+                  </p>
 
-          <a href="${data.loginUrl}"
-             style="display: inline-block; background: #1e3a8a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
-            Login to Portal
-          </a>
-        </div>
-        <div style="text-align: center; padding: 15px; color: #64748b; font-size: 12px;">
-          <p>This is an automated message from SmartTech Education System.</p>
-        </div>
-      </div>
+                  <!-- Parent Credentials -->
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:20px;">
+                    <tr>
+                      <td style="background:#1e40af;padding:14px 20px;">
+                        <span style="color:#ffffff;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">👤 Parent Account</span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:20px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="padding:8px 0;width:120px;color:#64748b;font-size:13px;font-weight:600;text-transform:uppercase;">Username</td>
+                            <td style="padding:8px 0;color:#0f172a;font-size:14px;font-family:'Courier New',monospace;background:#e0f2fe;padding:8px 14px;border-radius:6px;border:1px solid #bae6fd;">${data.parentUsername}</td>
+                          </tr>
+                          <tr><td colspan="2" style="height:1px;background:#e2e8f0;"></td></tr>
+                          <tr>
+                            <td style="padding:8px 0;width:120px;color:#64748b;font-size:13px;font-weight:600;text-transform:uppercase;">Password</td>
+                            <td style="padding:8px 0;color:#0f172a;font-size:14px;font-family:'Courier New',monospace;background:#e0f2fe;padding:8px 14px;border-radius:6px;border:1px solid #bae6fd;">${data.parentPassword}</td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Student Credentials -->
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:24px;">
+                    <tr>
+                      <td style="background:#0f766e;padding:14px 20px;">
+                        <span style="color:#ffffff;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">🎓 Student Account — ${data.studentName}</span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:20px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="padding:8px 0;width:120px;color:#64748b;font-size:13px;font-weight:600;text-transform:uppercase;">Username</td>
+                            <td style="padding:8px 0;color:#0f172a;font-size:14px;font-family:'Courier New',monospace;background:#e0f2fe;padding:8px 14px;border-radius:6px;border:1px solid #bae6fd;">${data.studentUsername}</td>
+                          </tr>
+                          <tr><td colspan="2" style="height:1px;background:#e2e8f0;"></td></tr>
+                          <tr>
+                            <td style="padding:8px 0;width:120px;color:#64748b;font-size:13px;font-weight:600;text-transform:uppercase;">Password</td>
+                            <td style="padding:8px 0;color:#0f172a;font-size:14px;font-family:'Courier New',monospace;background:#e0f2fe;padding:8px 14px;border-radius:6px;border:1px solid #bae6fd;">${data.studentPassword}</td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Warning -->
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;margin-bottom:28px;">
+                    <tr>
+                      <td style="padding:16px 20px;">
+                        <table role="presentation" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="vertical-align:top;padding-right:12px;font-size:18px;">⚠️</td>
+                            <td style="color:#92400e;font-size:14px;line-height:1.5;">
+                              <strong>Important:</strong> Both accounts require a password change on first login. Do not share these credentials.
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Login button -->
+                  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
+                    <tr>
+                      <td style="border-radius:10px;background:linear-gradient(135deg,#1e40af,#2563eb);box-shadow:0 4px 14px rgba(37,99,235,0.35);">
+                        <a href="${data.loginUrl}" target="_blank" style="display:inline-block;padding:16px 48px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;letter-spacing:0.3px;">
+                          Login to Portal →
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="background:#f8fafc;padding:28px 36px;border-radius:0 0 16px 16px;border-top:1px solid #e2e8f0;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td align="center" style="padding-bottom:12px;">
+                        <span style="font-size:14px;font-weight:700;color:#1e40af;">Smart Tech</span>
+                        <span style="color:#cbd5e1;padding:0 8px;">|</span>
+                        <span style="font-size:12px;color:#94a3b8;">Education Management Platform</span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="center" style="font-size:12px;color:#94a3b8;line-height:1.6;">
+                        This is an automated message. Please do not reply to this email.<br>
+                        If you did not expect this email, contact your school administrator.
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+            </table>
+          </td></tr>
+        </table>
+      </body>
+      </html>
     `;
     await this.emailService.sendMail(data.to, subject, html);
     return `bundle-email-${Date.now()}`;
@@ -241,27 +349,129 @@ export class CredentialDeliveryService {
 
       if (channel === 'EMAIL' && recipientEmail) {
         recipient = recipientEmail;
-        const subject = `Student Login Credentials - ${schoolName || 'SmartTech'}`;
+        const displayName = schoolName || 'SmartTech';
+        const subject = `Your ${displayName} Student Login Credentials — Action Required`;
         const html = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: #1e3a8a; padding: 20px; text-align: center;">
-              <h1 style="color: white; margin: 0;">${schoolName || 'SmartTech'} Portal</h1>
-            </div>
-            <div style="padding: 30px; background: #f8fafc;">
-              <h2>Hello ${recipientName}!</h2>
-              <p>Your student login credentials are ready.</p>
-              <div style="background: #fef3c7; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #fde68a;">
-                <h3 style="margin-top: 0; color: #92400e;">Student Login Credentials</h3>
-                <p><strong>Role:</strong> ${role}</p>
-                <p><strong>Username:</strong> ${username}</p>
-                <p><strong>Password:</strong> ${password}</p>
-              </div>
-              <a href="${loginUrl}"
-                 style="display: inline-block; background: #1e3a8a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
-                Login to Portal
-              </a>
-            </div>
-          </div>`;
+          <!DOCTYPE html>
+          <html lang="en">
+          <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+          <body style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f4f8;padding:40px 20px;">
+              <tr><td align="center">
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+                  <!-- Header -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #0f172a 0%, #1e40af 50%, #2563eb 100%); padding:40px 30px; border-radius:16px 16px 0 0; text-align:center;">
+                      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                        <tr>
+                          <td style="width:48px;height:48px;background:#2563eb;border-radius:12px;text-align:center;vertical-align:middle;font-size:24px;color:#fff;font-weight:700;line-height:48px;">ST</td>
+                          <td style="padding-left:14px;">
+                            <div style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">Smart Tech</div>
+                            <div style="color:#93c5fd;font-size:12px;font-weight:400;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;">Education Platform</div>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- Accent bar -->
+                  <tr>
+                    <td style="height:4px;background:linear-gradient(90deg,#2563eb,#06b6d4,#2563eb);"></td>
+                  </tr>
+
+                  <!-- Body -->
+                  <tr>
+                    <td style="background:#ffffff;padding:40px 36px;">
+                      <h1 style="margin:0 0 8px;font-size:22px;color:#0f172a;font-weight:700;">Hello, ${recipientName}</h1>
+                      <p style="margin:0 0 28px;font-size:15px;color:#64748b;line-height:1.6;">
+                        Your student login credentials for <strong>${displayName}</strong> are ready. Use them to access the portal.
+                      </p>
+
+                      <!-- Credentials card -->
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:24px;">
+                        <tr>
+                          <td style="background:#0f766e;padding:14px 20px;">
+                            <span style="color:#ffffff;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">🎓 Student Login Credentials</span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding:24px 20px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                              <tr>
+                                <td style="padding:8px 0;width:120px;color:#64748b;font-size:13px;font-weight:600;text-transform:uppercase;">Role</td>
+                                <td style="padding:8px 0;color:#0f172a;font-size:14px;font-weight:600;">${role}</td>
+                              </tr>
+                              <tr><td colspan="2" style="height:1px;background:#e2e8f0;"></td></tr>
+                              <tr>
+                                <td style="padding:8px 0;width:120px;color:#64748b;font-size:13px;font-weight:600;text-transform:uppercase;">Username</td>
+                                <td style="padding:8px 0;color:#0f172a;font-size:14px;font-family:'Courier New',monospace;background:#e0f2fe;padding:8px 14px;border-radius:6px;border:1px solid #bae6fd;">${username}</td>
+                              </tr>
+                              <tr><td colspan="2" style="height:1px;background:#e2e8f0;"></td></tr>
+                              <tr>
+                                <td style="padding:8px 0;width:120px;color:#64748b;font-size:13px;font-weight:600;text-transform:uppercase;">Password</td>
+                                <td style="padding:8px 0;color:#0f172a;font-size:14px;font-family:'Courier New',monospace;background:#e0f2fe;padding:8px 14px;border-radius:6px;border:1px solid #bae6fd;">${password}</td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <!-- Warning -->
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;margin-bottom:28px;">
+                        <tr>
+                          <td style="padding:16px 20px;">
+                            <table role="presentation" cellpadding="0" cellspacing="0">
+                              <tr>
+                                <td style="vertical-align:top;padding-right:12px;font-size:18px;">⚠️</td>
+                                <td style="color:#92400e;font-size:14px;line-height:1.5;">
+                                  <strong>Important:</strong> You will be required to change your password on first login. Keep these credentials safe.
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <!-- Login button -->
+                      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                        <tr>
+                          <td style="border-radius:10px;background:linear-gradient(135deg,#1e40af,#2563eb);box-shadow:0 4px 14px rgba(37,99,235,0.35);">
+                            <a href="${loginUrl}" target="_blank" style="display:inline-block;padding:16px 48px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;letter-spacing:0.3px;">
+                              Login to Portal →
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background:#f8fafc;padding:28px 36px;border-radius:0 0 16px 16px;border-top:1px solid #e2e8f0;">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td align="center" style="padding-bottom:12px;">
+                            <span style="font-size:14px;font-weight:700;color:#1e40af;">Smart Tech</span>
+                            <span style="color:#cbd5e1;padding:0 8px;">|</span>
+                            <span style="font-size:12px;color:#94a3b8;">Education Management Platform</span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td align="center" style="font-size:12px;color:#94a3b8;line-height:1.6;">
+                            This is an automated message. Please do not reply to this email.<br>
+                            If you did not expect this email, contact your school administrator.
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                </table>
+              </td></tr>
+            </table>
+          </body>
+          </html>`;
         await this.emailService.sendMail(recipientEmail, subject, html);
         messageId = `student-email-${Date.now()}`;
       } else if (recipientPhone) {
@@ -290,30 +500,147 @@ export class CredentialDeliveryService {
     schoolUrl?: string;
   }): Promise<string> {
     const loginUrl = this.getLoginUrl(data.schoolUrl);
-    const subject = `Your ${data.schoolName || 'SmartTech'} Account Credentials`;
+    const displayName = data.schoolName || 'SmartTech';
+    const subject = `Your ${displayName} Account Credentials — Action Required`;
     const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: #1e3a8a; padding: 20px; text-align: center;">
-          <h1 style="color: white; margin: 0;">${data.schoolName || 'SmartTech'} Portal</h1>
-        </div>
-        <div style="padding: 30px; background: #f8fafc;">
-          <h2>Welcome, ${data.recipientName}!</h2>
-          <p>Your ${data.role} account has been created successfully.</p>
-          <div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e2e8f0;">
-            <h3 style="margin-top: 0;">Your Login Credentials</h3>
-            <p><strong>Username/Email:</strong> ${data.username}</p>
-            <p><strong>Password:</strong> ${data.password}</p>
-            <p style="color: #dc2626; font-weight: bold;">You will be required to change your password on first login.</p>
-          </div>
-          <a href="${loginUrl}"
-             style="display: inline-block; background: #1e3a8a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
-            Login to Portal
-          </a>
-        </div>
-        <div style="text-align: center; padding: 15px; color: #64748b; font-size: 12px;">
-          <p>This is an automated message from SmartTech Education System.</p>
-        </div>
-      </div>
+      <!DOCTYPE html>
+      <html lang="en">
+      <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+      <body style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f4f8;padding:40px 20px;">
+          <tr><td align="center">
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #0f172a 0%, #1e40af 50%, #2563eb 100%); padding:40px 30px; border-radius:16px 16px 0 0; text-align:center;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                    <tr>
+                      <td style="width:48px;height:48px;background:#2563eb;border-radius:12px;text-align:center;vertical-align:middle;font-size:24px;color:#fff;font-weight:700;line-height:48px;">ST</td>
+                      <td style="padding-left:14px;">
+                        <div style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">Smart Tech</div>
+                        <div style="color:#93c5fd;font-size:12px;font-weight:400;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;">Education Platform</div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Accent bar -->
+              <tr>
+                <td style="height:4px;background:linear-gradient(90deg,#2563eb,#06b6d4,#2563eb);"></td>
+              </tr>
+
+              <!-- Body -->
+              <tr>
+                <td style="background:#ffffff;padding:40px 36px;">
+                  <h1 style="margin:0 0 8px;font-size:22px;color:#0f172a;font-weight:700;">Welcome, ${data.recipientName}</h1>
+                  <p style="margin:0 0 28px;font-size:15px;color:#64748b;line-height:1.6;">
+                    Your <strong style="color:#1e40af;">${data.role}</strong> account for <strong>${displayName}</strong> has been created. Use the credentials below to log in.
+                  </p>
+
+                  <!-- Credentials card -->
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:24px;">
+                    <tr>
+                      <td style="background:#1e40af;padding:14px 20px;">
+                        <span style="color:#ffffff;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">🔐 Login Credentials</span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:24px 20px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="padding:10px 0;width:120px;color:#64748b;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Username</td>
+                            <td style="padding:10px 0;color:#0f172a;font-size:15px;font-family:'Courier New',monospace;background:#e0f2fe;padding:10px 14px;border-radius:6px;border:1px solid #bae6fd;">${data.username}</td>
+                          </tr>
+                          <tr><td colspan="2" style="height:1px;background:#e2e8f0;"></td></tr>
+                          <tr>
+                            <td style="padding:10px 0;width:120px;color:#64748b;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Password</td>
+                            <td style="padding:10px 0;color:#0f172a;font-size:15px;font-family:'Courier New',monospace;background:#e0f2fe;padding:10px 14px;border-radius:6px;border:1px solid #bae6fd;">${data.password}</td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Warning -->
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;margin-bottom:28px;">
+                    <tr>
+                      <td style="padding:16px 20px;">
+                        <table role="presentation" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="vertical-align:top;padding-right:12px;font-size:18px;">⚠️</td>
+                            <td style="color:#92400e;font-size:14px;line-height:1.5;">
+                              <strong>Important:</strong> You will be required to change your password on first login. Do not share these credentials with anyone.
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Login button -->
+                  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;">
+                    <tr>
+                      <td style="border-radius:10px;background:linear-gradient(135deg,#1e40af,#2563eb);box-shadow:0 4px 14px rgba(37,99,235,0.35);">
+                        <a href="${loginUrl}" target="_blank" style="display:inline-block;padding:16px 48px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;letter-spacing:0.3px;">
+                          Login to Portal →
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Steps -->
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:0;">
+                    <tr>
+                      <td style="padding:20px 20px;background:#f0f9ff;border-radius:10px;border:1px solid #e0f2fe;">
+                        <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.5px;">Getting Started</p>
+                        <table role="presentation" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="padding:5px 0;color:#1e40af;font-size:14px;font-weight:600;padding-right:10px;vertical-align:top;">1.</td>
+                            <td style="padding:5px 0;color:#475569;font-size:14px;">Click the login button above or visit the portal</td>
+                          </tr>
+                          <tr>
+                            <td style="padding:5px 0;color:#1e40af;font-size:14px;font-weight:600;padding-right:10px;vertical-align:top;">2.</td>
+                            <td style="padding:5px 0;color:#475569;font-size:14px;">Enter your username and password</td>
+                          </tr>
+                          <tr>
+                            <td style="padding:5px 0;color:#1e40af;font-size:14px;font-weight:600;padding-right:10px;vertical-align:top;">3.</td>
+                            <td style="padding:5px 0;color:#475569;font-size:14px;">Set a new secure password when prompted</td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="background:#f8fafc;padding:28px 36px;border-radius:0 0 16px 16px;border-top:1px solid #e2e8f0;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td align="center" style="padding-bottom:12px;">
+                        <span style="font-size:14px;font-weight:700;color:#1e40af;">Smart Tech</span>
+                        <span style="color:#cbd5e1;padding:0 8px;">|</span>
+                        <span style="font-size:12px;color:#94a3b8;">Education Management Platform</span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="center" style="font-size:12px;color:#94a3b8;line-height:1.6;">
+                        This is an automated message. Please do not reply to this email.<br>
+                        If you did not expect this email, contact your school administrator.
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+            </table>
+          </td></tr>
+        </table>
+      </body>
+      </html>
     `;
 
     await this.emailService.sendMail(data.to, subject, html);
