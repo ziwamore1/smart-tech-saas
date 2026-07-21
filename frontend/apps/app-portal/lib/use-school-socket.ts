@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { useAuthStore } from './auth-context';
+import { useAuth } from './auth-context';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
 
 export function useSchoolSocket(events: Record<string, (data: any) => void>) {
   const socketRef = useRef<Socket | null>(null);
-  const { user } = useAuthStore();
+  const { user } = useAuth();
   const schoolId = (user as any)?.schoolId;
 
   useEffect(() => {
