@@ -95,6 +95,7 @@ import { SchoolMembershipModule } from './school-membership/school-membership.mo
 import { PlatformRoleModule } from './platform-role/platform-role.module';
 import { ClassTeacherAssignmentModule } from './class-teacher-assignment/class-teacher-assignment.module';
 import { ResultsSmsModule } from './results-sms/results-sms.module';
+import { HolidayModule } from './holiday/holiday.module';
 
 @Module({
   imports: [
@@ -215,6 +216,7 @@ import { ResultsSmsModule } from './results-sms/results-sms.module';
     PlatformRoleModule,
     ClassTeacherAssignmentModule,
     ResultsSmsModule,
+    HolidayModule,
   ],
   providers: [ProductionLogger],
 })

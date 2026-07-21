@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { schoolApi, termApi, academicYearApi, gradingSystemApi } from '@/lib/api';
+import { schoolApi, termApi, academicYearApi, gradingSystemApi, holidayApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { ReadOnlyBanner } from '@/components/permissions/ReadOnlyBanner';
 
-type SettingsTab = 'school' | 'academic' | 'terms' | 'grading' | 'appearance' | 'notifications';
+type SettingsTab = 'school' | 'academic' | 'terms' | 'grading' | 'holidays' | 'appearance' | 'notifications';
 
 type GradeEntry = {
   grade: string;
@@ -15,6 +15,263 @@ type GradeEntry = {
   maxScore: number;
   description: string;
 };
+
+const HOLIDAY_TYPES = [
+  { value: 'PUBLIC', label: 'Public Holiday', color: '#dc2626', bg: '#fee2e2' },
+  { value: 'SCHOOL', label: 'School Holiday', color: '#2563eb', bg: '#dbeafe' },
+  { value: 'RELIGIOUS', label: 'Religious Holiday', color: '#7c3aed', bg: '#ede9fe' },
+  { value: 'CUSTOM', label: 'Custom Holiday', color: '#059669', bg: '#d1faee' },
+];
+
+function HolidaySettingsTab() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: '', description: '', startDate: '', endDate: '', type: 'PUBLIC', isRecurring: false });
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const isDirector = user?.roles?.includes('Director') || user?.schoolRoles?.includes('Director');
+
+  const { data: holidays = [], isLoading } = useQuery({
+    queryKey: ['holidays'],
+    queryFn: async () => {
+      const res = await holidayApi.getAll();
+      const data = res.data?.data || res.data;
+      return Array.isArray(data) ? data : [];
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (editingId) {
+        return holidayApi.update(editingId, form);
+      }
+      return holidayApi.create(form);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['holidays'] });
+      setMsg({ type: 'success', text: editingId ? 'Holiday updated!' : 'Holiday created!' });
+      resetForm();
+      setTimeout(() => setMsg(null), 3000);
+    },
+    onError: (e: any) => {
+      setMsg({ type: 'error', text: e?.response?.data?.message || 'Failed to save holiday' });
+      setTimeout(() => setMsg(null), 4000);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => holidayApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['holidays'] });
+      setMsg({ type: 'success', text: 'Holiday deleted!' });
+      setTimeout(() => setMsg(null), 3000);
+    },
+  });
+
+  const seedMutation = useMutation({
+    mutationFn: (year: number) => holidayApi.seedNationalHolidays(year),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['holidays'] });
+      setMsg({ type: 'success', text: 'Zambian national holidays seeded!' });
+      setTimeout(() => setMsg(null), 3000);
+    },
+    onError: (e: any) => {
+      setMsg({ type: 'error', text: e?.response?.data?.message || 'Failed to seed holidays' });
+      setTimeout(() => setMsg(null), 4000);
+    },
+  });
+
+  const resetForm = () => {
+    setForm({ name: '', description: '', startDate: '', endDate: '', type: 'PUBLIC', isRecurring: false });
+    setEditingId(null);
+    setShowForm(false);
+  };
+
+  const startEdit = (h: any) => {
+    setForm({
+      name: h.name,
+      description: h.description || '',
+      startDate: h.startDate?.split('T')[0] || '',
+      endDate: h.endDate?.split('T')[0] || '',
+      type: h.type || 'PUBLIC',
+      isRecurring: h.isRecurring || false,
+    });
+    setEditingId(h.id);
+    setShowForm(true);
+  };
+
+  const getTypeConfig = (type: string) => HOLIDAY_TYPES.find(t => t.value === type) || HOLIDAY_TYPES[0];
+
+  const today = new Date().toISOString().split('T')[0];
+  const currentYear = new Date().getFullYear();
+
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      {msg && (
+        <div className={`mb-4 px-4 py-3 rounded-lg ${msg.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {msg.text}
+        </div>
+      )}
+
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-xl font-semibold">Holidays</h2>
+          <p className="text-sm text-gray-500 mt-1">Manage school holidays. Dates marked as holidays block attendance marking.</p>
+        </div>
+        <div className="flex gap-2">
+          {isDirector && (
+            <>
+              <button
+                onClick={() => seedMutation.mutate(currentYear)}
+                disabled={seedMutation.isPending}
+                className="px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 text-sm font-medium disabled:opacity-50"
+              >
+                {seedMutation.isPending ? 'Seeding...' : `Seed ${currentYear} Zambian Holidays`}
+              </button>
+              <button
+                onClick={() => { resetForm(); setShowForm(!showForm); }}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+              >
+                {showForm ? 'Cancel' : '+ Add Holiday'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {showForm && (
+        <div className="mb-6 p-4 border-2 border-indigo-200 rounded-xl bg-indigo-50/30">
+          <h3 className="font-semibold text-gray-800 mb-3">{editingId ? 'Edit Holiday' : 'New Holiday'}</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Name *</label>
+              <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none"
+                placeholder="e.g. Independence Day" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+              <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none">
+                {HOLIDAY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Start Date *</label>
+              <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">End Date *</label>
+              <input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
+              <input type="text" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none"
+                placeholder="Optional description" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.isRecurring} onChange={e => setForm({ ...form, isRecurring: e.target.checked })}
+                  className="w-4 h-4 text-indigo-600 rounded" />
+                <span className="text-sm text-gray-700">Repeats every year</span>
+              </label>
+            </div>
+          </div>
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={() => saveMutation.mutate()}
+              disabled={!form.name || !form.startDate || !form.endDate || saveMutation.isPending}
+              className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium disabled:opacity-50"
+            >
+              {saveMutation.isPending ? 'Saving...' : editingId ? 'Update' : 'Create'}
+            </button>
+            <button onClick={resetForm} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="text-center py-12 text-gray-400">Loading holidays...</div>
+      ) : holidays.length === 0 ? (
+        <div className="text-center py-12 text-gray-400">
+          <p className="text-4xl mb-3">🎉</p>
+          <p className="font-medium">No holidays configured yet</p>
+          <p className="text-sm mt-1">Click "Seed {currentYear} Zambian Holidays" or add custom holidays</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#f8fafc' }}>
+                <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Name</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Type</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Dates</th>
+                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Recurring</th>
+                <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</th>
+                {isDirector && (
+                  <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Actions</th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {holidays.map((h: any) => {
+                const tc = getTypeConfig(h.type);
+                const start = h.startDate?.split('T')[0] || '';
+                const end = h.endDate?.split('T')[0] || '';
+                const isPast = end && end < today;
+                const isActive = start <= today && end >= today;
+                return (
+                  <tr key={h.id} style={{ borderBottom: '1px solid #f1f5f9' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <td style={{ padding: '12px 14px' }}>
+                      <div className="font-medium text-gray-900 text-sm">{h.name}</div>
+                      {h.description && <div className="text-xs text-gray-500 mt-0.5">{h.description}</div>}
+                    </td>
+                    <td style={{ padding: '12px 14px' }}>
+                      <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600, color: tc.color, background: tc.bg }}>
+                        {tc.label}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 14px', fontSize: 13, color: '#475569' }}>
+                      {start === end ? start : `${start} → ${end}`}
+                    </td>
+                    <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                      {h.isRecurring ? <span style={{ color: '#059669', fontWeight: 600, fontSize: 12 }}>✓ Yes</span> : <span style={{ color: '#94a3b8', fontSize: 12 }}>No</span>}
+                    </td>
+                    <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                      {isActive ? (
+                        <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600, color: '#059669', background: '#d1fae5' }}>Active</span>
+                      ) : isPast ? (
+                        <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600, color: '#94a3b8', background: '#f1f5f9' }}>Past</span>
+                      ) : (
+                        <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600, color: '#2563eb', background: '#dbeafe' }}>Upcoming</span>
+                      )}
+                    </td>
+                    {isDirector && (
+                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                          <button onClick={() => startEdit(h)}
+                            style={{ padding: '5px 12px', fontSize: 12, fontWeight: 500, color: '#4f46e5', background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 6, cursor: 'pointer' }}>Edit</button>
+                          <button onClick={() => { if (confirm(`Delete "${h.name}"?`)) deleteMutation.mutate(h.id); }}
+                            style={{ padding: '5px 12px', fontSize: 12, fontWeight: 500, color: '#dc2626', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 6, cursor: 'pointer' }}>Delete</button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -321,6 +578,7 @@ export default function SettingsPage() {
     { key: 'academic' as SettingsTab, label: 'Academic Year', icon: '📅' },
     { key: 'terms' as SettingsTab, label: 'Terms', icon: '📚' },
     { key: 'grading' as SettingsTab, label: 'Grading System', icon: '📊' },
+    { key: 'holidays' as SettingsTab, label: 'Holidays', icon: '🎉' },
     { key: 'appearance' as SettingsTab, label: 'Appearance', icon: '🎨' },
     { key: 'notifications' as SettingsTab, label: 'Notifications', icon: '🔔' },
   ];
@@ -1186,6 +1444,10 @@ export default function SettingsPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {activeTab === 'holidays' && (
+        <HolidaySettingsTab />
       )}
 
       {activeTab === 'notifications' && (

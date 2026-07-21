@@ -886,6 +886,12 @@ export const attendanceApi = {
 
   getPunctualityTrends: (classId: string, termId?: string) =>
     api.get('/attendance/punctuality-trends', { params: { classId, termId } }),
+
+  getRegisterPdf: (classId: string, date: string) =>
+    api.get('/attendance/register/pdf', { params: { classId, date }, responseType: 'blob' }),
+
+  getStudentPdf: (studentId: string, params?: { startDate?: string; endDate?: string }) =>
+    api.get(`/attendance/student/${studentId}/pdf`, { params, responseType: 'blob' }),
 };
 
 export const homeworkApi = {
@@ -2357,4 +2363,19 @@ export const classTeacherAssignmentApi = {
   findByTeacher: (teacherId: string) => api.get(`/class-teacher-assignments/teacher/${teacherId}`),
   findBySchool: (academicYearId?: string) =>
     api.get('/class-teacher-assignments/school', { params: { academicYearId } }),
+};
+
+export const holidayApi = {
+  getAll: (params?: { type?: string; year?: number }) =>
+    api.get('/holiday', { params }),
+  getById: (id: string) => api.get(`/holiday/${id}`),
+  checkDate: (date: string) => api.get(`/holiday/check/${date}`),
+  getInRange: (startDate: string, endDate: string) =>
+    api.get('/holiday/range', { params: { startDate, endDate } }),
+  create: (data: { name: string; description?: string; startDate: string; endDate: string; type?: string; isRecurring?: boolean }) =>
+    api.post('/holiday', data),
+  update: (id: string, data: Partial<{ name: string; description: string; startDate: string; endDate: string; type: string; isRecurring: boolean }>) =>
+    api.put(`/holiday/${id}`, data),
+  delete: (id: string) => api.delete(`/holiday/${id}`),
+  seedNationalHolidays: (year: number) => api.post(`/holiday/seed/${year}`),
 };

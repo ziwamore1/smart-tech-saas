@@ -1,14 +1,34 @@
-import { Injectable, NotFoundException, BadRequestException, Optional, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional, Inject, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceStatus } from '@prisma/client';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
+import { HolidayService } from '../holiday/holiday.service';
 
 @Injectable()
 export class AttendanceService {
+  private readonly logger = new Logger(AttendanceService.name);
+
   constructor(
     private prisma: PrismaService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
+    @Optional() private holidayService?: HolidayService,
   ) {}
+
+  /**
+   * Check if a date is a school holiday. Throws if it is and force is false.
+   */
+  private async assertNotHoliday(schoolId: string, date: Date | string, force = false): Promise<void> {
+    if (!this.holidayService) return;
+
+    const d = new Date(date);
+    const result = await this.holidayService.isHoliday(schoolId, d);
+
+    if (result.isHoliday && !force) {
+      throw new BadRequestException(
+        `Cannot mark attendance on "${result.holiday?.name}" (${d.toDateString()}). This date is a school holiday.`,
+      );
+    }
+  }
 
   async getAll(schoolId: string, filters: {
     classId?: string;
@@ -145,6 +165,8 @@ export class AttendanceService {
     remarks?: string;
     schoolId: string;
   }) {
+    await this.assertNotHoliday(data.schoolId, data.date);
+
     return this.prisma.attendance.upsert({
       where: {
         studentId_slotId_date: {
@@ -175,6 +197,11 @@ export class AttendanceService {
     status: AttendanceStatus;
     remarks?: string;
   }>) {
+    // Check holiday for the date (all records should be same date)
+    if (records.length > 0) {
+      await this.assertNotHoliday(schoolId, records[0].date);
+    }
+
     const results = await Promise.all(
       records.map(record =>
         this.prisma.attendance.upsert({
@@ -220,6 +247,8 @@ export class AttendanceService {
     records: Array<{ studentId: string; status: string; remarks?: string }>;
     schoolId: string;
   }) {
+    await this.assertNotHoliday(data.schoolId, data.date);
+
     const enrollments = await this.prisma.enrollment.findMany({
       where: { classId: data.classId, status: 'ACTIVE' },
       select: { studentId: true },
@@ -463,6 +492,8 @@ export class AttendanceService {
     biometricId?: string;
     lateThresholdMinutes?: number;
   }) {
+    await this.assertNotHoliday(data.schoolId, data.date);
+
     const checkInTime = new Date();
     let isLate = false;
     let lateMinutes = 0;
@@ -1144,6 +1175,14 @@ export class AttendanceService {
     const dayOfWeek = today.getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) {
       return { message: 'Weekend — skipped', marked: 0, schoolId };
+    }
+
+    // Skip if today is a holiday
+    if (this.holidayService) {
+      const holidayCheck = await this.holidayService.isHoliday(schoolId, today);
+      if (holidayCheck.isHoliday) {
+        return { message: `Holiday (${holidayCheck.holiday?.name}) — skipped`, marked: 0, schoolId };
+      }
     }
 
     const currentTerm = await this.prisma.term.findFirst({

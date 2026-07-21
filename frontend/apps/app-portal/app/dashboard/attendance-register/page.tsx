@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { attendanceApi, classApi, studentApi, api } from '@/lib/api';
+import { attendanceApi, classApi, studentApi, api, holidayApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useSchoolSocket } from '@/lib/use-school-socket';
 
@@ -84,6 +84,15 @@ export default function AttendanceRegisterPage() {
     if (!classesData) return [];
     return Array.isArray(classesData) ? classesData : [];
   }, [classesData]);
+
+  const { data: holidayCheck } = useQuery({
+    queryKey: ['holiday-check', dateStr],
+    queryFn: async () => {
+      const res = await holidayApi.checkDate(dateStr);
+      return res.data;
+    },
+    enabled: !!dateStr,
+  });
 
   const { data: studentsData } = useQuery({
     queryKey: ['class-students-attendance', selectedClassId],
@@ -300,12 +309,43 @@ export default function AttendanceRegisterPage() {
               ))}
             </select>
           </div>
-          <div style={{ minWidth: 180 }}>
+          <div style={{ minWidth: 280 }}>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.3px' }}>Date</label>
-            <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
-              style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, outline: 'none', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s' }}
-              onFocus={e => { e.target.style.borderColor = '#818cf8'; e.target.style.boxShadow = '0 0 0 3px rgba(129,140,248,0.15)'; }}
-              onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button
+                onClick={() => {
+                  const d = new Date(selectedDate);
+                  d.setDate(d.getDate() - 1);
+                  setSelectedDate(d.toISOString().split('T')[0]);
+                }}
+                style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, background: '#f8fafc', cursor: 'pointer', fontSize: 16, lineHeight: 1, transition: 'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#818cf8'; e.currentTarget.style.background = '#eef2ff'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; }}
+                title="Previous day"
+              >&#8249;</button>
+              <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
+                style={{ flex: 1, padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, outline: 'none', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s' }}
+                onFocus={e => { e.target.style.borderColor = '#818cf8'; e.target.style.boxShadow = '0 0 0 3px rgba(129,140,248,0.15)'; }}
+                onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; }} />
+              <button
+                onClick={() => {
+                  const d = new Date(selectedDate);
+                  d.setDate(d.getDate() + 1);
+                  setSelectedDate(d.toISOString().split('T')[0]);
+                }}
+                style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, background: '#f8fafc', cursor: 'pointer', fontSize: 16, lineHeight: 1, transition: 'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#818cf8'; e.currentTarget.style.background = '#eef2ff'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; }}
+                title="Next day"
+              >&#8250;</button>
+              <button
+                onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
+                style={{ padding: '9px 10px', border: '1.5px solid #e2e8f0', borderRadius: 8, background: selectedDate === new Date().toISOString().split('T')[0] ? '#eef2ff' : '#f8fafc', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#4f46e5', transition: 'all 0.15s', whiteSpace: 'nowrap' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#818cf8'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                title="Go to today"
+              >Today</button>
+            </div>
           </div>
           <div style={{ minWidth: 150 }}>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.3px' }}>Filter</label>
@@ -386,6 +426,17 @@ export default function AttendanceRegisterPage() {
         </div>
 
         <div style={{ overflowX: 'auto' }}>
+          {holidayCheck?.isHoliday && (
+            <div style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', border: '1.5px solid #f59e0b', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 20 }}>📅</span>
+              <div>
+                <span style={{ fontWeight: 700, color: '#92400e', fontSize: 14 }}>Holiday: {holidayCheck.holiday?.name}</span>
+                <span style={{ color: '#a16207', fontSize: 13, marginLeft: 8 }}>
+                  Attendance cannot be marked on holidays. ({holidayCheck.holiday?.type})
+                </span>
+              </div>
+            </div>
+          )}
           <table className="attendance-register" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 750 }}>
             <thead>
               <tr style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
