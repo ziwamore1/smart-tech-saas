@@ -20,6 +20,7 @@ export default function StudentLayout({
     { href: '/student/homework', label: 'Homework', icon: '📚' },
     { href: '/student/report-cards', label: 'Reports', icon: '📄' },
     { href: '/student/assessments', label: 'Assessments', icon: '📊' },
+    { href: '/student/profile', label: 'Profile', icon: '👤' },
   ];
 
   return (

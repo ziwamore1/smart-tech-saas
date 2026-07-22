@@ -578,6 +578,9 @@ export const superAdminApi = {
   
   updateSetting: (key: string, value: any, isPublic?: boolean) => 
     api.put('/super-admin/settings', { key, value, isPublic }),
+  
+  enrollSelfAsStaff: (schoolId: string, role: string) =>
+    api.post('/super-admin/enroll-self-as-staff', { schoolId, role }),
 };
 
 export const featureLockApi = {

@@ -188,6 +188,12 @@ const superAdminNav = [
     color: '#22c55e'
   },
   { 
+    name: 'Enroll as Staff', 
+    href: '/super-admin/enroll-staff', 
+    icon: 'fa-user-plus',
+    color: '#10b981'
+  },
+  { 
     name: 'Profile', 
     href: '/super-admin/profile', 
     icon: 'fa-user-circle',

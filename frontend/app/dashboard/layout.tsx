@@ -461,6 +461,14 @@ const regularNav: NavItem[] = [
     typeRoles: ROLE_MAP.admin,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
+  { 
+    name: 'Profile', 
+    href: '/dashboard/profile', 
+    icon: 'fa-user-circle',
+    color: '#ea6645',
+    typeRoles: ROLE_MAP.everyone,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
+  },
 ];
 
 const superAdminNav = [
