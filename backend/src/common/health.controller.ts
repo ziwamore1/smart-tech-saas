@@ -828,61 +828,79 @@ export class HealthController {
           const curriculum = getCurriculumData(typeCode);
           if (!curriculum) continue;
 
-          for (const subjectDef of curriculum.subjects) {
-            let subject = await this.prisma.subject.findFirst({
-              where: { name: subjectDef.name, schoolId: school.id },
-            });
+          const existingSubjects = await this.prisma.subject.findMany({
+            where: { schoolId: school.id },
+            select: { id: true, name: true },
+          });
+          const existingSubjectMap = new Map(existingSubjects.map(s => [s.name, s.id]));
 
-            if (!subject) {
-              try {
-                subject = await this.prisma.subject.create({
-                  data: {
-                    name: subjectDef.name,
-                    code: subjectDef.code,
-                    isCore: subjectDef.isCore,
-                    schoolId: school.id,
-                  },
-                });
-                totalSubjects++;
-              } catch (e: any) {
-                if (e?.code === 'P2002') {
-                  subject = await this.prisma.subject.findFirst({
-                    where: { name: subjectDef.name, schoolId: school.id },
-                  });
-                }
-                if (!subject) continue;
+          const newSubjects = curriculum.subjects.filter(s => !existingSubjectMap.has(s.name));
+          if (newSubjects.length > 0) {
+            try {
+              await this.prisma.subject.createMany({
+                data: newSubjects.map(s => ({
+                  name: s.name,
+                  code: s.code,
+                  isCore: s.isCore,
+                  schoolId: school.id,
+                })),
+                skipDuplicates: true,
+              });
+              totalSubjects += newSubjects.length;
+            } catch {}
+            const refreshed = await this.prisma.subject.findMany({
+              where: { schoolId: school.id },
+              select: { id: true, name: true },
+            });
+            for (const s of refreshed) existingSubjectMap.set(s.name, s.id);
+          }
+
+          const subjectIds = Array.from(existingSubjectMap.values());
+
+          const existingEocs = await this.prisma.elementOfConstruct.findMany({
+            where: { subjectId: { in: subjectIds } },
+            select: { name: true, subjectId: true },
+          });
+          const existingEocSet = new Set(existingEocs.map(e => `${e.subjectId}::${e.name}`));
+
+          const existingAos = await this.prisma.assessmentObjective.findMany({
+            where: { subjectId: { in: subjectIds } },
+            select: { name: true, subjectId: true },
+          });
+          const existingAoSet = new Set(existingAos.map(a => `${a.subjectId}::${a.name}`));
+
+          const eocsToCreate: { name: string; construct: string; subjectId: string; schoolId: string }[] = [];
+          const aosToCreate: { name: string; weight: number; subjectId: string; schoolId: string }[] = [];
+
+          for (const subjectDef of curriculum.subjects) {
+            const subjectId = existingSubjectMap.get(subjectDef.name);
+            if (!subjectId) continue;
+
+            for (const eoc of curriculum.eocs[subjectDef.name] || []) {
+              if (!existingEocSet.has(`${subjectId}::${eoc.name}`)) {
+                eocsToCreate.push({ name: eoc.name, construct: eoc.construct, subjectId, schoolId: school.id });
               }
             }
 
-            const subjectEocs = curriculum.eocs[subjectDef.name] || [];
-            for (const eoc of subjectEocs) {
-              try {
-                const exists = await this.prisma.elementOfConstruct.findFirst({
-                  where: { name: eoc.name, subjectId: subject.id },
-                });
-                if (!exists) {
-                  await this.prisma.elementOfConstruct.create({
-                    data: { name: eoc.name, construct: eoc.construct, subjectId: subject.id, schoolId: school.id },
-                  });
-                  totalEocs++;
-                }
-              } catch {}
+            for (const ao of curriculum.aos[subjectDef.name] || []) {
+              if (!existingAoSet.has(`${subjectId}::${ao.name}`)) {
+                aosToCreate.push({ name: ao.name, weight: ao.weight, subjectId, schoolId: school.id });
+              }
             }
+          }
 
-            const subjectAos = curriculum.aos[subjectDef.name] || [];
-            for (const ao of subjectAos) {
-              try {
-                const exists = await this.prisma.assessmentObjective.findFirst({
-                  where: { name: ao.name, subjectId: subject.id },
-                });
-                if (!exists) {
-                  await this.prisma.assessmentObjective.create({
-                    data: { name: ao.name, weight: ao.weight, subjectId: subject.id, schoolId: school.id },
-                  });
-                  totalAos++;
-                }
-              } catch {}
-            }
+          if (eocsToCreate.length > 0) {
+            try {
+              await this.prisma.elementOfConstruct.createMany({ data: eocsToCreate, skipDuplicates: true });
+              totalEocs += eocsToCreate.length;
+            } catch {}
+          }
+
+          if (aosToCreate.length > 0) {
+            try {
+              await this.prisma.assessmentObjective.createMany({ data: aosToCreate, skipDuplicates: true });
+              totalAos += aosToCreate.length;
+            } catch {}
           }
 
           succeeded++;
