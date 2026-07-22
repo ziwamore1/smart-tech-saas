@@ -806,11 +806,83 @@ export class HealthController {
   async backfillProvisioning() {
     const start = Date.now();
     try {
-      const result = await this.provisioningService.backfillAllSchools();
+      const schools = await this.prisma.school.findMany({
+        include: { institutionType: true },
+        take: 5,
+      });
+
+      if (schools.length === 0) {
+        return { status: 'ok', latencyMs: Date.now() - start, message: 'No schools found' };
+      }
+
+      let succeeded = 0;
+      let failed = 0;
+      const details: string[] = [];
+
+      for (const school of schools) {
+        const typeCode = school.institutionType?.code;
+        if (!typeCode) {
+          details.push(`${school.name}: no institution type, skipped`);
+          continue;
+        }
+
+        try {
+          await this.provisioningService.ensureCompleteProvisioning(school.id, typeCode);
+          succeeded++;
+          details.push(`${school.name}: OK`);
+        } catch (e: any) {
+          failed++;
+          details.push(`${school.name}: ${e.message}`);
+        }
+      }
+
       return {
         status: 'ok',
         latencyMs: Date.now() - start,
-        ...result,
+        processed: schools.length,
+        succeeded,
+        failed,
+        details,
+        note: 'Processed first 5 schools. Call again to continue.',
+      };
+    } catch (error: any) {
+      return {
+        status: 'error',
+        latencyMs: Date.now() - start,
+        message: error?.message,
+      };
+    }
+  }
+
+  @Get('backfill-provisioning-all')
+  async backfillProvisioningAll() {
+    const start = Date.now();
+    try {
+      const schools = await this.prisma.school.findMany({
+        include: { institutionType: true },
+      });
+
+      let succeeded = 0;
+      let failed = 0;
+
+      for (const school of schools) {
+        const typeCode = school.institutionType?.code;
+        if (!typeCode) continue;
+
+        try {
+          await this.provisioningService.ensureCompleteProvisioning(school.id, typeCode);
+          succeeded++;
+        } catch {
+          failed++;
+        }
+      }
+
+      return {
+        status: 'ok',
+        latencyMs: Date.now() - start,
+        processed: schools.length,
+        succeeded,
+        failed,
       };
     } catch (error: any) {
       return {
