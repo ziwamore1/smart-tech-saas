@@ -82,6 +82,7 @@ export class NotificationService {
           role: data.role,
           schoolName: data.schoolName,
           loginUrl: data.schoolUrl,
+          email: data.email,
         });
         await this.logNotification(data.email, 'email', 'credentials', 'sent');
         this.logger.log(`Credentials email sent to ${data.email}`);
@@ -226,6 +227,11 @@ export class NotificationService {
       `Password: ${data.password}`,
       '',
     ];
+
+    if (data.email) {
+      lines.push(`You can also login using your email: ${data.email}`);
+      lines.push('');
+    }
 
     if (data.schoolName) {
       lines.push(`School: ${data.schoolName}`);

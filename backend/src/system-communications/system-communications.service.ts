@@ -737,6 +737,7 @@ export class SystemCommunicationsService {
           password: password || 'Welcome123',
           role,
           schoolName,
+          email: email,
         }).catch((err: any) => this.logger.error(`[${role}] Email failed: ${err.message}`)),
       );
     }

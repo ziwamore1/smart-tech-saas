@@ -14,6 +14,7 @@ export interface DeliveryOptions {
   schoolName?: string;
   schoolUrl?: string;
   channel: 'SMS' | 'EMAIL' | 'WHATSAPP';
+  email?: string;
 }
 
 export interface BundledCredentialOptions {
@@ -30,6 +31,7 @@ export interface BundledCredentialOptions {
   schoolName?: string;
   schoolUrl?: string;
   channel: 'SMS' | 'EMAIL' | 'WHATSAPP' | 'BUNDLED';
+  parentUserEmail?: string;
 }
 
 @Injectable()
@@ -46,7 +48,7 @@ export class CredentialDeliveryService {
   }
 
   async deliverCredentials(options: DeliveryOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    const { channel, recipientEmail, recipientPhone, username, password, recipientName, role, schoolName, schoolUrl } = options;
+    const { channel, recipientEmail, recipientPhone, username, password, recipientName, role, schoolName, schoolUrl, email } = options;
 
     try {
       let messageId: string | undefined;
@@ -64,6 +66,7 @@ export class CredentialDeliveryService {
             role,
             schoolName,
             schoolUrl,
+            email: email || recipientEmail,
           });
           break;
 
@@ -76,6 +79,7 @@ export class CredentialDeliveryService {
             password,
             recipientName,
             schoolUrl,
+            email: email || recipientEmail,
           });
           break;
 
@@ -88,6 +92,7 @@ export class CredentialDeliveryService {
             password,
             recipientName,
             schoolUrl,
+            email: email || recipientEmail,
           });
           break;
 
@@ -116,7 +121,7 @@ export class CredentialDeliveryService {
   }
 
   async deliverBundledCredentials(options: BundledCredentialOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    const { parentEmail, parentPhone, parentUsername, parentPassword, parentName, studentUsername, studentPassword, studentName, schoolName, schoolUrl } = options;
+    const { parentEmail, parentPhone, parentUsername, parentPassword, parentName, studentUsername, studentPassword, studentName, schoolName, schoolUrl, parentUserEmail } = options;
 
     const loginUrl = this.getLoginUrl(schoolUrl);
 
@@ -136,6 +141,7 @@ export class CredentialDeliveryService {
           studentPassword,
           schoolName,
           loginUrl,
+          parentUserEmail,
         });
       } else if (parentPhone) {
         recipient = parentPhone;
@@ -171,6 +177,7 @@ export class CredentialDeliveryService {
     studentPassword: string;
     schoolName?: string;
     loginUrl: string;
+    parentUserEmail?: string;
   }): Promise<string> {
     const displayName = data.schoolName || 'SmartTech';
     const subject = `Your ${displayName} Login Credentials — Action Required`;
@@ -230,6 +237,11 @@ export class CredentialDeliveryService {
                             <td style="padding:8px 0;width:120px;color:#64748b;font-size:13px;font-weight:600;text-transform:uppercase;">Password</td>
                             <td style="padding:8px 0;color:#0f172a;font-size:14px;font-family:'Courier New',monospace;background:#e0f2fe;padding:8px 14px;border-radius:6px;border:1px solid #bae6fd;">${data.parentPassword}</td>
                           </tr>
+                          ${data.parentUserEmail ? `<tr><td colspan="2" style="height:1px;background:#e2e8f0;"></td></tr>
+                          <tr>
+                            <td style="padding:8px 0;width:120px;color:#64748b;font-size:13px;font-weight:600;text-transform:uppercase;">Email</td>
+                            <td style="padding:8px 0;color:#0f172a;font-size:14px;font-family:'Courier New',monospace;background:#e0f2fe;padding:8px 14px;border-radius:6px;border:1px solid #bae6fd;">${data.parentUserEmail}</td>
+                          </tr>` : ''}
                         </table>
                       </td>
                     </tr>
@@ -267,7 +279,7 @@ export class CredentialDeliveryService {
                           <tr>
                             <td style="vertical-align:top;padding-right:12px;font-size:18px;">⚠️</td>
                             <td style="color:#92400e;font-size:14px;line-height:1.5;">
-                              <strong>Important:</strong> Both accounts require a password change on first login. Do not share these credentials.
+                              <strong>Important:</strong> Both accounts require a password change on first login. You can login using your username${data.parentUserEmail ? ` or email (${data.parentUserEmail})` : ''}. Do not share these credentials.
                             </td>
                           </tr>
                         </table>
@@ -328,10 +340,12 @@ export class CredentialDeliveryService {
     studentUsername: string;
     studentPassword: string;
     loginUrl: string;
+    parentUserEmail?: string;
   }): Promise<string> {
     const message =
       `Hello ${data.parentName},\n\n` +
-      `Your account: User: ${data.parentUsername}, Pass: ${data.parentPassword}\n\n` +
+      `Your account: User: ${data.parentUsername}, Pass: ${data.parentPassword}\n` +
+      (data.parentUserEmail ? `You can also login with email: ${data.parentUserEmail}\n\n` : '\n') +
       `Student (${data.studentName}) account: User: ${data.studentUsername}, Pass: ${data.studentPassword}\n\n` +
       `Login: ${data.loginUrl}\n\nChange passwords on first login. - SmartTech`;
     this.logger.log(`[SMS] Bundled credentials sent to ${data.to}`);
@@ -340,7 +354,7 @@ export class CredentialDeliveryService {
   }
 
   async deliverStudentCredentialsOnRequest(options: DeliveryOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    const { channel, recipientEmail, username, password, recipientName, role, schoolName, schoolUrl } = options;
+    const { channel, recipientEmail, username, password, recipientName, role, schoolName, schoolUrl, email } = options;
     const loginUrl = this.getLoginUrl(schoolUrl);
 
     try {
@@ -351,6 +365,12 @@ export class CredentialDeliveryService {
         recipient = recipientEmail;
         const displayName = schoolName || 'SmartTech';
         const subject = `Your ${displayName} Student Login Credentials — Action Required`;
+        const emailNote = email ? `<tr><td colspan="2" style="height:1px;background:#e2e8f0;"></td></tr>
+                              <tr>
+                                <td style="padding:8px 0;width:120px;color:#64748b;font-size:13px;font-weight:600;text-transform:uppercase;">Email</td>
+                                <td style="padding:8px 0;color:#0f172a;font-size:14px;font-family:'Courier New',monospace;background:#e0f2fe;padding:8px 14px;border-radius:6px;border:1px solid #bae6fd;">${email}</td>
+                              </tr>` : '';
+        const emailLoginNote = email ? ` You can also login with your email (${email}).` : '';
         const html = `
           <!DOCTYPE html>
           <html lang="en">
@@ -412,10 +432,15 @@ export class CredentialDeliveryService {
                                 <td style="padding:8px 0;width:120px;color:#64748b;font-size:13px;font-weight:600;text-transform:uppercase;">Password</td>
                                 <td style="padding:8px 0;color:#0f172a;font-size:14px;font-family:'Courier New',monospace;background:#e0f2fe;padding:8px 14px;border-radius:6px;border:1px solid #bae6fd;">${password}</td>
                               </tr>
+                              ${emailNote}
                             </table>
                           </td>
                         </tr>
                       </table>
+
+                      <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
+                        <strong>Login using:</strong> You can use your <strong>username</strong>${emailLoginNote}
+                      </p>
 
                       <!-- Warning -->
                       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;margin-bottom:28px;">
@@ -476,7 +501,7 @@ export class CredentialDeliveryService {
         messageId = `student-email-${Date.now()}`;
       } else if (recipientPhone) {
         recipient = recipientPhone;
-        const text = `Hello ${recipientName}, your student login is ready. User: ${username}, Pass: ${password}. Login: ${loginUrl}. Change password on first login. - SmartTech`;
+        const text = `Hello ${recipientName}, your student login is ready. User: ${username}, Pass: ${password}.${emailLoginNote} Login: ${loginUrl}. Change password on first login. - SmartTech`;
         this.logger.log(`[SMS] Student credentials sent to ${recipientPhone}`);
         messageId = `student-sms-${Date.now()}`;
       } else {
@@ -498,6 +523,7 @@ export class CredentialDeliveryService {
     role: string;
     schoolName?: string;
     schoolUrl?: string;
+    email?: string;
   }): Promise<string> {
     const loginUrl = this.getLoginUrl(data.schoolUrl);
     const displayName = data.schoolName || 'SmartTech';
@@ -558,6 +584,11 @@ export class CredentialDeliveryService {
                             <td style="padding:10px 0;width:120px;color:#64748b;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Password</td>
                             <td style="padding:10px 0;color:#0f172a;font-size:15px;font-family:'Courier New',monospace;background:#e0f2fe;padding:10px 14px;border-radius:6px;border:1px solid #bae6fd;">${data.password}</td>
                           </tr>
+                          ${data.email ? `<tr><td colspan="2" style="height:1px;background:#e2e8f0;"></td></tr>
+                          <tr>
+                            <td style="padding:10px 0;width:120px;color:#64748b;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Email</td>
+                            <td style="padding:10px 0;color:#0f172a;font-size:15px;font-family:'Courier New',monospace;background:#e0f2fe;padding:10px 14px;border-radius:6px;border:1px solid #bae6fd;">${data.email}</td>
+                          </tr>` : ''}
                         </table>
                       </td>
                     </tr>
@@ -602,7 +633,7 @@ export class CredentialDeliveryService {
                           </tr>
                           <tr>
                             <td style="padding:5px 0;color:#1e40af;font-size:14px;font-weight:600;padding-right:10px;vertical-align:top;">2.</td>
-                            <td style="padding:5px 0;color:#475569;font-size:14px;">Enter your username and password</td>
+                            <td style="padding:5px 0;color:#475569;font-size:14px;">Enter your username${data.email ? ` or email (${data.email})` : ''} and password</td>
                           </tr>
                           <tr>
                             <td style="padding:5px 0;color:#1e40af;font-size:14px;font-weight:600;padding-right:10px;vertical-align:top;">3.</td>
@@ -653,9 +684,11 @@ export class CredentialDeliveryService {
     password: string;
     recipientName: string;
     schoolUrl?: string;
+    email?: string;
   }): Promise<string> {
     const loginUrl = this.getLoginUrl(data.schoolUrl);
-    const message = `Welcome ${data.recipientName}! Your SmartTech account has been created. Username: ${data.username}, Password: ${data.password}. Login at: ${loginUrl}. Please change your password on first login.`;
+    const emailNote = data.email ? ` You can also login with email: ${data.email}.` : '';
+    const message = `Welcome ${data.recipientName}! Your SmartTech account has been created. Username: ${data.username}, Password: ${data.password}.${emailNote} Login at: ${loginUrl}. Please change your password on first login.`;
     this.logger.log(`[SMS] Sending credentials to ${data.to}`);
     this.logger.log(`[SMS] Message: ${message}`);
     return `sms-${Date.now()}`;
@@ -667,9 +700,11 @@ export class CredentialDeliveryService {
     password: string;
     recipientName: string;
     schoolUrl?: string;
+    email?: string;
   }): Promise<string> {
     const loginUrl = this.getLoginUrl(data.schoolUrl);
-    const message = `Hello ${data.recipientName},\n\nYour SmartTech Education account has been created.\n\nUsername: ${data.username}\nPassword: ${data.password}\n\nLogin: ${loginUrl}\n\nPlease change your password on first login.\n\n- SmartTech Team`;
+    const emailNote = data.email ? `\nYou can also login with email: ${data.email}` : '';
+    const message = `Hello ${data.recipientName},\n\nYour SmartTech Education account has been created.\n\nUsername: ${data.username}\nPassword: ${data.password}${emailNote}\n\nLogin: ${loginUrl}\n\nPlease change your password on first login.\n\n- SmartTech Team`;
     this.logger.log(`[WhatsApp] Sending credentials to ${data.to}`);
     this.logger.log(`[WhatsApp] Message: ${message}`);
     return `wa-${Date.now()}`;

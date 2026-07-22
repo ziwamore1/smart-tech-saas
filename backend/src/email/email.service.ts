@@ -230,6 +230,7 @@ export class EmailService {
     role: string;
     schoolName?: string;
     loginUrl?: string;
+    email?: string;
   }) {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -245,9 +246,13 @@ export class EmailService {
             <table style="width: 100%; border-collapse: collapse;">
               <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px; width: 100px;"><strong>Username:</strong></td><td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-family: monospace;">${data.username}</td></tr>
               <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;"><strong>Password:</strong></td><td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-family: monospace;">${data.password}</td></tr>
+              ${data.email ? `<tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;"><strong>Email:</strong></td><td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-family: monospace;">${data.email}</td></tr>` : ''}
               ${data.schoolName ? `<tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;"><strong>School:</strong></td><td style="padding: 8px 0; color: #1f2937; font-size: 14px;">${data.schoolName}</td></tr>` : ''}
             </table>
           </div>
+          <p style="color: #6b7280; font-size: 14px; margin-bottom: 16px;">
+            <strong>Login using:</strong> You can use either your <strong>username</strong>${data.email ? ` or your <strong>email address</strong> (${data.email})` : ''} along with your password to sign in.
+          </p>
           <div style="text-align: center; margin: 24px 0;">
             <a href="${data.loginUrl || 'https://smarttechsaas.com/login'}" style="background: #ea6645; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Sign In Now</a>
           </div>
@@ -256,7 +261,7 @@ export class EmailService {
           </div>
         </div>
         <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
-          <p style="margin: 0;">© ${new Date().getFullYear()} Smart Tech. All rights reserved.</p>
+          <p style="margin: 0;">&copy; ${new Date().getFullYear()} Smart Tech. All rights reserved.</p>
         </div>
       </div>
     `;

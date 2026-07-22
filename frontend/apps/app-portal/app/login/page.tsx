@@ -8,7 +8,7 @@ import Link from 'next/link';
 import '../super-admin-fix.css';
 
 function LoginForm() {
-  const [loginMode, setLoginMode] = useState<'email' | 'phone' | 'student'>('email');
+  const [loginMode, setLoginMode] = useState<'email' | 'phone' | 'student' | 'username'>('email');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -142,13 +142,14 @@ function LoginForm() {
                     color: '#374151', 
                     marginBottom: '6px' 
                   }}>
-                    {loginMode === 'email' ? 'Email Address' : loginMode === 'phone' ? 'Phone Number' : 'Admission Number'}
+                    {loginMode === 'email' ? 'Email Address' : loginMode === 'phone' ? 'Phone Number' : loginMode === 'username' ? 'Username' : 'Admission Number'}
                   </label>
                   {!loginAsSuperAdmin && (
                     <div style={{ display: 'flex', gap: '4px', marginBottom: '8px', background: '#f3f4f6', borderRadius: '8px', padding: '4px' }}>
                       {[
                         { mode: 'email' as const, label: 'Email', icon: 'fa-envelope' },
                         { mode: 'phone' as const, label: 'Phone', icon: 'fa-phone' },
+                        { mode: 'username' as const, label: 'Username', icon: 'fa-user' },
                         { mode: 'student' as const, label: 'Student No.', icon: 'fa-graduation-cap' },
                       ].map((opt) => (
                         <button
@@ -186,7 +187,7 @@ function LoginForm() {
                       transform: 'translateY(-50%)',
                       color: '#9ca3af'
                     }}>
-                      <i className={`fa fa-${loginMode === 'email' ? 'envelope' : loginMode === 'phone' ? 'phone' : 'graduation-cap'}`}></i>
+                      <i className={`fa fa-${loginMode === 'email' ? 'envelope' : loginMode === 'phone' ? 'phone' : loginMode === 'username' ? 'user' : 'graduation-cap'}`}></i>
                     </span>
                     <input
                       type={loginMode === 'email' ? 'email' : 'text'}
@@ -204,6 +205,7 @@ function LoginForm() {
                       placeholder={
                         loginMode === 'email' ? 'you@school.com' :
                         loginMode === 'phone' ? '+260XXXXXXXXX' :
+                        loginMode === 'username' ? 'Your username' :
                         'e.g. STD/2025/001'
                       }
                       required

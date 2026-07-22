@@ -1,12 +1,14 @@
 import { Controller, Get, Head } from '@nestjs/common';
 import { HealthService } from './health.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { InstitutionProvisioningService } from '../institution/institution-provisioning.service';
 
 @Controller('health')
 export class HealthController {
   constructor(
     private readonly healthService: HealthService,
     private readonly prisma: PrismaService,
+    private readonly provisioningService: InstitutionProvisioningService,
   ) {}
 
   @Get()
@@ -798,6 +800,25 @@ export class HealthController {
 
     results.summary = `sheetsFixed: ${results.sheetsFixed}, computedResultsUpdated: ${results.computedResultsUpdated}, errors: ${results.errors.length}`;
     return results;
+  }
+
+  @Get('backfill-provisioning')
+  async backfillProvisioning() {
+    const start = Date.now();
+    try {
+      const result = await this.provisioningService.backfillAllSchools();
+      return {
+        status: 'ok',
+        latencyMs: Date.now() - start,
+        ...result,
+      };
+    } catch (error: any) {
+      return {
+        status: 'error',
+        latencyMs: Date.now() - start,
+        message: error?.message,
+      };
+    }
   }
 
   @Head()

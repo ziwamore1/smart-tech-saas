@@ -863,4 +863,27 @@ Email: ${director.email}
       orderBy: { name: 'asc' },
     });
   }
+
+  async backfillAllSchools() {
+    this.logger.log('Starting backfill for all schools...');
+    return this.provisioningService.backfillAllSchools();
+  }
+
+  async reProvisionSchool(schoolId: string) {
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      include: { institutionType: true },
+    });
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const typeCode = school.institutionType?.code;
+    if (!typeCode) {
+      throw new BadRequestException('School has no institution type assigned');
+    }
+
+    this.logger.log(`Re-provisioning school ${school.name} (${typeCode})`);
+    return this.provisioningService.ensureCompleteProvisioning(schoolId, typeCode);
+  }
 }

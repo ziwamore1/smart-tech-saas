@@ -199,6 +199,7 @@ export class IdentityService {
       schoolName: school?.name,
       schoolUrl,
       channel,
+      email: user.email || undefined,
     });
 
     await this.prisma.user.update({

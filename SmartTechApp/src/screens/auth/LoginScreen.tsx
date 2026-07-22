@@ -22,7 +22,7 @@ export const LoginScreen: React.FC = () => {
   const [logoError, setLogoError] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showSuperAdmin, setShowSuperAdmin] = useState(false);
-  const [loginMode, setLoginMode] = useState<'email' | 'phone' | 'student'>('email');
+  const [loginMode, setLoginMode] = useState<'email' | 'phone' | 'student' | 'username'>('email');
   const { login, superAdminLogin, isLoading } = useAuthStore();
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export const LoginScreen: React.FC = () => {
       return;
     }
     if (!email.trim()) {
-      const fieldLabel = loginMode === 'student' ? 'student number' : loginMode === 'phone' ? 'phone number' : 'email';
+      const fieldLabel = loginMode === 'student' ? 'student number' : loginMode === 'phone' ? 'phone number' : loginMode === 'username' ? 'username' : 'email';
       Alert.alert('Error', `Please enter ${fieldLabel}`);
       return;
     }
@@ -55,6 +55,8 @@ export const LoginScreen: React.FC = () => {
       if (loginMode === 'student') {
         await login('', password, deviceToken, email.trim());
       } else if (loginMode === 'phone') {
+        await login('', password, deviceToken, email.trim());
+      } else if (loginMode === 'username') {
         await login('', password, deviceToken, email.trim());
       } else {
         await login(email.trim(), password, deviceToken);
@@ -140,6 +142,12 @@ export const LoginScreen: React.FC = () => {
                     <Text style={[styles.toggleText, loginMode === 'email' && styles.toggleTextActive]}>Email</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
+                    style={[styles.toggleBtn, loginMode === 'username' && styles.toggleBtnActive]}
+                    onPress={() => { setLoginMode('username'); setEmail(''); }}
+                  >
+                    <Text style={[styles.toggleText, loginMode === 'username' && styles.toggleTextActive]}>Username</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
                     style={[styles.toggleBtn, loginMode === 'phone' && styles.toggleBtnActive]}
                     onPress={() => { setLoginMode('phone'); setEmail(''); }}
                   >
@@ -157,16 +165,16 @@ export const LoginScreen: React.FC = () => {
               <View style={styles.inputGroup}>
                 <View style={styles.inputIconWrap}>
                   <Text style={styles.inputIcon}>
-                    {loginMode === 'student' ? '🎓' : loginMode === 'phone' ? '📱' : '✉️'}
+                    {loginMode === 'student' ? '🎓' : loginMode === 'phone' ? '📱' : loginMode === 'username' ? '👤' : '✉️'}
                   </Text>
                 </View>
                 <View style={styles.inputField}>
                   <Input
-                    label={loginMode === 'student' ? 'Student Number' : loginMode === 'phone' ? 'Phone Number' : 'Email'}
-                    placeholder={loginMode === 'student' ? 'Enter admission number' : loginMode === 'phone' ? '+260XXXXXXXXX' : 'Enter your email'}
+                    label={loginMode === 'student' ? 'Student Number' : loginMode === 'phone' ? 'Phone Number' : loginMode === 'username' ? 'Username' : 'Email'}
+                    placeholder={loginMode === 'student' ? 'Enter admission number' : loginMode === 'phone' ? '+260XXXXXXXXX' : loginMode === 'username' ? 'Enter your username' : 'Enter your email'}
                     value={email}
                     onChangeText={setEmail}
-                    keyboardType={loginMode === 'email' ? 'email-address' : loginMode === 'student' ? 'default' : 'phone-pad'}
+                    keyboardType={loginMode === 'email' ? 'email-address' : loginMode === 'student' ? 'default' : 'default'}
                     autoCapitalize="none"
                   />
                 </View>

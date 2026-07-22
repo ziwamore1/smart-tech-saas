@@ -479,47 +479,66 @@ export class InstitutionProvisioningService {
     this.logger.log(`Provisioning ${curriculum.subjects.length} subjects for ${schoolId}`);
 
     let createdCount = 0;
+    let eocsAdded = 0;
+    let aosAdded = 0;
 
     for (const subjectDef of curriculum.subjects) {
-      const existing = await this.prisma.subject.findUnique({
+      let subject = await this.prisma.subject.findUnique({
         where: { name_schoolId: { name: subjectDef.name, schoolId } },
       });
 
-      if (existing) {
-        this.logger.debug(`Subject ${subjectDef.name} already exists for ${schoolId}, skipping`);
-        continue;
+      if (!subject) {
+        subject = await this.prisma.subject.create({
+          data: {
+            name: subjectDef.name,
+            code: subjectDef.code,
+            isCore: subjectDef.isCore,
+            schoolId,
+          },
+        });
+        createdCount++;
       }
 
       const subjectEocs = curriculum.eocs[subjectDef.name] || [];
-      const subjectAos = curriculum.aos[subjectDef.name] || [];
-
-      await this.prisma.subject.create({
-        data: {
-          name: subjectDef.name,
-          code: subjectDef.code,
-          isCore: subjectDef.isCore,
-          schoolId,
-          elementOfConstruct: {
-            create: subjectEocs.map((eoc) => ({
+      for (const eoc of subjectEocs) {
+        const existingEoc = await this.prisma.elementOfConstruct.findFirst({
+          where: { name: eoc.name, subjectId: subject.id },
+        });
+        if (!existingEoc) {
+          await this.prisma.elementOfConstruct.create({
+            data: {
               name: eoc.name,
               construct: eoc.construct,
+              subjectId: subject.id,
               schoolId,
-            })),
-          },
-          assessmentObjectives: {
-            create: subjectAos.map((ao) => ({
+            },
+          });
+          eocsAdded++;
+        }
+      }
+
+      const subjectAos = curriculum.aos[subjectDef.name] || [];
+      for (const ao of subjectAos) {
+        const existingAo = await this.prisma.assessmentObjective.findFirst({
+          where: { name: ao.name, subjectId: subject.id },
+        });
+        if (!existingAo) {
+          await this.prisma.assessmentObjective.create({
+            data: {
               name: ao.name,
               weight: ao.weight,
+              subjectId: subject.id,
               schoolId,
-            })),
-          },
-        },
-      });
-
-      createdCount++;
+            },
+          });
+          aosAdded++;
+        }
+      }
     }
 
-    this.logger.log(`Created ${createdCount} new subjects for ${schoolId} (${institutionTypeCode})`);
+    this.logger.log(
+      `Subject provisioning for ${schoolId}: ${createdCount} subjects, ${eocsAdded} EoCs, ${aosAdded} AOs added`,
+    );
   }
 
   private async provisionEducationLevels(schoolId: string, institutionTypeCode: string) {
@@ -550,6 +569,72 @@ export class InstitutionProvisioningService {
     }
 
     this.logger.log(`Provisioned ${levels.length} education levels for ${schoolId} (${institutionTypeCode})`);
+  }
+
+  async ensureCompleteProvisioning(schoolId: string, institutionTypeCode: string) {
+    this.logger.log(`Ensuring complete provisioning for ${schoolId} (${institutionTypeCode})`);
+
+    const type = await this.prisma.institutionType.findUnique({
+      where: { code: institutionTypeCode as any },
+      include: {
+        modules: { include: { module: true } },
+        features: { include: { feature: true } },
+        roles: { include: { role: true } },
+        dashboards: { include: { dashboard: true } },
+        settings: true,
+      },
+    });
+
+    if (!type) {
+      throw new Error(`Institution type '${institutionTypeCode}' not found`);
+    }
+
+    await this.provisionModules(schoolId, type);
+    await this.provisionRoles(schoolId, type);
+    await this.provisionDashboard(schoolId, type);
+    await this.provisionSettings(schoolId, type);
+    await this.provisionGradingPolicies(schoolId, institutionTypeCode);
+    await this.provisionAssessmentDefinitions(schoolId, institutionTypeCode);
+    await this.provisionEducationLevels(schoolId, institutionTypeCode);
+    await this.provisionSubjects(schoolId, institutionTypeCode);
+    await this.provisionAdmissionSequence(schoolId);
+
+    this.logger.log(`Complete provisioning ensured for ${schoolId}`);
+    return { success: true };
+  }
+
+  async backfillAllSchools() {
+    this.logger.log('Starting backfill for all schools...');
+
+    const schools = await this.prisma.school.findMany({
+      include: { institutionType: true },
+    });
+
+    let processed = 0;
+    let succeeded = 0;
+    let failed = 0;
+
+    for (const school of schools) {
+      const typeCode = school.institutionType?.code;
+      if (!typeCode) {
+        this.logger.warn(`School ${school.name} (${school.id}) has no institution type, skipping`);
+        continue;
+      }
+
+      try {
+        await this.ensureCompleteProvisioning(school.id, typeCode);
+        succeeded++;
+        this.logger.log(`Backfilled school: ${school.name} (${typeCode})`);
+      } catch (error) {
+        failed++;
+        this.logger.error(`Failed to backfill school ${school.name}: ${error}`);
+      }
+
+      processed++;
+    }
+
+    this.logger.log(`Backfill complete: ${processed} processed, ${succeeded} succeeded, ${failed} failed`);
+    return { processed, succeeded, failed };
   }
 
   private async provisionAdmissionSequence(schoolId: string) {

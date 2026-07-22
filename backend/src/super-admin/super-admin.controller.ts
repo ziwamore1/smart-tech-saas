@@ -182,6 +182,16 @@ export class SuperAdminController {
   async getAllRoles() {
     return this.superAdminService.getAllRoles();
   }
+
+  @Post('backfill-provisioning')
+  async backfillProvisioning() {
+    return this.superAdminService.backfillAllSchools();
+  }
+
+  @Post('schools/:schoolId/re-provision')
+  async reProvisionSchool(@Param('schoolId') schoolId: string) {
+    return this.superAdminService.reProvisionSchool(schoolId);
+  }
 }
 
 @Controller('super-admin/setup')
