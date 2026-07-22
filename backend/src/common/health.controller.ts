@@ -1,14 +1,13 @@
 import { Controller, Get, Head } from '@nestjs/common';
 import { HealthService } from './health.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { InstitutionProvisioningService } from '../institution/institution-provisioning.service';
+import { getCurriculumData } from '../institution/default-curriculum-data';
 
 @Controller('health')
 export class HealthController {
   constructor(
     private readonly healthService: HealthService,
     private readonly prisma: PrismaService,
-    private readonly provisioningService: InstitutionProvisioningService,
   ) {}
 
   @Get()
@@ -808,7 +807,6 @@ export class HealthController {
     try {
       const schools = await this.prisma.school.findMany({
         include: { institutionType: true },
-        take: 5,
       });
 
       if (schools.length === 0) {
@@ -817,63 +815,80 @@ export class HealthController {
 
       let succeeded = 0;
       let failed = 0;
-      const details: string[] = [];
-
-      for (const school of schools) {
-        const typeCode = school.institutionType?.code;
-        if (!typeCode) {
-          details.push(`${school.name}: no institution type, skipped`);
-          continue;
-        }
-
-        try {
-          await this.provisioningService.ensureCompleteProvisioning(school.id, typeCode);
-          succeeded++;
-          details.push(`${school.name}: OK`);
-        } catch (e: any) {
-          failed++;
-          details.push(`${school.name}: ${e.message}`);
-        }
-      }
-
-      return {
-        status: 'ok',
-        latencyMs: Date.now() - start,
-        processed: schools.length,
-        succeeded,
-        failed,
-        details,
-        note: 'Processed first 5 schools. Call again to continue.',
-      };
-    } catch (error: any) {
-      return {
-        status: 'error',
-        latencyMs: Date.now() - start,
-        message: error?.message,
-      };
-    }
-  }
-
-  @Get('backfill-provisioning-all')
-  async backfillProvisioningAll() {
-    const start = Date.now();
-    try {
-      const schools = await this.prisma.school.findMany({
-        include: { institutionType: true },
-      });
-
-      let succeeded = 0;
-      let failed = 0;
+      let totalSubjects = 0;
+      let totalEocs = 0;
+      let totalAos = 0;
+      const errors: string[] = [];
 
       for (const school of schools) {
         const typeCode = school.institutionType?.code;
         if (!typeCode) continue;
 
         try {
-          await this.provisioningService.ensureCompleteProvisioning(school.id, typeCode);
+          const curriculum = getCurriculumData(typeCode);
+          if (!curriculum) continue;
+
+          for (const subjectDef of curriculum.subjects) {
+            let subject = await this.prisma.subject.findFirst({
+              where: { name: subjectDef.name, schoolId: school.id },
+            });
+
+            if (!subject) {
+              try {
+                subject = await this.prisma.subject.create({
+                  data: {
+                    name: subjectDef.name,
+                    code: subjectDef.code,
+                    isCore: subjectDef.isCore,
+                    schoolId: school.id,
+                  },
+                });
+                totalSubjects++;
+              } catch (e: any) {
+                if (e?.code === 'P2002') {
+                  subject = await this.prisma.subject.findFirst({
+                    where: { name: subjectDef.name, schoolId: school.id },
+                  });
+                }
+                if (!subject) continue;
+              }
+            }
+
+            const subjectEocs = curriculum.eocs[subjectDef.name] || [];
+            for (const eoc of subjectEocs) {
+              try {
+                const exists = await this.prisma.elementOfConstruct.findFirst({
+                  where: { name: eoc.name, subjectId: subject.id },
+                });
+                if (!exists) {
+                  await this.prisma.elementOfConstruct.create({
+                    data: { name: eoc.name, construct: eoc.construct, subjectId: subject.id, schoolId: school.id },
+                  });
+                  totalEocs++;
+                }
+              } catch {}
+            }
+
+            const subjectAos = curriculum.aos[subjectDef.name] || [];
+            for (const ao of subjectAos) {
+              try {
+                const exists = await this.prisma.assessmentObjective.findFirst({
+                  where: { name: ao.name, subjectId: subject.id },
+                });
+                if (!exists) {
+                  await this.prisma.assessmentObjective.create({
+                    data: { name: ao.name, weight: ao.weight, subjectId: subject.id, schoolId: school.id },
+                  });
+                  totalAos++;
+                }
+              } catch {}
+            }
+          }
+
           succeeded++;
-        } catch {
+        } catch (e: any) {
           failed++;
+          errors.push(`${school.name}: ${e.message}`);
         }
       }
 
@@ -883,6 +898,10 @@ export class HealthController {
         processed: schools.length,
         succeeded,
         failed,
+        subjectsCreated: totalSubjects,
+        eocsCreated: totalEocs,
+        aosCreated: totalAos,
+        errors: errors.length > 0 ? errors : undefined,
       };
     } catch (error: any) {
       return {

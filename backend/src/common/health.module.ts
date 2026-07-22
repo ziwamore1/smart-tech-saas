@@ -4,10 +4,9 @@ import { HealthController } from './health.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { MinistryGatewayModule } from '../ministry-gateway/ministry-gateway.module';
 import { BlockchainModule } from '../blockchain-service/blockchain.module';
-import { InstitutionModule } from '../institution/institution.module';
 
 @Module({
-  imports: [PrismaModule, MinistryGatewayModule, BlockchainModule, InstitutionModule],
+  imports: [PrismaModule, MinistryGatewayModule, BlockchainModule],
   providers: [HealthService],
   controllers: [HealthController],
   exports: [HealthService],
