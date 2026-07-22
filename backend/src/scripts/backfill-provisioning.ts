@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { getCurriculumData } from '../institution/default-curriculum-data';
+import { getCurriculumData } from '../common/curriculum-data';
 
 const prisma = new PrismaClient();
 

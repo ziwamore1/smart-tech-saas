@@ -1,7 +1,7 @@
 import { Controller, Get, Head } from '@nestjs/common';
 import { HealthService } from './health.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { getCurriculumData } from '../institution/default-curriculum-data';
+import { getCurriculumData } from './curriculum-data';
 
 @Controller('health')
 export class HealthController {

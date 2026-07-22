@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { getCurriculumData } from './default-curriculum-data';
+import { getCurriculumData } from '../common/curriculum-data';
 
 @Injectable()
 export class InstitutionProvisioningService {
