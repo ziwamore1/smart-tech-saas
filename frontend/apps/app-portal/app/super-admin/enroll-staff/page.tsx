@@ -41,8 +41,9 @@ export default function EnrollStaffPage() {
   const loadSchools = async () => {
     try {
       const res = await superAdminApi.getSchools();
-      const data = res.data?.data || res.data || [];
-      setSchools(Array.isArray(data) ? data.filter((s: any) => s.status === 'active' || s.status === 'trial') : []);
+      const payload = res.data?.data ?? res.data;
+      const list = Array.isArray(payload) ? payload : [];
+      setSchools(list.filter((s: any) => s.isActive && (s.subscriptionStatus === 'active' || s.subscriptionStatus === 'trial')));
     } catch (error) {
       console.error('Failed to load schools:', error);
     } finally {
