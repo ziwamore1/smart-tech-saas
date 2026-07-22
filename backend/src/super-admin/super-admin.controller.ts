@@ -186,10 +186,10 @@ export class SuperAdminController {
   @Post('enroll-self-as-staff')
   async enrollSelfAsStaff(
     @Request() req: any,
-    @Body() data: { schoolId: string; role: string },
+    @Body() data: any,
   ) {
     return this.superAdminService.enrollAsStaff(
-      req.user.sub,
+      req.user.id,
       data.schoolId,
       data.role,
     );

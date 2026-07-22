@@ -6,10 +6,14 @@ import { useAuth } from '@/lib/auth-context';
 import { superAdminApi } from '@/lib/api';
 
 const STAFF_ROLES = [
-  { value: 'admin', label: 'School Admin' },
-  { value: 'teacher', label: 'Teacher' },
-  { value: 'student', label: 'Student' },
-  { value: 'parent', label: 'Parent' },
+  { value: 'Director', label: 'Director' },
+  { value: 'Head Teacher', label: 'Head Teacher' },
+  { value: 'Teacher', label: 'Teacher' },
+  { value: 'Class Teacher', label: 'Class Teacher' },
+  { value: 'HOD', label: 'Head of Department' },
+  { value: 'Accountant', label: 'Accountant' },
+  { value: 'Secretary', label: 'Secretary' },
+  { value: 'Deputy', label: 'Deputy' },
 ];
 
 export default function EnrollStaffPage() {
@@ -21,7 +25,7 @@ export default function EnrollStaffPage() {
 
   const [schools, setSchools] = useState<Array<{ id: string; name: string; status: string }>>([]);
   const [selectedSchool, setSelectedSchool] = useState('');
-  const [selectedRole, setSelectedRole] = useState('admin');
+  const [selectedRole, setSelectedRole] = useState('Director');
 
   const gradOrange = 'linear-gradient(135deg, #ea6645, #f59e0b)';
   const gradGreen = 'linear-gradient(135deg, #10b981, #059669)';
@@ -63,7 +67,7 @@ export default function EnrollStaffPage() {
       const res = await superAdminApi.enrollSelfAsStaff(selectedSchool, selectedRole);
       setMessage({ type: 'success', text: res.data?.message || 'Successfully enrolled as staff!' });
       setSelectedSchool('');
-      setSelectedRole('admin');
+      setSelectedRole('Director');
       setTimeout(() => setMessage(null), 5000);
     } catch (error: any) {
       const msg = error?.response?.data?.message || 'Failed to enroll as staff';
@@ -150,7 +154,7 @@ export default function EnrollStaffPage() {
 
         <div style={{ marginBottom: '28px' }}>
           <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>Role</label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px' }}>
             {STAFF_ROLES.map(r => (
               <button
                 key={r.value}
@@ -162,7 +166,7 @@ export default function EnrollStaffPage() {
                   transition: 'all 0.2s',
                 }}
               >
-                <i className={`fa ${r.value === 'admin' ? 'fa-user-shield' : r.value === 'teacher' ? 'fa-chalkboard-teacher' : r.value === 'student' ? 'fa-user-graduate' : 'fa-user-friends'}`} style={{ marginRight: '8px' }}></i>
+                <i className={`fa ${r.value === 'Director' ? 'fa-user-shield' : r.value === 'Head Teacher' ? 'fa-chalkboard-teacher' : r.value === 'Teacher' ? 'fa-chalkboard-teacher' : r.value === 'Class Teacher' ? 'fa-user-graduate' : r.value === 'Accountant' ? 'fa-calculator' : r.value === 'Secretary' ? 'fa-keyboard' : 'fa-user-tie'}`} style={{ marginRight: '8px' }}></i>
                 {r.label}
               </button>
             ))}
