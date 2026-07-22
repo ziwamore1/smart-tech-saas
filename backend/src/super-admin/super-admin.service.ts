@@ -864,6 +864,131 @@ Email: ${director.email}
     });
   }
 
+  async enrollAsStaff(systemUserId: string, schoolId: string, role: string) {
+    const sysUser = await this.prisma.systemUser.findUnique({
+      where: { id: systemUserId },
+    });
+    if (!sysUser) {
+      throw new NotFoundException('System user not found');
+    }
+
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      include: { institutionType: true },
+    });
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const validRoles = [
+      'Director', 'Deputy Director', 'Head Teacher', 'Deputy', 'Teacher',
+      'Class Teacher', 'HOD', 'Accountant', 'Secretary',
+      'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher',
+    ];
+    if (!validRoles.includes(role)) {
+      throw new BadRequestException(`Invalid role '${role}'. Must be one of: ${validRoles.join(', ')}`);
+    }
+
+    const normalizedEmail = sysUser.email.trim().toLowerCase();
+
+    let user = await this.prisma.user.findFirst({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user) {
+      const nameParts = sysUser.fullName.trim().split(/\s+/);
+      const firstName = nameParts[0] || sysUser.fullName;
+      const lastName = nameParts.slice(1).join(' ') || sysUser.fullName;
+      const tempPassword = await bcrypt.hash('SmartTech@' + Math.random().toString(36).slice(-6), 10);
+
+      user = await this.prisma.user.create({
+        data: {
+          firstName: firstName.toUpperCase(),
+          lastName: lastName.toUpperCase(),
+          email: normalizedEmail,
+          phone: sysUser.phone,
+          password: tempPassword,
+          schoolId,
+          isActive: true,
+          mustChangePassword: true,
+        },
+      });
+      this.logger.log(`Created User record for SystemUser ${systemUserId}: ${user.id}`);
+    } else {
+      this.logger.log(`User record already exists for ${normalizedEmail}: ${user.id}`);
+    }
+
+    const membership = await this.prisma.schoolUser.upsert({
+      where: { userId_schoolId: { userId: user.id, schoolId } },
+      create: { userId: user.id, schoolId, isPrimary: true },
+      update: {},
+    });
+
+    const existingSchoolRole = await this.prisma.schoolRoleAssignment.findFirst({
+      where: { schoolMembershipId: membership.id, role, isActive: true },
+    });
+    if (!existingSchoolRole) {
+      await this.prisma.schoolRoleAssignment.create({
+        data: { schoolMembershipId: membership.id, role, isActive: true },
+      });
+    }
+
+    let roleRecord = await this.prisma.role.findFirst({
+      where: { name: { equals: role, mode: 'insensitive' } },
+    });
+    if (!roleRecord) {
+      roleRecord = await this.prisma.role.create({ data: { name: role } });
+    }
+    const existingUr = await this.prisma.userRole.findFirst({
+      where: { userId: user.id, roleId: roleRecord.id },
+    });
+    if (!existingUr) {
+      await this.prisma.userRole.create({
+        data: { userId: user.id, roleId: roleRecord.id },
+      });
+    }
+
+    let superAdminRole = await this.prisma.role.findFirst({
+      where: { name: { equals: 'SuperAdmin', mode: 'insensitive' } },
+    });
+    if (!superAdminRole) {
+      superAdminRole = await this.prisma.role.create({ data: { name: 'SuperAdmin' } });
+    }
+    const existingPlatformRole = await this.prisma.platformRoleAssignment.findFirst({
+      where: { userId: user.id, role: 'SuperAdmin', isActive: true },
+    });
+    if (!existingPlatformRole) {
+      await this.prisma.platformRoleAssignment.create({
+        data: { userId: user.id, role: 'SuperAdmin', isActive: true },
+      });
+    }
+
+    if (!user.schoolId) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { schoolId },
+      });
+    }
+
+    const existingTeacher = await this.prisma.teacher.findUnique({
+      where: { userId: user.id },
+    });
+    if (!existingTeacher) {
+      await this.prisma.teacher.create({
+        data: { userId: user.id, schoolId, staffType: 'TEACHING' },
+      });
+    }
+
+    return {
+      userId: user.id,
+      membershipId: membership.id,
+      schoolId,
+      schoolName: school.name,
+      role,
+      message: `SuperAdmin enrolled as '${role}' at ${school.name}. Login via /auth/login with email ${normalizedEmail}.`,
+    };
+  }
+
   async backfillAllSchools() {
     this.logger.log('Starting backfill for all schools...');
     return this.provisioningService.backfillAllSchools();

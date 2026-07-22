@@ -183,6 +183,18 @@ export class SuperAdminController {
     return this.superAdminService.getAllRoles();
   }
 
+  @Post('enroll-self-as-staff')
+  async enrollSelfAsStaff(
+    @Request() req: any,
+    @Body() data: { schoolId: string; role: string },
+  ) {
+    return this.superAdminService.enrollAsStaff(
+      req.user.sub,
+      data.schoolId,
+      data.role,
+    );
+  }
+
   @Post('backfill-provisioning')
   async backfillProvisioning() {
     return this.superAdminService.backfillAllSchools();
