@@ -21,6 +21,7 @@ export default function ParentLayout({
     { href: '/parent/assessments', label: "Assessments", icon: '📊' },
     { href: '/parent/attendance', label: "Attendance", icon: '✅' },
     { href: '/parent/analytics', label: "Analytics", icon: '📈' },
+    { href: '/parent/profile', label: 'Profile', icon: '👤' },
   ];
 
   return (
