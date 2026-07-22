@@ -483,55 +483,79 @@ export class InstitutionProvisioningService {
     let aosAdded = 0;
 
     for (const subjectDef of curriculum.subjects) {
-      let subject = await this.prisma.subject.findUnique({
-        where: { name_schoolId: { name: subjectDef.name, schoolId } },
+      let subject = await this.prisma.subject.findFirst({
+        where: { name: subjectDef.name, schoolId },
       });
 
       if (!subject) {
-        subject = await this.prisma.subject.create({
-          data: {
-            name: subjectDef.name,
-            code: subjectDef.code,
-            isCore: subjectDef.isCore,
-            schoolId,
-          },
-        });
-        createdCount++;
+        try {
+          subject = await this.prisma.subject.create({
+            data: {
+              name: subjectDef.name,
+              code: subjectDef.code,
+              isCore: subjectDef.isCore,
+              schoolId,
+            },
+          });
+          createdCount++;
+        } catch (e: any) {
+          if (e?.code === 'P2002') {
+            subject = await this.prisma.subject.findFirst({
+              where: { name: subjectDef.name, schoolId },
+            });
+          }
+          if (!subject) {
+            this.logger.error(`Failed to create subject ${subjectDef.name} for ${schoolId}: ${e.message}`);
+            continue;
+          }
+        }
       }
 
       const subjectEocs = curriculum.eocs[subjectDef.name] || [];
       for (const eoc of subjectEocs) {
-        const existingEoc = await this.prisma.elementOfConstruct.findFirst({
-          where: { name: eoc.name, subjectId: subject.id },
-        });
-        if (!existingEoc) {
-          await this.prisma.elementOfConstruct.create({
-            data: {
-              name: eoc.name,
-              construct: eoc.construct,
-              subjectId: subject.id,
-              schoolId,
-            },
+        try {
+          const existingEoc = await this.prisma.elementOfConstruct.findFirst({
+            where: { name: eoc.name, subjectId: subject.id },
           });
-          eocsAdded++;
+          if (!existingEoc) {
+            await this.prisma.elementOfConstruct.create({
+              data: {
+                name: eoc.name,
+                construct: eoc.construct,
+                subjectId: subject.id,
+                schoolId,
+              },
+            });
+            eocsAdded++;
+          }
+        } catch (e: any) {
+          if (e?.code !== 'P2002') {
+            this.logger.debug(`EoC "${eoc.name}" issue for subject ${subjectDef.name}: ${e.message}`);
+          }
         }
       }
 
       const subjectAos = curriculum.aos[subjectDef.name] || [];
       for (const ao of subjectAos) {
-        const existingAo = await this.prisma.assessmentObjective.findFirst({
-          where: { name: ao.name, subjectId: subject.id },
-        });
-        if (!existingAo) {
-          await this.prisma.assessmentObjective.create({
-            data: {
-              name: ao.name,
-              weight: ao.weight,
-              subjectId: subject.id,
-              schoolId,
-            },
+        try {
+          const existingAo = await this.prisma.assessmentObjective.findFirst({
+            where: { name: ao.name, subjectId: subject.id },
           });
-          aosAdded++;
+          if (!existingAo) {
+            await this.prisma.assessmentObjective.create({
+              data: {
+                name: ao.name,
+                weight: ao.weight,
+                subjectId: subject.id,
+                schoolId,
+              },
+            });
+            aosAdded++;
+          }
+        } catch (e: any) {
+          if (e?.code !== 'P2002') {
+            this.logger.debug(`AO "${ao.name}" issue for subject ${subjectDef.name}: ${e.message}`);
+          }
         }
       }
     }
