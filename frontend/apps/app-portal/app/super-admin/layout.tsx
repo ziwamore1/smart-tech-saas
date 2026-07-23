@@ -252,6 +252,7 @@ export default function SuperAdminLayout({
   }>>([]);
   const [identitiesLoading, setIdentitiesLoading] = useState(false);
   const [switchingSchool, setSwitchingSchool] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -514,7 +515,12 @@ export default function SuperAdminLayout({
                       onClick={() => {
                         setMobileMenuOpen(false);
                         setSwitchingSchool(identity.schoolId);
-                        switchToSchool(identity.schoolId).catch(() => setSwitchingSchool(null));
+                        setSwitchError(null);
+                        switchToSchool(identity.schoolId)
+                          .catch((err: any) => {
+                            setSwitchingSchool(null);
+                            setSwitchError(err?.message || 'Failed to switch');
+                          });
                       }}
                       disabled={switchingSchool !== null}
                       style={{
@@ -556,6 +562,11 @@ export default function SuperAdminLayout({
                       </div>
                     </button>
                   ))}
+                  {switchError && (
+                    <div style={{ fontSize: '12px', color: '#dc2626', padding: '8px 14px', background: '#fef2f2', borderRadius: '8px', marginTop: '4px' }}>
+                      {switchError}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -774,7 +785,12 @@ export default function SuperAdminLayout({
                 key={identity.schoolId}
                 onClick={() => {
                   setSwitchingSchool(identity.schoolId);
-                  switchToSchool(identity.schoolId).catch(() => setSwitchingSchool(null));
+                  setSwitchError(null);
+                  switchToSchool(identity.schoolId)
+                    .catch((err: any) => {
+                      setSwitchingSchool(null);
+                      setSwitchError(err?.message || 'Failed to switch');
+                    });
                 }}
                 disabled={switchingSchool !== null}
                 className="identity-card"
@@ -818,6 +834,11 @@ export default function SuperAdminLayout({
                 </div>
               </button>
             ))}
+            {switchError && (
+              <div style={{ fontSize: '12px', color: '#dc2626', padding: '8px 14px', background: '#fef2f2', borderRadius: '8px', marginTop: '4px' }}>
+                {switchError}
+              </div>
+            )}
           </div>
         )}
 

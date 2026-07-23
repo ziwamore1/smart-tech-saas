@@ -166,7 +166,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const switchToSchool = async (schoolId: string) => {
     const saToken = localStorage.getItem('sa_token');
-    if (!saToken) throw new Error('No SuperAdmin token available');
+    if (!saToken) {
+      console.error('[Auth] No SuperAdmin token available for identity switch');
+      throw new Error('No SuperAdmin token available. Please log in as Super Admin first.');
+    }
 
     const response = await authApi.switchIdentity(schoolId);
     const data = response.data?.data || response.data;
@@ -186,16 +189,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     localStorage.setItem('auth_token', saToken);
     localStorage.setItem('user', saUser);
-    localStorage.removeItem('sa_token');
-    localStorage.removeItem('sa_user');
     window.location.reload();
   };
 
-  const [isImpersonating, setIsImpersonating] = useState(false);
-
-  useEffect(() => {
-    setIsImpersonating(!!localStorage.getItem('sa_token'));
-  }, []);
+  const isImpersonating = isSuperAdmin && !!user?.schoolId;
 
   const allRoles = mergeAllRoles(user);
   const isSuperAdmin = allRoles.includes('SuperAdmin');

@@ -181,20 +181,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     localStorage.setItem('auth_token', saToken);
     localStorage.setItem('user', saUser);
-    localStorage.removeItem('sa_token');
-    localStorage.removeItem('sa_user');
     window.location.reload();
   };
-
-  const [isImpersonating, setIsImpersonating] = useState(false);
-
-  useEffect(() => {
-    setIsImpersonating(!!localStorage.getItem('sa_token'));
-  }, []);
 
   const allRoles = mergeAllRoles(user);
   const isSuperAdmin = allRoles.includes('SuperAdmin');
   const isPureSuperAdmin = isSuperAdmin && !user?.schoolId;
+  const isImpersonating = isSuperAdmin && !!user?.schoolId;
   const isDirector = allRoles.includes('Director') || allRoles.includes('SuperAdmin');
   const isTeacher = allRoles.includes('Teacher') || allRoles.includes('Class Teacher') || allRoles.includes('ClassTeacher');
   const isClassTeacher = allRoles.includes('Class Teacher') || allRoles.includes('ClassTeacher') || !!user?.classTeacherOf;
