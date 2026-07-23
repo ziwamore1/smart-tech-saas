@@ -737,18 +737,15 @@ export default function DashboardLayout({
     queryKey: ['school', user?.schoolId],
     queryFn: async () => {
       try {
-        console.log('[Dashboard Layout] Calling schoolApi.getProfile');
         const res = await schoolApi.getProfile();
-        console.log('[Dashboard Layout] School API response:', JSON.stringify(res.data));
         return res.data?.data || res.data || null;
       } catch (err: any) {
-        console.error('[Dashboard Layout] School API error:', err?.response?.status, err?.response?.data, err.message);
         return null;
       }
     },
     retry: 2,
     staleTime: 5 * 60 * 1000,
-    enabled: !isSuperAdmin,
+    enabled: !isSuperAdmin && isAuthenticated && !!user?.schoolId,
   });
 
   const resolvedInstitutionType = institutionType || schoolData?.institutionType?.code || null;
@@ -835,7 +832,38 @@ export default function DashboardLayout({
   }
 
   if (!isAuthenticated) {
-    return null;
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        background: '#f5efe8'
+      }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '16px'
+        }}>
+          <img src="/smart_tech_logo.png" alt="Smart Tech SaaS" style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover' }} />
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid #e8ddd0',
+            borderTopColor: '#ea6645',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }}></div>
+          <span style={{ color: '#666', fontSize: '14px' }}>Redirecting to login...</span>
+        </div>
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
   }
 
   return (

@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }).catch((err: any) => {
         const status = err?.response?.status;
-        if (status === 401 || status === 403) {
+        if (status === 401 || status === 403 || status === 404) {
           localStorage.removeItem('auth_token');
           localStorage.removeItem('user');
           localStorage.removeItem('sa_token');
