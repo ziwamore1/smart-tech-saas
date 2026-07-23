@@ -219,7 +219,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.reload();
   };
 
-  const isImpersonating = !!localStorage.getItem('sa_token');
+  const [isImpersonating, setIsImpersonating] = useState(false);
+
+  useEffect(() => {
+    setIsImpersonating(!!localStorage.getItem('sa_token'));
+  }, []);
 
   const allRoles = mergeAllRoles(user);
   const isSuperAdmin = allRoles.includes('SuperAdmin');
