@@ -777,10 +777,10 @@ export default function DashboardLayout({
   }, [isAuthenticated, isLoading, router]);
 
   useEffect(() => {
-    if (!isLoading && isSuperAdmin && pathname === '/dashboard') {
+    if (!isLoading && isSuperAdmin && !user?.schoolId && pathname === '/dashboard') {
       router.push('/super-admin');
     }
-  }, [isLoading, isSuperAdmin, pathname, router]);
+  }, [isLoading, isSuperAdmin, user, pathname, router]);
 
   const TYPE_ROUTE_MAP: Record<string, string> = {
     PRIMARY_SCHOOL: '/dashboard/primary',
