@@ -24,6 +24,7 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   isSuperAdmin: boolean;
+  isPureSuperAdmin: boolean;
   isDirector: boolean;
   isTeacher: boolean;
   isClassTeacher: boolean;
@@ -193,6 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const allRoles = mergeAllRoles(user);
   const isSuperAdmin = allRoles.includes('SuperAdmin');
+  const isPureSuperAdmin = isSuperAdmin && !user?.schoolId;
   const isDirector = allRoles.includes('Director') || allRoles.includes('SuperAdmin');
   const isTeacher = allRoles.includes('Teacher') || allRoles.includes('Class Teacher') || allRoles.includes('ClassTeacher');
   const isClassTeacher = allRoles.includes('Class Teacher') || allRoles.includes('ClassTeacher') || !!user?.classTeacherOf;
@@ -204,6 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         token,
         isLoading,
         isSuperAdmin,
+        isPureSuperAdmin,
         isDirector,
         isTeacher,
         isClassTeacher,
@@ -237,6 +240,11 @@ export function useUserRoles() {
 export function useIsSuperAdmin() {
   const { isSuperAdmin } = useAuth();
   return isSuperAdmin;
+}
+
+export function useIsPureSuperAdmin() {
+  const { isPureSuperAdmin } = useAuth();
+  return isPureSuperAdmin;
 }
 
 export function useIsDirector() {

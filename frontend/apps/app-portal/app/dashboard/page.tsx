@@ -9,7 +9,7 @@ import Icon3D from '@/components/Icon3D';
 import { INSTITUTION_TYPE_LABELS, INSTITUTION_TYPE_FEATURES, InstitutionTypeCode } from '@/lib/institution-types';
 
 export default function DashboardPage() {
-  const { user, allRoles, isSuperAdmin, isDirector } = useAuth();
+  const { user, allRoles, isSuperAdmin, isPureSuperAdmin, isDirector } = useAuth();
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
 
@@ -661,7 +661,7 @@ export default function DashboardPage() {
       )}
 
       {/* Intelligence Modules - Admin only */}
-      {(isSuperAdmin || isDirector) && (
+      {(isPureSuperAdmin || isDirector) && (
       <div style={{
         background: '#fefcf9',
         borderRadius: '12px',

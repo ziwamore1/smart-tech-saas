@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth, useIsSuperAdmin } from '@/lib/auth-context';
+import { useAuth, useIsPureSuperAdmin } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import {
   HardDrive,
@@ -35,7 +35,7 @@ function formatBytes(bytes: number): string {
 
 export default function MediaPage() {
   const { isAuthenticated, isLoading } = useAuth();
-  const isSuperAdmin = useIsSuperAdmin();
+  const isPureSuperAdmin = useIsPureSuperAdmin();
   const router = useRouter();
 
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
@@ -250,7 +250,7 @@ export default function MediaPage() {
             >
               <RefreshCw className="h-4 w-4" />
             </button>
-            {isSuperAdmin && (
+            {isPureSuperAdmin && (
               <button
                 onClick={handleCleanupOrphaned}
                 disabled={orphaning}

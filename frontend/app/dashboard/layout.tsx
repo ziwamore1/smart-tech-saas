@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth, useIsSuperAdmin, useIsDirector, useIsTeacher, useIsClassTeacher } from '@/lib/auth-context';
+import { useAuth, useIsSuperAdmin, useIsPureSuperAdmin, useIsDirector, useIsTeacher, useIsClassTeacher } from '@/lib/auth-context';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -571,11 +571,11 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, isLoading, user, logout } = useAuth();
   const isSuperAdmin = useIsSuperAdmin();
+  const isPureSuperAdmin = useIsPureSuperAdmin();
   const isDirector = useIsDirector();
   const router = useRouter();
   const pathname = usePathname();
   const userRoles = user?.roles || [];
-  const isPureSuperAdmin = isSuperAdmin && !user?.schoolId;
   const institutionType = user?.institutionType || null;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -602,10 +602,10 @@ export default function DashboardLayout({
   }, [isAuthenticated, isLoading, router]);
 
   useEffect(() => {
-    if (!isLoading && isSuperAdmin && !user?.schoolId && pathname === '/dashboard') {
+    if (!isLoading && isPureSuperAdmin && pathname === '/dashboard') {
       router.push('/super-admin');
     }
-  }, [isLoading, isSuperAdmin, user, pathname, router]);
+  }, [isLoading, isPureSuperAdmin, pathname, router]);
 
   const TYPE_ROUTE_MAP: Record<string, string> = {
     PRIMARY_SCHOOL: '/dashboard/primary',
@@ -641,7 +641,7 @@ export default function DashboardLayout({
     if (!isLoading && !isPureSuperAdmin && pathname === '/dashboard' && typeDashboardPath && typeDashboardPath !== '/dashboard') {
       router.push(typeDashboardPath);
     }
-  }, [isLoading, isSuperAdmin, pathname, router, typeDashboardPath]);
+  }, [isLoading, isPureSuperAdmin, pathname, router, typeDashboardPath]);
 
   if (isLoading) {
     return (
