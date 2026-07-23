@@ -202,7 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     localStorage.setItem('auth_token', data.access_token);
     localStorage.setItem('user', JSON.stringify(data.user));
-    window.location.reload();
+    window.location.href = '/dashboard';
   };
 
   const switchToSuperAdmin = () => {

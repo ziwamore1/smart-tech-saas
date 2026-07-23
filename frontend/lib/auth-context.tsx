@@ -172,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!data?.access_token) throw new Error('Failed to switch identity');
     localStorage.setItem('auth_token', data.access_token);
     localStorage.setItem('user', JSON.stringify(data.user));
-    window.location.reload();
+    window.location.href = '/dashboard';
   };
 
   const switchToSuperAdmin = () => {
