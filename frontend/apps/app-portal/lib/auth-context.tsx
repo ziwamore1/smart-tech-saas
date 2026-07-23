@@ -192,11 +192,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.reload();
   };
 
-  const isImpersonating = isSuperAdmin && !!user?.schoolId;
-
   const allRoles = mergeAllRoles(user);
   const isSuperAdmin = allRoles.includes('SuperAdmin');
   const isPureSuperAdmin = isSuperAdmin && !user?.schoolId;
+  const isImpersonating = isSuperAdmin && !!user?.schoolId;
   const isDirector = allRoles.includes('Director') || allRoles.includes('SuperAdmin');
   const isTeacher = allRoles.includes('Teacher') || allRoles.includes('Class Teacher') || allRoles.includes('ClassTeacher');
   const isClassTeacher = allRoles.includes('Class Teacher') || allRoles.includes('ClassTeacher') || !!user?.classTeacherOf;
