@@ -64,6 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = localStorage.getItem('user');
     
     if (!storedToken || !storedUser) {
+      setToken(null);
+      setUser(null);
       setIsLoading(false);
       return;
     }
@@ -72,45 +74,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
-
-      // Fetch fresh profile from backend to sync roles (handles role changes without re-login)
-      authApi.getMe().then((res: any) => {
-        const profile = res.data?.data || res.data;
-        if (profile) {
-          const mergedUser = {
-            ...parsedUser,
-            id: profile.id || parsedUser.id,
-            email: profile.email || parsedUser.email,
-            firstName: profile.firstName || parsedUser.firstName,
-            lastName: profile.lastName || parsedUser.lastName,
-            phone: profile.phone || parsedUser.phone,
-            roles: profile.roles || parsedUser.roles,
-            schoolRoles: profile.schoolRoles || parsedUser.schoolRoles,
-            platformRoles: profile.platformRoles || parsedUser.platformRoles,
-            schoolId: profile.schoolId ?? parsedUser.schoolId,
-            teacherId: profile.teacherId || parsedUser.teacherId,
-            classTeacherOf: profile.classTeacherOf || parsedUser.classTeacherOf,
-            institutionType: profile.institutionType || parsedUser.institutionType,
-          };
-          localStorage.setItem('user', JSON.stringify(mergedUser));
-          setUser(mergedUser);
-        }
-        setIsLoading(false);
-      }).catch((err: any) => {
-        const status = err?.response?.status;
-        if (status === 401 || status === 403 || status === 404) {
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('user');
-          localStorage.removeItem('sa_token');
-          localStorage.removeItem('sa_user');
-          setToken(null);
-          setUser(null);
-        }
-        setIsLoading(false);
-      });
+      setIsLoading(false);
     } catch (e) {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user');
+      localStorage.removeItem('sa_token');
+      localStorage.removeItem('sa_user');
+      setToken(null);
+      setUser(null);
       setIsLoading(false);
     }
   }, []);
