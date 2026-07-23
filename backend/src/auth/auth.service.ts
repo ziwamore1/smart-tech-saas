@@ -990,6 +990,129 @@ export class AuthService {
     return password;
   }
 
+  async switchIdentity(systemUserId: string, schoolId: string) {
+    const sysUser = await this.prisma.systemUser.findUnique({
+      where: { id: systemUserId },
+    });
+    if (!sysUser) throw new NotFoundException('System user not found');
+
+    const normalizedEmail = sysUser.email.trim().toLowerCase();
+    const user = await this.prisma.user.findFirst({
+      where: { email: normalizedEmail },
+      include: {
+        userRoles: { include: { role: true } },
+        schoolUsers: { select: { schoolId: true, isPrimary: true } },
+        teacher: { select: { id: true } },
+      },
+    });
+    if (!user) {
+      throw new NotFoundException('No linked school account found. Please enroll as staff first.');
+    }
+
+    const membership = await this.prisma.schoolUser.findFirst({
+      where: { userId: user.id, schoolId },
+    });
+    if (!membership) {
+      throw new ForbiddenException('You are not a member of this school.');
+    }
+
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      include: { institutionType: true },
+    });
+
+    const userRoles = user.userRoles.map(ur => ur.role.name);
+
+    const platformRoles = await this.prisma.platformRoleAssignment.findMany({
+      where: { userId: user.id, isActive: true },
+      select: { role: true },
+    });
+    const platformRoleNames = platformRoles.map(pr => pr.role);
+
+    const schoolRoles = await this.prisma.schoolRoleAssignment.findMany({
+      where: { schoolMembershipId: membership.id, isActive: true },
+      select: { role: true },
+    });
+    const schoolRoleNames = schoolRoles.map(sr => sr.role);
+
+    const allRoles = [...new Set([...userRoles, ...schoolRoleNames, ...platformRoleNames])];
+
+    let teacherId: string | undefined;
+    let classTeacherOf: string | undefined;
+    if (user.teacher) {
+      teacherId = user.teacher.id;
+      const cta = await this.prisma.classTeacherAssignment.findFirst({
+        where: { teacherId: user.teacher.id, isActive: true, isPrimary: true },
+        select: { classId: true },
+      });
+      classTeacherOf = cta?.classId;
+    }
+
+    const payload = {
+      sub: user.id,
+      schoolId,
+      institutionType: school?.institutionType?.code || null,
+      roles: allRoles,
+      platformRoles: platformRoleNames,
+      schoolRoles: schoolRoleNames,
+      teacherId,
+      classTeacherOf,
+      type: 'user',
+    };
+
+    return {
+      message: `Switched to ${school?.name || 'school'}`,
+      access_token: await this.jwtService.signAsync(payload),
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        roles: allRoles,
+        platformRoles: platformRoleNames,
+        schoolRoles: schoolRoleNames,
+        primaryRole: schoolRoleNames[0] || 'USER',
+        schoolId,
+        schoolName: school?.name,
+        institutionType: school?.institutionType?.code || null,
+        teacherId,
+        classTeacherOf,
+      },
+    };
+  }
+
+  async getLinkedIdentities(systemUserId: string) {
+    const sysUser = await this.prisma.systemUser.findUnique({
+      where: { id: systemUserId },
+    });
+    if (!sysUser) throw new NotFoundException('System user not found');
+
+    const normalizedEmail = sysUser.email.trim().toLowerCase();
+    const user = await this.prisma.user.findFirst({
+      where: { email: normalizedEmail },
+      include: {
+        schoolUsers: {
+          include: {
+            school: { include: { institutionType: true } },
+            SchoolRoleAssignment: { where: { isActive: true }, select: { role: true } },
+          },
+        },
+      },
+    });
+
+    if (!user) return { identities: [] };
+
+    const identities = user.schoolUsers.map(su => ({
+      schoolId: su.schoolId,
+      schoolName: su.school.name,
+      isPrimary: su.isPrimary,
+      roles: su.SchoolRoleAssignment.map(sra => sra.role),
+      institutionType: su.school.institutionType?.code || null,
+    }));
+
+    return { identities };
+  }
+
   private async ensureTeacherRecord(userId: string, schoolId: string) {
     const existing = await this.prisma.teacher.findUnique({ where: { userId } });
     if (existing) return;

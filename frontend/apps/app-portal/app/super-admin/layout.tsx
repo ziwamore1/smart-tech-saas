@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth, useIsSuperAdmin } from '@/lib/auth-context';
+import { authApi } from '@/lib/api';
 import Link from 'next/link';
 import '../super-admin-fix.css';
 
@@ -236,12 +237,21 @@ export default function SuperAdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, isLoading, user, logout } = useAuth();
+  const { isAuthenticated, isLoading, user, logout, switchToSchool, switchToSuperAdmin, isImpersonating } = useAuth();
   const isSuperAdmin = useIsSuperAdmin();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [linkedIdentities, setLinkedIdentities] = useState<Array<{
+    schoolId: string;
+    schoolName: string;
+    isPrimary: boolean;
+    roles: string[];
+    institutionType: string | null;
+  }>>([]);
+  const [identitiesLoading, setIdentitiesLoading] = useState(false);
+  const [switchingSchool, setSwitchingSchool] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -254,6 +264,19 @@ export default function SuperAdminLayout({
       router.replace('/dashboard');
     }
   }, [isLoading, isSuperAdmin, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (isAuthenticated && isSuperAdmin) {
+      setIdentitiesLoading(true);
+      authApi.getLinkedIdentities()
+        .then((res: any) => {
+          const data = res.data?.data || res.data;
+          setLinkedIdentities(data?.identities || []);
+        })
+        .catch(() => {})
+        .finally(() => setIdentitiesLoading(false));
+    }
+  }, [isAuthenticated, isSuperAdmin]);
 
   if (isLoading) {
     return (
@@ -332,6 +355,15 @@ export default function SuperAdminLayout({
         .sidebar-link.active .nav-text {
           color: #ea6645 !important;
           font-weight: 600 !important;
+        }
+        .identity-card:hover {
+          background: linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.08)) !important;
+          border-color: #10b981 !important;
+        }
+        .back-to-sa:hover {
+          background: #fee2e2 !important;
+          border-color: #fecaca !important;
+          color: #dc2626 !important;
         }
       `}</style>
 
@@ -471,6 +503,61 @@ export default function SuperAdminLayout({
                   </span>
                 </Link>
               ))}
+              {linkedIdentities.length > 0 && (
+                <div style={{ marginTop: '12px', padding: '8px 16px', borderTop: '1px solid #e8ddd0', paddingTop: '16px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                    Linked Schools
+                  </div>
+                  {linkedIdentities.map((identity) => (
+                    <button
+                      key={identity.schoolId}
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        setSwitchingSchool(identity.schoolId);
+                        switchToSchool(identity.schoolId).catch(() => setSwitchingSchool(null));
+                      }}
+                      disabled={switchingSchool !== null}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        marginBottom: '4px',
+                        border: '1px solid #e8ddd0',
+                        background: switchingSchool === identity.schoolId ? '#f0fdf4' : '#fefcf9',
+                        cursor: switchingSchool ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div style={{
+                        width: '28px',
+                        height: '28px',
+                        minWidth: '28px',
+                        background: 'linear-gradient(135deg, #10b981, #059669)',
+                        borderRadius: '7px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontSize: '11px',
+                      }}>
+                        {switchingSchool === identity.schoolId ? <i className="fa fa-spinner fa-spin"></i> : <i className="fa fa-building"></i>}
+                      </div>
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {identity.schoolName}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#9ca3af' }}>
+                          {identity.roles.slice(0, 2).join(', ')}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             {/* Mobile User Profile & Logout */}
             <div style={{ borderTop: '1px solid #e8ddd0', padding: '16px' }}>
@@ -668,6 +755,72 @@ export default function SuperAdminLayout({
           ))}
         </div>
 
+        {/* Linked Schools / Identity Switcher */}
+        {!sidebarCollapsed && linkedIdentities.length > 0 && (
+          <div style={{ padding: '0 12px 12px' }}>
+            <div style={{
+              fontSize: '11px',
+              fontWeight: 600,
+              color: '#9ca3af',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              padding: '8px 16px',
+              marginBottom: '8px',
+            }}>
+              Linked Schools
+            </div>
+            {linkedIdentities.map((identity) => (
+              <button
+                key={identity.schoolId}
+                onClick={() => {
+                  setSwitchingSchool(identity.schoolId);
+                  switchToSchool(identity.schoolId).catch(() => setSwitchingSchool(null));
+                }}
+                disabled={switchingSchool !== null}
+                className="identity-card"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  marginBottom: '4px',
+                  border: '1px solid #e8ddd0',
+                  background: switchingSchool === identity.schoolId ? '#f0fdf4' : '#fefcf9',
+                  cursor: switchingSchool ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  textAlign: 'left',
+                }}
+              >
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  minWidth: '32px',
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                }}>
+                  {switchingSchool === identity.schoolId ? <i className="fa fa-spinner fa-spin" style={{ fontSize: '12px' }}></i> : <i className="fa fa-building" style={{ fontSize: '12px' }}></i>}
+                </div>
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {identity.schoolName}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                    {identity.roles.slice(0, 2).join(', ')}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* User Section */}
         <div style={{
           padding: '16px',
@@ -750,6 +903,46 @@ export default function SuperAdminLayout({
         transition: 'margin-left 0.3s',
         minHeight: '100vh',
       }} className="main-content">
+        {isImpersonating && (
+          <div style={{
+            marginBottom: '20px',
+            padding: '12px 20px',
+            background: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
+            border: '1px solid #93c5fd',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <i className="fa fa-info-circle" style={{ color: '#3b82f6', fontSize: '16px' }}></i>
+              <span style={{ fontSize: '14px', color: '#1e40af', fontWeight: 500 }}>
+                Viewing as school staff — <strong>{user?.schoolRoles?.[0] || 'Staff'}</strong>
+              </span>
+            </div>
+            <button
+              onClick={switchToSuperAdmin}
+              className="back-to-sa"
+              style={{
+                padding: '8px 16px',
+                border: '1px solid #93c5fd',
+                background: 'white',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: '#3b82f6',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s',
+              }}
+            >
+              <i className="fa fa-arrow-left" style={{ fontSize: '12px' }}></i>
+              Back to Super Admin
+            </button>
+          </div>
+        )}
         {children}
       </div>
 

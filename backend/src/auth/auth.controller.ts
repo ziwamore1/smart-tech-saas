@@ -138,4 +138,17 @@ export class AuthController {
       req.user.schoolId,
     );
   }
+
+  @Post('switch-identity')
+  @UseGuards(JwtAuthGuard)
+  async switchIdentity(@Req() req: any, @Body() body: { schoolId: string }) {
+    this.logger.log(`Switch identity request for user ${req.user.id} to school ${body.schoolId}`);
+    return this.authService.switchIdentity(req.user.id, body.schoolId);
+  }
+
+  @Get('linked-identities')
+  @UseGuards(JwtAuthGuard)
+  async getLinkedIdentities(@Req() req: any) {
+    return this.authService.getLinkedIdentities(req.user.id);
+  }
 }

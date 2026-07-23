@@ -141,6 +141,11 @@ export const authApi = {
     schoolId: string;
   }) => api.post('/auth/director', data),
 
+  switchIdentity: (schoolId: string) =>
+    api.post('/auth/switch-identity', { schoolId }),
+
+  getLinkedIdentities: () => api.get('/auth/linked-identities'),
+
   createTeacher: (data: {
     fullName: string;
     phone: string;
