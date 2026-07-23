@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import Link from 'next/link';
@@ -15,9 +15,17 @@ function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loginAsSuperAdmin, setLoginAsSuperAdmin] = useState(false);
-  const { login } = useAuth();
+  const { login, isAuthenticated, isSuperAdmin, user, logout } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (isAuthenticated && !isSuperAdmin && user?.schoolId) {
+      router.replace('/dashboard');
+    } else if (isAuthenticated && isSuperAdmin && !user?.schoolId) {
+      router.replace('/super-admin');
+    }
+  }, [isAuthenticated, isSuperAdmin, user, router]);
 
   const registered = searchParams.get('registered');
   const successMessage = searchParams.get('message');

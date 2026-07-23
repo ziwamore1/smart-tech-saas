@@ -61,28 +61,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedToken = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('user');
     
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        
-        if (parsedUser.id && !parsedUser.roles?.length) {
-          roleApi.getUserRoles(parsedUser.id).then((roleRes: any) => {
-            if (roleRes.data?.length) {
-              const roles = roleRes.data.map((r: any) => r.roleName);
-              const updatedUser = { ...parsedUser, roles };
-              localStorage.setItem('user', JSON.stringify(updatedUser));
-              setUser(updatedUser);
-            }
-          }).catch(() => {});
-        }
-      } catch (e) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user');
-      }
+    if (!storedToken || !storedUser) {
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+
+    setToken(storedToken);
+    try {
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
+
+      authApi.getMe().then((res: any) => {
+        const profile = res.data?.data || res.data;
+        if (profile) {
+          const mergedUser = {
+            ...parsedUser,
+            id: profile.id || parsedUser.id,
+            email: profile.email || parsedUser.email,
+            firstName: profile.firstName || parsedUser.firstName,
+            lastName: profile.lastName || parsedUser.lastName,
+            phone: profile.phone || parsedUser.phone,
+            roles: profile.roles || parsedUser.roles,
+            schoolRoles: profile.schoolRoles || parsedUser.schoolRoles,
+            platformRoles: profile.platformRoles || parsedUser.platformRoles,
+            schoolId: profile.schoolId ?? parsedUser.schoolId,
+            teacherId: profile.teacherId || parsedUser.teacherId,
+            classTeacherOf: profile.classTeacherOf || parsedUser.classTeacherOf,
+            institutionType: profile.institutionType || parsedUser.institutionType,
+          };
+          localStorage.setItem('user', JSON.stringify(mergedUser));
+          setUser(mergedUser);
+        }
+        setIsLoading(false);
+      }).catch((err: any) => {
+        const status = err?.response?.status;
+        if (status === 401 || status === 403) {
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('sa_token');
+          localStorage.removeItem('sa_user');
+          setToken(null);
+          setUser(null);
+        }
+        setIsLoading(false);
+      });
+    } catch (e) {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+      setIsLoading(false);
+    }
   }, []);
 
   const login = async (identifier: string, password: string, isSuperAdmin: boolean = false, schoolId?: string) => {
