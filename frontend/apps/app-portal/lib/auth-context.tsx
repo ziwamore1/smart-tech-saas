@@ -132,16 +132,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('auth_token', access_token);
       setToken(access_token);
 
-      if (isSuperAdmin || payload.type === 'super_admin') {
-        localStorage.setItem('sa_token', access_token);
-        localStorage.setItem('sa_user', JSON.stringify(userData));
-      }
-
       const payload = JSON.parse(atob(access_token.split('.')[1]));
       console.log('[Auth] JWT Payload:', JSON.stringify(payload));
       
       let userData: User;
-      if (payload.type === 'super_admin' || isSuperAdmin) {
+      if (isSuperAdmin || payload.type === 'super_admin') {
+        localStorage.setItem('sa_token', access_token);
         userData = {
           id: payload.sub,
           email: responseData?.user?.email || identifier,
@@ -153,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: 'SuperAdmin',
           schoolId: null,
         };
+        localStorage.setItem('sa_user', JSON.stringify(userData));
       } else {
         userData = {
           id: payload.sub,
