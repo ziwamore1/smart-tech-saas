@@ -745,11 +745,12 @@ export default function DashboardLayout({
     },
     retry: 2,
     staleTime: 5 * 60 * 1000,
-    enabled: !isSuperAdmin && isAuthenticated && !!user?.schoolId,
+    enabled: !isPureSuperAdmin && isAuthenticated && !!user?.schoolId,
   });
 
   const resolvedInstitutionType = institutionType || schoolData?.institutionType?.code || null;
-  const navigation = isSuperAdmin ? superAdminNav : regularNav.filter(item => {
+  const isPureSuperAdmin = isSuperAdmin && !user?.schoolId;
+  const navigation = isPureSuperAdmin ? superAdminNav : regularNav.filter(item => {
     if (item.institutionTypes && item.institutionTypes.length > 0) {
       if (!resolvedInstitutionType) return false;
       if (!item.institutionTypes.includes(resolvedInstitutionType)) return false;
@@ -792,7 +793,7 @@ export default function DashboardLayout({
     : null;
 
   useEffect(() => {
-    if (!isLoading && !isSuperAdmin && pathname === '/dashboard' && typeDashboardPath && typeDashboardPath !== '/dashboard') {
+    if (!isLoading && !isPureSuperAdmin && pathname === '/dashboard' && typeDashboardPath && typeDashboardPath !== '/dashboard') {
       router.push(typeDashboardPath);
     }
   }, [isLoading, isSuperAdmin, pathname, router, typeDashboardPath]);
@@ -904,7 +905,7 @@ export default function DashboardLayout({
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img src="/smart_tech_logo.png" alt="Smart Tech SaaS" style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'cover' }} />
             <span style={{ fontWeight: 600, color: '#1f2937' }}>
-              {isSuperAdmin ? 'Super Admin' : 
+              {isPureSuperAdmin ? 'Super Admin' : 
                 (schoolData?.name || 'School')
               }
             </span>
@@ -1075,7 +1076,7 @@ export default function DashboardLayout({
                   margin: 0,
                   whiteSpace: 'nowrap'
                 }}>
-                  {isSuperAdmin ? 'Super Admin Portal' : (schoolData?.name || 'School Management')}
+                  {isPureSuperAdmin ? 'Super Admin Portal' : (schoolData?.name || 'School Management')}
                 </p>
               </div>
             )}
@@ -1097,7 +1098,7 @@ export default function DashboardLayout({
                 padding: '0 12px',
                 marginBottom: '8px'
               }}>
-                {isSuperAdmin ? 'Administration' : 'Management'}
+                {isPureSuperAdmin ? 'Administration' : 'Management'}
               </div>
             )}
             {navigation.map((item) => (
