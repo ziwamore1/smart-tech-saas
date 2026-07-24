@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { TwilioService } from '../twilio/twilio.service';
-import { BeemService } from '../beem/beem.service';
+import { SmsProviderFactory } from '../communications-cloud/providers/sms/sms-provider.factory';
+import { SmsProvider } from '../communications-cloud/interfaces/provider.interface';
 
 @Injectable()
 export class ResultsSmsService {
@@ -9,8 +9,7 @@ export class ResultsSmsService {
 
   constructor(
     private prisma: PrismaService,
-    private twilioService: TwilioService,
-    private beemService: BeemService,
+    private smsProviderFactory: SmsProviderFactory,
   ) {}
 
   async getRecipients(schoolId: string, classId: string, termId: string) {
@@ -140,10 +139,14 @@ export class ResultsSmsService {
     const preview = await this.getRecipients(schoolId, classId, termId);
     const batchId = `BATCH_${Date.now()}`;
 
-    const smsConfigured =
-      (await this.twilioService.isConfigured()) || (await this.beemService.isConfigured());
+    let smsProvider: SmsProvider | null = null;
+    try {
+      smsProvider = await this.smsProviderFactory.getSchoolSmsProvider(schoolId);
+    } catch (e) {
+      this.logger.warn(`Could not resolve school SMS provider for ${schoolId}: ${e.message}`);
+    }
 
-    if (!smsConfigured) {
+    if (!smsProvider) {
       const skipped: any[] = [];
       for (const r of preview.recipients) {
         const log = await this.prisma.resultSmsLog.create({
@@ -159,7 +162,7 @@ export class ResultsSmsService {
             phoneNumber: r.phoneNumber,
             message: r.message,
             status: 'SKIPPED',
-            errorMessage: 'No SMS provider configured. Set up Twilio or Beem in Settings.',
+            errorMessage: 'No SMS provider configured. Set up your SMS provider in School Communication Settings.',
             errorSuggestion: 'Configure an SMS provider in Communications Settings',
             batchId,
           },
@@ -168,7 +171,7 @@ export class ResultsSmsService {
       }
       return {
         success: false,
-        message: 'No SMS provider configured',
+        message: 'No SMS provider configured for this school',
         sent: 0,
         failed: 0,
         skipped: skipped.length,
@@ -210,31 +213,21 @@ export class ResultsSmsService {
       }
 
       let smsResult: { success: boolean; messageId?: string; error?: string };
-      const twilioReady = await this.twilioService.isConfigured();
-      const beemReady = await this.beemService.isConfigured();
+      let providerName = 'unknown';
 
-      if (twilioReady) {
-        try {
-          smsResult = await this.twilioService.sendSms(r.phoneNumber, r.message);
-        } catch (e: any) {
-          if (beemReady) {
-            try {
-              smsResult = await this.beemService.sendSms(r.phoneNumber, r.message);
-            } catch (e2: any) {
-              smsResult = { success: false, error: e2.message };
-            }
-          } else {
-            smsResult = { success: false, error: e.message };
-          }
-        }
-      } else if (beemReady) {
-        try {
-          smsResult = await this.beemService.sendSms(r.phoneNumber, r.message);
-        } catch (e: any) {
-          smsResult = { success: false, error: e.message };
-        }
-      } else {
-        smsResult = { success: false, error: 'No SMS provider configured' };
+      try {
+        const sendResult = await smsProvider.send({
+          to: r.phoneNumber,
+          body: r.message,
+        });
+        smsResult = {
+          success: sendResult.success,
+          messageId: sendResult.providerMessageId || sendResult.messageId,
+          error: sendResult.error,
+        };
+        providerName = sendResult.provider || 'sms-provider';
+      } catch (e: any) {
+        smsResult = { success: false, error: e.message };
       }
 
       const status = smsResult.success ? 'SENT' : 'FAILED';
@@ -254,7 +247,7 @@ export class ResultsSmsService {
           phoneNumber: r.phoneNumber,
           message: r.message,
           status,
-          provider: smsResult.success ? (twilioReady ? 'twilio' : 'beem') : undefined,
+          provider: smsResult.success ? providerName : undefined,
           providerMessageId: smsResult.messageId,
           errorMessage: smsResult.error,
           errorSuggestion: smsResult.success ? undefined : this.suggestFix(smsResult.error),

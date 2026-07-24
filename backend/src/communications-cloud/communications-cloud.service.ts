@@ -8,6 +8,7 @@ import { BillingService } from './billing/billing.service';
 import { CommunicationsAnalyticsService } from './analytics/communications-analytics.service';
 import { AuditLogService } from './security/audit-log.service';
 import { SmsProviderFactory } from './providers/sms/sms-provider.factory';
+import { SmsProvider } from './interfaces/provider.interface';
 import { EmailProviderFactory } from './providers/email/email-provider.factory';
 import { WhatsAppProviderFactory } from './providers/whatsapp/whatsapp-provider.factory';
 import { PushProviderFactory } from './providers/push/push-provider.factory';
@@ -251,7 +252,14 @@ export class CommunicationsCloudService {
       let result: any;
       switch (channel) {
         case CommCloudChannel.SMS:
-          const smsProvider = await this.smsProviderFactory.getProvider(decision.providerId);
+          let smsProvider: SmsProvider;
+          if (decision.providerId.startsWith('env:') && schoolId) {
+            smsProvider = await this.smsProviderFactory.getSchoolSmsProvider(schoolId)
+              || this.smsProviderFactory.getProviderByType(decision.providerId.slice(4))
+              || await this.smsProviderFactory.getProvider(decision.providerId);
+          } else {
+            smsProvider = await this.smsProviderFactory.getProvider(decision.providerId);
+          }
           result = await smsProvider.send({ to: recipient, body, senderId: senderIdentity });
           break;
         case CommCloudChannel.EMAIL:

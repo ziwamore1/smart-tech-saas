@@ -41,6 +41,11 @@ export class RoutingEngineService {
       }
     }
 
+    if (context.schoolId && context.channel === CommCloudChannel.SMS) {
+      const schoolDecision = await this.resolveSchoolProvider(context.schoolId);
+      if (schoolDecision) return schoolDecision;
+    }
+
     if (context.schoolId) {
       const schoolRule = matchingRules.find(
         r => r.ruleType === RoutingStrategy.SCHOOL_PREFERRED,
@@ -70,6 +75,57 @@ export class RoutingEngineService {
     }
 
     return this.getPriorityFallback(context.channel);
+  }
+
+  private async resolveSchoolProvider(schoolId: string): Promise<RoutingDecision | null> {
+    const settings = await this.prisma.communicationSettings.findUnique({
+      where: { schoolId },
+      select: { smsProvider: true, smsEnabled: true, smsSenderId: true, smsApiKey: true },
+    });
+
+    if (!settings?.smsEnabled || !settings.smsProvider) {
+      this.logger.debug(`School ${schoolId} has no SMS provider configured, falling back to system`);
+      return null;
+    }
+
+    const providerType = settings.smsProvider.toLowerCase().trim();
+
+    if (providerType === 'twilio' || providerType === 'beem') {
+      return {
+        providerId: `env:${providerType}`,
+        providerName: providerType.charAt(0).toUpperCase() + providerType.slice(1),
+        strategy: RoutingStrategy.SCHOOL_PREFERRED,
+        reason: `School ${schoolId} SMS provider: ${providerType} (credentials from CommunicationSettings)`,
+        confidence: 1.0,
+      };
+    }
+
+    const cloudProvider = await this.prisma.commCloudProvider.findFirst({
+      where: { providerType, channel: 'SMS', isActive: true },
+    });
+
+    if (cloudProvider) {
+      return {
+        providerId: cloudProvider.id,
+        providerName: cloudProvider.name,
+        strategy: RoutingStrategy.SCHOOL_PREFERRED,
+        reason: `School ${schoolId} SMS provider: ${providerType} (matched CommCloudProvider: ${cloudProvider.name})`,
+        confidence: 1.0,
+      };
+    }
+
+    if (['zamtel', 'zamtel-bulk', 'mtn', 'airtel', 'africastalking', 'infobip'].includes(providerType)) {
+      return {
+        providerId: `env:${providerType}`,
+        providerName: providerType.charAt(0).toUpperCase() + providerType.slice(1),
+        strategy: RoutingStrategy.SCHOOL_PREFERRED,
+        reason: `School ${schoolId} SMS provider: ${providerType} (adapter-based)`,
+        confidence: 1.0,
+      };
+    }
+
+    this.logger.warn(`School ${schoolId} configured SMS provider "${providerType}" has no matching adapter or CommCloudProvider`);
+    return null;
   }
 
   private async loadRules(channel: CommCloudChannel): Promise<RoutingRule[]> {

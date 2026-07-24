@@ -65,6 +65,6 @@ import { GenericWebhookController } from './webhooks/generic-webhook.controller'
     TemplateLibraryService,
     SenderIdentityService,
   ],
-  exports: [CommunicationsCloudService],
+  exports: [CommunicationsCloudService, SmsProviderFactory],
 })
 export class CommunicationsCloudModule {}

@@ -10,6 +10,7 @@ import { TwilioAdapter } from './adapters/twilio.adapter';
 import { AfricasTalkingAdapter } from './adapters/africastalking.adapter';
 import { InfobipAdapter } from './adapters/infobip.adapter';
 import { ZamtelAdapter } from './adapters/zamtel.adapter';
+import { ZamtelBulkSmsAdapter } from './adapters/zamtel-bulk.adapter';
 import { MtnAdapter } from './adapters/mtn.adapter';
 import { AirtelAdapter } from './adapters/airtel.adapter';
 
@@ -32,6 +33,7 @@ export class SmsProviderFactory {
     this.registry.set('africastalking', AfricasTalkingAdapter);
     this.registry.set('infobip', InfobipAdapter);
     this.registry.set('zamtel', ZamtelAdapter);
+    this.registry.set('zamtel-bulk', ZamtelBulkSmsAdapter);
     this.registry.set('mtn', MtnAdapter);
     this.registry.set('airtel', AirtelAdapter);
   }
@@ -70,6 +72,57 @@ export class SmsProviderFactory {
     });
 
     return Promise.all(records.map((r) => this.buildAdapter(r)));
+  }
+
+  /**
+   * Resolve SMS provider from a school's CommunicationSettings.
+   * Returns null if the school has no SMS provider configured or if it's disabled.
+   * School credentials take precedence over system-level defaults.
+   *
+   * For Twilio/Beem, the existing adapters use service instances (which read env vars),
+   * so school-level credentials for those providers route through env: prefix.
+   * For other providers (Zamtel, Zamtel-Bulk, MTN, Airtel, etc.), school credentials
+   * are passed directly to the adapter constructor.
+   */
+  async getSchoolSmsProvider(schoolId: string): Promise<SmsProvider | null> {
+    const settings = await this.prisma.communicationSettings.findUnique({
+      where: { schoolId },
+    });
+
+    if (!settings?.smsEnabled || !settings.smsProvider) {
+      this.logger.debug(`School ${schoolId} has no SMS provider configured or SMS is disabled`);
+      return null;
+    }
+
+    const providerType = settings.smsProvider.toLowerCase().trim();
+    this.logger.debug(`Resolving school ${schoolId} SMS provider: ${providerType}`);
+
+    try {
+      if (providerType === 'twilio') {
+        return new TwilioAdapter(this.twilioService) as SmsProvider;
+      }
+
+      if (providerType === 'beem') {
+        return new BeemAdapter(this.beemService) as SmsProvider;
+      }
+
+      const Ctor = this.registry.get(providerType);
+      if (!Ctor) {
+        this.logger.warn(`No adapter registered for school SMS provider type "${providerType}"`);
+        return null;
+      }
+
+      const config: Record<string, any> = {
+        apiKey: this.decryptIfEncrypted(settings.smsApiKey || ''),
+        apiSecret: this.decryptIfEncrypted(settings.smsApiSecret || ''),
+        senderId: settings.smsSenderId || '',
+      };
+
+      return new Ctor(config) as SmsProvider;
+    } catch (error) {
+      this.logger.error(`Failed to build school SMS adapter for ${schoolId}: ${error.message}`);
+      return null;
+    }
   }
 
   getProviderByType(type: string): SmsProvider | null {
@@ -144,5 +197,18 @@ export class SmsProviderFactory {
     }
 
     return creds;
+  }
+
+  private decryptIfEncrypted(value: string): string {
+    if (!value) return value;
+    if (value.startsWith('enc:')) {
+      try {
+        return this.encryptionService.decrypt(value.slice(4));
+      } catch (err) {
+        this.logger.warn(`Failed to decrypt value: ${err.message}`);
+        return value;
+      }
+    }
+    return value;
   }
 }
