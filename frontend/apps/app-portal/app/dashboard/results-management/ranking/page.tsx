@@ -19,6 +19,7 @@ export default function RankingPage() {
   const [showLimit, setShowLimit] = useState<'all' | 'top10' | 'bottom10'>('all');
   const [searchStudent, setSearchStudent] = useState('');
   const [rankings, setRankings] = useState<any>(null);
+  const [sheetInfo, setSheetInfo] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   const { data: classesData } = useQuery({
@@ -77,6 +78,7 @@ export default function RankingPage() {
       });
       const rankData = rr.data?.data || rr.data;
       setRankings(rankData);
+      setSheetInfo(sheetArr[sheetArr.length - 1]);
       toast.success('Rankings computed');
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to compute rankings');
@@ -164,8 +166,12 @@ export default function RankingPage() {
             onClick={() => {
               const cls = classes.find((c: any) => c.id === selectedClass);
               const term = terms.find((t: any) => t.id === selectedTerm);
+              const school = (sheetInfo as any)?.school;
               const meta: ReportMeta = {
-                schoolName: user?.schoolName || (user as any)?.school?.name || 'Smart Tech School',
+                schoolName: school?.name || user?.schoolName || (user as any)?.school?.name || 'Smart Tech School',
+                schoolAddress: school?.address || '',
+                schoolPhone: school?.phone || '',
+                schoolEmail: school?.email || '',
                 className: cls?.name || 'Class',
                 termName: term?.name || 'Term',
                 academicYear: term?.academicYear?.name || '',
@@ -356,7 +362,7 @@ export default function RankingPage() {
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: '#5f4b3a' }}>
+                  <tr style={{ background: '#374151' }}>
                     <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>#</th>
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>Admission No</th>
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>Student Name</th>

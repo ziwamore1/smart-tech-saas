@@ -712,7 +712,7 @@ export class ResultsManagementService {
 
       const groupByGender = (genderFilter: string[]) => {
         const filtered = computedResults.filter((r) =>
-          genderFilter.includes((r.student.gender || '').toUpperCase()),
+          genderFilter.includes((r.student.gender || '').trim().toUpperCase()),
         );
         const studentAverages = filtered.reduce(
           (acc, r) => {
@@ -757,6 +757,7 @@ export class ResultsManagementService {
         firstName: r.firstName || (r.studentName ? r.studentName.split(' ')[0] : ''),
         lastName: r.lastName || (r.studentName ? r.studentName.split(' ').slice(1).join(' ') : ''),
         admissionNumber: r.admissionNumber || '',
+        gender: r.gender || null,
         percentage: r.average || r.percentage || r.totalPercentage || 0,
         totalPercentage: r.average || r.percentage || r.totalPercentage || 0,
         average: r.average || r.percentage || r.totalPercentage || 0,
@@ -947,8 +948,10 @@ export class ResultsManagementService {
     const atRiskStudents = students.filter(s => s.percentage < 40).sort((a, b) => a.percentage - b.percentage);
 
     // Gender-based stats
-    const maleStudents = students.filter(s => s.gender === 'MALE' || s.gender === 'M');
-    const femaleStudents = students.filter(s => s.gender === 'FEMALE' || s.gender === 'F');
+    const isMale = (g: string | null) => g && ['MALE', 'M'].includes(g.trim().toUpperCase());
+    const isFemale = (g: string | null) => g && ['FEMALE', 'F'].includes(g.trim().toUpperCase());
+    const maleStudents = students.filter(s => isMale(s.gender));
+    const femaleStudents = students.filter(s => isFemale(s.gender));
     const malePassCount = maleStudents.filter(s => s.percentage >= 50).length;
     const femalePassCount = femaleStudents.filter(s => s.percentage >= 50).length;
     const malePassRate = maleStudents.length > 0 ? parseFloat(((malePassCount / maleStudents.length) * 100).toFixed(2)) : 0;
@@ -970,8 +973,9 @@ export class ResultsManagementService {
           }
           const score = effectivePercentage ?? 0;
           const gender = (r.student as any).gender;
-          if (gender === 'MALE' || gender === 'M') maleScores.push(score);
-          else if (gender === 'FEMALE' || gender === 'F') femaleScores.push(score);
+          const gNorm = gender ? gender.trim().toUpperCase() : '';
+          if (gNorm === 'MALE' || gNorm === 'M') maleScores.push(score);
+          else if (gNorm === 'FEMALE' || gNorm === 'F') femaleScores.push(score);
         });
       return {
         subjectId: subject.subjectId,

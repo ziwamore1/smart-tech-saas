@@ -223,17 +223,42 @@ export interface AnalysisData {
 
 export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta): string {
   const distEntries = Object.entries(analysis.gradeDistribution || {});
-  const maxCount = Math.max(...distEntries.map(([, c]) => c as number), 1);
 
-  const distRows = distEntries.map(([grade, count]) => {
-    const gc = getGradeColor(grade);
+  const gradePieColors: Record<string, string> = {
+    'A+': '#059669', 'A': '#10b981', 'A-': '#34d399',
+    'B+': '#2563eb', 'B': '#3b82f6', 'B-': '#60a5fa',
+    'C+': '#d97706', 'C': '#f59e0b', 'C-': '#fbbf24',
+    'D+': '#dc2626', 'D': '#ef4444', 'D-': '#f87171',
+    'E': '#991b1b', 'F': '#7f1d1d',
+    '1': '#059669', '2': '#2563eb', '3': '#d97706', '4': '#dc2626', '5': '#991b1b',
+  };
+
+  let cumulativePercent = 0;
+  const pieSlices = distEntries.map(([grade, count]) => {
+    const pct = analysis.totalStudents > 0 ? (count as number) / analysis.totalStudents * 100 : 0;
+    const startAngle = cumulativePercent / 100 * 360;
+    cumulativePercent += pct;
+    const endAngle = cumulativePercent / 100 * 360;
+    const color = gradePieColors[grade] || '#9ca3af';
+    const largeArc = pct > 50 ? 1 : 0;
+    const startRad = (startAngle - 90) * Math.PI / 180;
+    const endRad = (endAngle - 90) * Math.PI / 180;
+    const x1 = 100 + 80 * Math.cos(startRad);
+    const y1 = 100 + 80 * Math.sin(startRad);
+    const x2 = 100 + 80 * Math.cos(endRad);
+    const y2 = 100 + 80 * Math.sin(endRad);
+    if (pct < 0.5) return '';
+    return `<path d="M100,100 L${x1},${y1} A80,80 0 ${largeArc},1 ${x2},${y2} Z" fill="${color}" stroke="white" stroke-width="1"/>`;
+  }).join('');
+
+  const distLegend = distEntries.map(([grade, count]) => {
     const pct = analysis.totalStudents > 0 ? ((count as number) / analysis.totalStudents * 100).toFixed(1) : '0.0';
-    const barWidth = ((count as number) / maxCount * 100).toFixed(0);
+    const color = gradePieColors[grade] || '#9ca3af';
     return `<tr>
-      <td class="text-center font-bold" style="color:${gc.text};font-size:14px">${grade}</td>
+      <td class="text-center font-bold" style="color:${color};font-size:13px">${grade}</td>
       <td class="text-center font-semibold">${count}</td>
       <td class="text-center">${pct}%</td>
-      <td><div class="chart-bar" style="width:${barWidth}%;background:${gc.text}"></div></td>
+      <td><div style="width:16px;height:16px;border-radius:3px;background:${color};display:inline-block;vertical-align:middle;margin-right:6px"></div></td>
     </tr>`;
   }).join('');
 
@@ -291,10 +316,15 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
     </div>` : ''}
 
     <div class="section-title">Grade Distribution</div>
-    <table style="max-width:500px;margin-bottom:20px">
-      <thead><tr><th class="text-center">Grade</th><th class="text-center">Count</th><th class="text-center">%</th><th>Distribution</th></tr></thead>
-      <tbody>${distRows}</tbody>
-    </table>
+    <div style="display:flex;gap:24px;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap">
+      <div style="flex-shrink:0">
+        <svg width="200" height="200" viewBox="0 0 200 200">${pieSlices || '<circle cx="100" cy="100" r="80" fill="#e5e7eb"/>'}<circle cx="100" cy="100" r="35" fill="white"/><text x="100" y="105" text-anchor="middle" font-size="12" fill="#374151" font-weight="700">${analysis.totalStudents}</text><text x="100" y="118" text-anchor="middle" font-size="8" fill="#9ca3af">STUDENTS</text></svg>
+      </div>
+      <table style="max-width:350px;margin:0">
+        <thead><tr><th class="text-center">Grade</th><th class="text-center">Count</th><th class="text-center">%</th><th></th></tr></thead>
+        <tbody>${distLegend}</tbody>
+      </table>
+    </div>
 
     ${(analysis.subjectAnalysis || []).length > 0 ? `
     <div class="section-title">Subject Performance Breakdown</div>
