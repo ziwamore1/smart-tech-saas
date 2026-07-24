@@ -17,6 +17,7 @@ export class RankingService {
       },
       select: {
         studentId: true,
+        subjectId: true,
         finalPercentage: true,
         points: true,
         student: {
@@ -36,6 +37,30 @@ export class RankingService {
       return [];
     }
 
+    const studentIds = [...new Set(computedResults.map(r => r.studentId))];
+    const subjectIds = [...new Set(computedResults.map(r => r.subjectId).filter(Boolean))];
+
+    const rawResults = await this.prisma.result.findMany({
+      where: {
+        studentId: { in: studentIds },
+        subjectId: { in: subjectIds },
+        termId,
+        schoolId,
+      },
+      select: {
+        studentId: true,
+        subjectId: true,
+        score: true,
+      },
+    });
+
+    const rawScoreMap = new Map<string, number>();
+    for (const r of rawResults) {
+      if (r.score != null) {
+        rawScoreMap.set(`${r.studentId}::${r.subjectId}`, r.score);
+      }
+    }
+
     const studentMap = new Map<string, {
       studentId: string;
       firstName: string;
@@ -48,15 +73,24 @@ export class RankingService {
 
     for (const r of computedResults) {
       const existing = studentMap.get(r.studentId);
-      const points = r.points ?? (r.finalPercentage != null
-        ? r.finalPercentage >= 75 ? 1
-          : r.finalPercentage >= 65 ? 2
-          : r.finalPercentage >= 50 ? 3
-          : r.finalPercentage >= 40 ? 4
+
+      let effectivePercentage = r.finalPercentage;
+      if (effectivePercentage == null || effectivePercentage === 0) {
+        const rawScore = r.subjectId ? rawScoreMap.get(`${r.studentId}::${r.subjectId}`) : undefined;
+        if (rawScore != null) {
+          effectivePercentage = rawScore;
+        }
+      }
+
+      const points = r.points ?? (effectivePercentage != null
+        ? effectivePercentage >= 75 ? 1
+          : effectivePercentage >= 65 ? 2
+          : effectivePercentage >= 50 ? 3
+          : effectivePercentage >= 40 ? 4
           : 5
         : 0);
       if (existing) {
-        existing.totalPercentage += r.finalPercentage ?? 0;
+        existing.totalPercentage += effectivePercentage ?? 0;
         existing.subjectCount += 1;
         if (points > 0) existing.points.push(points);
       } else {
@@ -65,7 +99,7 @@ export class RankingService {
           firstName: r.student.firstName,
           lastName: r.student.lastName,
           admissionNumber: r.student.admissionNumber,
-          totalPercentage: r.finalPercentage ?? 0,
+          totalPercentage: effectivePercentage ?? 0,
           subjectCount: 1,
           points: points > 0 ? [points] : [],
         });
@@ -122,6 +156,7 @@ export class RankingService {
       },
       select: {
         studentId: true,
+        subjectId: true,
         finalPercentage: true,
         finalGrade: true,
         student: {
@@ -140,16 +175,47 @@ export class RankingService {
       return [];
     }
 
-    const rankings = computedResults.map((result, index) => ({
-      studentId: result.studentId,
-      firstName: result.student.firstName,
-      lastName: result.student.lastName,
-      studentName: `${result.student.firstName} ${result.student.lastName}`,
-      admissionNumber: result.student.admissionNumber,
-      percentage: result.finalPercentage,
-      grade: result.finalGrade,
-      subjectRank: index + 1,
-    }));
+    const studentIds = [...new Set(computedResults.map(r => r.studentId))];
+
+    const rawResults = await this.prisma.result.findMany({
+      where: {
+        studentId: { in: studentIds },
+        subjectId,
+        termId,
+        schoolId,
+      },
+      select: {
+        studentId: true,
+        score: true,
+      },
+    });
+
+    const rawScoreMap = new Map<string, number>();
+    for (const r of rawResults) {
+      if (r.score != null) {
+        rawScoreMap.set(r.studentId, r.score);
+      }
+    }
+
+    const rankings = computedResults.map((result, index) => {
+      let effectivePercentage = result.finalPercentage;
+      if (effectivePercentage == null || effectivePercentage === 0) {
+        const rawScore = rawScoreMap.get(result.studentId);
+        if (rawScore != null) {
+          effectivePercentage = rawScore;
+        }
+      }
+      return {
+        studentId: result.studentId,
+        firstName: result.student.firstName,
+        lastName: result.student.lastName,
+        studentName: `${result.student.firstName} ${result.student.lastName}`,
+        admissionNumber: result.student.admissionNumber,
+        percentage: effectivePercentage,
+        grade: result.finalGrade,
+        subjectRank: index + 1,
+      };
+    });
 
     await this.prisma.$transaction(
       rankings.map(ranking =>
@@ -180,17 +246,47 @@ export class RankingService {
       },
     });
 
-    return computedResults.map(result => ({
-      subjectId: result.subjectId,
-      subjectName: result.subject.name,
-      className: result.class.name,
-      percentage: result.finalPercentage,
-      grade: result.finalGrade,
-      classRank: result.classRank,
-      subjectRank: result.subjectRank,
-      points: result.points,
-      gpa: result.gpa,
-    }));
+    const subjectIds = [...new Set(computedResults.map(r => r.subjectId).filter(Boolean))];
+
+    const rawResults = await this.prisma.result.findMany({
+      where: {
+        studentId,
+        subjectId: { in: subjectIds },
+        termId,
+      },
+      select: {
+        subjectId: true,
+        score: true,
+      },
+    });
+
+    const rawScoreMap = new Map<string, number>();
+    for (const r of rawResults) {
+      if (r.score != null) {
+        rawScoreMap.set(r.subjectId, r.score);
+      }
+    }
+
+    return computedResults.map(result => {
+      let effectivePercentage = result.finalPercentage;
+      if (effectivePercentage == null || effectivePercentage === 0) {
+        const rawScore = rawScoreMap.get(result.subjectId);
+        if (rawScore != null) {
+          effectivePercentage = rawScore;
+        }
+      }
+      return {
+        subjectId: result.subjectId,
+        subjectName: result.subject.name,
+        className: result.class.name,
+        percentage: effectivePercentage,
+        grade: result.finalGrade,
+        classRank: result.classRank,
+        subjectRank: result.subjectRank,
+        points: result.points,
+        gpa: result.gpa,
+      };
+    });
   }
 
   async getTopPerformers(classId: string, termId: string, limit = 10) {

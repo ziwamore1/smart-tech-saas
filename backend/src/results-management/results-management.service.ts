@@ -788,11 +788,12 @@ export class ResultsManagementService {
       },
       select: {
         studentId: true,
+        subjectId: true,
         finalPercentage: true,
         finalGrade: true,
         points: true,
         student: {
-          select: { id: true, firstName: true, lastName: true, admissionNumber: true },
+          select: { id: true, firstName: true, lastName: true, admissionNumber: true, gender: true },
         },
         subject: {
           select: { id: true, name: true },
@@ -815,11 +816,43 @@ export class ResultsManagementService {
       };
     }
 
-    const studentAverages = new Map<string, { studentId: string; firstName: string; lastName: string; admissionNumber: string; totalPercentage: number; count: number }>();
+    const studentIds = [...new Set(computedResults.map(r => r.studentId))];
+    const subjectIds = [...new Set(computedResults.map(r => r.subjectId).filter(Boolean))];
+
+    const rawResults = await this.prisma.result.findMany({
+      where: {
+        studentId: { in: studentIds },
+        subjectId: { in: subjectIds },
+        termId: sheet.termId,
+        schoolId: sheet.schoolId,
+      },
+      select: {
+        studentId: true,
+        subjectId: true,
+        score: true,
+      },
+    });
+
+    const rawScoreMap = new Map<string, number>();
+    for (const r of rawResults) {
+      if (r.score != null) {
+        rawScoreMap.set(`${r.studentId}::${r.subjectId}`, r.score);
+      }
+    }
+
+    const studentAverages = new Map<string, { studentId: string; firstName: string; lastName: string; admissionNumber: string; gender: string | null; totalPercentage: number; count: number }>();
     for (const cr of computedResults) {
+      let effectivePercentage = cr.finalPercentage;
+      if (effectivePercentage == null || effectivePercentage === 0) {
+        const rawScore = cr.subjectId ? rawScoreMap.get(`${cr.studentId}::${cr.subjectId}`) : undefined;
+        if (rawScore != null) {
+          effectivePercentage = rawScore;
+        }
+      }
+
       const existing = studentAverages.get(cr.studentId);
       if (existing) {
-        existing.totalPercentage += cr.finalPercentage ?? 0;
+        existing.totalPercentage += effectivePercentage ?? 0;
         existing.count += 1;
       } else {
         studentAverages.set(cr.studentId, {
@@ -827,7 +860,8 @@ export class ResultsManagementService {
           firstName: cr.student.firstName,
           lastName: cr.student.lastName,
           admissionNumber: cr.student.admissionNumber,
-          totalPercentage: cr.finalPercentage ?? 0,
+          gender: (cr.student as any).gender ?? null,
+          totalPercentage: effectivePercentage ?? 0,
           count: 1,
         });
       }
@@ -838,6 +872,7 @@ export class ResultsManagementService {
       firstName: s.firstName,
       lastName: s.lastName,
       admissionNumber: s.admissionNumber,
+      gender: s.gender,
       percentage: s.count > 0 ? parseFloat((s.totalPercentage / s.count).toFixed(2)) : 0,
       grade: null as string | null,
     }));
@@ -850,7 +885,16 @@ export class ResultsManagementService {
       else s.grade = 'E';
     });
 
-    const overallScores = computedResults.map(r => r.finalPercentage ?? 0);
+    const overallScores = computedResults.map(r => {
+      let effectivePercentage = r.finalPercentage;
+      if (effectivePercentage == null || effectivePercentage === 0) {
+        const rawScore = r.subjectId ? rawScoreMap.get(`${r.studentId}::${r.subjectId}`) : undefined;
+        if (rawScore != null) {
+          effectivePercentage = rawScore;
+        }
+      }
+      return effectivePercentage ?? 0;
+    });
     const totalStudents = new Set(computedResults.map(r => r.studentId)).size;
     const overallAvg = overallScores.length > 0 ? overallScores.reduce((a, b) => a + b, 0) / overallScores.length : 0;
     const passCount = overallScores.filter(s => s >= 50).length;
@@ -868,7 +912,14 @@ export class ResultsManagementService {
       if (!acc[result.subjectId]) {
         acc[result.subjectId] = { subjectId: result.subjectId, subjectName: result.subject.name, scores: [] };
       }
-      acc[result.subjectId].scores.push(result.finalPercentage ?? 0);
+      let effectivePercentage = result.finalPercentage;
+      if (effectivePercentage == null || effectivePercentage === 0) {
+        const rawScore = result.subjectId ? rawScoreMap.get(`${result.studentId}::${result.subjectId}`) : undefined;
+        if (rawScore != null) {
+          effectivePercentage = rawScore;
+        }
+      }
+      acc[result.subjectId].scores.push(effectivePercentage ?? 0);
       return acc;
     }, {});
 
@@ -895,6 +946,45 @@ export class ResultsManagementService {
 
     const atRiskStudents = students.filter(s => s.percentage < 40).sort((a, b) => a.percentage - b.percentage);
 
+    // Gender-based stats
+    const maleStudents = students.filter(s => s.gender === 'MALE' || s.gender === 'M');
+    const femaleStudents = students.filter(s => s.gender === 'FEMALE' || s.gender === 'F');
+    const malePassCount = maleStudents.filter(s => s.percentage >= 50).length;
+    const femalePassCount = femaleStudents.filter(s => s.percentage >= 50).length;
+    const malePassRate = maleStudents.length > 0 ? parseFloat(((malePassCount / maleStudents.length) * 100).toFixed(2)) : 0;
+    const femalePassRate = femaleStudents.length > 0 ? parseFloat(((femalePassCount / femaleStudents.length) * 100).toFixed(2)) : 0;
+    const maleAverage = maleStudents.length > 0 ? parseFloat((maleStudents.reduce((sum, s) => sum + s.percentage, 0) / maleStudents.length).toFixed(2)) : 0;
+    const femaleAverage = femaleStudents.length > 0 ? parseFloat((femaleStudents.reduce((sum, s) => sum + s.percentage, 0) / femaleStudents.length).toFixed(2)) : 0;
+
+    // Gender-based subject stats
+    const subjectGenderAnalysis = Object.values(subjectAnalytics).map((subject: any) => {
+      const maleScores: number[] = [];
+      const femaleScores: number[] = [];
+      computedResults
+        .filter(r => r.subjectId === subject.subjectId)
+        .forEach(r => {
+          let effectivePercentage = r.finalPercentage;
+          if (effectivePercentage == null || effectivePercentage === 0) {
+            const rawScore = rawScoreMap.get(`${r.studentId}::${r.subjectId}`);
+            if (rawScore != null) effectivePercentage = rawScore;
+          }
+          const score = effectivePercentage ?? 0;
+          const gender = (r.student as any).gender;
+          if (gender === 'MALE' || gender === 'M') maleScores.push(score);
+          else if (gender === 'FEMALE' || gender === 'F') femaleScores.push(score);
+        });
+      return {
+        subjectId: subject.subjectId,
+        subjectName: subject.subjectName,
+        maleCount: maleScores.length,
+        femaleCount: femaleScores.length,
+        maleAverage: maleScores.length > 0 ? parseFloat((maleScores.reduce((a, b) => a + b, 0) / maleScores.length).toFixed(2)) : 0,
+        femaleAverage: femaleScores.length > 0 ? parseFloat((femaleScores.reduce((a, b) => a + b, 0) / femaleScores.length).toFixed(2)) : 0,
+        malePassRate: maleScores.length > 0 ? parseFloat(((maleScores.filter(s => s >= 50).length / maleScores.length) * 100).toFixed(2)) : 0,
+        femalePassRate: femaleScores.length > 0 ? parseFloat(((femaleScores.filter(s => s >= 50).length / femaleScores.length) * 100).toFixed(2)) : 0,
+      };
+    });
+
     return {
       totalStudents,
       passRate,
@@ -905,6 +995,15 @@ export class ResultsManagementService {
       subjectAnalysis,
       students,
       atRiskStudents,
+      genderStats: {
+        maleCount: maleStudents.length,
+        femaleCount: femaleStudents.length,
+        malePassRate,
+        femalePassRate,
+        maleAverage,
+        femaleAverage,
+      },
+      subjectGenderAnalysis,
     };
   }
 

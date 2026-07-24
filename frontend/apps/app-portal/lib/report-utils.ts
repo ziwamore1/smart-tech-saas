@@ -33,12 +33,12 @@ const REPORT_STYLES = `
   @page { margin: 15mm; size: A4 landscape; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif; color: #1f2937; background: white; padding: 24px; line-height: 1.4; }
-  .report-header { text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 3px solid #5f4b3a; }
-  .school-name { font-size: 22px; font-weight: 700; color: #5f4b3a; text-transform: uppercase; letter-spacing: 1px; }
-  .school-sub { font-size: 12px; color: #6b7280; margin-top: 4px; }
-  .report-title { font-size: 16px; font-weight: 600; color: #1f2937; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .report-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; font-size: 13px; color: #374151; }
-  .report-meta strong { color: #1f2937; }
+  .report-header { text-align: center; margin-bottom: 24px; padding: 16px 20px; background: linear-gradient(135deg, #5f4b3a 0%, #7a6b5a 100%); border-radius: 8px; color: white; }
+  .school-name { font-size: 22px; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+  .school-sub { font-size: 12px; color: #e8ddd0; margin-top: 4px; }
+  .report-title { font-size: 16px; font-weight: 600; color: white; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.95; }
+  .report-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; font-size: 13px; color: #374151; background: #f5f0eb; padding: 10px 16px; border-radius: 6px; border: 1px solid #e8ddd0; }
+  .report-meta strong { color: #5f4b3a; }
   table { width: 100%; border-collapse: collapse; font-size: 11px; }
   th { background: #5f4b3a; color: white; padding: 8px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; border: 1px solid #7a6b5a; }
   td { padding: 6px 10px; border: 1px solid #e5e7eb; }
@@ -201,7 +201,24 @@ export interface AnalysisData {
   atRiskCount: number;
   gradeDistribution: Record<string, number>;
   subjectAnalysis: { subjectName: string; average: number; highest: number; lowest: number; passRate: number; distinctionRate: number }[];
-  students: { firstName: string; lastName: string; admissionNumber?: string; percentage: number; grade?: string }[];
+  students: { firstName: string; lastName: string; admissionNumber?: string; gender?: string; percentage: number; grade?: string }[];
+  genderStats?: {
+    maleCount: number;
+    femaleCount: number;
+    malePassRate: number;
+    femalePassRate: number;
+    maleAverage: number;
+    femaleAverage: number;
+  };
+  subjectGenderAnalysis?: {
+    subjectName: string;
+    maleCount: number;
+    femaleCount: number;
+    maleAverage: number;
+    femaleAverage: number;
+    malePassRate: number;
+    femalePassRate: number;
+  }[];
 }
 
 export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta): string {
@@ -220,10 +237,14 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
     </tr>`;
   }).join('');
 
-  const subjectRows = (analysis.subjectAnalysis || []).map((s, i) => {
+  const genderStats = analysis.genderStats;
+  const subjectGender = analysis.subjectGenderAnalysis || [];
+
+  const subjectRows = (analysis.subjectAnalysis || []).map((s) => {
     const avgColor = scoreColor(s.average);
     const highest = (s as any).highest || (s as any).max || 0;
     const lowest = (s as any).lowest || (s as any).min || 0;
+    const sg = subjectGender.find(g => g.subjectName === s.subjectName);
     return `<tr>
       <td style="font-weight:600">${s.subjectName}</td>
       <td class="text-center font-semibold" style="color:${avgColor}">${s.average.toFixed(1)}%</td>
@@ -233,6 +254,10 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
         <span class="grade-badge" style="background:${s.passRate >= 70 ? '#d1fae5' : s.passRate >= 40 ? '#fef3c7' : '#fee2e2'};color:${s.passRate >= 70 ? '#059669' : s.passRate >= 40 ? '#d97706' : '#dc2626'}">${s.passRate.toFixed(1)}%</span>
       </td>
       <td class="text-center"><span class="grade-badge" style="background:#f3e8ff;color:#7c3aed">${s.distinctionRate.toFixed(1)}%</span></td>
+      <td class="text-center" style="color:#2563eb;font-weight:600">${sg ? sg.maleAverage.toFixed(1) + '%' : '-'}</td>
+      <td class="text-center" style="color:#db2777;font-weight:600">${sg ? sg.femaleAverage.toFixed(1) + '%' : '-'}</td>
+      <td class="text-center">${sg ? `<span style="color:#2563eb">${sg.malePassRate.toFixed(0)}%</span>` : '-'}</td>
+      <td class="text-center">${sg ? `<span style="color:#db2777">${sg.femalePassRate.toFixed(0)}%</span>` : '-'}</td>
     </tr>`;
   }).join('');
 
@@ -240,6 +265,7 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
     <td class="text-center" style="color:#6b7280">${i + 1}</td>
     <td style="font-weight:600">${s.firstName} ${s.lastName}</td>
     <td style="color:#6b7280;font-size:11px">${s.admissionNumber || '-'}</td>
+    <td class="text-center" style="color:${(s.gender || '').startsWith('M') ? '#2563eb' : '#db2777'};font-weight:600">${s.gender || '-'}</td>
     <td class="text-center font-bold fail">${(s.percentage || (s as any).avgPercentage || 0).toFixed(1)}%</td>
     <td class="text-center"><span class="grade-badge" style="background:#fee2e2;color:#dc2626">${s.grade || '-'}</span></td>
   </tr>`).join('');
@@ -247,11 +273,22 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
   const content = `
     <div class="summary-grid">
       <div class="summary-card"><div class="summary-value">${analysis.totalStudents}</div><div class="summary-label">Total Students</div></div>
-      <div class="summary-card"><div class="summary-value pass">${analysis.passRate.toFixed(1)}%</div><div class="summary-label">Pass Rate</div></div>
+      <div class="summary-card"><div class="summary-value pass">${analysis.passRate.toFixed(1)}%</div><div class="summary-label">Class Pass Rate</div></div>
       <div class="summary-card"><div class="summary-value" style="color:#ea6645">${analysis.averagePercentage.toFixed(1)}%</div><div class="summary-label">Class Average</div></div>
       <div class="summary-card"><div class="summary-value" style="color:#7c3aed">${analysis.distinctionRate.toFixed(1)}%</div><div class="summary-label">Distinction Rate</div></div>
       <div class="summary-card"><div class="summary-value fail">${analysis.atRiskCount}</div><div class="summary-label">At Risk Students</div></div>
     </div>
+
+    ${genderStats ? `
+    <div class="section-title">Gender Performance Overview</div>
+    <div class="summary-grid">
+      <div class="summary-card" style="border-left:4px solid #2563eb"><div class="summary-value" style="color:#2563eb">${genderStats.maleCount}</div><div class="summary-label">Male Students</div></div>
+      <div class="summary-card" style="border-left:4px solid #db2777"><div class="summary-value" style="color:#db2777">${genderStats.femaleCount}</div><div class="summary-label">Female Students</div></div>
+      <div class="summary-card" style="border-left:4px solid #2563eb"><div class="summary-value" style="color:#2563eb">${genderStats.malePassRate.toFixed(1)}%</div><div class="summary-label">Male Pass Rate</div></div>
+      <div class="summary-card" style="border-left:4px solid #db2777"><div class="summary-value" style="color:#db2777">${genderStats.femalePassRate.toFixed(1)}%</div><div class="summary-label">Female Pass Rate</div></div>
+      <div class="summary-card" style="border-left:4px solid #2563eb"><div class="summary-value" style="color:#2563eb">${genderStats.maleAverage.toFixed(1)}%</div><div class="summary-label">Male Average</div></div>
+      <div class="summary-card" style="border-left:4px solid #db2777"><div class="summary-value" style="color:#db2777">${genderStats.femaleAverage.toFixed(1)}%</div><div class="summary-label">Female Average</div></div>
+    </div>` : ''}
 
     <div class="section-title">Grade Distribution</div>
     <table style="max-width:500px;margin-bottom:20px">
@@ -259,17 +296,17 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
       <tbody>${distRows}</tbody>
     </table>
 
-    ${subjectRows ? `
+    ${(analysis.subjectAnalysis || []).length > 0 ? `
     <div class="section-title">Subject Performance Breakdown</div>
     <table>
-      <thead><tr><th>Subject</th><th class="text-center">Class Average</th><th class="text-center">Highest</th><th class="text-center">Lowest</th><th class="text-center">Pass Rate</th><th class="text-center">Distinction</th></tr></thead>
+      <thead><tr><th>Subject</th><th class="text-center">Class Avg</th><th class="text-center">Highest</th><th class="text-center">Lowest</th><th class="text-center">Pass Rate</th><th class="text-center">Distinction</th><th class="text-center" style="color:#dbeafe">Male Avg</th><th class="text-center" style="color:#fce7f3">Female Avg</th><th class="text-center" style="color:#dbeafe">Male Pass%</th><th class="text-center" style="color:#fce7f3">Female Pass%</th></tr></thead>
       <tbody>${subjectRows}</tbody>
     </table>` : ''}
 
     ${atRiskRows ? `
     <div class="section-title">At-Risk Students (Below 40%)</div>
     <table>
-      <thead><tr><th class="text-center">#</th><th>Student Name</th><th>Admission No.</th><th class="text-center">Score</th><th class="text-center">Grade</th></tr></thead>
+      <thead><tr><th class="text-center">#</th><th>Student Name</th><th>Admission No.</th><th class="text-center">Gender</th><th class="text-center">Score</th><th class="text-center">Grade</th></tr></thead>
       <tbody>${atRiskRows}</tbody>
     </table>` : ''}`;
 
@@ -344,6 +381,8 @@ export function openAnalysisReport(analysis: AnalysisData, meta: ReportMeta) {
     gradeDistribution: analysis.gradeDistribution || {},
     subjectAnalysis: analysis.subjectAnalysis || (analysis as any).subjectStats || [],
     students: analysis.students || [],
+    genderStats: analysis.genderStats || undefined,
+    subjectGenderAnalysis: analysis.subjectGenderAnalysis || [],
   };
   openReport(generateAnalysisReport(normalizedAnalysis, meta), `Analysis - ${meta.className}`);
 }
