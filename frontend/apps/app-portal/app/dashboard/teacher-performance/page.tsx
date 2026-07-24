@@ -45,7 +45,8 @@ export default function TeacherPerformancePage() {
   const [error, setError] = useState<string | null>(null);
   const [teacherPerformance, setTeacherPerformance] = useState<any[]>([]);
   const [teacherEffectiveness, setTeacherEffectiveness] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'effectiveness'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'subjects' | 'individual' | 'effectiveness'>('overview');
+  const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
 
   const userRoles = user?.roles || [];
   const isSupervisor = userRoles.some((r: string) => SUPERVISOR_ROLES.includes(r));
@@ -204,10 +205,12 @@ export default function TeacherPerformancePage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
+      <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit overflow-x-auto">
         {[
           { key: 'overview', label: 'Overview' },
+          { key: 'subjects', label: 'By Subject' },
           { key: 'effectiveness', label: 'Effectiveness' },
+          { key: 'individual', label: 'Individual' },
         ].map((tab) => (
           <button key={tab.key}
             onClick={() => setActiveTab(tab.key as any)}
@@ -280,16 +283,17 @@ export default function TeacherPerformancePage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Teacher</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Dept</th>
-                    <th className="text-center py-3 px-4 font-semibold text-gray-700">Assessments</th>
-                    <th className="text-center py-3 px-4 font-semibold text-gray-700">Completed</th>
-                    <th className="text-center py-3 px-4 font-semibold text-gray-700">Pending</th>
-                    <th className="text-center py-3 px-4 font-semibold text-gray-700">Completion</th>
-                    <th className="text-center py-3 px-4 font-semibold text-gray-700">Avg Score</th>
-                    <th className="text-center py-3 px-4 font-semibold text-gray-700">Pass Rate</th>
-                  </tr>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Teacher</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Dept</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Assessments</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Completed</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Pending</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Completion</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Avg Score</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Pass Rate</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Action</th>
+                    </tr>
                 </thead>
                 <tbody>
                   {teachers.map((t, i) => {
@@ -344,6 +348,160 @@ export default function TeacherPerformancePage() {
               </table>
             </div>
           </div>
+          {/* Subjects Tab */}
+          {activeTab === 'subjects' && (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="p-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">Subject Performance Analysis</h2>
+                <p className="text-sm text-gray-500">Performance breakdown by subject across all classes</p>
+              </div>
+              {subjectData && subjectData.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Subject</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Avg Score</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Highest</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Lowest</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Pass Rate</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Students</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Rating</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {subjectData.sort((a: any, b: any) => b.average - a.average).map((s: any, i: number) => {
+                        const rating = s.average >= 70 ? 'Excellent' : s.average >= 50 ? 'Good' : s.average >= 40 ? 'Average' : 'Poor';
+                        const ratingColor = s.average >= 70 ? 'bg-green-100 text-green-800' : s.average >= 50 ? 'bg-blue-100 text-blue-800' : s.average >= 40 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800';
+                        return (
+                          <tr key={i} className={`border-b border-gray-100 hover:bg-gray-50 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                            <td className="py-3 px-4 font-medium text-gray-900">{s.subject}</td>
+                            <td className="py-3 px-4 text-center font-medium">
+                              <span className={s.average >= 60 ? 'text-green-600' : s.average >= 40 ? 'text-amber-600' : 'text-red-600'}>
+                                {s.average?.toFixed(1)}%
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-center text-green-600">{s.highest?.toFixed(1)}%</td>
+                            <td className="py-3 px-4 text-center text-red-600">{s.lowest?.toFixed(1)}%</td>
+                            <td className="py-3 px-4 text-center font-medium">{s.passRate?.toFixed(1)}%</td>
+                            <td className="py-3 px-4 text-center">{s.studentCount || s.count || '—'}</td>
+                            <td className="py-3 px-4 text-center">
+                              <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${ratingColor}`}>
+                                {rating}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-8 text-center text-gray-500">No subject performance data available</div>
+              )}
+            </div>
+          )}
+
+          {/* Individual Teacher Tab */}
+          {activeTab === 'individual' && (
+            <div className="space-y-6">
+              {!selectedTeacher ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {teachers.sort((a, b) => (b.avgScore || 0) - (a.avgScore || 0)).map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => setSelectedTeacher(t)}
+                      className="text-left p-4 bg-white border border-gray-200 rounded-xl hover:border-indigo-300 hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                          {t.name?.charAt(0) || '?'}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900">{t.name}</p>
+                          <p className="text-xs text-gray-500">{t.department}</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                        <div className="bg-gray-50 rounded p-2">
+                          <p className="font-bold">{t.avgScore != null ? `${t.avgScore}%` : '—'}</p>
+                          <p className="text-gray-500">Avg</p>
+                        </div>
+                        <div className="bg-gray-50 rounded p-2">
+                          <p className="font-bold">{t.passRate != null ? `${t.passRate}%` : '—'}</p>
+                          <p className="text-gray-500">Pass</p>
+                        </div>
+                        <div className="bg-gray-50 rounded p-2">
+                          <p className="font-bold">{t.completionRate}%</p>
+                          <p className="text-gray-500">Done</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <button
+                    onClick={() => setSelectedTeacher(null)}
+                    className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                  >
+                    ← Back to teacher list
+                  </button>
+                  <div className="bg-white border border-gray-200 rounded-xl p-6">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-16 h-16 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-2xl">
+                        {selectedTeacher.name?.charAt(0) || '?'}
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-gray-900">{selectedTeacher.name}</h2>
+                        <p className="text-gray-500">{selectedTeacher.role} • {selectedTeacher.department}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                      <div className="bg-blue-50 rounded-lg p-4 text-center">
+                        <p className="text-2xl font-bold text-blue-600">{selectedTeacher.studentCount ?? '—'}</p>
+                        <p className="text-xs text-gray-600">Students</p>
+                      </div>
+                      <div className="bg-green-50 rounded-lg p-4 text-center">
+                        <p className="text-2xl font-bold text-green-600">{selectedTeacher.avgScore != null ? `${selectedTeacher.avgScore}%` : '—'}</p>
+                        <p className="text-xs text-gray-600">Avg Score</p>
+                      </div>
+                      <div className="bg-purple-50 rounded-lg p-4 text-center">
+                        <p className="text-2xl font-bold text-purple-600">{selectedTeacher.passRate != null ? `${selectedTeacher.passRate}%` : '—'}</p>
+                        <p className="text-xs text-gray-600">Pass Rate</p>
+                      </div>
+                      <div className="bg-amber-50 rounded-lg p-4 text-center">
+                        <p className="text-2xl font-bold text-amber-600">{selectedTeacher.completionRate}%</p>
+                        <p className="text-xs text-gray-600">Completion</p>
+                      </div>
+                    </div>
+                    {selectedTeacher.effectivenessScore != null && (
+                      <div className="p-4 bg-indigo-50 rounded-lg">
+                        <p className="text-sm text-gray-600">Effectiveness Score</p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <div className="flex-1 bg-gray-200 rounded-full h-3">
+                            <div className="h-3 rounded-full bg-indigo-600" style={{ width: `${Math.min((selectedTeacher.effectivenessScore / 5) * 100, 100)}%` }} />
+                          </div>
+                          <span className="text-2xl font-bold text-indigo-600">{selectedTeacher.effectivenessScore.toFixed(1)}/5.0</span>
+                        </div>
+                      </div>
+                    )}
+                    {selectedTeacher.pendingItems && selectedTeacher.pendingItems.length > 0 && (
+                      <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                        <h3 className="font-semibold text-amber-800 mb-2">Pending Assessments ({selectedTeacher.pendingItems.length})</h3>
+                        <ul className="text-sm text-amber-700 space-y-1">
+                          {selectedTeacher.pendingItems.slice(0, 5).map((item: any, idx: number) => (
+                            <li key={idx}>• {item.subjectName || item.assessmentName || `Assessment ${idx + 1}`} — {item.missingCount || '?'} missing</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
         </>
       ) : (
         /* Effectiveness Tab */

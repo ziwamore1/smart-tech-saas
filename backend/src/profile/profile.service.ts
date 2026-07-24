@@ -3,6 +3,7 @@ import * as bcrypt from 'bcrypt';
 import * as path from 'path';
 import * as fs from 'fs-extra';
 import { PrismaService } from '../prisma/prisma.service';
+import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { UpdateProfileDto, ChangePasswordDto } from './dto/profile.dto';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class ProfileService {
 
   constructor(
     private prisma: PrismaService,
+    private schoolEvents: SchoolEventsGateway,
   ) {}
 
   async getProfile(userId: string) {
@@ -45,6 +47,12 @@ export class ProfileService {
       }
     }
 
+    const changes: string[] = [];
+    if (data.firstName) changes.push('firstName');
+    if (data.lastName) changes.push('lastName');
+    if (data.email) changes.push('email');
+    if (data.phone) changes.push('phone');
+
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -53,8 +61,16 @@ export class ProfileService {
         email: data.email,
         phone: data.phone,
       },
-      select: { id: true, email: true, firstName: true, lastName: true, phone: true, photoUrl: true },
+      select: { id: true, email: true, firstName: true, lastName: true, phone: true, photoUrl: true, schoolId: true },
     });
+
+    if (user.schoolId) {
+      this.schoolEvents.emitProfileUpdated(user.schoolId, {
+        userId,
+        updatedBy: userId,
+        changes,
+      });
+    }
 
     return user;
   }
@@ -62,13 +78,21 @@ export class ProfileService {
   async uploadPhoto(userId: string, photoUrl: string, photoPublicId: string): Promise<string | null> {
     if (!photoUrl) throw new BadRequestException('No photo URL provided');
 
-    const oldUser = await this.prisma.user.findUnique({ where: { id: userId }, select: { photoPublicId: true } });
+    const oldUser = await this.prisma.user.findUnique({ where: { id: userId }, select: { photoPublicId: true, schoolId: true } });
     const oldPublicId = oldUser?.photoPublicId || null;
 
     await this.prisma.user.update({
       where: { id: userId },
       data: { photoUrl, photoPublicId },
     });
+
+    if (oldUser?.schoolId) {
+      this.schoolEvents.emitProfileUpdated(oldUser.schoolId, {
+        userId,
+        updatedBy: userId,
+        changes: ['photoUrl'],
+      });
+    }
 
     return oldPublicId;
   }

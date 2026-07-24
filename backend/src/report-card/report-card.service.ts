@@ -28,6 +28,18 @@ handlebars.registerHelper('math', (lhs: any, operator: string, rhs: any) => {
   }
 });
 
+handlebars.registerHelper('gte', (a: any, b: any) => {
+  return parseFloat(a) >= parseFloat(b);
+});
+
+handlebars.registerHelper('lt', (a: any, b: any) => {
+  return parseFloat(a) < parseFloat(b);
+});
+
+handlebars.registerHelper('minus', (a: any, b: any) => {
+  return Math.abs(parseFloat(a) - parseFloat(b)).toFixed(1);
+});
+
 @Injectable()
 export class ReportCardService {
   constructor(
@@ -773,12 +785,22 @@ export class ReportCardService {
       where: { schoolId },
     });
 
-    const templatePath = path.join(process.cwd(), 'src', 'templates', 'report-card-curriculum.hbs');
+    // Select enhanced template (always use enhanced for curriculum reports)
+    const templatePath = path.join(process.cwd(), 'src', 'templates', 'report-card-enhanced.hbs');
     let templateHtml = fs.readFileSync(templatePath, 'utf8');
 
     const commentData = await this.analyticsService.generateStudentComment(schoolId, studentId, termId);
-    const teacherComment = commentData.teacherComment;
-    const headComment = commentData.headComment;
+
+    // Get enhanced data: mid-term comparison, class comparison, charts, grading legend
+    const [midTermData, classComparison, classStats, gradingLegend] = await Promise.all([
+      this.reportCardEngineService.getMidTermComparison(studentId, termId, schoolId).catch(() => null),
+      this.reportCardEngineService.getClassComparison(studentId, termId, engineData.class?.id).catch(() => null),
+      this.reportCardEngineService.getClassStatistics(termId, engineData.class?.id, schoolId).catch(() => null),
+      this.reportCardEngineService.getGradingLegend(schoolId, engineData.class?.id).catch(() => null),
+    ]);
+
+    const now = new Date();
+    const generatedAtFormatted = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
     const templateData = {
       schoolName: school.name,
@@ -798,8 +820,8 @@ export class ReportCardService {
       attendance: engineData.attendance || { totalDays: 0, presentDays: 0, attendanceRate: 0 },
       termSummary: engineData.termSummary,
       curriculum: engineData.curriculum || { version: null, bestSubjectRule: null },
-      teacherComment: reportTemplate?.includeComments !== false ? teacherComment : undefined,
-      headComment: reportTemplate?.includeComments !== false ? headComment : undefined,
+      teacherComment: reportTemplate?.includeComments !== false ? commentData.teacherComment : undefined,
+      headComment: reportTemplate?.includeComments !== false ? commentData.headComment : undefined,
       includeStamp: reportTemplate?.includeStamp || false,
       includeSignature: reportTemplate?.includeSignature || false,
       stampUrl: reportTemplate?.stampUrl,
@@ -809,6 +831,21 @@ export class ReportCardService {
       footerText: reportTemplate?.footerText || '',
       showRemarks: reportTemplate?.remarksEnabled !== false,
       generatedAt: engineData.generatedAt,
+      generatedAtFormatted,
+      // Enhanced data for charts and analysis
+      classAverage: classStats?.classAverage ?? null,
+      midTermData,
+      classComparison,
+      gradeDistribution: classStats?.gradeDistribution ?? null,
+      histogramData: classStats?.histogramData ?? null,
+      gradingLegend: gradingLegend ?? [
+        { grade: 'A', range: '80-100', label: 'Distinction', color: '#10b981' },
+        { grade: 'B', range: '70-79', label: 'Merit', color: '#3b82f6' },
+        { grade: 'C', range: '60-69', label: 'Credit', color: '#f59e0b' },
+        { grade: 'D', range: '50-59', label: 'Pass', color: '#f97316' },
+        { grade: 'E', range: '40-49', label: 'Marginal Pass', color: '#fb923c' },
+        { grade: 'F', range: '0-39', label: 'Fail', color: '#ef4444' },
+      ],
     };
 
     const compiledTemplate = handlebars.compile(templateHtml);
@@ -847,8 +884,17 @@ export class ReportCardService {
       where: { schoolId, isDefault: true },
     }) || await this.prisma.reportTemplate.findFirst({ where: { schoolId } });
 
-    const templatePath = path.join(process.cwd(), 'src', 'templates', 'report-card-curriculum.hbs');
+    const templatePath = path.join(process.cwd(), 'src', 'templates', 'report-card-enhanced.hbs');
     const templateHtml = fs.readFileSync(templatePath, 'utf8');
+
+    // Pre-fetch class-level data shared across all students
+    const [classStats, gradingLegend] = await Promise.all([
+      this.reportCardEngineService.getClassStatistics(termId, classId, schoolId).catch(() => null),
+      this.reportCardEngineService.getGradingLegend(schoolId, classId).catch(() => null),
+    ]);
+
+    const now = new Date();
+    const generatedAtFormatted = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
     let allHtml = '';
 
@@ -857,6 +903,12 @@ export class ReportCardService {
         e.studentId, termId, schoolId,
       );
       const commentData = await this.analyticsService.generateStudentComment(schoolId, e.studentId, termId);
+
+      // Per-student enhanced data
+      const [midTermData, classComparison] = await Promise.all([
+        this.reportCardEngineService.getMidTermComparison(e.studentId, termId, schoolId).catch(() => null),
+        this.reportCardEngineService.getClassComparison(e.studentId, termId, classId).catch(() => null),
+      ]);
 
       const templateData = {
         schoolName: school.name,
@@ -887,6 +939,21 @@ export class ReportCardService {
         footerText: reportTemplate?.footerText || '',
         showRemarks: reportTemplate?.remarksEnabled !== false,
         generatedAt: engineData.generatedAt,
+        generatedAtFormatted,
+        // Enhanced data
+        classAverage: classStats?.classAverage ?? null,
+        midTermData,
+        classComparison,
+        gradeDistribution: classStats?.gradeDistribution ?? null,
+        histogramData: classStats?.histogramData ?? null,
+        gradingLegend: gradingLegend ?? [
+          { grade: 'A', range: '80-100', label: 'Distinction', color: '#10b981' },
+          { grade: 'B', range: '70-79', label: 'Merit', color: '#3b82f6' },
+          { grade: 'C', range: '60-69', label: 'Credit', color: '#f59e0b' },
+          { grade: 'D', range: '50-59', label: 'Pass', color: '#f97316' },
+          { grade: 'E', range: '40-49', label: 'Marginal Pass', color: '#fb923c' },
+          { grade: 'F', range: '0-39', label: 'Fail', color: '#ef4444' },
+        ],
       };
 
       const compiledTemplate = handlebars.compile(templateHtml);

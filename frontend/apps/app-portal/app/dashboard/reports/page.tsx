@@ -397,6 +397,7 @@ export default function ReportsPage() {
       icon: '📊', 
       description: 'Class and subject performance analysis',
       requiresStudent: false,
+      href: '/dashboard/result-analytics',
     },
     { 
       id: 'class-rankings', 
@@ -404,6 +405,7 @@ export default function ReportsPage() {
       icon: '🏆', 
       description: 'Student rankings within class',
       requiresStudent: false,
+      href: '/dashboard/analytics-enhanced',
     },
     { 
       id: 'teacher-performance', 
@@ -411,6 +413,7 @@ export default function ReportsPage() {
       icon: '👨‍🏫', 
       description: 'Teacher and subject performance analysis',
       requiresStudent: false,
+      href: '/dashboard/teacher-performance',
     },
   ];
 

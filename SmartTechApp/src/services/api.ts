@@ -2649,6 +2649,66 @@ class ApiService {
     return response.data;
   }
 
+  // ===== Analytics (web-compatible) =====
+  async getTeacherPerformance(termId: string) {
+    const response = await this.client.get('/analytics/teacher-performance', { params: { termId } });
+    return response.data;
+  }
+
+  async getClassPerformance(classId: string, term: string) {
+    const response = await this.client.get('/analytics/class-performance', { params: { classId, term } });
+    return response.data;
+  }
+
+  async getSubjectPerformance(classId: string, termId: string) {
+    const response = await this.client.get('/analytics/subject-performance', { params: { classId, termId } });
+    return response.data;
+  }
+
+  async getDirectorDashboardStats(classId?: string, termId?: string) {
+    const params: any = {};
+    if (classId) params.classId = classId;
+    if (termId) params.termId = termId;
+    const response = await this.client.get('/analytics/director-dashboard', { params });
+    return response.data;
+  }
+
+  async getGradeDistribution(classId: string, termId: string) {
+    const response = await this.client.get('/analytics/grade-distribution', { params: { classId, termId } });
+    return response.data;
+  }
+
+  async getGenderPerformance(classId: string, termId: string) {
+    const response = await this.client.get('/analytics/gender-performance', { params: { classId, termId } });
+    return response.data;
+  }
+
+  async getResultsStats(termId: string) {
+    const response = await this.client.get('/analytics/results-stats', { params: { termId } });
+    return response.data;
+  }
+
+  // ===== Report Card PDF Downloads =====
+  async getClassReportCardsPdf(classId: string, termId: string) {
+    const response = await this.client.get(`/report-card/class/${classId}/term/${termId}/pdf`, { responseType: 'blob' });
+    return response.data;
+  }
+
+  async getReportCardPdf(studentId: string, termId: string) {
+    const response = await this.client.get(`/report-card/${studentId}/${termId}/pdf`, { responseType: 'blob' });
+    return response.data;
+  }
+
+  async getTranscriptPdf(studentId: string) {
+    const response = await this.client.get(`/report-card/transcript/${studentId}/pdf`, { responseType: 'blob' });
+    return response.data;
+  }
+
+  async getReportCardJson(studentId: string, termId: string) {
+    const response = await this.client.get(`/report-card/${studentId}/${termId}`);
+    return response.data;
+  }
+
   // ===== Class Teacher Assignments =====
   async assignClassTeacher(data: { teacherId: string; classId: string }) {
     const response = await this.client.post('/class-teacher-assignments', data);

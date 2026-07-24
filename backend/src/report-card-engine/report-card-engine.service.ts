@@ -428,4 +428,299 @@ export class ReportCardEngineService {
 
     return filtered;
   }
+
+  /**
+   * Get mid-term / previous term comparison data for a student
+   */
+  async getMidTermComparison(studentId: string, currentTermId: string, schoolId: string) {
+    const currentTerm = await this.prisma.term.findUnique({
+      where: { id: currentTermId },
+      include: { academicYear: true },
+    });
+    if (!currentTerm) return null;
+
+    const student = await this.prisma.student.findUnique({
+      where: { id: studentId },
+      include: {
+        enrollments: { where: { status: 'ACTIVE' }, include: { class: true } },
+      },
+    });
+    if (!student) return null;
+
+    const enrollment = student.enrollments[0];
+    if (!enrollment) return null;
+
+    // Find the previous term in the same academic year or the last term of the previous year
+    const allTerms = await this.prisma.term.findMany({
+      where: { academicYearId: currentTerm.academicYearId },
+      orderBy: { startDate: 'asc' },
+    });
+
+    const currentIdx = allTerms.findIndex(t => t.id === currentTermId);
+    if (currentIdx <= 0) return null; // No previous term
+
+    const previousTerm = allTerms[currentIdx - 1];
+    if (!previousTerm) return null;
+
+    // Get previous term's term summary
+    const prevSummary = await this.prisma.termSummary.findFirst({
+      where: { studentId, termId: previousTerm.id },
+    });
+    if (!prevSummary) return null;
+
+    // Get current term's term summary
+    const currSummary = await this.prisma.termSummary.findFirst({
+      where: { studentId, termId: currentTermId },
+    });
+
+    // Get subject-level comparison
+    const prevResults = await this.prisma.computedResult.findMany({
+      where: { studentId, termId: previousTerm.id, classId: enrollment.classId, status: { in: ['COMPUTED', 'VERIFIED', 'LOCKED'] } },
+      include: { subject: true },
+    });
+
+    const currResults = await this.prisma.computedResult.findMany({
+      where: { studentId, termId: currentTermId, classId: enrollment.classId, status: { in: ['COMPUTED', 'VERIFIED', 'LOCKED'] } },
+      include: { subject: true },
+    });
+
+    const subjectComparisons = currResults.map(curr => {
+      const prev = prevResults.find(p => p.subjectId === curr.subjectId);
+      return {
+        subjectName: curr.subject.name,
+        previousPercentage: prev?.finalPercentage ?? null,
+        currentPercentage: curr.finalPercentage ?? null,
+      };
+    }).filter(sc => sc.previousPercentage !== null || sc.currentPercentage !== null);
+
+    // Previous term attendance
+    const prevAttendance = await this.prisma.attendance.findMany({
+      where: {
+        studentId,
+        date: { gte: previousTerm.startDate, lte: previousTerm.endDate },
+      },
+    });
+    const prevAttendanceRate = prevAttendance.length > 0
+      ? (prevAttendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length / prevAttendance.length) * 100
+      : null;
+
+    return {
+      termName: previousTerm.name,
+      overallPercentage: prevSummary.overallPercentage,
+      overallGrade: prevSummary.overallGrade,
+      classRank: prevSummary.classRank,
+      classSize: prevSummary.classSize,
+      attendanceRate: prevAttendanceRate ? parseFloat(prevAttendanceRate.toFixed(2)) : null,
+      subjectComparisons,
+    };
+  }
+
+  /**
+   * Get class average comparison data for a student (student score vs class average per subject)
+   */
+  async getClassComparison(studentId: string, termId: string, classId: string) {
+    const studentResults = await this.prisma.computedResult.findMany({
+      where: { studentId, termId, classId, status: { in: ['COMPUTED', 'VERIFIED', 'LOCKED'] } },
+      include: { subject: true },
+    });
+
+    const classResults = await this.prisma.computedResult.findMany({
+      where: { termId, classId, status: { in: ['COMPUTED', 'VERIFIED', 'LOCKED'] } },
+      include: { subject: true },
+    });
+
+    const comparison = studentResults.map(sr => {
+      const subjectResults = classResults.filter(cr => cr.subjectId === sr.subjectId);
+      const classAvg = subjectResults.length > 0
+        ? parseFloat((subjectResults.reduce((sum, r) => sum + (r.finalPercentage ?? 0), 0) / subjectResults.length).toFixed(1))
+        : null;
+
+      return {
+        subjectName: sr.subject.name,
+        studentScore: sr.finalPercentage ?? 0,
+        classAverage: classAvg ?? 0,
+      };
+    });
+
+    return comparison;
+  }
+
+  /**
+   * Get class-level statistics for charts
+   */
+  async getClassStatistics(termId: string, classId: string, schoolId?: string) {
+    const results = await this.prisma.computedResult.findMany({
+      where: { termId, classId, status: { in: ['COMPUTED', 'VERIFIED', 'LOCKED'] } },
+    });
+
+    if (results.length === 0) return null;
+
+    const percentages = results.map(r => r.finalPercentage ?? 0).filter(p => p > 0);
+    const classAverage = percentages.length > 0
+      ? parseFloat((percentages.reduce((a, b) => a + b, 0) / percentages.length).toFixed(1))
+      : null;
+    const highestScore = percentages.length > 0 ? Math.max(...percentages) : null;
+    const lowestScore = percentages.length > 0 ? Math.min(...percentages) : null;
+
+    // Resolve the class's grading system
+    let gradingSystem: any = null;
+    if (classId) {
+      const cls = await this.prisma.class.findUnique({ where: { id: classId }, select: { gradingSystemId: true } });
+      if (cls?.gradingSystemId) {
+        gradingSystem = await this.prisma.gradingSystem.findUnique({ where: { id: cls.gradingSystemId }, include: { gradeScales: true } });
+      }
+    }
+    if (!gradingSystem && schoolId) {
+      gradingSystem = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId, isDefault: true },
+        include: { gradeScales: true },
+      });
+    }
+    if (!gradingSystem && schoolId) {
+      gradingSystem = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId },
+        include: { gradeScales: true },
+      });
+    }
+
+    const scales = gradingSystem?.gradeScales ?? [];
+
+    // Grade distribution for pie chart — use the actual grading system scales
+    const gradeColors: Record<string, string> = {
+      'A+': '#10b981', 'A': '#10b981', 'A-': '#22c55e',
+      'B+': '#3b82f6', 'B': '#3b82f6', 'B-': '#60a5fa',
+      'C+': '#f59e0b', 'C': '#f59e0b', 'C-': '#fbbf24',
+      'D': '#f97316', 'D+': '#f97316',
+      'E': '#ef4444', 'F': '#ef4444',
+      'Distinction': '#10b981', 'Merit': '#3b82f6', 'Credit': '#f59e0b',
+      'Pass': '#f97316', 'Fail': '#ef4444',
+    };
+
+    const grades: Record<string, { count: number; color: string }> = {};
+
+    for (const r of results) {
+      if (r.finalGrade) {
+        const g = r.finalGrade;
+        if (!grades[g]) grades[g] = { count: 0, color: gradeColors[g] || '#6b7280' };
+        grades[g].count++;
+      }
+    }
+
+    const totalGraded = Object.values(grades).reduce((sum, g) => sum + g.count, 0);
+    let angleAccum = 0;
+    const gradeDistribution = Object.entries(grades).map(([grade, data]) => {
+      const pct = totalGraded > 0 ? Math.round((data.count / totalGraded) * 100) : 0;
+      const startAngle = angleAccum;
+      const sweepAngle = (data.count / Math.max(totalGraded, 1)) * 360;
+      angleAccum += sweepAngle;
+      return { grade, count: data.count, color: data.color, percentage: pct, startAngle: Math.round(startAngle), endAngle: Math.round(angleAccum) };
+    });
+
+    // Histogram: use grading system grade scales as buckets so bars align with graded results
+    let buckets: { label: string; min: number; max: number; count: number; color: string; grade: string }[] = [];
+
+    if (scales.length > 0) {
+      // Sort scales descending by minScore so highest grade is first
+      const sorted = [...scales].sort((a, b) => (b.minScore ?? 0) - (a.minScore ?? 0));
+      buckets = sorted.map(s => ({
+        label: s.maxScore != null ? `${s.grade} (${s.minScore ?? 0}-${s.maxScore})` : s.grade,
+        min: s.minScore ?? 0,
+        max: s.maxScore ?? 100,
+        count: 0,
+        color: gradeColors[s.grade] || s.color || '#6b7280',
+        grade: s.grade,
+      }));
+    } else {
+      // Fallback: standard ECZ secondary grading buckets
+      buckets = [
+        { label: 'A (80-100)', min: 80, max: 100, count: 0, color: '#10b981', grade: 'A' },
+        { label: 'B (70-79)', min: 70, max: 79, count: 0, color: '#3b82f6', grade: 'B' },
+        { label: 'C (60-69)', min: 60, max: 69, count: 0, color: '#f59e0b', grade: 'C' },
+        { label: 'D (50-59)', min: 50, max: 59, count: 0, color: '#f97316', grade: 'D' },
+        { label: 'E (40-49)', min: 40, max: 49, count: 0, color: '#fb923c', grade: 'E' },
+        { label: 'F (0-39)', min: 0, max: 39, count: 0, color: '#ef4444', grade: 'F' },
+      ];
+    }
+
+    for (const p of percentages) {
+      const bucket = buckets.find(b => p >= b.min && p <= b.max);
+      if (bucket) bucket.count++;
+    }
+
+    const maxCount = Math.max(...buckets.map(b => b.count), 1);
+    const histogramData = buckets.map(b => ({
+      label: b.label,
+      grade: b.grade,
+      count: b.count,
+      color: b.color,
+      barHeight: Math.max(2, Math.round((b.count / maxCount) * 55)),
+    }));
+
+    return {
+      classAverage,
+      highestScore,
+      lowestScore,
+      totalStudents: new Set(results.map(r => r.studentId)).size,
+      totalResults: results.length,
+      gradeDistribution,
+      histogramData,
+    };
+  }
+
+  /**
+   * Get grading legend for the school
+   */
+  async getGradingLegend(schoolId: string, classId?: string) {
+    let gradingSystem: any = null;
+
+    if (classId) {
+      const cls = await this.prisma.class.findUnique({ where: { id: classId }, select: { gradingSystemId: true } });
+      if (cls?.gradingSystemId) {
+        gradingSystem = await this.prisma.gradingSystem.findUnique({ where: { id: cls.gradingSystemId }, include: { gradeScales: true } });
+      }
+    }
+
+    if (!gradingSystem) {
+      gradingSystem = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId, isDefault: true },
+        include: { gradeScales: true },
+      });
+    }
+
+    if (!gradingSystem) {
+      gradingSystem = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId },
+        include: { gradeScales: true },
+      });
+    }
+
+    if (!gradingSystem?.gradeScales?.length) {
+      // Fallback: ECZ secondary grading
+      return [
+        { grade: 'A', range: '80-100', label: 'Distinction', color: '#10b981' },
+        { grade: 'B', range: '70-79', label: 'Merit', color: '#3b82f6' },
+        { grade: 'C', range: '60-69', label: 'Credit', color: '#f59e0b' },
+        { grade: 'D', range: '50-59', label: 'Pass', color: '#f97316' },
+        { grade: 'E', range: '40-49', label: 'Marginal Pass', color: '#fb923c' },
+        { grade: 'F', range: '0-39', label: 'Fail', color: '#ef4444' },
+      ];
+    }
+
+    const gradeColors: Record<string, string> = {
+      'A+': '#10b981', 'A': '#10b981', 'A-': '#22c55e',
+      'B+': '#3b82f6', 'B': '#3b82f6', 'B-': '#60a5fa',
+      'C+': '#f59e0b', 'C': '#f59e0b', 'C-': '#fbbf24',
+      'D': '#f97316', 'D+': '#f97316',
+      'E': '#ef4444', 'F': '#ef4444',
+    };
+
+    return gradingSystem.gradeScales
+      .sort((a: any, b: any) => (b.minScore ?? 0) - (a.minScore ?? 0))
+      .map((scale: any) => ({
+        grade: scale.grade,
+        range: `${scale.minScore ?? 0}-${scale.maxScore ?? 100}`,
+        label: scale.label || scale.grade,
+        color: gradeColors[scale.grade] || '#6b7280',
+      }));
+  }
 }

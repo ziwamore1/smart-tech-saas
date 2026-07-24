@@ -19,7 +19,7 @@ export class ReportCardController {
   ) {
     const schoolId = req.user.schoolId;
 
-    const result = await this.reportCardService.generateClassReportCardsPdf(
+    const result = await this.reportCardService.generateClassCurriculumReportCardsPdf(
       schoolId,
       classId,
       termId,
@@ -76,7 +76,7 @@ export class ReportCardController {
   ) {
     const schoolId = req.user.schoolId;
 
-    const result = await this.reportCardService.generateReportCardPdf(
+    const result = await this.reportCardService.generateCurriculumReportCardPdf(
       schoolId,
       studentId,
       termId,

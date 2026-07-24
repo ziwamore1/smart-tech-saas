@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl, Dimensions, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { HeaderBar, WidgetCard } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { apiService } from '../../services/api';
@@ -344,9 +346,70 @@ export const ResultsManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
     );
   };
 
+  const handleDownloadStudentReport = async (studentId: string, studentName: string) => {
+    if (!selectedTermId) {
+      Alert.alert('Error', 'No term selected');
+      return;
+    }
+    try {
+      const blob = await apiService.getReportCardPdf(studentId, selectedTermId) as Blob;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        const fileUri = FileSystem.documentDirectory + `${studentName.replace(/\s+/g, '_')}_Report_Card.pdf`;
+        await FileSystem.writeAsStringAsync(fileUri, base64.split(',')[1], { encoding: FileSystem.EncodingType.Base64 });
+        await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: `${studentName} Report Card` });
+      };
+      reader.readAsDataURL(blob);
+    } catch (err: any) {
+      if (err?.message !== 'User did not share') {
+        Alert.alert('Error', 'Failed to download report card. Ensure results are published.');
+      }
+    }
+  };
+
+  const handleDownloadClassReportCards = async () => {
+    if (!selectedClassId || !selectedTermId) {
+      Alert.alert('Select Class & Term', 'Please select both a class and term first.');
+      return;
+    }
+    try {
+      const blob = await apiService.getClassReportCardsPdf(selectedClassId, selectedTermId) as Blob;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        const fileUri = FileSystem.documentDirectory + `class-report-cards.pdf`;
+        await FileSystem.writeAsStringAsync(fileUri, base64.split(',')[1], { encoding: FileSystem.EncodingType.Base64 });
+        await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download Class Report Cards' });
+      };
+      reader.readAsDataURL(blob);
+    } catch (err: any) {
+      if (err?.message !== 'User did not share') {
+        Alert.alert('Error', 'Failed to download class report cards. Ensure results are published.');
+      }
+    }
+  };
+
   const renderResultSheetsTab = () => (
     <View>
       {renderSelectors()}
+
+      {/* Quick Actions */}
+      {selectedClassId && selectedTermId && (
+        <View style={styles.quickActionsRow}>
+          <TouchableOpacity
+            style={styles.quickActionBtn}
+            onPress={() => onNavigate ? onNavigate('TeacherMarks') : navigation.navigate('AssessmentEntry')}
+          >
+            <Text style={styles.quickActionIcon}>✏️</Text>
+            <Text style={styles.quickActionText}>Enter Scores</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionBtn} onPress={handleDownloadClassReportCards}>
+            <Text style={styles.quickActionIcon}>📄</Text>
+            <Text style={styles.quickActionText}>Class Reports</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={styles.sheetHeader}>
         <Text style={styles.sectionTitle}>Result Sheets</Text>
@@ -442,21 +505,22 @@ export const ResultsManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
         <WidgetCard title={`Students (${sheetStudents.length})`}>
           <View style={styles.studentTableHeader}>
             <Text style={[styles.tableHeaderCell, { flex: 0.4 }]}>#</Text>
-            <Text style={[styles.tableHeaderCell, { flex: 2.2 }]}>Student Name</Text>
+            <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Student Name</Text>
             <Text style={[styles.tableHeaderCell, { flex: 0.8, textAlign: 'center' }]}>%</Text>
             <Text style={[styles.tableHeaderCell, { flex: 0.6, textAlign: 'center' }]}>Grade</Text>
-            <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Remark</Text>
+            <Text style={[styles.tableHeaderCell, { flex: 0.7, textAlign: 'center' }]}>PDF</Text>
           </View>
 
           {sheetStudents.map((student: any, idx: number) => {
             const grade = student.grade || student.computedGrade || '—';
             const percentage = student.percentage ?? student.average ?? student.totalPercentage;
-            const remark = student.remark || student.remarks || '—';
+            const studentId = student.studentId || student.id;
+            const studentName = student.name || student.studentName || `${student.firstName || ''} ${student.lastName || ''}`.trim() || 'Unknown';
             return (
               <View key={student.id || idx} style={[styles.studentRow, idx > 0 && styles.studentRowBorder]}>
                 <Text style={[styles.studentCell, { flex: 0.4, color: colors.textLight }]}>{idx + 1}</Text>
-                <Text style={[styles.studentCell, { flex: 2.2 }]} numberOfLines={1}>
-                  {student.name || student.studentName || `${student.firstName || ''} ${student.lastName || ''}`.trim() || 'Unknown'}
+                <Text style={[styles.studentCell, { flex: 2 }]} numberOfLines={1}>
+                  {studentName}
                 </Text>
                 <Text style={[styles.studentCell, { flex: 0.8, textAlign: 'center', fontWeight: '600' }]}>
                   {percentage != null ? `${Number(percentage).toFixed(1)}%` : '—'}
@@ -464,9 +528,12 @@ export const ResultsManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
                 <View style={[styles.gradeCell, { flex: 0.6 }]}>
                   <Text style={[styles.gradeText, { color: getGradeColor(grade) }]}>{grade}</Text>
                 </View>
-                <Text style={[styles.studentCell, { flex: 1.2, color: colors.textLight }]} numberOfLines={1}>
-                  {remark}
-                </Text>
+                <TouchableOpacity
+                  style={[styles.pdfBtn, { flex: 0.7 }]}
+                  onPress={() => handleDownloadStudentReport(studentId, studentName)}
+                >
+                  <Text style={styles.pdfBtnText}>📄</Text>
+                </TouchableOpacity>
               </View>
             );
           })}
@@ -857,6 +924,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.md,
   },
+  quickActionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  quickActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+    ...shadows.sm,
+  },
+  quickActionIcon: {
+    fontSize: 18,
+  },
+  quickActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
   sectionTitle: {
     fontSize: 17,
     fontWeight: '700',
@@ -1032,6 +1125,13 @@ const styles = StyleSheet.create({
   gradeText: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  pdfBtn: {
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  pdfBtnText: {
+    fontSize: 16,
   },
 
   // Rankings

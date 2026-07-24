@@ -77,7 +77,7 @@ export class PublishingService {
 
     const generationJobs = enrollments.map((enrollment) =>
       limit(() =>
-        this.reportCardService.generateReportCardPdf(
+        this.reportCardService.generateCurriculumReportCardPdf(
           schoolId,
           enrollment.studentId,
           termId,
@@ -521,7 +521,7 @@ export class PublishingService {
 
     for (const enrollment of enrollments) {
       try {
-        const pdf = await this.reportCardService.generateReportCardPdf(
+        const pdf = await this.reportCardService.generateCurriculumReportCardPdf(
           schoolId,
           enrollment.studentId,
           termId,

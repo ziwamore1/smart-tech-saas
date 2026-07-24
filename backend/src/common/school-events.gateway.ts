@@ -72,4 +72,12 @@ export class SchoolEventsGateway implements OnGatewayInit, OnGatewayConnection, 
   emitReportCardGenerated(schoolId: string, data: { classId: string; termId: string }) {
     this.emitToSchool(schoolId, 'reportcard:generated', data);
   }
+
+  emitProfileUpdated(schoolId: string, data: { userId: string; updatedBy: string; changes: string[] }) {
+    this.emitToSchool(schoolId, 'profile:updated', data);
+  }
+
+  emitUserUpdated(schoolId: string, data: { userId: string; updatedBy: string }) {
+    this.emitToSchool(schoolId, 'user:updated', data);
+  }
 }

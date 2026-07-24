@@ -172,6 +172,16 @@ export function AppNavigator() {
             {can('template-personalization.manage') && <Stack.Screen name="CloudAssetLibrary" component={CloudAssetLibraryScreen} />}
             {can('stamps.manage') && <Stack.Screen name="DigitalSignature" component={DigitalSignatureScreen} />}
             {can('communications.manage') && <Stack.Screen name="Collaboration" component={CollaborationScreen} />}
+
+            {/* SuperAdmin-only unrestricted screens */}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminTemplateMarketplace" component={TemplateMarketplaceScreen} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminBrandingPresets" component={BrandingPresetsScreen} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminCloudAssetLibrary" component={CloudAssetLibraryScreen} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminDigitalSignature" component={DigitalSignatureScreen} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminDigitalStamps" component={DigitalStampScreen} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminQRVerification" component={QRVerificationScreen} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminApprovalWorkflow" component={ApprovalWorkflowScreen} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminCollaboration" component={CollaborationScreen} />}
             {isHodSupervisor && <Stack.Screen name="DepartmentTeachers" component={DepartmentTeachersScreen} />}
             <Stack.Screen name="TeacherAssessmentDetail" component={TeacherAssessmentDetailScreen} />
             <Stack.Screen name="ExamList" component={ExamListScreen} />
@@ -184,6 +194,10 @@ export function AppNavigator() {
             {can('stamps.manage') && <Stack.Screen name="PDFPreview" component={PDFPreviewScreen} />}
             {can('stamps.manage') && <Stack.Screen name="QRVerification" component={QRVerificationScreen} />}
             {can('stamps.manage') && <Stack.Screen name="ApprovalWorkflow" component={ApprovalWorkflowScreen} />}
+
+            {/* SuperAdmin unrestricted exam/stamps screens */}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminExamCreate" component={ExamCreateScreen} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminExamAnalytics" component={ExamAnalyticsScreen} />}
 
             {/* Assessment Screens */}
             {(isTeacher || isClassTeacher) && <Stack.Screen name="PendingAssessments" component={PendingAssessmentsScreen} />}

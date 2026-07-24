@@ -2,9 +2,9 @@
 
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { resultApi, classApi, termApi, subjectApi, assessmentApi, publishingApi, reportCardApi } from '@/lib/api';
+import { resultApi, classApi, termApi, subjectApi, publishingApi, reportCardApi } from '@/lib/api';
 
-type Tab = 'upload' | 'entry' | 'assessments' | 'review' | 'publish' | 'reports';
+type Tab = 'upload' | 'entry' | 'review' | 'publish' | 'reports';
 
 interface UploadResultsTabProps {
   classes: any[];
@@ -28,14 +28,6 @@ interface ReviewResultsTabProps {
   isLocked: boolean;
   isRecalculating?: boolean;
   onUnlock?: () => void;
-}
-
-interface AssessmentTypesTabProps {
-  selectedSubject: string;
-  selectedTerm: string;
-  assessmentTypes: any[];
-  isLocked: boolean;
-  onRefresh: () => void;
 }
 
 interface PublishTabProps {
@@ -207,200 +199,6 @@ function UploadResultsTab({
           <li>Student admission numbers in the Excel must match existing students</li>
           <li>Subject names must match the subjects assigned to the class</li>
           <li>Existing results will be updated if the same student/subject combination exists</li>
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-function AssessmentTypesTab({ selectedSubject, selectedTerm, assessmentTypes, isLocked, onRefresh }: AssessmentTypesTabProps) {
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newType, setNewType] = useState({ name: '', maxScore: 100, weight: 0 });
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  const createMutation = useMutation({
-    mutationFn: (data: { name: string; maxScore: number; weight: number; subjectId: string; termId: string }) => {
-      console.log('Creating assessment type:', data);
-      return assessmentApi.createType(data);
-    },
-    onSuccess: () => {
-      onRefresh();
-      setShowAddForm(false);
-      setNewType({ name: '', maxScore: 100, weight: 0 });
-      setMessage({ type: 'success', text: 'Assessment type added!' });
-      setTimeout(() => setMessage(null), 3000);
-    },
-    onError: (error: any) => {
-      console.error('Failed to create assessment type:', error);
-      setMessage({ type: 'error', text: error.response?.data?.message || error.message || 'Failed to add type' });
-      setTimeout(() => setMessage(null), 5000);
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => assessmentApi.deleteType(id),
-    onSuccess: () => {
-      onRefresh();
-      setMessage({ type: 'success', text: 'Assessment type deleted!' });
-      setTimeout(() => setMessage(null), 3000);
-    },
-    onError: (error: any) => {
-      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to delete' });
-      setTimeout(() => setMessage(null), 3000);
-    },
-  });
-
-  const totalWeight = assessmentTypes.reduce((sum: number, t: any) => sum + t.weight, 0);
-  const isComplete = Math.abs(totalWeight - 1.0) < 0.001;
-  const canAddType = selectedSubject && selectedTerm && !isLocked;
-
-  if (!selectedTerm) {
-    return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="text-center text-gray-500">
-          Select a term to manage assessment types
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      {message && (
-        <div className={`mx-4 mt-4 px-4 py-3 rounded-lg ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-          {message.text}
-        </div>
-      )}
-
-      <div className="p-4 border-b flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-semibold">Assessment Types</h2>
-          <p className="text-sm text-gray-500">
-            Total Weight: {(totalWeight * 100).toFixed(1)}% {isComplete ? '✓ Complete' : '⚠ Must equal 100%'}
-          </p>
-          {!selectedSubject && (
-            <p className="text-xs text-yellow-600 mt-1">Select a subject above to add new types</p>
-          )}
-        </div>
-        {canAddType && (
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Add Assessment Type
-          </button>
-        )}
-      </div>
-
-      {showAddForm && (
-        <div className="p-4 bg-gray-50 border-b">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
-              <input
-                type="text"
-                value={newType.name}
-                onChange={(e) => setNewType({ ...newType, name: e.target.value })}
-                placeholder="e.g., End of Term Exam"
-                className="w-full px-3 py-2 border rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Max Score *</label>
-              <input
-                type="number"
-                min="1"
-                value={newType.maxScore > 0 ? newType.maxScore : ''}
-                placeholder="e.g., 100"
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setNewType({ ...newType, maxScore: val ? Number(val) : 0 });
-                }}
-                className="w-full px-3 py-2 border rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Weight (%) *</label>
-              <input
-                type="number"
-                step="1"
-                min="1"
-                max="100"
-                value={newType.weight > 0 ? Math.round(newType.weight * 100) : ''}
-                placeholder="e.g., 20"
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setNewType({ ...newType, weight: val ? Number(val) / 100 : 0 });
-                }}
-                className="w-full px-3 py-2 border rounded-lg"
-              />
-            </div>
-            <div className="flex items-end gap-2">
-              <button
-                onClick={() => createMutation.mutate({ ...newType, subjectId: selectedSubject, termId: selectedTerm })}
-                disabled={!newType.name || newType.maxScore <= 0 || newType.weight <= 0 || createMutation.isPending}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-              >
-                {createMutation.isPending ? 'Saving...' : 'Save'}
-              </button>
-              <button
-                onClick={() => setShowAddForm(false)}
-                className="px-4 py-2 border rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {assessmentTypes.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          No assessment types defined. Add types that sum to 100%.
-        </div>
-      ) : (
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="text-left py-3 px-4 font-medium text-gray-700">Name</th>
-              <th className="text-left py-3 px-4 font-medium text-gray-700">Max Score</th>
-              <th className="text-left py-3 px-4 font-medium text-gray-700">Weight</th>
-              <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {assessmentTypes.map((type: any) => (
-              <tr key={type.id} className="border-t">
-                <td className="py-3 px-4 font-medium">{type.name}</td>
-                <td className="py-3 px-4">{type.maxScore}</td>
-                <td className="py-3 px-4">{(type.weight * 100).toFixed(1)}%</td>
-                <td className="py-3 px-4">
-                  {!isLocked && (
-                    <button
-                      onClick={() => {
-                        if (confirm('Delete this assessment type?')) {
-                          deleteMutation.mutate(type.id);
-                        }
-                      }}
-                      className="text-red-600 hover:text-red-800 text-sm"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      <div className="p-4 bg-blue-50 border-t">
-        <h3 className="font-medium mb-2">Common Assessment Setup Examples:</h3>
-        <ul className="text-sm text-gray-600 space-y-1">
-          <li>• <strong>Simple (Exam only):</strong> End of Term Exam = 100%</li>
-          <li>• <strong>Standard:</strong> CAT = 20%, Mid-Term = 20%, End of Term = 60%</li>
-          <li>• <strong>Detailed:</strong> Assignment = 10%, CAT = 15%, Project = 15%, Exam = 60%</li>
-          <li>• <strong>With Mock:</strong> Class Work = 20%, Mock Exam = 30%, Final Exam = 50%</li>
         </ul>
       </div>
     </div>
@@ -1035,29 +833,6 @@ export default function ResultsPage() {
 
   const results = Array.isArray(resultsData) ? resultsData : [];
 
-  const { data: assessmentTypesData = [], refetch: refetchAssessments } = useQuery({
-    queryKey: ['assessment-types', selectedSubject || 'all', selectedTerm],
-    queryFn: async () => {
-      const res = await assessmentApi.getTypes({ subjectId: selectedSubject || undefined, termId: selectedTerm });
-      const data = res.data?.data || res.data;
-      return Array.isArray(data) ? data : [];
-    },
-    enabled: !!selectedTerm,
-  });
-
-  const assessmentTypes = Array.isArray(assessmentTypesData) ? assessmentTypesData : [];
-
-  const { data: classAssessments } = useQuery({
-    queryKey: ['class-assessments', selectedClass, selectedSubject, selectedTerm],
-    queryFn: () => {
-      if (selectedClass && selectedSubject && selectedTerm) {
-        return assessmentApi.getClassDashboard(selectedClass, selectedSubject, selectedTerm).then(res => res.data);
-      }
-      return Promise.resolve(null);
-    },
-    enabled: !!selectedClass && !!selectedSubject && !!selectedTerm,
-  });
-
   const { data: publishStatusData = [] } = useQuery({
     queryKey: ['publish-status'],
     queryFn: async () => {
@@ -1188,7 +963,6 @@ export default function ResultsPage() {
     { key: 'upload' as Tab, label: 'Upload Results', icon: '📤' },
     { key: 'entry' as Tab, label: 'View Results', icon: '📝' },
     { key: 'review' as Tab, label: 'Review Results', icon: '👁️' },
-    { key: 'assessments' as Tab, label: 'Assessment Types', icon: '📋' },
     { key: 'publish' as Tab, label: 'Publish Results', icon: '🚀' },
     { key: 'reports' as Tab, label: 'Reports', icon: '📊' },
   ];
@@ -1230,6 +1004,42 @@ export default function ResultsPage() {
           {message.text}
         </div>
       )}
+
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 p-6">
+        <h2 className="text-lg font-bold text-blue-900 mb-3">Results Entry Workflow</h2>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {[
+            { step: 0, label: 'Create Exams', desc: 'Create online exams & question banks', icon: '📝', href: '/dashboard/exams' },
+            { step: 1, label: 'Configure', desc: 'Set up assessment types & weights', icon: '⚙️', href: '/dashboard/assessment-config' },
+            { step: 2, label: 'Enter Scores', desc: 'Enter student scores per subject', icon: '✏️', href: '/dashboard/assessment-entry' },
+            { step: 3, label: 'Review', desc: 'Check completeness & recalculate', icon: '👁️', tab: 'review' as Tab },
+            { step: 4, label: 'Publish', desc: 'Generate report cards & publish', icon: '🚀', tab: 'publish' as Tab },
+            { step: 5, label: 'Reports', desc: 'Download reports & analytics', icon: '📊', tab: 'reports' as Tab },
+          ].map((item) => (
+            <button
+              key={item.step}
+              onClick={() => {
+                if (item.href) {
+                  window.location.href = item.href;
+                } else if (item.tab) {
+                  setActiveTab(item.tab);
+                }
+              }}
+              className="text-left p-3 bg-white rounded-lg border border-blue-100 hover:border-blue-300 hover:shadow-md transition-all"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">{item.step}</span>
+                <span className="text-sm">{item.icon}</span>
+              </div>
+              <p className="font-semibold text-blue-900 text-sm">{item.label}</p>
+              <p className="text-xs text-blue-600">{item.desc}</p>
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-blue-600 mt-3">
+          Assessment types and weights are configured in <strong>Assessment Config</strong>. Score entry happens in <strong>Assessment Entry</strong>. This page manages review, publishing, and reports.
+        </p>
+      </div>
 
       <div className="flex gap-2 border-b overflow-x-auto">
         {tabs.map((tab) => (
@@ -1570,16 +1380,6 @@ export default function ResultsPage() {
               }
             }
           }}
-        />
-      )}
-
-      {activeTab === 'assessments' && (
-        <AssessmentTypesTab
-          selectedSubject={selectedSubject}
-          selectedTerm={selectedTerm}
-          assessmentTypes={assessmentTypes}
-          isLocked={isLocked}
-          onRefresh={refetchAssessments}
         />
       )}
 

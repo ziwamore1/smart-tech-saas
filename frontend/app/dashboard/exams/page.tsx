@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { examApi, classApi, subjectApi, termApi } from '@/lib/api';
 
@@ -275,6 +276,12 @@ export default function ExamsPage() {
           <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0 0' }}>Advanced examination management engine</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <Link href="/dashboard/assessment-entry" style={{ padding: '8px 16px', background: '#2563eb', color: 'white', borderRadius: '8px', fontWeight: 600, fontSize: '13px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <i className="fa fa-edit"></i> Enter Scores
+          </Link>
+          <Link href="/dashboard/results" style={{ padding: '8px 16px', background: '#059669', color: 'white', borderRadius: '8px', fontWeight: 600, fontSize: '13px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <i className="fa fa-clipboard-check"></i> Results
+          </Link>
           {activeTab === 'exams' && <button onClick={() => { setEditingExam(null); setExamForm({ title: '', description: '', type: 'EXAM', classId: '', subjectId: '', termId: '', duration: 60, totalScore: 100, passingScore: 50, instructions: '', startsAt: '', endsAt: '' }); setShowCreate(true); }} style={{ padding: '10px 20px', background: gradPink, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><i className="fa fa-plus"></i> Create Exam</button>}
           {activeTab === 'templates' && <button onClick={() => { setShowTemplateForm(true); }} style={{ padding: '10px 20px', background: gradPurple, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><i className="fa fa-plus"></i> New Template</button>}
         </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { Button } from '../../components';
 import { colors, spacing, borderRadius, typography, shadows } from '../../theme';
 import { useAuthStore } from '../../store';
 import { apiService, resolveImageUrl } from '../../services/api';
+import { socketService } from '../../services/socket';
 
 type ProfileScreenProps = {
   navigation: NativeStackNavigationProp<any>;
@@ -40,6 +41,49 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation, onTogg
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  const fetchLatestProfile = useCallback(async () => {
+    try {
+      const profile = await apiService.getProfile();
+      if (profile && user) {
+        setUser({
+          ...user,
+          firstName: profile.firstName || user.firstName,
+          lastName: profile.lastName || user.lastName,
+          email: profile.email || user.email,
+          phone: profile.phone || user.phone,
+          photoUrl: profile.photoUrl ? resolveImageUrl(profile.photoUrl) || profile.photoUrl : user.photoUrl,
+        });
+        setFirstName(profile.firstName || user.firstName || '');
+        setLastName(profile.lastName || user.lastName || '');
+        setEmail(profile.email || user.email || '');
+        setPhone(profile.phone || user.phone || '');
+      }
+    } catch (err) {
+      console.warn('Failed to fetch latest profile:', err);
+    }
+  }, [user, setUser]);
+
+  useEffect(() => {
+    const handleProfileUpdated = (data: { userId: string; updatedBy: string; changes: string[] }) => {
+      if (data.userId === user?.id && data.updatedBy !== user?.id) {
+        fetchLatestProfile();
+      }
+    };
+    const handleUserUpdated = (data: { userId: string; updatedBy: string }) => {
+      if (data.userId === user?.id && data.updatedBy !== user?.id) {
+        fetchLatestProfile();
+      }
+    };
+
+    socketService.on('profile:updated', handleProfileUpdated);
+    socketService.on('user:updated', handleUserUpdated);
+
+    return () => {
+      socketService.off('profile:updated', handleProfileUpdated);
+      socketService.off('user:updated', handleUserUpdated);
+    };
+  }, [user?.id, fetchLatestProfile]);
 
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();

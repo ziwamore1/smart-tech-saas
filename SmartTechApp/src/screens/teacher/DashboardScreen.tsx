@@ -29,7 +29,7 @@ export const TeacherDashboardScreen: React.FC<Props> = ({ onToggleDrawer, onNavi
     ...(isHod ? [{ icon: '🏛️', label: 'My Department', screen: 'HODMonitoring', gradient: ['#8B5CF6', '#A78BFA'] as const }] : []),
     { icon: '📋', label: 'Exams', screen: 'ExamList', gradient: ['#EA580C', '#F97316'] as const },
     { icon: '🤖', label: 'AI Tutor', screen: 'AiTutor', gradient: ['#7C3AED', '#A78BFA'] as const, params: { sourceScreen: 'teacher_dashboard' } },
-    { icon: '📊', label: 'Analytics', screen: 'Analytics', gradient: ['#D97706', '#F59E0B'] as const },
+    { icon: '📊', label: 'Performance', screen: 'TeacherPerformance', gradient: ['#D97706', '#F59E0B'] as const },
     { icon: '📄', label: 'Templates', screen: 'TemplateMarketplace', gradient: ['#0D9488', '#5EEAD4'] as const },
   ];
 

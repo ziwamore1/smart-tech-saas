@@ -367,6 +367,9 @@ export default function SuperAdminLayout({
             background: '#fdfaf7',
             transform: 'translateX(0)',
             transition: 'transform 0.3s',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
           }} onClick={(e) => e.stopPropagation()}>
             <div style={{
               padding: '20px',
@@ -374,6 +377,7 @@ export default function SuperAdminLayout({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              flexShrink: 0,
             }}>
               <div style={{
                 display: 'flex',
@@ -414,7 +418,7 @@ export default function SuperAdminLayout({
                 <i className="fa fa-times" style={{ fontSize: '14px', color: '#6b7280' }}></i>
               </button>
             </div>
-            <div style={{ padding: '16px 12px' }}>
+            <div style={{ padding: '16px 12px', flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
               {superAdminNav.map((item) => (
                 <Link
                   key={item.name}
@@ -443,7 +447,7 @@ export default function SuperAdminLayout({
               ))}
             </div>
             {/* Mobile User Profile & Logout */}
-            <div style={{ borderTop: '1px solid #e8ddd0', padding: '16px' }}>
+            <div style={{ borderTop: '1px solid #e8ddd0', padding: '16px', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', padding: '12px', background: '#f5efe8', borderRadius: '12px' }}>
                 <div style={{
                   width: '40px',
