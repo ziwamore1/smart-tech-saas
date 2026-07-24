@@ -360,6 +360,7 @@ export default function RankingPage() {
                     <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>#</th>
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>Admission No</th>
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>Student Name</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>Gender</th>
                     <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>Total</th>
                     <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>%</th>
                     <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'white' }}>Grade</th>
@@ -391,6 +392,9 @@ export default function RankingPage() {
                         </td>
                         <td style={{ padding: '12px 16px', fontWeight: 600, color: '#1f2937' }}>
                           {firstName} {lastName}
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: (student.gender || '').startsWith('M') ? '#2563eb' : '#db2777' }}>
+                          {student.gender || '-'}
                         </td>
                         <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#374151' }}>
                           {student.total || student.totalScore || 0}
@@ -430,7 +434,7 @@ export default function RankingPage() {
                   })}
                   {filteredRankings.length === 0 && (
                     <tr>
-                      <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>
+                      <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>
                         {searchStudent ? 'No students match your search' : 'No ranking data available'}
                       </td>
                     </tr>

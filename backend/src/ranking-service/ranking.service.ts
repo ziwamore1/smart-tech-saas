@@ -26,6 +26,7 @@ export class RankingService {
             firstName: true,
             lastName: true,
             admissionNumber: true,
+            gender: true,
           },
         },
       },
@@ -66,6 +67,7 @@ export class RankingService {
       firstName: string;
       lastName: string;
       admissionNumber: string;
+      gender: string | null;
       totalPercentage: number;
       subjectCount: number;
       points: number[];
@@ -99,6 +101,7 @@ export class RankingService {
           firstName: r.student.firstName,
           lastName: r.student.lastName,
           admissionNumber: r.student.admissionNumber,
+          gender: (r.student as any).gender ?? null,
           totalPercentage: effectivePercentage ?? 0,
           subjectCount: 1,
           points: points > 0 ? [points] : [],
@@ -121,6 +124,7 @@ export class RankingService {
         firstName: s.firstName,
         lastName: s.lastName,
         admissionNumber: s.admissionNumber,
+        gender: s.gender,
         average: parseFloat(avg.toFixed(2)),
         totalPercentage: parseFloat(avg.toFixed(2)),
         percentage: parseFloat(avg.toFixed(2)),
@@ -165,6 +169,7 @@ export class RankingService {
             firstName: true,
             lastName: true,
             admissionNumber: true,
+            gender: true,
           },
         },
       },
@@ -211,6 +216,7 @@ export class RankingService {
         lastName: result.student.lastName,
         studentName: `${result.student.firstName} ${result.student.lastName}`,
         admissionNumber: result.student.admissionNumber,
+        gender: (result.student as any).gender ?? null,
         percentage: effectivePercentage,
         grade: result.finalGrade,
         subjectRank: index + 1,
