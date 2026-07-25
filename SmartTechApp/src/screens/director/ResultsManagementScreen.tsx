@@ -103,20 +103,39 @@ export const ResultsManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
   const loadInitialData = async () => {
     try {
       const classData = await apiService.getClasses();
-      const classList = Array.isArray(classData) ? classData : classData?.data || [];
+      const classList = Array.isArray(classData) ? classData : classData?.data || classData?.data?.data || [];
       setClasses(classList);
 
-      const yearData = await apiService.getAcademicYears();
-      const years = Array.isArray(yearData) ? yearData : yearData?.data || [];
-      const currentYear = years.find((y: any) => y.isCurrent) || years[0];
-      if (currentYear) {
-        const termData = await apiService.getTerms(currentYear.id);
-        const termList = Array.isArray(termData) ? termData : termData?.data || [];
-        setTerms(termList);
-        const currentTerm = termList.find((t: any) => t.isCurrent) || termList[0];
-        if (currentTerm) {
-          setSelectedTermId(currentTerm.id);
+      let termList: any[] = [];
+
+      try {
+        const yearData = await apiService.getAcademicYears();
+        const years = Array.isArray(yearData) ? yearData : yearData?.data || yearData?.data?.data || [];
+        const currentYear = years.find((y: any) => y.isCurrent) || years[0];
+        if (currentYear) {
+          const termData = await apiService.getTerms(currentYear.id);
+          termList = Array.isArray(termData) ? termData : termData?.data || termData?.data?.data || [];
         }
+      } catch (yearErr) {
+        console.warn('Failed to load academic years, trying direct terms:', yearErr);
+      }
+
+      if (termList.length === 0) {
+        try {
+          const dashboard = await apiService.getDashboard();
+          const termId = dashboard?.currentTerm?.id;
+          if (termId) {
+            termList = [{ id: termId, name: dashboard.currentTerm.name, isCurrent: true }];
+          }
+        } catch (dashErr) {
+          console.warn('Failed to load terms from dashboard:', dashErr);
+        }
+      }
+
+      setTerms(termList);
+      const currentTerm = termList.find((t: any) => t.isCurrent) || termList[0];
+      if (currentTerm) {
+        setSelectedTermId(currentTerm.id);
       }
     } catch (err) {
       console.error('Failed to load initial data:', err);

@@ -53,6 +53,8 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
     totalChildren: directorStats.totalStudents ?? 0,
     totalTeachers: directorStats.totalTeachers ?? 0,
     todayLessons: 0,
+    averageScore: directorStats.averageScore,
+    attendanceRate: directorStats.attendanceRate,
   } : null;
 
   const handleLogout = () => {
@@ -240,21 +242,36 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
           gradient={['#EFF6FF', '#DBEAFE']}
           style={styles.activityCard}
         >
-          {[
-            { text: 'Term 2 exams scheduled', time: '2 hours ago', icon: '📋' },
-            { text: 'New staff member added', time: '1 day ago', icon: '👤' },
-            { text: 'Parent meeting completed', time: '2 days ago', icon: '💬' },
-          ].map((activity, i) => (
-            <View key={i} style={styles.activityRow}>
-              <View style={styles.activityIcon}>
-                <Text>{activity.icon}</Text>
-              </View>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityText}>{activity.text}</Text>
-                <Text style={styles.activityTime}>{activity.time}</Text>
-              </View>
+          {directorStats?.recentActivity && directorStats.recentActivity.length > 0 ? (
+            directorStats.recentActivity.map((activity: any, i: number) => {
+              const timeAgo = (() => {
+                const diff = Date.now() - new Date(activity.timestamp).getTime();
+                const mins = Math.floor(diff / 60000);
+                if (mins < 1) return 'Just now';
+                if (mins < 60) return `${mins}m ago`;
+                const hrs = Math.floor(mins / 60);
+                if (hrs < 24) return `${hrs}h ago`;
+                const days = Math.floor(hrs / 24);
+                return `${days}d ago`;
+              })();
+              return (
+                <View key={i} style={styles.activityRow}>
+                  <View style={styles.activityIcon}>
+                    <Text>{activity.icon}</Text>
+                  </View>
+                  <View style={styles.activityContent}>
+                    <Text style={styles.activityText}>{activity.title}</Text>
+                    <Text style={styles.activityDetail} numberOfLines={1}>{activity.detail}</Text>
+                    <Text style={styles.activityTime}>{timeAgo}</Text>
+                  </View>
+                </View>
+              );
+            })
+          ) : (
+            <View style={{ alignItems: 'center', paddingVertical: spacing.md }}>
+              <Text style={{ fontSize: 14, color: colors.textLight }}>No recent activity</Text>
             </View>
-          ))}
+          )}
         </GradientCard>
 
         <View style={{ height: spacing.xxl }} />
@@ -280,6 +297,7 @@ const styles = StyleSheet.create({
   activityIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', marginRight: spacing.sm },
   activityContent: { flex: 1 },
   activityText: { fontSize: 14, fontWeight: '500', color: colors.text },
+  activityDetail: { fontSize: 12, color: colors.textMuted || colors.textLight, marginTop: 1 },
   activityTime: { fontSize: 12, color: colors.textLight, marginTop: 2 },
 
   signatureCard: { alignItems: 'center', paddingVertical: spacing.md },

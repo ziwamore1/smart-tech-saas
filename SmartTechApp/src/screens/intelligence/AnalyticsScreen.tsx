@@ -28,7 +28,28 @@ export const AnalyticsScreen: React.FC = () => {
         apiService.getStudentGrowthTrajectory(user.id),
         termId ? apiService.getCompetencyDiagnosis(user.id, termId) : Promise.reject('no term'),
       ]);
-      if (statsRes.status === 'fulfilled') setStats(statsRes.value?.data || statsRes.value);
+      if (statsRes.status === 'fulfilled') {
+        const raw = statsRes.value?.data || statsRes.value;
+        if (raw?.descriptiveStats || raw?.comparativeStats) {
+          setStats({
+            mean: raw.descriptiveStats?.mean,
+            median: raw.descriptiveStats?.median,
+            stdDev: raw.descriptiveStats?.stdDev,
+            variance: raw.descriptiveStats?.variance,
+            mode: raw.descriptiveStats?.mode,
+            min: raw.descriptiveStats?.min,
+            max: raw.descriptiveStats?.max,
+            count: raw.descriptiveStats?.count,
+            percentile: raw.comparativeStats?.percentile,
+            zScore: raw.comparativeStats?.zScore,
+            schoolMean: raw.comparativeStats?.schoolMean,
+            interpretation: raw.comparativeStats?.interpretation,
+            subjectBreakdown: raw.subjectBreakdown,
+          });
+        } else {
+          setStats(raw);
+        }
+      }
       if (trajRes.status === 'fulfilled') setTrajectory(trajRes.value?.data || trajRes.value);
       if (weakRes.status === 'fulfilled') setWeaknesses(weakRes.value?.data || weakRes.value);
     } catch (err) { console.error('Analytics load error'); }
