@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -15,31 +15,9 @@ export const StudentResultsScreen: React.FC = () => {
   const { dashboard } = useAppStore();
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadResults();
-
-    // Real-time: listen for results published
-    const handleResultsPublished = (data: any) => {
-      console.log('[Results] Results published, refreshing...', data);
-      loadResults();
-    };
-
-    socketService.connect();
-    if (user?.schoolId) {
-      socketService.joinSchool(user.schoolId);
-    }
-    socketService.on('results:published', handleResultsPublished);
-
-    return () => {
-      socketService.off('results:published', handleResultsPublished);
-      if (user?.schoolId) {
-        socketService.leaveSchool(user.schoolId);
-      }
-    };
-  }, [dashboard?.currentTerm?.id]);
-
-  const loadResults = async () => {
+  const loadResults = useCallback(async (isRefresh = false) => {
     try {
       const termId = dashboard?.currentTerm?.id;
       if (user?.id && termId) {
@@ -76,11 +54,40 @@ export const StudentResultsScreen: React.FC = () => {
         setResults(resultsData);
       }
     } catch (err) {
-      console.error('Failed to load results');
+      console.error('Failed to load results:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [user?.id, user?.schoolId, dashboard?.currentTerm?.id]);
+
+  useEffect(() => {
+    loadResults();
+
+    // Real-time: listen for results published
+    const handleResultsPublished = (data: any) => {
+      console.log('[Results] Results published, refreshing...', data);
+      loadResults();
+    };
+
+    socketService.connect();
+    if (user?.schoolId) {
+      socketService.joinSchool(user.schoolId);
+    }
+    socketService.on('results:published', handleResultsPublished);
+
+    return () => {
+      socketService.off('results:published', handleResultsPublished);
+      if (user?.schoolId) {
+        socketService.leaveSchool(user.schoolId);
+      }
+    };
+  }, [dashboard?.currentTerm?.id]);
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadResults(true);
+  }, [loadResults]);
 
   const handleShareResults = async () => {
     if (results.length === 0) {
@@ -135,7 +142,10 @@ export const StudentResultsScreen: React.FC = () => {
           </TouchableOpacity>
         )}
       </View>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
+      >
         {results.length === 0 ? (
           <Card style={styles.emptyCard}>
             <Text style={{ textAlign: 'center', color: colors.textLight, fontSize: 16 }}>No results available yet</Text>

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -22,32 +22,9 @@ export const ParentChildResultsScreen: React.FC = () => {
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    if (childId) loadResults();
-    else setLoading(false);
-
-    // Real-time: listen for results published
-    const handleResultsPublished = (data: any) => {
-      console.log('[ParentResults] Results published, refreshing...', data);
-      if (childId) loadResults();
-    };
-
-    socketService.connect();
-    if (user?.schoolId) {
-      socketService.joinSchool(user.schoolId);
-    }
-    socketService.on('results:published', handleResultsPublished);
-
-    return () => {
-      socketService.off('results:published', handleResultsPublished);
-      if (user?.schoolId) {
-        socketService.leaveSchool(user.schoolId);
-      }
-    };
-  }, [childId]);
-
-  const loadResults = async () => {
+  const loadResults = useCallback(async (isRefresh = false) => {
     try {
       const termId = dashboard?.currentTerm?.id;
       if (termId) {
@@ -83,9 +60,33 @@ export const ParentChildResultsScreen: React.FC = () => {
 
         setResults(resultsData);
       }
-    } catch (err) { console.error('Failed to load results'); }
-    finally { setLoading(false); }
-  };
+    } catch (err) { console.error('Failed to load results:', err); }
+    finally { setLoading(false); setRefreshing(false); }
+  }, [childId, user?.schoolId, dashboard?.currentTerm?.id]);
+
+  useEffect(() => {
+    if (childId) loadResults();
+    else setLoading(false);
+
+    // Real-time: listen for results published
+    const handleResultsPublished = (data: any) => {
+      console.log('[ParentResults] Results published, refreshing...', data);
+      if (childId) loadResults();
+    };
+
+    socketService.connect();
+    if (user?.schoolId) {
+      socketService.joinSchool(user.schoolId);
+    }
+    socketService.on('results:published', handleResultsPublished);
+
+    return () => {
+      socketService.off('results:published', handleResultsPublished);
+      if (user?.schoolId) {
+        socketService.leaveSchool(user.schoolId);
+      }
+    };
+  }, [childId]);
 
   const generateResultsContent = (): string => {
     const date = new Date().toLocaleDateString();
@@ -206,6 +207,11 @@ export const ParentChildResultsScreen: React.FC = () => {
     }
   };
 
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadResults(true);
+  }, [loadResults]);
+
   if (loading) return <Loading fullScreen />;
 
   return (
@@ -227,7 +233,10 @@ export const ParentChildResultsScreen: React.FC = () => {
           </View>
         )}
       </View>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
+      >
         {results.length === 0 ? (
           <Card style={{ padding: spacing.xl }}>
             <Text style={{ textAlign: 'center', color: colors.textLight }}>No results available</Text>

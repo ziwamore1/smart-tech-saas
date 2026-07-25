@@ -27,7 +27,7 @@ export class ResultAnalyticsController {
     @Query('termId') termId?: string,
     @Request() req?,
   ) {
-    return this.analytics.getTeacherAnalytics(req.user.userId, req.user.schoolId, termId);
+    return this.analytics.getTeacherAnalytics(req.user.id, req.user.schoolId, termId);
   }
 
   @Get('student/trend')

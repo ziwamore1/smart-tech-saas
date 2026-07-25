@@ -210,12 +210,20 @@ export class ParentService {
     };
   }
 
-  async getChildResults(studentId: string) {
+  async getChildResults(studentId: string, schoolId?: string, termId?: string) {
+    const where: any = {
+      studentId,
+      status: 'PUBLISHED',
+    };
+    if (schoolId) {
+      where.schoolId = schoolId;
+    }
+    if (termId) {
+      where.termId = termId;
+    }
+
     const results = await this.prisma.computedResult.findMany({
-      where: {
-        studentId,
-        status: 'PUBLISHED',
-      },
+      where,
       include: {
         subject: { select: { id: true, name: true } },
         term: { select: { id: true, name: true, academicYearId: true } },

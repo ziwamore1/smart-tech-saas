@@ -142,7 +142,8 @@ export const ResultsManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
     setLoadingStudents(true);
     try {
       const data = await apiService.getSheetStudents(sheetId);
-      const studentList = Array.isArray(data) ? data : data?.data || [];
+      const unwrapped = data?.data ?? data;
+      const studentList = Array.isArray(unwrapped) ? unwrapped : unwrapped?.students || unwrapped?.data || [];
       setSheetStudents(studentList);
     } catch (err) {
       console.error('Failed to load sheet students:', err);
@@ -155,7 +156,8 @@ export const ResultsManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
     setLoadingRankings(true);
     try {
       const data = await apiService.getSheetRankings(sheetId, 'class');
-      const rankingList = Array.isArray(data) ? data : data?.data || [];
+      const unwrapped = data?.data ?? data;
+      const rankingList = Array.isArray(unwrapped) ? unwrapped : unwrapped?.students || unwrapped?.data || [];
       setRankings(rankingList);
     } catch (err) {
       console.error('Failed to load rankings:', err);
@@ -167,8 +169,9 @@ export const ResultsManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
   const loadAnalysis = async (sheetId: string) => {
     setLoadingAnalysis(true);
     try {
-      const data = await apiService.getSheetAnalysis(sheetId);
-      setAnalysis(data);
+      const raw = await apiService.getSheetAnalysis(sheetId);
+      const unwrapped = raw?.data ?? raw;
+      setAnalysis(unwrapped);
     } catch (err) {
       console.error('Failed to load analysis:', err);
     } finally {
@@ -675,11 +678,11 @@ export const ResultsManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
       );
     }
 
-    const classAvg = analysis.classAverage ?? analysis.averageScore ?? analysis.average ?? 0;
+    const classAvg = analysis.averagePercentage ?? analysis.classAverage ?? analysis.averageScore ?? analysis.average ?? 0;
     const passRate = analysis.passRate ?? analysis.passPercentage ?? 0;
     const distinctionRate = analysis.distinctionRate ?? 0;
     const totalStudents = analysis.totalStudents ?? analysis.studentCount ?? 0;
-    const subjectBreakdown = analysis.subjects || analysis.subjectBreakdown || [];
+    const subjectBreakdown = analysis.subjectAnalysis || analysis.subjects || analysis.subjectBreakdown || [];
     const atRiskStudents = analysis.atRiskStudents || analysis.atRisk || [];
     const gradeDistribution = analysis.gradeDistribution || analysis.grades || {};
     const distKeys = Object.keys(gradeDistribution).sort();

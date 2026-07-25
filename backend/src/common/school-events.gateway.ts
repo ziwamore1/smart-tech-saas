@@ -4,6 +4,9 @@ import {
   OnGatewayInit,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
@@ -28,6 +31,31 @@ export class SchoolEventsGateway implements OnGatewayInit, OnGatewayConnection, 
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
+  }
+
+  @SubscribeMessage('joinSchool')
+  handleJoinSchool(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() schoolId: string,
+  ) {
+    if (!schoolId) {
+      this.logger.warn(`Client ${client.id} attempted joinSchool without schoolId`);
+      return { event: 'joinSchool', data: { error: 'schoolId required' } };
+    }
+    client.join(`school:${schoolId}`);
+    this.logger.log(`Client ${client.id} joined school:${schoolId}`);
+    return { event: 'joinSchool', data: { schoolId, joined: true } };
+  }
+
+  @SubscribeMessage('leaveSchool')
+  handleLeaveSchool(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() schoolId: string,
+  ) {
+    if (!schoolId) return { event: 'leaveSchool', data: { error: 'schoolId required' } };
+    client.leave(`school:${schoolId}`);
+    this.logger.log(`Client ${client.id} left school:${schoolId}`);
+    return { event: 'leaveSchool', data: { schoolId, left: true } };
   }
 
   joinSchool(client: Socket, schoolId: string) {

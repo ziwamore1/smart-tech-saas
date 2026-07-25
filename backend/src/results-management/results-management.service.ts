@@ -460,7 +460,7 @@ export class ResultsManagementService {
       await tx.resultAuditLog.create({
         data: {
           schoolId: sheet.schoolId,
-          action: 'PUBLISHED',
+          action: 'VERIFIED',
           entityType: 'RESULT_SHEET',
           entityId: id,
           classId: sheet.classId,

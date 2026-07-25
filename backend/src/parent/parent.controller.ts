@@ -42,8 +42,8 @@ export class ParentController {
 
   @Get('results')
   @UseGuards(JwtAuthGuard)
-  getResults(@Query('studentId') studentId: string) {
-    return this.service.getChildResults(studentId);
+  getResults(@Query('studentId') studentId: string, @Query('termId') termId: string, @Req() req: any) {
+    return this.service.getChildResults(studentId, req.user.schoolId, termId);
   }
 
   @Get('report-card')

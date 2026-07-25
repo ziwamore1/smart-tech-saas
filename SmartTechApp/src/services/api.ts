@@ -230,8 +230,10 @@ class ApiService {
     return response.data;
   }
 
-  async getParentChildResults(studentId: string, _termId?: string) {
-    const response = await this.client.get('/parent/results', { params: { studentId } });
+  async getParentChildResults(studentId: string, termId?: string) {
+    const params: any = { studentId };
+    if (termId) params.termId = termId;
+    const response = await this.client.get('/parent/results', { params });
     return response.data;
   }
 
