@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Req, UseGuards, Res, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Req, UseGuards, Res, Param, Query, Logger } from '@nestjs/common';
 import type { Response as ExpressResponse } from 'express';
 import { ReportEngineService, ReportType, ReportGenerationRequest } from './report-engine.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -8,6 +8,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 @Controller('report-engine')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ReportEngineController {
+  private readonly logger = new Logger(ReportEngineController.name);
   constructor(private readonly reportEngine: ReportEngineService) {}
 
   @Get('types')
@@ -135,6 +136,7 @@ export class ReportEngineController {
         message: 'Report generated successfully',
       });
     } catch (error) {
+      this.logger.error(`generate-pdf failed: ${error.message}`, error.stack);
       const status = error.getStatus?.() || 500;
       res.status(status).json({
         statusCode: status,

@@ -35,6 +35,11 @@ RUN apk add --no-cache --virtual .build-deps python3 build-base cairo-dev pango-
 # Install OpenSSL for Prisma engine — NOT in .build-deps so it persists after cleanup
 RUN apk add --no-cache openssl
 
+# Install Chromium for Puppeteer PDF generation
+RUN apk add --no-cache chromium
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+
 # Copy package.json and install ALL deps (including dev, needed for build at runtime if start command rebuilds)
 COPY package*.json ./
 RUN npm ci --legacy-peer-deps && npm cache clean --force
@@ -42,6 +47,9 @@ RUN npm ci --legacy-peer-deps && npm cache clean --force
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
+
+# Copy Handlebars templates for report card generation
+COPY --from=builder /app/src/templates ./src/templates
 
 # Remove build-only deps to shrink image
 RUN apk del .build-deps

@@ -2870,7 +2870,15 @@ class ApiService {
 
   async generateReportPdf(data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string }) {
     const response = await this.client.post('/report-engine/generate-pdf', data, { responseType: 'blob' });
-    return response.data;
+    const blob = response.data as Blob;
+    if (blob.type === 'application/json') {
+      const text = await blob.text();
+      const parsed = JSON.parse(text);
+      const err = new Error(parsed.message || 'Report generation failed');
+      (err as any).response = { data: parsed, status: parsed.statusCode || 500 };
+      throw err;
+    }
+    return blob;
   }
 
   async generateBulkReports(data: { type: string; classId?: string; termId?: string; templateId?: string; studentIds?: string[] }) {
