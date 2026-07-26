@@ -204,6 +204,11 @@ export class SuperAdminController {
   async reProvisionSchool(@Param('schoolId') schoolId: string) {
     return this.superAdminService.reProvisionSchool(schoolId);
   }
+
+  @Post('seed-performance-categories')
+  async seedPerformanceCategories() {
+    return this.superAdminService.seedPerformanceCategories();
+  }
 }
 
 @Controller('super-admin/setup')

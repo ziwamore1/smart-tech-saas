@@ -1011,4 +1011,27 @@ Email: ${director.email}
     this.logger.log(`Re-provisioning school ${school.name} (${typeCode})`);
     return this.provisioningService.ensureCompleteProvisioning(schoolId, typeCode);
   }
+
+  async seedPerformanceCategories() {
+    this.logger.log('Seeding performance categories for all schools...');
+    const schools = await this.prisma.school.findMany({ select: { id: true, name: true } });
+    let created = 0;
+    let skipped = 0;
+
+    for (const school of schools) {
+      const existing = await this.prisma.performanceCategory.findMany({
+        where: { schoolId: school.id },
+      });
+      if (existing.length > 0) {
+        skipped++;
+        continue;
+      }
+
+      await this.provisioningService.provisionPerformanceCategories(school.id);
+      created++;
+    }
+
+    this.logger.log(`Performance categories: ${created} schools seeded, ${skipped} skipped`);
+    return { total: schools.length, created, skipped };
+  }
 }

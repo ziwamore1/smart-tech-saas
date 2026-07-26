@@ -35,6 +35,7 @@ export class InstitutionProvisioningService {
     await this.provisionEducationLevels(schoolId, institutionTypeCode);
     await this.provisionSubjects(schoolId, institutionTypeCode);
     await this.provisionAdmissionSequence(schoolId);
+    await this.provisionPerformanceCategories(schoolId);
 
     this.logger.log(`Institution ${schoolId} provisioned successfully`);
     return { success: true, type: type.code, modules: type.modules.length };
@@ -622,6 +623,7 @@ export class InstitutionProvisioningService {
     await this.provisionEducationLevels(schoolId, institutionTypeCode);
     await this.provisionSubjects(schoolId, institutionTypeCode);
     await this.provisionAdmissionSequence(schoolId);
+    await this.provisionPerformanceCategories(schoolId);
 
     this.logger.log(`Complete provisioning ensured for ${schoolId}`);
     return { success: true };
@@ -690,5 +692,39 @@ export class InstitutionProvisioningService {
     });
 
     this.logger.log(`Admission sequence provisioned for school ${schoolId}`);
+  }
+
+  async provisionPerformanceCategories(schoolId: string) {
+    const existing = await this.prisma.performanceCategory.findMany({
+      where: { schoolId },
+    });
+    if (existing.length > 0) {
+      this.logger.log(`Performance categories already exist for school ${schoolId}, skipping`);
+      return;
+    }
+
+    const categories = [
+      { name: 'One', label: 'Excellent', minScore: 80, maxScore: 100, color: '#10b981', sortOrder: 1 },
+      { name: 'Two', label: 'Very Good', minScore: 70, maxScore: 79.99, color: '#22c55e', sortOrder: 2 },
+      { name: 'Three', label: 'Good', minScore: 60, maxScore: 69.99, color: '#3b82f6', sortOrder: 3 },
+      { name: 'Four', label: 'Average', minScore: 50, maxScore: 59.99, color: '#f59e0b', sortOrder: 4 },
+      { name: 'Five', label: 'Below Average', minScore: 40, maxScore: 49.99, color: '#f97316', sortOrder: 5 },
+      { name: 'Six', label: 'Poor', minScore: 0, maxScore: 39.99, color: '#ef4444', sortOrder: 6 },
+    ];
+
+    await this.prisma.performanceCategory.createMany({
+      data: categories.map(c => ({
+        schoolId,
+        name: c.name,
+        label: c.label,
+        minScore: c.minScore,
+        maxScore: c.maxScore,
+        color: c.color,
+        sortOrder: c.sortOrder,
+        isActive: true,
+      })),
+    });
+
+    this.logger.log(`Performance categories provisioned for school ${schoolId}`);
   }
 }
