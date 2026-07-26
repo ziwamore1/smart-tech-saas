@@ -211,7 +211,7 @@ export class SuperAdminController {
   }
 }
 
-@Controller('super-admin/public')
+@Controller('public')
 export class SuperAdminPublicController {
   constructor(private readonly superAdminService: SuperAdminService) {}
 
