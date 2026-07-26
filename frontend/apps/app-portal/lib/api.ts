@@ -2395,7 +2395,7 @@ export const reportEngineApi = {
   generate: (data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string; options?: any }) =>
     api.post('/report-engine/generate', data),
   generatePdf: (data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string }) =>
-    api.post('/report-engine/generate-pdf', data, { responseType: 'blob' }),
+    api.post('/report-engine/generate-pdf', data, { responseType: 'blob', timeout: 120000 }),
   generateBulk: (data: { type: string; classId?: string; termId?: string; templateId?: string; studentIds?: string[] }) =>
     api.post('/report-engine/generate-bulk', data),
   listReports: (params?: { reportType?: string; classId?: string; termId?: string; page?: number; limit?: number }) =>

@@ -101,38 +101,47 @@ export class ReportEngineController {
     },
     @Res() res: ExpressResponse,
   ) {
-    const report = await this.reportEngine.generateReport({
-      ...body,
-      schoolId: req.user.schoolId,
-      options: {
-        ...body.options,
-        userId: req.user.id,
-        userName: req.user.name || req.user.firstName,
-      },
-    });
+    try {
+      const report = await this.reportEngine.generateReport({
+        ...body,
+        schoolId: req.user.schoolId,
+        options: {
+          ...body.options,
+          userId: req.user.id,
+          userName: req.user.name || req.user.firstName,
+        },
+      });
 
-    if (report.pdfUrl) {
-      try {
-        const pdfBuffer = await this.reportEngine.downloadPdf(report.pdfUrl);
-        res.set({
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="${report.fileName}"`,
-          'X-Report-Id': report.id,
-          'X-Pdf-Url': report.pdfUrl,
-        });
-        res.send(pdfBuffer);
-        return;
-      } catch {
-        // Fall through to return the URL
+      if (report.pdfUrl) {
+        try {
+          const pdfBuffer = await this.reportEngine.downloadPdf(report.pdfUrl);
+          res.set({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="${report.fileName}"`,
+            'X-Report-Id': report.id,
+            'X-Pdf-Url': report.pdfUrl,
+          });
+          res.send(pdfBuffer);
+          return;
+        } catch {
+          // Fall through to return the URL
+        }
       }
-    }
 
-    res.json({
-      statusCode: 200,
-      timestamp: new Date().toISOString(),
-      data: report,
-      message: 'Report generated successfully',
-    });
+      res.json({
+        statusCode: 200,
+        timestamp: new Date().toISOString(),
+        data: report,
+        message: 'Report generated successfully',
+      });
+    } catch (error) {
+      const status = error.getStatus?.() || 500;
+      res.status(status).json({
+        statusCode: status,
+        timestamp: new Date().toISOString(),
+        message: error.message || 'Failed to generate report',
+      });
+    }
   }
 
   @Post('generate-bulk')
@@ -164,21 +173,30 @@ export class ReportEngineController {
     @Param('reportId') reportId: string,
     @Res() res: ExpressResponse,
   ) {
-    const report = await this.reportEngine.getReportById(reportId, req.user.schoolId);
-    if (report?.fileUrl) {
-      const pdfBuffer = await this.reportEngine.downloadPdf(report.fileUrl);
-      res.set({
-        'Content-Type': report.mimeType || 'application/pdf',
-        'Content-Disposition': `attachment; filename="${report.fileName}"`,
-      });
-      res.send(pdfBuffer);
-      return;
-    }
+    try {
+      const report = await this.reportEngine.getReportById(reportId, req.user.schoolId);
+      if (report?.fileUrl) {
+        const pdfBuffer = await this.reportEngine.downloadPdf(report.fileUrl);
+        res.set({
+          'Content-Type': report.mimeType || 'application/pdf',
+          'Content-Disposition': `attachment; filename="${report.fileName}"`,
+        });
+        res.send(pdfBuffer);
+        return;
+      }
 
-    res.status(404).json({
-      statusCode: 404,
-      timestamp: new Date().toISOString(),
-      message: 'Report PDF not available. Generate the report first.',
-    });
+      res.status(404).json({
+        statusCode: 404,
+        timestamp: new Date().toISOString(),
+        message: 'Report PDF not available. Generate the report first.',
+      });
+    } catch (error) {
+      const status = error.getStatus?.() || 500;
+      res.status(status).json({
+        statusCode: status,
+        timestamp: new Date().toISOString(),
+        message: error.message || 'Failed to download report',
+      });
+    }
   }
 }
