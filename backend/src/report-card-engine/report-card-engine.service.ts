@@ -240,56 +240,6 @@ export class ReportCardEngineService {
       where: { studentId, termId },
     });
 
-    // --- Real strengths/weaknesses from subject breakdown ---
-    const sortedSubjects = [...enrichedBreakdown]
-      .filter(s => s.finalPercentage != null)
-      .sort((a, b) => (b.finalPercentage ?? 0) - (a.finalPercentage ?? 0));
-    const topSubjects = sortedSubjects.slice(0, 3);
-    const bottomSubjects = sortedSubjects.slice(-3).reverse();
-
-    // --- Overall average from subject breakdown ---
-    const subjectsWithScores = enrichedBreakdown.filter(s => s.finalPercentage != null);
-    const computedOverallPct = subjectsWithScores.length > 0
-      ? parseFloat((subjectsWithScores.reduce((sum, s) => sum + (s.finalPercentage ?? 0), 0) / subjectsWithScores.length).toFixed(2))
-      : null;
-
-    const overallPct = termSummary?.overallPercentage ?? computedOverallPct;
-
-    // --- Compute real parent analytics ---
-    const strengths = topSubjects.map(s => `${s.subjectName} (${s.finalPercentage}% - ${s.finalGrade ?? 'N/A'})`);
-    const weaknesses = bottomSubjects.map(s => `${s.subjectName} (${s.finalPercentage}% - ${s.finalGrade ?? 'N/A'})`);
-
-    // Generate real insights based on actual performance
-    const passedCount = subjectsWithScores.filter(s => (s.finalPercentage ?? 0) >= 50).length;
-    const failedCount = subjectsWithScores.length - passedCount;
-    const highestSubject = topSubjects[0];
-    const lowestSubject = bottomSubjects[0];
-    const avgScore = overallPct ?? 0;
-
-    const insightsList: string[] = [];
-    if (highestSubject) {
-      insightsList.push(`${student.firstName} performed best in ${highestSubject.subjectName} with ${highestSubject.finalPercentage}% (${highestSubject.finalGrade}).`);
-    }
-    if (lowestSubject && lowestSubject.subjectId !== highestSubject?.subjectId) {
-      insightsList.push(`${lowestSubject.subjectName} is the weakest area at ${lowestSubject.finalPercentage}% (${lowestSubject.finalGrade}). Focus should be placed on improving this subject.`);
-    }
-    if (failedCount > 0) {
-      insightsList.push(`${failedCount} of ${subjectsWithScores.length} subject(s) scored below 50%. Additional attention is needed in ${bottomSubjects.map(s => s.subjectName).join(', ')}.`);
-    }
-    if (avgScore >= 75) {
-      insightsList.push(`Overall performance is excellent with an average of ${avgScore}%. Continue the good work.`);
-    } else if (avgScore >= 60) {
-      insightsList.push(`Overall performance is good with an average of ${avgScore}%. With more effort, results can improve further.`);
-    } else if (avgScore >= 50) {
-      insightsList.push(`Overall average is ${avgScore}%. More study time and focused preparation are recommended.`);
-    } else {
-      insightsList.push(`Overall average is ${avgScore}%. Serious academic improvement is needed across multiple subjects.`);
-    }
-
-    const computedStrengths = termSummary?.strengths ?? (strengths.length > 0 ? strengths : null);
-    const computedWeaknesses = termSummary?.weaknesses ?? (weaknesses.length > 0 ? weaknesses : null);
-    const computedInsights = termSummary?.aiInsights ?? (insightsList.length > 0 ? insightsList : null);
-
     const attendance = await this.prisma.attendance.findMany({
       where: {
         studentId,
@@ -345,6 +295,56 @@ export class ReportCardEngineService {
       ) ?? performanceCategories.find(c => c.minScore == null && c.maxScore == null);
       return { ...s, performanceCategory: cat ? { label: cat.label, color: cat.color } : null };
     });
+
+    // --- Real strengths/weaknesses from subject breakdown ---
+    const sortedSubjects = [...enrichedBreakdown]
+      .filter(s => s.finalPercentage != null)
+      .sort((a, b) => (b.finalPercentage ?? 0) - (a.finalPercentage ?? 0));
+    const topSubjects = sortedSubjects.slice(0, 3);
+    const bottomSubjects = sortedSubjects.slice(-3).reverse();
+
+    // --- Overall average from subject breakdown ---
+    const subjectsWithScores = enrichedBreakdown.filter(s => s.finalPercentage != null);
+    const computedOverallPct = subjectsWithScores.length > 0
+      ? parseFloat((subjectsWithScores.reduce((sum, s) => sum + (s.finalPercentage ?? 0), 0) / subjectsWithScores.length).toFixed(2))
+      : null;
+
+    const overallPct = termSummary?.overallPercentage ?? computedOverallPct;
+
+    // --- Compute real parent analytics ---
+    const strengths = topSubjects.map(s => `${s.subjectName} (${s.finalPercentage}% - ${s.finalGrade ?? 'N/A'})`);
+    const weaknesses = bottomSubjects.map(s => `${s.subjectName} (${s.finalPercentage}% - ${s.finalGrade ?? 'N/A'})`);
+
+    // Generate real insights based on actual performance
+    const passedCount = subjectsWithScores.filter(s => (s.finalPercentage ?? 0) >= 50).length;
+    const failedCount = subjectsWithScores.length - passedCount;
+    const highestSubject = topSubjects[0];
+    const lowestSubject = bottomSubjects[0];
+    const avgScore = overallPct ?? 0;
+
+    const insightsList: string[] = [];
+    if (highestSubject) {
+      insightsList.push(`${student.firstName} performed best in ${highestSubject.subjectName} with ${highestSubject.finalPercentage}% (${highestSubject.finalGrade}).`);
+    }
+    if (lowestSubject && lowestSubject.subjectId !== highestSubject?.subjectId) {
+      insightsList.push(`${lowestSubject.subjectName} is the weakest area at ${lowestSubject.finalPercentage}% (${lowestSubject.finalGrade}). Focus should be placed on improving this subject.`);
+    }
+    if (failedCount > 0) {
+      insightsList.push(`${failedCount} of ${subjectsWithScores.length} subject(s) scored below 50%. Additional attention is needed in ${bottomSubjects.map(s => s.subjectName).join(', ')}.`);
+    }
+    if (avgScore >= 75) {
+      insightsList.push(`Overall performance is excellent with an average of ${avgScore}%. Continue the good work.`);
+    } else if (avgScore >= 60) {
+      insightsList.push(`Overall performance is good with an average of ${avgScore}%. With more effort, results can improve further.`);
+    } else if (avgScore >= 50) {
+      insightsList.push(`Overall average is ${avgScore}%. More study time and focused preparation are recommended.`);
+    } else {
+      insightsList.push(`Overall average is ${avgScore}%. Serious academic improvement is needed across multiple subjects.`);
+    }
+
+    const computedStrengths = termSummary?.strengths ?? (strengths.length > 0 ? strengths : null);
+    const computedWeaknesses = termSummary?.weaknesses ?? (weaknesses.length > 0 ? weaknesses : null);
+    const computedInsights = termSummary?.aiInsights ?? (insightsList.length > 0 ? insightsList : null);
 
     const getPerformanceCategory = (percentage: number | null) => {
       if (percentage == null) return null;
