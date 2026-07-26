@@ -217,7 +217,12 @@ export class SuperAdminPublicController {
 
   @Post('seed-performance-categories')
   async seedPerformanceCategories() {
-    return this.superAdminService.seedPerformanceCategories();
+    try {
+      const result = await this.superAdminService.seedPerformanceCategories();
+      return result;
+    } catch (error: any) {
+      return { error: error.message };
+    }
   }
 }
 

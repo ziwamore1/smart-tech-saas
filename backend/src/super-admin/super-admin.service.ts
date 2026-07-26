@@ -1015,13 +1015,15 @@ Email: ${director.email}
   async seedPerformanceCategories() {
     this.logger.log('Seeding performance categories for all schools...');
 
-    const schools = await this.prisma.school.findMany({ select: { id: true } });
+    const schools = await this.prisma.$queryRawUnsafe<{ id: string }[]>(
+      'SELECT id FROM "School"',
+    );
     const schoolIds = schools.map(s => s.id);
 
-    const existing = await this.prisma.performanceCategory.findMany({
-      where: { schoolId: { in: schoolIds } },
-      select: { schoolId: true },
-    });
+    const existing = await this.prisma.$queryRawUnsafe<{ "schoolId": string }[]>(
+      `SELECT DISTINCT "schoolId" FROM "PerformanceCategory" WHERE "schoolId" = ANY($1)`,
+      schoolIds,
+    );
     const schoolsWithCategories = new Set(existing.map(e => e.schoolId));
     const schoolsNeeding = schoolIds.filter(id => !schoolsWithCategories.has(id));
 
@@ -1029,26 +1031,34 @@ Email: ${director.email}
       return { total: schoolIds.length, created: 0, skipped: schoolIds.length };
     }
 
-    const categories = [
-      { name: 'One', label: 'Excellent', minScore: 80, maxScore: 100, color: '#10b981', sortOrder: 1 },
-      { name: 'Two', label: 'Very Good', minScore: 70, maxScore: 79.99, color: '#22c55e', sortOrder: 2 },
-      { name: 'Three', label: 'Good', minScore: 60, maxScore: 69.99, color: '#3b82f6', sortOrder: 3 },
-      { name: 'Four', label: 'Average', minScore: 50, maxScore: 59.99, color: '#f59e0b', sortOrder: 4 },
-      { name: 'Five', label: 'Below Average', minScore: 40, maxScore: 49.99, color: '#f97316', sortOrder: 5 },
-      { name: 'Six', label: 'Poor', minScore: 0, maxScore: 39.99, color: '#ef4444', sortOrder: 6 },
-    ];
+    const values: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
 
-    const records = schoolsNeeding.flatMap(schoolId =>
-      categories.map(c => ({
-        schoolId,
-        ...c,
-        isActive: true,
-      })),
-    );
+    for (const schoolId of schoolsNeeding) {
+      const cats: [string, string, string, number, number, string, number][] = [
+        ['One', 'Excellent', schoolId, 80, 100, '#10b981', 1],
+        ['Two', 'Very Good', schoolId, 70, 79.99, '#22c55e', 2],
+        ['Three', 'Good', schoolId, 60, 69.99, '#3b82f6', 3],
+        ['Four', 'Average', schoolId, 50, 59.99, '#f59e0b', 4],
+        ['Five', 'Below Average', schoolId, 40, 49.99, '#f97316', 5],
+        ['Six', 'Poor', schoolId, 0, 39.99, '#ef4444', 6],
+      ];
+      for (const c of cats) {
+        values.push(`(gen_random_uuid(), $${idx}, $${idx+1}, $${idx+2}, $${idx+3}, $${idx+4}, $${idx+5}, $${idx+6}, true, NOW(), NOW())`);
+        params.push(c[2], c[0], c[1], c[3], c[4], c[5], c[6]);
+        idx += 7;
+      }
+    }
 
-    await this.prisma.performanceCategory.createMany({ data: records });
+    if (values.length > 0) {
+      await this.prisma.$executeRawUnsafe(
+        `INSERT INTO "PerformanceCategory" ("id", "schoolId", "name", "label", "minScore", "maxScore", "color", "sortOrder", "isActive", "createdAt", "updatedAt") VALUES ${values.join(', ')}`,
+        ...params,
+      );
+    }
 
-    this.logger.log(`Performance categories: ${schoolsNeeding.length} schools seeded, ${schoolsWithCategories.size} skipped`);
+    this.logger.log(`Performance categories: ${schoolsNeeding.length} schools seeded`);
     return { total: schoolIds.length, created: schoolsNeeding.length, skipped: schoolsWithCategories.size };
   }
 }
