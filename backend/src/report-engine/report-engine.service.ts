@@ -123,6 +123,7 @@ const REPORT_TYPE_CONFIG: Record<ReportType, {
 @Injectable()
 export class ReportEngineService {
   private readonly logger = new Logger(ReportEngineService.name);
+  private readonly pdfBuffers = new Map<string, Buffer>();
 
   constructor(
     private prisma: PrismaService,
@@ -325,7 +326,6 @@ export class ReportEngineService {
           termId: request.termId || null,
           fileName,
           fileUrl: result.url,
-          publicId: result.publicId || null,
           templateId: request.templateId || null,
           generatedById: request.options?.userId || 'system',
           generatedByName: request.options?.userName || 'System',
@@ -359,6 +359,15 @@ export class ReportEngineService {
       (request.studentId ? ` student ${request.studentId}` : '') +
       (request.classId ? ` class ${request.classId}` : ''),
     );
+
+    // Cache the PDF buffer for direct download (avoids Cloudinary round-trip corruption)
+    if (result.buffer) {
+      const cacheKey = `${request.schoolId}_${request.studentId || ''}_${request.classId || ''}_${request.termId || ''}_${request.type}_${Date.now()}`;
+      this.pdfBuffers.set(cacheKey, result.buffer);
+      // Auto-evict after 30 minutes
+      setTimeout(() => this.pdfBuffers.delete(cacheKey), 30 * 60 * 1000);
+      (report as any)._bufferKey = cacheKey;
+    }
 
     return report;
   }
@@ -400,6 +409,10 @@ export class ReportEngineService {
     }
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
+  }
+
+  getCachedPdfBuffer(bufferKey: string): Buffer | null {
+    return this.pdfBuffers.get(bufferKey) || null;
   }
 
   async listReports(
@@ -646,7 +659,7 @@ export class ReportEngineService {
     const result = await this.cloudinary.uploadBuffer(buffer, {
       folder: `${FOLDERS.system}/reports`,
       publicId: `attendance-${request.termId}-${Date.now()}`,
-      resourceType: 'image',
+      resourceType: 'raw',
     });
 
     return { buffer, url: result.secureUrl, publicId: result.publicId };
@@ -761,7 +774,7 @@ export class ReportEngineService {
     const result = await this.cloudinary.uploadBuffer(buffer, {
       folder: `${FOLDERS.system}/reports`,
       publicId: `analytics-${request.termId}-${Date.now()}`,
-      resourceType: 'image',
+      resourceType: 'raw',
     });
 
     return { buffer, url: result.secureUrl, publicId: result.publicId };
@@ -839,7 +852,7 @@ export class ReportEngineService {
     const result = await this.cloudinary.uploadBuffer(buffer, {
       folder: `${FOLDERS.system}/reports`,
       publicId: `mark-schedule-${request.classId}-${request.termId}-${Date.now()}`,
-      resourceType: 'image',
+      resourceType: 'raw',
     });
 
     return { buffer, url: result.secureUrl, publicId: result.publicId };

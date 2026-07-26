@@ -55,7 +55,7 @@ export class ReportCardService {
       const result = await this.cloudinary.uploadBuffer(buffer, {
         folder: `${FOLDERS.system}/report-cards`,
         publicId,
-        resourceType: 'image',
+        resourceType: 'raw',
       });
       return { url: result.secureUrl, publicId: result.publicId };
     } catch {

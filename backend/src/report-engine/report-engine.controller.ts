@@ -113,6 +113,23 @@ export class ReportEngineController {
         },
       });
 
+      // Use cached buffer directly — avoids Cloudinary round-trip which corrupts PDFs uploaded as image type
+      const bufferKey = (report as any)._bufferKey;
+      if (bufferKey) {
+        const pdfBuffer = this.reportEngine.getCachedPdfBuffer(bufferKey);
+        if (pdfBuffer) {
+          res.set({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="${report.fileName}"`,
+            'X-Report-Id': report.id,
+            'X-Pdf-Url': report.pdfUrl || '',
+          });
+          res.send(pdfBuffer);
+          return;
+        }
+      }
+
+      // Fallback: re-download from Cloudinary
       if (report.pdfUrl) {
         try {
           const pdfBuffer = await this.reportEngine.downloadPdf(report.pdfUrl);
