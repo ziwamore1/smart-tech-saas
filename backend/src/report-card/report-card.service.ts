@@ -40,6 +40,10 @@ handlebars.registerHelper('minus', (a: any, b: any) => {
   return Math.abs(parseFloat(a) - parseFloat(b)).toFixed(1);
 });
 
+handlebars.registerHelper('ne', (a: any, b: any) => {
+  return a !== b;
+});
+
 @Injectable()
 export class ReportCardService {
   constructor(
