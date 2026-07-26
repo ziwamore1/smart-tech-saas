@@ -8,6 +8,7 @@ import { DirectorDashboardScreen } from '../screens/director/DashboardScreen';
 import { DirectorStaffScreen } from '../screens/director/StaffScreen';
 import { MonitoringDashboardScreen } from '../screens/monitoring/MonitoringDashboardScreen';
 import { DirectorReportsScreen } from '../screens/director/ReportsScreen';
+import { ReportCardsScreen } from '../screens/director/ReportCardsScreen';
 import { DirectorSettingsScreen } from '../screens/director/SettingsScreen';
 import { DirectorClassesScreen } from '../screens/director/ClassesScreen';
 import { ClassesManagementScreen } from '../screens/director/ClassesManagementScreen';
@@ -71,7 +72,8 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'DirectorExams', label: 'Exams', icon: '📋', stackScreen: 'ExamList', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'], requiredPermission: 'exams.manage' },
   { name: 'DirectorTemplates', label: 'Templates', icon: '📄', stackScreen: 'TemplateMarketplace', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'], requiredPermission: 'template-personalization.manage' },
   { name: 'DirectorAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
-  { name: 'DirectorReports', label: 'Reports', icon: '📈', component: DirectorReportsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
+  { name: 'DirectorReportHub', label: 'Report Hub', icon: '🖨️', component: ReportCardsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
+  { name: 'DirectorReports', label: 'Report Manager', icon: '📁', component: DirectorReportsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorStamps', label: 'Digital Stamps', icon: '🔏', stackScreen: 'DigitalStamps', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorApprovals', label: 'Approvals', icon: '✅', stackScreen: 'ApprovalWorkflow', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorGrade7', label: 'Grade 7 ECZ', icon: '🎓', component: Grade7Screen, institutionTypes: ['PRIMARY_SCHOOL'] },

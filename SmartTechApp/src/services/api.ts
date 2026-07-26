@@ -2851,6 +2851,47 @@ class ApiService {
     const response = await this.client.delete(`/class-subjects/${classId}/${subjectId}`);
     return response.data;
   }
+
+  // ===== Report Engine (Centralized Report Generation) =====
+  async getReportEngineTypes() {
+    const response = await this.client.get('/report-engine/types');
+    return response.data;
+  }
+
+  async validateReportRequest(data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string }) {
+    const response = await this.client.post('/report-engine/validate', data);
+    return response.data;
+  }
+
+  async generateReport(data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string; options?: any }) {
+    const response = await this.client.post('/report-engine/generate', data);
+    return response.data;
+  }
+
+  async generateReportPdf(data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string }) {
+    const response = await this.client.post('/report-engine/generate-pdf', data, { responseType: 'blob' });
+    return response.data;
+  }
+
+  async generateBulkReports(data: { type: string; classId?: string; termId?: string; templateId?: string; studentIds?: string[] }) {
+    const response = await this.client.post('/report-engine/generate-bulk', data);
+    return response.data;
+  }
+
+  async getGeneratedReports(params?: { reportType?: string; classId?: string; termId?: string; page?: number; limit?: number }) {
+    const response = await this.client.get('/report-engine/reports', { params });
+    return response.data;
+  }
+
+  async getGeneratedReport(id: string) {
+    const response = await this.client.get(`/report-engine/reports/${id}`);
+    return response.data;
+  }
+
+  async deleteGeneratedReport(id: string) {
+    const response = await this.client.delete(`/report-engine/reports/${id}`);
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

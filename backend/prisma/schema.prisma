@@ -5784,3 +5784,35 @@ model ResultSmsLog {
   @@index([status])
   @@index([createdAt])
 }
+
+model GeneratedReport {
+  id               String   @id @default(uuid())
+  schoolId         String
+  reportType       String   // REPORT_CARD, CLASS_REPORT, TRANSCRIPT, CERTIFICATE, ATTENDANCE_REPORT, ANALYTICS_SUMMARY, MARK_SCHEDULE, PERFORMANCE_REPORT
+  title            String
+  studentId        String?
+  className        String?
+  classId          String?
+  termId           String?
+  academicYear     String?
+  fileName         String
+  fileUrl          String?  // Cloudinary URL
+  fileSize         Int?     // bytes
+  mimeType         String?  @default("application/pdf")
+  templateId       String?
+  generatedById    String   // userId of the person who generated it
+  generatedByName  String?
+  status           String   @default("COMPLETED") // PENDING, PROCESSING, COMPLETED, FAILED
+  errorMessage     String?
+  metadata         Json?    // Extra data (subject, assessmentType, etc.)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([reportType])
+  @@index([studentId])
+  @@index([classId])
+  @@index([termId])
+  @@index([generatedById])
+  @@index([createdAt])
+}
