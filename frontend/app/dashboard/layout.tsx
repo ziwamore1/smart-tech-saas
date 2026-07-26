@@ -270,6 +270,22 @@ const regularNav: NavItem[] = [
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
+    name: 'Report Hub', 
+    href: '/dashboard/report-hub', 
+    icon: 'fa-print',
+    color: '#3b82f6',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
+  },
+  { 
+    name: 'Report Manager', 
+    href: '/dashboard/report-manager', 
+    icon: 'fa-folder-open',
+    color: '#6366f1',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
+  },
+  { 
     name: 'Communications', 
     href: '/dashboard/communications', 
     icon: 'fa-comments',
