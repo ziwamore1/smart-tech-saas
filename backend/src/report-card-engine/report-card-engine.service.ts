@@ -95,7 +95,8 @@ export class ReportCardEngineService {
       legacyResultMap.set(r.subjectId, r);
     }
 
-    const subjectBreakdown = computedResults.map(result => {
+    const subjectBreakdown: any[] = [];
+    for (const result of computedResults) {
       const assessments = assessmentResults
         .filter(a => a.subjectId === result.subjectId)
         .map(a => ({
@@ -145,7 +146,7 @@ export class ReportCardEngineService {
         }
       }
 
-      return {
+      subjectBreakdown.push({
         subjectId: result.subjectId,
         subjectName: result.subject.name,
         subjectCode: result.subject.code,
@@ -159,8 +160,8 @@ export class ReportCardEngineService {
         classRank: result.classRank,
         subjectRank: result.subjectRank,
         assessments,
-      };
-    });
+      });
+    }
 
     // Apply composite subject transformations
     const processedBreakdown = await this.applyCompositeTransform(
