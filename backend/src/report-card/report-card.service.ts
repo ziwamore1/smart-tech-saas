@@ -44,6 +44,10 @@ handlebars.registerHelper('ne', (a: any, b: any) => {
   return a !== b;
 });
 
+handlebars.registerHelper('present', function(value: any) {
+  return value != null && value !== '';
+});
+
 @Injectable()
 export class ReportCardService {
   constructor(
