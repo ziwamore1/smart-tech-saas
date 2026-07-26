@@ -1014,24 +1014,41 @@ Email: ${director.email}
 
   async seedPerformanceCategories() {
     this.logger.log('Seeding performance categories for all schools...');
-    const schools = await this.prisma.school.findMany({ select: { id: true, name: true } });
-    let created = 0;
-    let skipped = 0;
 
-    for (const school of schools) {
-      const existing = await this.prisma.performanceCategory.findMany({
-        where: { schoolId: school.id },
-      });
-      if (existing.length > 0) {
-        skipped++;
-        continue;
-      }
+    const schools = await this.prisma.school.findMany({ select: { id: true } });
+    const schoolIds = schools.map(s => s.id);
 
-      await this.provisioningService.provisionPerformanceCategories(school.id);
-      created++;
+    const existing = await this.prisma.performanceCategory.findMany({
+      where: { schoolId: { in: schoolIds } },
+      select: { schoolId: true },
+    });
+    const schoolsWithCategories = new Set(existing.map(e => e.schoolId));
+    const schoolsNeeding = schoolIds.filter(id => !schoolsWithCategories.has(id));
+
+    if (schoolsNeeding.length === 0) {
+      return { total: schoolIds.length, created: 0, skipped: schoolIds.length };
     }
 
-    this.logger.log(`Performance categories: ${created} schools seeded, ${skipped} skipped`);
-    return { total: schools.length, created, skipped };
+    const categories = [
+      { name: 'One', label: 'Excellent', minScore: 80, maxScore: 100, color: '#10b981', sortOrder: 1 },
+      { name: 'Two', label: 'Very Good', minScore: 70, maxScore: 79.99, color: '#22c55e', sortOrder: 2 },
+      { name: 'Three', label: 'Good', minScore: 60, maxScore: 69.99, color: '#3b82f6', sortOrder: 3 },
+      { name: 'Four', label: 'Average', minScore: 50, maxScore: 59.99, color: '#f59e0b', sortOrder: 4 },
+      { name: 'Five', label: 'Below Average', minScore: 40, maxScore: 49.99, color: '#f97316', sortOrder: 5 },
+      { name: 'Six', label: 'Poor', minScore: 0, maxScore: 39.99, color: '#ef4444', sortOrder: 6 },
+    ];
+
+    const records = schoolsNeeding.flatMap(schoolId =>
+      categories.map(c => ({
+        schoolId,
+        ...c,
+        isActive: true,
+      })),
+    );
+
+    await this.prisma.performanceCategory.createMany({ data: records });
+
+    this.logger.log(`Performance categories: ${schoolsNeeding.length} schools seeded, ${schoolsWithCategories.size} skipped`);
+    return { total: schoolIds.length, created: schoolsNeeding.length, skipped: schoolsWithCategories.size };
   }
 }
