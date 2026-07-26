@@ -393,7 +393,6 @@ export class ReportCardEngineService {
       orderBy: { maxScore: 'desc' },
     });
 
-    const overallPct = termSummary?.overallPercentage ?? computedOverallPct;
     const division = overallPct != null
       ? divisionRules.find(r => r.minScore <= overallPct && r.maxScore >= overallPct) ?? null
       : null;
