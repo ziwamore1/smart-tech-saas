@@ -2387,3 +2387,20 @@ export const holidayApi = {
   delete: (id: string) => api.delete(`/holiday/${id}`),
   seedNationalHolidays: (year: number) => api.post(`/holiday/seed/${year}`),
 };
+
+export const reportEngineApi = {
+  getTypes: () => api.get('/report-engine/types'),
+  validate: (data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string }) =>
+    api.post('/report-engine/validate', data),
+  generate: (data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string; options?: any }) =>
+    api.post('/report-engine/generate', data),
+  generatePdf: (data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string }) =>
+    api.post('/report-engine/generate-pdf', data, { responseType: 'blob' }),
+  generateBulk: (data: { type: string; classId?: string; termId?: string; templateId?: string; studentIds?: string[] }) =>
+    api.post('/report-engine/generate-bulk', data),
+  listReports: (params?: { reportType?: string; classId?: string; termId?: string; page?: number; limit?: number }) =>
+    api.get('/report-engine/reports', { params }),
+  getReport: (id: string) => api.get(`/report-engine/reports/${id}`),
+  deleteReport: (id: string) => api.delete(`/report-engine/reports/${id}`),
+  downloadReport: (id: string) => api.get(`/report-engine/download/${id}`, { responseType: 'blob' }),
+};

@@ -1,0 +1,200 @@
+'use client';
+
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { reportEngineApi, classApi, termApi, studentApi } from '@/lib/api';
+import { toast } from 'sonner';
+
+const REPORT_TYPES = [
+  { type: 'REPORT_CARD', label: 'Report Card', icon: 'fa-file-text', color: '#3b82f6', desc: 'Individual student report card with charts and analysis' },
+  { type: 'CLASS_REPORT', label: 'Class Report Cards', icon: 'fa-clipboard-list', color: '#0d9488', desc: 'All report cards for a class as a combined PDF', bulk: true },
+  { type: 'TRANSCRIPT', label: 'Academic Transcript', icon: 'fa-scroll', color: '#8b5cf6', desc: 'Full academic transcript for a student' },
+  { type: 'CERTIFICATE', label: 'Certificate', icon: 'fa-award', color: '#f59e0b', desc: 'Achievement, merit, or graduation certificate' },
+  { type: 'ATTENDANCE_REPORT', label: 'Attendance Report', icon: 'fa-calendar-check', color: '#10b981', desc: 'Attendance summary for a student or class', bulk: true },
+  { type: 'ANALYTICS_SUMMARY', label: 'Analytics Summary', icon: 'fa-chart-pie', color: '#4f46e5', desc: 'Class or school performance analytics', bulk: true },
+  { type: 'MARK_SCHEDULE', label: 'Mark Schedule', icon: 'fa-table', color: '#ea580c', desc: 'Subject-wise mark schedule for a class', bulk: true },
+  { type: 'PERFORMANCE_REPORT', label: 'Performance Report', icon: 'fa-chart-line', color: '#ec4899', desc: 'Detailed student performance profile' },
+];
+
+export default function ReportHubPage() {
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedTerm, setSelectedTerm] = useState('');
+  const [selectedStudent, setSelectedStudent] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [resultFileName, setResultFileName] = useState('');
+
+  const { data: classes } = useQuery({
+    queryKey: ['classes'],
+    queryFn: () => classApi.getAll().then(r => r.data?.data || r.data?.classes || r.data),
+  });
+
+  const { data: terms } = useQuery({
+    queryKey: ['terms'],
+    queryFn: () => termApi.getAll().then(r => r.data?.data || r.data?.terms || r.data),
+  });
+
+  const { data: students } = useQuery({
+    queryKey: ['students', selectedClass],
+    queryFn: () => studentApi.getAll({ classId: selectedClass }).then(r => r.data?.data || r.data?.students || r.data),
+    enabled: !!selectedClass,
+  });
+
+  const config = REPORT_TYPES.find(t => t.type === selectedType);
+  const needsStudent = selectedType && ['REPORT_CARD', 'TRANSCRIPT', 'CERTIFICATE', 'PERFORMANCE_REPORT'].includes(selectedType);
+  const needsClass = selectedType && ['CLASS_REPORT', 'MARK_SCHEDULE'].includes(selectedType);
+  const needsTerm = selectedType && !['TRANSCRIPT'].includes(selectedType);
+
+  const canGenerate = selectedType && (!needsStudent || selectedStudent) && (!needsClass || selectedClass) && (!needsTerm || selectedTerm);
+
+  const handleGenerate = async () => {
+    if (!selectedType) return;
+    setGenerating(true);
+    setResultUrl(null);
+    try {
+      const payload: any = { type: selectedType };
+      if (selectedStudent) payload.studentId = selectedStudent;
+      if (selectedClass) payload.classId = selectedClass;
+      if (selectedTerm) payload.termId = selectedTerm;
+
+      const res = await reportEngineApi.generatePdf(payload);
+      const blob = res.data;
+      const url = URL.createObjectURL(blob);
+      const fileName = `${selectedType.toLowerCase()}-${Date.now()}.pdf`;
+      setResultUrl(url);
+      setResultFileName(fileName);
+      toast.success('Report generated successfully');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to generate report');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleDownload = () => {
+    if (!resultUrl) return;
+    const a = document.createElement('a');
+    a.href = resultUrl;
+    a.download = resultFileName;
+    a.click();
+  };
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+          <i className="fas fa-print text-blue-500" />
+          Report Generation Hub
+        </h1>
+        <p className="text-gray-500 mt-1 text-sm">Generate any report type through the centralized report engine</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {REPORT_TYPES.map(rt => (
+          <div
+            key={rt.type}
+            onClick={() => { setSelectedType(rt.type); setResultUrl(null); }}
+            className={`p-5 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md ${
+              selectedType === rt.type ? 'border-current shadow-md' : 'border-gray-200 hover:border-gray-300'
+            }`}
+            style={selectedType === rt.type ? { borderColor: rt.color, backgroundColor: `${rt.color}08` } : {}}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${rt.color}15` }}>
+                <i className={`fas ${rt.icon}`} style={{ color: rt.color, fontSize: '18px' }} />
+              </div>
+              <div>
+                <div className="font-semibold text-sm text-gray-900">{rt.label}</div>
+                {rt.bulk && <span className="text-[10px] font-bold" style={{ color: rt.color }}>BULK</span>}
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 leading-relaxed">{rt.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      {selectedType && (
+        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+          <h3 className="text-base font-semibold text-gray-900 mb-4">Configure: {config?.label}</h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+            {(needsClass || needsStudent) && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Class</label>
+                <select
+                  value={selectedClass}
+                  onChange={e => { setSelectedClass(e.target.value); setSelectedStudent(''); }}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
+                >
+                  <option value="">Select class...</option>
+                  {(Array.isArray(classes) ? classes : []).map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {needsTerm && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Term</label>
+                <select
+                  value={selectedTerm}
+                  onChange={e => setSelectedTerm(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
+                >
+                  <option value="">Select term...</option>
+                  {(Array.isArray(terms) ? terms : []).map((t: any) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {needsStudent && selectedClass && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Student</label>
+                <select
+                  value={selectedStudent}
+                  onChange={e => setSelectedStudent(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
+                >
+                  <option value="">Select student...</option>
+                  {(Array.isArray(students) ? students : []).map((s: any) => (
+                    <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.admissionNumber})</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-3 items-center">
+            <button
+              onClick={handleGenerate}
+              disabled={!canGenerate || generating}
+              className={`px-5 py-2.5 rounded-lg text-white font-semibold text-sm flex items-center gap-2 ${
+                canGenerate && !generating ? 'hover:opacity-90' : 'opacity-50 cursor-not-allowed'
+              }`}
+              style={{ backgroundColor: canGenerate && !generating ? config?.color || '#3b82f6' : '#94a3b8' }}
+            >
+              {generating ? (
+                <><i className="fas fa-spinner fa-spin" /> Generating...</>
+              ) : (
+                <><i className="fas fa-file-pdf" /> Generate PDF</>
+              )}
+            </button>
+
+            {resultUrl && (
+              <button
+                onClick={handleDownload}
+                className="px-5 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium text-sm hover:bg-gray-50 flex items-center gap-2"
+              >
+                <i className="fas fa-download" /> Download
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
