@@ -398,7 +398,10 @@ Class Average: <strong>{{classAverage}}%</strong>
 
 {{#if termSummary.aiInsights}}
 <div style="margin-top:6px; padding:5px; background: #eff6ff; border-radius:4px; border-left:3px solid #3b82f6;">
-<strong style="color:#1d4ed8">Insights:</strong> {{termSummary.aiInsights}}
+<strong style="color:#1d4ed8">Insights:</strong>
+{{#each termSummary.aiInsights}}
+<div style="margin-top:2px; font-size:9pt; color:#1e40af;">• {{this}}</div>
+{{/each}}
 </div>
 {{/if}}
 

@@ -138,55 +138,158 @@ export class AnalyticsService {
   ) {
     const results = await this.prisma.computedResult.findMany({
       where: { studentId, termId, schoolId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
+      include: { subject: { select: { name: true } } },
     });
 
     if (!results.length) return { comment: 'No results available.' };
 
-    let average = 0;
-    if (gradingSystem === 'ECZ') {
-      const scores = results
-        .map((r) => r.finalPercentage ?? 0)
-        .sort((a, b) => b - a)
-        .slice(0, 6);
-      average = scores.reduce((sum, s) => sum + s, 0) / scores.length;
-    } else {
-      average = results.reduce((sum, r) => sum + (r.finalPercentage ?? 0), 0) / results.length;
+    // Also try Result table for NULL finalPercentage
+    const legacyResults = await this.prisma.result.findMany({
+      where: { studentId, termId, schoolId },
+      select: { subjectId: true, score: true },
+    });
+    const legacyMap = new Map<string, number>();
+    for (const lr of legacyResults) {
+      if (lr.score != null) legacyMap.set(lr.subjectId, lr.score);
     }
 
-    const failedSubjects = results.filter((r) => (r.finalPercentage ?? 0) < 50).length;
+    // Build enriched results with resolved scores
+    const enriched = results.map(r => ({
+      ...r,
+      resolvedScore: r.finalPercentage ?? legacyMap.get(r.subjectId) ?? null,
+      subjectName: r.subject?.name ?? 'Unknown',
+    }));
+    const withScores = enriched.filter(r => r.resolvedScore != null);
 
-    const teacherComment = this.generateReportComment(average, failedSubjects);
-    const headComment = this.generateHeadTeacherComment(average);
+    if (!withScores.length) return { comment: 'No results available.' };
+
+    const scores = withScores.map(r => r.resolvedScore!).sort((a, b) => b - a);
+    const average = gradingSystem === 'ECZ'
+      ? scores.slice(0, 6).reduce((sum, s) => sum + s, 0) / Math.min(scores.length, 6)
+      : scores.reduce((sum, s) => sum + s, 0) / scores.length;
+
+    const failedSubjects = withScores.filter(r => r.resolvedScore! < 50);
+    const excellentSubjects = withScores.filter(r => r.resolvedScore! >= 75);
+    const goodSubjects = withScores.filter(r => r.resolvedScore! >= 60 && r.resolvedScore! < 75);
+    const fairSubjects = withScores.filter(r => r.resolvedScore! >= 50 && r.resolvedScore! < 60);
+    const poorSubjects = withScores.filter(r => r.resolvedScore! < 50);
+
+    // Sort by score descending
+    withScores.sort((a, b) => (b.resolvedScore ?? 0) - (a.resolvedScore ?? 0));
+    const bestSubject = withScores[0];
+    const weakestSubject = withScores[withScores.length - 1];
+
+    const teacherComment = this.generatePersonalizedTeacherComment(
+      average, failedSubjects, excellentSubjects, goodSubjects, fairSubjects, poorSubjects,
+      bestSubject, weakestSubject, withScores.length,
+    );
+    const headComment = this.generatePersonalizedHeadComment(
+      average, failedSubjects, excellentSubjects, bestSubject, weakestSubject,
+    );
 
     return {
       average: Number(average.toFixed(2)),
-      failedSubjects,
+      failedSubjects: failedSubjects.length,
       teacherComment,
       headComment,
     };
   }
 
-  private generateReportComment(average: number, failedSubjects: number) {
-    if (average >= 80)
-      return 'Excellent performance. Keep up the outstanding work and continue striving for excellence.';
-    if (average >= 70)
-      return 'Very good performance. The student shows strong understanding of the subjects.';
-    if (average >= 60)
-      return 'Good performance. With a little more effort, the student can achieve even higher results.';
-    if (average >= 50)
-      return 'Fair performance. The student should work harder to improve understanding of key subjects.';
-    if (failedSubjects >= 3)
-      return 'The student is struggling academically and needs serious improvement and closer supervision.';
-    return 'The student needs to put more effort into studies to improve overall performance.';
+  private generatePersonalizedTeacherComment(
+    average: number,
+    failedSubjects: any[],
+    excellentSubjects: any[],
+    goodSubjects: any[],
+    fairSubjects: any[],
+    poorSubjects: any[],
+    bestSubject: any,
+    weakestSubject: any,
+    totalSubjects: number,
+  ) {
+    const parts: string[] = [];
+
+    if (average >= 75) {
+      parts.push(`${bestSubject?.subjectName} (${bestSubject?.resolvedScore}%) was the standout subject.`);
+    } else if (average >= 60) {
+      parts.push(`${bestSubject?.subjectName} (${bestSubject?.resolvedScore}%) was the strongest subject.`);
+    } else if (average >= 50) {
+      parts.push(`${bestSubject?.subjectName} (${bestSubject?.resolvedScore}%) was the best-performed subject.`);
+    }
+
+    if (excellentSubjects.length > 0) {
+      const names = excellentSubjects.map(s => s.subjectName).join(', ');
+      if (excellentSubjects.length === 1) {
+        parts.push(`${names} achieved an excellent result.`);
+      } else {
+        parts.push(`${names} achieved excellent results.`);
+      }
+    }
+
+    if (goodSubjects.length > 0) {
+      const names = goodSubjects.map(s => s.subjectName).join(', ');
+      parts.push(`${names} performed well and should be encouraged to improve further.`);
+    }
+
+    if (fairSubjects.length > 0) {
+      const names = fairSubjects.map(s => s.subjectName).join(', ');
+      parts.push(`${names} need more attention to reach higher performance levels.`);
+    }
+
+    if (poorSubjects.length > 0) {
+      const names = poorSubjects.map(s => s.subjectName).join(', ');
+      if (poorSubjects.length <= 2) {
+        parts.push(`${names} require(s) focused improvement through additional study and practice.`);
+      } else {
+        parts.push(`${names} require significant improvement. Additional support and supervision are strongly recommended.`);
+      }
+    }
+
+    if (failedSubjects.length > 0 && failedSubjects.length >= totalSubjects * 0.5) {
+      parts.push(`The student is struggling in more than half of the subjects and needs urgent academic intervention.`);
+    } else if (failedSubjects.length >= 3) {
+      parts.push(`Attention should be given to the ${failedSubjects.length} subject(s) below 50%.`);
+    }
+
+    if (parts.length === 0) {
+      parts.push('Performance is satisfactory across all subjects. Continued effort will yield better results.');
+    }
+
+    return parts.join(' ');
   }
 
-  private generateHeadTeacherComment(average: number) {
-    if (average >= 75)
-      return 'Excellent academic achievement. Keep aiming higher.';
-    if (average >= 60)
-      return 'Good work. Continue to build on this performance.';
-    if (average >= 50) return 'Fair performance. Greater effort is required.';
-    return 'Academic performance needs serious improvement.';
+  private generatePersonalizedHeadComment(
+    average: number,
+    failedSubjects: any[],
+    excellentSubjects: any[],
+    bestSubject: any,
+    weakestSubject: any,
+  ) {
+    const parts: string[] = [];
+
+    if (average >= 80) {
+      parts.push(`Outstanding performance with an average of ${average.toFixed(0)}%.`);
+      if (bestSubject) parts.push(`Top result in ${bestSubject.subjectName} (${bestSubject.resolvedScore}%).`);
+      parts.push('Keep aiming higher and maintain this excellent standard.');
+    } else if (average >= 70) {
+      parts.push(`Very good performance with an average of ${average.toFixed(0)}%.`);
+      if (bestSubject) parts.push(`${bestSubject.subjectName} (${bestSubject.resolvedScore}%) is a clear strength.`);
+      if (weakestSubject) parts.push(`Focus on improving ${weakestSubject.subjectName} (${weakestSubject.resolvedScore}%).`);
+    } else if (average >= 60) {
+      parts.push(`Good work with an average of ${average.toFixed(0)}%.`);
+      if (weakestSubject) parts.push(`More effort is needed in ${weakestSubject.subjectName} (${weakestSubject.resolvedScore}%).`);
+    } else if (average >= 50) {
+      parts.push(`Fair performance with an average of ${average.toFixed(0)}%.`);
+      if (weakestSubject) parts.push(`Serious improvement is required in ${weakestSubject.subjectName} (${weakestSubject.resolvedScore}%).`);
+      parts.push('Greater effort and discipline are necessary.');
+    } else {
+      parts.push(`Academic performance needs serious improvement (average: ${average.toFixed(0)}%).`);
+      if (failedSubjects.length > 0) {
+        parts.push(`${failedSubjects.length} subject(s) scored below 50%.`);
+      }
+      parts.push('Close supervision and additional support are strongly recommended.');
+    }
+
+    return parts.join(' ');
   }
   async getSubjectPerformance(classId: string, termId: string) {
     const results = await this.prisma.computedResult.findMany({

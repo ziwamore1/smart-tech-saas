@@ -168,9 +168,127 @@ export class ReportCardEngineService {
       subjectBreakdown, studentId, termId, enrollment.classId, schoolId,
     );
 
+    // --- Compute class rank on-the-fly from all students' average percentages ---
+    const allStudentResults = await this.prisma.computedResult.findMany({
+      where: { termId, classId: enrollment.classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
+      select: { studentId: true, finalPercentage: true },
+    });
+    // Also get Result table fallback for students with NULL finalPercentage
+    const allLegacyResults = await this.prisma.result.findMany({
+      where: { termId, schoolId },
+      select: { studentId: true, score: true },
+    });
+    const allLegacyMap = new Map<string, number[]>();
+    for (const lr of allLegacyResults) {
+      if (lr.score != null) {
+        const arr = allLegacyMap.get(lr.studentId) ?? [];
+        arr.push(lr.score);
+        allLegacyMap.set(lr.studentId, arr);
+      }
+    }
+
+    // Compute per-student average across all subjects
+    const studentAvgMap = new Map<string, { total: number; count: number }>();
+    for (const sr of allStudentResults) {
+      const key = sr.studentId;
+      const existing = studentAvgMap.get(key) ?? { total: 0, count: 0 };
+      if (sr.finalPercentage != null) {
+        existing.total += sr.finalPercentage;
+        existing.count += 1;
+      }
+      studentAvgMap.set(key, existing);
+    }
+    // Fill in NULL scores from legacy for students missing data
+    for (const [sid, scores] of allLegacyMap.entries()) {
+      const existing = studentAvgMap.get(sid) ?? { total: 0, count: 0 };
+      if (existing.count === 0 && scores.length > 0) {
+        existing.total = scores.reduce((a, b) => a + b, 0);
+        existing.count = scores.length;
+        studentAvgMap.set(sid, existing);
+      }
+    }
+
+    const rankedStudents = Array.from(studentAvgMap.entries())
+      .map(([sid, data]) => ({
+        studentId: sid,
+        average: data.count > 0 ? data.total / data.count : 0,
+      }))
+      .sort((a, b) => b.average - a.average);
+
+    let computedClassRank: number | null = null;
+    let computedClassSize = rankedStudents.length;
+    let lastRankAvg: number | null = null;
+    let lastRank = 0;
+    for (let i = 0; i < rankedStudents.length; i++) {
+      const s = rankedStudents[i];
+      if (lastRankAvg === null || Math.abs(s.average - lastRankAvg) > 0.001) {
+        lastRank = i + 1;
+        lastRankAvg = s.average;
+      }
+      if (s.studentId === studentId) {
+        computedClassRank = lastRank;
+        break;
+      }
+    }
+    // Percentile (1-100)
+    const computedPercentile = computedClassRank != null && computedClassSize > 0
+      ? Math.round(((computedClassSize - computedClassRank) / computedClassSize) * 100)
+      : null;
+
+    // Read TermSummary if available (may have additional data)
     const termSummary = await this.prisma.termSummary.findFirst({
       where: { studentId, termId },
     });
+
+    // --- Real strengths/weaknesses from subject breakdown ---
+    const sortedSubjects = [...enrichedBreakdown]
+      .filter(s => s.finalPercentage != null)
+      .sort((a, b) => (b.finalPercentage ?? 0) - (a.finalPercentage ?? 0));
+    const topSubjects = sortedSubjects.slice(0, 3);
+    const bottomSubjects = sortedSubjects.slice(-3).reverse();
+
+    // --- Overall average from subject breakdown ---
+    const subjectsWithScores = enrichedBreakdown.filter(s => s.finalPercentage != null);
+    const computedOverallPct = subjectsWithScores.length > 0
+      ? parseFloat((subjectsWithScores.reduce((sum, s) => sum + (s.finalPercentage ?? 0), 0) / subjectsWithScores.length).toFixed(2))
+      : null;
+
+    const overallPct = termSummary?.overallPercentage ?? computedOverallPct;
+
+    // --- Compute real parent analytics ---
+    const strengths = topSubjects.map(s => `${s.subjectName} (${s.finalPercentage}% - ${s.finalGrade ?? 'N/A'})`);
+    const weaknesses = bottomSubjects.map(s => `${s.subjectName} (${s.finalPercentage}% - ${s.finalGrade ?? 'N/A'})`);
+
+    // Generate real insights based on actual performance
+    const passedCount = subjectsWithScores.filter(s => (s.finalPercentage ?? 0) >= 50).length;
+    const failedCount = subjectsWithScores.length - passedCount;
+    const highestSubject = topSubjects[0];
+    const lowestSubject = bottomSubjects[0];
+    const avgScore = overallPct ?? 0;
+
+    const insightsList: string[] = [];
+    if (highestSubject) {
+      insightsList.push(`${student.firstName} performed best in ${highestSubject.subjectName} with ${highestSubject.finalPercentage}% (${highestSubject.finalGrade}).`);
+    }
+    if (lowestSubject && lowestSubject.subjectId !== highestSubject?.subjectId) {
+      insightsList.push(`${lowestSubject.subjectName} is the weakest area at ${lowestSubject.finalPercentage}% (${lowestSubject.finalGrade}). Focus should be placed on improving this subject.`);
+    }
+    if (failedCount > 0) {
+      insightsList.push(`${failedCount} of ${subjectsWithScores.length} subject(s) scored below 50%. Additional attention is needed in ${bottomSubjects.map(s => s.subjectName).join(', ')}.`);
+    }
+    if (avgScore >= 75) {
+      insightsList.push(`Overall performance is excellent with an average of ${avgScore}%. Continue the good work.`);
+    } else if (avgScore >= 60) {
+      insightsList.push(`Overall performance is good with an average of ${avgScore}%. With more effort, results can improve further.`);
+    } else if (avgScore >= 50) {
+      insightsList.push(`Overall average is ${avgScore}%. More study time and focused preparation are recommended.`);
+    } else {
+      insightsList.push(`Overall average is ${avgScore}%. Serious academic improvement is needed across multiple subjects.`);
+    }
+
+    const computedStrengths = termSummary?.strengths ?? (strengths.length > 0 ? strengths : null);
+    const computedWeaknesses = termSummary?.weaknesses ?? (weaknesses.length > 0 ? weaknesses : null);
+    const computedInsights = termSummary?.aiInsights ?? (insightsList.length > 0 ? insightsList : null);
 
     const attendance = await this.prisma.attendance.findMany({
       where: {
@@ -205,19 +323,26 @@ export class ReportCardEngineService {
     const priorityGroupIds = (bestSubjectRule?.priorityGroupIds as string[]) ?? [];
     const bestCount = bestSubjectRule?.count ?? 6;
 
-    // Load performance categories for this curriculum
-    const performanceCategories = await this.prisma.performanceCategory.findMany({
+    // Load performance categories for this curriculum (fallback: all categories for school)
+    let performanceCategories = await this.prisma.performanceCategory.findMany({
       where: {
         curriculumVersionId: schoolCurriculum?.curriculumVersionId ?? undefined,
       },
       orderBy: { minScore: 'desc' },
     });
+    if (performanceCategories.length === 0) {
+      performanceCategories = await this.prisma.performanceCategory.findMany({
+        where: { schoolId },
+        orderBy: { minScore: 'desc' },
+      });
+    }
 
     // Enrich subject breakdown with performance category
     const enrichedBreakdown = processedBreakdown.map(s => {
+      const pct = s.finalPercentage ?? 0;
       const cat = performanceCategories.find(
-        c => (c.minScore ?? 0) <= (s.finalPercentage ?? 0) && (!c.maxScore || c.maxScore >= (s.finalPercentage ?? 0)),
-      ) ?? performanceCategories.find(c => !c.minScore && !c.maxScore);
+        c => pct >= (c.minScore ?? 0) && (c.maxScore == null || pct <= c.maxScore),
+      ) ?? performanceCategories.find(c => c.minScore == null && c.maxScore == null);
       return { ...s, performanceCategory: cat ? { label: cat.label, color: cat.color } : null };
     });
 
@@ -268,7 +393,7 @@ export class ReportCardEngineService {
       orderBy: { maxScore: 'desc' },
     });
 
-    const overallPct = termSummary?.overallPercentage ?? null;
+    const overallPct = termSummary?.overallPercentage ?? computedOverallPct;
     const division = overallPct != null
       ? divisionRules.find(r => r.minScore <= overallPct && r.maxScore >= overallPct) ?? null
       : null;
@@ -311,20 +436,20 @@ export class ReportCardEngineService {
         color: division.color,
       } : null,
       performanceCategory: getPerformanceCategory(overallPct),
-      termSummary: termSummary ? {
-        overallPercentage: termSummary.overallPercentage,
-        overallGrade: termSummary.overallGrade,
-        overallRemark: termSummary.overallRemark,
-        gpa: termSummary.gpa,
-        totalPoints: termSummary.totalPoints,
-        classRank: termSummary.classRank,
-        classSize: termSummary.classSize,
-        percentile: termSummary.percentile,
-        strengths: termSummary.strengths,
-        weaknesses: termSummary.weaknesses,
-        teacherRemarks: termSummary.teacherRemarks,
-        aiInsights: termSummary.aiInsights,
-      } : null,
+      termSummary: {
+        overallPercentage: termSummary?.overallPercentage ?? computedOverallPct,
+        overallGrade: termSummary?.overallGrade ?? null,
+        overallRemark: termSummary?.overallRemark ?? null,
+        gpa: termSummary?.gpa ?? null,
+        totalPoints: termSummary?.totalPoints ?? totalPoints,
+        classRank: termSummary?.classRank ?? computedClassRank,
+        classSize: termSummary?.classSize ?? computedClassSize,
+        percentile: termSummary?.percentile ?? computedPercentile,
+        strengths: computedStrengths,
+        weaknesses: computedWeaknesses,
+        teacherRemarks: termSummary?.teacherRemarks ?? null,
+        aiInsights: computedInsights,
+      },
       attendance: {
         totalDays: attendance.length,
         presentDays: attendance.filter(a => a.status === 'PRESENT').length,
@@ -584,16 +709,35 @@ export class ReportCardEngineService {
       include: { subject: true },
     });
 
+    // Fallback: load Result table for students with NULL finalPercentage
+    const allStudentIds = [...new Set(classResults.map(r => r.studentId))];
+    const legacyResults = await this.prisma.result.findMany({
+      where: { termId, studentId: { in: allStudentIds } },
+      select: { studentId: true, subjectId: true, score: true },
+    });
+    const legacyScoreMap = new Map<string, number>();
+    for (const lr of legacyResults) {
+      if (lr.score != null) {
+        legacyScoreMap.set(`${lr.studentId}_${lr.subjectId}`, lr.score);
+      }
+    }
+
+    const getScore = (r: { studentId: string; subjectId: string; finalPercentage: number | null }) => {
+      if (r.finalPercentage != null) return r.finalPercentage;
+      return legacyScoreMap.get(`${r.studentId}_${r.subjectId}`) ?? 0;
+    };
+
     const comparison = studentResults.map(sr => {
       const subjectResults = classResults.filter(cr => cr.subjectId === sr.subjectId);
-      const classAvg = subjectResults.length > 0
-        ? parseFloat((subjectResults.reduce((sum, r) => sum + (r.finalPercentage ?? 0), 0) / subjectResults.length).toFixed(1))
-        : null;
+      const scores = subjectResults.map(r => getScore(r));
+      const classAvg = scores.length > 0
+        ? parseFloat((scores.reduce((sum, s) => sum + s, 0) / scores.length).toFixed(1))
+        : 0;
 
       return {
         subjectName: sr.subject.name,
-        studentScore: sr.finalPercentage ?? 0,
-        classAverage: classAvg ?? 0,
+        studentScore: getScore(sr),
+        classAverage: classAvg,
       };
     });
 
