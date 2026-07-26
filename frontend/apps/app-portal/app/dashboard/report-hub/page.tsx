@@ -43,7 +43,7 @@ export default function ReportHubPage() {
 
   const config = REPORT_TYPES.find(t => t.type === selectedType);
   const needsStudent = selectedType && ['REPORT_CARD', 'TRANSCRIPT', 'CERTIFICATE', 'PERFORMANCE_REPORT'].includes(selectedType);
-  const needsClass = selectedType && ['CLASS_REPORT', 'MARK_SCHEDULE'].includes(selectedType);
+  const needsClass = selectedType && ['CLASS_REPORT', 'MARK_SCHEDULE', 'ATTENDANCE_REPORT', 'ANALYTICS_SUMMARY'].includes(selectedType);
   const needsTerm = selectedType && !['TRANSCRIPT'].includes(selectedType);
 
   const canGenerate = selectedType && (!needsStudent || selectedStudent) && (!needsClass || selectedClass) && (!needsTerm || selectedTerm);
@@ -53,18 +53,31 @@ export default function ReportHubPage() {
     setGenerating(true);
     setResultUrl(null);
     try {
-      const payload: any = { type: selectedType };
-      if (selectedStudent) payload.studentId = selectedStudent;
-      if (selectedClass) payload.classId = selectedClass;
-      if (selectedTerm) payload.termId = selectedTerm;
+      const isBulk = ['CLASS_REPORT', 'ATTENDANCE_REPORT', 'ANALYTICS_SUMMARY', 'MARK_SCHEDULE'].includes(selectedType);
 
-      const res = await reportEngineApi.generatePdf(payload);
-      const blob = res.data;
-      const url = URL.createObjectURL(blob);
-      const fileName = `${selectedType.toLowerCase()}-${Date.now()}.pdf`;
-      setResultUrl(url);
-      setResultFileName(fileName);
-      toast.success('Report generated successfully');
+      if (isBulk) {
+        const payload: any = { type: selectedType };
+        if (selectedClass) payload.classId = selectedClass;
+        if (selectedTerm) payload.termId = selectedTerm;
+
+        const res = await reportEngineApi.generateBulk(payload);
+        const data = res.data?.data || res.data;
+        toast.success(data?.message || 'Bulk report generation started');
+        setResultUrl(null);
+      } else {
+        const payload: any = { type: selectedType };
+        if (selectedStudent) payload.studentId = selectedStudent;
+        if (selectedClass) payload.classId = selectedClass;
+        if (selectedTerm) payload.termId = selectedTerm;
+
+        const res = await reportEngineApi.generatePdf(payload);
+        const blob = res.data;
+        const url = URL.createObjectURL(blob);
+        const fileName = `${selectedType.toLowerCase()}-${Date.now()}.pdf`;
+        setResultUrl(url);
+        setResultFileName(fileName);
+        toast.success('Report generated successfully');
+      }
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to generate report');
     } finally {

@@ -27,15 +27,38 @@ export const ParentReportCardsScreen: React.FC = () => {
     if (kids.length > 0 && !selectedChildId) {
       setSelectedChildId(kids[0].id);
     }
-    if (dashboard?.currentTerm) {
-      setTerms([dashboard.currentTerm]);
-      setSelectedTermId(dashboard.currentTerm.id);
-    }
+    loadTerms();
   }, [dashboard]);
 
   useEffect(() => {
-    if (selectedChildId) loadResults();
-  }, [selectedChildId]);
+    if (selectedChildId && selectedTermId) loadResults();
+  }, [selectedChildId, selectedTermId]);
+
+  const loadTerms = async () => {
+    try {
+      let termList: any[] = [];
+      const yearData = await apiService.getAcademicYears();
+      const years = Array.isArray(yearData) ? yearData : yearData?.data || yearData?.data?.data || [];
+      const currentYear = years.find((y: any) => y.isCurrent) || years[0];
+      if (currentYear) {
+        const termData = await apiService.getTerms(currentYear.id);
+        termList = Array.isArray(termData) ? termData : termData?.data || termData?.data?.data || [];
+      }
+      if (termList.length === 0 && dashboard?.currentTerm) {
+        termList = [dashboard.currentTerm];
+      }
+      setTerms(termList);
+      const currentTerm = termList.find((t: any) => t.isCurrent) || termList[0] || dashboard?.currentTerm;
+      if (currentTerm && !selectedTermId) {
+        setSelectedTermId(currentTerm.id);
+      }
+    } catch {
+      if (dashboard?.currentTerm) {
+        setTerms([dashboard.currentTerm]);
+        if (!selectedTermId) setSelectedTermId(dashboard.currentTerm.id);
+      }
+    }
+  };
 
   const loadResults = async () => {
     if (!selectedChildId) return;
@@ -130,12 +153,30 @@ export const ParentReportCardsScreen: React.FC = () => {
     } finally { setActionLoading(false); }
   };
 
+  const selectedTerm = terms.find((t: any) => t.id === selectedTermId);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Report Cards</Text>
-        <Text style={styles.headerSub}>{dashboard?.currentTerm?.name || 'Current Term'}</Text>
+        <Text style={styles.headerSub}>{selectedTerm?.name || dashboard?.currentTerm?.name || 'Current Term'}</Text>
       </View>
+
+      {terms.length > 1 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.termScroll} contentContainerStyle={styles.termContent}>
+          {terms.map((term: any) => (
+            <TouchableOpacity
+              key={term.id}
+              style={[styles.termChip, selectedTermId === term.id && styles.termChipActive]}
+              onPress={() => { setSelectedTermId(term.id); setResults([]); setReportData(null); setLoading(true); }}
+            >
+              <Text style={[styles.termChipText, selectedTermId === term.id && styles.termChipTextActive]}>
+                {term.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       {children.length > 1 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.childStrip}>
@@ -280,6 +321,13 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
   headerTitle: { fontSize: 22, fontWeight: '700', color: colors.text },
   headerSub: { fontSize: 14, color: colors.textLight, marginTop: 2 },
+
+  termScroll: { maxHeight: 48, marginTop: spacing.sm, marginHorizontal: spacing.md },
+  termContent: { gap: spacing.sm },
+  termChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.full, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
+  termChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  termChipText: { fontSize: 13, fontWeight: '600', color: colors.text },
+  termChipTextActive: { color: colors.white },
   childStrip: { maxHeight: 44, marginHorizontal: spacing.md, marginTop: spacing.sm },
   childChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.white, marginRight: 8, borderWidth: 1, borderColor: colors.border },
   childChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },

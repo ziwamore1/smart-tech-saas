@@ -17,21 +17,57 @@ export const StudentReportCardsScreen: React.FC = () => {
   const [downloading, setDownloading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const termId = dashboard?.currentTerm?.id;
+  const [terms, setTerms] = useState<any[]>([]);
+  const [selectedTermId, setSelectedTermId] = useState<string>('');
+
   const studentId = user?.studentId || user?.id;
 
   useEffect(() => {
-    if (studentId && termId) loadResults();
+    loadTerms();
+  }, []);
+
+  useEffect(() => {
+    if (studentId && selectedTermId) loadResults();
     else setLoading(false);
-  }, [studentId, termId]);
+  }, [studentId, selectedTermId]);
+
+  const loadTerms = async () => {
+    try {
+      let termList: any[] = [];
+      const yearData = await apiService.getAcademicYears();
+      const years = Array.isArray(yearData) ? yearData : yearData?.data || yearData?.data?.data || [];
+      const currentYear = years.find((y: any) => y.isCurrent) || years[0];
+      if (currentYear) {
+        const termData = await apiService.getTerms(currentYear.id);
+        termList = Array.isArray(termData) ? termData : termData?.data || termData?.data?.data || [];
+      }
+      if (termList.length === 0 && dashboard?.currentTerm) {
+        termList = [dashboard.currentTerm];
+      }
+      setTerms(termList);
+      const currentTerm = termList.find((t: any) => t.isCurrent) || termList[0] || dashboard?.currentTerm;
+      if (currentTerm) {
+        setSelectedTermId(currentTerm.id);
+      } else {
+        setLoading(false);
+      }
+    } catch {
+      if (dashboard?.currentTerm) {
+        setTerms([dashboard.currentTerm]);
+        setSelectedTermId(dashboard.currentTerm.id);
+      } else {
+        setLoading(false);
+      }
+    }
+  };
 
   const loadResults = async () => {
-    if (!studentId || !termId) return;
+    if (!studentId || !selectedTermId) return;
     try {
       setLoading(true);
       const [resultsRes, reportRes] = await Promise.allSettled([
-        apiService.getStudentAssessmentResults(studentId, termId),
-        apiService.getReportCardData(studentId, termId),
+        apiService.getStudentAssessmentResults(studentId, selectedTermId),
+        apiService.getReportCardData(studentId, selectedTermId),
       ]);
 
       if (resultsRes.status === 'fulfilled') {
@@ -56,13 +92,13 @@ export const StudentReportCardsScreen: React.FC = () => {
   };
 
   const handleDownloadPdf = async () => {
-    if (!studentId || !termId) {
+    if (!studentId || !selectedTermId) {
       Alert.alert('Error', 'Missing student or term information');
       return;
     }
     setDownloading(true);
     try {
-      const blob = await apiService.getReportCardPdf(studentId, termId) as Blob;
+      const blob = await apiService.getReportCardPdf(studentId, selectedTermId) as Blob;
       const reader = new FileReader();
       reader.onload = async () => {
         const base64 = reader.result as string;
@@ -107,13 +143,31 @@ export const StudentReportCardsScreen: React.FC = () => {
     return 'Needs Improvement';
   };
 
+  const selectedTerm = terms.find((t: any) => t.id === selectedTermId);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <HeaderBar
         title="Report Cards"
-        subtitle={dashboard?.currentTerm?.name || 'Current Term'}
+        subtitle={selectedTerm?.name || dashboard?.currentTerm?.name || 'Current Term'}
         rightIcon={results.length > 0 ? { name: downloading ? '⏳' : '📄', onPress: handleDownloadPdf } : undefined}
       />
+
+      {terms.length > 1 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.termScroll} contentContainerStyle={styles.termContent}>
+          {terms.map((term: any) => (
+            <TouchableOpacity
+              key={term.id}
+              style={[styles.termChip, selectedTermId === term.id && styles.termChipActive]}
+              onPress={() => { setSelectedTermId(term.id); setResults([]); setReportData(null); setLoading(true); }}
+            >
+              <Text style={[styles.termChipText, selectedTermId === term.id && styles.termChipTextActive]}>
+                {term.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       <ScrollView
         contentContainerStyle={styles.list}
@@ -251,6 +305,13 @@ export const StudentReportCardsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   list: { padding: spacing.md },
+
+  termScroll: { maxHeight: 48, marginTop: spacing.sm },
+  termContent: { paddingHorizontal: spacing.md, gap: spacing.sm },
+  termChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.full, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
+  termChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  termChipText: { fontSize: 13, fontWeight: '600', color: colors.text },
+  termChipTextActive: { color: colors.white },
 
   empty: { alignItems: 'center', marginTop: 60, paddingHorizontal: spacing.xl },
   emptyIcon: { fontSize: 56, marginBottom: spacing.md },

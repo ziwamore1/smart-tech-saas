@@ -726,7 +726,7 @@ export class ReportEngineService {
 
     const computedResults = await this.prisma.computedResult.findMany({
       where: whereCondition,
-      include: { student: { select: { id: true, classId: true } }, subject: { select: { name: true } } },
+      include: { student: { select: { id: true, firstName: true, lastName: true } }, subject: { select: { name: true } } },
     });
 
     const percentages = computedResults.map(r => r.finalPercentage ?? 0).filter(p => p > 0);
