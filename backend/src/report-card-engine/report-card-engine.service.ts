@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
+import { GradingEngineService } from '../grading-engine/grading-engine.service';
 
 @Injectable()
 export class ReportCardEngineService {
@@ -9,6 +10,7 @@ export class ReportCardEngineService {
   constructor(
     private prisma: PrismaService,
     private compositeSubjectService: CompositeSubjectService,
+    private gradingEngine: GradingEngineService,
   ) {}
 
   async generateReportCardData(
@@ -79,6 +81,20 @@ export class ReportCardEngineService {
       ],
     });
 
+    // Fallback: read from Result table for subjects where ComputedResult has NULL scores
+    const legacyResults = await this.prisma.result.findMany({
+      where: {
+        studentId,
+        termId,
+        schoolId,
+      },
+      include: { subject: true },
+    });
+    const legacyResultMap = new Map<string, typeof legacyResults[0]>();
+    for (const r of legacyResults) {
+      legacyResultMap.set(r.subjectId, r);
+    }
+
     const subjectBreakdown = computedResults.map(result => {
       const assessments = assessmentResults
         .filter(a => a.subjectId === result.subjectId)
@@ -91,17 +107,55 @@ export class ReportCardEngineService {
           grade: a.grade,
         }));
 
+      // If ComputedResult has NULL scores, fall back to Result table
+      let totalRawScore = result.totalRawScore;
+      let finalPercentage = result.finalPercentage;
+      let finalGrade = result.finalGrade;
+      let finalRemark = result.finalRemark;
+      let points = result.points;
+      let gpa = result.gpa;
+
+      if (finalPercentage == null) {
+        const legacy = legacyResultMap.get(result.subjectId);
+        if (legacy && legacy.score != null) {
+          totalRawScore = legacy.score;
+          finalPercentage = legacy.score;
+          finalGrade = legacy.grade ?? null;
+          finalRemark = legacy.remark ?? null;
+
+          // Compute points from grading engine if not available
+          if (points == null && finalPercentage != null) {
+            try {
+              const gradeResult = await this.gradingEngine.computeGradeFull(
+                finalPercentage, enrollment.classId, result.subjectId, termId, schoolId,
+              );
+              points = gradeResult.points ?? null;
+              gpa = gradeResult.gpa ?? null;
+              if (!finalGrade && gradeResult.grade) finalGrade = gradeResult.grade;
+              if (!finalRemark && gradeResult.remark) finalRemark = gradeResult.remark;
+            } catch {
+              // Grading engine failed, use inline fallback
+              if (finalPercentage >= 75) { points = 1; finalGrade = finalGrade ?? 'A'; }
+              else if (finalPercentage >= 65) { points = 2; finalGrade = finalGrade ?? 'B'; }
+              else if (finalPercentage >= 50) { points = 3; finalGrade = finalGrade ?? 'C'; }
+              else if (finalPercentage >= 40) { points = 4; finalGrade = finalGrade ?? 'D'; }
+              else { points = 5; finalGrade = finalGrade ?? 'E'; }
+            }
+          }
+        }
+      }
+
       return {
         subjectId: result.subjectId,
         subjectName: result.subject.name,
         subjectCode: result.subject.code,
-        totalRawScore: result.totalRawScore,
+        totalRawScore,
         totalWeightedScore: result.totalWeightedScore,
-        finalPercentage: result.finalPercentage,
-        finalGrade: result.finalGrade,
-        finalRemark: result.finalRemark,
-        points: result.points,
-        gpa: result.gpa,
+        finalPercentage,
+        finalGrade,
+        finalRemark,
+        points,
+        gpa,
         classRank: result.classRank,
         subjectRank: result.subjectRank,
         assessments,
