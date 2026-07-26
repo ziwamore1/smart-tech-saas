@@ -52,7 +52,7 @@ export class ReportCardEngineService {
         studentId,
         termId,
         classId: enrollment.classId,
-        status: { in: ['COMPUTED', 'VERIFIED', 'LOCKED'] },
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
       },
       include: {
         subject: true,
@@ -475,12 +475,12 @@ export class ReportCardEngineService {
 
     // Get subject-level comparison
     const prevResults = await this.prisma.computedResult.findMany({
-      where: { studentId, termId: previousTerm.id, classId: enrollment.classId, status: { in: ['COMPUTED', 'VERIFIED', 'LOCKED'] } },
+      where: { studentId, termId: previousTerm.id, classId: enrollment.classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
       include: { subject: true },
     });
 
     const currResults = await this.prisma.computedResult.findMany({
-      where: { studentId, termId: currentTermId, classId: enrollment.classId, status: { in: ['COMPUTED', 'VERIFIED', 'LOCKED'] } },
+      where: { studentId, termId: currentTermId, classId: enrollment.classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
       include: { subject: true },
     });
 
@@ -520,12 +520,12 @@ export class ReportCardEngineService {
    */
   async getClassComparison(studentId: string, termId: string, classId: string) {
     const studentResults = await this.prisma.computedResult.findMany({
-      where: { studentId, termId, classId, status: { in: ['COMPUTED', 'VERIFIED', 'LOCKED'] } },
+      where: { studentId, termId, classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
       include: { subject: true },
     });
 
     const classResults = await this.prisma.computedResult.findMany({
-      where: { termId, classId, status: { in: ['COMPUTED', 'VERIFIED', 'LOCKED'] } },
+      where: { termId, classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
       include: { subject: true },
     });
 
@@ -550,7 +550,7 @@ export class ReportCardEngineService {
    */
   async getClassStatistics(termId: string, classId: string, schoolId?: string) {
     const results = await this.prisma.computedResult.findMany({
-      where: { termId, classId, status: { in: ['COMPUTED', 'VERIFIED', 'LOCKED'] } },
+      where: { termId, classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
     });
 
     if (results.length === 0) return null;
