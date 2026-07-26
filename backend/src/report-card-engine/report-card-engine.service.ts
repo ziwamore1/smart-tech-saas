@@ -273,7 +273,7 @@ export class ReportCardEngineService {
     const priorityGroupIds = (bestSubjectRule?.priorityGroupIds as string[]) ?? [];
     const bestCount = bestSubjectRule?.count ?? 6;
 
-    // Load performance categories for this curriculum (fallback: all categories for school)
+    // Load performance categories for this curriculum (fallback: all categories for school, then built-in defaults)
     let performanceCategories = await this.prisma.performanceCategory.findMany({
       where: {
         curriculumVersionId: schoolCurriculum?.curriculumVersionId ?? undefined,
@@ -286,13 +286,25 @@ export class ReportCardEngineService {
         orderBy: { minScore: 'desc' },
       });
     }
+    // Built-in default categories when DB has none
+    const defaultCategories = [
+      { minScore: 80, maxScore: 100, label: 'Excellent', color: '#10b981' },
+      { minScore: 70, maxScore: 79.99, label: 'Very Good', color: '#22c55e' },
+      { minScore: 60, maxScore: 69.99, label: 'Good', color: '#3b82f6' },
+      { minScore: 50, maxScore: 59.99, label: 'Average', color: '#f59e0b' },
+      { minScore: 40, maxScore: 49.99, label: 'Below Average', color: '#f97316' },
+      { minScore: 0, maxScore: 39.99, label: 'Poor', color: '#ef4444' },
+    ];
+    const effectiveCategories = performanceCategories.length > 0
+      ? performanceCategories
+      : defaultCategories;
 
     // Enrich subject breakdown with performance category
     const enrichedBreakdown = processedBreakdown.map(s => {
       const pct = s.finalPercentage ?? 0;
-      const cat = performanceCategories.find(
+      const cat = effectiveCategories.find(
         c => pct >= (c.minScore ?? 0) && (c.maxScore == null || pct <= c.maxScore),
-      ) ?? performanceCategories.find(c => c.minScore == null && c.maxScore == null);
+      ) ?? effectiveCategories.find(c => c.minScore == null && c.maxScore == null);
       return { ...s, performanceCategory: cat ? { label: cat.label, color: cat.color } : null };
     });
 
@@ -348,8 +360,8 @@ export class ReportCardEngineService {
 
     const getPerformanceCategory = (percentage: number | null) => {
       if (percentage == null) return null;
-      const cat = performanceCategories.find(
-        c => (c.minScore ?? 0) <= percentage && (!c.maxScore || c.maxScore >= percentage),
+      const cat = effectiveCategories.find(
+        c => percentage >= (c.minScore ?? 0) && (c.maxScore == null || percentage <= c.maxScore),
       );
       return cat ? { label: cat.label, color: cat.color } : null;
     };
