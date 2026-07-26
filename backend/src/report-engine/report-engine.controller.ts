@@ -142,15 +142,16 @@ export class ReportEngineController {
           res.send(pdfBuffer);
           return;
         } catch {
-          // Fall through to return the URL
+          // Cloudinary download failed
         }
       }
 
-      res.json({
-        statusCode: 200,
+      // Both cache and Cloudinary failed — return error, not JSON
+      res.status(404).json({
+        statusCode: 404,
         timestamp: new Date().toISOString(),
-        data: report,
-        message: 'Report generated successfully',
+        message: 'PDF not available. Please regenerate the report.',
+        data: { reportId: report.id, pdfUrl: report.pdfUrl },
       });
     } catch (error) {
       this.logger.error(`generate-pdf failed: ${error.message}`, error.stack);

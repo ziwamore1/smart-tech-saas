@@ -397,6 +397,18 @@ export class ReportEngineService {
           );
         }
       }
+    } else if (
+      request.type === ReportType.ATTENDANCE_REPORT ||
+      request.type === ReportType.ANALYTICS_SUMMARY ||
+      request.type === ReportType.MARK_SCHEDULE
+    ) {
+      // These types generate a single report per class/school
+      try {
+        const report = await this.generateReport(request);
+        reports.push(report);
+      } catch (error) {
+        this.logger.error(`Failed to generate bulk ${request.type}: ${error.message}`);
+      }
     }
 
     return reports;
@@ -701,14 +713,19 @@ export class ReportEngineService {
       include: { academicYear: true },
     });
 
-    // Get school-wide stats
+    // Get stats — filter by classId if provided
+    const whereCondition: any = {
+      termId: request.termId,
+      schoolId: request.schoolId,
+      status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+      finalPercentage: { not: null },
+    };
+    if (request.classId) {
+      whereCondition.classId = request.classId;
+    }
+
     const computedResults = await this.prisma.computedResult.findMany({
-      where: {
-        termId: request.termId,
-        schoolId: request.schoolId,
-        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-        finalPercentage: { not: null },
-      },
+      where: whereCondition,
       include: { student: { select: { id: true, classId: true } }, subject: { select: { name: true } } },
     });
 
