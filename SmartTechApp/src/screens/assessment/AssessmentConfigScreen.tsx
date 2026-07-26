@@ -49,7 +49,7 @@ export const AssessmentConfigScreen: React.FC = () => {
       const newWeightings = configurations.map(c => ({
         assessmentDefId: c.assessmentDefId,
         name: c.assessmentDef?.name || 'Unknown',
-        weight: c.weight.toString(),
+        weight: (c.weightPercentage ?? 0).toString(),
       }));
       setWeightings(newWeightings);
     }

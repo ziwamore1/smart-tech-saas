@@ -2732,17 +2732,6 @@ class ApiService {
     return response.data;
   }
 
-  // ===== Assessment Engine (synced with web) =====
-  async getAssessmentDefinitions() {
-    const response = await this.client.get('/assessment-engine/definitions');
-    return response.data;
-  }
-
-  async getAssessmentConfigurations() {
-    const response = await this.client.get('/assessment-engine/configurations');
-    return response.data;
-  }
-
   async enterAssessmentScore(data: { studentId: string; subjectId: string; assessmentDefinitionId: string; score: number; termId: string; classId: string }) {
     const response = await this.client.post('/assessment-engine/scores', data);
     return response.data;
