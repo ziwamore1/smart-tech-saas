@@ -165,7 +165,7 @@ tr:hover { background: {{primaryColor}}08; }
 <div class="badge category-badge">Performance: {{performanceCategory.label}}</div>
 {{/if}}
 {{#if termSummary.classRank}}
-<div class="badge" style="background:#f0f9ff; color:#0369a1; border:2px solid #0ea5e9;">Class Rank: {{termSummary.classRank}} / {{termSummary.classSize}}</div>
+<div class="badge" style="background:#f0f9ff; color:#0369a1; border:2px solid #0ea5e9;">Class Position: {{termSummary.classRank}} / {{termSummary.classSize}}</div>
 {{/if}}
 {{#if termSummary.percentile}}
 <div class="badge" style="background:#f0fdf4; color:#166534; border:2px solid #22c55e;">Top {{termSummary.percentile}}%</div>
@@ -178,11 +178,33 @@ tr:hover { background: {{primaryColor}}08; }
 <div class="stats-grid">
 {{#if termSummary.overallPercentage}}<div class="stat-item"><div class="stat-value">{{termSummary.overallPercentage}}%</div><div class="stat-label">Overall Score</div></div>{{/if}}
 {{#if termSummary.overallGrade}}<div class="stat-item"><div class="stat-value">{{termSummary.overallGrade}}</div><div class="stat-label">Overall Grade</div></div>{{/if}}
-{{#if totalPoints}}<div class="stat-item"><div class="stat-value">{{totalPoints}}</div><div class="stat-label">Total Points</div></div>{{/if}}
+{{#if termSummary.classRank}}<div class="stat-item" style="background:#eff6ff; border-color:#3b82f6"><div class="stat-value" style="color:#1d4ed8">{{termSummary.classRank}} / {{termSummary.classSize}}</div><div class="stat-label">Class Position</div></div>{{/if}}
+{{#if totalPoints}}<div class="stat-item" style="background:#fefce8; border-color:#eab308"><div class="stat-value" style="color:#a16207">{{totalPoints}}</div><div class="stat-label">Best 6 Points</div></div>{{/if}}
 {{#if bestSubjectsAverage}}<div class="stat-item"><div class="stat-value">{{bestSubjectsAverage}}%</div><div class="stat-label">Best Avg</div></div>{{/if}}
 {{#if attendance.attendanceRate}}<div class="stat-item"><div class="stat-value">{{attendance.attendanceRate}}%</div><div class="stat-label">Attendance</div></div>{{/if}}
 </div>
 </div>
+
+<!-- University Benchmark Section -->
+{{#if totalPoints}}
+<div class="section">
+<div class="section-title">University Benchmark — Best 6 Aggregate Points</div>
+<div style="background: linear-gradient(135deg, #fefce8, #fef9c3); border: 2px solid #eab308; border-radius: 8px; padding: 15px; text-align: center;">
+<div style="font-size: 11px; color: #713f12; margin-bottom: 8px; font-weight: 600;">Your Best 6 Subjects Combined Points</div>
+<div style="font-size: 36px; font-weight: 900; color: #a16207; line-height: 1;">{{totalPoints}}</div>
+<div style="font-size: 10px; color: #854d0e; margin-top: 4px;">out of 6 points (best possible) to 54 points (worst possible)</div>
+{{#if bestSubjects}}
+<div style="margin-top: 10px; font-size: 9px; color: #713f12;">
+<strong>Best {{bestSubjects.length}} Subjects:</strong> 
+{{#each bestSubjects}}{{subjectName}} ({{points}} pts){{#unless @last}}, {{/unless}}{{/each}}
+</div>
+{{/if}}
+<div style="margin-top: 8px; font-size: 9px; color: #92400e; font-style: italic;">
+Lower aggregate points indicate stronger performance for university admission
+</div>
+</div>
+</div>
+{{/if}}
 
 <!-- Subject Results Table -->
 <div class="section">
