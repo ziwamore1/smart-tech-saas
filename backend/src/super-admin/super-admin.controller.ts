@@ -211,6 +211,16 @@ export class SuperAdminController {
   }
 }
 
+@Controller('super-admin/public')
+export class SuperAdminPublicController {
+  constructor(private readonly superAdminService: SuperAdminService) {}
+
+  @Post('seed-performance-categories')
+  async seedPerformanceCategories() {
+    return this.superAdminService.seedPerformanceCategories();
+  }
+}
+
 @Controller('super-admin/setup')
 export class SuperAdminSetupController {
   constructor(private readonly superAdminService: SuperAdminService) {}

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { SuperAdminService } from './super-admin.service';
-import { SuperAdminController } from './super-admin.controller';
+import { SuperAdminController, SuperAdminPublicController } from './super-admin.controller';
 import { SuperAdminSetupController } from './super-admin.controller';
 import { AcademicTemplatesController } from './academic-templates.controller';
 import { AcademicTemplatesService } from './academic-templates.service';
@@ -12,7 +12,7 @@ import { ReportTemplateBuilderModule } from '../report-template-builder/report-t
 
 @Module({
   imports: [PrismaModule, MessagingModule, CommunicationModule, InstitutionModule, ReportTemplateBuilderModule],
-  controllers: [SuperAdminController, SuperAdminSetupController, AcademicTemplatesController],
+  controllers: [SuperAdminController, SuperAdminPublicController, SuperAdminSetupController, AcademicTemplatesController],
   providers: [SuperAdminService, AcademicTemplatesService],
   exports: [SuperAdminService, AcademicTemplatesService],
 })
