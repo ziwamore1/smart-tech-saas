@@ -806,7 +806,7 @@ export class ReportEngineService {
 
       const gradingCategories = await this.prisma.performanceCategory.findMany({
         where: { schoolId: request.schoolId },
-        orderBy: { minPercentage: 'desc' },
+        orderBy: { minScore: 'desc' },
       });
 
       for (const result of fallbackResults) {
@@ -1092,7 +1092,7 @@ export class ReportEngineService {
   private computeGrade(score: number, categories: any[]): string {
     if (categories.length > 0) {
       for (const cat of categories) {
-        if (score >= cat.minPercentage) return cat.name;
+        if (score >= cat.minScore) return cat.name;
       }
       return categories[categories.length - 1].name;
     }
