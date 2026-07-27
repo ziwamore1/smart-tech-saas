@@ -26,6 +26,7 @@ export class AnalyticsService {
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
+        isAbsent: false,
       },
       include: {
         student: { select: { id: true } },
@@ -79,6 +80,7 @@ export class AnalyticsService {
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
+        isAbsent: false,
       },
       include: {
         student: { select: { id: true, firstName: true, lastName: true, admissionNumber: true } },
@@ -298,6 +300,7 @@ export class AnalyticsService {
         termId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
+        isAbsent: false,
       },
       include: {
         subject: true,
@@ -332,6 +335,7 @@ export class AnalyticsService {
         classId,
         termId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        isAbsent: false,
       },
     });
 
@@ -356,6 +360,7 @@ export class AnalyticsService {
         termId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
+        isAbsent: false,
       },
       include: {
         student: { select: { id: true, gender: true } },
@@ -743,7 +748,7 @@ export class AnalyticsService {
     }
 
     const results = await this.prisma.computedResult.findMany({
-      where: { schoolId, termId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null } },
+      where: { schoolId, termId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null }, isAbsent: false },
       include: { student: { select: { id: true, firstName: true, lastName: true } }, subject: { select: { id: true, name: true } } },
     });
 
@@ -785,7 +790,7 @@ export class AnalyticsService {
 
   private async getTopPerformers(schoolId: string, termId: string) {
     const results = await this.prisma.computedResult.findMany({
-      where: { schoolId, termId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null } },
+      where: { schoolId, termId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null }, isAbsent: false },
       include: { student: { select: { id: true, firstName: true, lastName: true, admissionNumber: true } } },
     });
 
@@ -820,7 +825,7 @@ export class AnalyticsService {
 
   private async getImprovementAreas(schoolId: string, termId: string) {
     const results = await this.prisma.computedResult.findMany({
-      where: { schoolId, termId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null } },
+      where: { schoolId, termId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null }, isAbsent: false },
       include: { subject: { select: { id: true, name: true } } },
     });
 

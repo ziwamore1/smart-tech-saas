@@ -24,6 +24,7 @@ interface StudentRow {
   percentage: number | null;
   grade: string | null;
   remarks: string | null;
+  isAbsent: boolean;
   existing: boolean;
 }
 
@@ -107,6 +108,7 @@ export default function AssessmentEntryPage() {
             percentage: existing?.percentage ?? null,
             grade: existing?.grade ?? null,
             remarks: existing?.remarks ?? null,
+            isAbsent: existing?.isAbsent ?? false,
             existing: !!existing,
           };
         });
@@ -134,10 +136,12 @@ export default function AssessmentEntryPage() {
     }
 
     const scores = rows
-      .filter(r => r.rawScore !== null)
+      .filter(r => r.rawScore !== null || r.isAbsent)
       .map(r => ({
         studentId: r.studentId,
         rawScore: r.rawScore,
+        isAbsent: r.isAbsent,
+        absentCode: r.isAbsent ? ('X' as const) : undefined,
         remarks: r.remarks || undefined,
       }));
 
@@ -170,14 +174,24 @@ export default function AssessmentEntryPage() {
         if (row.id !== id) return row;
 
         if (field === 'rawScore') {
-          const numValue = value === '' || value === null ? null : parseFloat(value);
-          if (numValue !== null && (isNaN(numValue) || numValue < 0 || numValue > maxScore)) {
-            toast.error(`Score must be between 0 and ${maxScore}`);
+          const strValue = String(value).trim().toUpperCase();
+
+          if (strValue === 'X' || strValue === 'A') {
+            return { ...row, rawScore: null, isAbsent: true, percentage: null, grade: null, remarks: `[Absent-${strValue}]` };
+          }
+
+          if (strValue === '' || strValue === 'null') {
+            return { ...row, rawScore: null, isAbsent: false, percentage: null, grade: null };
+          }
+
+          const numValue = parseFloat(value);
+          if (isNaN(numValue) || numValue < 0 || numValue > maxScore) {
+            toast.error(`Score must be between 0 and ${maxScore}, or X/A for absent`);
             return row;
           }
-          const percentage = numValue !== null ? (numValue / maxScore) * 100 : null;
-          const grade = percentage !== null ? computeGrade(percentage) : null;
-          return { ...row, rawScore: numValue, percentage, grade };
+          const percentage = (numValue / maxScore) * 100;
+          const grade = computeGrade(percentage);
+          return { ...row, rawScore: numValue, isAbsent: false, percentage, grade };
         }
 
         return { ...row, [field]: value };
@@ -229,12 +243,16 @@ export default function AssessmentEntryPage() {
     },
     {
       field: 'rawScore',
-      headerName: 'Score',
-      width: 100,
+      headerName: 'Score (X=Absent)',
+      width: 130,
       editable: true,
-      type: 'number',
       sortable: false,
-      cellClassName: (params) => {
+      valueGetter: (value: any, row: any) => {
+        if (row.isAbsent) return 'X';
+        return value;
+      },
+      cellClassName: (params: any) => {
+        if (params.row?.isAbsent) return 'score-absent';
         if (params.value === null || params.value === undefined) return '';
         if (params.value >= 75) return 'score-distinction';
         if (params.value >= 60) return 'score-credit';
@@ -277,7 +295,8 @@ export default function AssessmentEntryPage() {
   ], []);
 
   const rowCount = rows.length;
-  const enteredCount = rows.filter(r => r.rawScore !== null).length;
+  const enteredCount = rows.filter(r => r.rawScore !== null || r.isAbsent).length;
+  const absentCount = rows.filter(r => r.isAbsent).length;
   const missingCount = rowCount - enteredCount;
 
   return (
@@ -372,6 +391,10 @@ export default function AssessmentEntryPage() {
                 <i className="fa fa-check-circle mr-1"></i>
                 {enteredCount} entered
               </span>
+              <span className="text-sm text-orange-600">
+                <i className="fa fa-user-slash mr-1"></i>
+                {absentCount} absent
+              </span>
               <span className="text-sm text-red-600">
                 <i className="fa fa-exclamation-circle mr-1"></i>
                 {missingCount} missing
@@ -457,6 +480,11 @@ export default function AssessmentEntryPage() {
           text-align: center;
           font-weight: 600;
           font-size: 14px;
+        }
+        .assessment-data-grid .score-absent {
+          color: #f59e0b !important;
+          font-weight: 700;
+          font-style: italic;
         }
       `}</style>
     </div>

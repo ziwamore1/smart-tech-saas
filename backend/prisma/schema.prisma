@@ -574,7 +574,7 @@ model Subject {
   CurriculumCoverage         CurriculumCoverage[]
   compositeSubjectComponents CompositeSubjectComponent[]
 
-  @@unique([name, schoolId])
+  @@unique([name, code, schoolId])
 }
 
 model ClassSubject {
@@ -3916,6 +3916,7 @@ model StudentAssessmentResult {
   verifiedBy      String?
   verifiedAt      DateTime?
   status          AssessmentResultStatus @default(DRAFT)
+  isAbsent        Boolean                @default(false)
   syncStatus      SyncStatus             @default(SYNCED)
   metadata        Json?                  @default("{}")
   createdAt       DateTime               @default(now())
@@ -4049,6 +4050,7 @@ model ComputedResult {
   gpa                Float?
   points             Float?
   status             ComputedResultStatus @default(PENDING)
+  isAbsent           Boolean              @default(false)
   computedAt         DateTime?
   verifiedBy         String?
   verifiedAt         DateTime?

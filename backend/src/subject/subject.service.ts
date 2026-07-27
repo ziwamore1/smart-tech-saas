@@ -7,6 +7,15 @@ export class SubjectService {
   constructor(private prisma: PrismaService) {}
 
   async create(data: { name: string; code?: string; category?: string; description?: string; credits?: string }, schoolId: string) {
+    if (data.code) {
+      const existing = await this.prisma.subject.findFirst({
+        where: { schoolId, name: data.name, code: data.code },
+      });
+      if (existing) {
+        throw new ConflictException(`A subject with name "${data.name}" and code "${data.code}" already exists`);
+      }
+    }
+
     try {
       return await this.prisma.subject.create({
         data: {
@@ -20,7 +29,7 @@ export class SubjectService {
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('A subject with this name already exists');
+        throw new ConflictException(`A subject with this name and code combination already exists in this school`);
       }
       throw error;
     }

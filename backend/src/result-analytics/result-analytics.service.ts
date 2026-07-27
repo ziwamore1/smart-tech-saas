@@ -19,11 +19,25 @@ export class ResultAnalyticsService {
         studentId: true,
         finalPercentage: true,
         finalGrade: true,
+        isAbsent: true,
         subject: { select: { id: true, name: true } },
       },
     });
 
-    if (computedResults.length === 0) {
+    const totalEnrolled = await this.prisma.enrollment.count({
+      where: { classId, status: 'ACTIVE' },
+    });
+
+    const participatedStudentIds = new Set(
+      computedResults.filter(r => !r.isAbsent).map(r => r.studentId),
+    );
+    const absentStudentIds = new Set(
+      computedResults.filter(r => r.isAbsent).map(r => r.studentId),
+    );
+
+    const nonAbsentResults = computedResults.filter(r => !r.isAbsent);
+
+    if (nonAbsentResults.length === 0) {
       return {
         classId,
         termId,
@@ -31,15 +45,22 @@ export class ResultAnalyticsService {
         subjectStats: [],
         gradeDistribution: {},
         totalStudents: 0,
+        participation: {
+          totalEnrolled,
+          participated: 0,
+          absent: absentStudentIds.size,
+          participationRate: totalEnrolled > 0 ? 0 : 0,
+        },
       };
     }
 
-    const subjectAnalytics = computedResults.reduce((acc, result) => {
+    const subjectAnalytics = nonAbsentResults.reduce((acc, result) => {
       if (!acc[result.subjectId]) {
         acc[result.subjectId] = {
           subjectId: result.subjectId,
           subjectName: result.subject.name,
           scores: [],
+          absentCount: 0,
         };
       }
       acc[result.subjectId].scores.push(result.finalPercentage ?? 0);
@@ -75,10 +96,10 @@ export class ResultAnalyticsService {
       };
     });
 
-    const overallScores = computedResults.map(r => r.finalPercentage ?? 0);
+    const overallScores = nonAbsentResults.map(r => r.finalPercentage ?? 0);
     const overallAvg = overallScores.reduce((a, b) => a + b, 0) / overallScores.length;
 
-    const gradeDistribution = computedResults.reduce((acc, result) => {
+    const gradeDistribution = nonAbsentResults.reduce((acc, result) => {
       const grade = result.finalGrade || 'Unknown';
       acc[grade] = (acc[grade] || 0) + 1;
       return acc;
@@ -88,7 +109,7 @@ export class ResultAnalyticsService {
       classAverage: parseFloat(overallAvg.toFixed(2)),
       subjectStats,
       gradeDistribution,
-      totalStudents: new Set(computedResults.map(r => r.studentId)).size,
+      totalStudents: participatedStudentIds.size,
     }).catch(err => this.logger.warn(`saveAnalytics failed: ${err.message}`));
 
     return {
@@ -97,7 +118,15 @@ export class ResultAnalyticsService {
       classAverage: parseFloat(overallAvg.toFixed(2)),
       subjectStats,
       gradeDistribution,
-      totalStudents: new Set(computedResults.map(r => r.studentId)).size,
+      totalStudents: participatedStudentIds.size,
+      participation: {
+        totalEnrolled,
+        participated: participatedStudentIds.size,
+        absent: absentStudentIds.size,
+        participationRate: totalEnrolled > 0
+          ? parseFloat(((participatedStudentIds.size / totalEnrolled) * 100).toFixed(2))
+          : 0,
+      },
     };
   }
 
@@ -121,7 +150,7 @@ export class ResultAnalyticsService {
       }
 
       const results = await this.prisma.computedResult.findMany({
-        where: whereClause,
+        where: { ...whereClause, isAbsent: false },
       });
 
       if (results.length === 0) continue;
@@ -204,6 +233,7 @@ export class ResultAnalyticsService {
         termId,
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        isAbsent: false,
       },
       select: {
         studentId: true,
@@ -269,7 +299,7 @@ export class ResultAnalyticsService {
   }
 
   async getSchoolPerformanceOverview(schoolId: string, termId?: string) {
-    const whereClause: any = { schoolId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } };
+    const whereClause: any = { schoolId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, isAbsent: false };
     if (termId) {
       whereClause.termId = termId;
     }

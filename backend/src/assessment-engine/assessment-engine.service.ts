@@ -45,6 +45,8 @@ export interface BulkScoreEntryDto {
   scores: {
     studentId: string;
     rawScore: number | null;
+    isAbsent?: boolean;
+    absentCode?: 'X' | 'A';
     remarks?: string;
   }[];
   enteredBy: string;
@@ -57,6 +59,8 @@ export interface ScoreEntryDto {
   classId: string;
   assessmentDefId: string;
   rawScore: number | null;
+  isAbsent?: boolean;
+  absentCode?: 'X' | 'A';
   maxScore?: number;
   remarks?: string;
   enteredBy: string;
@@ -352,7 +356,10 @@ export class AssessmentEngineService {
         ? await this.gradingEngine.computeGrade(finalPct, classId, subjectId, termId, schoolId)
         : null;
 
-      const allFilled = configs.every(c => results.some(r => r.assessmentDefId === c.assessmentDefId && r.rawScore != null));
+      const allFilled = configs.every(c => {
+        const result = results.find(r => r.assessmentDefId === c.assessmentDefId);
+        return result && (result.rawScore != null || result.isAbsent);
+      });
 
       await this.prisma.computedResult.upsert({
         where: {
@@ -429,7 +436,15 @@ export class AssessmentEngineService {
     const scoredStudents = new Set<string>();
     for (const cs of classSubjects) {
       const results = await this.prisma.studentAssessmentResult.findMany({
-        where: { classId, subjectId: cs.subjectId, termId, rawScore: { not: null } },
+        where: {
+          classId,
+          subjectId: cs.subjectId,
+          termId,
+          OR: [
+            { rawScore: { not: null } },
+            { isAbsent: true },
+          ],
+        },
         select: { studentId: true },
       });
       results.forEach(r => scoredStudents.add(r.studentId));
@@ -500,6 +515,57 @@ export class AssessmentEngineService {
     for (const scoreEntry of scores) {
       const { rawScore, remarks } = scoreEntry;
 
+      const isAbsent = scoreEntry.isAbsent || scoreEntry.absentCode === 'X' || scoreEntry.absentCode === 'A';
+
+      if (isAbsent) {
+        const absentRemarks = scoreEntry.absentCode
+          ? `[Absent-${scoreEntry.absentCode}] ${remarks || ''}`.trim()
+          : `[Absent] ${remarks || ''}`.trim();
+
+        const result = await this.prisma.studentAssessmentResult.upsert({
+          where: {
+            studentId_subjectId_termId_assessmentDefId: {
+              studentId: scoreEntry.studentId,
+              subjectId,
+              termId,
+              assessmentDefId,
+            },
+          },
+          update: {
+            rawScore: null,
+            maxScore: effectiveMaxScore,
+            weightedScore: null,
+            percentage: null,
+            grade: null,
+            isAbsent: true,
+            remarks: absentRemarks || null,
+            enteredBy,
+            status: 'SUBMITTED',
+            batchId: batch.id,
+          },
+          create: {
+            studentId: scoreEntry.studentId,
+            subjectId,
+            termId,
+            classId,
+            assessmentDefId,
+            rawScore: null,
+            maxScore: effectiveMaxScore,
+            weightedScore: null,
+            percentage: null,
+            grade: null,
+            isAbsent: true,
+            remarks: absentRemarks || null,
+            enteredBy,
+            status: 'SUBMITTED',
+            batchId: batch.id,
+          },
+        });
+
+        results.push(result);
+        continue;
+      }
+
       if (rawScore !== null) {
         if (!allowNegative && rawScore < 0) {
           throw new BadRequestException(`Negative scores not allowed. Student: ${scoreEntry.studentId}`);
@@ -541,6 +607,7 @@ export class AssessmentEngineService {
           weightedScore,
           percentage: weightedScore,
           grade,
+          isAbsent: false,
           remarks: remarks || null,
           enteredBy,
           status: 'SUBMITTED',
@@ -557,6 +624,7 @@ export class AssessmentEngineService {
           weightedScore,
           percentage: weightedScore,
           grade,
+          isAbsent: false,
           remarks: remarks || null,
           enteredBy,
           status: 'SUBMITTED',
@@ -607,7 +675,8 @@ export class AssessmentEngineService {
       summary: {
         total: results.length,
         entered: results.filter(r => r.rawScore !== null).length,
-        missing: results.filter(r => r.rawScore === null).length,
+        absent: results.filter(r => r.isAbsent).length,
+        missing: results.filter(r => r.rawScore === null && !r.isAbsent).length,
       },
     };
   }
@@ -626,6 +695,73 @@ export class AssessmentEngineService {
 
     const effectiveMaxScore = config?.maxScore || data.maxScore || 100;
     const decimalPlaces = config?.decimalPlaces ?? 0;
+
+    const isAbsent = data.isAbsent || data.absentCode === 'X' || data.absentCode === 'A';
+
+    if (isAbsent) {
+      const absentRemarks = data.absentCode
+        ? `[Absent-${data.absentCode}] ${data.remarks || ''}`.trim()
+        : `[Absent] ${data.remarks || ''}`.trim();
+
+      const result = await this.prisma.studentAssessmentResult.upsert({
+        where: {
+          studentId_subjectId_termId_assessmentDefId: {
+            studentId: data.studentId,
+            subjectId: data.subjectId,
+            termId: data.termId,
+            assessmentDefId: data.assessmentDefId,
+          },
+        },
+        update: {
+          rawScore: null,
+          maxScore: effectiveMaxScore,
+          weightedScore: null,
+          percentage: null,
+          grade: null,
+          isAbsent: true,
+          remarks: absentRemarks || null,
+          enteredBy: data.enteredBy,
+          status: 'SUBMITTED',
+        },
+        create: {
+          studentId: data.studentId,
+          subjectId: data.subjectId,
+          termId: data.termId,
+          classId: data.classId,
+          assessmentDefId: data.assessmentDefId,
+          rawScore: null,
+          maxScore: effectiveMaxScore,
+          weightedScore: null,
+          percentage: null,
+          grade: null,
+          isAbsent: true,
+          remarks: absentRemarks || null,
+          enteredBy: data.enteredBy,
+          status: 'SUBMITTED',
+        },
+      });
+
+      // Sync computed results and result sheet for real-time web analytics
+      await this.syncComputedResult(data.classId, data.subjectId, data.termId, schoolId).catch(e =>
+        this.logger.error(`syncComputedResult failed: ${e.message}`),
+      );
+      await this.compositeSubjectService.recomputeAllComposites(data.subjectId, data.classId, data.termId, schoolId).catch(e =>
+        this.logger.error(`composite recompute failed: ${e.message}`),
+      );
+      await this.syncResultSheet(schoolId, data.classId, data.termId, data.enteredBy).catch(e => {
+        this.logger.error(`syncResultSheet failed: ${e.message}`);
+      });
+
+      this.socketGateway.server?.emit(`result:updated:${schoolId}`, {
+        classId: data.classId,
+        subjectId: data.subjectId,
+        termId: data.termId,
+        studentId: data.studentId,
+        timestamp: new Date(),
+      });
+
+      return result;
+    }
 
     if (data.rawScore !== null) {
       if (data.rawScore < 0 && !(config?.allowNegative)) {
@@ -664,6 +800,7 @@ export class AssessmentEngineService {
         weightedScore,
         percentage: weightedScore,
         grade,
+        isAbsent: false,
         remarks: data.remarks || null,
         enteredBy: data.enteredBy,
         status: 'SUBMITTED',
@@ -679,6 +816,7 @@ export class AssessmentEngineService {
         weightedScore,
         percentage: weightedScore,
         grade,
+        isAbsent: false,
         remarks: data.remarks || null,
         enteredBy: data.enteredBy,
         status: 'SUBMITTED',
@@ -796,7 +934,7 @@ export class AssessmentEngineService {
       throw new NotFoundException('Batch not found');
     }
 
-    const missingScores = batch.results.filter(r => r.rawScore === null);
+    const missingScores = batch.results.filter(r => r.rawScore === null && !r.isAbsent);
 
     if (missingScores.length > 0) {
       throw new BadRequestException(`${missingScores.length} scores are missing. Cannot verify batch.`);
@@ -889,7 +1027,10 @@ export class AssessmentEngineService {
             subjectId: assignment.subjectId,
             termId: currentTerm.id,
             assessmentDefId: config.assessmentDefId,
-            rawScore: { not: null },
+            OR: [
+              { rawScore: { not: null } },
+              { isAbsent: true },
+            ],
             enteredBy: teacherId,
           },
         });
@@ -933,14 +1074,17 @@ export class AssessmentEngineService {
 
     for (const config of configs) {
       const enteredCount = await this.prisma.studentAssessmentResult.count({
-        where: {
-          classId,
-          subjectId,
-          termId,
-          assessmentDefId: config.assessmentDefId,
-          rawScore: { not: null },
-        },
-      });
+          where: {
+            classId,
+            subjectId,
+            termId,
+            assessmentDefId: config.assessmentDefId,
+            OR: [
+              { rawScore: { not: null } },
+              { isAbsent: true },
+            ],
+          },
+        });
 
       stats.push({
         assessmentDefId: config.assessmentDefId,
