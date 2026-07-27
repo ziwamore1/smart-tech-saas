@@ -3,6 +3,7 @@ import * as nodemailer from 'nodemailer';
 
 const SENDGRID_API = 'https://api.sendgrid.com/v3/mail/send';
 const MAILJET_API = 'https://api.mailjet.com/v3.1/send';
+const BREVO_API = 'https://api.brevo.com/v3/smtp/email';
 
 @Injectable()
 export class EmailService {
@@ -13,18 +14,27 @@ export class EmailService {
   private fromName: string;
   private mailjetApiKey = '';
   private mailjetSecretKey = '';
+  private brevoApiKey = '';
+  private brevoFromEmail = '';
 
   constructor() {
     this.sgApiKey = process.env.SENDGRID_API_KEY || '';
-    this.fromEmail = process.env.SENDGRID_FROM_EMAIL || 'support@smarttechsaas.com';
+    this.fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@smarttechsaas.com';
     this.fromName = process.env.SENDGRID_FROM_NAME || 'Smart Tech';
     const smtpPass = process.env.EMAIL_PASSWORD || process.env.ZOHO_SMTP_PASSWORD || '';
 
     this.mailjetApiKey = process.env.MAILJET_API_KEY || '';
     this.mailjetSecretKey = process.env.MAILJET_SECRET_KEY || '';
 
+    this.brevoApiKey = process.env.BREVO_API_KEY || process.env.BREVO_SMTP_KEY || '';
+    this.brevoFromEmail = process.env.BREVO_FROM_EMAIL || this.fromEmail;
+
+    if (this.brevoApiKey) {
+      console.log(`[EmailService] Brevo configured as primary provider (from: ${this.brevoFromEmail})`);
+    }
+
     if (this.mailjetApiKey && this.mailjetSecretKey) {
-      console.log(`[EmailService] MailJet configured as primary provider (from: ${process.env.MAILJET_FROM_EMAIL || this.fromEmail})`);
+      console.log(`[EmailService] MailJet available as secondary provider (from: ${process.env.MAILJET_FROM_EMAIL || this.fromEmail})`);
     }
 
     if (smtpPass) {
@@ -32,7 +42,7 @@ export class EmailService {
     }
 
     if (this.sgApiKey) {
-      console.log(`[EmailService] SendGrid API available as secondary fallback (from: ${this.fromEmail})`);
+      console.log(`[EmailService] SendGrid API available as tertiary fallback (from: ${this.fromEmail})`);
     }
 
     if (smtpPass) {
@@ -53,12 +63,51 @@ export class EmailService {
       this.useSmtp = true;
     }
 
-    if (!this.sgApiKey && !smtpPass && !this.mailjetApiKey) {
-      console.warn('[EmailService] no email credentials configured (SENDGRID_API_KEY, EMAIL_PASSWORD, or MAILJET_API_KEY)');
+    if (!this.sgApiKey && !smtpPass && !this.mailjetApiKey && !this.brevoApiKey) {
+      console.warn('[EmailService] no email credentials configured (BREVO_API_KEY, MAILJET_API_KEY, SENDGRID_API_KEY, or EMAIL_PASSWORD)');
     }
   }
 
   async sendMail(to: string, subject: string, html: string) {
+    if (this.brevoApiKey) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        const res = await fetch(BREVO_API, {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'accept': 'application/json',
+            'api-key': this.brevoApiKey,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            sender: { email: this.brevoFromEmail, name: this.fromName },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html,
+          }),
+        });
+        clearTimeout(timeout);
+        if (res.ok) {
+          const result = await res.json();
+          const messageId = result.messageId || `brevo-${Date.now()}`;
+          console.log(`[EmailService] Brevo sent to ${to} (ID: ${messageId})`);
+          return;
+        }
+        const errorBody = await res.text();
+        let parsed: any;
+        try { parsed = JSON.parse(errorBody); } catch { parsed = null; }
+        const errorMsg = parsed?.message || parsed?.error || `Brevo API ${res.status}: ${errorBody}`;
+        console.warn(`[EmailService] Brevo returned status ${res.status}: ${errorMsg}`);
+        throw new Error(`Brevo: ${errorMsg}`);
+      } catch (err) {
+        console.error('[EmailService] Brevo failed, trying MailJet fallback:', (err as Error).message);
+      }
+    } else {
+      console.warn('[EmailService] Brevo not configured — BREVO_API_KEY missing');
+    }
+
     if (this.mailjetApiKey && this.mailjetSecretKey) {
       try {
         const controller = new AbortController();
@@ -143,7 +192,7 @@ export class EmailService {
       }
     }
 
-    throw new Error('No email provider configured — check MAILJET_API_KEY, MAILJET_SECRET_KEY, SENDGRID_API_KEY, or EMAIL_PASSWORD');
+    throw new Error('No email provider configured — check BREVO_API_KEY, MAILJET_API_KEY, SENDGRID_API_KEY, or EMAIL_PASSWORD');
   }
 
   async sendOtpEmail(to: string, otp: string) {

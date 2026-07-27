@@ -21,6 +21,8 @@ export class CommunicationService {
   private readonly zohoTransporter: any;
   private readonly mailjetApiKey: string;
   private readonly mailjetSecretKey: string;
+  private readonly brevoApiKey: string;
+  private readonly brevoFromEmail: string;
 
   constructor(
     private prisma: PrismaService,
@@ -45,6 +47,13 @@ export class CommunicationService {
 
     this.mailjetApiKey = this.configService.get<string>('MAILJET_API_KEY', '');
     this.mailjetSecretKey = this.configService.get<string>('MAILJET_SECRET_KEY', '');
+
+    this.brevoApiKey = this.configService.get<string>('BREVO_API_KEY', '') || this.configService.get<string>('BREVO_SMTP_KEY', '');
+    this.brevoFromEmail = this.configService.get<string>('BREVO_FROM_EMAIL', 'noreply@smarttechsaas.com');
+
+    if (this.brevoApiKey) {
+      this.logger.log(`[Brevo] API initialized as primary email provider (from: ${this.brevoFromEmail})`);
+    }
 
     if (this.sendgridApiKey) {
       mail.setApiKey(this.sendgridApiKey);
@@ -1093,6 +1102,47 @@ export class CommunicationService {
     subject: string,
     body: string,
   ) {
+    const BREVO_API = 'https://api.brevo.com/v3/smtp/email';
+
+    if (this.brevoApiKey) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        const res = await fetch(BREVO_API, {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'accept': 'application/json',
+            'api-key': this.brevoApiKey,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            sender: { email: this.brevoFromEmail, name: 'Smart Tech' },
+            to: [{ email: to }],
+            subject,
+            htmlContent: body,
+          }),
+        });
+        clearTimeout(timeout);
+        if (res.ok) {
+          const result = await res.json();
+          const messageId = result.messageId || `brevo_${Date.now()}`;
+          this.logger.log(`[Brevo Email] Sent to ${to} (ID: ${messageId})`);
+          return { success: true, messageId };
+        }
+        const errorBody = await res.text();
+        let parsed: any;
+        try { parsed = JSON.parse(errorBody); } catch { parsed = null; }
+        const errorMsg = parsed?.message || parsed?.error || `Brevo API ${res.status}: ${errorBody}`;
+        this.logger.warn(`[Brevo Email] Status ${res.status}: ${errorMsg}`);
+        if (res.status === 401) {
+          this.logger.warn('[Brevo] ** Invalid API key. Check your BREVO_API_KEY at https://app.brevo.com/settings/keys/api');
+        }
+      } catch (error) {
+        this.logger.warn(`[Brevo Email] Failed: ${error.message}`);
+      }
+    }
+
     const emailPassword = this.configService.get<string>('EMAIL_PASSWORD', '');
     
     if (emailPassword && emailPassword !== 'your_zoho_password') {
@@ -1190,7 +1240,7 @@ export class CommunicationService {
       }
     }
 
-    this.logger.error(`[Email] No email provider configured. Set EMAIL_PASSWORD in .env`);
+    this.logger.error(`[Email] No email provider configured. Set BREVO_API_KEY, EMAIL_PASSWORD, or MAILJET_API_KEY in .env`);
     return { success: false, error: 'No email provider configured' };
   }
 
@@ -1473,7 +1523,7 @@ export class CommunicationService {
       smtpPort: 587,
       smtpUser: 'noreply@smarttechsaas.com',
       smtpFromEmail: 'noreply@smarttechsaas.com',
-      emailProvider: 'zoho',
+      emailProvider: 'brevo',
     };
 
     if (!settings) {

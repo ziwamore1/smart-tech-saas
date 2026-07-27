@@ -6,6 +6,7 @@ import { SendGridAdapter, type SendGridConfig } from './adapters/sendgrid.adapte
 import { AmazonSESAdapter, type AmazonSESConfig } from './adapters/amazon-ses.adapter';
 import { MailgunAdapter, type MailgunConfig } from './adapters/mailgun.adapter';
 import { SmtpAdapter, type SmtpConfig } from './adapters/smtp.adapter';
+import { BrevoAdapter, type BrevoConfig } from './adapters/brevo.adapter';
 import type { EmailProvider } from '../../interfaces/provider.interface';
 
 @Injectable()
@@ -86,6 +87,17 @@ export class EmailProviderFactory {
     const decrypted = this.decryptCredentials(credentials);
 
     switch (providerType) {
+      case 'brevo':
+        return new BrevoAdapter({
+          apiKey: decrypted.apiKey || decrypted.smtpKey,
+          smtpHost: decrypted.smtpHost,
+          smtpPort: decrypted.smtpPort,
+          smtpLogin: decrypted.smtpLogin || decrypted.smtpUser,
+          smtpPassword: decrypted.smtpPassword || decrypted.password,
+          smtpKey: decrypted.smtpKey,
+          fromEmail: decrypted.fromEmail,
+          fromName: decrypted.fromName || decrypted.name || 'Smart Tech',
+        } as BrevoConfig);
       case 'zoho':
         return new ZohoAdapter(decrypted as ZohoConfig);
       case 'sendgrid':
