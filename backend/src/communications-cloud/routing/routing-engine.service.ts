@@ -234,6 +234,32 @@ export class RoutingEngineService {
   }
 
   private getEnvFallback(channel: CommCloudChannel): RoutingDecision {
+    if (channel === CommCloudChannel.EMAIL) {
+      const brevoKey = this.configService.get<string>('BREVO_API_KEY') || this.configService.get<string>('BREVO_SMTP_KEY');
+      if (brevoKey) {
+        return {
+          providerId: 'env:brevo',
+          providerName: 'Brevo',
+          strategy: RoutingStrategy.PRIORITY_BASED,
+          reason: 'Env-configured fallback (Brevo)',
+          confidence: 0.7,
+        };
+      }
+
+      const sendgridKey = this.configService.get<string>('SENDGRID_API_KEY');
+      if (sendgridKey) {
+        return {
+          providerId: 'env:sendgrid',
+          providerName: 'SendGrid',
+          strategy: RoutingStrategy.PRIORITY_BASED,
+          reason: 'Env-configured fallback (SendGrid)',
+          confidence: 0.7,
+        };
+      }
+
+      throw new Error(`No active email providers found. Configure BREVO_API_KEY or SENDGRID_API_KEY in environment.`);
+    }
+
     if (channel !== CommCloudChannel.SMS) {
       throw new Error(`No active providers found for channel: ${channel}`);
     }

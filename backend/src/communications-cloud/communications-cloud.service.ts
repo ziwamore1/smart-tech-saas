@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { RoutingEngineService } from './routing/routing-engine.service';
 import { CommunicationQueueService } from './queue/communication-queue.service';
@@ -10,6 +11,7 @@ import { AuditLogService } from './security/audit-log.service';
 import { SmsProviderFactory } from './providers/sms/sms-provider.factory';
 import { SmsProvider } from './interfaces/provider.interface';
 import { EmailProviderFactory } from './providers/email/email-provider.factory';
+import { BrevoAdapter, type BrevoConfig } from './providers/email/adapters/brevo.adapter';
 import { WhatsAppProviderFactory } from './providers/whatsapp/whatsapp-provider.factory';
 import { PushProviderFactory } from './providers/push/push-provider.factory';
 import { ZamtelAdapter } from './providers/sms/adapters/zamtel.adapter';
@@ -24,6 +26,7 @@ export class CommunicationsCloudService {
 
   constructor(
     private prisma: PrismaService,
+    private configService: ConfigService,
     private routingEngine: RoutingEngineService,
     private queueService: CommunicationQueueService,
     private deliveryTracking: DeliveryTrackingService,
@@ -263,7 +266,13 @@ export class CommunicationsCloudService {
           result = await smsProvider.send({ to: recipient, body, senderId: senderIdentity });
           break;
         case CommCloudChannel.EMAIL:
-          const emailProvider = await this.emailProviderFactory.getProvider(decision.providerId);
+          let emailProvider: any;
+          if (decision.providerId.startsWith('env:')) {
+            const providerType = decision.providerId.slice(4);
+            emailProvider = this.buildEnvEmailProvider(providerType);
+          } else {
+            emailProvider = await this.emailProviderFactory.getProvider(decision.providerId);
+          }
           result = await emailProvider.send({
             to: recipient, subject, body, htmlBody, from: senderIdentity,
             cc: metadata?.cc, bcc: metadata?.bcc,
@@ -346,7 +355,11 @@ export class CommunicationsCloudService {
           where: { id },
           data: { status: 'QUEUED', retryCount, lastError: error.message },
         });
-        await this.queueService.enqueueMessage({ ...messageData, id }, 10, Math.pow(2, retryCount) * 1000);
+        try {
+          await this.queueService.enqueueMessage({ ...messageData, id }, 10, Math.pow(2, retryCount) * 1000);
+        } catch (retryErr) {
+          this.logger.warn(`Re-enqueue failed (Redis may be unavailable): ${(retryErr as Error).message}`);
+        }
       } else {
         await this.prisma.commCloudMessage.update({
           where: { id },
@@ -433,6 +446,23 @@ export class CommunicationsCloudService {
       return options.schoolIds;
     }
     return options.recipientIds || [];
+  }
+
+  private buildEnvEmailProvider(type: string): any {
+    switch (type) {
+      case 'brevo':
+        return new BrevoAdapter({
+          apiKey: this.configService.get('BREVO_API_KEY') || this.configService.get('BREVO_SMTP_KEY'),
+          smtpHost: this.configService.get('BREVO_SMTP_HOST', 'smtp-relay.brevo.com'),
+          smtpPort: parseInt(this.configService.get('BREVO_SMTP_PORT', '587'), 10),
+          smtpLogin: this.configService.get('BREVO_SMTP_LOGIN') || this.configService.get('BREVO_SMTP_USER'),
+          smtpPassword: this.configService.get('BREVO_SMTP_PASSWORD') || this.configService.get('BREVO_SMTP_PASS'),
+          fromEmail: this.configService.get('BREVO_FROM_EMAIL') || this.configService.get('EMAIL_FROM'),
+          fromName: this.configService.get('BREVO_FROM_NAME') || this.configService.get('EMAIL_FROM_NAME', 'Smart Tech'),
+        } as BrevoConfig);
+      default:
+        throw new Error(`No env-based email adapter for type: ${type}`);
+    }
   }
 
   // ===================== SCHOOL-SPECIFIC METHODS =====================
