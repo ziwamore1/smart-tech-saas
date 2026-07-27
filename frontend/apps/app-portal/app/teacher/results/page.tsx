@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { teacherApi, resultApi, classApi, termApi, subjectApi, assessmentApi, studentApi } from '@/lib/api';
+import { teacherApi, resultApi, classApi, termApi, subjectApi, assessmentApi, assessmentEngineApi, studentApi } from '@/lib/api';
 import { socket } from '@/lib/socket';
 
 const PASS_THRESHOLD = 50;
@@ -95,12 +95,15 @@ export default function TeacherResultsPage() {
   const terms = Array.isArray(termsResponse) ? termsResponse : [];
   const subjects = Array.isArray(subjectsResponse) ? subjectsResponse : [];
 
-  const { data: assessmentTypes } = useQuery({
-    queryKey: ['assessment-types', selectedSubject, selectedTerm],
-    queryFn: () => selectedSubject && selectedTerm
-      ? assessmentApi.getTypes({ subjectId: selectedSubject, termId: selectedTerm }).then(res => res.data)
-      : Promise.resolve([]),
-    enabled: !!selectedSubject && !!selectedTerm,
+  const { data: assessmentConfigs = [] } = useQuery({
+    queryKey: ['assessment-configs', selectedClass, selectedSubject, selectedTerm],
+    queryFn: async () => {
+      if (!selectedClass || !selectedSubject || !selectedTerm || selectedSubject === 'all') return [];
+      const res = await assessmentEngineApi.configurations.get(selectedClass, selectedSubject, selectedTerm);
+      const data = res.data?.data || res.data;
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !!selectedClass && !!selectedSubject && !!selectedTerm && selectedSubject !== 'all',
   });
 
   const { data: classSubjectsData } = useQuery({
@@ -145,10 +148,16 @@ export default function TeacherResultsPage() {
   const enterScoreMutation = useMutation({
     mutationFn: (data: { studentId: string; score: number }) => {
       if (selectedAssessmentType) {
-        return assessmentApi.enterScore({
+        const config = assessmentConfigs.find((c: any) => c.assessmentDefId === selectedAssessmentType);
+        return assessmentEngineApi.scores.single({
           studentId: data.studentId,
-          assessmentTypeId: selectedAssessmentType,
-          score: data.score,
+          subjectId: selectedSubject,
+          termId: selectedTerm,
+          classId: selectedClass,
+          assessmentDefId: selectedAssessmentType,
+          rawScore: data.score,
+          maxScore: config?.maxScore || 100,
+          enteredBy: user?.id || '',
         });
       }
       return resultApi.create({
@@ -360,10 +369,13 @@ export default function TeacherResultsPage() {
               value={selectedAssessmentType}
               onChange={(e) => setSelectedAssessmentType(e.target.value)}
               className="w-full px-3 py-2 border rounded-lg"
+              disabled={selectedSubject === 'all'}
             >
               <option value="">Direct (Final Score)</option>
-              {(assessmentTypes || []).map((type: any) => (
-                <option key={type.id} value={type.id}>{type.name} ({type.weight * 100}%)</option>
+              {assessmentConfigs.map((c: any) => (
+                <option key={c.assessmentDefId} value={c.assessmentDefId}>
+                  {c.assessmentDef?.name || 'Unknown'} ({c.weightPercentage}%, Max: {c.maxScore})
+                </option>
               ))}
             </select>
           </div>
@@ -395,7 +407,7 @@ export default function TeacherResultsPage() {
               )}
             </h2>
             <div className="flex gap-2">
-              {assessmentTypes?.length > 0 && selectedSubject && (
+              {assessmentConfigs?.length > 0 && selectedSubject && selectedSubject !== 'all' && (
                 <button
                   onClick={() => computeResultMutation.mutate(selectedClass)}
                   disabled={computeResultMutation.isPending}
