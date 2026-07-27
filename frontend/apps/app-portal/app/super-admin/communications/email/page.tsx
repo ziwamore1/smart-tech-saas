@@ -80,7 +80,7 @@ export default function EmailManagementPage() {
     setSending(true);
     setSendStatus(null);
     try {
-      await communicationsCloudApi.sendEmail({ to, cc: showCc ? cc : undefined, bcc: showBcc ? bcc : undefined, subject, body });
+      await communicationsCloudApi.sendEmail({ recipient: to, cc: showCc ? cc : undefined, bcc: showBcc ? bcc : undefined, subject, body });
       setSendStatus({ type: 'success', text: 'Email sent successfully!' });
       setTo(''); setSubject(''); setBody(''); setCc(''); setBcc('');
     } catch {

@@ -1,6 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { QueuesService } from '../queues/queues.service';
 import { CommunicationsCloudController } from './communications-cloud.controller';
 import { CommunicationsCloudService } from './communications-cloud.service';
 import { RoutingEngineService } from './routing/routing-engine.service';
@@ -45,8 +43,6 @@ import { GenericWebhookController } from './webhooks/generic-webhook.controller'
   ],
   providers: [
     CommunicationsCloudService,
-    PrismaService,
-    QueuesService,
     RoutingEngineService,
     RoutingRulesService,
     CommunicationQueueService,

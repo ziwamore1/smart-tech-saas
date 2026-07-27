@@ -19,9 +19,19 @@ export class EmailAttachmentDto {
 }
 
 export class SendEmailDto {
+  @IsOptional()
   @IsEmail()
   @IsString()
-  recipient: string;
+  recipient?: string;
+
+  @IsOptional()
+  @IsEmail()
+  @IsString()
+  to?: string;
+
+  getRecipient(): string {
+    return this.recipient || this.to || '';
+  }
 
   @IsOptional()
   @IsArray()

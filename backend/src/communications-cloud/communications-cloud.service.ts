@@ -57,7 +57,7 @@ export class CommunicationsCloudService {
 
   async sendEmail(options: SendEmailDto): Promise<CommunicationResponseDto> {
     return this.send(CommCloudChannel.EMAIL, {
-      recipient: options.recipient,
+      recipient: options.getRecipient(),
       subject: options.subject,
       body: options.body,
       htmlBody: options.htmlBody,

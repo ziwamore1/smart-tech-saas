@@ -1,5 +1,6 @@
 import {
   Controller, Get, Post, Param, Query, Body, Request,
+  Logger,
 } from '@nestjs/common';
 import { CommunicationsCloudService } from './communications-cloud.service';
 import {
@@ -9,15 +10,21 @@ import {
 
 @Controller('communications-cloud')
 export class CommunicationsCloudController {
-  constructor(private readonly service: CommunicationsCloudService) {}
+  private readonly logger = new Logger(CommunicationsCloudController.name);
+
+  constructor(private readonly service: CommunicationsCloudService) {
+    this.logger.log('CommunicationsCloudController initialized');
+  }
 
   @Post('send/sms')
   async sendSms(@Body() dto: SendSmsDto) {
+    this.logger.log('sendSms called');
     return this.service.sendSms(dto);
   }
 
   @Post('send/email')
   async sendEmail(@Body() dto: SendEmailDto) {
+    this.logger.log(`sendEmail called to=${(dto as any).to || dto.recipient}`);
     return this.service.sendEmail(dto);
   }
 
@@ -70,6 +77,7 @@ export class CommunicationsCloudController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
+    this.logger.log(`findAll called channel=${channel} limit=${limit}`);
     return this.service.findAll({
       channel,
       status,
