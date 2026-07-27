@@ -615,8 +615,21 @@ export class ReportEngineService {
     const whereClause: any = {
       date: { gte: term.startDate, lte: term.endDate },
     };
-    if (request.studentId) whereClause.studentId = request.studentId;
-    if (request.classId) whereClause.classId = request.classId;
+    if (request.studentId) {
+      whereClause.studentId = request.studentId;
+    } else if (request.classId) {
+      const enrollments = await this.prisma.enrollment.findMany({
+        where: { classId: request.classId, status: 'ACTIVE' },
+        select: { studentId: true },
+      });
+      const studentIds = enrollments.map(e => e.studentId);
+      if (studentIds.length === 0) {
+        return { buffer: Buffer.from(''), url: null, publicId: null };
+      }
+      whereClause.studentId = { in: studentIds };
+    } else {
+      whereClause.schoolId = request.schoolId;
+    }
 
     const attendance = await this.prisma.attendance.findMany({
       where: whereClause,
@@ -713,7 +726,55 @@ export class ReportEngineService {
       include: { academicYear: true },
     });
 
-    // Get stats — filter by classId if provided
+    // Fetch class name if classId provided
+    let className = '';
+    if (request.classId) {
+      const classRecord = await this.prisma.class.findUnique({ where: { id: request.classId }, select: { name: true } });
+      className = classRecord?.name || '';
+    }
+
+    // Fetch teaching assignments for this class + academic year → subject→teacher map
+    const teacherMap = new Map<string, string>();
+    if (request.classId && term?.academicYearId) {
+      const assignments = await this.prisma.teachingAssignment.findMany({
+        where: { classId: request.classId, academicYearId: term.academicYearId, schoolId: request.schoolId },
+        include: { teacher: { select: { firstName: true, lastName: true } }, subject: { select: { name: true } } },
+      });
+      for (const a of assignments) {
+        const teacherName = `${(a.teacher as any)?.firstName || ''} ${(a.teacher as any)?.lastName || ''}`.trim();
+        if (teacherName) teacherMap.set((a.subject as any)?.name || '', teacherName);
+      }
+    } else if (term?.academicYearId) {
+      // School-wide: get all assignments for the academic year
+      const assignments = await this.prisma.teachingAssignment.findMany({
+        where: { academicYearId: term.academicYearId, schoolId: request.schoolId },
+        include: { teacher: { select: { firstName: true, lastName: true } }, subject: { select: { name: true } }, class: { select: { name: true } } },
+      });
+      for (const a of assignments) {
+        const teacherName = `${(a.teacher as any)?.firstName || ''} ${(a.teacher as any)?.lastName || ''}`.trim();
+        const cname = (a.class as any)?.name || '';
+        const sname = (a.subject as any)?.name || '';
+        const key = cname ? `${sname}__${cname}` : sname;
+        if (teacherName) teacherMap.set(key, teacherName);
+      }
+    }
+
+    // Get enrolled student IDs for the class (if classId provided) or school
+    let enrolledStudentIds: string[] = [];
+    const enrollmentWhere: any = { schoolId: request.schoolId, status: 'ACTIVE' };
+    if (request.classId) {
+      enrollmentWhere.classId = request.classId;
+    }
+    if (term?.academicYearId) {
+      enrollmentWhere.academicYearId = term.academicYearId;
+    }
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: enrollmentWhere,
+      select: { studentId: true },
+    });
+    enrolledStudentIds = [...new Set(enrollments.map(e => e.studentId))];
+
+    // Get stats from ComputedResult
     const whereCondition: any = {
       termId: request.termId,
       schoolId: request.schoolId,
@@ -724,10 +785,64 @@ export class ReportEngineService {
       whereCondition.classId = request.classId;
     }
 
-    const computedResults = await this.prisma.computedResult.findMany({
+    let computedResults = await this.prisma.computedResult.findMany({
       where: whereCondition,
-      include: { student: { select: { id: true, firstName: true, lastName: true } }, subject: { select: { name: true } } },
+      include: { student: { select: { id: true, firstName: true, lastName: true } }, subject: { select: { id: true, name: true } } },
     });
+
+    // Fallback: students enrolled but missing from ComputedResult — use Result table
+    const computedStudentIds = new Set(computedResults.map(r => r.studentId));
+    const missingStudentIds = enrolledStudentIds.filter(id => !computedStudentIds.has(id));
+
+    if (missingStudentIds.length > 0) {
+      const fallbackResults = await this.prisma.result.findMany({
+        where: {
+          studentId: { in: missingStudentIds },
+          termId: request.termId,
+          schoolId: request.schoolId,
+        },
+        include: { subject: { select: { id: true, name: true } }, student: { select: { id: true, firstName: true, lastName: true } } },
+      });
+
+      const gradingCategories = await this.prisma.performanceCategory.findMany({
+        where: { schoolId: request.schoolId },
+        orderBy: { minPercentage: 'desc' },
+      });
+
+      for (const result of fallbackResults) {
+        const score = result.score ?? 0;
+        const grade = result.grade || this.computeGrade(score, gradingCategories);
+        computedResults.push({
+          id: result.id,
+          studentId: result.studentId,
+          subjectId: result.subjectId,
+          termId: result.termId,
+          classId: request.classId || '',
+          schoolId: request.schoolId,
+          totalRawScore: score,
+          totalWeightedScore: score,
+          finalPercentage: score,
+          finalGrade: grade,
+          finalRemark: null,
+          classRank: null,
+          subjectRank: null,
+          gpa: null,
+          points: null,
+          status: 'COMPUTED' as any,
+          computedAt: null,
+          verifiedBy: null,
+          verifiedAt: null,
+          metadata: {},
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          student: result.student as any,
+          subject: result.subject as any,
+        } as any);
+      }
+    }
+
+    // Total enrolled students (always use enrollment count)
+    const totalStudents = enrolledStudentIds.length || new Set(computedResults.map(r => r.studentId)).size;
 
     const percentages = computedResults.map(r => r.finalPercentage ?? 0).filter(p => p > 0);
     const avg = percentages.length > 0
@@ -739,19 +854,37 @@ export class ReportEngineService {
       ? (percentages.filter(p => p >= 50).length / percentages.length * 100).toFixed(1)
       : '0';
 
-    // Subject performance
-    const subjectMap = new Map<string, number[]>();
+    // Subject performance — track subjectId for teacher lookup
+    interface SubjectData { scores: number[]; subjectId: string; subjectName: string; }
+    const subjectMap = new Map<string, SubjectData>();
     for (const r of computedResults) {
-      const name = r.subject?.name || 'Unknown';
-      if (!subjectMap.has(name)) subjectMap.set(name, []);
-      subjectMap.get(name)!.push(r.finalPercentage ?? 0);
+      const sname = (r.subject as any)?.name || 'Unknown';
+      const sid = (r.subject as any)?.id || '';
+      if (!subjectMap.has(sname)) subjectMap.set(sname, { scores: [], subjectId: sid, subjectName: sname });
+      subjectMap.get(sname)!.scores.push(r.finalPercentage ?? 0);
     }
 
     const subjectRows = Array.from(subjectMap.entries())
-      .map(([name, scores]) => {
-        const subjectAvg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
-        return `<tr><td style="text-align:left">${name}</td><td>${scores.length}</td><td>${subjectAvg}%</td><td>${Math.max(...scores).toFixed(1)}%</td><td>${Math.min(...scores).toFixed(1)}%</td></tr>`;
+      .map(([name, data]) => {
+        const subjectAvg = (data.scores.reduce((a, b) => a + b, 0) / data.scores.length).toFixed(1);
+        // Look up teacher: first try class-level key, then subject-level key
+        let teacher = teacherMap.get(name) || '';
+        if (!teacher && className) {
+          teacher = teacherMap.get(`${name}__${className}`) || '';
+        }
+        const passCount = data.scores.filter(p => p >= 50).length;
+        return `<tr>
+          <td style="text-align:left;font-weight:500">${name}</td>
+          <td style="text-align:left">${teacher || '<span style=\"color:#999\">N/A</span>'}</td>
+          <td>${data.scores.length}</td>
+          <td style="font-weight:600">${subjectAvg}%</td>
+          <td>${Math.max(...data.scores).toFixed(1)}%</td>
+          <td>${Math.min(...data.scores).toFixed(1)}%</td>
+          <td>${passCount}/${data.scores.length}</td>
+        </tr>`;
       }).join('');
+
+    const classLabel = className ? ` — ${className}` : '';
 
     const html = `
 <!DOCTYPE html>
@@ -771,10 +904,10 @@ export class ReportEngineService {
 <body>
   <div class="header">
     <div class="school-name">${school?.name || 'School'}</div>
-    <div style="font-size:14px;color:#666;margin-top:5px">Analytics Report — ${term?.name || ''} (${term?.academicYear?.name || ''})</div>
+    <div style="font-size:14px;color:#666;margin-top:5px">Subject Performance Analytics${classLabel} — ${term?.name || ''} (${term?.academicYear?.name || ''})</div>
   </div>
   <div class="stat-grid">
-    <div class="stat-box"><div class="stat-value" style="color:#2563eb">${computedResults.length > 0 ? new Set(computedResults.map(r => r.studentId)).size : 0}</div><div class="stat-label">Students</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:#2563eb">${totalStudents}</div><div class="stat-label">Students</div></div>
     <div class="stat-box"><div class="stat-value" style="color:#16a34a">${avg}%</div><div class="stat-label">Average</div></div>
     <div class="stat-box"><div class="stat-value" style="color:#7c3aed">${highest}%</div><div class="stat-label">Highest</div></div>
     <div class="stat-box"><div class="stat-value" style="color:#dc2626">${lowest}%</div><div class="stat-label">Lowest</div></div>
@@ -782,7 +915,15 @@ export class ReportEngineService {
   </div>
   <h3 style="margin-top:30px;color:#1a365d">Subject Performance</h3>
   <table>
-    <thead><tr><th style="text-align:left">Subject</th><th>Students</th><th>Average</th><th>Highest</th><th>Lowest</th></tr></thead>
+    <thead><tr>
+      <th style="text-align:left">Subject</th>
+      <th style="text-align:left">Teacher</th>
+      <th>Students</th>
+      <th>Average</th>
+      <th>Highest</th>
+      <th>Lowest</th>
+      <th>Pass</th>
+    </tr></thead>
     <tbody>${subjectRows}</tbody>
   </table>
 </body></html>`;
@@ -946,5 +1087,19 @@ export class ReportEngineService {
 
     await browser.close();
     return Buffer.from(pdf);
+  }
+
+  private computeGrade(score: number, categories: any[]): string {
+    if (categories.length > 0) {
+      for (const cat of categories) {
+        if (score >= cat.minPercentage) return cat.name;
+      }
+      return categories[categories.length - 1].name;
+    }
+    if (score >= 75) return 'A';
+    if (score >= 65) return 'B';
+    if (score >= 50) return 'C';
+    if (score >= 40) return 'D';
+    return 'E';
   }
 }
