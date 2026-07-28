@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { assessmentEngineApi, classApi, subjectApi, termApi } from '@/lib/api';
+import { assessmentEngineApi, classApi, subjectApi, termApi, classSubjectApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { ReadOnlyBanner } from '@/components/permissions/ReadOnlyBanner';
 
@@ -30,9 +30,14 @@ export default function AssessmentConfigPage() {
     queryFn: () => termApi.getAll().then(r => r.data?.data || r.data),
   });
 
-  const { data: subjects } = useQuery({
-    queryKey: ['subjects'],
-    queryFn: () => subjectApi.getAll().then(r => r.data?.data || r.data),
+  const { data: classSubjects, isLoading: classSubjectsLoading } = useQuery({
+    queryKey: ['class-subjects-config', selectedClass],
+    queryFn: async () => {
+      if (!selectedClass) return [];
+      const res = await classSubjectApi.getByClass(selectedClass);
+      return res.data?.data || res.data || [];
+    },
+    enabled: !!selectedClass,
   });
 
   const { data: assessmentDefs } = useQuery({
@@ -151,16 +156,31 @@ export default function AssessmentConfigPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-            <select
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-              value={selectedSubject}
-              onChange={e => setSelectedSubject(e.target.value)}
-            >
-              <option value="">Select Subject</option>
-              {subjects?.map((s: any) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+            {selectedClass ? (
+              classSubjectsLoading ? (
+                <div className="w-full px-3 py-2 border rounded-lg bg-gray-50 text-gray-500 text-sm">Loading subjects...</div>
+              ) : classSubjects && classSubjects.length > 0 ? (
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  value={selectedSubject}
+                  onChange={e => setSelectedSubject(e.target.value)}
+                >
+                  <option value="">Select Subject</option>
+                  {classSubjects.map((cs: any) => {
+                    const subj = cs.subject || cs;
+                    return (
+                      <option key={subj.id} value={subj.id}>{subj.name}{subj.code ? ` (${subj.code})` : ''}</option>
+                    );
+                  })}
+                </select>
+              ) : (
+                <div className="w-full px-3 py-3 border rounded-lg bg-amber-50 border-amber-200">
+                  <p className="text-amber-700 text-sm font-medium">No subjects assigned to this class.</p>
+                </div>
+              )
+            ) : (
+              <div className="w-full px-3 py-2 border rounded-lg bg-gray-50 text-gray-400 text-sm">Select a class first</div>
+            )}
           </div>
 
           <div>
