@@ -20,7 +20,7 @@ export class CompositeSubjectController {
   constructor(private readonly service: CompositeSubjectService) {}
 
   @Post()
-  @Roles('SUPER_ADMIN', 'Director')
+  @Roles('SuperAdmin', 'Director')
   create(@Body() body: {
     name: string;
     code: string;
@@ -51,7 +51,7 @@ export class CompositeSubjectController {
   }
 
   @Put(':id')
-  @Roles('SUPER_ADMIN', 'Director')
+  @Roles('SuperAdmin', 'Director')
   update(
     @Param('id') id: string,
     @Body() body: {
@@ -66,13 +66,13 @@ export class CompositeSubjectController {
   }
 
   @Delete(':id')
-  @Roles('SUPER_ADMIN', 'Director')
+  @Roles('SuperAdmin', 'Director')
   remove(@Param('id') id: string) {
     return this.service.remove(id);
   }
 
   @Post(':id/recompute')
-  @Roles('SUPER_ADMIN', 'Director')
+  @Roles('SuperAdmin', 'Director')
   async recompute(
     @Param('id') id: string,
     @Body() body: { classId: string; termId: string; schoolId: string; studentIds?: string[] },

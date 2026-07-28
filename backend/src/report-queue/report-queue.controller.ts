@@ -24,7 +24,7 @@ export class ReportQueueController {
   constructor(private readonly reportQueue: ReportQueueService) {}
 
   @Post('generate')
-  @Roles('DIRECTOR', 'HEAD_TEACHER', 'TEACHER')
+  @Roles('Director', 'Head Teacher', 'Teacher')
   async generateReport(
     @Body() body: { type: string; params: Record<string, any>; priority?: number; delay?: number },
     @Req() req: any,
@@ -45,7 +45,7 @@ export class ReportQueueController {
   }
 
   @Post('generate/class')
-  @Roles('DIRECTOR', 'HEAD_TEACHER')
+  @Roles('Director', 'Head Teacher')
   async generateClassReports(
     @Body() body: { classId: string; termId: string; type?: string },
     @Req() req: any,
@@ -66,7 +66,7 @@ export class ReportQueueController {
   }
 
   @Post('generate/student')
-  @Roles('DIRECTOR', 'HEAD_TEACHER', 'TEACHER')
+  @Roles('Director', 'Head Teacher', 'Teacher')
   async generateStudentReport(
     @Body() body: { studentId: string; termId: string; type?: string },
     @Req() req: any,
@@ -120,13 +120,13 @@ export class ReportQueueController {
   }
 
   @Get('queue/stats')
-  @Roles('DIRECTOR', 'HEAD_TEACHER')
+  @Roles('Director', 'Head Teacher')
   async getQueueStats(@Req() req: any) {
     return this.reportQueue.getStats();
   }
 
   @Post('queue/clean')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   async cleanQueue(@Body() body: { hours?: number }) {
     await this.reportQueue.clean(body.hours || 24);
     return { message: `Queue cleaned (older than ${body.hours || 24}h)` };

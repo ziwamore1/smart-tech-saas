@@ -58,7 +58,7 @@ export const DigitalStampScreen: React.FC = () => {
   const { user } = useAuthStore();
   const isDirector = user?.roles?.includes('Director') || user?.roles?.includes('Head Teacher');
   const isClassTeacher = user?.roles?.includes('Class Teacher');
-  const isAdmin = user?.roles?.includes('Admin') || user?.roles?.includes('Deputy');
+  const isAdmin = user?.roles?.includes('Deputy Head') || user?.roles?.includes('Deputy Director') || user?.roles?.includes('HOD');
 
   const [activeTab, setActiveTab] = useState<'stamps' | 'documents' | 'approvals'>('stamps');
   const [stamps, setStamps] = useState<any[]>([]);

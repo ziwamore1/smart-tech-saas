@@ -26,7 +26,7 @@ export class TermController {
   }
 
   @Post()
-  @Roles('DIRECTOR')
+  @Roles('Director')
   create(@Body() body: any, @Req() req: any) {
     return this.termService.create(body, req.user.schoolId);
   }
@@ -37,37 +37,37 @@ export class TermController {
   }
 
   @Get(':academicYearId')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   findAllByYear(@Param('academicYearId') academicYearId: string) {
     return this.termService.findAll(academicYearId);
   }
 
   @Patch(':id')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
     return this.termService.update(id, body, req.user.schoolId);
   }
 
   @Delete(':id')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   delete(@Param('id') id: string, @Req() req: any) {
     return this.termService.delete(id, req.user.schoolId);
   }
 
   @Patch(':id/set-current')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   setCurrent(@Param('id') id: string, @Req() req: any) {
     return this.termService.setCurrent(id, req.user.schoolId);
   }
 
   @Patch(':termId/finalize')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   finalizeResults(@Req() req, @Param('termId') termId: string) {
     return this.termService.finalizeResults(req.user.schoolId, termId);
   }
 
   @Patch(':termId/unfinalize')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   unfinalizeResults(@Req() req, @Param('termId') termId: string) {
     return this.termService.unfinalizeResults(req.user.schoolId, termId);
   }

@@ -26,7 +26,7 @@ export class ResultsManagementController {
   constructor(private readonly resultsManagement: ResultsManagementService) {}
 
   @Get('sheets')
-  @Roles('DIRECTOR', 'TEACHER', 'CLASS_TEACHER')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   async getSheets(
     @Query('status') status: string,
     @Query('classId') classId: string,
@@ -44,14 +44,14 @@ export class ResultsManagementController {
   }
 
   @Get('sheets/:id')
-  @Roles('DIRECTOR', 'TEACHER', 'CLASS_TEACHER')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   async getSheet(@Param('id') id: string, @Request() req) {
     const data = await this.resultsManagement.getResultSheet(id);
     return { data, message: 'Result sheet retrieved successfully' };
   }
 
   @Post('sheets')
-  @Roles('DIRECTOR', 'CLASS_TEACHER')
+  @Roles('Director', 'Class Teacher')
   async createSheet(
     @Body()
     body: {
@@ -78,56 +78,56 @@ export class ResultsManagementController {
   }
 
   @Get('sheets/:id/students')
-  @Roles('DIRECTOR', 'TEACHER', 'CLASS_TEACHER')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   async getSheetStudents(@Param('id') id: string) {
     const data = await this.resultsManagement.getSheetStudents(id);
     return { data, message: 'Sheet students retrieved successfully' };
   }
 
   @Get('sheets/:id/subjects')
-  @Roles('DIRECTOR', 'TEACHER', 'CLASS_TEACHER')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   async getSheetSubjects(@Param('id') id: string) {
     const data = await this.resultsManagement.getSheetSubjects(id);
     return { data, message: 'Sheet subjects retrieved successfully' };
   }
 
   @Post('sheets/:id/submit')
-  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @Roles('Director', 'Class Teacher', 'Teacher')
   async submitSheet(@Param('id') id: string, @Request() req) {
     const data = await this.resultsManagement.submitSheet(id, req.user.id);
     return { data, message: 'Result sheet submitted successfully' };
   }
 
   @Post('sheets/:id/verify')
-  @Roles('DIRECTOR', 'CLASS_TEACHER')
+  @Roles('Director', 'Class Teacher')
   async verifySheet(@Param('id') id: string, @Request() req) {
     const data = await this.resultsManagement.verifySheet(id, req.user.id);
     return { data, message: 'Result sheet verified and computed successfully' };
   }
 
   @Post('sheets/:id/publish')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   async publishSheet(@Param('id') id: string, @Request() req) {
     const data = await this.resultsManagement.publishSheet(id, req.user.id);
     return { data, message: 'Result sheet published successfully' };
   }
 
   @Post('sheets/:id/lock')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   async lockSheet(@Param('id') id: string, @Request() req) {
     const data = await this.resultsManagement.lockSheet(id, req.user.id);
     return { data, message: 'Result sheet locked successfully' };
   }
 
   @Post('sheets/:id/unlock')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   async unlockSheet(@Param('id') id: string, @Request() req) {
     const data = await this.resultsManagement.unlockSheet(id, req.user.id);
     return { data, message: 'Result sheet unlocked successfully' };
   }
 
   @Get('sheets/:id/rankings')
-  @Roles('DIRECTOR', 'TEACHER', 'CLASS_TEACHER')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   async getRankings(
     @Param('id') id: string,
     @Query('type') type: string,
@@ -137,21 +137,21 @@ export class ResultsManagementController {
   }
 
   @Get('sheets/:id/analysis')
-  @Roles('DIRECTOR', 'TEACHER', 'CLASS_TEACHER')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   async getAnalysis(@Param('id') id: string) {
     const data = await this.resultsManagement.getAnalysis(id);
     return { data, message: 'Analysis retrieved successfully' };
   }
 
   @Get('sheets/:id/mark-schedule')
-  @Roles('DIRECTOR', 'TEACHER', 'CLASS_TEACHER')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   async getMarkSchedule(@Param('id') id: string) {
     const data = await this.resultsManagement.getMarkSchedule(id);
     return { data, message: 'Mark schedule retrieved successfully' };
   }
 
   @Get('sheets/:id/mark-schedule/html')
-  @Roles('DIRECTOR', 'TEACHER', 'CLASS_TEACHER')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   async getMarkScheduleHtml(@Param('id') id: string, @Request() req, @Res() res: Response) {
     const html = await this.resultsManagement.generateMarkScheduleHtml(id, req.user.schoolId);
     res.setHeader('Content-Type', 'text/html');
@@ -159,7 +159,7 @@ export class ResultsManagementController {
   }
 
   @Get('sheets/:id/mark-schedule/pdf')
-  @Roles('DIRECTOR', 'TEACHER', 'CLASS_TEACHER')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   async getMarkSchedulePdf(@Param('id') id: string, @Request() req, @Res() res: Response) {
     const pdfBuffer = await this.resultsManagement.generateMarkSchedulePdf(id, req.user.schoolId);
     res.setHeader('Content-Type', 'application/pdf');
@@ -168,7 +168,7 @@ export class ResultsManagementController {
   }
 
   @Post('sheets/preview')
-  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @Roles('Director', 'Class Teacher', 'Teacher')
   @UseInterceptors(FileInterceptor('file'))
   async previewExcelUpload(
     @UploadedFile() file: Express.Multer.File,
@@ -189,7 +189,7 @@ export class ResultsManagementController {
   }
 
   @Post('sheets/import')
-  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @Roles('Director', 'Class Teacher', 'Teacher')
   @UseInterceptors(FileInterceptor('file'))
   async importExcelResults(
     @UploadedFile() file: Express.Multer.File,
@@ -213,7 +213,7 @@ export class ResultsManagementController {
   }
 
   @Get('audit-logs')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   async getAuditLogs(
     @Query('schoolId') schoolId: string,
     @Query('entityType') entityType: string,

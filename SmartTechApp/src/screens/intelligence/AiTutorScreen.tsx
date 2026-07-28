@@ -36,7 +36,7 @@ export const AiTutorScreen: React.FC = () => {
   const route = useRoute();
   const [screen, setScreen] = useState<Screen>('sessions');
 
-  const userRole = user?.roles?.[0]?.toLowerCase().replace(' ', '_') || 'student';
+  const userRole = user?.roles?.[0] || 'student';
   const sourceScreen = (route.params as any)?.sourceScreen || 'ai_tutor';
 
   const buildContext = (overrides?: { subject?: string; topic?: string }) => ({

@@ -23,7 +23,7 @@ export class PrimaryGradingController {
   ) {}
 
   @Get('policies')
-  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @Roles('Director', 'Class Teacher', 'Teacher')
   async getPolicies(@Request() req) {
     await this.gradingSystemService.ensureG7PolicyExists(req.user.schoolId);
     const policies = await this.gradingEngine.getGradingPolicies(req.user.schoolId);
@@ -31,7 +31,7 @@ export class PrimaryGradingController {
   }
 
   @Get('policies/:id')
-  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @Roles('Director', 'Class Teacher', 'Teacher')
   async getPolicy(@Param('id') id: string) {
     const policy = await this.gradingEngine.getGradingPolicyById(id);
     if (!policy) throw new NotFoundException('Grading policy not found');
@@ -39,7 +39,7 @@ export class PrimaryGradingController {
   }
 
   @Post('assign')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   async assignPolicy(
     @Body() body: { classId: string; subjectId?: string; termId?: string; policyId: string },
     @Request() req,
@@ -55,7 +55,7 @@ export class PrimaryGradingController {
   }
 
   @Get('report/:classId/:termId')
-  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @Roles('Director', 'Class Teacher', 'Teacher')
   async getClassReport(@Param('classId') classId: string, @Param('termId') termId: string, @Request() req) {
     const report = await this.gradingEngine.getClassTermReport(classId, termId, req.user.schoolId);
     return { data: report, message: 'Class term report retrieved' };

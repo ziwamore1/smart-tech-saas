@@ -25,25 +25,25 @@ export class GradingSystemController {
   }
 
   @Post()
-  @Roles('DIRECTOR')
+  @Roles('Director')
   create(@Body() body: any, @Req() req: any) {
     return this.service.create(req.user.schoolId, body);
   }
 
   @Patch(':id')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
     return this.service.update(id, req.user.schoolId, body);
   }
 
   @Delete(':id')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   delete(@Param('id') id: string, @Req() req: any) {
     return this.service.delete(id, req.user.schoolId);
   }
 
   @Patch(':id/set-default')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   setDefault(@Param('id') id: string, @Req() req: any) {
     return this.service.setDefault(id, req.user.schoolId);
   }

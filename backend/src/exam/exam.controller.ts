@@ -28,7 +28,7 @@ export class ExamController {
 
   // ===== CRUD =====
   @Post()
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async create(@Body() data: any, @Request() req: any) {
     if (!req.user.schoolId) throw new NotFoundException('School ID required');
     return this.examService.create({ ...data, schoolId: req.user.schoolId, createdById: req.user.id });
@@ -46,20 +46,20 @@ export class ExamController {
   }
 
   @Patch(':id')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async update(@Param('id') id: string, @Body() data: any) {
     return this.examService.update(id, data);
   }
 
   @Delete(':id')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async delete(@Param('id') id: string) {
     return this.examService.delete(id);
   }
 
   // ===== Sections =====
   @Post(':id/sections')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async addSection(@Param('id') id: string, @Body() data: any) {
     return this.examService.addSection(id, data);
   }
@@ -70,44 +70,44 @@ export class ExamController {
   }
 
   @Patch('sections/:sectionId')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async updateSection(@Param('sectionId') sectionId: string, @Body() data: any) {
     return this.examService.updateSection(sectionId, data);
   }
 
   @Delete('sections/:sectionId')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async deleteSection(@Param('sectionId') sectionId: string) {
     return this.examService.deleteSection(sectionId);
   }
 
   // ===== Questions =====
   @Post(':id/questions')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async addQuestion(@Param('id') id: string, @Body() data: any) {
     return this.examService.addQuestion(id, data);
   }
 
   @Patch('questions/:questionId')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async updateQuestion(@Param('questionId') questionId: string, @Body() data: any) {
     return this.examService.updateQuestion(questionId, data);
   }
 
   @Delete('questions/:questionId')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async deleteQuestion(@Param('questionId') questionId: string) {
     return this.examService.deleteQuestion(questionId);
   }
 
   @Post(':id/questions/reorder')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async reorderQuestions(@Param('id') id: string, @Body('order') order: { id: string; order: number }[]) {
     return this.examService.reorderQuestions(id, order);
   }
 
   @Post(':id/upload-question')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   @UseInterceptors(FileInterceptor('file', {
     storage: cloudinaryMemoryStorage(),
     fileFilter: CLOUDINARY_FILE_FILTER,
@@ -126,19 +126,19 @@ export class ExamController {
 
   // ===== Publish / Status =====
   @Post(':id/publish')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async publish(@Param('id') id: string) {
     return this.examService.update(id, { isPublished: true, status: 'published' });
   }
 
   @Post(':id/unpublish')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async unpublish(@Param('id') id: string) {
     return this.examService.update(id, { isPublished: false, status: 'draft' });
   }
 
   @Post(':id/archive')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async archive(@Param('id') id: string) {
     return this.examService.update(id, { status: 'archived' });
   }
@@ -150,14 +150,14 @@ export class ExamController {
   }
 
   @Post(':id/preview/html')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async renderPreviewHtml(@Param('id') id: string) {
     return this.examService.renderPreviewHtml(id);
   }
 
   // ===== Answer Key / Marking Key =====
   @Post(':id/answer-key')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   @UseInterceptors(FileInterceptor('file', {
     storage: cloudinaryMemoryStorage(),
     fileFilter: CLOUDINARY_FILE_FILTER,
@@ -169,7 +169,7 @@ export class ExamController {
   }
 
   @Post(':id/marking-key')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   @UseInterceptors(FileInterceptor('file', {
     storage: cloudinaryMemoryStorage(),
     fileFilter: CLOUDINARY_FILE_FILTER,
@@ -181,20 +181,20 @@ export class ExamController {
   }
 
   @Patch(':id/auto-grade')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async toggleAutoGrade(@Param('id') id: string, @Body('enabled') enabled: boolean) {
     return this.examService.update(id, { autoGrade: enabled });
   }
 
   @Patch('attempt/:attemptId/answer')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async gradeAnswer(@Param('attemptId') attemptId: string, @Body() data: { questionId: string; score: number; isCorrect?: boolean; feedback?: string }) {
     return this.examService.updateExamAnswer(attemptId, data.questionId, data);
   }
 
   // ===== Attempts & Taking Exams =====
   @Post(':id/start')
-  @Roles('STUDENT', 'TEACHER', 'DIRECTOR')
+  @Roles('Student', 'Teacher', 'Director')
   async startAttempt(@Param('id') id: string, @Body() data: { studentId: string }, @Request() req: any) {
     const studentId = data.studentId || req.user.studentId;
     const ip = req.ip;
@@ -203,13 +203,13 @@ export class ExamController {
   }
 
   @Post('attempt/:attemptId/answer')
-  @Roles('STUDENT', 'TEACHER', 'DIRECTOR')
+  @Roles('Student', 'Teacher', 'Director')
   async submitAnswer(@Param('attemptId') attemptId: string, @Body() data: { questionId: string; answer: string; timeSpent?: number }) {
     return this.examService.submitAnswer(attemptId, data.questionId, data.answer, data.timeSpent);
   }
 
   @Post('attempt/:attemptId/submit')
-  @Roles('STUDENT', 'TEACHER', 'DIRECTOR')
+  @Roles('Student', 'Teacher', 'Director')
   async submitExam(@Param('attemptId') attemptId: string) {
     return this.examService.submitExam(attemptId);
   }
@@ -221,7 +221,7 @@ export class ExamController {
 
   // ===== Auto-Marking =====
   @Post(':id/auto-mark')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async autoMarkExam(@Param('id') examId: string) {
     const attempts = await this.examService.getAttemptsForMarking(examId);
     const results = [];
@@ -232,7 +232,7 @@ export class ExamController {
   }
 
   @Post('attempt/:attemptId/auto-mark')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async autoMarkSingle(@Param('attemptId') attemptId: string) {
     return this.markingService.autoMarkAttempt(attemptId);
   }
@@ -244,7 +244,7 @@ export class ExamController {
   }
 
   @Get('results/student')
-  @Roles('STUDENT', 'TEACHER', 'DIRECTOR')
+  @Roles('Student', 'Teacher', 'Director')
   async getStudentResults(@Request() req: any, @Query() filters: any) {
     const studentId = req.user.studentId || filters.studentId;
     if (!studentId) throw new NotFoundException('Student ID not found');
@@ -264,25 +264,25 @@ export class ExamController {
   }
 
   @Post('bank/questions')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async createBankQuestion(@Body() data: any, @Request() req: any) {
     return this.questionBankService.create(req.user.schoolId, data, req.user.id);
   }
 
   @Patch('bank/questions/:id')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async updateBankQuestion(@Param('id') id: string, @Body() data: any) {
     return this.questionBankService.update(id, data);
   }
 
   @Delete('bank/questions/:id')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async deleteBankQuestion(@Param('id') id: string) {
     return this.questionBankService.delete(id);
   }
 
   @Post(':id/bank/import')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async importFromBank(@Param('id') id: string, @Body('questionIds') questionIds: string[]) {
     return this.questionBankService.importToExam(questionIds, id);
   }
@@ -294,13 +294,13 @@ export class ExamController {
   }
 
   @Post('bank/categories')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async createBankCategory(@Body() data: any, @Request() req: any) {
     return this.questionBankService.createCategory(req.user.schoolId, data);
   }
 
   @Delete('bank/categories/:id')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async deleteBankCategory(@Param('id') id: string) {
     return this.questionBankService.deleteCategory(id);
   }
@@ -318,32 +318,32 @@ export class ExamController {
   }
 
   @Post('templates')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async createTemplate(@Body() data: any, @Request() req: any) {
     return this.templateService.create(req.user.schoolId, data, req.user.id);
   }
 
   @Patch('templates/:id')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async updateTemplate(@Param('id') id: string, @Body() data: any) {
     return this.templateService.update(id, data);
   }
 
   @Delete('templates/:id')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async deleteTemplate(@Param('id') id: string) {
     return this.templateService.delete(id);
   }
 
   @Post(':id/apply-template')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async applyTemplate(@Param('id') id: string, @Body('templateId') templateId: string) {
     return this.examService.applyTemplate(id, templateId);
   }
 
   // ===== Uploaded Exams =====
   @Post('upload')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   @UseInterceptors(FileInterceptor('file', {
     storage: cloudinaryMemoryStorage(),
     fileFilter: CLOUDINARY_FILE_FILTER,
@@ -374,19 +374,19 @@ export class ExamController {
   }
 
   @Patch('uploaded/:id')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async updateUploadedExam(@Param('id') id: string, @Body() data: any) {
     return this.uploadedExamService.update(id, data);
   }
 
   @Delete('uploaded/:id')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async deleteUploadedExam(@Param('id') id: string) {
     return this.uploadedExamService.delete(id);
   }
 
   @Post('uploaded/:id/answer-script')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   @UseInterceptors(FileInterceptor('file', {
     storage: cloudinaryMemoryStorage(),
     fileFilter: CLOUDINARY_FILE_FILTER,
@@ -398,7 +398,7 @@ export class ExamController {
   }
 
   @Post('uploaded/:id/parse')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async parseExamDoc(@Param('id') id: string) {
     return this.uploadedExamService.parseDocument(id);
   }

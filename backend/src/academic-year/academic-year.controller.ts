@@ -20,7 +20,7 @@ export class AcademicYearController {
   constructor(private readonly service: AcademicYearService) {}
 
   @Post()
-  @Roles('DIRECTOR')
+  @Roles('Director')
   create(@Body() body: any, @Req() req: any) {
     return this.service.create(body, req.user.schoolId);
   }
@@ -31,19 +31,19 @@ export class AcademicYearController {
   }
 
   @Patch(':id')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
     return this.service.update(id, body, req.user.schoolId);
   }
 
   @Delete(':id')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   delete(@Param('id') id: string, @Req() req: any) {
     return this.service.delete(id, req.user.schoolId);
   }
 
   @Patch(':id/current')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   setCurrent(@Param('id') id: string, @Req() req: any) {
     return this.service.setCurrent(id, req.user.schoolId);
   }

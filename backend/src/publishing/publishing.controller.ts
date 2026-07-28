@@ -21,7 +21,7 @@ export class PublishingController {
   constructor(private service: PublishingService) {}
 
   @Post('publish-results')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   publishResults(
     @Body() body: { classId: string; termId: string },
     @Req() req: any,
@@ -34,7 +34,7 @@ export class PublishingController {
   }
 
   @Post('publish-all')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   publishAllClasses(
     @Body() body: { termId: string },
     @Req() req: any,
@@ -43,7 +43,7 @@ export class PublishingController {
   }
 
   @Post('unpublish-results')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   unpublishResults(
     @Body() body: { classId: string; termId: string },
     @Req() req: any,
@@ -56,13 +56,13 @@ export class PublishingController {
   }
 
   @Get('status')
-  @Roles('DIRECTOR', 'TEACHER')
+  @Roles('Director', 'Teacher')
   getStatus(@Req() req: any) {
     return this.service.getPublicationStatus(req.user.schoolId);
   }
 
   @Get('status/:termId')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   getTermLockStatus(
     @Param('termId') termId: string,
     @Req() req: any,
@@ -71,7 +71,7 @@ export class PublishingController {
   }
 
   @Get('check-completeness')
-  @Roles('DIRECTOR', 'TEACHER')
+  @Roles('Director', 'Teacher')
   checkCompleteness(
     @Query('classId') classId: string,
     @Query('termId') termId: string,
@@ -85,7 +85,7 @@ export class PublishingController {
   }
 
   @Get('results-summary')
-  @Roles('DIRECTOR', 'TEACHER')
+  @Roles('Director', 'Teacher')
   getResultsSummary(
     @Query('classId') classId: string,
     @Query('termId') termId: string,
@@ -99,7 +99,7 @@ export class PublishingController {
   }
 
   @Get('download-zip')
-  @Roles('DIRECTOR', 'TEACHER')
+  @Roles('Director', 'Teacher')
   async downloadZip(
     @Query('classId') classId: string,
     @Query('termId') termId: string,
@@ -121,7 +121,7 @@ export class PublishingController {
   }
 
   @Get('class-summary-pdf')
-  @Roles('DIRECTOR', 'TEACHER')
+  @Roles('Director', 'Teacher')
   async downloadClassSummaryPdf(
     @Query('classId') classId: string,
     @Query('termId') termId: string,

@@ -35,7 +35,7 @@ export class StudentSubjectController {
   }
 
   @Post('assign')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   assign(
     @Body() body: { studentId: string; subjectIds: string[]; classId: string; academicYearId?: string },
     @Req() req: any,
@@ -50,7 +50,7 @@ export class StudentSubjectController {
   }
 
   @Post('bulk-assign')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   bulkAssign(
     @Body() body: { classId: string; assignments: Array<{ studentId: string; subjectIds: string[] }>; academicYearId?: string },
     @Req() req: any,
@@ -64,7 +64,7 @@ export class StudentSubjectController {
   }
 
   @Delete()
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   unassign(
     @Query('studentId') studentId: string,
     @Query('subjectId') subjectId: string,

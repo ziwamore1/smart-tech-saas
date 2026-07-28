@@ -25,7 +25,7 @@ export class AssessmentController {
   ) {}
 
   @Get('types')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   getTypes(
     @Query('subjectId') subjectId: string,
     @Query('termId') termId: string,
@@ -39,7 +39,7 @@ export class AssessmentController {
   }
 
   @Get('weights')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   getWeights(
     @Query('subjectId') subjectId: string,
     @Query('termId') termId: string,
@@ -61,7 +61,7 @@ export class AssessmentController {
   }
 
   @Get('class-dashboard')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   getDashboard(
     @Query('classId') classId: string,
     @Query('subjectId') subjectId: string,
@@ -71,7 +71,7 @@ export class AssessmentController {
   }
 
   @Get('teacher-heatmap')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   getTeacherHeatmap(
     @Query('classId') classId: string,
     @Query('subjectId') subjectId: string,
@@ -81,7 +81,7 @@ export class AssessmentController {
   }
 
   @Post('create-type')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   createType(@Body() body: any, @Req() req: any) {
     return this.service.createAssessmentType(
       req.user.schoolId,
@@ -94,7 +94,7 @@ export class AssessmentController {
   }
 
   @Post('bulk-create')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   createBulkTypes(@Body() body: any, @Req() req: any) {
     return this.service.createBulkAssessmentTypes(
       req.user.schoolId,
@@ -105,7 +105,7 @@ export class AssessmentController {
   }
 
   @Patch('type/:id')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   updateType(
     @Param('id') id: string,
     @Body() body: { name?: string; maxScore?: number; weight?: number },
@@ -115,13 +115,13 @@ export class AssessmentController {
   }
 
   @Delete('type/:id')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   deleteType(@Param('id') id: string, @Req() req: any) {
     return this.service.deleteAssessmentType(id, req.user.schoolId);
   }
 
   @Post('enter-score')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async enterScore(@Body() body: any, @Req() req: any) {
     const userId = req.user.sub;
     let teacherId = userId;
@@ -153,7 +153,7 @@ export class AssessmentController {
   }
 
   @Post('bulk-enter-scores')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async enterBulkScores(@Body() body: any, @Req() req: any) {
     const userId = req.user.sub;
     let teacherId = userId;
@@ -183,7 +183,7 @@ export class AssessmentController {
   }
 
   @Patch('score/:id')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async updateScore(
     @Param('id') id: string,
     @Body() body: { score: number },
@@ -213,7 +213,7 @@ export class AssessmentController {
   }
 
   @Get('compute')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async computeResults(
     @Query('studentId') studentId: string,
     @Query('subjectId') subjectId: string,
@@ -250,7 +250,7 @@ export class AssessmentController {
   }
 
   @Post('compute-all')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Teacher', 'Director')
   async computeAllResults(@Body() body: { classId: string; subjectId: string; termId: string }, @Req() req: any) {
     const userId = req.user.sub;
     let teacherId = userId;

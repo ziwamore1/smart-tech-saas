@@ -10,19 +10,19 @@ export class QueuesController {
   constructor(private readonly queuesService: QueuesService) {}
 
   @Get()
-  @Roles('DIRECTOR', 'SUPER_ADMIN')
+  @Roles('Director', 'SuperAdmin')
   async listQueues() {
     return { queues: this.queuesService.getRegisteredQueueNames() };
   }
 
   @Get('stats')
-  @Roles('DIRECTOR', 'SUPER_ADMIN')
+  @Roles('Director', 'SuperAdmin')
   async getAllStats() {
     return this.queuesService.getAllQueueStats();
   }
 
   @Get(':name/stats')
-  @Roles('DIRECTOR', 'SUPER_ADMIN')
+  @Roles('Director', 'SuperAdmin')
   async getQueueStats(@Param('name') name: string) {
     try {
       return this.queuesService.getQueueStats(name);
@@ -32,7 +32,7 @@ export class QueuesController {
   }
 
   @Get(':name/failed')
-  @Roles('DIRECTOR', 'SUPER_ADMIN')
+  @Roles('Director', 'SuperAdmin')
   async getFailedJobs(
     @Param('name') name: string,
     @Query('start') start?: string,
@@ -46,7 +46,7 @@ export class QueuesController {
   }
 
   @Get(':name/jobs/:jobId')
-  @Roles('DIRECTOR', 'SUPER_ADMIN', 'HEAD_TEACHER')
+  @Roles('Director', 'SuperAdmin', 'Head Teacher')
   async getJobStatus(@Param('name') name: string, @Param('jobId') jobId: string) {
     const status = await this.queuesService.getJobStatus(name, jobId);
     if (!status) return { error: 'Job not found' };
@@ -54,42 +54,42 @@ export class QueuesController {
   }
 
   @Post(':name/pause')
-  @Roles('SUPER_ADMIN')
+  @Roles('SuperAdmin')
   async pauseQueue(@Param('name') name: string) {
     await this.queuesService.pauseQueue(name);
     return { message: `Queue '${name}' paused` };
   }
 
   @Post(':name/resume')
-  @Roles('SUPER_ADMIN')
+  @Roles('SuperAdmin')
   async resumeQueue(@Param('name') name: string) {
     await this.queuesService.resumeQueue(name);
     return { message: `Queue '${name}' resumed` };
   }
 
   @Post(':name/clean')
-  @Roles('SUPER_ADMIN', 'DIRECTOR')
+  @Roles('SuperAdmin', 'Director')
   async cleanQueue(@Param('name') name: string, @Body() body: { hours?: number }) {
     await this.queuesService.cleanQueue(name, body.hours || 24);
     return { message: `Queue '${name}' cleaned (older than ${body.hours || 24}h)` };
   }
 
   @Post(':name/drain')
-  @Roles('SUPER_ADMIN')
+  @Roles('SuperAdmin')
   async drainQueue(@Param('name') name: string) {
     await this.queuesService.drainQueue(name);
     return { message: `Queue '${name}' drained` };
   }
 
   @Post(':name/jobs/:jobId/retry')
-  @Roles('DIRECTOR', 'SUPER_ADMIN')
+  @Roles('Director', 'SuperAdmin')
   async retryJob(@Param('name') name: string, @Param('jobId') jobId: string) {
     await this.queuesService.retryJob(name, jobId);
     return { message: `Job ${jobId} retried` };
   }
 
   @Delete(':name/jobs/:jobId')
-  @Roles('SUPER_ADMIN')
+  @Roles('SuperAdmin')
   async removeJob(@Param('name') name: string, @Param('jobId') jobId: string) {
     await this.queuesService.removeJob(name, jobId);
     return { message: `Job ${jobId} removed` };

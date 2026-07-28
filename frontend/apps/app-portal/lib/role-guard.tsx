@@ -3,6 +3,7 @@
 import { useEffect, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 export type UserRole = 
   | 'SuperAdmin'
@@ -10,6 +11,7 @@ export type UserRole =
   | 'Deputy Director'
   | 'Head Teacher'
   | 'Deputy'
+  | 'Deputy Head'
   | 'Accountant'
   | 'Secretary'
   | 'Teacher'
@@ -23,14 +25,14 @@ export type UserRole =
 interface RoleProtectionProps {
   children: ReactNode;
   requiredRoles?: UserRole[];
-  redirectTo?: string;
 }
 
-export function RoleGuard({ children, requiredRoles, redirectTo = '/dashboard' }: RoleProtectionProps) {
+export function RoleGuard({ children, requiredRoles }: RoleProtectionProps) {
   const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isAllowed, setIsAllowed] = useState(false);
+  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
@@ -45,18 +47,14 @@ export function RoleGuard({ children, requiredRoles, redirectTo = '/dashboard' }
       const hasRequiredRole = requiredRoles.some(role =>
         userRoles.some((ur: string) => ur.toLowerCase().replace(/\s+/g, '') === role.toLowerCase().replace(/\s+/g, ''))
       );
-      
-      if (!hasRequiredRole) {
-        setIsAllowed(false);
-        router.push(redirectTo);
-        return;
-      }
+      setIsAllowed(hasRequiredRole);
+    } else {
+      setIsAllowed(true);
     }
+    setChecked(true);
+  }, [isLoading, isAuthenticated, user, requiredRoles, router, pathname]);
 
-    setIsAllowed(true);
-  }, [isLoading, isAuthenticated, user, requiredRoles, redirectTo, router, pathname]);
-
-  if (isLoading) {
+  if (isLoading || !checked) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -68,31 +66,16 @@ export function RoleGuard({ children, requiredRoles, redirectTo = '/dashboard' }
   }
 
   if (!isAllowed) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-2">Access Denied</h1>
-          <p className="text-gray-500 mb-4">
-            You need one of these roles to access this page: {requiredRoles?.join(', ')}
-          </p>
-          <button
-            onClick={() => router.push(redirectTo)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg"
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    );
+    return <AccessDenied requiredRoles={requiredRoles} />;
   }
 
   return <>{children}</>;
 }
 
-export function withRole(WrappedComponent: React.ComponentType<any>, requiredRoles: UserRole[], redirectTo = '/dashboard') {
+export function withRole(WrappedComponent: React.ComponentType<any>, requiredRoles: UserRole[]) {
   return function WithRoleComponent(props: any) {
     return (
-      <RoleGuard requiredRoles={requiredRoles} redirectTo={redirectTo}>
+      <RoleGuard requiredRoles={requiredRoles}>
         <WrappedComponent {...props} />
       </RoleGuard>
     );

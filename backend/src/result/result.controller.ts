@@ -35,6 +35,7 @@ export class ResultController {
   ) {}
 
   @Get()
+  @Roles('Director', 'Teacher', 'Class Teacher')
   findAll(
     @Query('classId') classId: string,
     @Query('termId') termId: string,
@@ -50,11 +51,13 @@ export class ResultController {
   }
 
   @Get(':id')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   findOne(@Param('id') id: string, @Req() req: any) {
     return this.resultService.findOne(id, req.user.schoolId);
   }
 
   @Get('student/:studentId')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   findByStudent(
     @Param('studentId') studentId: string,
     @Query('termId') termId: string,
@@ -64,6 +67,7 @@ export class ResultController {
   }
 
   @Get(':studentId/:termId')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   async findByStudentAlt(
     @Param('studentId') studentId: string,
     @Param('termId') termId: string,
@@ -315,7 +319,7 @@ export class ResultController {
   }
 
   @Delete(':id')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   delete(@Param('id') id: string, @Req() req: any) {
     return this.resultService.delete(id, req.user.schoolId);
   }

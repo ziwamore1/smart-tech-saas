@@ -19,14 +19,14 @@ export class Grade7EczController {
   constructor(private readonly grade7Ecz: Grade7EczService) {}
 
   @Get('classes')
-  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @Roles('Director', 'Class Teacher', 'Teacher')
   async getClasses(@Request() req) {
     const data = await this.grade7Ecz.getSchoolGrade7Classes(req.user.schoolId);
     return { data, message: 'Grade 7 classes retrieved' };
   }
 
   @Post('mock-exam')
-  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @Roles('Director', 'Class Teacher', 'Teacher')
   async createMockExam(
     @Body() body: {
       classId: string;
@@ -50,21 +50,21 @@ export class Grade7EczController {
   }
 
   @Get('mock-exams')
-  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @Roles('Director', 'Class Teacher', 'Teacher')
   async getMockExams(@Query('classId') classId: string, @Request() req) {
     const data = await this.grade7Ecz.getMockExams(req.user.schoolId, classId);
     return { data, message: 'Mock exams retrieved' };
   }
 
   @Get('mock-exams/:id/results')
-  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @Roles('Director', 'Class Teacher', 'Teacher')
   async getMockExamResults(@Param('id') id: string) {
     const data = await this.grade7Ecz.getMockExamResults(id);
     return { data, message: 'Mock exam results retrieved' };
   }
 
   @Post('enter-score')
-  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @Roles('Director', 'Class Teacher', 'Teacher')
   async enterScore(
     @Body() body: { examId: string; studentId: string; score: number; totalScore?: number },
     @Request() req,
@@ -78,7 +78,7 @@ export class Grade7EczController {
   }
 
   @Post('enter-bulk-scores')
-  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @Roles('Director', 'Class Teacher', 'Teacher')
   async enterBulkScores(
     @Body() body: { examId: string; scores: Array<{ studentId: string; score: number }> },
     @Request() req,
@@ -92,28 +92,28 @@ export class Grade7EczController {
   }
 
   @Post('compute/:classId/:termId')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   async computeGrade7(@Param('classId') classId: string, @Param('termId') termId: string) {
     const data = await this.grade7Ecz.computeGrade7FromExams(classId, termId);
     return { data, message: 'Grade 7 computation completed' };
   }
 
   @Get('results/:classId/:termId')
-  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @Roles('Director', 'Class Teacher', 'Teacher')
   async getResults(@Param('classId') classId: string, @Param('termId') termId: string) {
     const data = await this.grade7Ecz.getGrade7Results(classId, termId);
     return { data, message: 'Grade 7 results retrieved' };
   }
 
   @Post('rank/:schoolId/:termId')
-  @Roles('DIRECTOR')
+  @Roles('Director')
   async rankResults(@Param('schoolId') schoolId: string, @Param('termId') termId: string) {
     const data = await this.grade7Ecz.rankGrade7Results(schoolId, termId);
     return { data, message: 'Grade 7 results ranked' };
   }
 
   @Get('prediction/:classId/:termId')
-  @Roles('DIRECTOR', 'CLASS_TEACHER', 'TEACHER')
+  @Roles('Director', 'Class Teacher', 'Teacher')
   async getPrediction(@Param('classId') classId: string, @Param('termId') termId: string) {
     const data = await this.grade7Ecz.getSelectionPrediction(classId, termId);
     return { data, message: 'Selection prediction retrieved' };

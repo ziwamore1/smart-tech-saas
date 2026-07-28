@@ -112,14 +112,14 @@ export class SchoolController {
 
   @Post('fix-class-grading-systems')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin', 'SuperAdmin')
+  @Roles('SuperAdmin')
   async fixClassGradingSystems() {
     return this.schoolService.fixClassGradingSystems();
   }
 
   @Get('diagnose-grading/:className')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin', 'SuperAdmin')
+  @Roles('SuperAdmin')
   async diagnoseGrading(@Param('className') className: string) {
     return this.schoolService.diagnoseGradingForClass(className);
   }
