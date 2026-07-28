@@ -110,7 +110,7 @@ export class ResultController {
   }
 
   @Get('template/:termId')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   async downloadTemplate(
     @Param('termId') termId: string,
     @Query('classId') classId: string,
@@ -167,7 +167,7 @@ export class ResultController {
   }
 
   @Post()
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   async create(
     @Body()
     body: {
@@ -206,7 +206,7 @@ export class ResultController {
   }
 
   @Post('bulk')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   async createBulk(
     @Body()
     body: {
@@ -247,7 +247,7 @@ export class ResultController {
   }
 
   @Post('upload/:termId')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   @UseInterceptors(FileInterceptor('file'))
   async uploadResults(
     @UploadedFile() file: Express.Multer.File,
@@ -280,7 +280,7 @@ export class ResultController {
   }
 
   @Patch(':id')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   async update(
     @Param('id') id: string,
     @Body() body: { score: number },
@@ -321,7 +321,7 @@ export class ResultController {
   }
 
   @Post('recalculate-grades')
-  @Roles('TEACHER', 'DIRECTOR')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   async recalculateGrades(
     @Body() body: { classId: string; termId: string },
     @Req() req: any,
