@@ -3,9 +3,73 @@ export interface SubjectColorConfig {
   text: string;
   border: string;
   hover: string;
+  gradient: string;
+  shortcut: string;
 }
 
-export const subjectColors: Record<string, SubjectColorConfig> = {
+export const categoryColors: Record<string, { bg: string; text: string; border: string; badge: string; gradient: string }> = {
+  Core: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300', badge: 'bg-blue-500', gradient: 'from-blue-400 to-blue-600' },
+  Science: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300', badge: 'bg-green-500', gradient: 'from-green-400 to-green-600' },
+  Mathematics: { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300', badge: 'bg-amber-500', gradient: 'from-amber-400 to-amber-600' },
+  Languages: { bg: 'bg-sky-100', text: 'text-sky-800', border: 'border-sky-300', badge: 'bg-sky-500', gradient: 'from-sky-400 to-sky-600' },
+  Humanities: { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300', badge: 'bg-orange-500', gradient: 'from-orange-400 to-orange-600' },
+  Technical: { bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-300', badge: 'bg-slate-500', gradient: 'from-slate-400 to-slate-600' },
+  'Creative and Performing Art': { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800', border: 'border-fuchsia-300', badge: 'bg-fuchsia-500', gradient: 'from-fuchsia-400 to-fuchsia-600' },
+  Elective: { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300', badge: 'bg-purple-500', gradient: 'from-purple-400 to-purple-600' },
+  'Business Studies': { bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-300', badge: 'bg-cyan-500', gradient: 'from-cyan-400 to-cyan-600' },
+  'Technical and Vocational': { bg: 'bg-stone-100', text: 'text-stone-800', border: 'border-stone-300', badge: 'bg-stone-500', gradient: 'from-stone-400 to-stone-600' },
+  'Home Economics': { bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-300', badge: 'bg-rose-500', gradient: 'from-rose-400 to-rose-600' },
+  'Computer & Technology Studies': { bg: 'bg-violet-100', text: 'text-violet-800', border: 'border-violet-300', badge: 'bg-violet-500', gradient: 'from-violet-400 to-violet-600' },
+};
+
+export function getCategoryColor(category: string | null | undefined) {
+  if (!category) return { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300', badge: 'bg-gray-500', gradient: 'from-gray-400 to-gray-600' };
+  return categoryColors[category] || { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300', badge: 'bg-gray-500', gradient: 'from-gray-400 to-gray-600' };
+}
+
+export const subjectShortcuts: Record<string, string> = {
+  'Mathematics': 'MATH',
+  'English Language': 'ENG',
+  'English': 'ENG',
+  'Biology': 'BIO',
+  'Chemistry': 'CHEM',
+  'Physics': 'PHY',
+  'Geography': 'GEO',
+  'History': 'HIST',
+  'Religious Education': 'RE',
+  'French': 'FR',
+  'Computer Studies': 'ICT',
+  'Information and Communication Technology': 'ICT',
+  'Physical Education': 'PE',
+  'Creative and Performing Art': 'CPA',
+  'Art and Design': 'ART',
+  'Music': 'MUS',
+  'Commerce': 'COM',
+  'Business Studies': 'BS',
+  'Home Economics': 'HE',
+  'Technical Drawing': 'TD',
+  'Literature in English': 'LIT',
+  'Civic Education': 'CIV',
+  'Zambian Languages': 'ZAM',
+  'Agricultural Science': 'AGR',
+  'Food and Nutrition': 'FN',
+  'Additional Mathematics': 'AM',
+  'Computer Science': 'CS',
+  'Economics': 'ECON',
+  'Government': 'GOV',
+};
+
+export function getSubjectShortcut(name: string | null | undefined): string {
+  if (!name) return '??';
+  const normalized = name.toUpperCase().trim();
+  const shortcut = subjectShortcuts[name] || subjectShortcuts[Object.keys(subjectShortcuts).find(k => k.toUpperCase() === normalized) || ''];
+  if (shortcut) return shortcut;
+  const words = name.split(/\s+/);
+  if (words.length === 1) return words[0].substring(0, 4).toUpperCase();
+  return words.slice(0, 2).map(w => w[0]).join('').toUpperCase();
+}
+
+export const subjectColors: Record<string, Omit<SubjectColorConfig, 'gradient' | 'shortcut'>> = {
   MATHS: {
     bg: "bg-amber-200",
     text: "text-amber-900",
@@ -182,7 +246,7 @@ export const subjectColors: Record<string, SubjectColorConfig> = {
   },
 };
 
-export function getSubjectColor(subjectName: string): SubjectColorConfig {
+export function getSubjectColor(subjectName: string): Omit<SubjectColorConfig, 'gradient' | 'shortcut'> {
   const normalized = subjectName?.toUpperCase()?.trim() || ""
 
   if (subjectColors[normalized]) {

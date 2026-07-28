@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { subjectApi } from '@/lib/api';
+import { getSubjectColor, getCategoryColor, getSubjectShortcut } from '@/config/subjectColors';
 
 export default function SubjectsPage() {
   const queryClient = useQueryClient();
@@ -183,23 +184,21 @@ export default function SubjectsPage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredSubjects.map((subject: any, index: number) => {
-                  const colors = [
-                    'from-blue-400 to-blue-600', 'from-green-400 to-green-600', 
-                    'from-purple-400 to-purple-600', 'from-pink-400 to-pink-600',
-                    'from-indigo-400 to-indigo-600', 'from-amber-400 to-amber-600',
-                    'from-teal-400 to-teal-600', 'from-red-400 to-red-600',
-                  ];
-                  const colorClass = colors[index % colors.length];
+                  const categoryColor = getCategoryColor(subject.category);
+                  const shortcut = getSubjectShortcut(subject.name);
+                  const subjectColor = getSubjectColor(subject.name);
                   
                   return (
                   <tr key={subject.id} className="hover:bg-gray-50 transition-colors">
                     <td className="py-4 px-6">
-                      <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">{subject.code || 'N/A'}</span>
+                      <span className={`inline-flex items-center justify-center w-14 h-8 rounded-lg text-xs font-bold ${subjectColor.bg} ${subjectColor.text} border ${subjectColor.border}`}>
+                        {shortcut}
+                      </span>
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colorClass} flex items-center justify-center text-white font-bold text-sm shadow-sm`}>
-                          {subject.name?.[0] || '?'}
+                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${categoryColor.gradient} flex items-center justify-center text-white font-bold text-sm shadow-sm`}>
+                          {shortcut[0] || '?'}
                         </div>
                         <div>
                           <div className="font-medium text-gray-900">{subject.name}</div>
@@ -208,7 +207,9 @@ export default function SubjectsPage() {
                       </div>
                     </td>
                     <td className="py-4 px-6">
-                      <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">{subject.category || 'Uncategorized'}</span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${categoryColor.bg} ${categoryColor.text}`}>
+                        {subject.category || 'Uncategorized'}
+                      </span>
                     </td>
                     <td className="py-4 px-6">
                       <span className="text-sm">{subject.credits || '-'}</span>
@@ -296,7 +297,11 @@ export default function SubjectsPage() {
                   <option value="Languages">Languages</option>
                   <option value="Humanities">Humanities</option>
                   <option value="Technical">Technical</option>
-                  <option value="Arts">Arts</option>
+                  <option value="Creative and Performing Art">Creative and Performing Art</option>
+                  <option value="Business Studies">Business Studies</option>
+                  <option value="Technical and Vocational">Technical and Vocational</option>
+                  <option value="Home Economics">Home Economics</option>
+                  <option value="Computer & Technology Studies">Computer & Technology Studies</option>
                   <option value="Elective">Elective</option>
                 </select>
               </div>
@@ -385,7 +390,11 @@ export default function SubjectsPage() {
                   <option value="Languages">Languages</option>
                   <option value="Humanities">Humanities</option>
                   <option value="Technical">Technical</option>
-                  <option value="Arts">Arts</option>
+                  <option value="Creative and Performing Art">Creative and Performing Art</option>
+                  <option value="Business Studies">Business Studies</option>
+                  <option value="Technical and Vocational">Technical and Vocational</option>
+                  <option value="Home Economics">Home Economics</option>
+                  <option value="Computer & Technology Studies">Computer & Technology Studies</option>
                   <option value="Elective">Elective</option>
                 </select>
               </div>
