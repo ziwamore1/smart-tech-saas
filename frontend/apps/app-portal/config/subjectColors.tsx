@@ -65,6 +65,7 @@ export const subjectShortcuts: Record<string, string> = {
   'Economics': 'ECON',
   'Government': 'GOV',
   'Principles of Accounts': 'PA',
+  'Transport and Tourism': 'TT',
 };
 
 export function getSubjectShortcut(name: string | null | undefined): string {
