@@ -1,9 +1,22 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { StudentSubjectService } from '../student-subject/student-subject.service';
 
 @Injectable()
 export class AnalyticsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private studentSubjectService: StudentSubjectService,
+  ) {}
+
+  private async filterComputedResultsBySubjects(results: any[], classId: string) {
+    const studentIds = [...new Set(results.map(r => r.studentId))];
+    const subjectMap = await this.studentSubjectService.getClassSubjectsForStudents(studentIds, classId);
+    return results.filter(r => {
+      const validIds = subjectMap.get(r.studentId);
+      return validIds ? validIds.includes(r.subjectId) : true;
+    });
+  }
 
   // ECZ Grading System mapping
   private interpretECZ(score: number) {
@@ -19,7 +32,7 @@ export class AnalyticsService {
   }
 
   async getClassPerformance(schoolId: string, classId: string, termId: string) {
-    const results = await this.prisma.computedResult.findMany({
+    let results = await this.prisma.computedResult.findMany({
       where: {
         classId,
         termId,
@@ -32,6 +45,8 @@ export class AnalyticsService {
         student: { select: { id: true } },
       },
     });
+
+    results = await this.filterComputedResultsBySubjects(results, classId);
 
     if (results.length === 0) {
       return null;
@@ -73,7 +88,7 @@ export class AnalyticsService {
     termId: string,
     gradingSystem: 'ECZ' | 'GPA' = 'ECZ',
   ) {
-    const computedResults = await this.prisma.computedResult.findMany({
+    let computedResults = await this.prisma.computedResult.findMany({
       where: {
         classId,
         termId,
@@ -86,6 +101,8 @@ export class AnalyticsService {
         student: { select: { id: true, firstName: true, lastName: true, admissionNumber: true } },
       },
     });
+
+    computedResults = await this.filterComputedResultsBySubjects(computedResults, classId);
 
     if (!computedResults.length) return [];
 
@@ -294,7 +311,7 @@ export class AnalyticsService {
     return parts.join(' ');
   }
   async getSubjectPerformance(classId: string, termId: string) {
-    const results = await this.prisma.computedResult.findMany({
+    let results = await this.prisma.computedResult.findMany({
       where: {
         classId,
         termId,
@@ -306,6 +323,8 @@ export class AnalyticsService {
         subject: true,
       },
     });
+
+    results = await this.filterComputedResultsBySubjects(results, classId);
 
     const subjects: Record<string, any> = {};
 
@@ -330,7 +349,7 @@ export class AnalyticsService {
     }));
   }
   async getGradeDistribution(classId: string, termId: string) {
-    const results = await this.prisma.computedResult.findMany({
+    let results = await this.prisma.computedResult.findMany({
       where: {
         classId,
         termId,
@@ -338,6 +357,8 @@ export class AnalyticsService {
         isAbsent: false,
       },
     });
+
+    results = await this.filterComputedResultsBySubjects(results, classId);
 
     const distribution: Record<string, number> = {};
 
@@ -354,7 +375,7 @@ export class AnalyticsService {
     return distribution;
   }
   async getGenderPerformance(classId: string, termId: string) {
-    const results = await this.prisma.computedResult.findMany({
+    let results = await this.prisma.computedResult.findMany({
       where: {
         classId,
         termId,
@@ -366,6 +387,8 @@ export class AnalyticsService {
         student: { select: { id: true, gender: true } },
       },
     });
+
+    results = await this.filterComputedResultsBySubjects(results, classId);
 
     const genderTotals: Record<string, any> = {};
 
@@ -747,7 +770,7 @@ export class AnalyticsService {
       };
     }
 
-    const results = await this.prisma.computedResult.findMany({
+    let results = await this.prisma.computedResult.findMany({
       where: { schoolId, termId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null }, isAbsent: false },
       include: { student: { select: { id: true, firstName: true, lastName: true } }, subject: { select: { id: true, name: true } } },
     });

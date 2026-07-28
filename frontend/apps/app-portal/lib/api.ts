@@ -429,6 +429,18 @@ export const classSubjectApi = {
   remove: (classId: string, subjectId: string) => api.delete(`/class-subjects/${classId}/${subjectId}`),
 };
 
+export const studentSubjectApi = {
+  getByStudent: (studentId: string) => api.get(`/student-subjects/student/${studentId}`),
+  getByClass: (classId: string) => api.get(`/student-subjects/class/${classId}`),
+  getMissing: (classId: string) => api.get(`/student-subjects/class/${classId}/missing`),
+  assign: (data: { studentId: string; subjectIds: string[]; classId: string; academicYearId?: string }) =>
+    api.post('/student-subjects/assign', data),
+  bulkAssign: (data: { classId: string; assignments: Array<{ studentId: string; subjectIds: string[] }>; academicYearId?: string }) =>
+    api.post('/student-subjects/bulk-assign', data),
+  unassign: (studentId: string, subjectId: string, classId: string) =>
+    api.delete(`/student-subjects?studentId=${studentId}&subjectId=${subjectId}&classId=${classId}`),
+};
+
 export const termApi = {
   getAll: () => api.get('/term'),
   getByYear: (academicYearId: string) => api.get(`/term/${academicYearId}`),

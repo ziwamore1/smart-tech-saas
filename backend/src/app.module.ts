@@ -97,6 +97,7 @@ import { ClassTeacherAssignmentModule } from './class-teacher-assignment/class-t
 import { ResultsSmsModule } from './results-sms/results-sms.module';
 import { HolidayModule } from './holiday/holiday.module';
 import { ReportEngineModule } from './report-engine/report-engine.module';
+import { StudentSubjectModule } from './student-subject/student-subject.module';
 
 @Module({
   imports: [
@@ -219,6 +220,7 @@ import { ReportEngineModule } from './report-engine/report-engine.module';
     ResultsSmsModule,
     HolidayModule,
     ReportEngineModule,
+    StudentSubjectModule,
   ],
   providers: [ProductionLogger],
 })

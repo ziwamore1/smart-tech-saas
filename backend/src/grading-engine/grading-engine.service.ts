@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { StudentSubjectService } from '../student-subject/student-subject.service';
 import { Decimal } from 'decimal.js';
 
 export interface GradeResult {
@@ -20,7 +21,10 @@ export interface ComputeClassResultsDto {
 export class GradingEngineService {
   private readonly logger = new Logger(GradingEngineService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private studentSubjectService: StudentSubjectService,
+  ) {}
 
   async computeGrade(
     percentage: number,
@@ -302,10 +306,16 @@ export class GradingEngineService {
       select: { studentId: true },
     });
 
+    const studentIds = enrollments.map(e => e.studentId);
+    const subjectMap = await this.studentSubjectService.getClassSubjectsForStudents(studentIds, classId);
+
     const computed = [];
     const failed = [];
 
     for (const enrollment of enrollments) {
+      const validSubjectIds = subjectMap.get(enrollment.studentId) ?? [];
+      if (!validSubjectIds.includes(subjectId)) continue;
+
       try {
         const result = await this.computeWeightedTotal(
           enrollment.studentId,
@@ -377,23 +387,27 @@ export class GradingEngineService {
       return null;
     }
 
+    const classId = computedResults[0].classId;
+    const validSubjectIds = await this.studentSubjectService.getClassSubjectsForStudent(studentId, classId);
+    const filteredResults = computedResults.filter(r => validSubjectIds.includes(r.subjectId));
+    if (filteredResults.length === 0) return null;
+
     const institutionType = await this.getSchoolInstitutionType(schoolId);
     const isPrimary = institutionType === 'PRIMARY_SCHOOL';
     const passThreshold = isPrimary ? 35 : 50;
 
-    const classId = computedResults[0].classId;
     const classSize = await this.prisma.enrollment.count({
       where: { classId, status: 'ACTIVE' },
     });
 
-    const subjectsPassed = computedResults.filter(r => {
+    const subjectsPassed = filteredResults.filter(r => {
       const percentage = r.finalPercentage ?? 0;
       return percentage >= passThreshold;
     }).length;
 
-    const subjectsFailed = computedResults.length - subjectsPassed;
+    const subjectsFailed = filteredResults.length - subjectsPassed;
 
-    const avgPercentage = computedResults.reduce((sum, r) => sum + (r.finalPercentage ?? 0), 0) / computedResults.length;
+    const avgPercentage = filteredResults.reduce((sum, r) => sum + (r.finalPercentage ?? 0), 0) / filteredResults.length;
 
     const overallGradeResult = await this.computeGradeFull(
       avgPercentage,
@@ -403,22 +417,22 @@ export class GradingEngineService {
       schoolId,
     );
 
-    const sortedByPercentage = [...computedResults].sort((a, b) => (b.finalPercentage ?? 0) - (a.finalPercentage ?? 0));
+    const sortedByPercentage = [...filteredResults].sort((a, b) => (b.finalPercentage ?? 0) - (a.finalPercentage ?? 0));
     const strengths = sortedByPercentage.slice(0, 3).map(r => r.subject.name);
     const weaknesses = sortedByPercentage.slice(-3).reverse().map(r => r.subject.name);
 
-    const avgGpa = computedResults.some(r => r.gpa !== null)
-      ? computedResults.reduce((sum, r) => sum + (r.gpa ?? 0), 0) / computedResults.filter(r => r.gpa !== null).length
+    const avgGpa = filteredResults.some(r => r.gpa !== null)
+      ? filteredResults.reduce((sum, r) => sum + (r.gpa ?? 0), 0) / filteredResults.filter(r => r.gpa !== null).length
       : null;
 
-    const totalPoints = computedResults.reduce((sum, r) => sum + (r.points ?? 0), 0);
+    const totalPoints = filteredResults.reduce((sum, r) => sum + (r.points ?? 0), 0);
 
     return {
       studentId,
       termId,
       classId,
       schoolId,
-      totalSubjects: computedResults.length,
+      totalSubjects: filteredResults.length,
       subjectsPassed,
       subjectsFailed,
       overallPercentage: parseFloat(avgPercentage.toFixed(2)),

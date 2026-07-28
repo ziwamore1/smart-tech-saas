@@ -1,11 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { StudentSubjectService } from '../student-subject/student-subject.service';
 
 @Injectable()
 export class ResultAnalyticsService {
   private readonly logger = new Logger(ResultAnalyticsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private studentSubjectService: StudentSubjectService,
+  ) {}
+
+  private async filterComputedResultsBySubjects(results: any[], classId: string) {
+    const studentIds = [...new Set(results.map(r => r.studentId))];
+    const subjectMap = await this.studentSubjectService.getClassSubjectsForStudents(studentIds, classId);
+    return results.filter(r => {
+      const validIds = subjectMap.get(r.studentId);
+      return validIds ? validIds.includes(r.subjectId) : true;
+    });
+  }
 
   async getClassAnalytics(classId: string, termId: string, schoolId: string) {
     let computedResults = await this.prisma.computedResult.findMany({
@@ -23,6 +36,8 @@ export class ResultAnalyticsService {
         subject: { select: { id: true, name: true } },
       },
     });
+
+    computedResults = await this.filterComputedResultsBySubjects(computedResults, classId);
 
     const totalEnrolled = await this.prisma.enrollment.count({
       where: { classId, status: 'ACTIVE' },
@@ -251,6 +266,8 @@ export class ResultAnalyticsService {
         subject: { select: { name: true } },
       },
     });
+
+    computedResults = await this.filterComputedResultsBySubjects(computedResults, classId);
 
     if (computedResults.length === 0) {
       return [];

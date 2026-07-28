@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 import { GradingEngineService } from '../grading-engine/grading-engine.service';
+import { StudentSubjectService } from '../student-subject/student-subject.service';
 
 @Injectable()
 export class ReportCardEngineService {
@@ -11,6 +12,7 @@ export class ReportCardEngineService {
     private prisma: PrismaService,
     private compositeSubjectService: CompositeSubjectService,
     private gradingEngine: GradingEngineService,
+    private studentSubjectService: StudentSubjectService,
   ) {}
 
   async generateReportCardData(
@@ -81,6 +83,11 @@ export class ReportCardEngineService {
       ],
     });
 
+    // Filter by student's assigned subjects
+    const validSubjectIds = await this.studentSubjectService.getClassSubjectsForStudent(studentId, enrollment.classId);
+    const filteredComputedResults = computedResults.filter(r => validSubjectIds.includes(r.subjectId));
+    const filteredAssessmentResults = assessmentResults.filter(r => validSubjectIds.includes(r.subjectId));
+
     // Fallback: read from Result table for subjects where ComputedResult has NULL scores
     const legacyResults = await this.prisma.result.findMany({
       where: {
@@ -96,8 +103,8 @@ export class ReportCardEngineService {
     }
 
     const subjectBreakdown: any[] = [];
-    for (const result of computedResults) {
-      const assessments = assessmentResults
+    for (const result of filteredComputedResults) {
+      const assessments = filteredAssessmentResults
         .filter(a => a.subjectId === result.subjectId)
         .map(a => ({
           name: a.assessmentDef.name,

@@ -309,6 +309,7 @@ model School {
   CurriculumCoverage           CurriculumCoverage[]
   compositeSubjects            CompositeSubject[]
   holidays                     Holiday[]
+  studentSubjects              StudentSubject[]
 
   @@index([institutionTypeId])
   @@index([isActive])
@@ -332,6 +333,7 @@ model AcademicYear {
   grade7Results           Grade7Result[]
   CurriculumLessonPlan    CurriculumLessonPlan[]
   classTeacherAssignments ClassTeacherAssignment[]
+  studentSubjects         StudentSubject[]
 
   @@index([schoolId])
   @@index([isCurrent])
@@ -379,7 +381,7 @@ model Holiday {
   startDate   DateTime
   endDate     DateTime
   type        String   @default("PUBLIC") // PUBLIC, SCHOOL, RELIGIOUS, CUSTOM
-  isRecurring Boolean  @default(false)     // repeats annually
+  isRecurring Boolean  @default(false) // repeats annually
   schoolId    String
   school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
@@ -526,6 +528,7 @@ model Class {
   CurriculumLessonPlan    CurriculumLessonPlan[]
   CurriculumCoverage      CurriculumCoverage[]
   classTeacherAssignments ClassTeacherAssignment[]
+  studentSubjects         StudentSubject[]
 }
 
 model Subject {
@@ -573,6 +576,7 @@ model Subject {
   CurriculumLessonPlan       CurriculumLessonPlan[]
   CurriculumCoverage         CurriculumCoverage[]
   compositeSubjectComponents CompositeSubjectComponent[]
+  studentSubjects            StudentSubject[]
 
   @@unique([name, code, schoolId])
 }
@@ -589,6 +593,31 @@ model ClassSubject {
   @@unique([classId, subjectId])
   @@index([classId])
   @@index([subjectId])
+}
+
+model StudentSubject {
+  id             String   @id @default(uuid())
+  studentId      String
+  subjectId      String
+  classId        String
+  schoolId       String
+  academicYearId String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  student      Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject      Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  class        Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id], onDelete: SetNull)
+
+  @@unique([studentId, subjectId, classId, academicYearId])
+  @@index([studentId])
+  @@index([subjectId])
+  @@index([classId])
+  @@index([schoolId])
+  @@index([academicYearId])
 }
 
 model TeachingAssignment {
@@ -725,6 +754,7 @@ model Student {
   aiRecommendations    AiRecommendation[]
   aiTopicMasteries     AiTopicMastery[]
   grade7Results        Grade7Result[]
+  studentSubjects      StudentSubject[]
 
   @@unique([admissionNumber, schoolId])
   @@unique([studentUuid])
@@ -5759,25 +5789,25 @@ model WhatsAppQueue {
 }
 
 model ResultSmsLog {
-  id               String   @id @default(uuid())
-  schoolId         String
-  classId          String
-  termId           String
-  studentId        String
-  parentId         String?
-  parentName       String?
-  studentName      String
-  admissionNumber  String?
-  phoneNumber      String?
-  message          String
-  status           String   @default("PENDING") // PENDING, SENT, FAILED, SKIPPED
-  provider         String?  // twilio, beem
+  id                String    @id @default(uuid())
+  schoolId          String
+  classId           String
+  termId            String
+  studentId         String
+  parentId          String?
+  parentName        String?
+  studentName       String
+  admissionNumber   String?
+  phoneNumber       String?
+  message           String
+  status            String    @default("PENDING") // PENDING, SENT, FAILED, SKIPPED
+  provider          String? // twilio, beem
   providerMessageId String?
-  errorMessage     String?
-  errorSuggestion  String?  // Recommended action for the error
-  batchId          String?  // Groups messages sent together
-  sentAt           DateTime?
-  createdAt        DateTime @default(now())
+  errorMessage      String?
+  errorSuggestion   String? // Recommended action for the error
+  batchId           String? // Groups messages sent together
+  sentAt            DateTime?
+  createdAt         DateTime  @default(now())
 
   @@index([schoolId])
   @@index([classId])
@@ -5788,27 +5818,27 @@ model ResultSmsLog {
 }
 
 model GeneratedReport {
-  id               String   @id @default(uuid())
-  schoolId         String
-  reportType       String   // REPORT_CARD, CLASS_REPORT, TRANSCRIPT, CERTIFICATE, ATTENDANCE_REPORT, ANALYTICS_SUMMARY, MARK_SCHEDULE, PERFORMANCE_REPORT
-  title            String
-  studentId        String?
-  className        String?
-  classId          String?
-  termId           String?
-  academicYear     String?
-  fileName         String
-  fileUrl          String?  // Cloudinary URL
-  fileSize         Int?     // bytes
-  mimeType         String?  @default("application/pdf")
-  templateId       String?
-  generatedById    String   // userId of the person who generated it
-  generatedByName  String?
-  status           String   @default("COMPLETED") // PENDING, PROCESSING, COMPLETED, FAILED
-  errorMessage     String?
-  metadata         Json?    // Extra data (subject, assessmentType, etc.)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String   @id @default(uuid())
+  schoolId        String
+  reportType      String // REPORT_CARD, CLASS_REPORT, TRANSCRIPT, CERTIFICATE, ATTENDANCE_REPORT, ANALYTICS_SUMMARY, MARK_SCHEDULE, PERFORMANCE_REPORT
+  title           String
+  studentId       String?
+  className       String?
+  classId         String?
+  termId          String?
+  academicYear    String?
+  fileName        String
+  fileUrl         String? // Cloudinary URL
+  fileSize        Int? // bytes
+  mimeType        String?  @default("application/pdf")
+  templateId      String?
+  generatedById   String // userId of the person who generated it
+  generatedByName String?
+  status          String   @default("COMPLETED") // PENDING, PROCESSING, COMPLETED, FAILED
+  errorMessage    String?
+  metadata        Json? // Extra data (subject, assessmentType, etc.)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([schoolId])
   @@index([reportType])

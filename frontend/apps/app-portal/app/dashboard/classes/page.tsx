@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { classApi, levelTypeApi, enrollmentApi, studentApi, subjectApi, classSubjectApi, gradingSystemApi, api, classTeacherAssignmentApi, academicYearApi } from '@/lib/api';
+import { classApi, levelTypeApi, enrollmentApi, studentApi, subjectApi, classSubjectApi, gradingSystemApi, api, classTeacherAssignmentApi, academicYearApi, studentSubjectApi } from '@/lib/api';
 import { usePermissions } from '@/lib/permission-context';
 import TooltipWrap from '@/components/timetable/TooltipWrap';
 
@@ -36,6 +36,10 @@ export default function ClassesPage() {
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [showClassTeacherModal, setShowClassTeacherModal] = useState(false);
   const [classTeacherForm, setClassTeacherForm] = useState({ teacherId: '', academicYearId: '', isPrimary: true });
+  const [showStudentSubjectsModal, setShowStudentSubjectsModal] = useState(false);
+  const [studentSubjectAssignments, setStudentSubjectAssignments] = useState<Record<string, string[]>>({});
+  const [selectedAssignStudentId, setSelectedAssignStudentId] = useState<string | null>(null);
+  const [selectedAssignSubjectIds, setSelectedAssignSubjectIds] = useState<string[]>([]);
 
   const { data: classesResponse, isLoading: classesLoading } = useQuery({
     queryKey: ['classes'],
@@ -171,6 +175,28 @@ export default function ClassesPage() {
 
   const enrollments = Array.isArray(enrollmentsData) ? enrollmentsData : [];
 
+  const { data: studentSubjectData, refetch: refetchStudentSubjects } = useQuery({
+    queryKey: ['student-subjects', selectedClass?.id],
+    queryFn: async () => {
+      if (!selectedClass?.id) return [];
+      const res = await studentSubjectApi.getByClass(selectedClass.id);
+      const data = res.data?.data || res.data || [];
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !!selectedClass?.id,
+  });
+
+  const { data: missingStudentSubjectsData } = useQuery({
+    queryKey: ['missing-student-subjects', selectedClass?.id],
+    queryFn: async () => {
+      if (!selectedClass?.id) return [];
+      const res = await studentSubjectApi.getMissing(selectedClass.id);
+      const data = res.data?.data || res.data || [];
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !!selectedClass?.id && showStudentSubjectsModal,
+  });
+
   const levelTypes = Array.isArray(levelTypesResponse) ? levelTypesResponse : 
                      levelTypesResponse?.data ? levelTypesResponse.data : [];
 
@@ -296,6 +322,38 @@ export default function ClassesPage() {
     },
     onError: (error: any) => {
       setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to remove subject.' });
+      setTimeout(() => setMessage(null), 5000);
+    },
+  });
+
+  const assignStudentSubjectsMutation = useMutation({
+    mutationFn: async (data: { studentId: string; subjectIds: string[]; classId: string }) => {
+      return studentSubjectApi.assign(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['student-subjects'] });
+      queryClient.invalidateQueries({ queryKey: ['missing-student-subjects'] });
+      setMessage({ type: 'success', text: 'Subjects assigned to student!' });
+      setTimeout(() => setMessage(null), 3000);
+    },
+    onError: (error: any) => {
+      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to assign subjects.' });
+      setTimeout(() => setMessage(null), 5000);
+    },
+  });
+
+  const bulkAssignStudentSubjectsMutation = useMutation({
+    mutationFn: async (data: { classId: string; assignments: Array<{ studentId: string; subjectIds: string[] }> }) => {
+      return studentSubjectApi.bulkAssign(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['student-subjects'] });
+      queryClient.invalidateQueries({ queryKey: ['missing-student-subjects'] });
+      setMessage({ type: 'success', text: 'Subjects assigned to all students!' });
+      setTimeout(() => setMessage(null), 3000);
+    },
+    onError: (error: any) => {
+      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to bulk assign subjects.' });
       setTimeout(() => setMessage(null), 5000);
     },
   });
@@ -485,6 +543,19 @@ export default function ClassesPage() {
                   >
                     📚
                   </button>
+                  {(canManageClasses || user?.role === 'TEACHER') && (
+                  <TooltipWrap text="Assign subjects to individual students">
+                  <button 
+                    onClick={() => {
+                      setSelectedClass(cls);
+                      setShowStudentSubjectsModal(true);
+                    }}
+                    className="px-3 py-2 bg-violet-50 text-violet-600 rounded-xl hover:bg-violet-100 text-xs font-medium transition-colors"
+                  >
+                    🎯
+                  </button>
+                  </TooltipWrap>
+                  )}
                   </TooltipWrap>
                   {canManageClasses && (
                   <TooltipWrap text="Manage class teacher assignment">
@@ -1232,6 +1303,202 @@ export default function ClassesPage() {
                 className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-gray-400 transition-all active:scale-95"
               >
                 {createClassTeacherAssignmentMutation.isPending ? 'Assigning...' : 'Assign'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showStudentSubjectsModal && selectedClass && (
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">Student Subject Assignments — {selectedClass.name}</h2>
+              <button
+                onClick={() => {
+                  setShowStudentSubjectsModal(false);
+                  setSelectedClass(null);
+                  setSelectedAssignStudentId(null);
+                  setSelectedAssignSubjectIds([]);
+                }}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex items-center gap-4 mb-4">
+              <button
+                onClick={() => {
+                  const allStudentIds = enrollments.map((e: any) => e.student?.id || e.studentId).filter(Boolean);
+                  const classSubjectIds = (classSubjectsData || []).map((cs: any) => cs.subject?.id || cs.subjectId).filter(Boolean);
+                  const assignments = allStudentIds.map(studentId => ({
+                    studentId,
+                    subjectIds: classSubjectIds,
+                  }));
+                  if (assignments.length > 0 && confirm(`Assign all ${classSubjectIds.length} subjects to all ${assignments.length} students?`)) {
+                    bulkAssignStudentSubjectsMutation.mutate({ classId: selectedClass.id, assignments });
+                  }
+                }}
+                disabled={bulkAssignStudentSubjectsMutation.isPending}
+                className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 text-xs font-medium transition-colors disabled:opacity-50"
+              >
+                {bulkAssignStudentSubjectsMutation.isPending ? 'Assigning...' : 'Assign All Subjects to All Students'}
+              </button>
+              <span className="text-xs text-gray-500">
+                {missingStudentSubjectsData?.length ?? 0} students need subject assignments
+              </span>
+            </div>
+
+            <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
+              <div className="w-1/3 border rounded-lg overflow-y-auto">
+                <div className="sticky top-0 bg-gray-50 px-3 py-2 border-b font-semibold text-sm text-gray-700">
+                  Students ({enrollments.length})
+                </div>
+                {enrollments.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-gray-500">No students enrolled</div>
+                ) : (
+                  <div className="divide-y">
+                    {enrollments.map((enrollment: any) => {
+                      const studentId = enrollment.student?.id || enrollment.studentId;
+                      const student = enrollment.student || {};
+                      const studentSubjects = studentSubjectData?.filter(
+                        (ss: any) => ss.studentId === studentId
+                      ) || [];
+                      const isSelected = selectedAssignStudentId === studentId;
+                      const isMissing = missingStudentSubjectsData?.includes(studentId);
+                      return (
+                        <button
+                          key={studentId}
+                          onClick={() => {
+                            setSelectedAssignStudentId(studentId);
+                            setSelectedAssignSubjectIds(studentSubjects.map((ss: any) => ss.subjectId));
+                          }}
+                          className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
+                            isSelected ? 'bg-indigo-50 border-l-2 border-indigo-500' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="font-medium">{student.firstName} {student.lastName}</div>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="text-xs text-gray-500">{studentSubjects.length} subjects</span>
+                            {isMissing && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">!</span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 border rounded-lg overflow-y-auto">
+                {!selectedAssignStudentId ? (
+                  <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                    Select a student to assign subjects
+                  </div>
+                ) : (
+                  <div className="p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-gray-800">
+                        {enrollments.find((e: any) => (e.student?.id || e.studentId) === selectedAssignStudentId)?.student?.firstName || 'Student'} — Subject Selection
+                      </h3>
+                      <button
+                        onClick={() => {
+                          setSelectedAssignSubjectIds([]);
+                        }}
+                        className="text-xs text-gray-500 hover:text-gray-700"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+
+                    {(classSubjectsData || []).length === 0 ? (
+                      <div className="text-center py-8 text-gray-500 text-sm">
+                        No subjects assigned to this class. Add subjects first.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {(classSubjectsData || []).map((cs: any) => {
+                          const subjectId = cs.subject?.id || cs.subjectId;
+                          const subjectName = cs.subject?.name || 'Unknown';
+                          const isChecked = selectedAssignSubjectIds.includes(subjectId);
+                          return (
+                            <label
+                              key={cs.id}
+                              className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                                isChecked ? 'bg-indigo-50 border-indigo-200' : 'hover:bg-gray-50 border-gray-200'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {
+                                  setSelectedAssignSubjectIds(prev =>
+                                    prev.includes(subjectId)
+                                      ? prev.filter(id => id !== subjectId)
+                                      : [...prev, subjectId]
+                                  );
+                                }}
+                                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                              />
+                              <div className="flex items-center gap-2">
+                                <span className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">
+                                  {subjectName[0] || '?'}
+                                </span>
+                                <span className="font-medium text-sm">{subjectName}</span>
+                                {cs.subject?.code && (
+                                  <span className="text-xs text-gray-500">({cs.subject.code})</span>
+                                )}
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div className="mt-6 flex justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedAssignStudentId(null);
+                          setSelectedAssignSubjectIds([]);
+                        }}
+                        className="px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (selectedAssignStudentId && selectedAssignSubjectIds.length > 0) {
+                            assignStudentSubjectsMutation.mutate({
+                              studentId: selectedAssignStudentId,
+                              subjectIds: selectedAssignSubjectIds,
+                              classId: selectedClass.id,
+                            });
+                          }
+                        }}
+                        disabled={assignStudentSubjectsMutation.isPending || selectedAssignSubjectIds.length === 0}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 text-sm transition-all active:scale-95"
+                      >
+                        {assignStudentSubjectsMutation.isPending ? 'Saving...' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-4 pt-4 border-t">
+              <button
+                onClick={() => {
+                  setShowStudentSubjectsModal(false);
+                  setSelectedClass(null);
+                  setSelectedAssignStudentId(null);
+                  setSelectedAssignSubjectIds([]);
+                }}
+                className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all active:scale-95"
+              >
+                Done
               </button>
             </div>
           </div>

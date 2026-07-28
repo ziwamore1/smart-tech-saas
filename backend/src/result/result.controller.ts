@@ -21,6 +21,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
+import { StudentSubjectService } from '../student-subject/student-subject.service';
 
 @Controller('results')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,6 +31,7 @@ export class ResultController {
   constructor(
     private readonly resultService: ResultService,
     private prisma: PrismaService,
+    private studentSubjectService: StudentSubjectService,
   ) {}
 
   @Get()
@@ -67,7 +69,7 @@ export class ResultController {
     @Param('termId') termId: string,
     @Req() req: any,
   ) {
-    const results = await this.prisma.computedResult.findMany({
+    let results = await this.prisma.computedResult.findMany({
       where: {
         studentId,
         termId,
@@ -79,6 +81,12 @@ export class ResultController {
       },
       orderBy: { subject: { name: 'asc' } },
     });
+
+    if (results.length > 0) {
+      const classId = results[0].classId;
+      const validSubjectIds = await this.studentSubjectService.getClassSubjectsForStudent(studentId, classId);
+      results = results.filter(r => validSubjectIds.includes(r.subjectId));
+    }
 
     return {
       studentId,
