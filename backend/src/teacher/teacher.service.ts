@@ -355,6 +355,96 @@ export class TeacherService {
       assignedSubjects: formattedAssignments,
     };
   }
+  async getTeacherClasses(teacherId: string, schoolId: string) {
+    const assignments = await this.prisma.teachingAssignment.findMany({
+      where: { teacherId },
+      include: {
+        class: {
+          include: {
+            levelType: true,
+            gradingSystem: { select: { id: true, name: true } },
+            classTeacher: { select: { id: true, firstName: true, lastName: true, email: true } },
+            enrollments: {
+              where: { status: 'ACTIVE' },
+              include: {
+                student: {
+                  select: {
+                    id: true, firstName: true, lastName: true, gender: true,
+                    admissionNumber: true, photoUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const ctaRecords = await this.prisma.classTeacherAssignment.findMany({
+      where: { teacherId, isActive: true },
+      include: {
+        class: {
+          include: {
+            levelType: true,
+            gradingSystem: { select: { id: true, name: true } },
+            classTeacher: { select: { id: true, firstName: true, lastName: true, email: true } },
+            enrollments: {
+              where: { status: 'ACTIVE' },
+              include: {
+                student: {
+                  select: {
+                    id: true, firstName: true, lastName: true, gender: true,
+                    admissionNumber: true, photoUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const classMap = new Map<string, any>();
+    for (const a of assignments) {
+      classMap.set(a.class.id, a.class);
+    }
+    for (const cta of ctaRecords) {
+      classMap.set(cta.class.id, cta.class);
+    }
+
+    return Array.from(classMap.values())
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((c) => {
+        const males = c.enrollments.filter((e: any) => e.student.gender === 'MALE' || e.student.gender === 'Male' || e.student.gender === 'M').length;
+        const females = c.enrollments.filter((e: any) => e.student.gender === 'FEMALE' || e.student.gender === 'Female' || e.student.gender === 'F').length;
+        const students = c.enrollments.map((e: any) => ({
+          id: e.student.id,
+          firstName: e.student.firstName,
+          lastName: e.student.lastName,
+          admissionNumber: e.student.admissionNumber,
+        }));
+        return {
+          id: c.id,
+          classId: c.id,
+          _id: c.id,
+          name: c.name,
+          className: c.name,
+          capacity: c.capacity,
+          schoolId: c.schoolId,
+          levelTypeId: c.levelTypeId,
+          gradingSystemId: c.gradingSystemId,
+          order: c.order,
+          levelType: c.levelType,
+          gradingSystem: c.gradingSystem,
+          classTeacher: c.classTeacher,
+          students,
+          totalStudents: c.enrollments.length,
+          studentCount: c.enrollments.length,
+          maleCount: males,
+          femaleCount: females,
+        };
+      });
+  }
   async getAssignedSubjects(teacherId: string) {
     return this.prisma.teachingAssignment.findMany({
       where: { teacherId },

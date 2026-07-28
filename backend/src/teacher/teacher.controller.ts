@@ -78,6 +78,12 @@ export class TeacherController {
     return this.teacherService.getAssignedSubjects(req.user.id);
   }
 
+  @Get('classes')
+  @Roles('Teacher')
+  getClasses(@Req() req: any) {
+    return this.teacherService.getTeacherClasses(req.user.id, req.user.schoolId);
+  }
+
   @Get('class-students')
   getClassStudents(@Query('classId') classId: string) {
     return this.teacherService.getClassStudents(classId);

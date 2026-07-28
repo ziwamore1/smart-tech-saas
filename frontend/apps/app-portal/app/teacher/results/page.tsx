@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { teacherApi, resultApi, classApi, termApi, subjectApi, assessmentApi, assessmentEngineApi, studentApi } from '@/lib/api';
+import { teacherApi, resultApi, termApi, subjectApi, assessmentApi, assessmentEngineApi, studentApi } from '@/lib/api';
 import { socket } from '@/lib/socket';
 
 const PASS_THRESHOLD = 50;
@@ -56,13 +56,12 @@ export default function TeacherResultsPage() {
   });
 
   const { data: classesResponse } = useQuery({
-    queryKey: ['classes'],
+    queryKey: ['teacher-classes'],
     queryFn: async () => {
-      const res = await classApi.getAll();
+      const res = await teacherApi.getClasses();
       let data = res.data;
       if (data?.data) data = data.data;
       if (data?.classes) data = data.classes;
-      if (data?.result) data = data.result;
       return Array.isArray(data) ? data : [];
     },
   });

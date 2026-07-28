@@ -246,7 +246,7 @@ class ApiService {
   }
 
   async getTeacherClasses() {
-    const response = await this.client.get('/teacher/class-students');
+    const response = await this.client.get('/teacher/classes');
     return response.data;
   }
 
