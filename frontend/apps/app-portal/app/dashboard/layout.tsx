@@ -19,18 +19,23 @@ type NavItem = {
   institutionTypes?: string[];
 };
 
+const ALL_SECONDARY = ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Accountant', 'Secretary', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
+const ALL_PRIMARY = ['Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Primary Teacher', 'Accountant', 'Secretary'];
+const ALL_COLLEGE = ['Principal', 'Registrar', 'Lecturer', 'Accountant', 'Secretary'];
+const ALL_UNIVERSITY = ['Vice Chancellor', 'Dean', 'Lecturer', 'Research Supervisor', 'Accountant', 'Secretary'];
+
 const ROLE_MAP: Record<string, Record<string, string[]>> = {
   admin: {
-    PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'],
-    SECONDARY_SCHOOL: ['Director', 'Deputy Director'],
-    ADVANCED_SECONDARY: ['Director', 'Deputy Director'],
-    COLLEGE: ['Principal', 'Registrar'],
-    UNIVERSITY: ['Vice Chancellor', 'Dean'],
+    PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Accountant', 'Secretary'],
+    SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD', 'Accountant', 'Secretary'],
+    ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD', 'Accountant', 'Secretary'],
+    COLLEGE: ['Principal', 'Registrar', 'Accountant', 'Secretary'],
+    UNIVERSITY: ['Vice Chancellor', 'Dean', 'Accountant', 'Secretary'],
   },
   teaching: {
-    PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Primary Teacher'],
-    SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'HOD', 'Teacher', 'Class Teacher'],
-    ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'HOD', 'Teacher', 'Class Teacher'],
+    PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Primary Teacher'],
+    SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'],
+    ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'],
     COLLEGE: ['Principal', 'Lecturer'],
     UNIVERSITY: ['Dean', 'Lecturer', 'Research Supervisor'],
   },
@@ -40,6 +45,20 @@ const ROLE_MAP: Record<string, Record<string, string[]>> = {
     ADVANCED_SECONDARY: ['Teacher', 'Class Teacher'],
     COLLEGE: ['Lecturer'],
     UNIVERSITY: ['Lecturer', 'Research Supervisor'],
+  },
+  supervision: {
+    PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'],
+    SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD'],
+    ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD'],
+    COLLEGE: ['Principal', 'Registrar'],
+    UNIVERSITY: ['Vice Chancellor', 'Dean'],
+  },
+  finance: {
+    PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Accountant'],
+    SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Accountant'],
+    ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Accountant'],
+    COLLEGE: ['Principal', 'Accountant'],
+    UNIVERSITY: ['Vice Chancellor', 'Accountant'],
   },
   student: {
     PRIMARY_SCHOOL: ['Learner'],
@@ -56,17 +75,13 @@ const ROLE_MAP: Record<string, Record<string, string[]>> = {
     UNIVERSITY: [],
   },
   everyone: {
-    PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Primary Teacher', 'Parent', 'Learner'],
-    SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'HOD', 'Teacher', 'Class Teacher', 'Parent', 'Student'],
-    ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'HOD', 'Teacher', 'Class Teacher', 'Parent', 'Student'],
-    COLLEGE: ['Principal', 'Registrar', 'Lecturer', 'Student'],
-    UNIVERSITY: ['Vice Chancellor', 'Dean', 'Lecturer', 'Research Supervisor', 'Student'],
+    PRIMARY_SCHOOL: ALL_PRIMARY.concat(['Parent', 'Learner']),
+    SECONDARY_SCHOOL: ALL_SECONDARY.concat(['Parent', 'Student']),
+    ADVANCED_SECONDARY: ALL_SECONDARY.concat(['Parent', 'Student']),
+    COLLEGE: ALL_COLLEGE.concat(['Student']),
+    UNIVERSITY: ALL_UNIVERSITY.concat(['Student']),
   },
 };
-
-function r(type: string, roles: string[]): Record<string, string[]> {
-  return { [type]: roles };
-}
 
 const regularNav: NavItem[] = [
   { 
@@ -210,7 +225,7 @@ const regularNav: NavItem[] = [
     href: '/dashboard/classes', 
     icon: 'fa-school',
     color: '#8b5cf6',
-    typeRoles: ROLE_MAP.admin,
+    typeRoles: ROLE_MAP.teaching,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
@@ -226,7 +241,7 @@ const regularNav: NavItem[] = [
     href: '/dashboard/subjects', 
     icon: 'fa-book',
     color: '#f59e0b',
-    typeRoles: ROLE_MAP.admin,
+    typeRoles: ROLE_MAP.teaching,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
@@ -282,7 +297,7 @@ const regularNav: NavItem[] = [
     href: '/dashboard/attendance/dashboard', 
     icon: 'fa-chart-pie',
     color: '#0d9488',
-    typeRoles: ROLE_MAP.admin,
+    typeRoles: ROLE_MAP.supervision,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
@@ -323,9 +338,9 @@ const regularNav: NavItem[] = [
     icon: 'fa-eye',
     color: '#7c3aed',
     typeRoles: {
-      PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head'],
-      SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'HOD'],
-      ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'HOD'],
+      PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Deputy'],
+      SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Deputy', 'HOD'],
+      ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Deputy', 'HOD'],
       COLLEGE: ['Principal', 'Registrar'],
       UNIVERSITY: ['Vice Chancellor', 'Dean'],
     },
@@ -337,9 +352,9 @@ const regularNav: NavItem[] = [
     icon: 'fa-chart-bar',
     color: '#0891b2',
     typeRoles: {
-      PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head'],
-      SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'HOD'],
-      ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'HOD'],
+      PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Deputy'],
+      SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Deputy', 'HOD'],
+      ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Deputy', 'HOD'],
       COLLEGE: ['Principal', 'Registrar'],
       UNIVERSITY: ['Vice Chancellor', 'Dean'],
     },
@@ -351,9 +366,9 @@ const regularNav: NavItem[] = [
     icon: 'fa-shield-alt',
     color: '#6366f1',
     typeRoles: {
-      PRIMARY_SCHOOL: ['Director', 'Head Teacher'],
-      SECONDARY_SCHOOL: ['Director', 'Deputy Director'],
-      ADVANCED_SECONDARY: ['Director', 'Deputy Director'],
+      PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head'],
+      SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Deputy'],
+      ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Deputy'],
       COLLEGE: ['Principal'],
       UNIVERSITY: ['Vice Chancellor'],
     },
@@ -372,7 +387,7 @@ const regularNav: NavItem[] = [
     href: '/dashboard/result-analytics', 
     icon: 'fa-chart-line',
     color: '#059669',
-    typeRoles: ROLE_MAP.admin,
+    typeRoles: ROLE_MAP.supervision,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
@@ -404,7 +419,7 @@ const regularNav: NavItem[] = [
     href: '/dashboard/exams', 
     icon: 'fa-file-signature',
     color: '#dc2626',
-    typeRoles: ROLE_MAP.admin,
+    typeRoles: ROLE_MAP.teaching,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
@@ -412,7 +427,7 @@ const regularNav: NavItem[] = [
     href: '/dashboard/fees', 
     icon: 'fa-money-bill-wave',
     color: '#22c55e',
-    typeRoles: ROLE_MAP.admin,
+    typeRoles: ROLE_MAP.finance,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
@@ -476,7 +491,7 @@ const regularNav: NavItem[] = [
     href: '/dashboard/analytics', 
     icon: 'fa-chart-bar',
     color: '#a855f7',
-    typeRoles: ROLE_MAP.admin,
+    typeRoles: ROLE_MAP.supervision,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
@@ -484,7 +499,7 @@ const regularNav: NavItem[] = [
     href: '/dashboard/analytics-enhanced', 
     icon: 'fa-chart-line',
     color: '#ec4899',
-    typeRoles: ROLE_MAP.admin,
+    typeRoles: ROLE_MAP.supervision,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
@@ -500,7 +515,7 @@ const regularNav: NavItem[] = [
     href: '/dashboard/benchmarking', 
     icon: 'fa-trophy',
     color: '#f59e0b',
-    typeRoles: ROLE_MAP.admin,
+    typeRoles: ROLE_MAP.supervision,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
@@ -508,7 +523,7 @@ const regularNav: NavItem[] = [
     href: '/dashboard/psychometric', 
     icon: 'fa-flask',
     color: '#8b5cf6',
-    typeRoles: ROLE_MAP.admin,
+    typeRoles: ROLE_MAP.supervision,
     institutionTypes: ['SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
   { 
@@ -532,7 +547,7 @@ const regularNav: NavItem[] = [
     href: '/dashboard/exam-quality', 
     icon: 'fa-clipboard-check',
     color: '#f97316',
-    typeRoles: ROLE_MAP.admin,
+    typeRoles: ROLE_MAP.supervision,
     institutionTypes: ['SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
@@ -620,7 +635,7 @@ const regularNav: NavItem[] = [
     href: '/dashboard/curriculum', 
     icon: 'fa-book-open',
     color: '#0891b2',
-    typeRoles: ROLE_MAP.admin,
+    typeRoles: ROLE_MAP.teaching,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
@@ -739,13 +754,13 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, isLoading, user, logout } = useAuth();
+  const { isAuthenticated, isLoading, user, allRoles, logout } = useAuth();
   const isSuperAdmin = useIsSuperAdmin();
   const isPureSuperAdmin = useIsPureSuperAdmin();
   const isDirector = useIsDirector();
   const router = useRouter();
   const pathname = usePathname();
-  const userRoles = user?.roles || [];
+  const userRoles = allRoles || user?.roles || [];
   const institutionType = user?.institutionType || null;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
