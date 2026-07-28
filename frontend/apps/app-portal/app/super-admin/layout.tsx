@@ -430,6 +430,7 @@ export default function SuperAdminLayout({
             background: '#fdfaf7',
             transform: 'translateX(0)',
             transition: 'transform 0.3s',
+            overflowY: 'auto',
           }} onClick={(e) => e.stopPropagation()}>
             <div style={{
               padding: '20px',
