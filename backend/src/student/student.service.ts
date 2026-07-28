@@ -631,16 +631,19 @@ export class StudentService {
       firstName: true, lastName: true, gender: true, photoUrl: true,
     }});
     if (!student) throw new NotFoundException('Student not found');
-    try {
-      await this.prisma.student.delete({ where: { id } });
-      return { message: 'Student deleted successfully' };
-    } catch (error: any) {
-      this.logger.error('Delete student error:', error);
-      if (error.code === 'P2003' || error.code === 'P2014') {
-        throw new ConflictException('Cannot delete student - it has related records like enrollments, results, or attendance. Please remove related data first.');
-      }
-      throw error;
-    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.enrollment.deleteMany({ where: { studentId: id } });
+      await tx.studentAssessmentResult.deleteMany({ where: { studentId: id } });
+      await tx.computedResult.deleteMany({ where: { studentId: id } });
+      await tx.termSummary.deleteMany({ where: { studentId: id } });
+      await tx.attendance.deleteMany({ where: { studentId: id } });
+      await tx.studentSubject.deleteMany({ where: { studentId: id } });
+      await tx.result.deleteMany({ where: { studentId: id } });
+      await tx.student.delete({ where: { id } });
+    });
+
+    return { message: 'Student deleted successfully' };
   }
 
   async enroll(studentId: string, academicYearId: string, classId: string, schoolId: string) {
