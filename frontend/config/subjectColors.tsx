@@ -29,6 +29,8 @@ export function getCategoryColor(category: string | null | undefined) {
 
 export const subjectShortcuts: Record<string, string> = {
   'Mathematics': 'MATH',
+  'Mathematics I': 'MATH I',
+  'Mathematics II': 'MATH II',
   'English Language': 'ENG',
   'English': 'ENG',
   'Biology': 'BIO',
@@ -40,9 +42,13 @@ export const subjectShortcuts: Record<string, string> = {
   'French': 'FR',
   'Computer Studies': 'ICT',
   'Information and Communication Technology': 'ICT',
+  'Information and Communications Technology': 'ICT',
+  'Design and Technology': 'DT',
+  'Physical Education and Sports': 'PES',
   'Physical Education': 'PE',
   'Creative and Performing Art': 'CPA',
   'Art and Design': 'ART',
+  'Fashion and Fabrics': 'FF',
   'Music': 'MUS',
   'Commerce': 'COM',
   'Business Studies': 'BS',
@@ -50,13 +56,15 @@ export const subjectShortcuts: Record<string, string> = {
   'Technical Drawing': 'TD',
   'Literature in English': 'LIT',
   'Civic Education': 'CIV',
-  'Zambian Languages': 'ZAM',
+  'Zambian Language': 'ZL',
+  'Zambian Languages': 'ZL',
   'Agricultural Science': 'AGR',
   'Food and Nutrition': 'FN',
   'Additional Mathematics': 'AM',
   'Computer Science': 'CS',
   'Economics': 'ECON',
   'Government': 'GOV',
+  'Principles of Accounts': 'PA',
 };
 
 export function getSubjectShortcut(name: string | null | undefined): string {
