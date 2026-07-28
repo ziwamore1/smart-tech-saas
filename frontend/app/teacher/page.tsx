@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { teacherApi, termApi, classApi } from '@/lib/api';
+import { teacherApi, termApi } from '@/lib/api';
 
 export default function TeacherDashboard() {
   const { user, isClassTeacher } = useAuth();
@@ -18,11 +18,6 @@ export default function TeacherDashboard() {
     queryKey: ['current-term'],
     queryFn: () => termApi.getCurrent().then(res => res.data),
     retry: false,
-  });
-
-  const { data: classes } = useQuery({
-    queryKey: ['classes'],
-    queryFn: () => classApi.getAll().then(res => res.data),
   });
 
   const teacher = teacherData?.data || teacherData;

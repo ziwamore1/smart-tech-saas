@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { studentApi, classApi } from '@/lib/api';
+import { studentApi, teacherApi } from '@/lib/api';
 import { socket } from '@/lib/socket';
 
 export default function MyClassPage() {
@@ -40,13 +40,12 @@ export default function MyClassPage() {
   }, [user?.schoolId, queryClient]);
 
   const { data: classesResponse } = useQuery({
-    queryKey: ['classes'],
+    queryKey: ['teacher-classes'],
     queryFn: async () => {
-      const res = await classApi.getAll();
+      const res = await teacherApi.getClasses();
       let data = res.data;
       if (data?.data) data = data.data;
       if (data?.classes) data = data.classes;
-      if (data?.result) data = data.result;
       return Array.isArray(data) ? data : [];
     },
   });
@@ -63,12 +62,6 @@ export default function MyClassPage() {
       setSelectedClassId(classes[0].id);
     }
   }, [assignedClassId, classes, selectedClassId]);
-
-  const { data: classData } = useQuery({
-    queryKey: ['class', classId],
-    queryFn: () => classApi.getById(classId!).then(res => res.data),
-    enabled: !!classId,
-  });
 
   const { data: studentsData, isLoading } = useQuery({
     queryKey: ['class-students', classId],
@@ -186,7 +179,7 @@ export default function MyClassPage() {
               <option value="">Select Class</option>
               {classes.map((cls: any) => (
                 <option key={cls.id} value={cls.id}>
-                  {cls.name}{cls.id === assignedClass?.id ? ' (Your Class)' : ''}
+                  {cls.name}{cls.id === assignedClassId ? ' (Your Class)' : ''}
                 </option>
               ))}
             </select>

@@ -513,7 +513,7 @@ export class AuthService {
     if (user.teacher) {
       teacherId = user.teacher.id;
       const cta = await this.prisma.classTeacherAssignment.findFirst({
-        where: { teacherId: user.teacher.id, isActive: true, isPrimary: true },
+        where: { teacherId: user.id, isActive: true, isPrimary: true },
         select: { classId: true },
       });
       classTeacherOf = cta?.classId;
@@ -616,9 +616,9 @@ export class AuthService {
     const allRoles = [...new Set([...roles, ...schoolRoleNames, ...platformRoleNames])];
 
     // Fetch class teacher assignments
-    const classTeacherOf = user.teacher?.id
+    const classTeacherOf = user.teacher
       ? (await this.prisma.classTeacherAssignment.findFirst({
-          where: { teacherId: user.teacher.id, isActive: true, isPrimary: true },
+          where: { teacherId: user.id, isActive: true, isPrimary: true },
           select: { classId: true },
         }))?.classId
       : undefined;
@@ -1042,7 +1042,7 @@ export class AuthService {
     if (user.teacher) {
       teacherId = user.teacher.id;
       const cta = await this.prisma.classTeacherAssignment.findFirst({
-        where: { teacherId: user.teacher.id, isActive: true, isPrimary: true },
+        where: { teacherId: user.id, isActive: true, isPrimary: true },
         select: { classId: true },
       });
       classTeacherOf = cta?.classId;

@@ -391,6 +391,7 @@ export const teacherApi = {
   getAll: (params?: { page?: number; limit?: number; search?: string; schoolId?: string }) =>
     api.get('/teacher', { params }),
   getById: (id: string) => api.get(`/teacher/${id}`),
+  getClasses: () => api.get('/teacher/classes'),
   create: (data: any) => api.post('/teacher', data),
   update: (id: string, data: any) => api.put(`/teacher/${id}`, data),
   delete: (id: string) => api.delete(`/teacher/${id}`),
