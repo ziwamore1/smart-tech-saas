@@ -8,6 +8,7 @@ export interface CreateAssessmentDefinitionDto {
   name: string;
   code: string;
   category?: string;
+  examType?: string;
   description?: string;
   defaultMaxScore?: number;
   defaultWeight?: number;
@@ -92,6 +93,7 @@ export class AssessmentEngineService {
         name: data.name,
         code: data.code,
         category: data.category || 'continuous',
+        examType: data.examType as any || undefined,
         description: data.description,
         defaultMaxScore: data.defaultMaxScore || 100,
         defaultWeight: data.defaultWeight || 0,
@@ -124,6 +126,7 @@ export class AssessmentEngineService {
         ...(data.name && { name: data.name }),
         ...(data.code && { code: data.code }),
         ...(data.category && { category: data.category }),
+        ...(data.examType && { examType: data.examType as any }),
         ...(data.description !== undefined && { description: data.description }),
         ...(data.defaultMaxScore !== undefined && { defaultMaxScore: data.defaultMaxScore }),
         ...(data.defaultWeight !== undefined && { defaultWeight: data.defaultWeight }),
@@ -396,6 +399,7 @@ export class AssessmentEngineService {
     classId: string,
     termId: string,
     userId: string,
+    examType?: string,
   ) {
     const term = await this.prisma.term.findUnique({
       where: { id: termId },
@@ -403,12 +407,14 @@ export class AssessmentEngineService {
     });
     if (!term) return;
 
+    const resolvedExamType = examType || 'END_TERM';
+
     const sheet = await this.prisma.resultSheet.upsert({
       where: {
         classId_termId_examType: {
           classId,
           termId,
-          examType: 'END_TERM',
+          examType: resolvedExamType,
         },
       },
       update: {},
@@ -417,7 +423,7 @@ export class AssessmentEngineService {
         classId,
         termId,
         academicYearId: term.academicYearId,
-        examType: 'END_TERM',
+        examType: resolvedExamType,
         createdBy: userId || 'SYSTEM',
         status: 'DRAFT',
         totalStudents: 0,
@@ -427,6 +433,13 @@ export class AssessmentEngineService {
     const totalStudents = await this.prisma.enrollment.count({
       where: { classId, academicYearId: term.academicYearId, status: 'ACTIVE' },
     });
+
+    // Find all assessment definitions matching this exam type
+    const matchingDefs = await this.prisma.assessmentDefinition.findMany({
+      where: { schoolId, examType: resolvedExamType as any },
+      select: { id: true },
+    });
+    const defIds = matchingDefs.map(d => d.id);
 
     const classSubjects = await this.prisma.classSubject.findMany({
       where: { classId },
@@ -440,6 +453,7 @@ export class AssessmentEngineService {
           classId,
           subjectId: cs.subjectId,
           termId,
+          ...(defIds.length > 0 ? { assessmentDefId: { in: defIds } } : {}),
           OR: [
             { rawScore: { not: null } },
             { isAbsent: true },
@@ -653,7 +667,14 @@ export class AssessmentEngineService {
     await this.compositeSubjectService.recomputeAllComposites(subjectId, classId, termId, schoolId).catch(e =>
       this.logger.error(`composite recompute failed: ${e.message}`),
     );
-    const sheet = await this.syncResultSheet(schoolId, classId, termId, enteredBy).catch(e => {
+    const def = await this.prisma.assessmentDefinition.findUnique({
+      where: { id: assessmentDefId },
+      select: { examType: true },
+    });
+    const sheet = await this.syncResultSheet(
+      schoolId, classId, termId, enteredBy,
+      def?.examType as string | undefined,
+    ).catch(e => {
       this.logger.error(`syncResultSheet failed: ${e.message}`);
       return null;
     });
@@ -748,7 +769,14 @@ export class AssessmentEngineService {
       await this.compositeSubjectService.recomputeAllComposites(data.subjectId, data.classId, data.termId, schoolId).catch(e =>
         this.logger.error(`composite recompute failed: ${e.message}`),
       );
-      await this.syncResultSheet(schoolId, data.classId, data.termId, data.enteredBy).catch(e => {
+      const absentDef = await this.prisma.assessmentDefinition.findUnique({
+        where: { id: data.assessmentDefId },
+        select: { examType: true },
+      });
+      await this.syncResultSheet(
+        schoolId, data.classId, data.termId, data.enteredBy,
+        absentDef?.examType as string | undefined,
+      ).catch(e => {
         this.logger.error(`syncResultSheet failed: ${e.message}`);
       });
 
@@ -831,7 +859,14 @@ export class AssessmentEngineService {
     await this.compositeSubjectService.recomputeAllComposites(data.subjectId, data.classId, data.termId, schoolId).catch(e =>
       this.logger.error(`composite recompute failed: ${e.message}`),
     );
-    await this.syncResultSheet(schoolId, data.classId, data.termId, data.enteredBy).catch(e => {
+    const scoreDef = await this.prisma.assessmentDefinition.findUnique({
+      where: { id: data.assessmentDefId },
+      select: { examType: true },
+    });
+    await this.syncResultSheet(
+      schoolId, data.classId, data.termId, data.enteredBy,
+      scoreDef?.examType as string | undefined,
+    ).catch(e => {
       this.logger.error(`syncResultSheet failed: ${e.message}`);
     });
 
