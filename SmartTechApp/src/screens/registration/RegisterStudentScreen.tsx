@@ -52,14 +52,14 @@ export const RegisterStudentScreen: React.FC<Props> = ({ onToggleDrawer, onNavig
   const loadFormData = async () => {
     try {
       const [clsRes, yearsRes] = await Promise.allSettled([
-        apiService.getTeacherClasses(),
+        apiService.getClasses(),
         apiService.getAcademicYears(),
       ]);
 
       let classList: any[] = [];
       if (clsRes.status === 'fulfilled') {
         const d = clsRes.value?.data || clsRes.value;
-        classList = Array.isArray(d) ? d : d?.classes || [];
+        classList = Array.isArray(d) ? d : d?.classes || d?.result || [];
       }
       if (classList.length === 0 && clsRes.status === 'fulfilled') {
         const d = clsRes.value?.data || clsRes.value;

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { teacherApi, studentApi, classApi, termApi, enrollmentApi } from '@/lib/api';
+import { socket } from '@/lib/socket';
 
 export default function MyClassPage() {
   const { user, isClassTeacher } = useAuth();
@@ -13,6 +14,7 @@ export default function MyClassPage() {
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [selectedClassId, setSelectedClassId] = useState('');
   const [editForm, setEditForm] = useState({
     firstName: '',
     lastName: '',
@@ -26,15 +28,48 @@ export default function MyClassPage() {
     parentEmail: '',
   });
 
+  useEffect(() => {
+    const schoolId = user?.schoolId;
+    if (!schoolId) return;
+    const eventName = `student:updated:${schoolId}`;
+    const handler = () => {
+      queryClient.invalidateQueries({ queryKey: ['class-students'] });
+    };
+    socket.on(eventName, handler);
+    return () => { socket.off(eventName, handler); };
+  }, [user?.schoolId, queryClient]);
+
   const { data: teacherData } = useQuery({
     queryKey: ['my-teacher-profile'],
     queryFn: () => teacherApi.getById('me').then(res => res.data),
     retry: false,
   });
 
+  const { data: classesResponse } = useQuery({
+    queryKey: ['classes'],
+    queryFn: async () => {
+      const res = await classApi.getAll();
+      let data = res.data;
+      if (data?.data) data = data.data;
+      if (data?.classes) data = data.classes;
+      if (data?.result) data = data.result;
+      return Array.isArray(data) ? data : [];
+    },
+  });
+
   const teacher = teacherData?.data || teacherData;
   const assignedClass = teacher?.classTeacherOf;
-  const classId = assignedClass?.id;
+  const classes = Array.isArray(classesResponse) ? classesResponse : [];
+  const classId = selectedClassId || assignedClass?.id || '';
+  const selectedClassObj = classes.find((c: any) => c.id === classId);
+
+  useEffect(() => {
+    if (!selectedClassId && assignedClass?.id) {
+      setSelectedClassId(assignedClass.id);
+    } else if (!selectedClassId && classes.length > 0 && !assignedClass?.id) {
+      setSelectedClassId(classes[0].id);
+    }
+  }, [assignedClass, classes, selectedClassId]);
 
   const { data: classData } = useQuery({
     queryKey: ['class', classId],
@@ -107,14 +142,14 @@ export default function MyClassPage() {
     setShowEditModal(true);
   };
 
-  if (!isClassTeacher || !assignedClass) {
+  if (!isClassTeacher) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
           <span className="text-4xl">⚠️</span>
           <h2 className="text-xl font-semibold mt-4">Not a Class Teacher</h2>
           <p className="text-gray-600 mt-2">
-            You are not assigned as a class teacher. Contact your school director to be assigned a class.
+            You are not a class teacher. Contact your school director.
           </p>
         </div>
       </div>
@@ -131,7 +166,7 @@ export default function MyClassPage() {
         </div>
         <h1 className="text-3xl font-bold text-gray-900">My Class</h1>
         <p className="text-gray-600 mt-1">
-          Manage students in {assignedClass.name || 'your class'}
+          Manage students in {selectedClassObj?.name || 'your class'}
         </p>
       </div>
 
@@ -146,17 +181,31 @@ export default function MyClassPage() {
       )}
 
       <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
           <div>
-            <h2 className="text-xl font-semibold">{assignedClass.name}</h2>
+            <h2 className="text-xl font-semibold">{selectedClassObj?.name || 'Select a class'}</h2>
             <p className="text-gray-500">{filteredStudents.length} students enrolled</p>
           </div>
-          <Link
-            href="/teacher/enrollments"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            + Enroll New Student
-          </Link>
+          <div className="flex gap-3 items-center">
+            <select
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+              className="px-3 py-2 border rounded-lg"
+            >
+              <option value="">Select Class</option>
+              {classes.map((cls: any) => (
+                <option key={cls.id} value={cls.id}>
+                  {cls.name}{cls.id === assignedClass?.id ? ' (Your Class)' : ''}
+                </option>
+              ))}
+            </select>
+            <Link
+              href="/teacher/enrollments"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              + Enroll New Student
+            </Link>
+          </div>
         </div>
 
         <div className="mb-4">

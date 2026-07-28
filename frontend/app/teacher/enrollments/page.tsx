@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { teacherApi, studentApi, classApi, termApi, enrollmentApi, academicYearApi } from '@/lib/api';
+import { socket } from '@/lib/socket';
 
 export default function EnrollmentsPage() {
   const { user, isClassTeacher } = useAuth();
@@ -13,6 +14,7 @@ export default function EnrollmentsPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showNewStudentForm, setShowNewStudentForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('');
 
   const [enrollForm, setEnrollForm] = useState({
     admissionNumber: '',
@@ -42,9 +44,16 @@ export default function EnrollmentsPage() {
     retry: false,
   });
 
-  const { data: classes } = useQuery({
+  const { data: classesResponse } = useQuery({
     queryKey: ['classes'],
-    queryFn: () => classApi.getAll().then(res => res.data),
+    queryFn: async () => {
+      const res = await classApi.getAll();
+      let data = res.data;
+      if (data?.data) data = data.data;
+      if (data?.classes) data = data.classes;
+      if (data?.result) data = data.result;
+      return Array.isArray(data) ? data : [];
+    },
   });
 
   const { data: terms } = useQuery({
@@ -64,9 +73,31 @@ export default function EnrollmentsPage() {
 
   const teacher = teacherData?.data || teacherData;
   const assignedClass = teacher?.classTeacherOf;
-  const classId = assignedClass?.id;
+  const classes = Array.isArray(classesResponse) ? classesResponse : [];
   const currentTerm = terms?.find((t: any) => t.isCurrent);
   const currentAcademicYear = academicYears?.find((y: any) => y.isCurrent);
+  const classId = selectedClassId || assignedClass?.id || '';
+  const selectedClassObj = classes.find((c: any) => c.id === classId);
+
+  useEffect(() => {
+    if (!selectedClassId && assignedClass?.id) {
+      setSelectedClassId(assignedClass.id);
+    } else if (!selectedClassId && classes.length > 0 && !assignedClass?.id) {
+      setSelectedClassId(classes[0].id);
+    }
+  }, [assignedClass, classes, selectedClassId]);
+
+  useEffect(() => {
+    const schoolId = user?.schoolId;
+    if (!schoolId) return;
+    const eventName = `enrollment:updated:${schoolId}`;
+    const handler = () => {
+      queryClient.invalidateQueries({ queryKey: ['all-students'] });
+      queryClient.invalidateQueries({ queryKey: ['class-students'] });
+    };
+    socket.on(eventName, handler);
+    return () => { socket.off(eventName, handler); };
+  }, [user?.schoolId, queryClient]);
 
   const enrollExistingStudentMutation = useMutation({
     mutationFn: (studentId: string) => enrollmentApi.create({
@@ -139,7 +170,7 @@ export default function EnrollmentsPage() {
     createAndEnrollMutation.mutate(enrollForm);
   };
 
-  if (!isClassTeacher || !assignedClass) {
+  if (!isClassTeacher) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
@@ -178,7 +209,7 @@ export default function EnrollmentsPage() {
         </div>
         <h1 className="text-3xl font-bold text-gray-900">Student Enrollments</h1>
         <p className="text-gray-600 mt-1">
-          Enroll students into {assignedClass.name || 'your class'}
+          Enroll students into {selectedClassObj?.name || 'your class'}
         </p>
       </div>
 
@@ -193,6 +224,22 @@ export default function EnrollmentsPage() {
       )}
 
       <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Select Class to Enroll Into *</label>
+          <select
+            value={selectedClassId}
+            onChange={(e) => setSelectedClassId(e.target.value)}
+            className="w-full md:w-80 px-3 py-2 border rounded-lg"
+          >
+            <option value="">Select Class</option>
+            {classes.map((cls: any) => (
+              <option key={cls.id} value={cls.id}>
+                {cls.name}{cls.id === assignedClass?.id ? ' (Your Class)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="flex gap-4 border-b">
           <button
             onClick={() => setActiveTab('enroll')}
@@ -436,7 +483,7 @@ export default function EnrollmentsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Class</label>
                     <input
                       type="text"
-                      value={assignedClass.name}
+                      value={selectedClassObj?.name || 'Select a class above'}
                       disabled
                       className="w-full px-3 py-2 border rounded-lg bg-gray-50"
                     />
@@ -476,7 +523,7 @@ export default function EnrollmentsPage() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h3 className="font-medium text-blue-800 mb-2">Enrollment Information</h3>
         <ul className="text-sm text-blue-700 space-y-1">
-          <li>• Students will be enrolled in: <strong>{assignedClass.name}</strong></li>
+          <li>• Students will be enrolled in: <strong>{selectedClassObj?.name || 'Select a class'}</strong></li>
           <li>• Current Academic Year: <strong>{currentAcademicYear?.name || 'Not set'}</strong></li>
           <li>• Current Term: <strong>{currentTerm?.name || 'Not set'}</strong></li>
           <li>• Enrolled students will appear in your class list immediately</li>

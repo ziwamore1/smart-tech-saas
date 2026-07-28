@@ -312,13 +312,11 @@ export default function TeacherResultsPage() {
               className="w-full px-3 py-2 border rounded-lg"
             >
               <option value="">Select Class</option>
-              {isClassTeacher && assignedClass ? (
-                <option value={assignedClass.id}>{assignedClass.name} (Your Class)</option>
-              ) : (
-                classes?.map((cls: any) => (
-                  <option key={cls.id} value={cls.id}>{cls.name}</option>
-                ))
-              )}
+              {classes?.map((cls: any) => (
+                <option key={cls.id} value={cls.id}>
+                  {cls.name}{isClassTeacher && cls.id === assignedClass?.id ? ' (Your Class)' : ''}
+                </option>
+              ))}
             </select>
           </div>
 

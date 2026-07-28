@@ -490,7 +490,7 @@ class ApiService {
   }
 
   async getClasses() {
-    const response = await this.client.get('/mobile/classes');
+    const response = await this.client.get('/class');
     return response.data;
   }
 
