@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { teacherApi, studentApi, classApi, termApi, enrollmentApi } from '@/lib/api';
+import { studentApi, classApi } from '@/lib/api';
 import { socket } from '@/lib/socket';
 
 export default function MyClassPage() {
@@ -39,12 +39,6 @@ export default function MyClassPage() {
     return () => { socket.off(eventName, handler); };
   }, [user?.schoolId, queryClient]);
 
-  const { data: teacherData } = useQuery({
-    queryKey: ['my-teacher-profile'],
-    queryFn: () => teacherApi.getById('me').then(res => res.data),
-    retry: false,
-  });
-
   const { data: classesResponse } = useQuery({
     queryKey: ['classes'],
     queryFn: async () => {
@@ -57,19 +51,18 @@ export default function MyClassPage() {
     },
   });
 
-  const teacher = teacherData?.data || teacherData;
-  const assignedClass = teacher?.classTeacherOf;
   const classes = Array.isArray(classesResponse) ? classesResponse : [];
-  const classId = selectedClassId || assignedClass?.id || '';
+  const assignedClassId = user?.classTeacherOf || '';
+  const classId = selectedClassId || assignedClassId;
   const selectedClassObj = classes.find((c: any) => c.id === classId);
 
   useEffect(() => {
-    if (!selectedClassId && assignedClass?.id) {
-      setSelectedClassId(assignedClass.id);
-    } else if (!selectedClassId && classes.length > 0 && !assignedClass?.id) {
+    if (!selectedClassId && assignedClassId) {
+      setSelectedClassId(assignedClassId);
+    } else if (!selectedClassId && classes.length > 0 && !assignedClassId) {
       setSelectedClassId(classes[0].id);
     }
-  }, [assignedClass, classes, selectedClassId]);
+  }, [assignedClassId, classes, selectedClassId]);
 
   const { data: classData } = useQuery({
     queryKey: ['class', classId],
@@ -79,11 +72,9 @@ export default function MyClassPage() {
 
   const { data: studentsData, isLoading } = useQuery({
     queryKey: ['class-students', classId],
-    queryFn: () => studentApi.getAll({ limit: 100 }).then(res => {
+    queryFn: () => studentApi.getAll({ classId, limit: 200 }).then(res => {
       const students = res.data?.data || res.data?.students || [];
-      return students.filter((s: any) => 
-        s.enrollments?.some((e: any) => e.classId === classId && e.isActive)
-      );
+      return Array.isArray(students) ? students : [];
     }),
     enabled: !!classId,
   });
