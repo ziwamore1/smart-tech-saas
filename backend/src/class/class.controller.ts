@@ -44,9 +44,9 @@ export class ClassController {
   }
 
   @Get()
-  @Roles('Director')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   findAll(@Req() req: any) {
-    return this.service.findAll(req.user.schoolId);
+    return this.service.findAll(req.user);
   }
 
   @Patch(':id')
@@ -76,8 +76,8 @@ export class ClassController {
   }
 
   @Get('by-level')
-  @Roles('Director')
+  @Roles('Director', 'Teacher', 'Class Teacher')
   findByLevel(@Query('levelTypeId') levelTypeId: string, @Req() req: any) {
-    return this.service.findByLevel(levelTypeId, req.user.schoolId);
+    return this.service.findByLevel(levelTypeId, req.user);
   }
 }

@@ -47,10 +47,18 @@ export class ClassService {
     });
   }
 
-  async findAll(schoolId: string) {
-    if (!schoolId) return [];
+  async findAll(user: { id: string; schoolId: string; roles?: string[] }) {
+    if (!user.schoolId) return [];
+
+    const classIds = await this.getTeacherClassIds(user);
+
+    const where: any = { schoolId: user.schoolId };
+    if (classIds) {
+      where.id = { in: classIds };
+    }
+
     const classes = await this.prisma.class.findMany({
-      where: { schoolId },
+      where,
       include: {
         levelType: true,
         gradingSystem: {
@@ -95,12 +103,16 @@ export class ClassService {
     });
   }
 
-  async findByLevel(levelTypeId: string, schoolId: string) {
+  async findByLevel(levelTypeId: string, user: { id: string; schoolId: string; roles?: string[] }) {
+    const classIds = await this.getTeacherClassIds(user);
+
+    const where: any = { levelTypeId, schoolId: user.schoolId };
+    if (classIds) {
+      where.id = { in: classIds };
+    }
+
     return this.prisma.class.findMany({
-      where: {
-        levelTypeId,
-        schoolId,
-      },
+      where,
       include: {
         gradingSystem: {
           select: { id: true, name: true },
@@ -202,5 +214,32 @@ export class ClassService {
     await this.prisma.class.delete({ where: { id } });
 
     return { message: `Class "${classEntity.name}" deleted successfully` };
+  }
+
+  private async getTeacherClassIds(user: { id: string; schoolId: string; roles?: string[] }): Promise<string[] | null> {
+    const roles = (user.roles ?? []).map((r) => r.toUpperCase());
+    if (roles.includes('DIRECTOR') || roles.includes('SUPERADMIN')) {
+      return null;
+    }
+    if (!roles.includes('TEACHER') && !roles.includes('CLASS_TEACHER')) {
+      return null;
+    }
+
+    const [teachingAssignments, classTeacherAssignments] = await Promise.all([
+      this.prisma.teachingAssignment.findMany({
+        where: { teacherId: user.id, schoolId: user.schoolId },
+        select: { classId: true },
+      }),
+      this.prisma.classTeacherAssignment.findMany({
+        where: { teacherId: user.id, isActive: true },
+        select: { classId: true },
+      }),
+    ]);
+
+    const ids = new Set<string>();
+    for (const ta of teachingAssignments) ids.add(ta.classId);
+    for (const cta of classTeacherAssignments) ids.add(cta.classId);
+
+    return ids.size > 0 ? Array.from(ids) : [];
   }
 }
