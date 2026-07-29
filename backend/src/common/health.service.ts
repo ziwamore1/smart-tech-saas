@@ -93,8 +93,11 @@ export class HealthService {
         status: 'degraded',
         message: `${needsBackfill}/${total} students need classId backfill — run GET /health/backfill-classid`,
       };
-    } catch {
-      return { status: 'down', message: 'Failed to check classId backfill status' };
+    } catch (e: any) {
+      if (e?.message?.includes('does not exist') || e?.message?.includes('column') || e?.message?.includes('classId')) {
+        return { status: 'degraded', message: 'classId column not yet migrated — run prisma migrate deploy' };
+      }
+      return { status: 'down', message: `Failed to check classId backfill: ${e?.message}` };
     }
   }
 
