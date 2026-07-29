@@ -295,6 +295,8 @@ export default function StudentsPage() {
 
   const students = Array.isArray(studentsData) ? studentsData : [];
   const totalStudents = students.length;
+  const maleStudents = students.filter((s: any) => s.gender?.toUpperCase() === 'MALE').length;
+  const femaleStudents = students.filter((s: any) => s.gender?.toUpperCase() === 'FEMALE').length;
 
   if (studentsError) {
     console.log('Students query error:', studentsError);
@@ -335,6 +337,21 @@ export default function StudentsPage() {
         >
           + Add Student
         </button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+          <div className="text-2xl font-bold text-blue-700">{totalStudents}</div>
+          <div className="text-sm text-blue-600">Total Students</div>
+        </div>
+        <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+          <div className="text-2xl font-bold text-indigo-700">{maleStudents}</div>
+          <div className="text-sm text-indigo-600">Male</div>
+        </div>
+        <div className="bg-pink-50 rounded-xl p-4 border border-pink-100">
+          <div className="text-2xl font-bold text-pink-700">{femaleStudents}</div>
+          <div className="text-sm text-pink-600">Female</div>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
@@ -395,8 +412,16 @@ export default function StudentsPage() {
           </div>
 
           <div className="flex items-end">
-            <div className="text-sm text-gray-600">
-              Total Students: <span className="font-bold text-gray-900">{totalStudents}</span>
+            <div className="flex items-end gap-4">
+              <div className="text-sm text-gray-600">
+                Total: <span className="font-bold text-gray-900">{totalStudents}</span>
+              </div>
+              <div className="text-sm text-blue-600">
+                Male: <span className="font-bold">{maleStudents}</span>
+              </div>
+              <div className="text-sm text-pink-600">
+                Female: <span className="font-bold">{femaleStudents}</span>
+              </div>
             </div>
           </div>
         </div>
