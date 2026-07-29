@@ -59,22 +59,18 @@ export class ClassService {
 
     const classes = await this.prisma.class.findMany({
       where,
-      include: {
-        levelType: true,
-        gradingSystem: {
-          select: { id: true, name: true },
-        },
-        classTeacher: {
-          select: { id: true, firstName: true, lastName: true, email: true },
-        },
-        enrollments: {
-          where: { status: 'ACTIVE' },
-          include: {
-            student: {
-              select: { id: true, gender: true },
-            },
-          },
-        },
+      select: {
+        id: true,
+        name: true,
+        capacity: true,
+        schoolId: true,
+        levelTypeId: true,
+        gradingSystemId: true,
+        order: true,
+        levelType: { select: { id: true, name: true, code: true } },
+        gradingSystem: { select: { id: true, name: true } },
+        classTeacher: { select: { id: true, firstName: true, lastName: true, email: true } },
+        _count: { select: { enrollments: { where: { status: 'ACTIVE' } } } },
       },
       orderBy: [
         { levelTypeId: 'asc' },
@@ -82,9 +78,24 @@ export class ClassService {
       ]
     });
 
+    // Batch-fetch gender counts for all classes
+    const classIdsList = classes.map(c => c.id);
+    const enrollments = classIdsList.length > 0 ? await this.prisma.enrollment.findMany({
+      where: { classId: { in: classIdsList }, status: 'ACTIVE' },
+      select: { classId: true, student: { select: { gender: true } } },
+    }) : [];
+
+    const genderMap = new Map<string, { male: number; female: number }>();
+    for (const e of enrollments) {
+      if (!genderMap.has(e.classId)) genderMap.set(e.classId, { male: 0, female: 0 });
+      const g = e.student?.gender || '';
+      const entry = genderMap.get(e.classId)!;
+      if (g === 'MALE' || g === 'Male' || g === 'M') entry.male++;
+      else if (g === 'FEMALE' || g === 'Female' || g === 'F') entry.female++;
+    }
+
     return classes.map((c) => {
-      const males = c.enrollments.filter((e) => e.student.gender === 'MALE' || e.student.gender === 'Male' || e.student.gender === 'M').length;
-      const females = c.enrollments.filter((e) => e.student.gender === 'FEMALE' || e.student.gender === 'Female' || e.student.gender === 'F').length;
+      const counts = genderMap.get(c.id) || { male: 0, female: 0 };
       return {
         id: c.id,
         name: c.name,
@@ -96,9 +107,9 @@ export class ClassService {
         levelType: c.levelType,
         gradingSystem: c.gradingSystem,
         classTeacher: c.classTeacher,
-        totalStudents: c.enrollments.length,
-        maleCount: males,
-        femaleCount: females,
+        totalStudents: (c as any)._count?.enrollments || 0,
+        maleCount: counts.male,
+        femaleCount: counts.female,
       };
     });
   }

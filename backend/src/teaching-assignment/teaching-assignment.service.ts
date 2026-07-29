@@ -73,27 +73,46 @@ export class TeachingAssignmentService {
     });
   }
 
-  async findAll(schoolId: string) {
-    const assignments = await this.prisma.teachingAssignment.findMany({
-      where: { schoolId },
-      include: {
-        teacher: true,
-        subject: true,
-        class: true,
-        academicYear: true,
-      },
-    });
-    return assignments;
+  async findAll(schoolId: string, page = 1, limit = 100) {
+    const skip = (page - 1) * limit;
+    const [assignments, total] = await this.prisma.$transaction([
+      this.prisma.teachingAssignment.findMany({
+        where: { schoolId },
+        skip,
+        take: limit,
+        orderBy: { class: { name: 'asc' } },
+        select: {
+          id: true,
+          teacherId: true,
+          classId: true,
+          subjectId: true,
+          academicYearId: true,
+          schoolId: true,
+          teacher: { select: { id: true, firstName: true, lastName: true, email: true } },
+          subject: { select: { id: true, name: true, code: true } },
+          class: { select: { id: true, name: true } },
+          academicYear: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.teachingAssignment.count({ where: { schoolId } }),
+    ]);
+    return { data: assignments, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findByTeacher(teacherId: string) {
     return this.prisma.teachingAssignment.findMany({
       where: { teacherId },
-      include: {
-        teacher: true,
-        subject: true,
-        class: true,
-        academicYear: true,
+      select: {
+        id: true,
+        teacherId: true,
+        classId: true,
+        subjectId: true,
+        academicYearId: true,
+        schoolId: true,
+        teacher: { select: { id: true, firstName: true, lastName: true } },
+        subject: { select: { id: true, name: true, code: true } },
+        class: { select: { id: true, name: true } },
+        academicYear: { select: { id: true, name: true } },
       },
     });
   }

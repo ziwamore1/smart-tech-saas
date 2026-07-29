@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Body, Param, Req, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { TeachingAssignmentService } from './teaching-assignment.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -32,8 +32,8 @@ export class TeachingAssignmentController {
 
   @Get()
   @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
-  findAll(@Req() req: any) {
-    return this.service.findAll(req.user.schoolId);
+  findAll(@Req() req: any, @Query('page') page?: number, @Query('limit') limit?: number) {
+    return this.service.findAll(req.user.schoolId, page, limit);
   }
 
   @Get('teacher/:teacherId')

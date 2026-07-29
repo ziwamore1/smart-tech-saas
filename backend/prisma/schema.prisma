@@ -579,6 +579,7 @@ model Subject {
   studentSubjects            StudentSubject[]
 
   @@unique([name, code, schoolId])
+  @@index([schoolId])
 }
 
 model ClassSubject {
@@ -816,6 +817,7 @@ model Enrollment {
   @@index([studentId])
   @@index([academicYearId])
   @@index([classId])
+  @@index([classId, status])
   @@index([status])
 }
 

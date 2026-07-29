@@ -460,6 +460,8 @@ export class StudentService {
       status?: string;
       includeInactive?: boolean;
       search?: string;
+      page?: number;
+      limit?: number;
     },
   ) {
     const where: Prisma.StudentWhereInput = { schoolId };
@@ -489,28 +491,45 @@ export class StudentService {
       ];
     }
 
-    const enrollmentIncludes = {
-      include: { class: true, academicYear: true },
-      orderBy: { academicYear: { startDate: 'desc' } as const },
-    };
+    const page = options?.page || 1;
+    const limit = options?.limit || 100;
+    const skip = (page - 1) * limit;
 
-    return this.prisma.student.findMany({
-      where,
-      select: {
-        id: true, admissionNumber: true, studentUuid: true, status: true,
-        dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
-        gender: true, photoUrl: true, photoPublicId: true,
-        enrollments: enrollmentIncludes,
-        parents: { include: { parent: true } },
-      },
-    }).then(students => students.map(s => {
-      const latestEnrollment = (s as any).enrollments?.[0];
-      return {
+    const [students, total] = await this.prisma.$transaction([
+      this.prisma.student.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { lastName: 'asc' },
+        select: {
+          id: true, admissionNumber: true, studentUuid: true, status: true,
+          dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
+          gender: true, photoUrl: true, photoPublicId: true,
+          enrollments: {
+            take: 1,
+            orderBy: { academicYear: { startDate: 'desc' } },
+            select: {
+              class: { select: { id: true, name: true } },
+              academicYear: { select: { id: true, name: true } },
+            },
+          },
+          parents: { select: { parent: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } } } },
+        },
+      }),
+      this.prisma.student.count({ where }),
+    ]);
+
+    return {
+      data: students.map(s => ({
         ...s,
-        className: latestEnrollment?.class?.name || null,
+        className: (s as any).enrollments?.[0]?.class?.name || null,
         grade: null,
-      };
-    }));
+        parentCount: (s as any).parents?.length || 0,
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   async findOne(id: string) {

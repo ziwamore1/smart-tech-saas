@@ -42,12 +42,16 @@ export class StudentController {
     @Query('status') status?: string,
     @Query('includeInactive') includeInactive?: string,
     @Query('search') search?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
     return this.service.findAll(req.user.schoolId, {
       classId,
       status,
       includeInactive: includeInactive === 'true',
       search,
+      page,
+      limit,
     });
   }
 
