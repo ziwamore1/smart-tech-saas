@@ -3,8 +3,10 @@
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { schoolApi, termApi, teacherApi } from '@/lib/api';
+import { schoolApi, termApi, teacherApi, attendanceApi } from '@/lib/api';
+import { useMemo } from 'react';
 import { RoleGuard } from '@/lib/role-guard';
+import Icon3D from '@/components/Icon3D';
 
 export default function ClassTeacherDashboardPage() {
   return (
@@ -26,6 +28,30 @@ function ClassTeacherDashboardContent() {
     queryKey: ['current-term'],
     queryFn: () => termApi.getCurrent().then(r => r.data?.data || r.data),
   });
+
+  const { data: statsData } = useQuery({
+    queryKey: ['school-stats'],
+    queryFn: () => schoolApi.getStats().then(r => r.data?.data || r.data),
+  });
+
+  const totalStudents = statsData?.totalStudents || 0;
+  const totalTeachers = statsData?.totalTeachers || 0;
+  const totalClasses = statsData?.totalClasses || 0;
+  const studentsByClass: any[] = statsData?.studentsByClass || [];
+
+  const { data: attendanceStats } = useQuery({
+    queryKey: ['attendance-stats', currentTerm?.id],
+    queryFn: () => attendanceApi.getStats({ termId: currentTerm?.id }).then(r => r.data?.data || r.data),
+    enabled: !!currentTerm?.id,
+  });
+
+  const gradeEnrollment = useMemo(() => {
+    if (!studentsByClass.length) return [];
+    return studentsByClass.map((c: any) => ({
+      grade: c.className || c.class || 'Unknown',
+      count: (c.male || 0) + (c.female || 0),
+    }));
+  }, [studentsByClass]);
 
   const { data: myClasses } = useQuery({
     queryKey: ['teacher-classes'],
@@ -88,6 +114,56 @@ function ClassTeacherDashboardContent() {
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '28px', fontWeight: 700, lineHeight: 1 }}>{classCount}</div>
             <div style={{ fontSize: '12px', color: '#a7f3d0' }}>Assigned Classes</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="flex items-center gap-3">
+            <Icon3D name="students" size={40} />
+            <div>
+              <p className="text-sm text-gray-500">Total Students</p>
+              <p className="text-2xl font-bold text-gray-900">{totalStudents}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="flex items-center gap-3">
+            <Icon3D name="teachers" size={40} />
+            <div>
+              <p className="text-sm text-gray-500">Teachers</p>
+              <p className="text-2xl font-bold text-gray-900">{totalTeachers}</p>
+            </div>
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            Ratio: {totalTeachers > 0 ? `${Math.round(totalStudents / totalTeachers)}:1` : '—'}
+          </div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="flex items-center gap-3">
+            <Icon3D name="classes" size={40} />
+            <div>
+              <p className="text-sm text-gray-500">Classes</p>
+              <p className="text-2xl font-bold text-gray-900">{totalClasses}</p>
+            </div>
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            {gradeEnrollment.filter((g: any) => g.count > 0).map((g: any) => g.grade).join(', ') || '—'}
+          </div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 text-lg">
+              <i className="fa fa-clipboard-check" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Attendance Rate</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {attendanceStats?.averageRate ? `${Math.round(attendanceStats.averageRate * 100)}%` : '—'}
+              </p>
+            </div>
           </div>
         </div>
       </div>

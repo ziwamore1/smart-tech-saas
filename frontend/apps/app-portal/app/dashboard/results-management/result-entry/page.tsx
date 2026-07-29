@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, classApi, termApi, gradingSystemApi } from '@/lib/api';
+import { api, classApi, termApi, gradingSystemApi, teacherApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import { socket } from '@/lib/socket';
@@ -34,7 +34,7 @@ function getGrade(result: any, score: number | null, gradeScales?: any[]) {
 }
 
 export default function ResultEntryPage() {
-  const { user, isClassTeacher } = useAuth();
+  const { user, isClassTeacher, isTeacher } = useAuth();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -67,9 +67,9 @@ export default function ResultEntryPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: classesData } = useQuery({
-    queryKey: ['classes'],
+    queryKey: isTeacher ? ['teacher-classes'] : ['classes'],
     queryFn: async () => {
-      const r = await classApi.getAll();
+      const r = isTeacher ? await teacherApi.getClasses() : await classApi.getAll();
       const d = r.data?.data || r.data;
       return Array.isArray(d) ? d : [];
     },

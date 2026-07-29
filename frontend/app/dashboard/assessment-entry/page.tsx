@@ -10,7 +10,7 @@ import {
   GridCellEditStopReasons,
   GridEditCellProps,
 } from '@mui/x-data-grid';
-import { assessmentEngineApi, classApi, subjectApi, termApi, studentApi } from '@/lib/api';
+import { assessmentEngineApi, classApi, subjectApi, termApi, studentApi, teacherApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 
@@ -41,7 +41,7 @@ function computeGrade(percentage: number): string {
 }
 
 export default function AssessmentEntryPage() {
-  const { user } = useAuth();
+  const { user, isTeacher } = useAuth();
   const queryClient = useQueryClient();
 
   const [selectedClass, setSelectedClass] = useState('');
@@ -57,8 +57,11 @@ export default function AssessmentEntryPage() {
   const [showSavedBanner, setShowSavedBanner] = useState(false);
 
   const { data: classes } = useQuery({
-    queryKey: ['classes'],
-    queryFn: () => classApi.getAll().then(r => r.data?.data || r.data),
+    queryKey: isTeacher ? ['teacher-classes'] : ['classes'],
+    queryFn: () =>
+      isTeacher
+        ? teacherApi.getClasses().then(r => r.data?.data || r.data)
+        : classApi.getAll().then(r => r.data?.data || r.data),
   });
 
   const { data: terms } = useQuery({
