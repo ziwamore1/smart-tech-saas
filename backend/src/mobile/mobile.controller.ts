@@ -246,9 +246,10 @@ export class MobileController {
   async previewAdmission(
     @Req() req: any,
     @Query('academicYearId') academicYearId?: string,
+    @Query('classId') classId?: string,
   ) {
     const { schoolId } = req.user;
-    return this.mobileService.previewAdmission(schoolId, academicYearId);
+    return this.mobileService.previewAdmission(schoolId, academicYearId, classId);
   }
 
   @Post('students')

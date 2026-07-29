@@ -47,7 +47,7 @@ export const RegisterStudentScreen: React.FC<Props> = ({ onToggleDrawer, onNavig
 
   useEffect(() => {
     if (academicYearId) fetchPreview();
-  }, [academicYearId]);
+  }, [academicYearId, classId]);
 
   const loadFormData = async () => {
     try {
@@ -87,7 +87,7 @@ export const RegisterStudentScreen: React.FC<Props> = ({ onToggleDrawer, onNavig
 
   const fetchPreview = async () => {
     try {
-      const res = await apiService.previewAdmission(academicYearId);
+      const res = await apiService.previewAdmission(academicYearId, classId || undefined);
       setAdmissionPreview(res?.admissionNumber || '');
     } catch {
       setAdmissionPreview('');

@@ -968,13 +968,14 @@ export class MobileService {
   async previewAdmission(
     schoolId: string,
     academicYearId?: string,
+    classId?: string,
   ) {
     const yearId = academicYearId || (await this.prisma.academicYear.findFirst({
       where: { schoolId, isCurrent: true },
       select: { id: true },
     }))?.id;
     if (!yearId) return { admissionNumber: null };
-    return this.admissionNumberService.previewNextAdmission(schoolId, yearId);
+    return this.admissionNumberService.previewNextAdmission(schoolId, yearId, classId);
   }
 
   async createStudent(

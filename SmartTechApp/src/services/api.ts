@@ -500,8 +500,10 @@ class ApiService {
     return response.data;
   }
 
-  async previewAdmission(academicYearId?: string) {
-    const params = academicYearId ? { academicYearId } : {};
+  async previewAdmission(academicYearId?: string, classId?: string) {
+    const params: any = {};
+    if (academicYearId) params.academicYearId = academicYearId;
+    if (classId) params.classId = classId;
     const response = await this.client.get('/mobile/students/preview-admission', { params });
     return response.data;
   }
