@@ -757,7 +757,7 @@ model Student {
   grade7Results        Grade7Result[]
   studentSubjects      StudentSubject[]
 
-  @@index([admissionNumber, classId])
+  @@unique([admissionNumber, classId])
   @@unique([studentUuid])
   @@index([schoolId])
   @@index([classId])
