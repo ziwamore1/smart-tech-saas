@@ -930,6 +930,78 @@ export class HealthController {
     }
   }
 
+  @Get('backfill-classid')
+  async backfillClassId() {
+    const start = Date.now();
+    const results: Record<string, any> = { updated: [], skipped: [], errors: [] };
+
+    try {
+      const students = await this.prisma.student.findMany({
+        where: { classId: { in: ['__SCHOOL__', null] } },
+        select: { id: true, firstName: true, lastName: true, admissionNumber: true, classId: true },
+      });
+
+      for (const student of students) {
+        try {
+          const enrollment = await this.prisma.enrollment.findFirst({
+            where: { studentId: student.id, status: 'ACTIVE' },
+            select: { classId: true },
+            orderBy: { academicYear: { startDate: 'desc' } },
+          });
+
+          const newClassId = enrollment?.classId || '__SCHOOL__';
+          if (newClassId !== student.classId) {
+            await this.prisma.student.update({
+              where: { id: student.id },
+              data: { classId: newClassId },
+            });
+            results.updated.push({
+              id: student.id,
+              name: `${student.firstName} ${student.lastName}`,
+              admissionNumber: student.admissionNumber,
+              from: student.classId || null,
+              to: newClassId,
+            });
+          } else {
+            results.skipped.push(student.id);
+          }
+        } catch (e: any) {
+          results.errors.push({ id: student.id, error: e.message });
+        }
+      }
+    } catch (e: any) {
+      results.fatal = e.message;
+    }
+
+    return {
+      status: 'ok',
+      latencyMs: Date.now() - start,
+      total: results.updated.length + results.skipped.length,
+      updated: results.updated.length,
+      skipped: results.skipped.length,
+      errors: results.errors.length,
+      details: results,
+    };
+  }
+
+  @Get('classid-health')
+  async classIdHealth() {
+    const total = await this.prisma.student.count();
+    const schoolDefault = await this.prisma.student.count({ where: { classId: '__SCHOOL__' } });
+    const nullClassId = await this.prisma.student.count({ where: { classId: null } });
+    const perClass = await this.prisma.student.count({ where: { classId: { notIn: ['__SCHOOL__', null] } } });
+
+    return {
+      status: schoolDefault + nullClassId === 0 ? 'healthy' : 'degraded',
+      totalStudents: total,
+      withActualClass: perClass,
+      needsBackfill: schoolDefault + nullClassId,
+      schoolDefault,
+      nullClassId,
+      backfillUrl: '/health/backfill-classid',
+    };
+  }
+
   @Head()
   async head() {
     const health = await this.healthService.check();

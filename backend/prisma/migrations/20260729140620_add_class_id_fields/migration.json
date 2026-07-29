@@ -1,0 +1,39 @@
+{
+  "version": "5.22",
+  "steps": [
+    {
+      "tag": "AlterTable",
+      "table": "Student",
+      "operation": "addColumn",
+      "column": {
+        "name": "classId",
+        "type": "TEXT"
+      }
+    },
+    {
+      "tag": "AlterTable",
+      "table": "AdmissionSequence",
+      "operation": "addColumn",
+      "column": {
+        "name": "classId",
+        "type": "TEXT"
+      }
+    },
+    {
+      "tag": "CreateIndex",
+      "index": {
+        "name": "Student_classId_idx",
+        "table": "Student",
+        "columns": ["classId"]
+      }
+    },
+    {
+      "tag": "CreateIndex",
+      "index": {
+        "name": "Student_admissionNumber_classId_idx",
+        "table": "Student",
+        "columns": ["admissionNumber", "classId"]
+      }
+    }
+  ]
+}

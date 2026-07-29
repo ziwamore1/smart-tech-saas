@@ -65,7 +65,7 @@ export class StudentService {
       gender: dto.gender,
       status: (dto.status as StudentStatus) || StudentStatus.ACTIVE,
       schoolId,
-      classId: dto.classId || '__SCHOOL__',
+      classId: dto.classId || null,
     };
 
     if (dto.grade) createData.grade = dto.grade;

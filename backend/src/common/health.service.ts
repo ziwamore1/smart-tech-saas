@@ -36,6 +36,7 @@ export class HealthService {
     checks.ministry = await this.checkMinistryAdapters();
     checks.blockchain = await this.checkBlockchain();
     checks.memory = this.checkMemory();
+    checks.classIdBackfill = await this.checkClassIdBackfill();
 
     const allStatuses = Object.values(checks).map(c => c.status);
     let status: HealthCheckResult['status'] = 'healthy';
@@ -80,6 +81,21 @@ export class HealthService {
       version: this.version,
       checks,
     };
+  }
+
+  private async checkClassIdBackfill(): Promise<HealthCheck> {
+    try {
+      const total = await this.prisma.student.count();
+      if (total === 0) return { status: 'up', message: 'No students to backfill' };
+      const needsBackfill = await this.prisma.student.count({ where: { classId: { in: ['__SCHOOL__', null] } } });
+      if (needsBackfill === 0) return { status: 'up', message: `${total} students have proper classIds` };
+      return {
+        status: 'degraded',
+        message: `${needsBackfill}/${total} students need classId backfill — run GET /health/backfill-classid`,
+      };
+    } catch {
+      return { status: 'down', message: 'Failed to check classId backfill status' };
+    }
   }
 
   private async checkDatabase(): Promise<HealthCheck> {

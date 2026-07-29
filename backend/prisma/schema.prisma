@@ -721,7 +721,7 @@ model Student {
   status               StudentStatus             @default(ACTIVE)
   dateOfBirth          DateTime?
   schoolId             String
-  classId              String
+  classId              String?
   firstName            String
   lastName             String
   gender               String?
@@ -757,7 +757,7 @@ model Student {
   grade7Results        Grade7Result[]
   studentSubjects      StudentSubject[]
 
-  @@unique([admissionNumber, classId])
+  @@index([admissionNumber, classId])
   @@unique([studentUuid])
   @@index([schoolId])
   @@index([classId])
