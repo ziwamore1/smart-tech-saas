@@ -327,6 +327,65 @@ export default function StudentsPage() {
     group.sort((a: any, b: any) => (a.admissionNumber || '').localeCompare(b.admissionNumber || ''));
   });
 
+  const tableRows: any[] = [];
+  sortedClassGroups.forEach(([className, classStudents], gi) => {
+    tableRows.push(
+      <tr key={`header-${gi}`} className="bg-indigo-50">
+        <td colSpan={8} className="px-6 py-2 text-sm font-semibold text-indigo-800">
+          {className} — {classStudents.length} student{classStudents.length !== 1 ? 's' : ''}
+        </td>
+      </tr>
+    );
+    classStudents.forEach((student: any, si: number) => {
+      tableRows.push(
+        <tr key={student.id || `r-${gi}-${si}`} className="hover:bg-gray-50 transition-colors">
+          <td className="py-4 px-6">
+            <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">{student.admissionNumber || 'N/A'}</span>
+          </td>
+          <td className="py-4 px-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
+                {(student.firstName?.[0] || '?')}{(student.lastName?.[0] || '?')}
+              </div>
+              <div className="font-medium text-gray-900">{student.firstName} {student.lastName}</div>
+            </div>
+          </td>
+          <td className="py-4 px-6">
+            <span className="text-sm text-gray-700">{student.className || '-'}</span>
+          </td>
+          <td className="py-4 px-6">
+            <span className={`px-2 py-1 rounded text-xs font-medium ${student.gender === 'Male' ? 'bg-blue-100 text-blue-700' : student.gender === 'Female' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-700'}`}>
+              {student.gender || '-'}
+            </span>
+          </td>
+          <td className="py-4 px-6 text-sm text-gray-600">
+            {student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : '-'}
+          </td>
+          <td className="py-4 px-6">
+            <div className="text-sm">
+              <div className="text-gray-900">{student.email || '-'}</div>
+              <div className="text-gray-500">{student.phone || '-'}</div>
+            </div>
+          </td>
+          <td className="py-4 px-6">
+            <span className={`px-3 py-1 rounded-full text-xs font-medium border ${student.status === 'ACTIVE' ? 'bg-green-100 text-green-700 border-green-200' : student.status === 'INACTIVE' ? 'bg-gray-100 text-gray-600 border-gray-200' : student.status === 'TRANSFERRED' ? 'bg-purple-100 text-purple-700 border-purple-200' : student.status === 'GRADUATED' ? 'bg-blue-100 text-blue-700 border-blue-200' : student.status === 'WITHDRAWN' ? 'bg-orange-100 text-orange-700 border-orange-200' : student.status === 'SUSPENDED' ? 'bg-red-100 text-red-700 border-red-200' : student.status === 'DECEASED' ? 'bg-gray-200 text-gray-800 border-gray-300' : 'bg-red-100 text-red-700 border-red-200'}`}>
+              {student.status || 'ACTIVE'}
+            </span>
+          </td>
+          <td className="py-4 px-6">
+            <div className="flex items-center justify-end gap-2">
+              <button onClick={() => { setSelectedStudent(student); setShowViewModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">👁️ View</button>
+              <button onClick={() => { setSelectedStudent(student); setEditForm({ firstName: student.firstName || '', lastName: student.lastName || '', admissionNumber: student.admissionNumber || '', dateOfBirth: student.dateOfBirth ? student.dateOfBirth.split('T')[0] : '', gender: student.gender || '', email: student.email || '', phone: student.phone || '', address: student.address || '', parentName: student.parentName || '', parentPhone: student.parentPhone || '', parentEmail: student.parentEmail || '', }); setShowEditModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors">✏️ Edit</button>
+              <button onClick={() => { setSelectedStudent(student); setShowEnrollmentModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-50 text-green-600 hover:bg-green-100 transition-colors">📚 Enroll</button>
+              <button onClick={() => { setSelectedStudent(student); setShowLinkParentModal(true); setSelectedParentId(''); setLinkParentSearch(''); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-pink-50 text-pink-600 hover:bg-pink-100 transition-colors">👪 Parent</button>
+              <button onClick={() => { if (confirm(`Delete ${student.firstName} ${student.lastName}?`)) { deleteStudentMutation.mutate(student.id); } }} disabled={deleteStudentMutation.isPending} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50">🗑️ Delete</button>
+            </div>
+          </td>
+        </tr>
+      );
+    });
+  });
+
   return (
     <div className="space-y-6">
       <ReadOnlyBanner managePermission="students.manage" />
@@ -494,121 +553,7 @@ export default function StudentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {sortedClassGroups.flatMap(([className, classStudents], gi) => [
-                  <tr key={`header-${gi}`} className="bg-indigo-50">
-                    <td colSpan={8} className="px-6 py-2 text-sm font-semibold text-indigo-800">
-                      {className} — {classStudents.length} student{classStudents.length !== 1 ? 's' : ''}
-                    </td>
-                  </tr>,
-                  ...classStudents.map((student: any, index: number) => (
-                  <tr key={student.id || index} className="hover:bg-gray-50 transition-colors">
-                    <td className="py-4 px-6">
-                      <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">{student.admissionNumber || 'N/A'}</span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
-                          {(student.firstName?.[0] || '?')}{(student.lastName?.[0] || '?')}
-                        </div>
-                        <div className="font-medium text-gray-900">{student.firstName} {student.lastName}</div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className="text-sm text-gray-700">{student.className || '-'}</span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        student.gender === 'Male' ? 'bg-blue-100 text-blue-700' :
-                        student.gender === 'Female' ? 'bg-pink-100 text-pink-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {student.gender || '-'}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6 text-sm text-gray-600">
-                      {student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : '-'}
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="text-sm">
-                        <div className="text-gray-900">{student.email || '-'}</div>
-                        <div className="text-gray-500">{student.phone || '-'}</div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
-                        student.status === 'ACTIVE' ? 'bg-green-100 text-green-700 border-green-200' :
-                        student.status === 'INACTIVE' ? 'bg-gray-100 text-gray-600 border-gray-200' :
-                        student.status === 'TRANSFERRED' ? 'bg-purple-100 text-purple-700 border-purple-200' :
-                        student.status === 'GRADUATED' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                        student.status === 'WITHDRAWN' ? 'bg-orange-100 text-orange-700 border-orange-200' :
-                        student.status === 'SUSPENDED' ? 'bg-red-100 text-red-700 border-red-200' :
-                        student.status === 'DECEASED' ? 'bg-gray-200 text-gray-800 border-gray-300' :
-                        'bg-red-100 text-red-700 border-red-200'
-                      }`}>
-                        {student.status || 'ACTIVE'}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => { setSelectedStudent(student); setShowViewModal(true); }}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                        >
-                          👁️ View
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedStudent(student);
-                            setEditForm({
-                              firstName: student.firstName || '',
-                              lastName: student.lastName || '',
-                              admissionNumber: student.admissionNumber || '',
-                              dateOfBirth: student.dateOfBirth ? student.dateOfBirth.split('T')[0] : '',
-                              gender: student.gender || '',
-                              email: student.email || '',
-                              phone: student.phone || '',
-                              address: student.address || '',
-                              parentName: student.parentName || '',
-                              parentPhone: student.parentPhone || '',
-                              parentEmail: student.parentEmail || '',
-                            });
-                            setShowEditModal(true);
-                          }}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedStudent(student);
-                            setShowEnrollmentModal(true);
-                          }}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
-                        >
-                          📚 Enroll
-                        </button>
-                        <button
-                          onClick={() => { setSelectedStudent(student); setShowLinkParentModal(true); setSelectedParentId(''); setLinkParentSearch(''); }}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-pink-50 text-pink-600 hover:bg-pink-100 transition-colors"
-                        >
-                          👪 Parent
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (confirm(`Delete ${student.firstName} ${student.lastName}?`)) {
-                              deleteStudentMutation.mutate(student.id);
-                            }
-                          }}
-                          disabled={deleteStudentMutation.isPending}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
-                        >
-                          🗑️ Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  ))
-                ]))}
+                {tableRows}
               </tbody>
             </table>
           </div>
