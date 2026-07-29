@@ -660,7 +660,10 @@ export default function TeachersPage() {
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <span>📋</span> Teaching Assignments
               </h2>
-              <p className="text-sm text-gray-500">{assignmentsData?.length || 0} assignments</p>
+              <p className="text-sm text-gray-500">
+                {assignmentsData?.length || 0} total assignments
+                {assignmentsData?.length ? ` · ${new Set(assignmentsData.map((a: any) => a.teacher?.id || a.teacherId)).size} teachers` : ''}
+              </p>
             </div>
             <button
               onClick={() => setShowAssignmentModal(true)}
@@ -691,74 +694,108 @@ export default function TeachersPage() {
               <thead className="bg-gray-50 border-b-2">
                 <tr>
                   <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Teacher</th>
-                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Class</th>
-                  {!isPrimary && <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Subject</th>}
-                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Academic Year</th>
+                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Assignments</th>
+                  <th className="text-center py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Total</th>
                   <th className="text-right py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {assignmentsData.map((assignment: any, index: number) => {
-                  const colors = [
-                    { bg: 'bg-blue-100', text: 'text-blue-700' },
-                    { bg: 'bg-green-100', text: 'text-green-700' },
-                    { bg: 'bg-purple-100', text: 'text-purple-700' },
-                    { bg: 'bg-pink-100', text: 'text-pink-700' },
-                    { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+                {(() => {
+                  const grouped = assignmentsData.reduce((acc: any, a: any) => {
+                    const key = a.teacher?.id || a.teacherId;
+                    if (!acc[key]) acc[key] = { teacher: a.teacher, teacherId: key, assignments: [] };
+                    acc[key].assignments.push(a);
+                    return acc;
+                  }, {} as Record<string, any>);
+                  return Object.values(grouped);
+                })().map((group: any, gi: number) => {
+                  const { teacher, assignments } = group;
+                  const teacherColors = [
+                    { bg: 'bg-blue-50', border: 'border-blue-200' },
+                    { bg: 'bg-green-50', border: 'border-green-200' },
+                    { bg: 'bg-purple-50', border: 'border-purple-200' },
+                    { bg: 'bg-pink-50', border: 'border-pink-200' },
+                    { bg: 'bg-indigo-50', border: 'border-indigo-200' },
                   ];
-                  const colorSet = colors[index % colors.length];
+                  const tc = teacherColors[gi % teacherColors.length];
                   
                   return (
-                  <tr key={assignment.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold text-sm ${colorSet.bg.replace('bg-', 'opacity-0 ')}`}>
-                          {assignment.teacher?.firstName?.[0] || '?'}{assignment.teacher?.lastName?.[0] || '?'}
+                    <tr key={group.teacherId} className={`hover:bg-gray-50 transition-colors ${tc.bg}`}>
+                      <td className="py-4 px-6 align-top">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                            {teacher?.firstName?.[0] || '?'}{teacher?.lastName?.[0] || '?'}
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-900 block">
+                              {teacher?.firstName || '-'} {teacher?.lastName || '-'}
+                            </span>
+                            <span className="text-xs text-gray-400">{assignments.length} assignment{assignments.length !== 1 ? 's' : ''}</span>
+                          </div>
                         </div>
-                        <span className="font-medium text-gray-900">
-                          {assignment.teacher?.firstName || '-'} {assignment.teacher?.lastName || '-'}
+                      </td>
+                      <td className="py-4 px-6 align-top">
+                        <div className="flex flex-wrap gap-2">
+                          {assignments.map((a: any) => (
+                            <div key={a.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm bg-white shadow-sm">
+                              <span className="font-medium text-gray-700">{a.class?.name || '-'}</span>
+                              {!isPrimary && a.subject?.name && (
+                                <>
+                                  <span className="text-gray-300">·</span>
+                                  <span className="text-gray-500">{a.subject.name}</span>
+                                </>
+                              )}
+                              {a.academicYear?.name && (
+                                <>
+                                  <span className="text-gray-300">·</span>
+                                  <span className="text-xs text-gray-400">{a.academicYear.name}</span>
+                                </>
+                              )}
+                              <div className="flex items-center gap-0.5 ml-1 border-l border-gray-200 pl-1.5">
+                                <button
+                                  onClick={() => {
+                                    setEditingAssignment(a);
+                                    setSelectedTeacherForAssignment(teachers.find((t: any) => (t.user?.id || t.userId || t.id) === a.teacherId) || null);
+                                    setAssignmentForm({
+                                      classId: a.classId || a.class?.id || '',
+                                      subjectId: a.subjectId || a.subject?.id || '',
+                                      academicYearId: a.academicYearId || a.academicYear?.id || '',
+                                    });
+                                    setShowAssignmentModal(true);
+                                  }}
+                                  className="text-amber-500 hover:text-amber-700 text-xs transition-colors p-0.5"
+                                  title="Edit assignment"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  onClick={() => { if (confirm('Delete this assignment?')) { deleteAssignmentMutation.mutate(a.id); } }}
+                                  className="text-red-400 hover:text-red-600 text-xs transition-colors p-0.5"
+                                  title="Delete assignment"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 align-top text-center">
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 font-bold text-sm">
+                          {assignments.length}
                         </span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${colorSet.bg} ${colorSet.text}`}>
-                        {assignment.class?.name || '-'}
-                      </span>
-                    </td>
-                    {!isPrimary && (
-                    <td className="py-4 px-6">
-                      <span className="text-sm text-gray-900">{assignment.subject?.name || '-'}</span>
-                    </td>
-                    )}
-                    <td className="py-4 px-6">
-                      <span className="text-sm text-gray-500">{assignment.academicYear?.name || '-'}</span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => {
-                            setEditingAssignment(assignment);
-                            setSelectedTeacherForAssignment(teachers.find((t: any) => (t.user?.id || t.userId || t.id) === assignment.teacherId) || null);
-                            setAssignmentForm({
-                              classId: assignment.classId || assignment.class?.id || '',
-                              subjectId: assignment.subjectId || assignment.subject?.id || '',
-                              academicYearId: assignment.academicYearId || assignment.academicYear?.id || '',
-                            });
-                            setShowAssignmentModal(true);
-                          }} 
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button 
-                          onClick={() => { if (confirm('Delete this assignment?')) { deleteAssignmentMutation.mutate(assignment.id); } }} 
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                        >
-                          🗑️ Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="py-4 px-6 align-top">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setShowAssignmentModal(true)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>
