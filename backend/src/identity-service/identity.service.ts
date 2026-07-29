@@ -43,6 +43,7 @@ export class IdentityService {
         OR: [
           { userRoles: { some: { role: { name: filters.role } } } },
           { schoolUsers: { some: { SchoolRoleAssignment: { some: { role: filters.role, isActive: true } } } } },
+          { platformRoleAssignments: { some: { role: filters.role, isActive: true } } },
         ],
       });
     }

@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
@@ -155,7 +154,7 @@ export default function PasswordHubPage() {
               />
             </div>
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="All Roles" />
               </SelectTrigger>
               <SelectContent>
@@ -163,9 +162,13 @@ export default function PasswordHubPage() {
                 <SelectItem value="Student">Students</SelectItem>
                 <SelectItem value="Parent">Parents</SelectItem>
                 <SelectItem value="Teacher">Teachers</SelectItem>
-                <SelectItem value="ClassTeacher">Class Teachers</SelectItem>
+                <SelectItem value="Class Teacher">Class Teachers</SelectItem>
+                <SelectItem value="HOD">HOD</SelectItem>
                 <SelectItem value="Director">Directors</SelectItem>
-                <SelectItem value="Staff">Staff</SelectItem>
+                <SelectItem value="Deputy Director">Deputy Directors</SelectItem>
+                <SelectItem value="Head Teacher">Head Teachers</SelectItem>
+                <SelectItem value="Accountant">Accountants</SelectItem>
+                <SelectItem value="Secretary">Secretaries</SelectItem>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -194,17 +197,17 @@ export default function PasswordHubPage() {
           <CardDescription>{users.length} user(s) found</CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[600px]">
-            <table className="w-full">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px]">
               <thead>
                 <tr className="border-b text-left text-sm font-medium text-muted-foreground">
-                  <th className="pb-3 pr-4">User</th>
-                  <th className="pb-3 pr-4">Roles</th>
-                  <th className="pb-3 pr-4">Status</th>
-                  <th className="pb-3 pr-4">MFA</th>
-                  <th className="pb-3 pr-4">Last Login</th>
-                  <th className="pb-3 pr-4">Devices</th>
-                  <th className="pb-3 pr-4">Actions</th>
+                  <th className="pb-3 pr-4 whitespace-nowrap">User</th>
+                  <th className="pb-3 pr-4 whitespace-nowrap">Roles</th>
+                  <th className="pb-3 pr-4 whitespace-nowrap">Status</th>
+                  <th className="pb-3 pr-4 whitespace-nowrap">MFA</th>
+                  <th className="pb-3 pr-4 whitespace-nowrap">Last Login</th>
+                  <th className="pb-3 pr-4 whitespace-nowrap">Devices</th>
+                  <th className="pb-3 pr-4 whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -223,7 +226,7 @@ export default function PasswordHubPage() {
                 ) : (
                   users.map((u) => (
                     <tr key={u.id} className="border-b hover:bg-muted/50 cursor-pointer" onClick={() => { setSelectedUser(u); setShowUserDetail(true); }}>
-                      <td className="py-3 pr-4">
+                      <td className="py-3 pr-4 whitespace-nowrap">
                         <div>
                           <div className="font-medium">{u.firstName} {u.lastName}</div>
                           <div className="text-sm text-muted-foreground">{u.email}</div>
@@ -233,22 +236,22 @@ export default function PasswordHubPage() {
                       <td className="py-3 pr-4">
                         <div className="flex flex-wrap gap-1">
                           {u.roles?.map((role: string) => (
-                            <Badge key={role} variant="outline" className="text-xs">{role}</Badge>
+                            <Badge key={role} variant="outline" className="text-xs whitespace-nowrap">{role}</Badge>
                           ))}
                         </div>
                       </td>
-                      <td className="py-3 pr-4">{getStatusBadge(u.accountStatus)}</td>
-                      <td className="py-3 pr-4">
+                      <td className="py-3 pr-4 whitespace-nowrap">{getStatusBadge(u.accountStatus)}</td>
+                      <td className="py-3 pr-4 whitespace-nowrap">
                         {u.mfaEnabled ? (
                           <Badge className="text-green-600 bg-green-50 dark:bg-green-950/30 text-xs">Enabled</Badge>
                         ) : (
                           <Badge variant="secondary" className="text-xs">Disabled</Badge>
                         )}
                       </td>
-                      <td className="py-3 pr-4 text-sm text-muted-foreground">
+                      <td className="py-3 pr-4 whitespace-nowrap text-sm text-muted-foreground">
                         {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'Never'}
                       </td>
-                      <td className="py-3 pr-4 text-sm">{u.activeSessions || 0}</td>
+                      <td className="py-3 pr-4 whitespace-nowrap text-sm">{u.activeSessions || 0}</td>
                       <td className="py-3 pr-4">
                         <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                           {actionLoading === `generate-${u.id}` ? (
@@ -315,7 +318,7 @@ export default function PasswordHubPage() {
                 )}
               </tbody>
             </table>
-          </ScrollArea>
+          </div>
         </CardContent>
       </Card>
 
