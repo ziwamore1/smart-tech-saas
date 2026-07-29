@@ -1008,6 +1008,12 @@ export class HealthController {
     const results: Record<string, any> = { classes: [], errors: [], summary: '' };
 
     try {
+      // Drop the old per-school unique constraint on (admissionNumber, schoolId) if it still exists.
+      // This constraint blocks per-class re-sequencing since the same number can appear in different classes.
+      try {
+        await this.prisma.$executeRawUnsafe(`DROP INDEX IF EXISTS "Student_admissionNumber_schoolId_key"`);
+      } catch {}
+
       // Get all students with proper classId (not null, not __SCHOOL__)
       const students = await this.prisma.student.findMany({
         where: {
