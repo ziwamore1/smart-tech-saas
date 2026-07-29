@@ -1002,6 +1002,137 @@ export class HealthController {
     };
   }
 
+  @Get('resequence-admission-numbers')
+  async resequenceAdmissionNumbers() {
+    const start = Date.now();
+    const results: Record<string, any> = { classes: [], errors: [], summary: '' };
+
+    try {
+      // Get all students with proper classId (not null, not __SCHOOL__)
+      const students = await this.prisma.student.findMany({
+        where: {
+          classId: { not: null },
+          NOT: { classId: '__SCHOOL__' },
+        },
+        select: {
+          id: true,
+          admissionNumber: true,
+          schoolId: true,
+          classId: true,
+          enrollments: {
+            where: { status: 'ACTIVE' },
+            select: { academicYearId: true },
+            orderBy: { academicYear: { startDate: 'desc' } },
+            take: 1,
+          },
+        },
+      });
+
+      // Group by (schoolId, classId)
+      const groups = new Map<string, any[]>();
+      for (const s of students) {
+        const key = `${s.schoolId}::${s.classId}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(s);
+      }
+
+      for (const [key, group] of groups) {
+        const [schoolId, classId] = key.split('::');
+        const classInfo = await this.prisma.class.findUnique({
+          where: { id: classId },
+          select: { name: true },
+        });
+
+        // Determine academic year: use the latest active enrollment's year, or the current academic year for the school
+        let academicYearId: string | null = null;
+        for (const s of group) {
+          if (s.enrollments?.length > 0) {
+            academicYearId = s.enrollments[0].academicYearId;
+            break;
+          }
+        }
+        if (!academicYearId) {
+          const currentYear = await this.prisma.academicYear.findFirst({
+            where: { schoolId, isCurrent: true },
+          });
+          if (!currentYear) {
+            results.errors.push({ group: key, error: 'No academic year found' });
+            continue;
+          }
+          academicYearId = currentYear.id;
+        }
+
+        const academicYear = await this.prisma.academicYear.findUnique({
+          where: { id: academicYearId },
+        });
+        if (!academicYear) {
+          results.errors.push({ group: key, error: 'Academic year not found' });
+          continue;
+        }
+
+        const year = academicYear.startDate.getFullYear();
+
+        // Sort group by current admission number
+        group.sort((a, b) => (a.admissionNumber || '').localeCompare(b.admissionNumber || ''));
+
+        // Reset sequence for this class
+        await this.prisma.admissionSequence.upsert({
+          where: {
+            schoolId_academicYearId_classId: { schoolId, academicYearId, classId },
+          },
+          update: { currentSequence: 0 },
+          create: { schoolId, academicYearId, classId, year, currentSequence: 0 },
+        });
+
+        // Get a fresh sequence counter
+        const sequence = await this.prisma.admissionSequence.findUnique({
+          where: { schoolId_academicYearId_classId: { schoolId, academicYearId, classId } },
+        });
+        let counter = sequence?.currentSequence ?? 0;
+
+        const updated: any[] = [];
+        for (const student of group) {
+          counter++;
+          const newNumber = `ST-${year}-${String(counter).padStart(3, '0')}`;
+          await this.prisma.student.update({
+            where: { id: student.id },
+            data: { admissionNumber: newNumber },
+          });
+          updated.push({
+            id: student.id,
+            oldNumber: student.admissionNumber,
+            newNumber,
+          });
+        }
+
+        // Finalize sequence
+        await this.prisma.admissionSequence.update({
+          where: { schoolId_academicYearId_classId: { schoolId, academicYearId, classId } },
+          data: { currentSequence: counter },
+        });
+
+        results.classes.push({
+          classId,
+          className: classInfo?.name || 'Unknown',
+          schoolId,
+          studentCount: group.length,
+          updated,
+        });
+      }
+
+      const totalUpdated = results.classes.reduce((sum: number, c: any) => sum + c.studentCount, 0);
+      results.summary = `${totalUpdated} students renumbered across ${results.classes.length} classes`;
+    } catch (e: any) {
+      results.fatalError = e.message;
+    }
+
+    return {
+      status: results.fatalError ? 'error' : 'ok',
+      latencyMs: Date.now() - start,
+      ...results,
+    };
+  }
+
   @Head()
   async head() {
     const health = await this.healthService.check();
