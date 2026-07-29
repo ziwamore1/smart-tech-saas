@@ -307,8 +307,24 @@ export default function StudentsPage() {
       student.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.admissionNumber?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesSearch;
+    const matchesClass = filterClass === '' || student.enrollments?.some((e: any) => e.classId === filterClass && e.status?.toUpperCase() === 'ACTIVE');
+    const matchesStatus = filterStatus === '' || student.status === filterStatus;
+    return matchesSearch && matchesClass && matchesStatus;
+  });
+
+  const groupedByClass = filteredStudents.reduce((acc: Record<string, any[]>, s: any) => {
+    const key = s.className || 'Ungrouped';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(s);
+    return acc;
+  }, {});
+
+  const sortedClassGroups = Object.entries(groupedByClass).sort(([a], [b]) =>
+    a === 'Ungrouped' ? 1 : b === 'Ungrouped' ? -1 : a.localeCompare(b)
+  );
+
+  sortedClassGroups.forEach(([, group]) => {
+    group.sort((a: any, b: any) => (a.admissionNumber || '').localeCompare(b.admissionNumber || ''));
   });
 
   return (
@@ -469,6 +485,7 @@ export default function StudentsPage() {
                 <tr>
                   <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Admission #</th>
                   <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
+                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Class</th>
                   <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Gender</th>
                   <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Date of Birth</th>
                   <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Contact</th>
@@ -477,7 +494,13 @@ export default function StudentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredStudents.map((student: any, index: number) => (
+                {sortedClassGroups.flatMap(([className, classStudents], gi) => [
+                  <tr key={`header-${gi}`} className="bg-indigo-50">
+                    <td colSpan={8} className="px-6 py-2 text-sm font-semibold text-indigo-800">
+                      {className} — {classStudents.length} student{classStudents.length !== 1 ? 's' : ''}
+                    </td>
+                  </tr>,
+                  ...classStudents.map((student: any, index: number) => (
                   <tr key={student.id || index} className="hover:bg-gray-50 transition-colors">
                     <td className="py-4 px-6">
                       <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">{student.admissionNumber || 'N/A'}</span>
@@ -489,6 +512,9 @@ export default function StudentsPage() {
                         </div>
                         <div className="font-medium text-gray-900">{student.firstName} {student.lastName}</div>
                       </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className="text-sm text-gray-700">{student.className || '-'}</span>
                     </td>
                     <td className="py-4 px-6">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -581,7 +607,8 @@ export default function StudentsPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  ))
+                ]))}
               </tbody>
             </table>
           </div>
