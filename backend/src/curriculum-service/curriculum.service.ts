@@ -87,12 +87,18 @@ export class CurriculumService {
   }
 
   async updateCurriculumVersion(id: string, data: any) {
-    const updateData: any = { ...data };
-    if (data.effectiveFrom) updateData.effectiveFrom = new Date(data.effectiveFrom);
-    else if (data.effectiveFrom === null) updateData.effectiveFrom = null;
-    if (data.effectiveTo) updateData.effectiveTo = new Date(data.effectiveTo);
-    else if (data.effectiveTo === null) updateData.effectiveTo = null;
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.code !== undefined) updateData.code = data.code;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.educationLevelId !== undefined) updateData.educationLevelId = data.educationLevelId;
+    if (data.schoolId !== undefined) updateData.schoolId = data.schoolId;
+    if (data.effectiveFrom !== undefined && data.effectiveFrom !== '') updateData.effectiveFrom = new Date(data.effectiveFrom);
+    else if (data.effectiveFrom === '' || data.effectiveFrom === null) updateData.effectiveFrom = null;
+    if (data.effectiveTo !== undefined && data.effectiveTo !== '') updateData.effectiveTo = new Date(data.effectiveTo);
+    else if (data.effectiveTo === '' || data.effectiveTo === null) updateData.effectiveTo = null;
     if (data.isCurrent !== undefined) {
+      updateData.isCurrent = data.isCurrent;
       updateData.status = data.isCurrent ? 'CURRENT' as CurriculumStatus : 'DRAFT' as CurriculumStatus;
     }
     return this.prisma.curriculumVersion.update({
