@@ -59,6 +59,7 @@ function SavingOverlay({ visible, enteredCount, assessmentName }: { visible: boo
 }
 
 function SuccessModal({ visible, enteredCount, assessmentName, onClose }: { visible: boolean; enteredCount: number; assessmentName: string; onClose: () => void }) {
+  const savedTime = typeof window !== 'undefined' ? new Date().toLocaleString() : '';
   if (!visible) return null;
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
@@ -70,12 +71,16 @@ function SuccessModal({ visible, enteredCount, assessmentName, onClose }: { visi
             </svg>
           </div>
           <h3 className="text-xl font-bold text-gray-900 mb-2">Scores Saved Successfully</h3>
-          <p className="text-gray-600 mb-4">
-            {enteredCount} score{enteredCount !== 1 ? 's' : ''} for <strong>{assessmentName}</strong> have been saved.
+          <p className="text-gray-600 mb-1">
+            {enteredCount} score{enteredCount !== 1 ? 's' : ''} for <strong>{assessmentName}</strong>.
           </p>
-          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-4 mb-6 text-left">
+          <p className="text-xs text-gray-400 mb-4">Saved at: {savedTime} &middot; Ref: assessment-scores-{Date.now()}</p>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-4 mb-6 text-left space-y-2">
             <p className="text-sm text-blue-800 leading-relaxed">
-              Your assessment scores have been successfully saved. This will automatically be submitted to the results sheet in the Results Management. The status will remain pending until verified and approved by the relevant supervisor, then the results sheet progress bar will move depending on how many assessment scores/exam types have been submitted.
+              <strong>&checkmark; Record kept.</strong> Your scores are now saved and linked to this class, subject, term, and assessment type. When you return to this page with the same selections, your previously saved scores will appear automatically.
+            </p>
+            <p className="text-sm text-blue-800 leading-relaxed">
+              <strong>&#8594; Results Sheet.</strong> These scores will appear in the Results Management module as pending entries. Once a supervisor verifies and approves them, the assessment progress bar will update.
             </p>
           </div>
           <button
@@ -121,6 +126,8 @@ export default function AssessmentEntryPage() {
   const [batchTitle, setBatchTitle] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [showSavedBanner, setShowSavedBanner] = useState(false);
 
   const { data: classes } = useQuery({
     queryKey: ['classes'],
@@ -219,8 +226,12 @@ export default function AssessmentEntryPage() {
   const bulkSaveMutation = useMutation({
     mutationFn: (data: any) => assessmentEngineApi.scores.bulk(data).then(r => r.data?.data || r.data),
     onSuccess: (data: any) => {
-      setSavedCount(data.summary?.entered || 0);
+      const count = data.summary?.entered || 0;
+      setSavedCount(count);
+      setLastSavedAt(new Date().toLocaleTimeString());
       setShowSuccessModal(true);
+      setShowSavedBanner(true);
+      setTimeout(() => setShowSavedBanner(false), 8000);
       queryClient.invalidateQueries({ queryKey: ['class-results'] });
       queryClient.invalidateQueries({ queryKey: ['teacher', 'pending'] });
       queryClient.invalidateQueries({ queryKey: ['completion-stats'] });
@@ -305,7 +316,37 @@ export default function AssessmentEntryPage() {
     }
   }, [maxScore]);
 
+  const handleCellEditStart = useCallback((params: any) => {
+    setTimeout(() => {
+      const input = document.querySelector(`[data-field="${params.field}"][data-id="${params.id}"] input`) as HTMLInputElement;
+      if (input && params.field === 'rawScore') {
+        input.type = 'text';
+        input.inputMode = 'decimal';
+      }
+    }, 0);
+  }, []);
+
   const columns: GridColDef[] = useMemo(() => [
+    {
+      field: 'existing',
+      headerName: '',
+      width: 40,
+      editable: false,
+      sortable: false,
+      disableColumnMenu: true,
+      renderCell: (params) => {
+        if (params.value) {
+          return (
+            <span className="flex items-center justify-center w-full h-full" title="Previously saved">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            </span>
+          );
+        }
+        return null;
+      },
+    },
     {
       field: 'admissionNumber',
       headerName: 'Adm No',
@@ -404,7 +445,7 @@ export default function AssessmentEntryPage() {
 
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Assessment Score Entry</h1>
-        <p className="text-gray-500 mt-1">Enter scores for entire class at once. Scores auto-sync to results sheet on submit.</p>
+        <p className="text-gray-500 mt-1">Enter scores for entire class at once. Saved scores are preserved and restored when you return. <span className="text-green-600 font-medium">Synced to results sheet.</span></p>
       </div>
 
       <div className="bg-white rounded-lg shadow p-4">
@@ -522,8 +563,26 @@ export default function AssessmentEntryPage() {
 
       {selectedAssessment && (
         <div className="bg-white rounded-lg shadow p-4">
+          {/* Persistent saved banner */}
+          {showSavedBanner && (
+            <div className="mb-3 flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-800">
+              <svg className="w-5 h-5 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>
+                <strong>{savedCount}</strong> score{savedCount !== 1 ? 's' : ''} saved successfully at <strong>{lastSavedAt}</strong>.
+                {' '}All saved scores are synced to the results sheet and will be preserved when you return.
+              </span>
+              <button onClick={() => setShowSavedBanner(false)} className="ml-auto text-green-500 hover:text-green-700">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <span className="text-sm text-gray-500">
                 <i className="fa fa-users mr-1"></i>
                 {rowCount} students
@@ -541,11 +600,16 @@ export default function AssessmentEntryPage() {
                 {missingCount} missing
               </span>
               <span className="text-sm text-gray-500">
-                Max Score: <strong>{maxScore}</strong>
+                Max: <strong>{maxScore}</strong>
               </span>
               {selectedConfig && (
                 <span className="text-sm text-indigo-600">
                   Weight: <strong>{selectedConfig.weightPercentage}%</strong>
+                </span>
+              )}
+              {lastSavedAt && !showSavedBanner && (
+                <span className="text-xs text-gray-400 border-l border-gray-200 pl-3">
+                  Last saved: <strong>{lastSavedAt}</strong>
                 </span>
               )}
             </div>
@@ -579,25 +643,74 @@ export default function AssessmentEntryPage() {
                 setRows(prev => prev.map(r => r.id === newRow.id ? newRow as StudentRow : r));
                 return newRow;
               }}
+              onCellEditStart={handleCellEditStart}
               onCellEditStop={handleCellEditStop}
               sx={{
-                border: 'none',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                '& .MuiDataGrid-main': { border: 'none' },
+                '& .MuiDataGrid-cell': {
+                  borderRight: '1px solid #e5e7eb',
+                  borderBottom: '1px solid #e5e7eb',
+                  outline: 'none',
+                },
                 '& .MuiDataGrid-cell:focus': { outline: 'none' },
                 '& .MuiDataGrid-cell:focus-within': { outline: 'none' },
-                '& .score-distinction': { color: '#059669', fontWeight: 600 },
-                '& .score-credit': { color: '#2563eb', fontWeight: 600 },
-                '& .score-pass': { color: '#d97706', fontWeight: 600 },
-                '& .score-fail': { color: '#dc2626', fontWeight: 600 },
+                '& .MuiDataGrid-columnHeader': {
+                  borderRight: '1px solid #d1d5db',
+                  backgroundColor: '#f1f5f9',
+                },
+                '& .MuiDataGrid-columnHeader:last-child': { borderRight: 'none' },
+                '& .score-distinction': {
+                  backgroundColor: '#ecfdf5',
+                  color: '#059669',
+                  fontWeight: 600,
+                },
+                '& .score-credit': {
+                  backgroundColor: '#eff6ff',
+                  color: '#2563eb',
+                  fontWeight: 600,
+                },
+                '& .score-pass': {
+                  backgroundColor: '#fffbeb',
+                  color: '#d97706',
+                  fontWeight: 600,
+                },
+                '& .score-fail': {
+                  backgroundColor: '#fef2f2',
+                  color: '#dc2626',
+                  fontWeight: 600,
+                },
+                '& .score-absent': {
+                  backgroundColor: '#fef3c7',
+                  color: '#92400e',
+                  fontWeight: 700,
+                  fontStyle: 'italic',
+                },
                 '& .grade-excellent': { color: '#059669', fontWeight: 700 },
                 '& .grade-good': { color: '#2563eb', fontWeight: 600 },
                 '& .grade-average': { color: '#d97706' },
                 '& .grade-poor': { color: '#dc2626' },
                 '& .MuiDataGrid-columnHeaders': {
-                  backgroundColor: '#f8fafc',
+                  backgroundColor: '#f1f5f9',
                   fontWeight: 600,
+                  borderBottom: '2px solid #cbd5e1',
+                },
+                '& .MuiDataGrid-row:nth-of-type(even)': {
+                  backgroundColor: '#f8fafc',
                 },
                 '& .MuiDataGrid-row:nth-of-type(odd)': {
-                  backgroundColor: '#fafafa',
+                  backgroundColor: '#ffffff',
+                },
+                '& .MuiDataGrid-row:hover': {
+                  backgroundColor: '#eef2ff',
+                },
+                '& .MuiDataGrid-cell--editable': {
+                  backgroundColor: '#fffbeb',
+                },
+                '& .MuiDataGrid-cell--editing': {
+                  backgroundColor: '#fefce8',
+                  boxShadow: 'inset 0 0 0 2px #f59e0b',
                 },
               }}
             />
@@ -613,15 +726,34 @@ export default function AssessmentEntryPage() {
       )}
 
       <style jsx global>{`
+        .assessment-data-grid .MuiDataGrid-cell {
+          padding: 4px 8px !important;
+        }
         .assessment-data-grid .MuiDataGrid-cell input[type="number"] {
           text-align: center;
           font-weight: 600;
           font-size: 14px;
+          width: 100%;
         }
         .assessment-data-grid .score-absent {
-          color: #f59e0b !important;
+          background-color: #fef3c7 !important;
+          color: #92400e !important;
           font-weight: 700;
           font-style: italic;
+        }
+        .assessment-data-grid .MuiDataGrid-columnHeader[data-field="rawScore"] {
+          background-color: #fef9c3 !important;
+        }
+        .assessment-data-grid .MuiDataGrid-columnHeader[data-field="remarks"] {
+          background-color: #f0f9ff !important;
+        }
+        .assessment-data-grid .MuiDataGrid-cell[data-field="rawScore"]:not(.MuiDataGrid-cell--editing) {
+          background-color: #fffbeb;
+          cursor: pointer;
+        }
+        .assessment-data-grid .MuiDataGrid-cell[data-field="remarks"]:not(.MuiDataGrid-cell--editing) {
+          background-color: #f0f9ff;
+          cursor: pointer;
         }
       `}</style>
     </div>

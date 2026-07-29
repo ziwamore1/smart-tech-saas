@@ -24,7 +24,20 @@ interface StudentRow {
   percentage: number | null;
   grade: string | null;
   remarks: string | null;
+  isAbsent: boolean;
   existing: boolean;
+}
+
+function computeGrade(percentage: number): string {
+  if (percentage >= 75) return '1';
+  if (percentage >= 70) return '2';
+  if (percentage >= 65) return '3';
+  if (percentage >= 60) return '4';
+  if (percentage >= 55) return '5';
+  if (percentage >= 50) return '6';
+  if (percentage >= 45) return '7';
+  if (percentage >= 40) return '8';
+  return '9';
 }
 
 export default function AssessmentEntryPage() {
@@ -39,6 +52,9 @@ export default function AssessmentEntryPage() {
   const [maxScore, setMaxScore] = useState(100);
   const [saving, setSaving] = useState(false);
   const [batchTitle, setBatchTitle] = useState('');
+  const [savedCount, setSavedCount] = useState(0);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [showSavedBanner, setShowSavedBanner] = useState(false);
 
   const { data: classes } = useQuery({
     queryKey: ['classes'],
@@ -107,6 +123,7 @@ export default function AssessmentEntryPage() {
             percentage: existing?.percentage ?? null,
             grade: existing?.grade ?? null,
             remarks: existing?.remarks ?? null,
+            isAbsent: existing?.isAbsent ?? false,
             existing: !!existing,
           };
         });
@@ -118,7 +135,12 @@ export default function AssessmentEntryPage() {
   const bulkSaveMutation = useMutation({
     mutationFn: (data: any) => assessmentEngineApi.scores.bulk(data).then(r => r.data?.data || r.data),
     onSuccess: (data: any) => {
-      toast.success(`${data.summary?.entered || 0} scores saved successfully`);
+      const count = data.summary?.entered || 0;
+      setSavedCount(count);
+      setLastSavedAt(new Date().toLocaleTimeString());
+      setShowSavedBanner(true);
+      setTimeout(() => setShowSavedBanner(false), 8000);
+      toast.success(`${count} scores saved successfully`);
       queryClient.invalidateQueries({ queryKey: ['class-results'] });
       queryClient.invalidateQueries({ queryKey: ['teacher', 'pending'] });
     },
@@ -134,10 +156,12 @@ export default function AssessmentEntryPage() {
     }
 
     const scores = rows
-      .filter(r => r.rawScore !== null)
+      .filter(r => r.rawScore !== null || r.isAbsent)
       .map(r => ({
         studentId: r.studentId,
         rawScore: r.rawScore,
+        isAbsent: r.isAbsent,
+        absentCode: r.isAbsent ? ('X' as const) : undefined,
         remarks: r.remarks || undefined,
       }));
 
@@ -170,14 +194,24 @@ export default function AssessmentEntryPage() {
         if (row.id !== id) return row;
 
         if (field === 'rawScore') {
-          const numValue = value === '' || value === null ? null : parseFloat(value);
-          if (numValue !== null && (isNaN(numValue) || numValue < 0 || numValue > maxScore)) {
-            toast.error(`Score must be between 0 and ${maxScore}`);
+          const strValue = String(value).trim().toUpperCase();
+
+          if (strValue === 'X' || strValue === 'A') {
+            return { ...row, rawScore: null, isAbsent: true, percentage: null, grade: null, remarks: `[Absent-${strValue}]` };
+          }
+
+          if (strValue === '' || strValue === 'null') {
+            return { ...row, rawScore: null, isAbsent: false, percentage: null, grade: null };
+          }
+
+          const numValue = parseFloat(value);
+          if (isNaN(numValue) || numValue < 0 || numValue > maxScore) {
+            toast.error(`Score must be between 0 and ${maxScore}, or X/A for absent`);
             return row;
           }
-          const percentage = numValue !== null ? (numValue / maxScore) * 100 : null;
-          const grade = percentage !== null ? computeGrade(percentage) : null;
-          return { ...row, rawScore: numValue, percentage, grade };
+          const percentage = (numValue / maxScore) * 100;
+          const grade = computeGrade(percentage);
+          return { ...row, rawScore: numValue, isAbsent: false, percentage, grade };
         }
 
         return { ...row, [field]: value };
@@ -193,19 +227,37 @@ export default function AssessmentEntryPage() {
     }
   }, [maxScore]);
 
-  const computeGrade = (percentage: number): string => {
-    if (percentage >= 75) return '1';
-    if (percentage >= 70) return '2';
-    if (percentage >= 65) return '3';
-    if (percentage >= 60) return '4';
-    if (percentage >= 55) return '5';
-    if (percentage >= 50) return '6';
-    if (percentage >= 45) return '7';
-    if (percentage >= 40) return '8';
-    return '9';
-  };
+  const handleCellEditStart = useCallback((params: any) => {
+    setTimeout(() => {
+      const input = document.querySelector(`[data-field="${params.field}"][data-id="${params.id}"] input`) as HTMLInputElement;
+      if (input && params.field === 'rawScore') {
+        input.type = 'text';
+        input.inputMode = 'decimal';
+      }
+    }, 0);
+  }, []);
 
   const columns: GridColDef[] = useMemo(() => [
+    {
+      field: 'existing',
+      headerName: '',
+      width: 40,
+      editable: false,
+      sortable: false,
+      disableColumnMenu: true,
+      renderCell: (params) => {
+        if (params.value) {
+          return (
+            <span className="flex items-center justify-center w-full h-full" title="Previously saved">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            </span>
+          );
+        }
+        return null;
+      },
+    },
     {
       field: 'admissionNumber',
       headerName: 'Adm No',
@@ -229,12 +281,16 @@ export default function AssessmentEntryPage() {
     },
     {
       field: 'rawScore',
-      headerName: 'Score',
-      width: 100,
+      headerName: 'Score (X=Absent)',
+      width: 130,
       editable: true,
-      type: 'number',
       sortable: false,
-      cellClassName: (params) => {
+      valueGetter: (value: any, row: any) => {
+        if (row.isAbsent) return 'X';
+        return value;
+      },
+      cellClassName: (params: any) => {
+        if (params.row?.isAbsent) return 'score-absent';
         if (params.value === null || params.value === undefined) return '';
         if (params.value >= 75) return 'score-distinction';
         if (params.value >= 60) return 'score-credit';
@@ -277,14 +333,15 @@ export default function AssessmentEntryPage() {
   ], []);
 
   const rowCount = rows.length;
-  const enteredCount = rows.filter(r => r.rawScore !== null).length;
+  const enteredCount = rows.filter(r => r.rawScore !== null || r.isAbsent).length;
+  const absentCount = rows.filter(r => r.isAbsent).length;
   const missingCount = rowCount - enteredCount;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Assessment Score Entry</h1>
-        <p className="text-gray-500 mt-1">Enter scores for entire class at once. Scores auto-save on submit.</p>
+        <p className="text-gray-500 mt-1">Enter scores for entire class at once. Saved scores are preserved and restored when you return. <span className="text-green-600 font-medium">Synced to results sheet.</span></p>
       </div>
 
       <div className="bg-white rounded-lg shadow p-4">
@@ -362,6 +419,22 @@ export default function AssessmentEntryPage() {
 
       {selectedAssessment && (
         <div className="bg-white rounded-lg shadow p-4">
+          {showSavedBanner && (
+            <div className="mb-3 flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-800">
+              <svg className="w-5 h-5 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>
+                <strong>{savedCount}</strong> score{savedCount !== 1 ? 's' : ''} saved successfully at <strong>{lastSavedAt}</strong>.
+                {' '}All saved scores are synced to the results sheet and will be preserved when you return.
+              </span>
+              <button onClick={() => setShowSavedBanner(false)} className="ml-auto text-green-500 hover:text-green-700">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-500">
@@ -372,13 +445,22 @@ export default function AssessmentEntryPage() {
                 <i className="fa fa-check-circle mr-1"></i>
                 {enteredCount} entered
               </span>
+              <span className="text-sm text-orange-600">
+                <i className="fa fa-user-slash mr-1"></i>
+                {absentCount} absent
+              </span>
               <span className="text-sm text-red-600">
                 <i className="fa fa-exclamation-circle mr-1"></i>
                 {missingCount} missing
               </span>
               <span className="text-sm text-gray-500">
-                Max Score: <strong>{maxScore}</strong>
+                Max: <strong>{maxScore}</strong>
               </span>
+              {lastSavedAt && !showSavedBanner && (
+                <span className="text-xs text-gray-400 border-l border-gray-200 pl-3">
+                  Last saved: <strong>{lastSavedAt}</strong>
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -419,25 +501,74 @@ export default function AssessmentEntryPage() {
                 setRows(prev => prev.map(r => r.id === newRow.id ? newRow as StudentRow : r));
                 return newRow;
               }}
+              onCellEditStart={handleCellEditStart}
               onCellEditStop={handleCellEditStop}
               sx={{
-                border: 'none',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                '& .MuiDataGrid-main': { border: 'none' },
+                '& .MuiDataGrid-cell': {
+                  borderRight: '1px solid #e5e7eb',
+                  borderBottom: '1px solid #e5e7eb',
+                  outline: 'none',
+                },
                 '& .MuiDataGrid-cell:focus': { outline: 'none' },
                 '& .MuiDataGrid-cell:focus-within': { outline: 'none' },
-                '& .score-distinction': { color: '#059669', fontWeight: 600 },
-                '& .score-credit': { color: '#2563eb', fontWeight: 600 },
-                '& .score-pass': { color: '#d97706', fontWeight: 600 },
-                '& .score-fail': { color: '#dc2626', fontWeight: 600 },
+                '& .MuiDataGrid-columnHeader': {
+                  borderRight: '1px solid #d1d5db',
+                  backgroundColor: '#f1f5f9',
+                },
+                '& .MuiDataGrid-columnHeader:last-child': { borderRight: 'none' },
+                '& .score-distinction': {
+                  backgroundColor: '#ecfdf5',
+                  color: '#059669',
+                  fontWeight: 600,
+                },
+                '& .score-credit': {
+                  backgroundColor: '#eff6ff',
+                  color: '#2563eb',
+                  fontWeight: 600,
+                },
+                '& .score-pass': {
+                  backgroundColor: '#fffbeb',
+                  color: '#d97706',
+                  fontWeight: 600,
+                },
+                '& .score-fail': {
+                  backgroundColor: '#fef2f2',
+                  color: '#dc2626',
+                  fontWeight: 600,
+                },
+                '& .score-absent': {
+                  backgroundColor: '#fef3c7',
+                  color: '#92400e',
+                  fontWeight: 700,
+                  fontStyle: 'italic',
+                },
                 '& .grade-excellent': { color: '#059669', fontWeight: 700 },
                 '& .grade-good': { color: '#2563eb', fontWeight: 600 },
                 '& .grade-average': { color: '#d97706' },
                 '& .grade-poor': { color: '#dc2626' },
                 '& .MuiDataGrid-columnHeaders': {
-                  backgroundColor: '#f8fafc',
+                  backgroundColor: '#f1f5f9',
                   fontWeight: 600,
+                  borderBottom: '2px solid #cbd5e1',
+                },
+                '& .MuiDataGrid-row:nth-of-type(even)': {
+                  backgroundColor: '#f8fafc',
                 },
                 '& .MuiDataGrid-row:nth-of-type(odd)': {
-                  backgroundColor: '#fafafa',
+                  backgroundColor: '#ffffff',
+                },
+                '& .MuiDataGrid-row:hover': {
+                  backgroundColor: '#eef2ff',
+                },
+                '& .MuiDataGrid-cell--editable': {
+                  backgroundColor: '#fffbeb',
+                },
+                '& .MuiDataGrid-cell--editing': {
+                  backgroundColor: '#fefce8',
+                  boxShadow: 'inset 0 0 0 2px #f59e0b',
                 },
               }}
             />
@@ -453,10 +584,37 @@ export default function AssessmentEntryPage() {
       )}
 
       <style jsx global>{`
-        .assessment-data-grid .MuiDataGrid-cell input[type="number"] {
+        .assessment-data-grid .MuiDataGrid-cell {
+          padding: 4px 8px !important;
+        }
+        .assessment-data-grid .MuiDataGrid-cell input {
           text-align: center;
           font-weight: 600;
           font-size: 14px;
+          width: 100%;
+          border: none;
+          outline: none;
+          background: transparent;
+        }
+        .assessment-data-grid .MuiDataGrid-columnHeader[data-field="rawScore"] {
+          background-color: #fef9c3 !important;
+        }
+        .assessment-data-grid .MuiDataGrid-columnHeader[data-field="remarks"] {
+          background-color: #f0f9ff !important;
+        }
+        .assessment-data-grid .MuiDataGrid-cell[data-field="rawScore"]:not(.MuiDataGrid-cell--editing) {
+          background-color: #fffbeb;
+          cursor: pointer;
+        }
+        .assessment-data-grid .MuiDataGrid-cell[data-field="remarks"]:not(.MuiDataGrid-cell--editing) {
+          background-color: #f0f9ff;
+          cursor: pointer;
+        }
+        .assessment-data-grid .score-absent {
+          background-color: #fef3c7 !important;
+          color: #92400e !important;
+          font-weight: 700;
+          font-style: italic;
         }
       `}</style>
     </div>
