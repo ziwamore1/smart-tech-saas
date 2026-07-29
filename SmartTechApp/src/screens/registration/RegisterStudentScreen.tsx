@@ -78,6 +78,17 @@ export const RegisterStudentScreen: React.FC<Props> = ({ onToggleDrawer, onNavig
       if (current) {
         setAcademicYearId(current.id);
       }
+
+      // Auto-select class for Class Teachers
+      if (user?.roles?.includes('Class Teacher') || user?.roles?.includes('Teacher')) {
+        try {
+          const assigned = await apiService.getMobileTeacherClasses();
+          const assignedList = Array.isArray(assigned) ? assigned : assigned?.data || [];
+          if (assignedList.length === 1 && assignedList[0].classId) {
+            setClassId(assignedList[0].classId);
+          }
+        } catch {}
+      }
     } catch (err) {
       console.error('Failed to load form data:', err);
     } finally {

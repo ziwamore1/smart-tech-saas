@@ -250,6 +250,11 @@ class ApiService {
     return response.data;
   }
 
+  async getMobileTeacherClasses() {
+    const response = await this.client.get('/mobile/teacher/classes');
+    return response.data;
+  }
+
   async getTeacherSubjects() {
     const response = await this.client.get('/teacher/subjects');
     return response.data;
