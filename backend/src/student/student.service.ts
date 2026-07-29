@@ -40,6 +40,23 @@ export class StudentService {
       admissionNumber = await this.admissionNumberService.getNextAdmissionNumber(schoolId, academicYearId);
     }
 
+    const existing = await this.prisma.student.findFirst({
+      where: {
+        schoolId,
+        firstName: { equals: dto.firstName, mode: 'insensitive' },
+        lastName: { equals: dto.lastName, mode: 'insensitive' },
+        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
+        NOT: { status: 'WITHDRAWN' as StudentStatus },
+      },
+      select: { id: true, firstName: true, lastName: true, admissionNumber: true, dateOfBirth: true, status: true },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        `A student with the name "${existing.firstName} ${existing.lastName}" and date of birth ${dto.dateOfBirth} already exists (Admission: ${existing.admissionNumber}, Status: ${existing.status.toLowerCase()}). Please verify before registering.`
+      );
+    }
+
     const createData: any = {
       firstName: dto.firstName,
       lastName: dto.lastName,
@@ -59,6 +76,11 @@ export class StudentService {
         data: createData,
       });
     } catch (error: any) {
+      if (error.code === 'P2002') {
+        throw new ConflictException(
+          `A student with admission number "${admissionNumber}" already exists in this school. Duplicate registration prevented.`
+        );
+      }
       if (error.code === 'P2022' || error.message?.includes('column') || error.message?.includes('grade') || error.message?.includes('className')) {
         this.logger.warn(`Student create failed with grade/className columns, retrying without: ${error.message}`);
         delete createData.grade;
