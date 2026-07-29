@@ -77,7 +77,7 @@ export class StudentController {
   }
 
   @Delete(':id')
-  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD')
   delete(@Param('id') id: string) {
     return this.service.delete(id);
   }
