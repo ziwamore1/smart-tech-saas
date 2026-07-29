@@ -55,12 +55,6 @@ export class CurriculumService {
     isCurrent?: boolean;
     schoolId?: string;
   }) {
-    if (data.isCurrent) {
-      await this.prisma.curriculumVersion.updateMany({
-        where: { educationLevelId: data.educationLevelId, schoolId: data.schoolId || null, isCurrent: true },
-        data: { isCurrent: false },
-      });
-    }
     return this.prisma.curriculumVersion.create({
       data: {
         ...data,
@@ -93,22 +87,17 @@ export class CurriculumService {
   }
 
   async updateCurriculumVersion(id: string, data: any) {
-    if (data.isCurrent) {
-      const version = await this.prisma.curriculumVersion.findUnique({ where: { id } });
-      if (version) {
-        await this.prisma.curriculumVersion.updateMany({
-          where: { educationLevelId: version.educationLevelId, id: { not: id } },
-          data: { isCurrent: false },
-        });
-      }
+    const updateData: any = { ...data };
+    if (data.effectiveFrom) updateData.effectiveFrom = new Date(data.effectiveFrom);
+    else if (data.effectiveFrom === null) updateData.effectiveFrom = null;
+    if (data.effectiveTo) updateData.effectiveTo = new Date(data.effectiveTo);
+    else if (data.effectiveTo === null) updateData.effectiveTo = null;
+    if (data.isCurrent !== undefined) {
+      updateData.status = data.isCurrent ? 'CURRENT' as CurriculumStatus : 'DRAFT' as CurriculumStatus;
     }
     return this.prisma.curriculumVersion.update({
       where: { id },
-      data: {
-        ...data,
-        effectiveFrom: data.effectiveFrom ? new Date(data.effectiveFrom) : undefined,
-        effectiveTo: data.effectiveTo ? new Date(data.effectiveTo) : undefined,
-      },
+      data: updateData,
       include: { educationLevel: true, stages: true },
     });
   }
