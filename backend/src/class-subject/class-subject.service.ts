@@ -34,13 +34,22 @@ export class ClassSubjectService {
     return this.prisma.classSubject.delete({ where: { id: classSubject.id } });
   }
 
-  async getSubjectsByClass(classId: string, schoolId: string) {
+  async getSubjectsByClass(classId: string, schoolId: string, termId?: string) {
     const classEntity = await this.prisma.class.findUnique({ where: { id: classId } });
     if (!classEntity) throw new NotFoundException('Class not found');
     if (classEntity.schoolId !== schoolId) throw new NotFoundException('Class not found');
 
+    const where: any = { classId };
+    if (termId) {
+      where.subject = {
+        termAssessmentConfigurations: {
+          some: { classId, termId },
+        },
+      };
+    }
+
     return this.prisma.classSubject.findMany({
-      where: { classId },
+      where,
       include: { subject: true },
       orderBy: { subject: { name: 'asc' } },
     });

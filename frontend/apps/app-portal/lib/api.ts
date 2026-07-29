@@ -424,7 +424,7 @@ export const subjectApi = {
 
 export const classSubjectApi = {
   getAll: () => api.get('/class-subjects'),
-  getByClass: (classId: string) => api.get(`/class-subjects/class/${classId}`),
+  getByClass: (classId: string, termId?: string) => api.get(`/class-subjects/class/${classId}${termId ? `?termId=${termId}` : ''}`),
   getBySubject: (subjectId: string) => api.get(`/class-subjects/subject/${subjectId}`),
   add: (data: { classId: string; subjectId: string }) => api.post('/class-subjects', data),
   remove: (classId: string, subjectId: string) => api.delete(`/class-subjects/${classId}/${subjectId}`),

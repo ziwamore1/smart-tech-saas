@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Body, Param, Req, UseGuards, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param, Query, Req, UseGuards, HttpException, HttpStatus } from '@nestjs/common';
 import { ClassSubjectService } from './class-subject.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -43,10 +43,11 @@ export class ClassSubjectController {
   @Roles('Director', 'Teacher')
   async getSubjectsByClass(
     @Param('classId') classId: string,
+    @Query('termId') termId: string | undefined,
     @Req() req: any,
   ) {
     try {
-      return await this.service.getSubjectsByClass(classId, req.user.schoolId);
+      return await this.service.getSubjectsByClass(classId, req.user.schoolId, termId);
     } catch (error) {
       console.error('Get subjects by class error:', error);
       throw new HttpException(error.message || 'Failed to get subjects', HttpStatus.BAD_REQUEST);

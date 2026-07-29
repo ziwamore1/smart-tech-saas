@@ -133,10 +133,10 @@ export default function AssessmentEntryPage() {
   });
 
   const { data: classSubjects, isLoading: classSubjectsLoading } = useQuery({
-    queryKey: ['class-subjects-entry', selectedClass],
+    queryKey: ['class-subjects-entry', selectedClass, selectedTerm],
     queryFn: async () => {
       if (!selectedClass) return [];
-      const res = await classSubjectApi.getByClass(selectedClass);
+      const res = await classSubjectApi.getByClass(selectedClass, selectedTerm || undefined);
       return res.data?.data || res.data || [];
     },
     enabled: !!selectedClass,

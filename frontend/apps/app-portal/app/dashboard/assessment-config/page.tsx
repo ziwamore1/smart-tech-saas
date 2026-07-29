@@ -31,10 +31,10 @@ export default function AssessmentConfigPage() {
   });
 
   const { data: classSubjects, isLoading: classSubjectsLoading } = useQuery({
-    queryKey: ['class-subjects-config', selectedClass],
+    queryKey: ['class-subjects-config', selectedClass, selectedTerm],
     queryFn: async () => {
       if (!selectedClass) return [];
-      const res = await classSubjectApi.getByClass(selectedClass);
+      const res = await classSubjectApi.getByClass(selectedClass, selectedTerm || undefined);
       return res.data?.data || res.data || [];
     },
     enabled: !!selectedClass,
