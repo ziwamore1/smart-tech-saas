@@ -74,8 +74,11 @@ export default function StudentsPage() {
 
   const { data: studentsData, isLoading: studentsLoading, error: studentsError } = useQuery({
     queryKey: ['students'],
-    keepPreviousData: true,
     retry: 2,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 10000,
+    placeholderData: (previousData: any) => previousData,
     queryFn: async () => {
       const res = await api.get('/student');
       console.log('Students API response:', res.data);
@@ -192,11 +195,16 @@ export default function StudentsPage() {
 
   const createStudentMutation = useMutation({
     mutationFn: (data: any) => studentApi.create(data),
-    onSuccess: () => {
+    onSuccess: (res) => {
+      const createdName = `${studentForm.firstName} ${studentForm.lastName}`;
+      const credentialsInfo = res?.data?.credentials
+        ? ` Username: ${res.data.credentials.username || ''}`
+        : '';
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
-      setFormMessage({ type: 'success', text: 'Student registered successfully! Login credentials have been sent.' });
-      setTimeout(() => setFormMessage(null), 4000);
+      setShowAddModal(false);
+      setMessage({ type: 'success', text: `${createdName} registered successfully! Login credentials have been sent.${credentialsInfo}` });
+      setTimeout(() => setMessage(null), 6000);
       setStudentForm({
         firstName: '',
         lastName: '',
@@ -214,6 +222,7 @@ export default function StudentsPage() {
         manualOverride: false,
       });
       setAdmissionPreview('');
+      setFormMessage(null);
     },
     onError: (error: any) => {
       console.error('Failed to create student:', error);
