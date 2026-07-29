@@ -44,7 +44,7 @@ export class ClassController {
   }
 
   @Get()
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   findAll(@Req() req: any) {
     return this.service.findAll(req.user);
   }
@@ -76,7 +76,7 @@ export class ClassController {
   }
 
   @Get('by-level')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   findByLevel(@Query('levelTypeId') levelTypeId: string, @Req() req: any) {
     return this.service.findByLevel(levelTypeId, req.user);
   }

@@ -14,9 +14,10 @@ export default function ModerationPage() {
   const [activeTab, setActiveTab] = useState<ModerationTab>('pending');
   const [confirmAction, setConfirmAction] = useState<{ id: string; action: string; title: string } | null>(null);
 
-  const isDirector = user?.roles?.includes('Director');
-  const isHOD = user?.roles?.includes('HOD');
-  const isTeacher = user?.roles?.includes('Teacher') || user?.roles?.includes('ClassTeacher');
+  const userRoles = user?.allRoles || user?.roles || [];
+  const isDirector = userRoles.some((r: string) => ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD'].includes(r));
+  const isHOD = userRoles.some((r: string) => ['HOD', 'Deputy Director', 'Head Teacher', 'Deputy Head'].includes(r));
+  const isTeacher = userRoles.some((r: string) => ['Teacher', 'Class Teacher', 'ClassTeacher', 'Deputy Head', 'Deputy Director', 'Head Teacher', 'HOD', 'Deputy'].includes(r));
 
   const { data: sheetsData, isLoading } = useQuery({
     queryKey: ['result-sheets', 'all'],

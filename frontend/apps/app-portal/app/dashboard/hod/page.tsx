@@ -8,7 +8,7 @@ import { RoleGuard } from '@/lib/role-guard';
 
 export default function HODDashboardPage() {
   return (
-    <RoleGuard requiredRoles={['HOD', 'Director', 'Deputy Director', 'Head Teacher']}>
+    <RoleGuard requiredRoles={['HOD', 'Director', 'Deputy Director', 'Head Teacher', 'Deputy Head']}>
       <HODDashboardContent />
     </RoleGuard>
   );

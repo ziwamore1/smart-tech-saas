@@ -31,7 +31,7 @@ export class TeachingAssignmentController {
   }
 
   @Get()
-  @Roles('Director')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   findAll(@Req() req: any) {
     return this.service.findAll(req.user.schoolId);
   }

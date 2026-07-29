@@ -12,7 +12,8 @@ export default function LockedResultsPage() {
   const [showUnlockModal, setShowUnlockModal] = useState<{ id: string; title: string } | null>(null);
   const [unlockReason, setUnlockReason] = useState('');
 
-  const isDirector = user?.roles?.includes('Director');
+  const userRoles = user?.allRoles || user?.roles || [];
+  const isDirector = userRoles.some((r: string) => ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head'].includes(r));
 
   const { data: sheetsData, isLoading } = useQuery({
     queryKey: ['result-sheets', 'locked'],

@@ -6,8 +6,8 @@ import { useAuth } from '@/lib/auth-context';
 import { staffPositionApi } from '@/lib/api';
 import { ReadOnlyBanner } from '@/components/permissions/ReadOnlyBanner';
 
-type AdminRole = 'Director' | 'SuperAdmin' | 'Head Teacher' | 'Deputy' | 'HOD';
-const ADMIN_ROLES: AdminRole[] = ['Director', 'SuperAdmin', 'Head Teacher', 'Deputy', 'HOD', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
+type AdminRole = 'Director' | 'SuperAdmin' | 'Deputy Director' | 'Head Teacher' | 'Deputy Head' | 'Deputy' | 'HOD' | 'Lower Primary Senior Teacher' | 'Upper Primary Senior Teacher';
+const ADMIN_ROLES: AdminRole[] = ['Director', 'SuperAdmin', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
 
 const getSupervisorLabel = (posType: string) => {
   if (posType === 'LOWER_PRIMARY_SENIOR_TEACHER') return 'Lower Primary Senior Teacher';

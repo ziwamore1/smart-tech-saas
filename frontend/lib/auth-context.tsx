@@ -188,8 +188,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isSuperAdmin = allRoles.includes('SuperAdmin');
   const isPureSuperAdmin = isSuperAdmin && !user?.schoolId;
   const isImpersonating = isSuperAdmin && !!user?.schoolId;
-  const isDirector = allRoles.includes('Director') || allRoles.includes('SuperAdmin');
-  const isTeacher = allRoles.includes('Teacher') || allRoles.includes('Class Teacher') || allRoles.includes('ClassTeacher');
+  const isDirector = allRoles.includes('Director') || allRoles.includes('SuperAdmin') || allRoles.includes('Deputy Director');
+  const isTeacher = allRoles.includes('Teacher') || allRoles.includes('Class Teacher') || allRoles.includes('ClassTeacher') || allRoles.includes('Deputy Head') || allRoles.includes('Deputy Director') || allRoles.includes('Head Teacher') || allRoles.includes('HOD') || allRoles.includes('Deputy');
   const isClassTeacher = allRoles.includes('Class Teacher') || allRoles.includes('ClassTeacher') || !!user?.classTeacherOf;
 
   return (

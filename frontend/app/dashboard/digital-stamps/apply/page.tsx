@@ -9,8 +9,9 @@ import type { StampConfig } from '@/types/stamps';
 
 export default function ApplyStampPage() {
   const { user } = useAuth();
-  const isDirector = user?.roles?.includes('Director') || user?.roles?.includes('Head Teacher');
-  const isAdmin = user?.roles?.includes('Deputy');
+  const userRoles = user?.allRoles || user?.roles || [];
+  const isDirector = userRoles.some((r: string) => ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head'].includes(r));
+  const isAdmin = userRoles.some((r: string) => ['Deputy', 'HOD', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'].includes(r));
 
   const [stamps, setStamps] = useState<StampType[]>([]);
   const [selectedStampId, setSelectedStampId] = useState('');

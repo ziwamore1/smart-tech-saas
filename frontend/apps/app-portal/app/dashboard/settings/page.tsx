@@ -30,7 +30,8 @@ function HolidaySettingsTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', description: '', startDate: '', endDate: '', type: 'PUBLIC', isRecurring: false });
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const isDirector = user?.roles?.includes('Director') || user?.schoolRoles?.includes('Director');
+  const userRoles = user?.allRoles || user?.roles || user?.schoolRoles || [];
+  const isDirector = userRoles.some((r: string) => ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head'].includes(r));
 
   const { data: holidays = [], isLoading } = useQuery({
     queryKey: ['holidays'],

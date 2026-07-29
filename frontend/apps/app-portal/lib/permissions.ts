@@ -203,10 +203,10 @@ export const PERMISSION_CATEGORIES: Record<string, { label: string; permissions:
 export const ALL_PERMISSIONS: Permission[] = Object.values(PERMISSION_CATEGORIES)
   .flatMap(c => c.permissions) as Permission[];
 
-type RoleKey = 'SuperAdmin' | 'Director' | 'Deputy Director' | 'Head Teacher' | 'Deputy Head' | 'HOD' | 'Teacher' | 'Class Teacher' | 'Lower Primary Senior Teacher' | 'Upper Primary Senior Teacher';
+type RoleKey = 'SuperAdmin' | 'Director' | 'Deputy Director' | 'Head Teacher' | 'Deputy Head' | 'Deputy' | 'HOD' | 'Teacher' | 'Class Teacher' | 'Lower Primary Senior Teacher' | 'Upper Primary Senior Teacher';
 
 export function isRoleKey(role: string): role is RoleKey {
-  return ['SuperAdmin', 'Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'].includes(role);
+  return ['SuperAdmin', 'Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'].includes(role);
 }
 
 const ALL: Permission[] = ALL_PERMISSIONS;
@@ -241,6 +241,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
     'results.view',
     'communications.view',
     'lesson-plans.view',
+  ],
+  'Deputy': [
+    ...FULL_ACCESS,
   ],
   'HOD': [
     ...VIEW_ONLY,

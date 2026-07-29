@@ -12,7 +12,8 @@ export default function PublishPage() {
   const queryClient = useQueryClient();
   const [showConfirm, setShowConfirm] = useState<{ id: string; action: string; title: string; description: string } | null>(null);
 
-  const isDirector = user?.roles?.includes('Director');
+  const userRoles = user?.allRoles || user?.roles || [];
+  const isDirector = userRoles.some((r: string) => ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head'].includes(r));
 
   // Real-time: refresh when results are published elsewhere
   useSchoolSocket({

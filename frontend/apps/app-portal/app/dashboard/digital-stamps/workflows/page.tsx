@@ -7,7 +7,8 @@ import type { ApprovalWorkflow } from '@/types/stamps';
 
 export default function WorkflowsPage() {
   const { user } = useAuth();
-  const isDirector = user?.roles?.includes('Director') || user?.roles?.includes('Head Teacher');
+  const userRoles = user?.allRoles || user?.roles || [];
+  const isDirector = userRoles.some((r: string) => ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD'].includes(r));
   const isAdmin = user?.roles?.includes('Deputy');
 
   const [workflows, setWorkflows] = useState<ApprovalWorkflow[]>([]);

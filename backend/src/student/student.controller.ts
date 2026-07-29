@@ -20,7 +20,7 @@ export class StudentController {
   ) {}
 
   @Get('preview-admission')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   async previewAdmissionNumber(@Req() req: any, @Query('academicYearId') academicYearId?: string) {
     const schoolId = req.user.schoolId;
     const yearId = academicYearId || await this.service.getCurrentAcademicYearId(schoolId);
@@ -29,13 +29,13 @@ export class StudentController {
   }
 
   @Post()
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   create(@Body() dto: CreateStudentDto, @Req() req: any) {
     return this.service.create(dto, req.user.schoolId, req.user.id, req.user.roles);
   }
 
   @Get()
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   findAll(
     @Req() req: any,
     @Query('classId') classId?: string,
@@ -52,38 +52,38 @@ export class StudentController {
   }
 
   @Get('search')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   search(@Req() req: any, @Query('q') query: string) {
     return this.service.comprehensiveSearch(query, req.user.schoolId);
   }
 
   @Get('admission/:admissionNumber')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   findByAdmissionNumber(@Param('admissionNumber') admissionNumber: string, @Req() req: any) {
     return this.service.findByAdmissionNumber(admissionNumber, req.user.schoolId);
   }
 
   @Get(':id')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
   }
 
   @Patch(':id')
   @Put(':id')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   update(@Param('id') id: string, @Body() dto: UpdateStudentDto, @Req() req: any) {
     return this.service.update(id, dto, req.user.id, req.user.roles);
   }
 
   @Delete(':id')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   delete(@Param('id') id: string) {
     return this.service.delete(id);
   }
 
   @Post(':id/status')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   changeStatus(
     @Param('id') id: string,
     @Body() body: { status: string },
@@ -93,13 +93,13 @@ export class StudentController {
   }
 
   @Get(':id/status-history')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   getStatusHistory(@Param('id') id: string) {
     return this.service.getStatusHistory(id);
   }
 
   @Post(':id/upload-photo')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   @UseInterceptors(
     FileInterceptor('photo', {
       storage: cloudinaryMemoryStorage(),
@@ -121,7 +121,7 @@ export class StudentController {
   }
 
   @Post('enroll')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   enroll(
     @Body()
     body: {

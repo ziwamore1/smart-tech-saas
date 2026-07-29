@@ -355,7 +355,8 @@ export default function ResultEntryPage() {
     return { entered, total, missing: total - entered };
   }, [students, displaySubjects, scores]);
 
-  const isDirector = user?.roles?.includes('Director');
+  const userRoles = user?.allRoles || user?.roles || [];
+  const isDirector = userRoles.some((r: string) => ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head'].includes(r));
 
   return (
     <div>

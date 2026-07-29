@@ -91,11 +91,11 @@ export function SuperAdminOnly({ children }: { children: ReactNode }) {
 }
 
 export function AdminOnly({ children }: { children: ReactNode }) {
-  return <RoleGuard requiredRoles={['Director', 'SuperAdmin', 'Head Teacher', 'Deputy', 'HOD']}>{children}</RoleGuard>;
+  return <RoleGuard requiredRoles={['Director', 'SuperAdmin', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'HOD']}>{children}</RoleGuard>;
 }
 
 export function TeacherOnly({ children }: { children: ReactNode }) {
-  return <RoleGuard requiredRoles={['Teacher', 'Class Teacher']}>{children}</RoleGuard>;
+  return <RoleGuard requiredRoles={['Teacher', 'Class Teacher', 'Deputy Head', 'Deputy Director', 'Head Teacher', 'HOD', 'Deputy']}>{children}</RoleGuard>;
 }
 
 export function AccountantOnly({ children }: { children: ReactNode }) {
