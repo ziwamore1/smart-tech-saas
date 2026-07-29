@@ -1,12 +1,12 @@
 'use client';
 
 import { useAuth } from '@/lib/auth-context';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Shield, ArrowLeft } from 'lucide-react';
 
 export default function SecurityLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
 
   const pageTitles: Record<string, string> = {
     '/security/password-hub': 'Password Management Hub',
@@ -19,17 +19,25 @@ export default function SecurityLayout({ children }: { children: React.ReactNode
 
   const title = pageTitles[pathname] || 'Security';
 
+  const handleBack = () => {
+    try {
+      router.push('/dashboard');
+    } catch {
+      window.location.href = '/dashboard';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <header className="sticky top-0 z-10 border-b bg-white dark:bg-gray-900 shadow-sm">
         <div className="container mx-auto px-4 h-14 flex items-center gap-3">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             Dashboard
-          </Link>
+          </button>
           <div className="w-px h-5 bg-border" />
           <Shield className="w-4 h-4 text-blue-600" />
           <span className="font-semibold text-sm">{title}</span>
