@@ -717,6 +717,54 @@ export default function DashboardLayout({
             borderRadius: '50%',
             animation: 'spin 1s linear infinite'
           }}></div>
+          <p style={{ color: '#666', fontSize: '14px' }}>Redirecting...</p>
+        </div>
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  // Prevent rendering the children (dashboard pages) on the generic /dashboard route
+  // when a redirect to the type-specific dashboard is pending. This prevents crashes
+  // from the DashboardPage component trying to mount with incomplete data.
+  if (!isPureSuperAdmin && pathname === '/dashboard' && typeDashboardPath && typeDashboardPath !== '/dashboard') {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        background: '#f5efe8'
+      }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '16px'
+        }}>
+          <img src="/smart_tech_logo.png" alt="Smart Tech SaaS" style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover' }} />
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid #e8ddd0',
+            borderTopColor: '#ea6645',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }}></div>
+          <p style={{ color: '#666', fontSize: '14px' }}>Redirecting...</p>
+        </div>
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
           <span style={{ color: '#666', fontSize: '14px' }}>Redirecting to login...</span>
         </div>
         <style>{`
