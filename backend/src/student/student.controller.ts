@@ -77,7 +77,7 @@ export class StudentController {
   }
 
   @Delete(':id')
-  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   delete(@Param('id') id: string) {
     return this.service.delete(id);
   }
@@ -141,7 +141,7 @@ export class StudentController {
   }
 
   @Post(':id/link-parent')
-  @Roles('Director')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   linkParent(
     @Param('id') id: string,
     @Body() body: { parentId: string },
@@ -150,7 +150,7 @@ export class StudentController {
   }
 
   @Post(':id/unlink-parent')
-  @Roles('Director')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   unlinkParent(
     @Param('id') id: string,
     @Body() body: { parentId: string },

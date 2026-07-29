@@ -16,7 +16,7 @@ const gradPurpleLight = 'linear-gradient(135deg, #f3e8ff, #e9d5ff)';
 const gradOrangeLight = 'linear-gradient(135deg, #ffedd5, #fed7aa)';
 
 export default function StudentsPage() {
-  const { user, isDirector } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEnrollmentModal, setShowEnrollmentModal] = useState(false);
@@ -564,19 +564,17 @@ export default function StudentsPage() {
                         >
                           👪 Parent
                         </button>
-                        {isDirector && user && (
-                          <button
-                            onClick={() => {
-                              if (confirm(`Delete ${student.firstName} ${student.lastName}?`)) {
-                                deleteStudentMutation.mutate(student.id);
-                              }
-                            }}
-                            disabled={deleteStudentMutation.isPending}
-                            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
-                          >
-                            🗑️ Delete
-                          </button>
-                        )}
+                        <button
+                          onClick={() => {
+                            if (confirm(`Delete ${student.firstName} ${student.lastName}?`)) {
+                              deleteStudentMutation.mutate(student.id);
+                            }
+                          }}
+                          disabled={deleteStudentMutation.isPending}
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
+                        >
+                          🗑️ Delete
+                        </button>
                       </div>
                     </td>
                   </tr>
