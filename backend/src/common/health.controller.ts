@@ -937,7 +937,7 @@ export class HealthController {
 
     try {
       const students = await this.prisma.student.findMany({
-        where: { classId: { in: ['__SCHOOL__', null] } },
+        where: { OR: [{ classId: '__SCHOOL__' }, { classId: null }] },
         select: { id: true, firstName: true, lastName: true, admissionNumber: true, classId: true },
       });
 
@@ -989,7 +989,7 @@ export class HealthController {
     const total = await this.prisma.student.count();
     const schoolDefault = await this.prisma.student.count({ where: { classId: '__SCHOOL__' } });
     const nullClassId = await this.prisma.student.count({ where: { classId: null } });
-    const perClass = await this.prisma.student.count({ where: { classId: { notIn: ['__SCHOOL__', null] } } });
+    const perClass = await this.prisma.student.count({ where: { NOT: [{ classId: '__SCHOOL__' }, { classId: null }] } });
 
     return {
       status: schoolDefault + nullClassId === 0 ? 'healthy' : 'degraded',

@@ -87,7 +87,7 @@ export class HealthService {
     try {
       const total = await this.prisma.student.count();
       if (total === 0) return { status: 'up', message: 'No students to backfill' };
-      const needsBackfill = await this.prisma.student.count({ where: { classId: { in: ['__SCHOOL__', null] } } });
+      const needsBackfill = await this.prisma.student.count({ where: { OR: [{ classId: '__SCHOOL__' }, { classId: null }] } });
       if (needsBackfill === 0) return { status: 'up', message: `${total} students have proper classIds` };
       return {
         status: 'degraded',
