@@ -161,9 +161,9 @@ export default function StudentsPage() {
     if (showAddModal && currentAcademicYear) {
       const fetchPreview = async () => {
         try {
-          const res = await api.get('/student/preview-admission', {
-            params: { academicYearId: currentAcademicYear.id },
-          });
+          const params: any = { academicYearId: currentAcademicYear.id };
+          if (studentForm.classId) params.classId = studentForm.classId;
+          const res = await api.get('/student/preview-admission', { params });
           setAdmissionPreview(res.data?.admissionNumber || '');
         } catch {
           setAdmissionPreview('');
@@ -171,7 +171,7 @@ export default function StudentsPage() {
       };
       fetchPreview();
     }
-  }, [showAddModal, currentAcademicYear]);
+  }, [showAddModal, currentAcademicYear, studentForm.classId]);
 
   const [enrollmentForm, setEnrollmentForm] = useState({
     classId: '',

@@ -7,7 +7,7 @@ export class AdmissionNumberService {
 
   constructor(private prisma: PrismaService) {}
 
-  async getNextAdmissionNumber(schoolId: string, academicYearId: string): Promise<string> {
+  async getNextAdmissionNumber(schoolId: string, academicYearId: string, classId?: string): Promise<string> {
     const academicYear = await this.prisma.academicYear.findUnique({
       where: { id: academicYearId },
     });
@@ -17,13 +17,15 @@ export class AdmissionNumberService {
     }
 
     const year = academicYear.startDate.getFullYear();
+    const effectiveClassId = classId || '__SCHOOL__';
 
     const sequence = await this.prisma.admissionSequence.upsert({
-      where: { schoolId_academicYearId: { schoolId, academicYearId } },
+      where: { schoolId_academicYearId_classId: { schoolId, academicYearId, classId: effectiveClassId } },
       update: { currentSequence: { increment: 1 } },
       create: {
         schoolId,
         academicYearId,
+        classId: effectiveClassId,
         year,
         currentSequence: 1,
       },
@@ -31,12 +33,12 @@ export class AdmissionNumberService {
 
     const admissionNumber = `ST-${sequence.year}-${String(sequence.currentSequence).padStart(3, '0')}`;
 
-    this.logger.log(`Generated admission number ${admissionNumber} for school ${schoolId}, year ${year}`);
+    this.logger.log(`Generated admission number ${admissionNumber} for school ${schoolId}, class ${classId || 'school'}, year ${year}`);
 
     return admissionNumber;
   }
 
-  async previewNextAdmissionNumber(schoolId: string, academicYearId: string): Promise<string> {
+  async previewNextAdmissionNumber(schoolId: string, academicYearId: string, classId?: string): Promise<string> {
     const academicYear = await this.prisma.academicYear.findUnique({
       where: { id: academicYearId },
     });
@@ -46,9 +48,10 @@ export class AdmissionNumberService {
     }
 
     const year = academicYear.startDate.getFullYear();
+    const effectiveClassId = classId || '__SCHOOL__';
 
     const sequence = await this.prisma.admissionSequence.findUnique({
-      where: { schoolId_academicYearId: { schoolId, academicYearId } },
+      where: { schoolId_academicYearId_classId: { schoolId, academicYearId, classId: effectiveClassId } },
     });
 
     const nextSeq = sequence ? sequence.currentSequence + 1 : 1;
@@ -56,10 +59,10 @@ export class AdmissionNumberService {
     return `ST-${year}-${String(nextSeq).padStart(3, '0')}`;
   }
 
-  async validateAdmissionNumber(schoolId: string, admissionNumber: string): Promise<boolean> {
-    const existing = await this.prisma.student.findUnique({
-      where: { admissionNumber_schoolId: { admissionNumber, schoolId } },
-    });
+  async validateAdmissionNumber(schoolId: string, admissionNumber: string, classId?: string): Promise<boolean> {
+    const where: any = { admissionNumber, schoolId };
+    if (classId) where.classId = classId;
+    const existing = await this.prisma.student.findFirst({ where });
     return !existing;
   }
 
@@ -67,6 +70,7 @@ export class AdmissionNumberService {
     schoolId: string,
     academicYearId: string,
     manualNumber: string,
+    classId?: string,
   ): Promise<string> {
     const pattern = /^ST-(\d{4})-(\d{3})$/;
     const match = manualNumber.match(pattern);
@@ -78,13 +82,15 @@ export class AdmissionNumberService {
     const year = parseInt(match[1], 10);
     const seq = parseInt(match[2], 10);
 
-    const valid = await this.validateAdmissionNumber(schoolId, manualNumber);
+    const valid = await this.validateAdmissionNumber(schoolId, manualNumber, classId);
     if (!valid) {
       throw new Error(`Admission number ${manualNumber} already exists in this school`);
     }
 
+    const effectiveClassId = classId || '__SCHOOL__';
+
     const sequence = await this.prisma.admissionSequence.upsert({
-      where: { schoolId_academicYearId: { schoolId, academicYearId } },
+      where: { schoolId_academicYearId_classId: { schoolId, academicYearId, classId: effectiveClassId } },
       update: {
         currentSequence: seq,
         year,
@@ -92,6 +98,7 @@ export class AdmissionNumberService {
       create: {
         schoolId,
         academicYearId,
+        classId: effectiveClassId,
         year,
         currentSequence: seq,
       },
@@ -99,7 +106,7 @@ export class AdmissionNumberService {
 
     if (seq > sequence.currentSequence) {
       await this.prisma.admissionSequence.update({
-        where: { schoolId_academicYearId: { schoolId, academicYearId } },
+        where: { schoolId_academicYearId_classId: { schoolId, academicYearId, classId: effectiveClassId } },
         data: { currentSequence: seq },
       });
     }

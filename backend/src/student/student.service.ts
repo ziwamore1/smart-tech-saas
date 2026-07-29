@@ -35,9 +35,9 @@ export class StudentService {
       if (!admissionNumber) {
         throw new Error('admissionNumber is required when manualOverride is true');
       }
-      await this.admissionNumberService.setManualAdmissionNumber(schoolId, academicYearId, admissionNumber);
+      await this.admissionNumberService.setManualAdmissionNumber(schoolId, academicYearId, admissionNumber, dto.classId);
     } else {
-      admissionNumber = await this.admissionNumberService.getNextAdmissionNumber(schoolId, academicYearId);
+      admissionNumber = await this.admissionNumberService.getNextAdmissionNumber(schoolId, academicYearId, dto.classId);
     }
 
     const existing = await this.prisma.student.findFirst({
@@ -65,6 +65,7 @@ export class StudentService {
       gender: dto.gender,
       status: (dto.status as StudentStatus) || StudentStatus.ACTIVE,
       schoolId,
+      classId: dto.classId || '__SCHOOL__',
     };
 
     if (dto.grade) createData.grade = dto.grade;
@@ -532,8 +533,8 @@ export class StudentService {
   }
 
   async findByAdmissionNumber(admissionNumber: string, schoolId: string) {
-    const student = await this.prisma.student.findUnique({
-      where: { admissionNumber_schoolId: { admissionNumber, schoolId } },
+    const student = await this.prisma.student.findFirst({
+      where: { admissionNumber, schoolId },
       select: {
         id: true, admissionNumber: true, studentUuid: true, status: true,
         dateOfBirth: true, schoolId: true, firstName: true, lastName: true,

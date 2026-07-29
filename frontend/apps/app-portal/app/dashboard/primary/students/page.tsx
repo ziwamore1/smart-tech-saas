@@ -75,9 +75,9 @@ export default function PrimaryStudentsPage() {
       const fetchPreview = async () => {
         try {
           const yearId = formData.academicYearId || currentAcademicYear.id;
-          const res = await api.get('/student/preview-admission', {
-            params: { academicYearId: yearId },
-          });
+          const params: any = { academicYearId: yearId };
+          if (formData.classId) params.classId = formData.classId;
+          const res = await api.get('/student/preview-admission', { params });
           setAdmissionPreview(res.data?.admissionNumber || '');
         } catch {
           setAdmissionPreview('');
@@ -85,7 +85,7 @@ export default function PrimaryStudentsPage() {
       };
       fetchPreview();
     }
-  }, [showRegisterForm, currentAcademicYear, formData.academicYearId]);
+  }, [showRegisterForm, currentAcademicYear, formData.academicYearId, formData.classId]);
 
   const toCreateStudentDto = (form: any) => {
     const dto: any = {

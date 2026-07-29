@@ -21,10 +21,10 @@ export class StudentController {
 
   @Get('preview-admission')
   @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
-  async previewAdmissionNumber(@Req() req: any, @Query('academicYearId') academicYearId?: string) {
+  async previewAdmissionNumber(@Req() req: any, @Query('academicYearId') academicYearId?: string, @Query('classId') classId?: string) {
     const schoolId = req.user.schoolId;
     const yearId = academicYearId || await this.service.getCurrentAcademicYearId(schoolId);
-    const preview = await this.admissionNumberService.previewNextAdmissionNumber(schoolId, yearId);
+    const preview = await this.admissionNumberService.previewNextAdmissionNumber(schoolId, yearId, classId);
     return { admissionNumber: preview };
   }
 
