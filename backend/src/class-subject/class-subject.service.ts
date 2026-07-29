@@ -42,7 +42,7 @@ export class ClassSubjectService {
     const where: any = { classId };
     if (termId) {
       where.subject = {
-        termAssessmentConfigurations: {
+        assessmentConfigs: {
           some: { classId, termId },
         },
       };
