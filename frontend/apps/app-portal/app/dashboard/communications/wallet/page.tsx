@@ -76,7 +76,7 @@ export default function SchoolWalletPage() {
 
   const buyMutation = useMutation({
     mutationFn: (data: { channel: string; amount: number }) =>
-      communicationsCloudApi.rechargeWallet('school', data),
+      communicationsCloudApi.rechargeSchoolWallet(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['school-wallet'] });
       queryClient.invalidateQueries({ queryKey: ['school-transactions'] });
@@ -329,6 +329,25 @@ export default function SchoolWalletPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div style={{ background: '#fdfaf7', borderRadius: '12px', border: '1px solid #e8ddd0', padding: '24px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#1f2937', margin: '0 0 16px' }}>
+              <i className="fa fa-info-circle" style={{ color: '#ea6645', marginRight: '8px' }}></i>
+              Zamtel Credit Purchasing
+            </h2>
+            <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 12px', lineHeight: '1.6' }}>
+              Zamtel Bulk SMS credits are purchased offline. To add credits to your Zamtel account:
+            </p>
+            <ol style={{ fontSize: '13px', color: '#4b5563', margin: '0 0 12px', paddingLeft: '20px', lineHeight: '1.8' }}>
+              <li>Visit any Zamtel shop country-wide or log in to <a href="https://bulksms.zamtel.co.zm/login" target="_blank" rel="noopener noreferrer" style={{ color: '#ea6645' }}>bulksms.zamtel.co.zm</a></li>
+              <li>Purchase a prepaid SMS bundle (valid for 30 days)</li>
+              <li>Your Zamtel balance will be updated automatically</li>
+            </ol>
+            <p style={{ fontSize: '13px', color: '#6b7280', margin: 0, lineHeight: '1.6' }}>
+              <i className="fa fa-arrow-right" style={{ marginRight: '6px', color: '#ea6645' }}></i>
+              Use the <strong>Buy Credits</strong> button above to add credits to your SmartTech platform wallet for seamless SMS sending.
+            </p>
           </div>
 
           <div style={{ background: '#fdfaf7', borderRadius: '12px', border: '1px solid #e8ddd0', padding: '24px' }}>

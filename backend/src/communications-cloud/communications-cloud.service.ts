@@ -653,6 +653,7 @@ export class CommunicationsCloudService {
     const data: any = {};
     if (dto.smsProvider) data.smsProvider = dto.smsProvider;
     if (dto.smsApiKey) data.smsApiKey = dto.smsApiKey;
+    if (dto.smsApiSecret) data.smsApiSecret = dto.smsApiSecret;
     if (dto.smsSenderId) data.smsSenderId = dto.smsSenderId;
     if (dto.emailProvider) data.emailProvider = dto.emailProvider;
     if (dto.emailApiKey) data.smtpApiKey = dto.emailApiKey;

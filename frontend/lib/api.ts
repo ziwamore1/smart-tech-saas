@@ -660,6 +660,20 @@ export const communicationApi = {
     api.post('/communications/alerts/sms', data),
 };
 
+export const communicationsCloudApi = {
+  getSchoolWallet: () => api.get('/communications-cloud/school/wallet'),
+  getSchoolTransactions: () => api.get('/communications-cloud/school/wallet/transactions'),
+  rechargeSchoolWallet: (data: { amount: number; channel?: string; description?: string }) =>
+    api.post('/communications-cloud/school/wallet/recharge', data),
+  getSchoolBalance: (provider?: string) => api.get('/communications-cloud/school/balance', { params: { provider } }),
+  getSchoolSettings: () => api.get('/communications-cloud/school/settings'),
+  updateSchoolSettings: (data: any) => api.post('/communications-cloud/school/settings', data),
+  sendSchoolSms: (data: { recipient: string; message: string; senderId?: string; scheduledAt?: string }) =>
+    api.post('/communications-cloud/school/send-sms', data),
+  getSchoolStats: () => api.get('/communications-cloud/school/stats'),
+  getSchoolMessages: (params?: any) => api.get('/communications-cloud/school/messages', { params }),
+};
+
 export const systemCommunicationApi = {
   getDashboard: () => api.get('/system-communications/dashboard'),
   getStatus: () => api.get('/system-communications/status'),

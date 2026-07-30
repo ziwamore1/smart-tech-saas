@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { communicationApi } from '@/lib/api';
+import { communicationsCloudApi } from '@/lib/api';
 
 const providerOptions = {
   email: [
@@ -42,15 +42,19 @@ export default function SchoolCommunicationSettingsPage() {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [activeTab, setActiveTab] = useState<'school' | 'system'>('school');
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [testPhone, setTestPhone] = useState('');
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [testLoading, setTestLoading] = useState(false);
 
   const { data: settings, isLoading } = useQuery({
-    queryKey: ['communication-settings'],
-    queryFn: () => communicationApi.getSettings().then(r => r.data),
+    queryKey: ['school-comm-settings'],
+    queryFn: () => communicationsCloudApi.getSchoolSettings().then(r => r.data?.settings || r.data),
   });
 
   const { data: systemProviders } = useQuery({
     queryKey: ['system-sms-providers'],
-    queryFn: () => communicationApi.getSettings().then(r => r.data?.availableProviders || []),
+    queryFn: () => communicationsCloudApi.getSchoolSettings().then(r => r.data?.availableProviders || []),
   });
 
   const [form, setForm] = useState<any>({});
@@ -81,10 +85,11 @@ export default function SchoolCommunicationSettingsPage() {
   }, [settings]);
 
   const updateMutation = useMutation({
-    mutationFn: (data: any) => communicationApi.updateSettings(data),
+    mutationFn: (data: any) => communicationsCloudApi.updateSchoolSettings(data),
     onSuccess: () => {
       setSuccessMsg('Communication settings saved successfully');
-      queryClient.invalidateQueries({ queryKey: ['communication-settings'] });
+      queryClient.invalidateQueries({ queryKey: ['school-comm-settings'] });
+      queryClient.invalidateQueries({ queryKey: ['system-sms-providers'] });
       setTimeout(() => setSuccessMsg(''), 3000);
     },
     onError: (err: any) => {
@@ -95,6 +100,23 @@ export default function SchoolCommunicationSettingsPage() {
 
   const handleSave = () => {
     updateMutation.mutate(form);
+  };
+
+  const handleTestSms = async () => {
+    if (!testPhone) return;
+    setTestLoading(true);
+    setTestResult(null);
+    try {
+      const res = await communicationsCloudApi.sendSchoolSms({
+        recipient: testPhone,
+        message: 'This is a test SMS from SmartTech. Your SMS configuration is working correctly!',
+        senderId: form.smsSenderId || undefined,
+      });
+      setTestResult({ success: true, message: `Test SMS sent successfully! Message ID: ${res.data?.id || 'N/A'}` });
+    } catch (err: any) {
+      setTestResult({ success: false, message: err?.response?.data?.message || err?.message || 'Failed to send test SMS' });
+    }
+    setTestLoading(false);
   };
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
@@ -314,6 +336,11 @@ export default function SchoolCommunicationSettingsPage() {
               </div>
 
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button onClick={() => setShowTestModal(true)} disabled={!form.smsEnabled}
+                  style={{ padding: '12px 24px', background: 'white', color: '#374151', border: '1px solid #e8ddd0', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <i className="fa fa-paper-plane"></i>
+                  Send Test SMS
+                </button>
                 <button onClick={handleSave} disabled={updateMutation.isPending}
                   style={{ padding: '12px 24px', background: '#ea6645', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <i className="fa fa-save"></i>
@@ -383,6 +410,51 @@ export default function SchoolCommunicationSettingsPage() {
           Your school communication settings are isolated from other schools.
         </p>
       </div>
+
+      {showTestModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+          <div style={{ background: 'white', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '420px' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1f2937', margin: '0 0 4px' }}>
+              <i className="fa fa-paper-plane" style={{ color: '#ea6645', marginRight: '8px' }}></i>
+              Send Test SMS
+            </h2>
+            <p style={{ color: '#6b7280', fontSize: '13px', margin: '0 0 20px' }}>
+              Send a test message to verify your SMS configuration.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>Phone Number</label>
+                <input type="text" value={testPhone} onChange={e => setTestPhone(e.target.value)}
+                  placeholder="+26097XXXXXXX"
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #e8ddd0', borderRadius: '8px', fontSize: '14px' }} />
+                <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>Enter phone number with country code (e.g. +26097...)</p>
+              </div>
+              <div style={{ padding: '12px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a', fontSize: '13px', color: '#92400e' }}>
+                <i className="fa fa-info-circle" style={{ marginRight: '6px' }}></i>
+                A test SMS will be sent using your current provider configuration: <strong>{providerOptions.sms.find(p => p.value === form.smsProvider)?.label || form.smsProvider}</strong>
+                {form.smsSenderId ? ` from sender ID "${form.smsSenderId}"` : ''}.
+              </div>
+              {testResult && (
+                <div style={{ padding: '12px', borderRadius: '8px', fontSize: '13px', background: testResult.success ? '#ecfdf5' : '#fef2f2', border: `1px solid ${testResult.success ? '#a7f3d0' : '#fecaca'}`, color: testResult.success ? '#065f46' : '#991b1b' }}>
+                  <i className={`fa ${testResult.success ? 'fa-check-circle' : 'fa-exclamation-circle'}`} style={{ marginRight: '6px' }}></i>
+                  {testResult.message}
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button onClick={() => { setShowTestModal(false); setTestResult(null); setTestPhone(''); }}
+                style={{ padding: '10px 20px', background: 'white', color: '#374151', border: '1px solid #e8ddd0', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={handleTestSms} disabled={testLoading || !testPhone}
+                style={{ padding: '10px 20px', background: '#ea6645', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {testLoading ? <i className="fa fa-spinner fa-spin"></i> : <i className="fa fa-paper-plane"></i>}
+                {testLoading ? 'Sending...' : 'Send Test'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
