@@ -37,7 +37,6 @@ export default function CommunicationsPage() {
   const queryClient = useQueryClient();
   const [selectedPlatform, setSelectedPlatform] = useState<CommunicationType>('SMS');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showAlertsModal, setShowAlertsModal] = useState(false);
   const [message, setMessage] = useState('');
   const [subject, setSubject] = useState('');
@@ -173,12 +172,12 @@ export default function CommunicationsPage() {
               </span>
             )}
           </button>
-          <button
-            onClick={() => setShowSettingsModal(true)}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          <Link
+            href="/dashboard/communications/settings"
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors inline-flex items-center gap-2"
           >
-            ⚙️ Settings
-          </button>
+            <i className="fa fa-cog"></i> Settings
+          </Link>
           <button
             onClick={() => setShowCreateModal(true)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -470,138 +469,6 @@ export default function CommunicationsPage() {
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
                 >
                   {createMutation.isPending ? 'Creating...' : scheduledAt ? 'Schedule' : 'Create'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showSettingsModal && (
-        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-4">Communication Settings</h2>
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="border rounded p-4">
-                  <h3 className="font-semibold mb-3">📱 SMS</h3>
-                  <div className="space-y-2">
-                    <label className="flex items-center">
-                      <input type="checkbox" className="mr-2" /> Enable SMS
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="API Key"
-                      className="w-full px-3 py-2 border rounded"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Sender ID"
-                      className="w-full px-3 py-2 border rounded"
-                    />
-                  </div>
-                </div>
-
-                <div className="border rounded p-4">
-                  <h3 className="font-semibold mb-3">📧 Email</h3>
-                  <div className="space-y-2">
-                    <label className="flex items-center">
-                      <input type="checkbox" className="mr-2" /> Enable Email
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="SMTP Host"
-                      className="w-full px-3 py-2 border rounded"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Port"
-                      className="w-full px-3 py-2 border rounded"
-                    />
-                  </div>
-                </div>
-
-                <div className="border rounded p-4">
-                  <h3 className="font-semibold mb-3">💬 WhatsApp</h3>
-                  <div className="space-y-2">
-                    <label className="flex items-center">
-                      <input type="checkbox" className="mr-2" /> Enable WhatsApp
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="API Key"
-                      className="w-full px-3 py-2 border rounded"
-                    />
-                  </div>
-                </div>
-
-                <div className="border rounded p-4">
-                  <h3 className="font-semibold mb-3">📘 Facebook</h3>
-                  <div className="space-y-2">
-                    <label className="flex items-center">
-                      <input type="checkbox" className="mr-2" /> Enable Facebook
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Page ID"
-                      className="w-full px-3 py-2 border rounded"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Access Token"
-                      className="w-full px-3 py-2 border rounded"
-                    />
-                  </div>
-                </div>
-
-                <div className="border rounded p-4">
-                  <h3 className="font-semibold mb-3">▶️ YouTube</h3>
-                  <div className="space-y-2">
-                    <label className="flex items-center">
-                      <input type="checkbox" className="mr-2" /> Enable YouTube
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Channel ID"
-                      className="w-full px-3 py-2 border rounded"
-                    />
-                    <input
-                      type="text"
-                      placeholder="API Key"
-                      className="w-full px-3 py-2 border rounded"
-                    />
-                  </div>
-                </div>
-
-                <div className="border rounded p-4">
-                  <h3 className="font-semibold mb-3">💼 LinkedIn</h3>
-                  <div className="space-y-2">
-                    <label className="flex items-center">
-                      <input type="checkbox" className="mr-2" /> Enable LinkedIn
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Page ID"
-                      className="w-full px-3 py-2 border rounded"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Access Token"
-                      className="w-full px-3 py-2 border rounded"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3 justify-end pt-4">
-                <button
-                  onClick={() => setShowSettingsModal(false)}
-                  className="px-4 py-2 border rounded-lg hover:bg-gray-50"
-                >
-                  Close
-                </button>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                  Save Settings
                 </button>
               </div>
             </div>
