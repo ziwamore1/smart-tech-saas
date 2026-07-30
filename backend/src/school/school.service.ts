@@ -91,6 +91,7 @@ export class SchoolService {
         .catch((err) => this.logger.error('Failed to send director welcome message:', err));
 
       this.notificationService.sendCredentials({
+        schoolId: school.id,
         recipientName: 'School Director',
         email: dto.email,
         phone: dto.phone || '',

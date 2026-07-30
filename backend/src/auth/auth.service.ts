@@ -258,6 +258,7 @@ export class AuthService {
     const directorSchoolUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?school=${data.schoolId}`;
 
     await this.notificationService.sendCredentials({
+      schoolId: data.schoolId,
       recipientName: data.fullName,
       email: hasEmail ? data.email : undefined,
       phone: data.phone,
@@ -377,6 +378,7 @@ export class AuthService {
     const teacherSchoolUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?school=${schoolId}`;
 
     await this.notificationService.sendCredentials({
+      schoolId,
       recipientName: data.fullName,
       email: hasEmail ? data.email : undefined,
       phone: data.phone,
@@ -983,7 +985,7 @@ export class AuthService {
         data: { resetToken: otp },
       });
       const message = `Your Smart Tech password reset OTP is: ${otp}. This code expires in 1 hour.`;
-      await this.notificationService.sendGenericSms(user.phone, message);
+      await this.notificationService.sendGenericSms(user.phone, message, user.schoolId);
       this.logger.log(`Password reset SMS sent to: ${user.phone}`);
     }
 

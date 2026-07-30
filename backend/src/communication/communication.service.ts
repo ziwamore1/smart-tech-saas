@@ -6,9 +6,9 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import { BeemService } from '../beem/beem.service';
-import { TwilioService } from '../twilio/twilio.service';
 import { StudentFilterService } from '../common/services/student-filter.service';
+import { BeemService } from '../beem/beem.service';
+import { CommunicationsCloudService } from '../communications-cloud/communications-cloud.service';
 import mail from '@sendgrid/mail';
 import * as nodemailer from 'nodemailer';
 import { google } from 'googleapis';
@@ -27,9 +27,9 @@ export class CommunicationService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
-    private beemService: BeemService,
-    private twilioService: TwilioService,
     private studentFilter: StudentFilterService,
+    private commCloudService: CommunicationsCloudService,
+    private beemService: BeemService,
   ) {
     this.sendgridApiKey = this.configService.get<string>('SENDGRID_API_KEY', '');
     this.sendgridFromEmail = this.configService.get<string>('SENDGRID_FROM_EMAIL', 'noreply@smarttechsaas.com');
@@ -251,6 +251,7 @@ export class CommunicationService {
           settings,
           recipient.phone,
           communication.message,
+          communication.schoolId,
         );
         await this.addLog(communication.id, 'sent', {
           recipientId: recipient.id,
@@ -690,7 +691,7 @@ export class CommunicationService {
     let sentCount = 0;
     for (const user of users) {
       if (user.phone) {
-        await this.simulateSMSApi(settings, user.phone, communication.message);
+        await this.simulateSMSApi(settings, user.phone, communication.message, communication.schoolId);
         await this.addLog(communication.id, 'sent', {
           recipientId: user.id,
           phone: user.phone,
@@ -1058,42 +1059,22 @@ export class CommunicationService {
     }
   }
 
-  private async simulateSMSApi(settings: any, phone: string, message: string) {
-    const twilioConfigured = await this.twilioService.isConfigured();
-    const beemConfigured = await this.beemService.isConfigured();
-
-    if (twilioConfigured) {
-      try {
-        const result = await this.twilioService.sendSms(phone, message);
-        if (result.success) {
-          this.logger.log(`[Twilio SMS] Sent to ${phone}, SID: ${result.messageId}`);
-          return { success: true, messageId: result.messageId };
-        }
-        this.logger.warn(`[Twilio SMS] Failed, falling back to Beem: ${result.error}`);
-      } catch (error) {
-        this.logger.warn(`[Twilio SMS] Error, falling back to Beem: ${error.message}`);
+  private async simulateSMSApi(settings: any, phone: string, message: string, schoolId: string) {
+    try {
+      const result = await this.commCloudService.sendSchoolSms(schoolId, {
+        recipient: phone,
+        message,
+      });
+      if (result.status === 'QUEUED') {
+        this.logger.log(`[CommCloud SMS] Sent to ${phone} via school ${schoolId}`);
+        return { success: true, messageId: `comm_${Date.now()}` };
       }
+      this.logger.warn(`[CommCloud SMS] Failed to ${phone}: unexpected status ${result.status}`);
+      return { success: false, error: `SMS queued but status: ${result.status}` };
+    } catch (error) {
+      this.logger.error(`[CommCloud SMS] Error sending to ${phone}: ${error.message}`);
+      return { success: false, error: error.message };
     }
-
-    if (beemConfigured) {
-      try {
-        const result = await this.beemService.sendSms(phone, message);
-        if (result.success) {
-          this.logger.log(`[Beem SMS] Sent to ${phone}, messageId: ${result.messageId}`);
-          return { success: true, messageId: result.messageId };
-        }
-        this.logger.error(`[Beem SMS] Failed: ${result.error}`);
-        return { success: false, error: result.error };
-      } catch (error) {
-        this.logger.error(`[Beem SMS] Error: ${error.message}`);
-        return { success: false, error: error.message };
-      }
-    }
-
-    this.logger.warn(
-      `[SMS API] Not configured. To: ${phone}, Message: ${message.substring(0, 30)}...`,
-    );
-    return { success: false, error: 'SMS service not configured. Please set up an SMS provider in Settings.' };
   }
 
   private async simulateEmailApi(

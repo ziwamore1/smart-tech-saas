@@ -2,9 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { BeemService } from '../beem/beem.service';
-import { TwilioService } from '../twilio/twilio.service';
+import { CommunicationsCloudService } from '../communications-cloud/communications-cloud.service';
 
 export interface CredentialNotificationData {
+  schoolId: string;
   recipientName: string;
   email?: string;
   phone?: string;
@@ -16,6 +17,7 @@ export interface CredentialNotificationData {
 }
 
 export interface AttendanceNotificationData {
+  schoolId: string;
   recipientName: string;
   email?: string;
   phone?: string;
@@ -26,6 +28,7 @@ export interface AttendanceNotificationData {
 }
 
 export interface ResultNotificationData {
+  schoolId: string;
   recipientName: string;
   email?: string;
   phone?: string;
@@ -38,6 +41,7 @@ export interface ResultNotificationData {
 }
 
 export interface FeeNotificationData {
+  schoolId: string;
   recipientName: string;
   email?: string;
   phone?: string;
@@ -49,6 +53,7 @@ export interface FeeNotificationData {
 }
 
 export interface ApprovalNotificationData {
+  schoolId: string;
   recipientName: string;
   email?: string;
   phone?: string;
@@ -66,8 +71,8 @@ export class NotificationService {
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,
+    private commCloudService: CommunicationsCloudService,
     private beemService: BeemService,
-    private twilioService: TwilioService,
   ) {}
 
   async sendCredentials(data: CredentialNotificationData): Promise<void> {
@@ -94,7 +99,7 @@ export class NotificationService {
 
     if (data.phone) {
       const message = this.buildCredentialMessage(data);
-      await this.sendSMS(data.phone, message);
+      await this.sendSMS(data.phone, message, data.schoolId);
       await this.sendWhatsApp(data.phone, message).catch(() => {});
     }
   }
@@ -120,7 +125,7 @@ export class NotificationService {
 
     if (data.phone) {
       const message = `Attendance alert: ${data.studentName} was marked ${data.status} on ${data.date}.`;
-      await this.sendSMS(data.phone, message);
+      await this.sendSMS(data.phone, message, data.schoolId);
     }
   }
 
@@ -147,7 +152,7 @@ export class NotificationService {
 
     if (data.phone) {
       const message = `Results published for ${data.studentName} - ${data.term}. ${data.grade ? `Grade: ${data.grade}` : ''}`;
-      await this.sendSMS(data.phone, message);
+      await this.sendSMS(data.phone, message, data.schoolId);
     }
   }
 
@@ -173,7 +178,7 @@ export class NotificationService {
 
     if (data.phone) {
       const message = `Fee reminder: ${data.amount} due on ${data.dueDate} for ${data.studentName}.`;
-      await this.sendSMS(data.phone, message);
+      await this.sendSMS(data.phone, message, data.schoolId);
     }
   }
 
@@ -199,7 +204,7 @@ export class NotificationService {
 
     if (data.phone) {
       const message = `Approval required: ${data.documentName} needs your ${data.actionRequired}.`;
-      await this.sendSMS(data.phone, message);
+      await this.sendSMS(data.phone, message, data.schoolId);
     }
   }
 
@@ -247,42 +252,17 @@ export class NotificationService {
     return lines.join('\n');
   }
 
-  private async sendSMS(phone: string, message: string): Promise<void> {
-    const twilioConfigured = await this.twilioService.isConfigured();
-    const beemConfigured = await this.beemService.isConfigured();
-
-    if (twilioConfigured) {
-      try {
-        const result = await this.twilioService.sendSms(phone, message);
-        if (result.success) {
-          this.logger.log(`[Twilio SMS] Sent to ${phone}, SID: ${result.messageId}`);
-          await this.logNotification(phone, 'sms', 'generic', 'sent', undefined, message);
-          return;
-        }
-        this.logger.warn(`[Twilio SMS] Failed, falling back to Beem: ${result.error}`);
-      } catch (error) {
-        this.logger.warn(`[Twilio SMS] Error, falling back to Beem: ${error.message}`);
-      }
-    }
-
-    if (beemConfigured) {
-      try {
-        const result = await this.beemService.sendSms(phone, message);
-        if (result.success) {
-          this.logger.log(`[Beem SMS] Sent to ${phone}, messageId: ${result.messageId}`);
-          await this.logNotification(phone, 'sms', 'generic', 'sent', undefined, message);
-        } else {
-          this.logger.error(`[Beem SMS] Failed to ${phone}: ${result.error}`);
-          await this.logNotification(phone, 'sms', 'generic', 'failed', undefined, message, result.error);
-        }
-      } catch (error) {
-        this.logger.error(`[Beem SMS] Error: ${error.message}`);
-        await this.logNotification(phone, 'sms', 'generic', 'failed', undefined, message, error.message);
-      }
-    } else {
-      this.logger.log(`[SMS] To: ${phone}`);
-      this.logger.debug(`[SMS] Message: ${message}`);
-      await this.logNotification(phone, 'sms', 'generic', 'sent');
+  private async sendSMS(phone: string, message: string, schoolId: string): Promise<void> {
+    try {
+      const result = await this.commCloudService.sendSchoolSms(schoolId, {
+        recipient: phone,
+        message,
+      });
+      await this.logNotification(phone, 'sms', 'generic', 'sent', undefined, message);
+      this.logger.log(`[CommCloud SMS] Sent to ${phone} via school ${schoolId}`);
+    } catch (error) {
+      this.logger.error(`[CommCloud SMS] Failed to ${phone}: ${error.message}`);
+      await this.logNotification(phone, 'sms', 'generic', 'failed', undefined, message, error.message);
     }
   }
 
@@ -308,9 +288,9 @@ export class NotificationService {
     }
   }
 
-  async sendGenericSms(phone: string, message: string): Promise<void> {
+  async sendGenericSms(phone: string, message: string, schoolId?: string): Promise<void> {
     this.logger.log(`Sending generic SMS to ${phone}`);
-    await this.sendSMS(phone, message);
+    await this.sendSMS(phone, message, schoolId || 'system');
   }
 
   async sendVoiceOtp(phone: string, otp: string, language?: string): Promise<void> {
