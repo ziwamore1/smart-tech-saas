@@ -54,20 +54,21 @@ export default function EnrollmentsPage() {
   const { data: classesResponse } = useQuery({
     queryKey: ['my-class-teacher-classes', user?.id],
     queryFn: async () => {
-      // Primary: query ClassTeacherAssignment via DB (always up-to-date)
+      // 1. ClassTeacherAssignment table (🏫 dedicated modal)
       try {
         const res = await classTeacherAssignmentApi.findByTeacher(user!.id);
         let items = res.data?.data || res.data;
         if (!Array.isArray(items)) items = [];
-        const mapped = items
-          .filter((cta: any) => cta.class)
+        const fromCta = items
+          .filter((cta: any) => cta?.class)
           .map((cta: any) => ({
             id: cta.class.id, classId: cta.class.id, _id: cta.class.id,
             name: cta.class.name, className: cta.class.name,
           }));
-        if (mapped.length > 0) return mapped;
+        if (fromCta.length > 0) return fromCta;
       } catch {}
-      // Fallback: fetch assigned class directly by ID from JWT
+
+      // 2. Class.classTeacherId from JWT (Edit Class modal)
       if (user?.classTeacherOf) {
         const res = await classApi.getById(user.classTeacherOf);
         const cls = res.data?.data || res.data;
@@ -78,6 +79,18 @@ export default function EnrollmentsPage() {
           }];
         }
       }
+
+      // 3. Fallback via classApi (backend now includes Class.classTeacherId)
+      try {
+        const res = await classApi.getAll();
+        let all = res.data?.data || res.data || [];
+        if (!Array.isArray(all)) all = [];
+        const mine = all.filter((cls: any) =>
+          (cls.classTeacher?.id || cls.classTeacherId) === user!.id
+        );
+        if (mine.length > 0) return mine;
+      } catch {}
+
       return [];
     },
     enabled: !!user?.id,

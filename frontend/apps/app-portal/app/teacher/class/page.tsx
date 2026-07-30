@@ -46,13 +46,13 @@ export default function MyClassPage() {
         const res = await classTeacherAssignmentApi.findByTeacher(user!.id);
         let items = res.data?.data || res.data;
         if (!Array.isArray(items)) items = [];
-        const mapped = items
-          .filter((cta: any) => cta.class)
+        const fromCta = items
+          .filter((cta: any) => cta?.class)
           .map((cta: any) => ({
             id: cta.class.id, classId: cta.class.id, _id: cta.class.id,
             name: cta.class.name, className: cta.class.name,
           }));
-        if (mapped.length > 0) return mapped;
+        if (fromCta.length > 0) return fromCta;
       } catch {}
       if (user?.classTeacherOf) {
         const res = await classApi.getById(user.classTeacherOf);
@@ -64,6 +64,15 @@ export default function MyClassPage() {
           }];
         }
       }
+      try {
+        const res = await classApi.getAll();
+        let all = res.data?.data || res.data || [];
+        if (!Array.isArray(all)) all = [];
+        const mine = all.filter((cls: any) =>
+          (cls.classTeacher?.id || cls.classTeacherId) === user!.id
+        );
+        if (mine.length > 0) return mine;
+      } catch {}
       return [];
     },
     enabled: !!user?.id,

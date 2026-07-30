@@ -236,7 +236,7 @@ export class ClassService {
       return null;
     }
 
-    const [teachingAssignments, classTeacherAssignments] = await Promise.all([
+    const [teachingAssignments, classTeacherAssignments, directClasses] = await Promise.all([
       this.prisma.teachingAssignment.findMany({
         where: { teacherId: user.id, schoolId: user.schoolId },
         select: { classId: true },
@@ -245,11 +245,16 @@ export class ClassService {
         where: { teacherId: user.id, isActive: true },
         select: { classId: true },
       }),
+      this.prisma.class.findMany({
+        where: { schoolId: user.schoolId, classTeacherId: user.id },
+        select: { id: true },
+      }),
     ]);
 
     const ids = new Set<string>();
     for (const ta of teachingAssignments) ids.add(ta.classId);
     for (const cta of classTeacherAssignments) ids.add(cta.classId);
+    for (const dc of directClasses) ids.add(dc.id);
 
     return ids.size > 0 ? Array.from(ids) : [];
   }
