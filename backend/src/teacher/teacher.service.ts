@@ -404,12 +404,35 @@ export class TeacherService {
       },
     });
 
+    const directClasses = await this.prisma.class.findMany({
+      where: { classTeacherId: teacherId, schoolId },
+      include: {
+        levelType: true,
+        gradingSystem: { select: { id: true, name: true } },
+        classTeacher: { select: { id: true, firstName: true, lastName: true, email: true } },
+        enrollments: {
+          where: { status: 'ACTIVE' },
+          include: {
+            student: {
+              select: {
+                id: true, firstName: true, lastName: true, gender: true,
+                admissionNumber: true, photoUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
     const classMap = new Map<string, any>();
     for (const a of assignments) {
       classMap.set(a.class.id, a.class);
     }
     for (const cta of ctaRecords) {
       classMap.set(cta.class.id, cta.class);
+    }
+    for (const dc of directClasses) {
+      classMap.set(dc.id, dc);
     }
 
     return Array.from(classMap.values())

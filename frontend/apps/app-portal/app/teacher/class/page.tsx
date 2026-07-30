@@ -51,17 +51,14 @@ export default function MyClassPage() {
   });
 
   const classes = Array.isArray(classesResponse) ? classesResponse : [];
-  const assignedClassId = user?.classTeacherOf || '';
-  const classId = selectedClassId || assignedClassId;
+  const classId = selectedClassId || (classes.length > 0 ? classes[0].id : '');
   const selectedClassObj = classes.find((c: any) => c.id === classId);
 
   useEffect(() => {
-    if (!selectedClassId && assignedClassId) {
-      setSelectedClassId(assignedClassId);
-    } else if (!selectedClassId && classes.length > 0 && !assignedClassId) {
+    if (!selectedClassId && classes.length > 0) {
       setSelectedClassId(classes[0].id);
     }
-  }, [assignedClassId, classes, selectedClassId]);
+  }, [classes, selectedClassId]);
 
   const { data: studentsData, isLoading } = useQuery({
     queryKey: ['class-students', classId],
@@ -179,7 +176,7 @@ export default function MyClassPage() {
               <option value="">Select Class</option>
               {classes.map((cls: any) => (
                 <option key={cls.id} value={cls.id}>
-                  {cls.name}{cls.id === assignedClassId ? ' (Your Class)' : ''}
+                  {cls.name}
                 </option>
               ))}
             </select>
