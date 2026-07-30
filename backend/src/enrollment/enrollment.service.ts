@@ -1,10 +1,16 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AdmissionNumberService } from '../admission-number/admission-number.service';
 import { EnrollmentStatus, StudentStatus } from '@prisma/client';
 
 @Injectable()
 export class EnrollmentService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(EnrollmentService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private admissionNumberService: AdmissionNumberService,
+  ) {}
 
   async enrollStudent(data: {
     studentId: string;
@@ -63,6 +69,19 @@ export class EnrollmentService {
         where: { id: data.studentId },
         data: { status: StudentStatus.ACTIVE },
       });
+    }
+
+    try {
+      const newAdmissionNumber = await this.admissionNumberService.getNextAdmissionNumber(
+        data.schoolId, data.academicYearId, data.classId,
+      );
+      await this.prisma.student.update({
+        where: { id: data.studentId },
+        data: { admissionNumber: newAdmissionNumber },
+      });
+      this.logger.log(`Re-sequenced student ${data.studentId} admission number to ${newAdmissionNumber} for class ${data.classId}`);
+    } catch (error) {
+      this.logger.error(`Failed to re-sequence admission number for student ${data.studentId}: ${(error as Error).message}`);
     }
 
     return enrollment;

@@ -180,15 +180,17 @@ export default function StudentsPage() {
   });
 
   useEffect(() => {
-    if (user?.classTeacherOf && classes.some((c: any) => c.id === user.classTeacherOf)) {
+    const assignedId = user?.classTeacherOf
+      || classes.find((c: any) => c.classTeacher?.id === user?.id)?.id;
+    if (assignedId && classes.some((c: any) => c.id === assignedId)) {
       if (showAddModal && !studentForm.classId) {
-        setStudentForm(prev => ({ ...prev, classId: user.classTeacherOf as string }));
+        setStudentForm(prev => ({ ...prev, classId: assignedId }));
       }
       if (showEnrollmentModal && !enrollmentForm.classId) {
-        setEnrollmentForm(prev => ({ ...prev, classId: user.classTeacherOf as string }));
+        setEnrollmentForm(prev => ({ ...prev, classId: assignedId }));
       }
     }
-  }, [showAddModal, showEnrollmentModal, user?.classTeacherOf, classes]);
+  }, [showAddModal, showEnrollmentModal, user?.classTeacherOf, classes, user?.id]);
 
   const [editForm, setEditForm] = useState<any>({
     firstName: '',
@@ -280,7 +282,7 @@ export default function StudentsPage() {
       setTimeout(() => setMessage(null), 3000);
       setShowEnrollmentModal(false);
       setSelectedStudent(null);
-      setEnrollmentForm({ classId: '', termId: '', academicYearId: '' });
+      setEnrollmentForm({ classId: '', termId: '', academicYearId: currentAcademicYear?.id || '' });
     },
     onError: (error: any) => {
       setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to enroll student.' });
@@ -877,7 +879,7 @@ export default function StudentsPage() {
                   onClick={() => {
                     setShowEnrollmentModal(false);
                     setSelectedStudent(null);
-                    setEnrollmentForm({ classId: '', termId: '', academicYearId: '' });
+                    setEnrollmentForm({ classId: '', termId: '', academicYearId: currentAcademicYear?.id || '' });
                   }}
                   className="px-4 py-2 border rounded-lg hover:bg-gray-50"
                 >
