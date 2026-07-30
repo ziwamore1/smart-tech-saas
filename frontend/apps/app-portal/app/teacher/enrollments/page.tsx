@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { classTeacherAssignmentApi, studentApi, termApi, enrollmentApi, academicYearApi } from '@/lib/api';
+import { classApi, classTeacherAssignmentApi, studentApi, termApi, enrollmentApi, academicYearApi } from '@/lib/api';
 import { socket } from '@/lib/socket';
 
 export default function EnrollmentsPage() {
@@ -52,13 +52,29 @@ export default function EnrollmentsPage() {
   }, [user?.schoolId, queryClient]);
 
   const { data: classesResponse } = useQuery({
-    queryKey: ['my-class-teacher-classes'],
+    queryKey: ['my-class-teacher-classes', user?.classTeacherOf],
     queryFn: async () => {
-      const res = await classTeacherAssignmentApi.getMyClasses();
-      let data = res.data;
-      if (data?.data) data = data.data;
-      return Array.isArray(data) ? data : [];
+      // Primary: dedicated ClassTeacherAssignment endpoint
+      try {
+        const res = await classTeacherAssignmentApi.getMyClasses();
+        let data = res.data;
+        if (data?.data) data = data.data;
+        if (Array.isArray(data) && data.length > 0) return data;
+      } catch {}
+      // Fallback: fetch the assigned class directly by ID from JWT
+      if (user?.classTeacherOf) {
+        const res = await classApi.getById(user.classTeacherOf);
+        const cls = res.data?.data || res.data;
+        if (cls?.id) {
+          return [{
+            id: cls.id, classId: cls.id, _id: cls.id,
+            name: cls.name, className: cls.name, capacity: cls.capacity,
+          }];
+        }
+      }
+      return [];
     },
+    enabled: isClassTeacher,
   });
 
   const { data: terms } = useQuery({
