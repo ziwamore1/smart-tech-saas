@@ -420,13 +420,14 @@ export class AuthService {
         include: userInclude,
       });
     } else {
-      const cleanedPhone = identifier.trim().replace(/[^0-9+]/g, '');
+      const trimmed = identifier.trim();
+      const cleanedPhone = trimmed.replace(/[^0-9+]/g, '');
       user = await this.prisma.user.findFirst({
         where: {
           OR: [
+            { username: { equals: trimmed, mode: 'insensitive' } },
             { phone: { equals: cleanedPhone, mode: 'insensitive' } },
-            { username: { equals: cleanedPhone, mode: 'insensitive' } },
-            { student: { admissionNumber: identifier.trim() } },
+            { student: { admissionNumber: trimmed } },
           ],
         },
         include: userInclude,
