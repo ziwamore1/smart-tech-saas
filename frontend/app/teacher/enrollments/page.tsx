@@ -38,12 +38,6 @@ export default function EnrollmentsPage() {
     reason: '',
   });
 
-  const { data: teacherData } = useQuery({
-    queryKey: ['my-teacher-profile'],
-    queryFn: () => teacherApi.getById('me').then(res => res.data),
-    retry: false,
-  });
-
   const { data: classesResponse } = useQuery({
     queryKey: ['teacher-classes'],
     queryFn: async () => {
@@ -70,21 +64,17 @@ export default function EnrollmentsPage() {
     queryFn: () => studentApi.getAll({ limit: 500 }).then(res => res.data),
   });
 
-  const teacher = teacherData?.data || teacherData;
-  const assignedClass = teacher?.classTeacherOf;
   const classes = Array.isArray(classesResponse) ? classesResponse : [];
   const currentTerm = terms?.find((t: any) => t.isCurrent);
   const currentAcademicYear = academicYears?.find((y: any) => y.isCurrent);
-  const classId = selectedClassId || assignedClass?.id || '';
+  const classId = selectedClassId || (classes.length > 0 ? classes[0].id : '');
   const selectedClassObj = classes.find((c: any) => c.id === classId);
 
   useEffect(() => {
-    if (!selectedClassId && assignedClass?.id) {
-      setSelectedClassId(assignedClass.id);
-    } else if (!selectedClassId && classes.length > 0 && !assignedClass?.id) {
+    if (!selectedClassId && classes.length > 0) {
       setSelectedClassId(classes[0].id);
     }
-  }, [assignedClass, classes, selectedClassId]);
+  }, [classes, selectedClassId]);
 
   useEffect(() => {
     const schoolId = user?.schoolId;
@@ -233,7 +223,7 @@ export default function EnrollmentsPage() {
             <option value="">Select Class</option>
             {classes.map((cls: any) => (
               <option key={cls.id} value={cls.id}>
-                {cls.name}{cls.id === assignedClass?.id ? ' (Your Class)' : ''}
+                {cls.name}
               </option>
             ))}
           </select>
