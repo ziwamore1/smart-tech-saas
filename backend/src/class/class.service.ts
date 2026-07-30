@@ -50,71 +50,86 @@ export class ClassService {
   }
 
   async findAll(user: { id: string; schoolId: string; roles?: string[] }) {
-    if (!user.schoolId) return [];
+    try {
+      if (!user.schoolId) {
+        this.logger.warn(`findAll: no schoolId for user ${user.id}`);
+        return [];
+      }
 
-    const classIds = await this.getTeacherClassIds(user);
+      this.logger.log(`findAll: user=${user.id}, schoolId=${user.schoolId}, roles=${JSON.stringify(user.roles)}`);
 
-    const where: any = { schoolId: user.schoolId };
-    if (classIds) {
-      where.id = { in: classIds };
+      const classIds = await this.getTeacherClassIds(user);
+      this.logger.log(`findAll: getTeacherClassIds returned ${classIds === null ? 'null' : Array.isArray(classIds) ? classIds.length + ' ids' : classIds}`);
+
+      const where: any = { schoolId: user.schoolId };
+      if (classIds) {
+        where.id = { in: classIds };
+      }
+
+      const classes = await this.prisma.class.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          capacity: true,
+          schoolId: true,
+          levelTypeId: true,
+          gradingSystemId: true,
+          order: true,
+          levelType: { select: { id: true, name: true, code: true } },
+          gradingSystem: { select: { id: true, name: true } },
+          classTeacher: { select: { id: true, firstName: true, lastName: true, email: true } },
+        },
+        orderBy: [
+          { levelTypeId: 'asc' },
+          { order: 'asc' }
+        ]
+      });
+
+      this.logger.log(`findAll: class.findMany returned ${classes.length} classes`);
+
+      // Batch-fetch active enrollment counts and gender counts for all classes
+      const classIdsList = classes.map(c => c.id);
+      const enrollments = classIdsList.length > 0 ? await this.prisma.enrollment.findMany({
+        where: { classId: { in: classIdsList }, status: 'ACTIVE' },
+        select: { classId: true, student: { select: { gender: true } } },
+      }) : [];
+
+      this.logger.log(`findAll: enrollment.findMany returned ${enrollments.length} enrollments`);
+
+      const enrollmentCountMap = new Map<string, number>();
+      const genderMap = new Map<string, { male: number; female: number }>();
+      for (const e of enrollments) {
+        enrollmentCountMap.set(e.classId, (enrollmentCountMap.get(e.classId) || 0) + 1);
+        if (!genderMap.has(e.classId)) genderMap.set(e.classId, { male: 0, female: 0 });
+        const g = e.student?.gender || '';
+        const entry = genderMap.get(e.classId)!;
+        if (g === 'MALE' || g === 'Male' || g === 'M') entry.male++;
+        else if (g === 'FEMALE' || g === 'Female' || g === 'F') entry.female++;
+      }
+
+      return classes.map((c) => {
+        const counts = genderMap.get(c.id) || { male: 0, female: 0 };
+        return {
+          id: c.id,
+          name: c.name,
+          capacity: c.capacity,
+          schoolId: c.schoolId,
+          levelTypeId: c.levelTypeId,
+          gradingSystemId: c.gradingSystemId,
+          order: c.order,
+          levelType: c.levelType,
+          gradingSystem: c.gradingSystem,
+          classTeacher: c.classTeacher,
+          totalStudents: enrollmentCountMap.get(c.id) || 0,
+          maleCount: counts.male,
+          femaleCount: counts.female,
+        };
+      });
+    } catch (error) {
+      this.logger.error(`findAll error: ${error.message}`, error.stack);
+      throw error;
     }
-
-    const classes = await this.prisma.class.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        capacity: true,
-        schoolId: true,
-        levelTypeId: true,
-        gradingSystemId: true,
-        order: true,
-        levelType: { select: { id: true, name: true, code: true } },
-        gradingSystem: { select: { id: true, name: true } },
-        classTeacher: { select: { id: true, firstName: true, lastName: true, email: true } },
-      },
-      orderBy: [
-        { levelTypeId: 'asc' },
-        { order: 'asc' }
-      ]
-    });
-
-    // Batch-fetch active enrollment counts and gender counts for all classes
-    const classIdsList = classes.map(c => c.id);
-    const enrollments = classIdsList.length > 0 ? await this.prisma.enrollment.findMany({
-      where: { classId: { in: classIdsList }, status: 'ACTIVE' },
-      select: { classId: true, student: { select: { gender: true } } },
-    }) : [];
-
-    const enrollmentCountMap = new Map<string, number>();
-    const genderMap = new Map<string, { male: number; female: number }>();
-    for (const e of enrollments) {
-      enrollmentCountMap.set(e.classId, (enrollmentCountMap.get(e.classId) || 0) + 1);
-      if (!genderMap.has(e.classId)) genderMap.set(e.classId, { male: 0, female: 0 });
-      const g = e.student?.gender || '';
-      const entry = genderMap.get(e.classId)!;
-      if (g === 'MALE' || g === 'Male' || g === 'M') entry.male++;
-      else if (g === 'FEMALE' || g === 'Female' || g === 'F') entry.female++;
-    }
-
-    return classes.map((c) => {
-      const counts = genderMap.get(c.id) || { male: 0, female: 0 };
-      return {
-        id: c.id,
-        name: c.name,
-        capacity: c.capacity,
-        schoolId: c.schoolId,
-        levelTypeId: c.levelTypeId,
-        gradingSystemId: c.gradingSystemId,
-        order: c.order,
-        levelType: c.levelType,
-        gradingSystem: c.gradingSystem,
-        classTeacher: c.classTeacher,
-        totalStudents: enrollmentCountMap.get(c.id) || 0,
-        maleCount: counts.male,
-        femaleCount: counts.female,
-      };
-    });
   }
 
   async findByLevel(levelTypeId: string, user: { id: string; schoolId: string; roles?: string[] }) {
