@@ -9,28 +9,17 @@ export interface ZamtelBulkSmsConfig {
   baseUrl?: string;
 }
 
-/**
- * Zamtel Bulk SMS adapter using the bulk SMS API.
- * Compatible with the zamtel-smsjs npm package.
- * API: https://bulksms.zamtel.co.zm/api/v2.1/action/send/
- */
 export class ZamtelBulkSmsAdapter implements SmsProvider {
   private readonly logger = new Logger(ZamtelBulkSmsAdapter.name);
-  private readonly baseUrl: string;
+  private readonly apiBase: string;
   private readonly apiKey: string;
   private readonly senderId: string;
+  private readonly apiVersion = 'v2.1';
 
   constructor(config: ZamtelBulkSmsConfig) {
     this.apiKey = config.apiKey;
-    this.baseUrl = (config.baseUrl || 'https://bulksms.zamtel.co.zm').replace(/\/+$/, '');
+    this.apiBase = (config.baseUrl || 'https://bulksms.zamtel.co.zm').replace(/\/+$/, '');
     this.senderId = config.senderId || 'SMARTTECH';
-  }
-
-  private get authHeaders(): Record<string, string> {
-    return {
-      Authorization: `Basic ${Buffer.from(`${this.apiKey}:`).toString('base64')}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    };
   }
 
   async send(options: SendSmsOptions): Promise<SendResult> {
@@ -38,24 +27,16 @@ export class ZamtelBulkSmsAdapter implements SmsProvider {
       this.logger.debug(`ZamtelBulkSms send: to=${options.to}`);
 
       const phone = options.to.replace(/^\+/, '').replace(/^0/, '260');
+      const contacts = `[${phone}]`;
+      const sender = options.senderId || this.senderId;
 
-      const params = new URLSearchParams();
-      params.append('sender', options.senderId || this.senderId);
-      params.append('message', options.body);
-      params.append('recipients', phone);
+      const url = `${this.apiBase}/api/${this.apiVersion}/action/send/api_key/${this.apiKey}/contacts/${encodeURIComponent(contacts)}/senderId/${encodeURIComponent(sender)}/message/${encodeURIComponent(options.body)}`;
 
-      const response = await axios.post(
-        `${this.baseUrl}/api/v2.1/action/send/`,
-        params.toString(),
-        {
-          headers: this.authHeaders,
-          timeout: 15000,
-        },
-      );
+      const response = await axios.get(url, { timeout: 15000 });
 
       const data = response.data;
 
-      if (data?.status === 'success' || data?.successful === true || data?.code === 200) {
+      if (response.status >= 200 && response.status < 300 && !data?.error) {
         return {
           success: true,
           provider: 'zamtel-bulk',
@@ -92,10 +73,10 @@ export class ZamtelBulkSmsAdapter implements SmsProvider {
   async healthCheck(): Promise<{ status: string; latencyMs: number; details?: string }> {
     const startTime = Date.now();
     try {
-      await axios.get(`${this.baseUrl}/api/v2.1/action/balance/`, {
-        headers: this.authHeaders,
-        timeout: 10000,
-      });
+      await axios.get(
+        `${this.apiBase}/api/${this.apiVersion}/action/balance/api_key/${this.apiKey}`,
+        { timeout: 10000 },
+      );
       return { status: 'ok', latencyMs: Date.now() - startTime };
     } catch (error) {
       return {
@@ -108,10 +89,10 @@ export class ZamtelBulkSmsAdapter implements SmsProvider {
 
   async getBalance(): Promise<{ balance: number; currency: string }> {
     try {
-      const response = await axios.get(`${this.baseUrl}/api/v2.1/action/balance/`, {
-        headers: this.authHeaders,
-        timeout: 10000,
-      });
+      const response = await axios.get(
+        `${this.apiBase}/api/${this.apiVersion}/action/balance/api_key/${this.apiKey}`,
+        { timeout: 10000 },
+      );
 
       const data = response.data;
       return {
