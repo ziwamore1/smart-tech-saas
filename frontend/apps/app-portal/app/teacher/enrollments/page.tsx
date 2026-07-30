@@ -80,14 +80,20 @@ export default function EnrollmentsPage() {
   const classes = Array.isArray(classesResponse) ? classesResponse : [];
   const currentTerm = terms?.find((t: any) => t.isCurrent);
   const currentAcademicYear = academicYears?.find((y: any) => y.isCurrent);
-  const classId = selectedClassId || (classes.length > 0 ? classes[0].id : '');
+  const defaultClassId = user?.classTeacherOf && classes.some((c: any) => c.id === user.classTeacherOf)
+    ? user.classTeacherOf
+    : (classes.length > 0 ? classes[0].id : '');
+  const classId = selectedClassId || defaultClassId;
   const selectedClassObj = classes.find((c: any) => c.id === classId);
 
   useEffect(() => {
     if (!selectedClassId && classes.length > 0) {
-      setSelectedClassId(classes[0].id);
+      const id = user?.classTeacherOf && classes.some((c: any) => c.id === user.classTeacherOf)
+        ? user.classTeacherOf
+        : classes[0].id;
+      setSelectedClassId(id);
     }
-  }, [classes, selectedClassId]);
+  }, [classes, selectedClassId, user?.classTeacherOf]);
 
   const enrollExistingStudentMutation = useMutation({
     mutationFn: (studentId: string) => enrollmentApi.create({

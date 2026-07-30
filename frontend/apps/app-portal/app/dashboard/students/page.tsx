@@ -184,6 +184,17 @@ export default function StudentsPage() {
     academicYearId: currentAcademicYear?.id || '',
   });
 
+  useEffect(() => {
+    if (user?.classTeacherOf && classes.some((c: any) => c.id === user.classTeacherOf)) {
+      if (showAddModal && !studentForm.classId) {
+        setStudentForm(prev => ({ ...prev, classId: user.classTeacherOf as string }));
+      }
+      if (showEnrollmentModal && !enrollmentForm.classId) {
+        setEnrollmentForm(prev => ({ ...prev, classId: user.classTeacherOf as string }));
+      }
+    }
+  }, [showAddModal, showEnrollmentModal, user?.classTeacherOf, classes]);
+
   const [editForm, setEditForm] = useState<any>({
     firstName: '',
     lastName: '',
