@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { classApi, classTeacherAssignmentApi, studentApi, termApi, enrollmentApi, academicYearApi } from '@/lib/api';
+import { teacherApi, studentApi, termApi, enrollmentApi, academicYearApi } from '@/lib/api';
 import { socket } from '@/lib/socket';
 
 export default function EnrollmentsPage() {
@@ -52,48 +52,14 @@ export default function EnrollmentsPage() {
   }, [user?.schoolId, queryClient]);
 
   const { data: classesResponse } = useQuery({
-    queryKey: ['my-class-teacher-classes', user?.id],
+    queryKey: ['teacher-classes'],
     queryFn: async () => {
-      // 1. ClassTeacherAssignment table (🏫 dedicated modal)
-      try {
-        const res = await classTeacherAssignmentApi.findByTeacher(user!.id);
-        let items = res.data?.data || res.data;
-        if (!Array.isArray(items)) items = [];
-        const fromCta = items
-          .filter((cta: any) => cta?.class)
-          .map((cta: any) => ({
-            id: cta.class.id, classId: cta.class.id, _id: cta.class.id,
-            name: cta.class.name, className: cta.class.name,
-          }));
-        if (fromCta.length > 0) return fromCta;
-      } catch {}
-
-      // 2. Class.classTeacherId from JWT (Edit Class modal)
-      if (user?.classTeacherOf) {
-        const res = await classApi.getById(user.classTeacherOf);
-        const cls = res.data?.data || res.data;
-        if (cls?.id) {
-          return [{
-            id: cls.id, classId: cls.id, _id: cls.id,
-            name: cls.name, className: cls.name,
-          }];
-        }
-      }
-
-      // 3. Fallback via classApi (backend now includes Class.classTeacherId)
-      try {
-        const res = await classApi.getAll();
-        let all = res.data?.data || res.data || [];
-        if (!Array.isArray(all)) all = [];
-        const mine = all.filter((cls: any) =>
-          (cls.classTeacher?.id || cls.classTeacherId) === user!.id
-        );
-        if (mine.length > 0) return mine;
-      } catch {}
-
-      return [];
+      const res = await teacherApi.getClasses();
+      let data = res.data;
+      if (data?.data) data = data.data;
+      if (data?.classes) data = data.classes;
+      return Array.isArray(data) ? data : [];
     },
-    enabled: !!user?.id,
   });
 
   const { data: terms } = useQuery({
