@@ -1,4 +1,4 @@
-import { Controller, Get, Head } from '@nestjs/common';
+import { Controller, Get, Head, Query } from '@nestjs/common';
 import { HealthService } from './health.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { getCurriculumData } from './curriculum-data';
@@ -1000,6 +1000,90 @@ export class HealthController {
       nullClassId,
       backfillUrl: '/health/backfill-classid',
     };
+  }
+
+  @Get('resequence-student-admission')
+  async resequenceStudentAdmission(@Query('studentId') studentId: string, @Query('classId') classId?: string) {
+    const start = Date.now();
+    try {
+      if (!studentId) {
+        return { status: 'error', message: 'studentId query param is required' };
+      }
+
+      const student = await this.prisma.student.findUnique({
+        where: { id: studentId },
+        include: {
+          enrollments: {
+            where: { status: 'ACTIVE' },
+            orderBy: { academicYear: { startDate: 'desc' } },
+            take: 1,
+            include: { academicYear: true },
+          },
+        },
+      });
+
+      if (!student) {
+        return { status: 'error', message: 'Student not found', latencyMs: Date.now() - start };
+      }
+
+      const targetClassId = classId || student.classId;
+      if (!targetClassId) {
+        return { status: 'error', message: 'Student has no classId and no classId provided', latencyMs: Date.now() - start };
+      }
+
+      const classEntity = await this.prisma.class.findUnique({ where: { id: targetClassId } });
+      if (!classEntity) {
+        return { status: 'error', message: 'Class not found', latencyMs: Date.now() - start };
+      }
+
+      const enrollment = student.enrollments?.[0];
+      const academicYear = enrollment?.academicYear;
+      if (!academicYear) {
+        return { status: 'error', message: 'No active enrollment with academic year found', latencyMs: Date.now() - start };
+      }
+
+      const year = academicYear.startDate.getFullYear();
+
+      // Get next sequence number for this class
+      const sequence = await this.prisma.admissionSequence.upsert({
+        where: {
+          schoolId_academicYearId_classId: {
+            schoolId: student.schoolId,
+            academicYearId: academicYear.id,
+            classId: targetClassId,
+          },
+        },
+        update: { currentSequence: { increment: 1 } },
+        create: {
+          schoolId: student.schoolId,
+          academicYearId: academicYear.id,
+          classId: targetClassId,
+          year,
+          currentSequence: 1,
+        },
+      });
+
+      const newAdmissionNumber = `ST-${sequence.year}-${String(sequence.currentSequence).padStart(3, '0')}`;
+      const oldAdmissionNumber = student.admissionNumber;
+
+      await this.prisma.student.update({
+        where: { id: studentId },
+        data: { admissionNumber: newAdmissionNumber },
+      });
+
+      return {
+        status: 'ok',
+        latencyMs: Date.now() - start,
+        studentId,
+        oldAdmissionNumber,
+        newAdmissionNumber,
+        classId: targetClassId,
+        className: classEntity.name,
+        academicYearId: academicYear.id,
+      };
+    } catch (e: any) {
+      return { status: 'error', message: e.message, latencyMs: Date.now() - start };
+    }
   }
 
   @Get('resequence-admission-numbers')
