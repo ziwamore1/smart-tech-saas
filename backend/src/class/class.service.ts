@@ -51,15 +51,9 @@ export class ClassService {
 
   async findAll(user: { id: string; schoolId: string; roles?: string[] }) {
     try {
-      if (!user.schoolId) {
-        this.logger.warn(`findAll: no schoolId for user ${user.id}`);
-        return [];
-      }
-
-      this.logger.log(`findAll: user=${user.id}, schoolId=${user.schoolId}, roles=${JSON.stringify(user.roles)}`);
+      if (!user.schoolId) return [];
 
       const classIds = await this.getTeacherClassIds(user);
-      this.logger.log(`findAll: getTeacherClassIds returned ${classIds === null ? 'null' : Array.isArray(classIds) ? classIds.length + ' ids' : classIds}`);
 
       const where: any = { schoolId: user.schoolId };
       if (classIds) {
@@ -76,7 +70,7 @@ export class ClassService {
           levelTypeId: true,
           gradingSystemId: true,
           order: true,
-          levelType: { select: { id: true, name: true, code: true } },
+          levelType: { select: { id: true, name: true } },
           gradingSystem: { select: { id: true, name: true } },
           classTeacher: { select: { id: true, firstName: true, lastName: true, email: true } },
         },
@@ -86,16 +80,11 @@ export class ClassService {
         ]
       });
 
-      this.logger.log(`findAll: class.findMany returned ${classes.length} classes`);
-
-      // Batch-fetch active enrollment counts and gender counts for all classes
       const classIdsList = classes.map(c => c.id);
       const enrollments = classIdsList.length > 0 ? await this.prisma.enrollment.findMany({
         where: { classId: { in: classIdsList }, status: 'ACTIVE' },
         select: { classId: true, student: { select: { gender: true } } },
       }) : [];
-
-      this.logger.log(`findAll: enrollment.findMany returned ${enrollments.length} enrollments`);
 
       const enrollmentCountMap = new Map<string, number>();
       const genderMap = new Map<string, { male: number; female: number }>();
@@ -127,7 +116,7 @@ export class ClassService {
         };
       });
     } catch (error) {
-      this.logger.error(`findAll error: ${error.message}`, error.stack);
+      this.logger.error(`findAll error: ${(error as Error).message}`, (error as Error).stack);
       throw error;
     }
   }
