@@ -401,21 +401,9 @@ export class CommunicationsCloudService {
     } else {
       const job = await this.queueService.enqueueMessage(message, data.priority);
       if (!job) {
-        const syncResult = await this.processMessage(message);
-        await this.auditLog.record('MESSAGE_SENT', {
-          channel, messageId: message.id, recipient: data.recipient, schoolId: data.schoolId,
-        });
-        if (!syncResult.success) {
-          throw new Error(syncResult.error || 'Failed to send message');
-        }
-        return {
-          id: message.id,
-          channel,
-          status: syncResult.status || 'SENT',
-          recipient: data.recipient,
-          subject: data.subject,
-          createdAt: message.createdAt.toISOString(),
-        };
+        this.processMessage(message).catch(err =>
+          this.logger.error(`Background processing failed for ${message.id}: ${err.message}`)
+        );
       }
     }
 
