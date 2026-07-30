@@ -64,25 +64,25 @@ export class EnrollmentService {
       },
     });
 
+    const updateData: any = { classId: data.classId };
     if (student.status !== StudentStatus.ACTIVE) {
-      await this.prisma.student.update({
-        where: { id: data.studentId },
-        data: { status: StudentStatus.ACTIVE },
-      });
+      updateData.status = StudentStatus.ACTIVE;
     }
 
     try {
       const newAdmissionNumber = await this.admissionNumberService.getNextAdmissionNumber(
         data.schoolId, data.academicYearId, data.classId,
       );
-      await this.prisma.student.update({
-        where: { id: data.studentId },
-        data: { admissionNumber: newAdmissionNumber },
-      });
+      updateData.admissionNumber = newAdmissionNumber;
       this.logger.log(`Re-sequenced student ${data.studentId} admission number to ${newAdmissionNumber} for class ${data.classId}`);
     } catch (error) {
       this.logger.error(`Failed to re-sequence admission number for student ${data.studentId}: ${(error as Error).message}`);
     }
+
+    await this.prisma.student.update({
+      where: { id: data.studentId },
+      data: updateData,
+    });
 
     return enrollment;
   }

@@ -708,12 +708,13 @@ export class StudentService {
       },
     });
 
-    if (student.status !== StudentStatus.ACTIVE) {
-      await this.prisma.student.update({
-        where: { id: studentId },
-        data: { status: StudentStatus.ACTIVE },
-      });
-    }
+    await this.prisma.student.update({
+      where: { id: studentId },
+      data: {
+        classId,
+        ...(student.status !== StudentStatus.ACTIVE ? { status: StudentStatus.ACTIVE } : {}),
+      },
+    });
 
     return enrollment;
   }
