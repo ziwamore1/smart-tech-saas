@@ -2384,6 +2384,7 @@ export const classTeacherAssignmentApi = {
   findByTeacher: (teacherId: string) => api.get(`/class-teacher-assignments/teacher/${teacherId}`),
   findBySchool: (academicYearId?: string) =>
     api.get('/class-teacher-assignments/school', { params: { academicYearId } }),
+  getMyClasses: () => api.get('/class-teacher-assignments/my-classes'),
 };
 
 export const holidayApi = {

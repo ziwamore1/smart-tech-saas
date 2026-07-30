@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { teacherApi, studentApi, termApi, enrollmentApi, academicYearApi } from '@/lib/api';
+import { classTeacherAssignmentApi, studentApi, termApi, enrollmentApi, academicYearApi } from '@/lib/api';
 import { socket } from '@/lib/socket';
 
 export default function EnrollmentsPage() {
@@ -51,19 +51,12 @@ export default function EnrollmentsPage() {
     return () => { socket.off(eventName, handler); };
   }, [user?.schoolId, queryClient]);
 
-  const { data: teacherData } = useQuery({
-    queryKey: ['my-teacher-profile'],
-    queryFn: () => teacherApi.getById('me').then(res => res.data),
-    retry: false,
-  });
-
   const { data: classesResponse } = useQuery({
-    queryKey: ['teacher-classes'],
+    queryKey: ['my-class-teacher-classes'],
     queryFn: async () => {
-      const res = await teacherApi.getClasses();
+      const res = await classTeacherAssignmentApi.getMyClasses();
       let data = res.data;
       if (data?.data) data = data.data;
-      if (data?.classes) data = data.classes;
       return Array.isArray(data) ? data : [];
     },
   });
@@ -83,21 +76,18 @@ export default function EnrollmentsPage() {
     queryFn: () => studentApi.getAll({ limit: 500 }).then(res => res.data),
   });
 
-  const teacher = teacherData?.data || teacherData;
-  const assignedClass = teacher?.classTeacherOf;
   const classes = Array.isArray(classesResponse) ? classesResponse : [];
   const currentTerm = terms?.find((t: any) => t.isCurrent);
   const currentAcademicYear = academicYears?.find((y: any) => y.isCurrent);
-  const classId = selectedClassId || assignedClass?.id || '';
+  const classId = selectedClassId || user?.classTeacherOf || (classes.length > 0 ? classes[0].id : '');
   const selectedClassObj = classes.find((c: any) => c.id === classId);
 
   useEffect(() => {
-    if (!selectedClassId && assignedClass?.id) {
-      setSelectedClassId(assignedClass.id);
-    } else if (!selectedClassId && classes.length > 0 && !assignedClass?.id) {
-      setSelectedClassId(classes[0].id);
+    if (!selectedClassId) {
+      const defaultId = user?.classTeacherOf || (classes.length > 0 ? classes[0].id : '');
+      if (defaultId) setSelectedClassId(defaultId);
     }
-  }, [assignedClass, classes, selectedClassId]);
+  }, [classes, selectedClassId, user?.classTeacherOf]);
 
   const enrollExistingStudentMutation = useMutation({
     mutationFn: (studentId: string) => enrollmentApi.create({
@@ -239,7 +229,7 @@ export default function EnrollmentsPage() {
             <option value="">Select Class</option>
             {classes.map((cls: any) => (
               <option key={cls.id} value={cls.id}>
-                {cls.name}{cls.id === assignedClass?.id ? ' (Your Class)' : ''}
+                {cls.name}
               </option>
             ))}
           </select>
@@ -488,7 +478,7 @@ export default function EnrollmentsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Class</label>
                     <input
                       type="text"
-                      value={selectedClassObj?.name || 'Select a class above'}
+                      value={selectedClassObj?.name || 'Your assigned class'}
                       disabled
                       className="w-full px-3 py-2 border rounded-lg bg-gray-50"
                     />

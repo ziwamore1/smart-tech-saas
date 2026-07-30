@@ -182,6 +182,27 @@ export class ClassTeacherAssignmentService {
     });
   }
 
+  async getMyClasses(userId: string, schoolId: string) {
+    const assignments = await this.prisma.classTeacherAssignment.findMany({
+      where: { teacherId: userId, schoolId, isActive: true },
+      include: {
+        class: {
+          select: { id: true, name: true, capacity: true },
+        },
+      },
+      orderBy: { startDate: 'desc' },
+    });
+
+    return assignments.map(a => ({
+      id: a.class.id,
+      classId: a.class.id,
+      _id: a.class.id,
+      name: a.class.name,
+      className: a.class.name,
+      capacity: a.class.capacity,
+    }));
+  }
+
   async findBySchool(schoolId: string, academicYearId?: string) {
     const where: any = { schoolId, isActive: true };
     if (academicYearId) where.academicYearId = academicYearId;

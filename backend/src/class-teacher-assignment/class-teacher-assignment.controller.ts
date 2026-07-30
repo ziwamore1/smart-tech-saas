@@ -35,6 +35,12 @@ export class ClassTeacherAssignmentController {
     return this.assignmentService.findByClass(classId, academicYearId);
   }
 
+  @Get('my-classes')
+  @Roles('Teacher', 'Class Teacher')
+  async getMyClasses(@Req() req: any) {
+    return this.assignmentService.getMyClasses(req.user.id, req.user.schoolId);
+  }
+
   @Get('teacher/:teacherId')
   async findByTeacher(@Param('teacherId') teacherId: string, @Req() req: any) {
     return this.assignmentService.findByTeacher(teacherId, req.user.schoolId);
