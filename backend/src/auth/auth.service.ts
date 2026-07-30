@@ -421,17 +421,25 @@ export class AuthService {
       });
     } else {
       const trimmed = identifier.trim();
-      const cleanedPhone = trimmed.replace(/[^0-9+]/g, '');
       user = await this.prisma.user.findFirst({
-        where: {
-          OR: [
-            { username: { equals: trimmed, mode: 'insensitive' } },
-            { phone: { equals: cleanedPhone, mode: 'insensitive' } },
-            { student: { admissionNumber: trimmed } },
-          ],
-        },
+        where: { username: trimmed.toLowerCase() },
         include: userInclude,
       });
+
+      if (!user) {
+        const cleanedPhone = trimmed.replace(/[^0-9+]/g, '');
+        user = await this.prisma.user.findFirst({
+          where: { phone: cleanedPhone },
+          include: userInclude,
+        });
+      }
+
+      if (!user) {
+        user = await this.prisma.user.findFirst({
+          where: { student: { admissionNumber: trimmed } },
+          include: userInclude,
+        });
+      }
     }
 
     this.logger.log(`User found: ${user?.email || user?.phone}, schoolId: ${user?.schoolId}`);
@@ -653,15 +661,8 @@ export class AuthService {
     let user = null;
 
     if (username) {
-      const cleanedPhone = username.replace(/[^0-9+]/g, '');
       user = await this.prisma.user.findFirst({
-        where: {
-          OR: [
-            { username },
-            { phone: { equals: cleanedPhone, mode: 'insensitive' } },
-            { student: { admissionNumber: username } },
-          ],
-        },
+        where: { username: username.toLowerCase() },
         include: {
           userRoles: { include: { role: true } },
           schoolUsers: { select: { schoolId: true, isPrimary: true } },
@@ -673,6 +674,39 @@ export class AuthService {
           },
         },
       });
+
+      if (!user) {
+        const cleanedPhone = username.replace(/[^0-9+]/g, '');
+        user = await this.prisma.user.findFirst({
+          where: { phone: cleanedPhone },
+          include: {
+            userRoles: { include: { role: true } },
+            schoolUsers: { select: { schoolId: true, isPrimary: true } },
+            school: {
+              select: {
+                id: true, name: true, logo: true, primaryColor: true,
+                institutionType: { select: { code: true, name: true } },
+              },
+            },
+          },
+        });
+      }
+
+      if (!user) {
+        user = await this.prisma.user.findFirst({
+          where: { student: { admissionNumber: username } },
+          include: {
+            userRoles: { include: { role: true } },
+            schoolUsers: { select: { schoolId: true, isPrimary: true } },
+            school: {
+              select: {
+                id: true, name: true, logo: true, primaryColor: true,
+                institutionType: { select: { code: true, name: true } },
+              },
+            },
+          },
+        });
+      }
     }
 
     if (!user && email) {
