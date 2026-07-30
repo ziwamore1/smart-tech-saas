@@ -40,13 +40,19 @@ export default function MyClassPage() {
   }, [user?.schoolId, queryClient]);
 
   const { data: classesResponse } = useQuery({
-    queryKey: ['my-class-teacher-classes', user?.classTeacherOf],
+    queryKey: ['my-class-teacher-classes', user?.id],
     queryFn: async () => {
       try {
-        const res = await classTeacherAssignmentApi.getMyClasses();
-        let data = res.data;
-        if (data?.data) data = data.data;
-        if (Array.isArray(data) && data.length > 0) return data;
+        const res = await classTeacherAssignmentApi.findByTeacher(user!.id);
+        let items = res.data?.data || res.data;
+        if (!Array.isArray(items)) items = [];
+        const mapped = items
+          .filter((cta: any) => cta.class)
+          .map((cta: any) => ({
+            id: cta.class.id, classId: cta.class.id, _id: cta.class.id,
+            name: cta.class.name, className: cta.class.name,
+          }));
+        if (mapped.length > 0) return mapped;
       } catch {}
       if (user?.classTeacherOf) {
         const res = await classApi.getById(user.classTeacherOf);
@@ -54,13 +60,13 @@ export default function MyClassPage() {
         if (cls?.id) {
           return [{
             id: cls.id, classId: cls.id, _id: cls.id,
-            name: cls.name, className: cls.name, capacity: cls.capacity,
+            name: cls.name, className: cls.name,
           }];
         }
       }
       return [];
     },
-    enabled: isClassTeacher,
+    enabled: !!user?.id,
   });
 
   const classes = Array.isArray(classesResponse) ? classesResponse : [];
