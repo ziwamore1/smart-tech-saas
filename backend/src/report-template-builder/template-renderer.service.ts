@@ -933,17 +933,17 @@ export class TemplateRendererService {
   <style>
     @page { size: ${pageSize} ${orientation}; margin: ${template.marginTop || 15}mm ${template.marginRight || 15}mm ${template.marginBottom || 15}mm ${template.marginLeft || 15}mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: ${template.fontFamily || 'Arial'}, sans-serif; font-size: ${template.fontSize || 11}px; color: #333; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { font-family: ${template.fontFamily || 'Arial'}, sans-serif; font-size: ${template.fontSize || 12}px; color: #111827; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     img { max-width: 100%; }
     table { page-break-inside: avoid; }
     @media print { body { margin: 0; padding: 0; } }
   </style>
 </head>
 <body>
-  ${template.headerText ? `<div style="text-align:center;margin-bottom:10px;font-size:10px;color:#666;border-bottom:1px solid #ddd;padding-bottom:5px;">${template.headerText}</div>` : ''}
+  ${template.headerText ? `<div style="text-align:center;margin-bottom:10px;font-size:12px;color:#374151;border-bottom:1px solid #9ca3af;padding-bottom:5px;">${template.headerText}</div>` : ''}
   ${mainContent}
   ${stampOverlay ? `<div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">${stampOverlay}</div>` : ''}
-  ${template.footerText ? `<div style="text-align:center;margin-top:10px;font-size:9px;color:#999;border-top:1px solid #ddd;padding-top:5px;">${template.footerText}</div>` : ''}
+  ${template.footerText ? `<div style="text-align:center;margin-top:10px;font-size:11px;color:#4b5563;border-top:1px solid #9ca3af;padding-top:5px;">${template.footerText}</div>` : ''}
 </body>
 </html>`;
   }

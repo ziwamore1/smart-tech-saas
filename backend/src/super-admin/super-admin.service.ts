@@ -881,7 +881,7 @@ Email: ${director.email}
     }
 
     const validRoles = [
-      'Director', 'Deputy Director', 'Head Teacher', 'Deputy', 'Teacher',
+      'Director', 'Deputy Director', 'Head Teacher', 'Deputy', 'Deputy Head', 'Teacher',
       'Class Teacher', 'HOD', 'Accountant', 'Secretary',
       'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher',
     ];

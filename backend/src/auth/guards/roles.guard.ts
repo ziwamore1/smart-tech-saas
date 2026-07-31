@@ -29,7 +29,15 @@ export class RolesGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest();
     const user = request.user;
-    
+
+    // 'Deputy Head' and 'Deputy' are two labels for the same position depending
+    // on how the account was provisioned (primary school-members page vs
+    // super-admin/staff-position flows). Normalize them so both variants work
+    // interchangeably across every @Roles(...) guard in the system.
+    const normalize = (role: string) => {
+      const u = role.toUpperCase();
+      return u === 'DEPUTY HEAD' ? 'DEPUTY' : u;
+    };
     this.logger.log(`RolesGuard: user=${user.id}, schoolId=${user.schoolId}, roles=${JSON.stringify(user.roles)}`);
     this.logger.log(`RolesGuard: requiredRoles=${JSON.stringify(requiredRoles)}`);
 
@@ -44,7 +52,7 @@ export class RolesGuard implements CanActivate {
     // 0. JWT merged roles (contains all roles merged at login time)
     if (user.roles && Array.isArray(user.roles)) {
       for (const r of user.roles) {
-        allRoleNames.add(r.toUpperCase());
+        allRoleNames.add(normalize(r));
       }
     }
 
@@ -54,20 +62,20 @@ export class RolesGuard implements CanActivate {
       include: { role: true },
     });
     for (const ur of userRoles) {
-      allRoleNames.add(ur.role.name.toUpperCase());
+      allRoleNames.add(normalize(ur.role.name));
     }
 
     // 2. Platform roles
     if (user.platformRoles && Array.isArray(user.platformRoles)) {
       for (const pr of user.platformRoles) {
-        allRoleNames.add(pr.toUpperCase());
+        allRoleNames.add(normalize(pr));
       }
     }
 
     // 3. School roles (from JWT)
     if (user.schoolRoles && Array.isArray(user.schoolRoles)) {
       for (const sr of user.schoolRoles) {
-        allRoleNames.add(sr.toUpperCase());
+        allRoleNames.add(normalize(sr));
       }
     }
 
@@ -82,7 +90,7 @@ export class RolesGuard implements CanActivate {
           select: { role: true },
         });
         for (const sra of schoolRoleAssignments) {
-          allRoleNames.add(sra.role.toUpperCase());
+          allRoleNames.add(normalize(sra.role));
         }
       }
     }
@@ -90,7 +98,7 @@ export class RolesGuard implements CanActivate {
     const roleNames = Array.from(allRoleNames);
     this.logger.log(`RolesGuard: allRoles from DB+JWT=${JSON.stringify(roleNames)}`);
 
-    const hasRole = requiredRoles.some((role) => roleNames.includes(role.toUpperCase()));
+    const hasRole = requiredRoles.some((role) => roleNames.includes(normalize(role)));
     
     if (!hasRole) {
       this.logger.warn(`RolesGuard: Access denied for user ${user.id}. Has roles: ${roleNames.join(', ')}, Required: ${requiredRoles.join(', ')}`);

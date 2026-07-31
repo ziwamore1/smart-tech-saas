@@ -66,6 +66,85 @@ export class AdmissionNumberService {
     return !existing;
   }
 
+  /**
+   * Re-sequences the admission numbers for every ACTIVE student enrolled in a
+   * class for a given academic year. Remaining students are renumbered from
+   * ST-YYYY-001 upward (filling any gaps left by removed students) and the
+   * class AdmissionSequence counter is reset so the next admitted student
+   * continues seamlessly. This removes the need to manually backfill or
+   * re-sequence a class after a student is removed.
+   *
+   * Student login credentials are untouched: only the Student.admissionNumber
+   * column is updated, never the linked User record.
+   */
+  async resequenceClass(schoolId: string, academicYearId: string, classId: string): Promise<void> {
+    const academicYear = await this.prisma.academicYear.findUnique({
+      where: { id: academicYearId },
+    });
+
+    if (!academicYear) {
+      throw new Error(`Academic year ${academicYearId} not found`);
+    }
+
+    const year = academicYear.startDate.getFullYear();
+    const prefix = `ST-${year}-`;
+
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: {
+        classId,
+        academicYearId,
+        schoolId,
+        status: 'ACTIVE',
+      },
+      orderBy: { student: { admissionNumber: 'asc' } },
+      select: { student: { select: { id: true, admissionNumber: true } } },
+    });
+
+    const operations = [];
+
+    // Phase 1: move every remaining student to a unique temporary number so the
+    // final renumbering below cannot collide with the (admissionNumber, classId)
+    // unique constraint while gaps are being filled.
+    for (const enrollment of enrollments) {
+      operations.push(
+        this.prisma.student.update({
+          where: { id: enrollment.student.id },
+          data: { admissionNumber: `TMP-${enrollment.student.id.slice(0, 12)}` },
+        }),
+      );
+    }
+
+    // Phase 2: assign the sequential numbers, preserving the existing register order.
+    for (let i = 0; i < enrollments.length; i++) {
+      operations.push(
+        this.prisma.student.update({
+          where: { id: enrollments[i].student.id },
+          data: { admissionNumber: `${prefix}${String(i + 1).padStart(3, '0')}` },
+        }),
+      );
+    }
+
+    if (operations.length > 0) {
+      await this.prisma.$transaction(operations);
+    }
+
+    await this.prisma.admissionSequence.upsert({
+      where: { schoolId_academicYearId_classId: { schoolId, academicYearId, classId } },
+      update: { currentSequence: enrollments.length, year },
+      create: {
+        schoolId,
+        academicYearId,
+        classId,
+        year,
+        currentSequence: enrollments.length,
+      },
+    });
+
+    this.logger.log(
+      `Re-sequenced class ${classId} (${academicYearId}): ${enrollments.length} student(s) → ${prefix}001..${String(enrollments.length).padStart(3, '0')}`,
+    );
+  }
+
   async setManualAdmissionNumber(
     schoolId: string,
     academicYearId: string,

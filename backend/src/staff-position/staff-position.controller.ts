@@ -10,7 +10,7 @@ import { UpdateDepartmentDto } from './dto/update-department.dto';
 import { CreateActingPositionDto } from './dto/create-acting-position.dto';
 import { UpdateActingPositionDto } from './dto/update-acting-position.dto';
 
-const ADMIN_ROLES = ['Director', 'Deputy Director', 'SuperAdmin', 'Head Teacher', 'Deputy'];
+const ADMIN_ROLES = ['Director', 'Deputy Director', 'SuperAdmin', 'Head Teacher', 'Deputy', 'Deputy Head'];
 
 @Controller('staff-positions')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -44,7 +44,7 @@ export class StaffPositionController {
   }
 
   @Delete('departments/:id')
-  @Roles('Director', 'SuperAdmin')
+  @Roles('Director', 'SuperAdmin', 'Deputy Head', 'Deputy')
   async deleteDepartment(@Param('id') id: string) {
     return this.service.deleteDepartment(id);
   }
@@ -77,7 +77,7 @@ export class StaffPositionController {
   }
 
   @Delete('positions/:id')
-  @Roles('Director', 'SuperAdmin')
+  @Roles('Director', 'SuperAdmin', 'Deputy Head', 'Deputy')
   async deleteActingPosition(@Param('id') id: string) {
     return this.service.deleteActingPosition(id);
   }

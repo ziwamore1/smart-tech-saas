@@ -6,41 +6,41 @@
 <style>
   @page { margin: 15mm 12mm; size: A4; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; font-size: 11px; color: #1f2937; line-height: 1.5; }
+  body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; font-size: 13px; color: #111827; line-height: 1.5; }
 
   .page-break { page-break-after: always; }
 
   .student-header { background: linear-gradient(135deg, {{primaryColor}}, {{primaryColor}}dd); color: white; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; }
-  .student-header h1 { font-size: 22px; margin-bottom: 4px; }
-  .student-header .meta { font-size: 12px; opacity: 0.85; }
+  .student-header h1 { font-size: 24px; margin-bottom: 4px; }
+  .student-header .meta { font-size: 13px; opacity: 0.95; }
   .student-header table { margin-top: 10px; }
-  .student-header td { padding: 2px 16px 2px 0; font-size: 11px; opacity: 0.9; }
+  .student-header td { padding: 2px 16px 2px 0; font-size: 12px; opacity: 0.95; }
   .student-header td b { opacity: 1; }
 
   .metric-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-  .metric-card { flex: 1; min-width: 100px; background: {{secondaryColor}}; border-radius: 8px; padding: 12px 14px; text-align: center; border: 1px solid #e5e7eb; }
-  .metric-card .value { font-size: 20px; font-weight: 700; color: {{primaryColor}}; }
-  .metric-card .label { font-size: 9px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+  .metric-card { flex: 1; min-width: 100px; background: {{secondaryColor}}; border-radius: 8px; padding: 12px 14px; text-align: center; border: 1.5px solid #9ca3af; }
+  .metric-card .value { font-size: 22px; font-weight: 800; color: {{primaryColor}}; }
+  .metric-card .label { font-size: 10px; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; font-weight: 600; }
   .metric-card.highlight { background: {{primaryColor}}; color: white; }
   .metric-card.highlight .value { color: white; }
-  .metric-card.highlight .label { color: rgba(255,255,255,0.8); }
+  .metric-card.highlight .label { color: #ffffff; }
 
-  .section-title { font-size: 13px; font-weight: 700; color: {{primaryColor}}; margin: 18px 0 10px; padding-bottom: 6px; border-bottom: 2px solid {{primaryColor}}; }
+  .section-title { font-size: 14px; font-weight: 800; color: {{primaryColor}}; margin: 18px 0 10px; padding-bottom: 6px; border-bottom: 2px solid {{primaryColor}}; }
 
   table.data-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-  table.data-table th { background: {{primaryColor}}; color: white; padding: 7px 10px; font-size: 10px; font-weight: 600; text-align: center; text-transform: uppercase; letter-spacing: 0.3px; }
-  table.data-table td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #e5e7eb; font-size: 10px; }
-  table.data-table tr:nth-child(even) { background: #f9fafb; }
+  table.data-table th { background: #1f2937; color: #ffffff; padding: 7px 10px; font-size: 12px; font-weight: 700; text-align: center; text-transform: uppercase; letter-spacing: 0.3px; border: 1px solid #111827; }
+  table.data-table td { padding: 6px 10px; text-align: center; border: 1px solid #9ca3af; border-bottom-width: 1.5px; font-size: 12px; }
+  table.data-table tr:nth-child(even) { background: #f3f4f6; }
 
   .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
-  .tag { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+  .tag { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 700; }
   .tag.strength { background: #d1fae5; color: #065f46; }
   .tag.weakness { background: #fee2e2; color: #991b1b; }
   .tag.recommendation { background: #dbeafe; color: #1e40af; }
 
-  .trend-improving { color: #059669; font-weight: 700; }
-  .trend-declining { color: #dc2626; font-weight: 700; }
-  .trend-stable { color: #d97706; font-weight: 700; }
+  .trend-improving { color: #065f46; font-weight: 700; }
+  .trend-declining { color: #b91c1c; font-weight: 700; }
+  .trend-stable { color: #92400e; font-weight: 700; }
 
   .chart-container { text-align: center; margin: 16px 0; }
 
@@ -155,7 +155,7 @@
 <div class="section-title">Behavioral Notes</div>
 <ul style="padding-left: 20px; margin-bottom: 16px;">
   {{#each behavioralNotes}}
-  <li style="font-size: 10px; color: #374151; margin-bottom: 4px;">{{this}}</li>
+  <li style="font-size: 12px; color: #1f2937; margin-bottom: 4px;">{{this}}</li>
   {{/each}}
 </ul>
 {{/if}}

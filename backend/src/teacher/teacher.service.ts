@@ -325,7 +325,7 @@ export class TeacherService {
         class: {
           include: {
             enrollments: {
-              where: { status: 'ACTIVE' },
+              where: { status: 'ACTIVE', student: { status: 'ACTIVE' } },
               include: {
                 student: true,
               },
@@ -365,7 +365,7 @@ export class TeacherService {
             gradingSystem: { select: { id: true, name: true } },
             classTeacher: { select: { id: true, firstName: true, lastName: true, email: true } },
             enrollments: {
-              where: { status: 'ACTIVE' },
+              where: { status: 'ACTIVE', student: { status: 'ACTIVE' } },
               include: {
                 student: {
                   select: {
@@ -389,7 +389,7 @@ export class TeacherService {
             gradingSystem: { select: { id: true, name: true } },
             classTeacher: { select: { id: true, firstName: true, lastName: true, email: true } },
             enrollments: {
-              where: { status: 'ACTIVE' },
+              where: { status: 'ACTIVE', student: { status: 'ACTIVE' } },
               include: {
                 student: {
                   select: {
@@ -482,6 +482,7 @@ export class TeacherService {
       where: {
         classId,
         status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
       include: {
         student: true,
@@ -613,6 +614,7 @@ export class TeacherService {
         classId,
         studentId: { in: studentIds },
         status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
     });
 
@@ -711,6 +713,7 @@ export class TeacherService {
       where: {
         classId,
         status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
       include: {
         student: true,

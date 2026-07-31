@@ -1046,7 +1046,7 @@ export class AttendanceService {
     if (!classData) throw new NotFoundException('Class not found');
 
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { classId, schoolId },
+      where: { classId, schoolId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       include: {
         student: true,
       },

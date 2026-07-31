@@ -57,6 +57,7 @@ export class ReportCardEngineService {
         termId,
         classId: enrollment.classId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        student: { status: 'ACTIVE' },
       },
       include: {
         subject: true,
@@ -94,6 +95,7 @@ export class ReportCardEngineService {
         studentId,
         termId,
         schoolId,
+        student: { status: 'ACTIVE' },
       },
       include: { subject: true },
     });
@@ -170,6 +172,49 @@ export class ReportCardEngineService {
       });
     }
 
+    // Fallback: include subjects present only in the Result table (e.g. Excel-imported results)
+    const coveredSubjectIds = new Set(subjectBreakdown.map((s) => s.subjectId));
+    for (const legacy of legacyResults) {
+      if (legacy.score == null || coveredSubjectIds.has(legacy.subjectId)) continue;
+
+      let legacyGrade = legacy.grade ?? null;
+      let legacyRemark = legacy.remark ?? null;
+      let legacyPoints: number | null = null;
+      let legacyGpa: number | null = null;
+
+      try {
+        const gradeResult = await this.gradingEngine.computeGradeFull(
+          legacy.score, enrollment.classId, legacy.subjectId, termId, schoolId,
+        );
+        legacyPoints = gradeResult.points ?? null;
+        legacyGpa = gradeResult.gpa ?? null;
+        if (!legacyGrade && gradeResult.grade) legacyGrade = gradeResult.grade;
+        if (!legacyRemark && gradeResult.remark) legacyRemark = gradeResult.remark;
+      } catch {
+        if (legacy.score >= 75) { legacyPoints = 1; legacyGrade = legacyGrade ?? 'A'; }
+        else if (legacy.score >= 65) { legacyPoints = 2; legacyGrade = legacyGrade ?? 'B'; }
+        else if (legacy.score >= 50) { legacyPoints = 3; legacyGrade = legacyGrade ?? 'C'; }
+        else if (legacy.score >= 40) { legacyPoints = 4; legacyGrade = legacyGrade ?? 'D'; }
+        else { legacyPoints = 5; legacyGrade = legacyGrade ?? 'E'; }
+      }
+
+      subjectBreakdown.push({
+        subjectId: legacy.subjectId,
+        subjectName: legacy.subject.name,
+        subjectCode: legacy.subject.code,
+        totalRawScore: legacy.score,
+        totalWeightedScore: legacy.score,
+        finalPercentage: legacy.score,
+        finalGrade: legacyGrade,
+        finalRemark: legacyRemark,
+        points: legacyPoints,
+        gpa: legacyGpa,
+        classRank: null,
+        subjectRank: null,
+        assessments: [],
+      });
+    }
+
     // Apply composite subject transformations
     const processedBreakdown = await this.applyCompositeTransform(
       subjectBreakdown, studentId, termId, enrollment.classId, schoolId,
@@ -177,12 +222,12 @@ export class ReportCardEngineService {
 
     // --- Compute class rank on-the-fly from all students' average percentages ---
     const allStudentResults = await this.prisma.computedResult.findMany({
-      where: { termId, classId: enrollment.classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
+      where: { termId, classId: enrollment.classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, student: { status: 'ACTIVE' } },
       select: { studentId: true, finalPercentage: true },
     });
     // Also get Result table fallback for students with NULL finalPercentage
     const allLegacyResults = await this.prisma.result.findMany({
-      where: { termId, schoolId },
+      where: { termId, schoolId, student: { status: 'ACTIVE' } },
       select: { studentId: true, score: true },
     });
     const allLegacyMap = new Map<string, number[]>();
@@ -489,7 +534,7 @@ export class ReportCardEngineService {
     schoolId: string,
   ) {
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { classId, status: 'ACTIVE' },
+      where: { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       select: { studentId: true },
     });
 
@@ -548,7 +593,7 @@ export class ReportCardEngineService {
 
   async getReportCardStatus(classId: string, termId: string, schoolId: string) {
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { classId, status: 'ACTIVE' },
+      where: { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       select: { studentId: true },
     });
 
@@ -565,6 +610,7 @@ export class ReportCardEngineService {
         classId,
         termId,
         studentId: { in: enrollments.map(e => e.studentId) },
+        student: { status: 'ACTIVE' },
       },
     });
 
@@ -673,12 +719,12 @@ export class ReportCardEngineService {
 
     // Get subject-level comparison
     const prevResults = await this.prisma.computedResult.findMany({
-      where: { studentId, termId: previousTerm.id, classId: enrollment.classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
+      where: { studentId, termId: previousTerm.id, classId: enrollment.classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, student: { status: 'ACTIVE' } },
       include: { subject: true },
     });
 
     const currResults = await this.prisma.computedResult.findMany({
-      where: { studentId, termId: currentTermId, classId: enrollment.classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
+      where: { studentId, termId: currentTermId, classId: enrollment.classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, student: { status: 'ACTIVE' } },
       include: { subject: true },
     });
 
@@ -718,19 +764,19 @@ export class ReportCardEngineService {
    */
   async getClassComparison(studentId: string, termId: string, classId: string) {
     const studentResults = await this.prisma.computedResult.findMany({
-      where: { studentId, termId, classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
+      where: { studentId, termId, classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, student: { status: 'ACTIVE' } },
       include: { subject: true },
     });
 
     const classResults = await this.prisma.computedResult.findMany({
-      where: { termId, classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
+      where: { termId, classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, student: { status: 'ACTIVE' } },
       include: { subject: true },
     });
 
     // Fallback: load Result table for students with NULL finalPercentage
     const allStudentIds = [...new Set(classResults.map(r => r.studentId))];
     const legacyResults = await this.prisma.result.findMany({
-      where: { termId, studentId: { in: allStudentIds } },
+      where: { termId, studentId: { in: allStudentIds }, student: { status: 'ACTIVE' } },
       select: { studentId: true, subjectId: true, score: true },
     });
     const legacyScoreMap = new Map<string, number>();
@@ -767,7 +813,7 @@ export class ReportCardEngineService {
    */
   async getClassStatistics(termId: string, classId: string, schoolId?: string) {
     const results = await this.prisma.computedResult.findMany({
-      where: { termId, classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
+      where: { termId, classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, student: { status: 'ACTIVE' } },
     });
 
     if (results.length === 0) return null;

@@ -933,8 +933,11 @@ export class MobileService {
     });
 
     const where: any = {
+      status: 'ACTIVE',
       enrollments: {
-        some: currentAcademicYear ? { academicYearId: currentAcademicYear.id } : {},
+        some: currentAcademicYear
+          ? { academicYearId: currentAcademicYear.id, status: 'ACTIVE' }
+          : { status: 'ACTIVE' },
       },
     };
     if (classId) {
@@ -945,7 +948,9 @@ export class MobileService {
       where,
       include: {
         enrollments: {
-          where: currentAcademicYear ? { academicYearId: currentAcademicYear.id } : {},
+          where: currentAcademicYear
+            ? { academicYearId: currentAcademicYear.id, status: 'ACTIVE' }
+            : { status: 'ACTIVE' },
           include: { class: { select: { id: true, name: true } } },
         },
         user: { select: { id: true, email: true, isActive: true } },
@@ -962,6 +967,7 @@ export class MobileService {
       isActive: s.user?.isActive ?? true,
       class: s.enrollments[0]?.class?.name || 'Not assigned',
       classId: s.enrollments[0]?.class?.id || null,
+      enrollmentId: s.enrollments[0]?.id || null,
     }));
   }
 

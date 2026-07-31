@@ -1,9 +1,11 @@
-import { Controller, Post, Body, Get, Param, Req, UseGuards, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Req, UseGuards, HttpException, HttpStatus, Delete } from '@nestjs/common';
 import { EnrollmentService } from './enrollment.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('enrollments')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class EnrollmentController {
   constructor(private enrollmentService: EnrollmentService) {}
 
@@ -24,5 +26,11 @@ export class EnrollmentController {
   @Get('class/:classId')
   async getByClass(@Param('classId') classId: string) {
     return this.enrollmentService.getActiveEnrollmentsByClass(classId);
+  }
+
+  @Delete(':id')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
+  removeFromClass(@Param('id') id: string, @Req() req: any) {
+    return this.enrollmentService.removeEnrollment(id, req.user.schoolId);
   }
 }

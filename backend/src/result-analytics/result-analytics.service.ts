@@ -27,9 +27,11 @@ export class ResultAnalyticsService {
         termId,
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        student: { status: 'ACTIVE' },
       },
       select: {
         studentId: true,
+        subjectId: true,
         finalPercentage: true,
         finalGrade: true,
         isAbsent: true,
@@ -37,10 +39,32 @@ export class ResultAnalyticsService {
       },
     });
 
+    // Resolve NULL finalPercentage scores from the Result table (Excel-imported results)
+    if (computedResults.length > 0) {
+      const studentIds = [...new Set(computedResults.map(r => r.studentId))];
+      const legacyResults = await this.prisma.result.findMany({
+        where: { studentId: { in: studentIds }, termId, schoolId, student: { status: 'ACTIVE' } },
+        select: { studentId: true, subjectId: true, score: true, grade: true },
+      });
+      const legacyMap = new Map<string, { score: number; grade: string | null }>();
+      for (const lr of legacyResults) {
+        legacyMap.set(`${lr.studentId}:${lr.subjectId}`, { score: lr.score, grade: lr.grade });
+      }
+      for (const r of computedResults) {
+        if (r.finalPercentage == null) {
+          const legacy = legacyMap.get(`${r.studentId}:${r.subjectId}`);
+          if (legacy) {
+            r.finalPercentage = legacy.score;
+            if (!r.finalGrade) r.finalGrade = legacy.grade;
+          }
+        }
+      }
+    }
+
     computedResults = await this.filterComputedResultsBySubjects(computedResults, classId);
 
     const totalEnrolled = await this.prisma.enrollment.count({
-      where: { classId, status: 'ACTIVE' },
+      where: { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
     });
 
     const participatedStudentIds = new Set(
@@ -158,6 +182,7 @@ export class ResultAnalyticsService {
         classId: assignment.classId,
         subjectId: assignment.subjectId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        student: { status: 'ACTIVE' },
       };
 
       if (termId) {
@@ -249,6 +274,7 @@ export class ResultAnalyticsService {
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         isAbsent: false,
+        student: { status: 'ACTIVE' },
       },
       select: {
         studentId: true,
@@ -316,7 +342,7 @@ export class ResultAnalyticsService {
   }
 
   async getSchoolPerformanceOverview(schoolId: string, termId?: string) {
-    const whereClause: any = { schoolId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, isAbsent: false };
+    const whereClause: any = { schoolId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, isAbsent: false, student: { status: 'ACTIVE' } };
     if (termId) {
       whereClause.termId = termId;
     }

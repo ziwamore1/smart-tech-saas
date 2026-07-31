@@ -213,7 +213,7 @@ export class ParentService {
   async getChildResults(studentId: string, schoolId?: string, termId?: string) {
     const where: any = {
       studentId,
-      status: 'PUBLISHED',
+      status: { in: ['PUBLISHED', 'LOCKED'] },
     };
     if (schoolId) {
       where.schoolId = schoolId;

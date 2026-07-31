@@ -141,4 +141,51 @@ export class EnrollmentService {
       data: { status },
     });
   }
+
+  /**
+   * Removes a student from a single class. The student record, its other
+   * enrollments and its login credentials are all preserved — only the given
+   * enrollment is deleted. The class admission sequence is then automatically
+   * reset so the remaining students stay contiguously numbered.
+   */
+  async removeEnrollment(enrollmentId: string, schoolId: string) {
+    const enrollment = await this.prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+    });
+
+    if (!enrollment) throw new NotFoundException('Enrollment not found');
+    if (enrollment.schoolId !== schoolId) throw new ForbiddenException('Invalid enrollment');
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.enrollment.delete({ where: { id: enrollmentId } });
+
+      const otherActive = await tx.enrollment.count({
+        where: {
+          studentId: enrollment.studentId,
+          status: EnrollmentStatus.ACTIVE,
+        },
+      });
+
+      if (otherActive === 0) {
+        await tx.student.update({
+          where: { id: enrollment.studentId },
+          data: { classId: null },
+        });
+      }
+    });
+
+    try {
+      await this.admissionNumberService.resequenceClass(
+        enrollment.schoolId,
+        enrollment.academicYearId,
+        enrollment.classId,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to re-sequence class ${enrollment.classId} after removing enrollment ${enrollmentId}: ${(error as Error).message}`,
+      );
+    }
+
+    return { message: 'Student removed from class successfully' };
+  }
 }

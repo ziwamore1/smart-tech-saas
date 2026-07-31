@@ -190,6 +190,7 @@ export class ReportCardService {
         studentId,
         academicYearId: term.academicYearId,
         status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
     });
 
@@ -202,6 +203,7 @@ export class ReportCardService {
         classId: enrollment.classId,
         academicYearId: term.academicYearId,
         status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
       select: {
         studentId: true,
@@ -215,6 +217,7 @@ export class ReportCardService {
         studentId: { in: studentIds },
         termId,
         schoolId,
+        student: { status: 'ACTIVE' },
       },
     });
 
@@ -244,6 +247,7 @@ export class ReportCardService {
         studentId,
         termId,
         schoolId,
+        student: { status: 'ACTIVE' },
       },
       include: {
         subject: true,
@@ -462,6 +466,7 @@ export class ReportCardService {
         classId,
         academicYearId: term.academicYearId,
         status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
       include: {
         student: true,
@@ -582,6 +587,7 @@ export class ReportCardService {
       where: {
         studentId,
         status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
       include: {
         academicYear: {
@@ -607,6 +613,7 @@ export class ReportCardService {
             studentId,
             termId: term.id,
             schoolId,
+            student: { status: 'ACTIVE' },
           },
           include: {
             subject: true,
@@ -883,7 +890,7 @@ export class ReportCardService {
     if (!school) throw new Error('School not found');
 
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { classId, academicYearId: term.academicYearId, status: 'ACTIVE' },
+      where: { classId, academicYearId: term.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       include: { student: true },
     });
 

@@ -14,6 +14,7 @@ export class RankingService {
         termId,
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        student: { status: 'ACTIVE' },
       },
       select: {
         studentId: true,
@@ -47,6 +48,7 @@ export class RankingService {
         subjectId: { in: subjectIds },
         termId,
         schoolId,
+        student: { status: 'ACTIVE' },
       },
       select: {
         studentId: true,
@@ -157,6 +159,7 @@ export class RankingService {
         classId,
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        student: { status: 'ACTIVE' },
       },
       select: {
         studentId: true,
@@ -188,6 +191,7 @@ export class RankingService {
         subjectId,
         termId,
         schoolId,
+        student: { status: 'ACTIVE' },
       },
       select: {
         studentId: true,
@@ -244,6 +248,7 @@ export class RankingService {
       where: {
         studentId,
         termId,
+        student: { status: 'ACTIVE' },
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
       },
       include: {
@@ -259,6 +264,7 @@ export class RankingService {
         studentId,
         subjectId: { in: subjectIds },
         termId,
+        student: { status: 'ACTIVE' },
       },
       select: {
         subjectId: true,
@@ -303,6 +309,7 @@ export class RankingService {
         termId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
+        student: { status: 'ACTIVE' },
       },
       _avg: {
         finalPercentage: true,
@@ -352,6 +359,7 @@ export class RankingService {
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
+        student: { status: 'ACTIVE' },
       },
       select: {
         studentId: true,

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import { HeaderBar, WidgetCard } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
@@ -26,6 +26,9 @@ interface StudentRecord {
   lastName: string;
   admissionNumber?: string;
   className?: string;
+  classId?: string;
+  enrollmentId?: string;
+  status?: string;
   score?: number;
   grade?: string;
   attendance?: number;
@@ -44,6 +47,10 @@ export const ClassTeacherStudentsScreen: React.FC<Props> = ({ onToggleDrawer, on
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [statusStudent, setStatusStudent] = useState<StudentRecord | null>(null);
+  const [changingStatus, setChangingStatus] = useState(false);
+
+  const STATUS_OPTIONS = ['ACTIVE', 'INACTIVE', 'TRANSFERRED', 'GRADUATED', 'WITHDRAWN', 'SUSPENDED'];
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -60,6 +67,9 @@ export const ClassTeacherStudentsScreen: React.FC<Props> = ({ onToggleDrawer, on
                 lastName: s.lastName || s.user?.lastName || '',
                 admissionNumber: s.admissionNumber,
                 className: cls.name || cls.className,
+                classId: cls.id,
+                enrollmentId: s.enrollmentId,
+                status: s.status,
                 score: s.averageScore,
                 grade: s.grade,
                 attendance: s.attendanceRate,
@@ -67,7 +77,23 @@ export const ClassTeacherStudentsScreen: React.FC<Props> = ({ onToggleDrawer, on
             }
           }
         }
-        setStudents(flattened);
+        if (flattened.length > 0) {
+          setStudents(flattened);
+        } else {
+          const res2 = await apiService.getStudents();
+          const data2 = Array.isArray(res2) ? res2 : res2?.data || [];
+          setStudents(data2.map((s: any) => ({
+            id: s.id,
+            firstName: s.firstName || s.user?.firstName || '',
+            lastName: s.lastName || s.user?.lastName || '',
+            admissionNumber: s.admissionNumber,
+            className: s.className || s.class,
+            enrollmentId: s.enrollmentId,
+            score: s.averageScore,
+            grade: s.grade,
+            attendance: s.attendanceRate,
+          })));
+        }
       } catch {
         try {
           const res = await apiService.getStudents();
@@ -77,7 +103,10 @@ export const ClassTeacherStudentsScreen: React.FC<Props> = ({ onToggleDrawer, on
             firstName: s.firstName || s.user?.firstName || '',
             lastName: s.lastName || s.user?.lastName || '',
             admissionNumber: s.admissionNumber,
-            className: s.className,
+            className: s.className || s.class,
+            classId: s.classId,
+            enrollmentId: s.enrollmentId,
+            status: s.status,
             score: s.averageScore,
             grade: s.grade,
             attendance: s.attendanceRate,
@@ -91,6 +120,51 @@ export const ClassTeacherStudentsScreen: React.FC<Props> = ({ onToggleDrawer, on
     };
     fetchStudents();
   }, []);
+
+  const handleRemoveFromClass = (student: StudentRecord) => {
+    if (!student.enrollmentId) {
+      Alert.alert('Not Enrolled', 'No enrollment found for this student.');
+      return;
+    }
+    Alert.alert(
+      'Remove from Class',
+      `Remove ${student.firstName} ${student.lastName} from ${student.className || 'this class'}? The class register will be re-sequenced automatically.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setActionLoading(true);
+              await apiService.removeFromClass(student.enrollmentId!);
+              setStudents(prev => prev.filter(s => s.id !== student.id));
+              Alert.alert('Removed', 'Student removed from class. Register re-sequenced automatically.');
+            } catch (err: any) {
+              Alert.alert('Error', err?.response?.data?.message || 'Failed to remove student from class.');
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const applyStatusChange = async (option: string) => {
+    if (!statusStudent) return;
+    setChangingStatus(true);
+    try {
+      await apiService.changeStudentStatus(statusStudent.id, option);
+      setStudents(prev => prev.map(s => s.id === statusStudent.id ? { ...s, status: option } : s));
+      Alert.alert('Status Updated', `${statusStudent.firstName} ${statusStudent.lastName} marked as ${option}.`);
+      setStatusStudent(null);
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to update student status.');
+    } finally {
+      setChangingStatus(false);
+    }
+  };
 
   const getStatus = (student: StudentRecord) => {
     if (student.score >= 80) return 'top';
@@ -160,9 +234,9 @@ export const ClassTeacherStudentsScreen: React.FC<Props> = ({ onToggleDrawer, on
     try {
       setActionLoading(true);
       const termId = dashboard?.currentTerm?.id;
-      const classId = students[0]?.id; // best effort
+      const classId = students[0]?.classId;
       if (termId && classId) {
-        const blob = await apiService.getReportCard(classId, termId) as Blob;
+        const blob = await apiService.getClassReportCardsPdf(classId, termId) as Blob;
         const reader = new FileReader();
         reader.onload = async () => {
           const fileUri = FileSystem.documentDirectory + 'Class_Report.pdf';
@@ -256,6 +330,20 @@ export const ClassTeacherStudentsScreen: React.FC<Props> = ({ onToggleDrawer, on
                       </Text>
                     )}
                   </View>
+                  <TouchableOpacity
+                    style={styles.statusBtn}
+                    onPress={() => setStatusStudent({ ...student, status: student.status || 'ACTIVE' })}
+                    disabled={actionLoading}
+                  >
+                    <Text style={styles.statusBtnText}>🔁</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.removeBtn}
+                    onPress={() => handleRemoveFromClass(student)}
+                    disabled={actionLoading}
+                  >
+                    <Text style={styles.removeBtnText}>✕</Text>
+                  </TouchableOpacity>
                 </TouchableOpacity>
               );
             })
@@ -280,6 +368,42 @@ export const ClassTeacherStudentsScreen: React.FC<Props> = ({ onToggleDrawer, on
 
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
+
+      <Modal
+        visible={!!statusStudent}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !changingStatus && setStatusStudent(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Change Status</Text>
+            <Text style={styles.modalSubtitle}>
+              {statusStudent ? `${statusStudent.firstName} ${statusStudent.lastName}` : ''}
+            </Text>
+            {changingStatus && <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.md }} />}
+            {STATUS_OPTIONS.map((option) => (
+              <TouchableOpacity
+                key={option}
+                style={[styles.statusOption, statusStudent?.status === option && styles.statusOptionActive]}
+                onPress={() => applyStatusChange(option)}
+                disabled={changingStatus}
+              >
+                <Text style={[styles.statusOptionText, statusStudent?.status === option && styles.statusOptionTextActive]}>
+                  {option}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.modalCancel}
+              onPress={() => setStatusStudent(null)}
+              disabled={changingStatus}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -308,6 +432,20 @@ const styles = StyleSheet.create({
   scoreArea: { alignItems: 'flex-end' },
   score: { fontSize: 16, fontWeight: '700' },
   gradeBadge: { fontSize: 11, fontWeight: '700', paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.sm, marginTop: 2, overflow: 'hidden' },
+  removeBtn: { marginLeft: spacing.sm, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.error + '15', justifyContent: 'center', alignItems: 'center' },
+  removeBtnText: { color: colors.error, fontSize: 14, fontWeight: '700' },
+  statusBtn: { marginLeft: spacing.sm, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary + '15', justifyContent: 'center', alignItems: 'center' },
+  statusBtnText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: spacing.lg },
+  modalCard: { backgroundColor: colors.white, borderRadius: borderRadius.lg, padding: spacing.lg },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: colors.text, textAlign: 'center' },
+  modalSubtitle: { fontSize: 13, color: colors.textLight, textAlign: 'center', marginTop: spacing.xs, marginBottom: spacing.md },
+  statusOption: { paddingVertical: spacing.md, paddingHorizontal: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.background, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
+  statusOptionActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  statusOptionText: { fontSize: 15, fontWeight: '600', color: colors.text, textAlign: 'center' },
+  statusOptionTextActive: { color: colors.white },
+  modalCancel: { paddingVertical: spacing.md, alignItems: 'center' },
+  modalCancelText: { fontSize: 15, fontWeight: '600', color: colors.textLight },
   actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   actionCard: { width: '47%', backgroundColor: colors.background, borderRadius: borderRadius.lg, padding: spacing.md, alignItems: 'center', ...shadows.sm },
   actionLabel: { fontSize: 12, fontWeight: '600', color: colors.text, marginTop: spacing.sm, textAlign: 'center' },

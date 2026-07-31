@@ -296,7 +296,7 @@ export class AssessmentEngineService {
     });
 
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { classId, academicYear: { terms: { some: { id: termId } } }, status: 'ACTIVE' },
+      where: { classId, academicYear: { terms: { some: { id: termId } } }, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       select: { studentId: true },
     });
 
@@ -431,7 +431,7 @@ export class AssessmentEngineService {
     });
 
     const totalStudents = await this.prisma.enrollment.count({
-      where: { classId, academicYearId: term.academicYearId, status: 'ACTIVE' },
+      where: { classId, academicYearId: term.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
     });
 
     // Find all assessment definitions matching this exam type
@@ -1053,6 +1053,7 @@ export class AssessmentEngineService {
             classId: assignment.classId,
             academicYearId: currentTerm.academicYearId,
             status: 'ACTIVE',
+            student: { status: 'ACTIVE' },
           },
         });
 
@@ -1102,7 +1103,7 @@ export class AssessmentEngineService {
     });
 
     const enrolledStudents = await this.prisma.enrollment.count({
-      where: { classId, status: 'ACTIVE' },
+      where: { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
     });
 
     const stats = [];

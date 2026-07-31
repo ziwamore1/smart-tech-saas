@@ -244,6 +244,17 @@ export class ExamService {
       throw new ForbiddenException('Exam has ended');
     }
 
+    const student = await this.prisma.student.findUnique({
+      where: { id: studentId },
+      select: { status: true },
+    });
+    if (!student || student.status !== 'ACTIVE') {
+      throw new ForbiddenException(
+        'Only students with an ACTIVE status are allowed to take exams. ' +
+        'Students who have transferred, withdrawn or graduated are excluded.',
+      );
+    }
+
     const existing = await this.prisma.examAttempt.findUnique({
       where: { examId_studentId: { examId, studentId } },
     });
@@ -373,6 +384,12 @@ export class ExamService {
 
   private async recordExamResult(studentId: string, exam: any, score: number, totalPossible: number, grade: string) {
     try {
+      const student = await this.prisma.student.findUnique({
+        where: { id: studentId },
+        select: { status: true },
+      });
+      if (!student || student.status !== 'ACTIVE') return;
+
       const percentage = totalPossible > 0 ? score / totalPossible : 0;
 
       await this.prisma.result.upsert({

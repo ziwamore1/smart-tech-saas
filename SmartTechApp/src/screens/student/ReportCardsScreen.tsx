@@ -70,14 +70,26 @@ export const StudentReportCardsScreen: React.FC = () => {
         apiService.getReportCardData(studentId, selectedTermId),
       ]);
 
+      let list: any[] = [];
       if (resultsRes.status === 'fulfilled') {
         const data = resultsRes.value?.data || resultsRes.value || [];
-        setResults(Array.isArray(data) ? data : data?.results || data?.subjects || []);
+        list = Array.isArray(data) ? data : data?.results || data?.subjects || [];
       }
 
       if (reportRes.status === 'fulfilled') {
-        setReportData(reportRes.value);
+        const report = reportRes.value?.data || reportRes.value || {};
+        setReportData(report);
+        if (list.length === 0 && Array.isArray(report?.subjectBreakdown) && report.subjectBreakdown.length > 0) {
+          list = report.subjectBreakdown.map((s: any) => ({
+            subject: { name: s.subjectName, id: s.subjectId },
+            score: s.finalPercentage ?? s.totalRawScore,
+            grade: s.finalGrade,
+            remark: s.finalRemark,
+          }));
+        }
       }
+
+      setResults(list);
     } catch (err) {
       console.error('Failed to load results');
     } finally {

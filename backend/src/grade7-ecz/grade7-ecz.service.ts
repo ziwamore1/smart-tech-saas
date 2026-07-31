@@ -22,7 +22,7 @@ export class Grade7EczService {
       },
       include: {
         levelType: true,
-        _count: { select: { enrollments: { where: { status: 'ACTIVE' } } } },
+        _count: { select: { enrollments: { where: { status: 'ACTIVE', student: { status: 'ACTIVE' } } } } },
       },
     });
   }
@@ -278,7 +278,7 @@ export class Grade7EczService {
 
   async computeGrade7FromExams(classId: string, termId: string) {
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { classId, status: 'ACTIVE' },
+      where: { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       include: { student: true },
     });
 
@@ -317,7 +317,7 @@ export class Grade7EczService {
 
   async getGrade7Results(classId: string, termId: string) {
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { classId, status: 'ACTIVE' },
+      where: { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       select: { studentId: true },
     });
 
@@ -325,6 +325,7 @@ export class Grade7EczService {
       where: {
         studentId: { in: enrollments.map(e => e.studentId) },
         termId,
+        student: { status: 'ACTIVE' },
       },
       include: { student: true, term: true, examStructure: true },
       orderBy: { finalAggregate: 'desc' },
@@ -339,7 +340,7 @@ export class Grade7EczService {
     const results = await this.prisma.grade7Result.findMany({
       where: {
         termId,
-        student: { enrollments: { some: { classId, status: 'ACTIVE' } } },
+        student: { status: 'ACTIVE', enrollments: { some: { classId, status: 'ACTIVE' } } },
       },
       include: { student: true },
       orderBy: { finalAggregate: 'desc' },

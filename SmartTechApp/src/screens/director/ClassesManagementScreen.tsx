@@ -62,6 +62,7 @@ export const ClassesManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [addingSubject, setAddingSubject] = useState(false);
   const [removingSubjectId, setRemovingSubjectId] = useState<string | null>(null);
+  const [removingEnrollmentId, setRemovingEnrollmentId] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
@@ -275,6 +276,34 @@ export const ClassesManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
     } finally {
       setRemovingSubjectId(null);
     }
+  };
+
+  const handleRemoveEnrollment = async (enr: any) => {
+    if (!detailClass || removingEnrollmentId) return;
+    const studentName = `${enr.student?.firstName || enr.firstName || ''} ${enr.student?.lastName || enr.lastName || ''}`.trim();
+    Alert.alert(
+      'Remove from Class',
+      `Remove ${studentName || 'this student'} from ${detailClass.name}? The class register will be re-sequenced automatically.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setRemovingEnrollmentId(enr.id);
+            try {
+              await apiService.removeFromClass(enr.id);
+              setDetailEnrollments(prev => prev.filter(e => e.id !== enr.id));
+              Alert.alert('Removed', 'Student removed from class. Register re-sequenced automatically.');
+            } catch (err: any) {
+              Alert.alert('Error', err?.response?.data?.message || 'Failed to remove student from class.');
+            } finally {
+              setRemovingEnrollmentId(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -641,6 +670,17 @@ export const ClassesManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
                       <Text style={styles.detailListItemText}>
                         {enr.student?.firstName || enr.firstName || ''} {enr.student?.lastName || enr.lastName || ''}
                       </Text>
+                      <TouchableOpacity
+                        style={[styles.removeEnrollmentBtn, removingEnrollmentId === enr.id && styles.btnDisabled]}
+                        onPress={() => handleRemoveEnrollment(enr)}
+                        disabled={removingEnrollmentId === enr.id}
+                      >
+                        {removingEnrollmentId === enr.id ? (
+                          <ActivityIndicator size="small" color={colors.error} />
+                        ) : (
+                          <Text style={styles.removeEnrollmentText}>✕</Text>
+                        )}
+                      </TouchableOpacity>
                     </View>
                   ))
                 ) : (
@@ -751,6 +791,8 @@ const styles = StyleSheet.create({
   detailListItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.xs },
   detailBullet: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginRight: spacing.sm },
   detailListItemText: { fontSize: 14, color: colors.text, flex: 1 },
+  removeEnrollmentBtn: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.errorLight, justifyContent: 'center', alignItems: 'center', marginLeft: spacing.sm },
+  removeEnrollmentText: { color: colors.error, fontSize: 13, fontWeight: '700' },
   subjectAddRow: { marginBottom: spacing.sm },
   subjectPicker: { backgroundColor: colors.primaryLight + '15', borderRadius: borderRadius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.primaryLight + '40', borderStyle: 'dashed', alignItems: 'center' },
   subjectPickerText: { fontSize: 13, fontWeight: '600', color: colors.primaryLight },

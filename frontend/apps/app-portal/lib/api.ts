@@ -381,6 +381,9 @@ export const studentApi = {
   create: (data: any) => api.post('/student', data),
   update: (id: string, data: any) => api.patch(`/student/${id}`, data),
   delete: (id: string) => api.delete(`/student/${id}`),
+  changeStatus: (id: string, status: string) =>
+    api.post(`/student/${id}/status`, { status }),
+  getStatusHistory: (id: string) => api.get(`/student/${id}/status-history`),
   importExcel: (formData: FormData) =>
     api.post('/student/import', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -704,6 +707,7 @@ export const enrollmentApi = {
   create: (data: { studentId: string; academicYearId: string; classId: string; termId?: string; streamId?: string }) => api.post('/enrollments', data),
   update: (id: string, data: any) => api.patch(`/enrollments/${id}`, data),
   delete: (id: string) => api.delete(`/enrollments/${id}`),
+  removeFromClass: (enrollmentId: string) => api.delete(`/enrollments/${enrollmentId}`),
 };
 
 export const levelTypeApi = {

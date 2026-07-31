@@ -419,7 +419,7 @@ export class AssessmentService {
     const finalScore = Math.round(totalWeightedScore * 100) / 100;
 
     const enrollment = await this.prisma.enrollment.findFirst({
-      where: { studentId, status: 'ACTIVE' },
+      where: { studentId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       select: { classId: true },
     });
 
@@ -463,6 +463,8 @@ export class AssessmentService {
         academicYear: {
           terms: { some: { id: termId } },
         },
+        status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
       select: { studentId: true },
     });
@@ -566,6 +568,8 @@ export class AssessmentService {
         academicYear: {
           terms: { some: { id: termId } },
         },
+        status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
       include: { student: true },
     });
@@ -643,6 +647,8 @@ export class AssessmentService {
         academicYear: {
           terms: { some: { id: termId } },
         },
+        status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
       include: { student: true },
     });

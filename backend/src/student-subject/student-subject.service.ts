@@ -127,7 +127,7 @@ export class StudentSubjectService {
 
   async getStudentsWithoutSubjects(classId: string) {
     const enrolled = await this.prisma.enrollment.findMany({
-      where: { classId, status: 'ACTIVE' },
+      where: { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       select: { studentId: true },
     });
     const enrolledIds = enrolled.map(e => e.studentId);

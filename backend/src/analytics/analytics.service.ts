@@ -18,6 +18,32 @@ export class AnalyticsService {
     });
   }
 
+  private async resolveLegacyScores(results: any[], termId: string, schoolId: string) {
+    if (results.length === 0) return results;
+    const studentIds = [...new Set(results.map(r => r.studentId))];
+    const legacyResults = await this.prisma.result.findMany({
+      where: { studentId: { in: studentIds }, termId, schoolId, student: { status: 'ACTIVE' } },
+      select: { studentId: true, subjectId: true, score: true, grade: true },
+    });
+    const legacyMap = new Map<string, { score: number; grade: string | null }>();
+    for (const lr of legacyResults) {
+      legacyMap.set(`${lr.studentId}:${lr.subjectId}`, { score: lr.score, grade: lr.grade });
+    }
+    for (const r of results) {
+      if (r.finalPercentage == null) {
+        const legacy = legacyMap.get(`${r.studentId}:${r.subjectId}`);
+        if (legacy) {
+          r.finalPercentage = legacy.score;
+          if (r.finalGrade == null) r.finalGrade = legacy.grade;
+          if (r.points == null) {
+            r.points = legacy.score >= 75 ? 1 : legacy.score >= 65 ? 2 : legacy.score >= 50 ? 3 : legacy.score >= 40 ? 4 : 5;
+          }
+        }
+      }
+    }
+    return results;
+  }
+
   // ECZ Grading System mapping
   private interpretECZ(score: number) {
     if (score >= 75) return { grade: '1', remark: 'Distinction' };
@@ -38,13 +64,16 @@ export class AnalyticsService {
         termId,
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-        finalPercentage: { not: null },
         isAbsent: false,
+        student: { status: 'ACTIVE' },
       },
       include: {
         student: { select: { id: true } },
       },
     });
+
+    results = await this.resolveLegacyScores(results, termId, schoolId);
+    results = results.filter(r => r.finalPercentage != null);
 
     results = await this.filterComputedResultsBySubjects(results, classId);
 
@@ -94,13 +123,16 @@ export class AnalyticsService {
         termId,
         schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-        finalPercentage: { not: null },
         isAbsent: false,
+        student: { status: 'ACTIVE' },
       },
       include: {
         student: { select: { id: true, firstName: true, lastName: true, admissionNumber: true } },
       },
     });
+
+    computedResults = await this.resolveLegacyScores(computedResults, termId, schoolId);
+    computedResults = computedResults.filter(r => r.finalPercentage != null);
 
     computedResults = await this.filterComputedResultsBySubjects(computedResults, classId);
 
@@ -156,7 +188,7 @@ export class AnalyticsService {
     gradingSystem: 'ECZ' | 'GPA' = 'ECZ',
   ) {
     const results = await this.prisma.computedResult.findMany({
-      where: { studentId, termId, schoolId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
+      where: { studentId, termId, schoolId, student: { status: 'ACTIVE' }, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
       include: { subject: { select: { name: true } } },
     });
 
@@ -164,7 +196,7 @@ export class AnalyticsService {
 
     // Also try Result table for NULL finalPercentage
     const legacyResults = await this.prisma.result.findMany({
-      where: { studentId, termId, schoolId },
+      where: { studentId, termId, schoolId, student: { status: 'ACTIVE' } },
       select: { subjectId: true, score: true },
     });
     const legacyMap = new Map<string, number>();
@@ -318,6 +350,7 @@ export class AnalyticsService {
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
         isAbsent: false,
+        student: { status: 'ACTIVE' },
       },
       include: {
         subject: true,
@@ -355,6 +388,7 @@ export class AnalyticsService {
         termId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         isAbsent: false,
+        student: { status: 'ACTIVE' },
       },
     });
 
@@ -382,6 +416,7 @@ export class AnalyticsService {
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
         isAbsent: false,
+        student: { status: 'ACTIVE' },
       },
       include: {
         student: { select: { id: true, gender: true } },
@@ -410,7 +445,7 @@ export class AnalyticsService {
   }
   async getTeacherPerformance(schoolId: string, termId: string) {
     const results = await this.prisma.result.findMany({
-      where: { termId, schoolId },
+      where: { termId, schoolId, student: { status: 'ACTIVE' } },
       include: {
         teacher: true,
         subject: true,
@@ -473,7 +508,7 @@ export class AnalyticsService {
   // ----------------------
   async getSubjectHeatmap(classId: string, termId: string) {
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { classId, status: 'ACTIVE' },
+      where: { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       include: { student: true },
     });
     const studentIds = enrollments.map((e) => e.studentId);
@@ -486,7 +521,7 @@ export class AnalyticsService {
     const subjectIds = assessments.map((a) => a.subjectId);
 
     const results = await this.prisma.result.findMany({
-      where: { studentId: { in: studentIds }, termId },
+      where: { studentId: { in: studentIds }, termId, student: { status: 'ACTIVE' } },
       include: { subject: true, student: true },
     });
 
@@ -527,7 +562,7 @@ export class AnalyticsService {
     previousTermId?: string,
   ) {
     const results = await this.prisma.result.findMany({
-      where: { student: { enrollments: { some: { classId } } }, termId },
+      where: { student: { status: 'ACTIVE', enrollments: { some: { classId } } }, termId },
       include: { student: true, subject: true },
     });
 
@@ -543,7 +578,7 @@ export class AnalyticsService {
     if (previousTermId) {
       const prevResults = await this.prisma.result.findMany({
         where: {
-          student: { enrollments: { some: { classId } } },
+          student: { status: 'ACTIVE', enrollments: { some: { classId } } },
           termId: previousTermId,
         },
       });
@@ -582,9 +617,9 @@ export class AnalyticsService {
   }
 
   async getPieChartData(schoolId: string, classId?: string) {
-    const where: any = { schoolId };
+    const where: any = { schoolId, student: { status: 'ACTIVE' } };
     if (classId) {
-      where.student = { enrollments: { some: { classId } } };
+      where.student = { status: 'ACTIVE', enrollments: { some: { classId } } };
     }
 
     const results = await this.prisma.result.findMany({ where });
@@ -629,7 +664,7 @@ export class AnalyticsService {
       const where: any = {
         schoolId,
         termId: term.id,
-        student: { enrollments: { some: { classId } } },
+        student: { status: 'ACTIVE', enrollments: { some: { classId } } },
       };
       if (subjectId) where.subjectId = subjectId;
 
@@ -678,7 +713,7 @@ export class AnalyticsService {
           schoolId,
           termId,
           subjectId: subject.id,
-          student: { enrollments: { some: { classId } } },
+          student: { status: 'ACTIVE', enrollments: { some: { classId } } },
         },
       });
 
@@ -721,7 +756,7 @@ export class AnalyticsService {
       where: {
         schoolId,
         termId,
-        student: { enrollments: { some: { classId } } },
+        student: { status: 'ACTIVE', enrollments: { some: { classId } } },
       },
     });
 
@@ -771,7 +806,7 @@ export class AnalyticsService {
     }
 
     let results = await this.prisma.computedResult.findMany({
-      where: { schoolId, termId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null }, isAbsent: false },
+      where: { schoolId, termId, student: { status: 'ACTIVE' }, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null }, isAbsent: false },
       include: { student: { select: { id: true, firstName: true, lastName: true } }, subject: { select: { id: true, name: true } } },
     });
 
@@ -813,7 +848,7 @@ export class AnalyticsService {
 
   private async getTopPerformers(schoolId: string, termId: string) {
     const results = await this.prisma.computedResult.findMany({
-      where: { schoolId, termId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null }, isAbsent: false },
+      where: { schoolId, termId, student: { status: 'ACTIVE' }, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null }, isAbsent: false },
       include: { student: { select: { id: true, firstName: true, lastName: true, admissionNumber: true } } },
     });
 
@@ -848,7 +883,7 @@ export class AnalyticsService {
 
   private async getImprovementAreas(schoolId: string, termId: string) {
     const results = await this.prisma.computedResult.findMany({
-      where: { schoolId, termId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null }, isAbsent: false },
+      where: { schoolId, termId, student: { status: 'ACTIVE' }, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, finalPercentage: { not: null }, isAbsent: false },
       include: { subject: { select: { id: true, name: true } } },
     });
 

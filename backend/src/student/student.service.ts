@@ -130,9 +130,12 @@ export class StudentService {
         mustChangePassword: true,
       },
       update: {
+        // Re-registration under a new student number must preserve the student's
+        // first login credentials — never overwrite the existing password.
         studentId: student.id,
-        password: hashedStudentPwd,
-        mustChangePassword: true,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        isActive: true,
       },
     });
 
@@ -509,6 +512,8 @@ export class StudentService {
             take: 1,
             orderBy: { academicYear: { startDate: 'desc' } },
             select: {
+              id: true,
+              status: true,
               class: { select: { id: true, name: true } },
               academicYear: { select: { id: true, name: true } },
             },
@@ -667,14 +672,29 @@ export class StudentService {
     return oldPublicId;
   }
 
-  async delete(id: string) {
+  async delete(id: string, schoolId?: string) {
     const student = await this.prisma.student.findUnique({ where: { id }, select: {
       id: true, admissionNumber: true, studentUuid: true, status: true, schoolId: true,
       firstName: true, lastName: true, gender: true, photoUrl: true,
     }});
     if (!student) throw new NotFoundException('Student not found');
+    if (schoolId && student.schoolId !== schoolId) throw new ForbiddenException('Invalid student');
+
+    // Capture the classes this student was enrolled in so their admission
+    // sequences can be reset after the record is removed.
+    const enrolledClasses = await this.prisma.enrollment.findMany({
+      where: { studentId: id },
+      select: { classId: true, academicYearId: true, schoolId: true },
+    });
 
     await this.prisma.$transaction(async (tx) => {
+      // Detach any linked login account without deleting it, so the student's
+      // original credentials survive re-registration under a new student number.
+      await tx.user.updateMany({
+        where: { studentId: id },
+        data: { studentId: null },
+      });
+      await tx.parentStudent.deleteMany({ where: { studentId: id } });
       await tx.enrollment.deleteMany({ where: { studentId: id } });
       await tx.studentAssessmentResult.deleteMany({ where: { studentId: id } });
       await tx.computedResult.deleteMany({ where: { studentId: id } });
@@ -682,8 +702,33 @@ export class StudentService {
       await tx.attendance.deleteMany({ where: { studentId: id } });
       await tx.studentSubject.deleteMany({ where: { studentId: id } });
       await tx.result.deleteMany({ where: { studentId: id } });
+      await tx.resultAuditLog.deleteMany({ where: { studentId: id } });
+      await tx.feePayment.deleteMany({ where: { studentId: id } });
+      await tx.homeworkSubmission.deleteMany({ where: { studentId: id } });
+      await tx.assessmentScore.deleteMany({ where: { studentId: id } });
+      await tx.examAttempt.deleteMany({ where: { studentId: id } });
+      await tx.longitudinalRecord.deleteMany({ where: { studentId: id } });
+      await tx.grade7Result.deleteMany({ where: { studentId: id } });
+      await tx.resultSmsLog.deleteMany({ where: { studentId: id } });
+      await tx.generatedReport.deleteMany({ where: { studentId: id } });
       await tx.student.delete({ where: { id } });
     });
+
+    // Auto-reset class sequencing for every class the student was removed from,
+    // so the remaining registers stay contiguous without manual backfilling.
+    for (const enrolled of enrolledClasses) {
+      try {
+        await this.admissionNumberService.resequenceClass(
+          enrolled.schoolId,
+          enrolled.academicYearId,
+          enrolled.classId,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to re-sequence class ${enrolled.classId} after deleting student ${id}: ${(error as Error).message}`,
+        );
+      }
+    }
 
     return { message: 'Student deleted successfully' };
   }
@@ -764,7 +809,7 @@ export class StudentService {
       data: { status: newStatus },
     });
 
-    if (newStatus === StudentStatus.TRANSFERRED || newStatus === StudentStatus.WITHDRAWN || newStatus === StudentStatus.GRADUATED) {
+    if (newStatus !== StudentStatus.ACTIVE) {
       await this.prisma.enrollment.updateMany({
         where: { studentId, status: EnrollmentStatus.ACTIVE },
         data: { status: EnrollmentStatus.INACTIVE },

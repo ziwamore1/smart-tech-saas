@@ -45,6 +45,8 @@ export class ResultService {
       where.subjectId = subjectId;
     }
 
+    where.student = { ...where.student, status: 'ACTIVE' };
+
     return this.prisma.result.findMany({
       where,
       include: {
@@ -82,6 +84,7 @@ export class ResultService {
         studentId,
         termId,
         schoolId,
+        student: { status: 'ACTIVE' },
       },
       include: {
         student: true,
@@ -119,6 +122,7 @@ export class ResultService {
         studentId,
         academicYearId: term.academicYearId,
         status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
     });
 
@@ -159,7 +163,7 @@ export class ResultService {
     const gradeData = await this.calculateGrade(score, schoolId, enrollment.classId);
 
     const existing = await this.prisma.result.findFirst({
-      where: { studentId, subjectId, termId },
+      where: { studentId, subjectId, termId, student: { status: 'ACTIVE' } },
     });
 
     if (existing) {
@@ -294,6 +298,7 @@ export class ResultService {
         studentId: { in: uniqueStudentIds },
         academicYearId: term.academicYearId,
         status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
       select: { studentId: true, classId: true },
     });
@@ -376,7 +381,7 @@ export class ResultService {
       const classIds = [...new Set(created.map(r => enrollmentMap.get(r.studentId)).filter(Boolean))] as string[];
       for (const classId of classIds) {
         const enrolled = await this.prisma.enrollment.count({
-          where: { classId, academicYearId: term.academicYearId, status: 'ACTIVE' },
+          where: { classId, academicYearId: term.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
         });
         const entered = created.filter(r => enrollmentMap.get(r.studentId) === classId).length;
         await this.prisma.resultSheet.updateMany({
@@ -413,7 +418,7 @@ export class ResultService {
     }
 
     const enrollment = await this.prisma.enrollment.findFirst({
-      where: { studentId: result.studentId, status: 'ACTIVE' },
+      where: { studentId: result.studentId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       select: { classId: true },
     });
 
@@ -639,6 +644,7 @@ export class ResultService {
         ...(classId ? { classId } : { classId: { in: [...new Set(assignments.map((a) => a.classId))] } }),
         academicYearId: term.academicYearId,
         status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
       include: { student: true, class: true },
       orderBy: { student: { firstName: 'asc' } },
@@ -837,7 +843,7 @@ export class ResultService {
       }
 
       const student = await this.prisma.student.findFirst({
-        where: { admissionNumber, schoolId },
+        where: { admissionNumber, schoolId, status: 'ACTIVE' },
       });
 
       if (!student) {
@@ -866,6 +872,7 @@ export class ResultService {
             studentId: student.id,
             academicYearId: term.academicYearId,
             status: 'ACTIVE',
+            student: { status: 'ACTIVE' },
           },
         });
 
@@ -890,7 +897,7 @@ export class ResultService {
         const gradeData = await this.calculateGrade(score, schoolId, enrollment?.classId);
 
         const existing = await this.prisma.result.findFirst({
-          where: { studentId: student.id, subjectId, termId },
+          where: { studentId: student.id, subjectId, termId, student: { status: 'ACTIVE' } },
         });
 
         if (existing) {
@@ -955,6 +962,7 @@ export class ResultService {
         classId,
         academicYearId: term.academicYearId,
         status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
     });
 
@@ -965,6 +973,7 @@ export class ResultService {
         studentId: { in: studentIds },
         termId,
         schoolId,
+        student: { status: 'ACTIVE' },
       },
     });
 

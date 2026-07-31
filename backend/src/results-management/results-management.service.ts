@@ -33,10 +33,16 @@ export class ResultsManagementService {
     if (this.computingKeys.has(key)) return;
     this.computingKeys.add(key);
 
-    this.prisma.computedResult.count({
-      where: { classId, termId, schoolId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] } },
-    }).then(count => {
-      if (count > 0) { this.computingKeys.delete(key); return; }
+    const activeWhere: Prisma.ComputedResultWhereInput = { classId, termId, schoolId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, student: { status: 'ACTIVE' } };
+
+    Promise.all([
+      this.prisma.computedResult.count({ where: activeWhere }),
+      this.prisma.computedResult.findFirst({
+        where: { ...activeWhere, finalPercentage: null },
+        select: { id: true },
+      }),
+    ]).then(([count, missingScoreRow]) => {
+      if (count > 0 && !missingScoreRow) { this.computingKeys.delete(key); return; }
       return this.prisma.classSubject.findMany({ where: { classId }, select: { subjectId: true } });
     }).then(classSubjects => {
       if (!classSubjects || classSubjects.length === 0) { this.computingKeys.delete(key); return; }
@@ -92,7 +98,7 @@ export class ResultsManagementService {
           for (const cls of activeClasses) {
             if (!existingClassIds.has(cls.id)) {
               const totalStudents = await this.prisma.enrollment.count({
-                where: { classId: cls.id, academicYearId: currentYear.id, status: 'ACTIVE' },
+                where: { classId: cls.id, academicYearId: currentYear.id, status: 'ACTIVE', student: { status: 'ACTIVE' } },
               });
               await this.prisma.resultSheet.create({
                 data: {
@@ -135,7 +141,7 @@ export class ResultsManagementService {
       });
       if (term && term.academicYear) {
         const totalStudents = await this.prisma.enrollment.count({
-          where: { classId: filters.classId, academicYearId: term.academicYear.id, status: 'ACTIVE' },
+          where: { classId: filters.classId, academicYearId: term.academicYear.id, status: 'ACTIVE', student: { status: 'ACTIVE' } },
         });
         const newSheet = await this.prisma.resultSheet.create({
           data: {
@@ -201,6 +207,7 @@ export class ResultsManagementService {
         classId: sheet.classId,
         academicYearId: sheet.academicYearId,
         status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
       select: {
         student: {
@@ -224,6 +231,7 @@ export class ResultsManagementService {
         where: {
           termId: sheet.termId,
           schoolId: sheet.schoolId,
+          student: { status: 'ACTIVE' },
         },
         select: {
           student: {
@@ -246,6 +254,7 @@ export class ResultsManagementService {
         studentId: { in: students.map((s) => s.id) },
         termId: sheet.termId,
         classId: sheet.classId,
+        student: { status: 'ACTIVE' },
       },
       include: {
         subject: { select: { id: true, name: true, code: true } },
@@ -259,6 +268,7 @@ export class ResultsManagementService {
         where: {
           studentId: { in: students.map((s) => s.id) },
           termId: sheet.termId,
+          student: { status: 'ACTIVE' },
         },
         include: {
           subject: { select: { id: true, name: true, code: true } },
@@ -272,6 +282,7 @@ export class ResultsManagementService {
         studentId: { in: students.map((s) => s.id) },
         termId: sheet.termId,
         schoolId: sheet.schoolId,
+        student: { status: 'ACTIVE' },
       },
       select: {
         studentId: true,
@@ -322,7 +333,7 @@ export class ResultsManagementService {
     });
 
     const enrolledCount = await this.prisma.enrollment.count({
-      where: { classId: sheet.classId, status: 'ACTIVE' },
+      where: { classId: sheet.classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
     });
 
     const subjectsWithStatus = await Promise.all(
@@ -341,6 +352,7 @@ export class ResultsManagementService {
             subjectId: cs.subjectId,
             termId: sheet.termId,
             rawScore: { not: null },
+            student: { status: 'ACTIVE' },
           },
         });
 
@@ -453,6 +465,7 @@ export class ResultsManagementService {
           classId: sheet.classId,
           termId: sheet.termId,
           schoolId: sheet.schoolId,
+          student: { status: 'ACTIVE' },
         },
         data: { status: 'VERIFIED' },
       });
@@ -530,6 +543,7 @@ export class ResultsManagementService {
           classId: sheet.classId,
           termId: sheet.termId,
           schoolId: sheet.schoolId,
+          student: { status: 'ACTIVE' },
         },
         data: { status: 'PUBLISHED' },
       });
@@ -588,6 +602,7 @@ export class ResultsManagementService {
           classId: sheet.classId,
           termId: sheet.termId,
           schoolId: sheet.schoolId,
+          student: { status: 'ACTIVE' },
         },
         data: { status: 'LOCKED' },
       });
@@ -634,6 +649,7 @@ export class ResultsManagementService {
           classId: sheet.classId,
           termId: sheet.termId,
           schoolId: sheet.schoolId,
+          student: { status: 'ACTIVE' },
         },
         data: { status: 'PUBLISHED' },
       });
@@ -696,6 +712,7 @@ export class ResultsManagementService {
           termId: sheet.termId,
           schoolId: sheet.schoolId,
           status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+          student: { status: 'ACTIVE' },
         },
         select: {
           studentId: true,
@@ -786,6 +803,7 @@ export class ResultsManagementService {
         termId: sheet.termId,
         schoolId: sheet.schoolId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        student: { status: 'ACTIVE' },
       },
       select: {
         studentId: true,
@@ -826,6 +844,7 @@ export class ResultsManagementService {
         subjectId: { in: subjectIds },
         termId: sheet.termId,
         schoolId: sheet.schoolId,
+        student: { status: 'ACTIVE' },
       },
       select: {
         studentId: true,
@@ -1050,6 +1069,7 @@ export class ResultsManagementService {
         classId: sheet.classId,
         academicYearId: sheet.academicYearId,
         status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
       select: {
         student: {
@@ -1073,6 +1093,7 @@ export class ResultsManagementService {
         classId: sheet.classId,
         termId: sheet.termId,
         studentId: { in: studentIds },
+        student: { status: 'ACTIVE' },
       },
     });
 
@@ -1081,6 +1102,7 @@ export class ResultsManagementService {
         where: {
           termId: sheet.termId,
           studentId: { in: studentIds },
+          student: { status: 'ACTIVE' },
         },
       });
     }
@@ -1090,6 +1112,7 @@ export class ResultsManagementService {
         studentId: { in: studentIds },
         termId: sheet.termId,
         schoolId: sheet.schoolId,
+        student: { status: 'ACTIVE' },
       },
       select: {
         studentId: true,
@@ -1238,9 +1261,9 @@ export class ResultsManagementService {
         const passed = pct != null && pct >= passThreshold;
         const grade = subResult?.finalGrade || '-';
         const points = subResult?.points != null ? subResult.points : '-';
-        return `<td style="text-align:center;padding:6px 8px;border:1px solid #e8ddd0;${pct == null ? 'background:#fffbeb;' : !passed ? 'background:#fef2f2;' : ''}">
-          ${pct != null ? `<div style="font-weight:600;font-size:14px;color:${passed ? '#059669' : '#dc2626'}">${pct.toFixed(1)}%</div>
-          <div style="font-size:11px;color:#6b7280">${grade} | ${points} pts</div>` : '<span style="color:#d1d5db">-</span>'}
+        return `<td style="text-align:center;padding:6px 8px;border:1px solid #c4b5a3;${pct == null ? 'background:#fffbeb;' : !passed ? 'background:#fef2f2;' : ''}">
+          ${pct != null ? `<div style="font-weight:700;font-size:13px;color:${passed ? '#047857' : '#b91c1c'}">${pct.toFixed(1)}%</div>
+          <div style="font-size:12px;color:#374151">${grade} | ${points} pts</div>` : '<span style="color:#9ca3af">-</span>'}
         </td>`;
       });
 
@@ -1250,20 +1273,20 @@ export class ResultsManagementService {
         : null;
 
       return `<tr>
-        <td style="text-align:center;padding:6px 12px;border:1px solid #e8ddd0;font-weight:600;color:#5f4b3a">${s.rank || '-'}</td>
-        <td style="padding:6px 12px;border:1px solid #e8ddd0;font-weight:600">${s.student?.firstName || ''} ${s.student?.lastName || ''}</td>
-        <td style="padding:6px 12px;border:1px solid #e8ddd0;color:#6b7280;font-size:12px">${s.student?.admissionNumber || '-'}</td>
-        <td style="padding:6px 12px;border:1px solid #e8ddd0;color:#6b7280;font-size:12px">${s.student?.gender || '-'}</td>
+        <td style="text-align:center;padding:6px 12px;border:1px solid #c4b5a3;font-weight:700;color:#3d2f24">${s.rank || '-'}</td>
+        <td style="padding:6px 12px;border:1px solid #c4b5a3;font-weight:700">${s.student?.firstName || ''} ${s.student?.lastName || ''}</td>
+        <td style="padding:6px 12px;border:1px solid #c4b5a3;color:#374151;font-size:12px">${s.student?.admissionNumber || '-'}</td>
+        <td style="padding:6px 12px;border:1px solid #c4b5a3;color:#374151;font-size:12px">${s.student?.gender || '-'}</td>
         ${subjectCells.join('')}
-        <td style="text-align:center;padding:6px 12px;border:1px solid #e8ddd0;font-weight:600;${avg != null && avg >= passThreshold ? 'color:#059669' : avg != null ? 'color:#dc2626' : 'color:#d1d5db'}">
+        <td style="text-align:center;padding:6px 12px;border:1px solid #c4b5a3;font-weight:700;${avg != null && avg >= passThreshold ? 'color:#047857' : avg != null ? 'color:#b91c1c' : 'color:#9ca3af'}">
           ${avg != null ? `${avg.toFixed(1)}%` : '-'}
         </td>
-        <td style="text-align:center;padding:6px 12px;border:1px solid #e8ddd0;font-weight:600">${s.totalPoints ?? 0}</td>
+        <td style="text-align:center;padding:6px 12px;border:1px solid #c4b5a3;font-weight:700">${s.totalPoints ?? 0}</td>
       </tr>`;
     }).join('');
 
     const subjectHeaders = subjects.map((sub: any) =>
-      `<th style="text-align:center;padding:10px 8px;background:#5f4b3a;color:white;font-size:11px;text-transform:uppercase;border:1px solid #7a6b5a;min-width:80px">${sub.name}</th>`
+      `<th style="text-align:center;padding:10px 8px;background:#4b3b2e;color:white;font-size:12px;font-weight:700;text-transform:uppercase;border:1px solid #2f241b;min-width:80px">${sub.name}</th>`
     ).join('');
 
     const html = `<!DOCTYPE html>
@@ -1274,26 +1297,26 @@ export class ResultsManagementService {
   <style>
     @page { margin: 20mm; size: A4 landscape; }
     * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
-    body { margin: 0; padding: 20px; color: #1f2937; }
-    .header { text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 3px solid #5f4b3a; }
-    .header h1 { margin: 0; font-size: 22px; color: #5f4b3a; }
+    body { margin: 0; padding: 20px; color: #111827; font-size: 13px; }
+    .header { text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 3px solid #4b3b2e; }
+    .header h1 { margin: 0; font-size: 22px; color: #4b3b2e; }
     .header .school-name { font-size: 18px; font-weight: 700; }
-    .header .details { font-size: 13px; color: #6b7280; margin-top: 6px; }
+    .header .details { font-size: 14px; color: #374151; margin-top: 6px; font-weight: 600; }
     .header .details span { margin: 0 12px; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    th { background: #5f4b3a; color: white; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; border: 1px solid #7a6b5a; position: sticky; top: 0; }
-    td { padding: 8px 12px; border: 1px solid #e8ddd0; }
-    tr:nth-child(even) { background: #faf7f4; }
-    tr:hover { background: #f5efe8; }
+    th { background: #4b3b2e; color: white; padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 700; text-transform: uppercase; border: 1px solid #2f241b; position: sticky; top: 0; }
+    td { padding: 8px 12px; border: 1px solid #c4b5a3; }
+    tr:nth-child(even) { background: #f5efe8; }
+    tr:hover { background: #ede3d8; }
     .signatures { margin-top: 40px; display: flex; justify-content: space-between; }
     .signatures .sig { text-align: center; }
-    .signatures .sig .line { width: 200px; border-top: 1px solid #1f2937; margin-top: 40px; padding-top: 8px; font-size: 12px; color: #6b7280; }
-    .print-btn { position: fixed; top: 20px; right: 20px; padding: 10px 24px; background: #5f4b3a; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; z-index: 100; }
+    .signatures .sig .line { width: 200px; border-top: 1px solid #111827; margin-top: 40px; padding-top: 8px; font-size: 13px; color: #374151; font-weight: 600; }
+    .print-btn { position: fixed; top: 20px; right: 20px; padding: 10px 24px; background: #4b3b2e; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; z-index: 100; }
     @media print { .print-btn { display: none; } body { padding: 0; } }
-    .footer { text-align: center; margin-top: 20px; font-size: 11px; color: #9ca3af; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; }
-    .badge-pass { background: #d1fae5; color: #059669; }
-    .badge-fail { background: #fee2e2; color: #dc2626; }
+    .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #4b5563; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+    .badge-pass { background: #d1fae5; color: #047857; }
+    .badge-fail { background: #fee2e2; color: #b91c1c; }
   </style>
 </head>
 <body>
@@ -1402,7 +1425,7 @@ export class ResultsManagementService {
     );
 
     const students = await this.prisma.student.findMany({
-      where: { schoolId },
+      where: { schoolId, status: 'ACTIVE' },
       select: { id: true, admissionNumber: true, firstName: true, lastName: true },
     });
     const studentMap = new Map(
@@ -1512,7 +1535,7 @@ export class ResultsManagementService {
 
     if (!resultSheet) {
       const enrollmentCount = await this.prisma.enrollment.count({
-        where: { classId, academicYearId: currentAcYear, status: 'ACTIVE' },
+        where: { classId, academicYearId: currentAcYear, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       });
       resultSheet = await this.prisma.resultSheet.create({
         data: {
@@ -1535,7 +1558,7 @@ export class ResultsManagementService {
       }
 
       const student = await this.prisma.student.findFirst({
-        where: { admissionNumber, schoolId },
+        where: { admissionNumber, schoolId, status: 'ACTIVE' },
       });
 
       if (!student) {
@@ -1549,6 +1572,7 @@ export class ResultsManagementService {
           studentId: student.id,
           academicYearId: currentAcYear,
           status: 'ACTIVE',
+          student: { status: 'ACTIVE' },
         },
       });
 
@@ -1573,7 +1597,7 @@ export class ResultsManagementService {
         );
 
         const existing = await this.prisma.result.findFirst({
-          where: { studentId: student.id, subjectId, termId },
+          where: { studentId: student.id, subjectId, termId, student: { status: 'ACTIVE' } },
         });
 
         if (existing) {
@@ -1604,6 +1628,8 @@ export class ResultsManagementService {
         }
       }
     }
+
+    this.ensureComputedResults(classId, termId, schoolId);
 
     // Audit log
     await this.prisma.resultAuditLog.create({
@@ -1663,6 +1689,7 @@ export class ResultsManagementService {
         classId: data.classId,
         academicYearId,
         status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
     });
 

@@ -212,15 +212,7 @@ export class GradingEngineService {
     });
 
     if (configs.length === 0) {
-      return {
-        totalRawScore: null,
-        totalWeightedScore: null,
-        finalPercentage: null,
-        finalGrade: null,
-        finalRemark: null,
-        points: null,
-        gpa: null,
-      };
+      return this.getLegacyResultFallback(studentId, subjectId, termId, classId, schoolId);
     }
 
     const results = await this.prisma.studentAssessmentResult.findMany({
@@ -260,6 +252,8 @@ export class GradingEngineService {
     }
 
     if (totalWeight === 0 || !hasAllMandatory) {
+      const fallback = await this.getLegacyResultFallback(studentId, subjectId, termId, classId, schoolId);
+      if (fallback.finalPercentage != null) return fallback;
       return {
         totalRawScore: totalRawScore.toNumber(),
         totalWeightedScore: null,
@@ -291,6 +285,56 @@ export class GradingEngineService {
     };
   }
 
+  private async getLegacyResultFallback(
+    studentId: string,
+    subjectId: string,
+    termId: string,
+    classId: string,
+    schoolId: string,
+  ): Promise<{
+    totalRawScore: number | null;
+    totalWeightedScore: number | null;
+    finalPercentage: number | null;
+    finalGrade: string | null;
+    finalRemark: string | null;
+    points: number | null;
+    gpa: number | null;
+  }> {
+    const legacy = await this.prisma.result.findUnique({
+      where: { studentId_subjectId_termId: { studentId, subjectId, termId } },
+    });
+
+    if (!legacy || legacy.score == null) {
+      return {
+        totalRawScore: null,
+        totalWeightedScore: null,
+        finalPercentage: null,
+        finalGrade: null,
+        finalRemark: null,
+        points: null,
+        gpa: null,
+      };
+    }
+
+    const gradeResult = await this.computeGradeFull(
+      legacy.score,
+      classId,
+      subjectId,
+      termId,
+      schoolId,
+    ).catch(() => null);
+
+    return {
+      totalRawScore: legacy.score,
+      totalWeightedScore: legacy.score,
+      finalPercentage: legacy.score,
+      finalGrade: gradeResult?.grade ?? legacy.grade ?? null,
+      finalRemark: gradeResult?.remark ?? legacy.remark ?? null,
+      points: gradeResult?.points ?? null,
+      gpa: gradeResult?.gpa ?? null,
+    };
+  }
+
   async computeAllClassResults(
     classId: string,
     subjectId: string,
@@ -302,7 +346,7 @@ export class GradingEngineService {
     results: any[];
   }> {
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { classId, status: 'ACTIVE' },
+      where: { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       select: { studentId: true },
     });
 
@@ -397,7 +441,7 @@ export class GradingEngineService {
     const passThreshold = isPrimary ? 35 : 50;
 
     const classSize = await this.prisma.enrollment.count({
-      where: { classId, status: 'ACTIVE' },
+      where: { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
     });
 
     const subjectsPassed = filteredResults.filter(r => {
@@ -552,7 +596,7 @@ export class GradingEngineService {
     });
 
     const enrollments = await this.prisma.enrollment.count({
-      where: { classId, status: 'ACTIVE' },
+      where: { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
     });
 
     const subjectAverages: Record<string, { count: number; total: number; name: string }> = {};

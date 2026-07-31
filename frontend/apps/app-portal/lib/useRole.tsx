@@ -7,8 +7,11 @@ import { api } from './api';
 export type UserRole = 
   | 'SuperAdmin'
   | 'Director'
+  | 'Deputy Director'
   | 'Head Teacher'
   | 'Deputy'
+  | 'Deputy Head'
+  | 'HOD'
   | 'Accountant'
   | 'Secretary'
   | 'Teacher'
@@ -76,7 +79,7 @@ export function useAuth() {
   const isDirector = (): boolean => hasRole('Director');
   const isSuperAdmin = (): boolean => hasRole('SuperAdmin');
   const isTeacher = (): boolean => hasRole('Teacher', 'Class Teacher');
-  const isAdmin = (): boolean => hasRole('Director', 'SuperAdmin', 'Head Teacher', 'Deputy', 'HOD');
+  const isAdmin = (): boolean => hasRole('Director', 'SuperAdmin', 'Head Teacher', 'Deputy', 'Deputy Head', 'HOD');
 
   return {
     user,

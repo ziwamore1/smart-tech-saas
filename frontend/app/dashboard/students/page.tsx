@@ -30,6 +30,8 @@ export default function StudentsPage() {
   const [includeInactive, setIncludeInactive] = useState(false);
   const [linkParentSearch, setLinkParentSearch] = useState('');
   const [selectedParentId, setSelectedParentId] = useState('');
+  const [statusModalStudent, setStatusModalStudent] = useState<any>(null);
+  const [newStatus, setNewStatus] = useState('ACTIVE');
 
   const { data: parentsData } = useQuery({
     queryKey: ['parents-search', linkParentSearch],
@@ -131,6 +133,16 @@ export default function StudentsPage() {
       if (data?.academicYears) data = data.academicYears;
       return Array.isArray(data) ? data : [];
     },
+  });
+
+  const { data: viewStudentData } = useQuery({
+    queryKey: ['student-detail', selectedStudent?.id],
+    queryFn: async () => {
+      if (!selectedStudent?.id) return null;
+      const res = await studentApi.getById(selectedStudent.id);
+      return res.data?.data || res.data;
+    },
+    enabled: !!selectedStudent?.id && showViewModal,
   });
 
   const classes = Array.isArray(classesResponse) ? classesResponse : [];
@@ -273,6 +285,37 @@ export default function StudentsPage() {
     },
   });
 
+  const removeFromClassMutation = useMutation({
+    mutationFn: (enrollmentId: string) => enrollmentApi.removeFromClass(enrollmentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['school-stats'] });
+      setShowViewModal(false);
+      setSelectedStudent(null);
+      setMessage({ type: 'success', text: 'Student removed from class. Class register re-sequenced automatically.' });
+      setTimeout(() => setMessage(null), 5000);
+    },
+    onError: (error: any) => {
+      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to remove student from class.' });
+      setTimeout(() => setMessage(null), 5000);
+    },
+  });
+
+  const changeStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => studentApi.changeStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['school-stats'] });
+      setStatusModalStudent(null);
+      setMessage({ type: 'success', text: 'Student status updated. Non-ACTIVE students are excluded from exams, assessments, analytics and results.' });
+      setTimeout(() => setMessage(null), 5000);
+    },
+    onError: (error: any) => {
+      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to update student status.' });
+      setTimeout(() => setMessage(null), 5000);
+    },
+  });
+
   const enrollStudentMutation = useMutation({
     mutationFn: (data: any) => enrollmentApi.create(data),
     onSuccess: () => {
@@ -387,6 +430,22 @@ export default function StudentsPage() {
               <button onClick={() => { setSelectedStudent(student); setEditForm({ firstName: student.firstName || '', lastName: student.lastName || '', admissionNumber: student.admissionNumber || '', dateOfBirth: student.dateOfBirth ? student.dateOfBirth.split('T')[0] : '', gender: student.gender || '', email: student.email || '', phone: student.phone || '', address: student.address || '', parentName: student.parentName || '', parentPhone: student.parentPhone || '', parentEmail: student.parentEmail || '', }); setShowEditModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors">✏️ Edit</button>
               <button onClick={() => { setSelectedStudent(student); setShowEnrollmentModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-50 text-green-600 hover:bg-green-100 transition-colors">📚 Enroll</button>
               <button onClick={() => { setSelectedStudent(student); setShowLinkParentModal(true); setSelectedParentId(''); setLinkParentSearch(''); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-pink-50 text-pink-600 hover:bg-pink-100 transition-colors">👪 Parent</button>
+              <button onClick={() => { setStatusModalStudent(student); setNewStatus(student.status || 'ACTIVE'); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors">🔁 Status</button>
+              <button
+                onClick={() => {
+                  const enrollmentId = student.enrollments?.[0]?.id;
+                  if (!enrollmentId) {
+                    setMessage({ type: 'error', text: 'No enrollment to remove for this student.' });
+                    setTimeout(() => setMessage(null), 4000);
+                    return;
+                  }
+                  if (confirm(`Remove ${student.firstName} ${student.lastName} from ${student.enrollments?.[0]?.class?.name || 'this class'}? The class register will be re-sequenced automatically.`)) {
+                    removeFromClassMutation.mutate(enrollmentId);
+                  }
+                }}
+                disabled={removeFromClassMutation.isPending}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors disabled:opacity-50"
+              >↩️ Remove</button>
               <button onClick={() => { if (confirm(`Delete ${student.firstName} ${student.lastName}?`)) { deleteStudentMutation.mutate(student.id); } }} disabled={deleteStudentMutation.isPending} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50">🗑️ Delete</button>
             </div>
           </td>
@@ -992,26 +1051,43 @@ export default function StudentsPage() {
                 )}
               </div>
 
-              {selectedStudent.enrollments && selectedStudent.enrollments.length > 0 && (
+              {(() => {
+                const allEnrollments = viewStudentData?.enrollments || selectedStudent.enrollments || [];
+                if (allEnrollments.length === 0) return null;
+                return (
                 <div className="border-t pt-4 mt-4">
                   <h3 className="text-lg font-semibold mb-3">Enrollments</h3>
                   <div className="space-y-2">
-                    {selectedStudent.enrollments.map((enrollment: any) => (
+                    {allEnrollments.map((enrollment: any) => (
                       <div key={enrollment.id} className="bg-gray-50 p-3 rounded-lg">
-                        <div className="flex justify-between">
+                        <div className="flex justify-between items-center gap-2">
                           <span className="font-medium">{enrollment.class?.name}</span>
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            enrollment.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {enrollment.status}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              enrollment.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {enrollment.status}
+                            </span>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Remove ${selectedStudent.firstName} ${selectedStudent.lastName} from ${enrollment.class?.name}? The class register will be re-sequenced automatically.`)) {
+                                  removeFromClassMutation.mutate(enrollment.id);
+                                }
+                              }}
+                              disabled={removeFromClassMutation.isPending}
+                              className="px-2 py-1 rounded text-xs font-medium bg-orange-50 text-orange-600 hover:bg-orange-100 disabled:opacity-50"
+                            >
+                              Remove
+                            </button>
+                          </div>
                         </div>
                         <p className="text-sm text-gray-500">{enrollment.academicYear?.name}</p>
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               <div className="flex justify-end pt-4">
                 <button
@@ -1312,6 +1388,68 @@ export default function StudentsPage() {
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
                 >
                   {updateStudentMutation.isPending ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {statusModalStudent && (
+        <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">Change Status</h2>
+                <p className="text-gray-600 text-sm mt-1">
+                  {statusModalStudent.firstName} {statusModalStudent.lastName}
+                  {statusModalStudent.admissionNumber ? ` (${statusModalStudent.admissionNumber})` : ''}
+                </p>
+              </div>
+              <button onClick={() => setStatusModalStudent(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                <select
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg"
+                >
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                  <option value="TRANSFERRED">Transferred</option>
+                  <option value="GRADUATED">Graduated</option>
+                  <option value="WITHDRAWN">Withdrawn</option>
+                  <option value="SUSPENDED">Suspended</option>
+                  <option value="DECEASED">Deceased</option>
+                </select>
+              </div>
+
+              {newStatus !== 'ACTIVE' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+                  Setting a non-ACTIVE status deactivates the student's enrollment and excludes them from exams,
+                  school assessments, analytics, rankings and results.
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={() => setStatusModalStudent(null)}
+                  className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (statusModalStudent.status !== newStatus && confirm(`Change ${statusModalStudent.firstName} ${statusModalStudent.lastName}'s status to ${newStatus.replace('_', ' ').toLowerCase()}?`)) {
+                      changeStatusMutation.mutate({ id: statusModalStudent.id, status: newStatus });
+                    }
+                  }}
+                  disabled={changeStatusMutation.isPending}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400"
+                >
+                  {changeStatusMutation.isPending ? 'Saving...' : 'Save Status'}
                 </button>
               </div>
             </div>

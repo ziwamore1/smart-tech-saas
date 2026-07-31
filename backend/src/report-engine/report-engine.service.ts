@@ -221,6 +221,7 @@ export class ReportEngineService {
             studentId: request.studentId,
             termId: request.termId,
             status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+            student: { status: 'ACTIVE' },
           },
         });
         if (computedResults.length === 0) {
@@ -379,7 +380,7 @@ export class ReportEngineService {
 
     if (request.type === ReportType.CLASS_REPORT && request.classId && request.termId) {
       const enrollments = await this.prisma.enrollment.findMany({
-        where: { classId: request.classId, status: 'ACTIVE' },
+        where: { classId: request.classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
         select: { studentId: true },
       });
 
@@ -580,6 +581,7 @@ export class ReportEngineService {
         studentId: request.studentId!,
         academicYear: { terms: { some: { id: request.termId } } },
         status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
       },
       include: { class: true, academicYear: true },
     });
@@ -619,7 +621,7 @@ export class ReportEngineService {
       whereClause.studentId = request.studentId;
     } else if (request.classId) {
       const enrollments = await this.prisma.enrollment.findMany({
-        where: { classId: request.classId, status: 'ACTIVE' },
+        where: { classId: request.classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
         select: { studentId: true },
       });
       const studentIds = enrollments.map(e => e.studentId);
@@ -648,17 +650,17 @@ export class ReportEngineService {
 <!DOCTYPE html>
 <html>
 <head><style>
-  body { font-family: Arial, sans-serif; padding: 40px; }
+  body { font-family: Arial, sans-serif; padding: 40px; font-size: 13px; color: #111827; }
   .header { text-align: center; margin-bottom: 30px; }
   .school-name { font-size: 24px; font-weight: bold; color: #1a365d; }
-  .subtitle { font-size: 14px; color: #666; margin-top: 5px; }
+  .subtitle { font-size: 15px; color: #374151; margin-top: 5px; }
   table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-  th, td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 12px; }
-  th { background: #1a365d; color: white; }
+  th, td { border: 1px solid #9ca3af; padding: 8px; text-align: center; font-size: 13px; }
+  th { background: #1a365d; color: white; font-weight: 700; }
   .stat-grid { display: flex; gap: 15px; margin: 20px 0; }
-  .stat-box { flex: 1; background: #f8fafc; border-radius: 8px; padding: 15px; text-align: center; }
-  .stat-value { font-size: 24px; font-weight: bold; }
-  .stat-label { font-size: 11px; color: #666; margin-top: 4px; }
+  .stat-box { flex: 1; background: #f8fafc; border: 1px solid #9ca3af; border-radius: 8px; padding: 15px; text-align: center; }
+  .stat-value { font-size: 26px; font-weight: bold; }
+  .stat-label { font-size: 12px; color: #374151; margin-top: 4px; font-weight: 600; }
 </style></head>
 <body>
   <div class="header">
@@ -666,11 +668,11 @@ export class ReportEngineService {
     <div class="subtitle">Attendance Report — ${term.name} (${term.academicYear?.name || ''})</div>
   </div>
   <div class="stat-grid">
-    <div class="stat-box"><div class="stat-value" style="color:#2563eb">${total}</div><div class="stat-label">Total Records</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#16a34a">${present}</div><div class="stat-label">Present</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#dc2626">${absent}</div><div class="stat-label">Absent</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#f59e0b">${late}</div><div class="stat-label">Late</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#7c3aed">${rate}%</div><div class="stat-label">Attendance Rate</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:#1d4ed8">${total}</div><div class="stat-label">Total Records</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:#047857">${present}</div><div class="stat-label">Present</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:#b91c1c">${absent}</div><div class="stat-label">Absent</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:#b45309">${late}</div><div class="stat-label">Late</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:#6d28d9">${rate}%</div><div class="stat-label">Attendance Rate</div></div>
   </div>
   <table>
     <thead><tr><th>#</th><th>Student</th><th>Admission No</th><th>Present</th><th>Absent</th><th>Late</th><th>Rate</th></tr></thead>
@@ -713,7 +715,7 @@ export class ReportEngineService {
         <td style="text-align:left">${student?.firstName || ''} ${student?.lastName || ''}</td>
         <td>${student?.admissionNumber || ''}</td>
         <td>${present}</td><td>${absent}</td><td>${late}</td>
-        <td style="font-weight:bold;color:${Number(rate) >= 80 ? '#16a34a' : Number(rate) >= 60 ? '#f59e0b' : '#dc2626'}">${rate}%</td>
+        <td style="font-weight:bold;color:${Number(rate) >= 80 ? '#047857' : Number(rate) >= 60 ? '#b45309' : '#b91c1c'}">${rate}%</td>
       </tr>`;
     }
     return rows;
@@ -761,7 +763,7 @@ export class ReportEngineService {
 
     // Get enrolled student IDs for the class (if classId provided) or school
     let enrolledStudentIds: string[] = [];
-    const enrollmentWhere: any = { schoolId: request.schoolId, status: 'ACTIVE' };
+    const enrollmentWhere: any = { schoolId: request.schoolId, status: 'ACTIVE', student: { status: 'ACTIVE' } };
     if (request.classId) {
       enrollmentWhere.classId = request.classId;
     }
@@ -780,6 +782,7 @@ export class ReportEngineService {
       schoolId: request.schoolId,
       status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
       finalPercentage: { not: null },
+      student: { status: 'ACTIVE' },
     };
     if (request.classId) {
       whereCondition.classId = request.classId;
@@ -800,6 +803,7 @@ export class ReportEngineService {
           studentId: { in: missingStudentIds },
           termId: request.termId,
           schoolId: request.schoolId,
+          student: { status: 'ACTIVE' },
         },
         include: { subject: { select: { id: true, name: true } }, student: { select: { id: true, firstName: true, lastName: true } } },
       });
@@ -875,7 +879,7 @@ export class ReportEngineService {
         const passCount = data.scores.filter(p => p >= 50).length;
         return `<tr>
           <td style="text-align:left;font-weight:500">${name}</td>
-          <td style="text-align:left">${teacher || '<span style=\"color:#999\">N/A</span>'}</td>
+          <td style="text-align:left">${teacher || '<span style=\"color:#6b7280\">N/A</span>'}</td>
           <td>${data.scores.length}</td>
           <td style="font-weight:600">${subjectAvg}%</td>
           <td>${Math.max(...data.scores).toFixed(1)}%</td>
@@ -890,28 +894,28 @@ export class ReportEngineService {
 <!DOCTYPE html>
 <html>
 <head><style>
-  body { font-family: Arial, sans-serif; padding: 40px; }
+  body { font-family: Arial, sans-serif; padding: 40px; font-size: 13px; color: #111827; }
   .header { text-align: center; margin-bottom: 30px; }
   .school-name { font-size: 24px; font-weight: bold; color: #1a365d; }
   table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-  th, td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 12px; }
-  th { background: #1a365d; color: white; }
+  th, td { border: 1px solid #9ca3af; padding: 8px; text-align: center; font-size: 13px; }
+  th { background: #1a365d; color: white; font-weight: 700; }
   .stat-grid { display: flex; gap: 15px; margin: 20px 0; }
-  .stat-box { flex: 1; background: #f8fafc; border-radius: 8px; padding: 15px; text-align: center; }
-  .stat-value { font-size: 24px; font-weight: bold; }
-  .stat-label { font-size: 11px; color: #666; margin-top: 4px; }
+  .stat-box { flex: 1; background: #f8fafc; border: 1px solid #9ca3af; border-radius: 8px; padding: 15px; text-align: center; }
+  .stat-value { font-size: 26px; font-weight: bold; }
+  .stat-label { font-size: 12px; color: #374151; margin-top: 4px; font-weight: 600; }
 </style></head>
 <body>
   <div class="header">
     <div class="school-name">${school?.name || 'School'}</div>
-    <div style="font-size:14px;color:#666;margin-top:5px">Subject Performance Analytics${classLabel} — ${term?.name || ''} (${term?.academicYear?.name || ''})</div>
+    <div style="font-size:15px;color:#374151;margin-top:5px">Subject Performance Analytics${classLabel} — ${term?.name || ''} (${term?.academicYear?.name || ''})</div>
   </div>
   <div class="stat-grid">
-    <div class="stat-box"><div class="stat-value" style="color:#2563eb">${totalStudents}</div><div class="stat-label">Students</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#16a34a">${avg}%</div><div class="stat-label">Average</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#7c3aed">${highest}%</div><div class="stat-label">Highest</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#dc2626">${lowest}%</div><div class="stat-label">Lowest</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#f59e0b">${passRate}%</div><div class="stat-label">Pass Rate</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:#1d4ed8">${totalStudents}</div><div class="stat-label">Students</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:#047857">${avg}%</div><div class="stat-label">Average</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:#6d28d9">${highest}%</div><div class="stat-label">Highest</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:#b91c1c">${lowest}%</div><div class="stat-label">Lowest</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:#b45309">${passRate}%</div><div class="stat-label">Pass Rate</div></div>
   </div>
   <h3 style="margin-top:30px;color:#1a365d">Subject Performance</h3>
   <table>
@@ -951,7 +955,7 @@ export class ReportEngineService {
     });
 
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { classId: request.classId, academicYearId: term?.academicYearId, status: 'ACTIVE' },
+      where: { classId: request.classId, academicYearId: term?.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       include: { student: { select: { firstName: true, lastName: true, admissionNumber: true } } },
     });
 
@@ -962,22 +966,23 @@ export class ReportEngineService {
         termId: request.termId,
         classId: request.classId,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        student: { status: 'ACTIVE' },
       },
     });
 
     const subjectHeaders = classSubjects.map(cs =>
-      `<th style="padding:6px 8px;border:1px solid #ddd;background:#1a365d;color:white;font-size:10px">${cs.subject.name}</th>`
+      `<th style="padding:6px 8px;border:1px solid #9ca3af;background:#1a365d;color:white;font-size:12px;font-weight:700">${cs.subject.name}</th>`
     ).join('');
 
     const studentRows = enrollments.map((e, idx) => {
       const cells = classSubjects.map(cs => {
         const result = results.find(r => r.studentId === e.studentId && r.subjectId === cs.subjectId);
-        return `<td style="padding:5px 8px;border:1px solid #ddd;text-align:center;font-size:10px">${result?.finalPercentage != null ? result.finalPercentage.toFixed(1) : '—'}</td>`;
+        return `<td style="padding:5px 8px;border:1px solid #9ca3af;text-align:center;font-size:12px">${result?.finalPercentage != null ? result.finalPercentage.toFixed(1) : '—'}</td>`;
       }).join('');
 
-      return `<tr style="background:${idx % 2 === 0 ? 'white' : '#f8fafc'}">
-        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${e.student.admissionNumber}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;text-align:left;font-size:10px">${e.student.firstName} ${e.student.lastName}</td>
+      return `<tr style="background:${idx % 2 === 0 ? 'white' : '#f3f4f6'}">
+        <td style="padding:5px 8px;border:1px solid #9ca3af;font-size:12px">${e.student.admissionNumber}</td>
+        <td style="padding:5px 8px;border:1px solid #9ca3af;text-align:left;font-size:12px;font-weight:600">${e.student.firstName} ${e.student.lastName}</td>
         ${cells}
       </tr>`;
     }).join('');
@@ -986,20 +991,20 @@ export class ReportEngineService {
 <!DOCTYPE html>
 <html>
 <head><style>
-  body { font-family: Arial, sans-serif; padding: 30px; }
+  body { font-family: Arial, sans-serif; padding: 30px; font-size: 12px; color: #111827; }
   .header { text-align: center; margin-bottom: 20px; }
   table { width: 100%; border-collapse: collapse; }
-  th, td { border: 1px solid #ddd; }
+  th, td { border: 1px solid #9ca3af; }
 </style></head>
 <body>
   <div class="header">
     <div style="font-size:22px;font-weight:bold;color:#1a365d">${school?.name || 'School'}</div>
-    <div style="font-size:13px;color:#666;margin-top:4px">Mark Schedule — ${term?.name || ''}</div>
+    <div style="font-size:14px;color:#374151;margin-top:4px">Mark Schedule — ${term?.name || ''}</div>
   </div>
   <table>
     <thead><tr>
-      <th style="padding:6px 8px;border:1px solid #ddd;background:#1a365d;color:white;font-size:10px">Adm. No</th>
-      <th style="padding:6px 8px;border:1px solid #ddd;background:#1a365d;color:white;font-size:10px;text-align:left">Student</th>
+      <th style="padding:6px 8px;border:1px solid #9ca3af;background:#1a365d;color:white;font-size:12px;font-weight:700">Adm. No</th>
+      <th style="padding:6px 8px;border:1px solid #9ca3af;background:#1a365d;color:white;font-size:12px;font-weight:700;text-align:left">Student</th>
       ${subjectHeaders}
     </tr></thead>
     <tbody>${studentRows}</tbody>

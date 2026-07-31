@@ -6,42 +6,42 @@
 <style>
   @page { margin: 15mm 10mm; size: A4 landscape; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; font-size: 10px; color: #1f2937; line-height: 1.4; }
+  body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; font-size: 12px; color: #111827; line-height: 1.4; }
 
   .school-header { text-align: center; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 3px solid {{primaryColor}}; }
-  .school-header h1 { font-size: 20px; font-weight: 700; color: {{primaryColor}}; margin: 0; }
-  .school-header p { font-size: 11px; color: #6b7280; margin: 4px 0 0; }
+  .school-header h1 { font-size: 22px; font-weight: 800; color: {{primaryColor}}; margin: 0; }
+  .school-header p { font-size: 12px; color: #374151; margin: 4px 0 0; }
 
   .report-title { text-align: center; margin-bottom: 14px; }
-  .report-title h2 { font-size: 16px; font-weight: 700; color: #1f2937; margin: 0; }
-  .report-title p { font-size: 11px; color: #6b7280; margin: 2px 0 0; }
+  .report-title h2 { font-size: 18px; font-weight: 800; color: #111827; margin: 0; }
+  .report-title p { font-size: 12px; color: #374151; margin: 2px 0 0; }
 
   .summary-grid { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-  .summary-card { flex: 1; min-width: 100px; border-radius: 6px; padding: 10px 14px; text-align: center; border: 1px solid #e5e7eb; }
-  .summary-card .card-value { font-size: 20px; font-weight: 700; }
-  .summary-card .card-label { font-size: 8px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
-  .summary-card.total { background: #f9fafb; } .summary-card.total .card-value { color: {{primaryColor}}; }
-  .summary-card.male { background: #eff6ff; } .summary-card.male .card-value { color: #2563eb; }
-  .summary-card.female { background: #fdf2f8; } .summary-card.female .card-value { color: #db2777; }
-  .summary-card.capacity { background: #f0fdf4; } .summary-card.capacity .card-value { color: #059669; }
+  .summary-card { flex: 1; min-width: 100px; border-radius: 6px; padding: 10px 14px; text-align: center; border: 1.5px solid #9ca3af; }
+  .summary-card .card-value { font-size: 21px; font-weight: 800; }
+  .summary-card .card-label { font-size: 10px; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; font-weight: 600; }
+  .summary-card.total { background: #f3f4f6; } .summary-card.total .card-value { color: {{primaryColor}}; }
+  .summary-card.male { background: #dbeafe; } .summary-card.male .card-value { color: #1d4ed8; }
+  .summary-card.female { background: #fce7f3; } .summary-card.female .card-value { color: #be185d; }
+  .summary-card.capacity { background: #d1fae5; } .summary-card.capacity .card-value { color: #047857; }
 
-  .info-bar { display: flex; gap: 20px; font-size: 11px; color: #6b7280; margin-bottom: 12px; padding: 8px 12px; background: #f9fafb; border-radius: 6px; }
-  .info-bar strong { color: #374151; }
+  .info-bar { display: flex; gap: 20px; font-size: 12px; color: #374151; margin-bottom: 12px; padding: 8px 12px; background: #f3f4f6; border-radius: 6px; border: 1px solid #d1d5db; }
+  .info-bar strong { color: #111827; }
 
   table.students { width: 100%; border-collapse: collapse; margin-top: 6px; }
-  table.students th { background: {{primaryColor}}; color: white; padding: 7px 10px; font-size: 9px; font-weight: 600; text-align: center; text-transform: uppercase; letter-spacing: 0.4px; }
-  table.students td { padding: 5px 10px; text-align: center; border-bottom: 1px solid #e5e7eb; font-size: 10px; }
-  table.students tr:nth-child(even) { background: #f9fafb; }
-  table.students tr:hover { background: #f3f4f6; }
+  table.students th { background: #1f2937; color: #ffffff; padding: 7px 10px; font-size: 11px; font-weight: 700; text-align: center; text-transform: uppercase; letter-spacing: 0.4px; border: 1px solid #111827; }
+  table.students td { padding: 5px 10px; text-align: center; border: 1px solid #9ca3af; border-bottom-width: 1.5px; font-size: 11px; }
+  table.students tr:nth-child(even) { background: #f3f4f6; }
+  table.students tr:hover { background: #e5e7eb; }
   table.students .left { text-align: left; }
   table.students .name { text-align: left; font-weight: 600; }
 
-  .gender-male { color: #2563eb; font-weight: 700; }
-  .gender-female { color: #db2777; font-weight: 700; }
-  .status-active { color: #059669; font-weight: 600; }
-  .status-inactive { color: #dc2626; font-weight: 600; }
+  .gender-male { color: #1d4ed8; font-weight: 700; }
+  .gender-female { color: #be185d; font-weight: 700; }
+  .status-active { color: #047857; font-weight: 700; }
+  .status-inactive { color: #b91c1c; font-weight: 700; }
 
-  .footer { margin-top: 18px; font-size: 9px; color: #9ca3af; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+  .footer { margin-top: 18px; font-size: 10px; color: #374151; text-align: center; border-top: 1px solid #9ca3af; padding-top: 8px; }
   .footer .meta { display: flex; justify-content: space-between; }
 
   .page-break { page-break-after: always; }

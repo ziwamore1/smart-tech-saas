@@ -4,122 +4,122 @@
 @page { size: A4; margin: 15mm 18mm 15mm 18mm; }
 @page:first { margin-top: 12mm; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; color: #1a1a2e; font-size: 11px; line-height: 1.4; }
+body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; color: #111827; font-size: 13px; line-height: 1.4; }
 
 /* ===== HEADER ===== */
 .header { text-align: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 3px solid {{primaryColor}}; }
-.school-name { font-size: 22px; font-weight: 800; color: {{primaryColor}}; letter-spacing: 0.5px; }
-.report-title { font-size: 14px; color: #555; margin-top: 2px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-.term-info { font-size: 12px; color: #777; margin-top: 3px; }
-.header-text { font-size: 10px; color: #888; margin-top: 4px; font-style: italic; }
+.school-name { font-size: 23px; font-weight: 800; color: {{primaryColor}}; letter-spacing: 0.5px; }
+.report-title { font-size: 15px; color: #111827; margin-top: 2px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+.term-info { font-size: 13px; color: #374151; margin-top: 3px; }
+.header-text { font-size: 12px; color: #4b5563; margin-top: 4px; font-style: italic; }
 
 /* ===== STUDENT INFO ===== */
 .student-section { display: flex; gap: 12px; margin-bottom: 10px; align-items: stretch; }
-.student-info-card { flex: 1; background: #f8f9fc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; }
-.student-info-card h3 { font-size: 11px; color: {{primaryColor}}; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; }
-.info-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 10px; }
-.info-label { color: #666; font-weight: 600; }
-.info-value { color: #1a1a2e; font-weight: 700; }
+.student-info-card { flex: 1; background: #f8f9fc; border: 1px solid #9ca3af; border-radius: 6px; padding: 10px; }
+.student-info-card h3 { font-size: 13px; color: {{primaryColor}}; margin-bottom: 6px; border-bottom: 1px solid #9ca3af; padding-bottom: 3px; }
+.info-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 12px; }
+.info-label { color: #374151; font-weight: 700; }
+.info-value { color: #111827; font-weight: 700; }
 .photo-box { width: 70px; height: 85px; border: 2px solid {{primaryColor}}; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #f0f0f0; }
 .photo-box img { width: 100%; height: 100%; object-fit: cover; }
-.photo-placeholder { font-size: 28px; color: #ccc; }
+.photo-placeholder { font-size: 28px; color: #6b7280; }
 
 /* ===== DIVISION & PERFORMANCE BADGE ===== */
 .performance-bar { display: flex; justify-content: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
-.badge { padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 11px; text-align: center; }
+.badge { padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 12px; text-align: center; }
 .division-badge { background: {{#if division}}{{division.color}}{{else}}#6b7280{{/if}}20; color: {{#if division}}{{division.color}}{{else}}#6b7280{{/if}}; border: 2px solid {{#if division}}{{division.color}}{{else}}#6b7280{{/if}}; }
 .category-badge { background: {{#if performanceCategory}}{{performanceCategory.color}}{{else}}#6b7280{{/if}}20; color: {{#if performanceCategory}}{{performanceCategory.color}}{{else}}#6b7280{{/if}}; border: 2px solid {{#if performanceCategory}}{{performanceCategory.color}}{{else}}#6b7280{{/if}}; }
 
 /* ===== RESULTS TABLE ===== */
 .section { margin-bottom: 10px; }
-.section-title { font-size: 12px; font-weight: 800; color: {{primaryColor}}; margin-bottom: 5px; padding-bottom: 3px; border-bottom: 2px solid {{primaryColor}}; text-transform: uppercase; letter-spacing: 0.5px; }
+.section-title { font-size: 13px; font-weight: 800; color: {{primaryColor}}; margin-bottom: 5px; padding-bottom: 3px; border-bottom: 2px solid {{primaryColor}}; text-transform: uppercase; letter-spacing: 0.5px; }
 table { width: 100%; border-collapse: collapse; }
-th { background: {{primaryColor}}; color: white; padding: 4px 5px; text-align: center; font-size: 9px; font-weight: 700; }
-td { padding: 3px 5px; text-align: center; font-size: 9px; border-bottom: 1px solid #e8e8e8; }
+th { background: #1f2937; color: #ffffff; padding: 5px 5px; text-align: center; font-size: 11px; font-weight: 700; border: 1px solid #111827; }
+td { padding: 4px 5px; text-align: center; font-size: 11px; border: 1px solid #9ca3af; border-bottom-width: 1.5px; }
 tr:nth-child(even) { background: {{secondaryColor}}; }
-.subject-name { text-align: left !important; font-weight: 600; }
-.perf-cat { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 8px; font-weight: 700; }
+.subject-name { text-align: left !important; font-weight: 700; }
+.perf-cat { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 700; }
 
 /* ===== CHARTS ===== */
 .charts-row { display: flex; gap: 10px; margin-bottom: 10px; }
-.chart-card { flex: 1; background: #f8f9fc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; }
-.chart-title { font-size: 10px; font-weight: 700; color: {{primaryColor}}; margin-bottom: 6px; text-align: center; }
+.chart-card { flex: 1; background: #f8f9fc; border: 1px solid #9ca3af; border-radius: 6px; padding: 8px; }
+.chart-title { font-size: 12px; font-weight: 700; color: {{primaryColor}}; margin-bottom: 6px; text-align: center; }
 
 /* Bar Chart */
 .bar-chart { display: flex; flex-direction: column; gap: 3px; }
 .bar-row { display: flex; align-items: center; gap: 5px; }
-.bar-label { width: 60px; font-size: 8px; font-weight: 600; text-align: right; color: #555; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bar-track { flex: 1; height: 12px; background: #e8ecf1; border-radius: 3px; overflow: hidden; }
-.bar-fill { height: 100%; border-radius: 3px; display: flex; align-items: center; justify-content: flex-end; padding-right: 3px; font-size: 7px; font-weight: 700; color: white; min-width: 16px; }
+.bar-label { width: 60px; font-size: 10px; font-weight: 700; text-align: right; color: #374151; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-track { flex: 1; height: 12px; background: #e5e7eb; border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; display: flex; align-items: center; justify-content: flex-end; padding-right: 3px; font-size: 9px; font-weight: 700; color: white; min-width: 16px; }
 .bar-fill.excellent { background: linear-gradient(90deg, #10b981, #059669); }
 .bar-fill.good { background: linear-gradient(90deg, #3b82f6, #2563eb); }
 .bar-fill.average { background: linear-gradient(90deg, #f59e0b, #d97706); }
 .bar-fill.below { background: linear-gradient(90deg, #ef4444, #dc2626); }
-.bar-avg { position: absolute; top: 0; height: 100%; width: 2px; background: #1a1a2e; z-index: 2; }
+.bar-avg { position: absolute; top: 0; height: 100%; width: 2px; background: #111827; z-index: 2; }
 
 /* Pie Chart */
 .pie-container { display: flex; align-items: center; gap: 10px; justify-content: center; }
 .pie-chart { width: 80px; height: 80px; border-radius: 50%; position: relative; }
-.pie-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 36px; height: 36px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: {{primaryColor}}; }
+.pie-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 36px; height: 36px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: {{primaryColor}}; }
 .pie-legend { display: flex; flex-direction: column; gap: 2px; }
-.legend-item { display: flex; align-items: center; gap: 4px; font-size: 8px; }
+.legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; }
 .legend-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
 /* Histogram */
 .histogram { display: flex; align-items: flex-end; gap: 2px; height: 60px; padding-top: 4px; }
 .hist-bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; }
 .hist-fill { width: 100%; border-radius: 2px 2px 0 0; min-height: 2px; }
-.hist-label { font-size: 7px; color: #666; word-break: break-word; max-width: 45px; }
-.hist-count { font-size: 7px; font-weight: 700; color: #333; }
+.hist-label { font-size: 9px; color: #374151; word-break: break-word; max-width: 45px; }
+.hist-count { font-size: 9px; font-weight: 700; color: #111827; }
 
 /* ===== MID-TERM COMPARISON ===== */
 .comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.comparison-card { background: #f8f9fc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; }
-.comparison-title { font-size: 10px; font-weight: 700; color: {{primaryColor}}; margin-bottom: 4px; }
-.comparison-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 9px; }
-.trend-up { color: #10b981; font-weight: 700; }
-.trend-down { color: #ef4444; font-weight: 700; }
-.trend-same { color: #6b7280; font-weight: 700; }
+.comparison-card { background: #f8f9fc; border: 1px solid #9ca3af; border-radius: 6px; padding: 8px; }
+.comparison-title { font-size: 12px; font-weight: 700; color: {{primaryColor}}; margin-bottom: 4px; }
+.comparison-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; }
+.trend-up { color: #065f46; font-weight: 700; }
+.trend-down { color: #b91c1c; font-weight: 700; }
+.trend-same { color: #374151; font-weight: 700; }
 
 /* ===== CLASS STATS ===== */
 .stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-bottom: 6px; }
-.stat-item { background: #f8f9fc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 5px; text-align: center; }
-.stat-value { font-size: 13px; font-weight: 800; color: {{primaryColor}}; }
-.stat-label { font-size: 7px; color: #666; margin-top: 1px; }
+.stat-item { background: #f8f9fc; border: 1px solid #9ca3af; border-radius: 4px; padding: 5px; text-align: center; }
+.stat-value { font-size: 14px; font-weight: 800; color: {{primaryColor}}; }
+.stat-label { font-size: 9px; color: #374151; margin-top: 1px; font-weight: 600; }
 
 /* ===== BEST SUBJECTS ===== */
 .best-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
-.best-item { padding: 4px; border: 1px solid #e2e8f0; border-radius: 4px; text-align: center; border-top: 3px solid {{primaryColor}}; }
-.best-item.top { border-top-color: #f59e0b; background: #fffbeb; }
-.best-subject { font-size: 8px; font-weight: 700; color: #333; }
-.best-score { font-size: 11px; font-weight: 800; color: {{primaryColor}}; }
+.best-item { padding: 4px; border: 1px solid #9ca3af; border-radius: 4px; text-align: center; border-top: 3px solid {{primaryColor}}; }
+.best-item.top { border-top-color: #d97706; background: #fef3c7; }
+.best-subject { font-size: 10px; font-weight: 700; color: #111827; }
+.best-score { font-size: 13px; font-weight: 800; color: {{primaryColor}}; }
 
 /* ===== PARENT ANALYSIS ===== */
-.analysis-box { background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 1px solid #bae6fd; border-radius: 6px; padding: 8px; margin-bottom: 8px; }
-.analysis-title { font-size: 10px; font-weight: 800; color: #0369a1; margin-bottom: 4px; }
-.analysis-text { font-size: 9px; color: #334155; line-height: 1.5; }
-.strength-item, .weakness-item { display: flex; align-items: flex-start; gap: 4px; padding: 1px 0; font-size: 9px; }
-.strength-item::before { content: "✓"; color: #10b981; font-weight: 700; }
-.weakness-item::before { content: "△"; color: #f59e0b; font-weight: 700; }
+.analysis-box { background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 1px solid #93c5fd; border-radius: 6px; padding: 8px; margin-bottom: 8px; }
+.analysis-title { font-size: 12px; font-weight: 800; color: #0369a1; margin-bottom: 4px; }
+.analysis-text { font-size: 11px; color: #1f2937; line-height: 1.5; }
+.strength-item, .weakness-item { display: flex; align-items: flex-start; gap: 4px; padding: 1px 0; font-size: 11px; }
+.strength-item::before { content: "✓"; color: #065f46; font-weight: 700; }
+.weakness-item::before { content: "△"; color: #b45309; font-weight: 700; }
 
 /* ===== COMMENTS ===== */
 .comments-section { margin-bottom: 8px; }
-.comment-box { padding: 6px; border: 1px solid #e2e8f0; border-radius: 4px; margin-bottom: 5px; background: #fafbfc; }
-.comment-label { font-size: 9px; font-weight: 700; color: {{primaryColor}}; margin-bottom: 2px; }
-.comment-text { font-size: 9px; color: #333; line-height: 1.4; }
+.comment-box { padding: 6px; border: 1px solid #9ca3af; border-radius: 4px; margin-bottom: 5px; background: #fafbfc; }
+.comment-label { font-size: 11px; font-weight: 700; color: {{primaryColor}}; margin-bottom: 2px; }
+.comment-text { font-size: 11px; color: #111827; line-height: 1.4; }
 
 /* ===== GRADES LEGEND ===== */
 .legend-table { width: 100%; margin-top: 6px; }
-.legend-table th { background: {{primaryColor}}; color: white; padding: 3px 5px; font-size: 8px; }
-.legend-table td { padding: 3px 5px; font-size: 8px; text-align: center; border: 1px solid #e8e8e8; }
+.legend-table th { background: #1f2937; color: #ffffff; padding: 4px 5px; font-size: 11px; }
+.legend-table td { padding: 4px 5px; font-size: 11px; text-align: center; border: 1px solid #9ca3af; }
 
 /* ===== FOOTER ===== */
-.footer { margin-top: 15px; display: flex; justify-content: space-between; align-items: flex-end; padding-top: 8px; border-top: 1px solid #e2e8f0; }
+.footer { margin-top: 15px; display: flex; justify-content: space-between; align-items: flex-end; padding-top: 8px; border-top: 1px solid #9ca3af; }
 .signature-section { text-align: center; }
-.signature-line { margin-top: 20px; border-top: 1px solid #333; width: 130px; margin-left: auto; margin-right: auto; }
+.signature-line { margin-top: 20px; border-top: 1px solid #111827; width: 130px; margin-left: auto; margin-right: auto; }
 .stamp-section { text-align: center; }
 .stamp-image { max-width: 60px; max-height: 60px; }
-.footer-text { margin-top: 10px; font-size: 8px; color: #888; text-align: center; font-style: italic; border-top: 1px solid #e2e8f0; padding-top: 5px; }
+.footer-text { margin-top: 10px; font-size: 10px; color: #4b5563; text-align: center; font-style: italic; border-top: 1px solid #9ca3af; padding-top: 5px; }
 
 /* ===== PAGE BREAK CONTROL ===== */
 .avoid-break { page-break-inside: avoid; break-inside: avoid; }
@@ -185,17 +185,17 @@ tr:nth-child(even) { background: {{secondaryColor}}; }
 </div>
 
 <!-- University Benchmark -->
-<div style="background: linear-gradient(135deg, #fefce8, #fef9c3); border: 2px solid #eab308; border-radius: 8px; padding: 10px; text-align: center; margin-top: 6px;">
-<div style="font-size: 10px; color: #713f12; margin-bottom: 5px; font-weight: 600;">University Benchmark — Best 6 Aggregate Points</div>
+<div style="background: linear-gradient(135deg, #fefce8, #fef9c3); border: 2px solid #a16207; border-radius: 8px; padding: 10px; text-align: center; margin-top: 6px;">
+<div style="font-size: 12px; color: #713f12; margin-bottom: 5px; font-weight: 700;">University Benchmark — Best 6 Aggregate Points</div>
 <div style="font-size: 32px; font-weight: 900; color: #a16207; line-height: 1;">{{totalPoints}}</div>
-<div style="font-size: 9px; color: #854d0e; margin-top: 3px;">out of 6 (best) to 54 (worst)</div>
+<div style="font-size: 11px; color: #854d0e; margin-top: 3px;">out of 6 (best) to 54 (worst)</div>
 {{#if bestSubjects.length}}
-<div style="margin-top: 6px; font-size: 8px; color: #713f12;">
+<div style="margin-top: 6px; font-size: 10px; color: #713f12;">
 <strong>Best {{bestSubjects.length}}:</strong> 
 {{#each bestSubjects}}{{subjectName}} ({{#if (present points)}}{{points}}{{else}}—{{/if}} pts){{#unless @last}}, {{/unless}}{{/each}}
 </div>
 {{/if}}
-<div style="margin-top: 4px; font-size: 8px; color: #92400e; font-style: italic;">Lower aggregate = stronger university admission</div>
+<div style="margin-top: 4px; font-size: 10px; color: #92400e; font-style: italic;">Lower aggregate = stronger university admission</div>
 </div>
 </div>
 
@@ -228,7 +228,7 @@ tr:nth-child(even) { background: {{secondaryColor}}; }
 <span class="perf-cat" style="background:{{performanceCategory.color}}25; color:{{performanceCategory.color}}">{{performanceCategory.label}}</span>
 {{else}}—{{/if}}
 </td>
-{{#if ../showRemarks}}<td style="font-size:8px">{{#if finalRemark}}{{finalRemark}}{{else}}—{{/if}}</td>{{/if}}
+{{#if ../showRemarks}}<td style="font-size:10px">{{#if finalRemark}}{{finalRemark}}{{else}}—{{/if}}</td>{{/if}}
 </tr>
 {{/each}}
 </table>
@@ -250,8 +250,8 @@ tr:nth-child(even) { background: {{secondaryColor}}; }
 {{/each}}
 </div>
 {{#if classAverage}}
-<div style="text-align:center; margin-top:4px; font-size:8px; color:#666">
-<span style="display:inline-block; width:7px; height:7px; background:#1a1a2e; border-radius:1px; vertical-align:middle; margin-right:2px"></span>
+<div style="text-align:center; margin-top:4px; font-size:10px; color:#374151">
+<span style="display:inline-block; width:7px; height:7px; background:#111827; border-radius:1px; vertical-align:middle; margin-right:2px"></span>
 Class Average: <strong>{{classAverage}}%</strong>
 </div>
 {{/if}}
@@ -263,7 +263,7 @@ Class Average: <strong>{{classAverage}}%</strong>
 {{#if gradeDistribution}}
 <div class="pie-container">
 <div class="pie-chart" style="background: conic-gradient({{#each gradeDistribution}}{{color}} {{startAngle}}deg {{endAngle}}deg{{#unless @last}},{{/unless}}{{/each}});">
-<div class="pie-center">{{subjectBreakdown.length}}<br><span style="font-size:7px;font-weight:400">subjects</span></div>
+<div class="pie-center">{{subjectBreakdown.length}}<br><span style="font-size:8px;font-weight:400">subjects</span></div>
 </div>
 <div class="pie-legend">
 {{#each gradeDistribution}}
@@ -275,7 +275,7 @@ Class Average: <strong>{{classAverage}}%</strong>
 </div>
 </div>
 {{else}}
-<div style="text-align:center; padding:15px; color:#999; font-size:9px">No grade data available</div>
+<div style="text-align:center; padding:15px; color:#4b5563; font-size:11px">No grade data available</div>
 {{/if}}
 </div>
 </div>
@@ -294,7 +294,7 @@ Class Average: <strong>{{classAverage}}%</strong>
 </div>
 {{/each}}
 </div>
-<div style="text-align:center; margin-top:3px; font-size:7px; color:#666">← Lower Grades | Grade Ranges | Higher Grades →</div>
+<div style="text-align:center; margin-top:3px; font-size:9px; color:#374151">← Lower Grades | Grade Ranges | Higher Grades →</div>
 </div>
 </div>
 {{/if}}
@@ -308,8 +308,8 @@ Class Average: <strong>{{classAverage}}%</strong>
 <div class="best-item {{#if @first}}top{{/if}}">
 <div class="best-subject">{{subjectName}}</div>
 <div class="best-score">{{#if (present finalPercentage)}}{{finalPercentage}}%{{else}}—{{/if}}</div>
-<div style="font-size:7px; color:#666">{{#if (present points)}}{{points}} pts{{else}}— pts{{/if}}</div>
-{{#if performanceCategory}}<span class="perf-cat" style="background:{{performanceCategory.color}}25; color:{{performanceCategory.color}}; font-size:7px">{{performanceCategory.label}}</span>{{/if}}
+<div style="font-size:9px; color:#374151">{{#if (present points)}}{{points}} pts{{else}}— pts{{/if}}</div>
+{{#if performanceCategory}}<span class="perf-cat" style="background:{{performanceCategory.color}}25; color:{{performanceCategory.color}}; font-size:9px">{{performanceCategory.label}}</span>{{/if}}
 </div>
 {{/each}}
 </div>
@@ -369,9 +369,9 @@ Class Average: <strong>{{classAverage}}%</strong>
 </div>
 {{/each}}
 </div>
-<div style="text-align:center; margin-top:4px; font-size:8px; color:#666">
+<div style="text-align:center; margin-top:4px; font-size:10px; color:#374151">
 <span style="display:inline-block; width:10px; height:6px; background:#3b82f680; border-radius:2px; vertical-align:middle; margin-right:2px"></span> Your Score &nbsp;&nbsp;
-<span style="display:inline-block; width:10px; height:2px; background:#1a1a2e; vertical-align:middle; margin-right:2px"></span> Class Average
+<span style="display:inline-block; width:10px; height:2px; background:#111827; vertical-align:middle; margin-right:2px"></span> Class Average
 </div>
 </div>
 </div>
@@ -397,10 +397,10 @@ Class Average: <strong>{{classAverage}}%</strong>
 {{/if}}
 
 {{#if termSummary.aiInsights}}
-<div style="margin-top:6px; padding:5px; background: #eff6ff; border-radius:4px; border-left:3px solid #3b82f6;">
-<strong style="color:#1d4ed8">Insights:</strong>
+<div style="margin-top:6px; padding:5px; background: #eff6ff; border-radius:4px; border-left:3px solid #1d4ed8;">
+<strong style="color:#1e3a8a">Insights:</strong>
 {{#each termSummary.aiInsights}}
-<div style="margin-top:2px; font-size:9pt; color:#1e40af;">• {{this}}</div>
+<div style="margin-top:2px; font-size:11px; color:#1e3a8a;">• {{this}}</div>
 {{/each}}
 </div>
 {{/if}}
@@ -448,7 +448,7 @@ Together, we can help {{student.firstName}} achieve better results.
 {{/if}}
 {{#unless teacherComment}}{{#unless headComment}}
 <div class="comment-box">
-<div class="comment-text" style="color:#999; font-style:italic">No comments available for this term.</div>
+<div class="comment-text" style="color:#4b5563; font-style:italic">No comments available for this term.</div>
 </div>
 {{/unless}}{{/unless}}
 </div>
@@ -472,7 +472,7 @@ Together, we can help {{student.firstName}} achieve better results.
 
 <!-- Curriculum Info -->
 {{#if curriculum.version}}
-<div style="text-align:center; font-size:8px; color:#999; margin-top:6px">
+<div style="text-align:center; font-size:10px; color:#4b5563; margin-top:6px">
 Curriculum: {{curriculum.version}}{{#if curriculum.bestSubjectRule.name}} • Best Subject Rule: {{curriculum.bestSubjectRule.name}}{{/if}}
 </div>
 {{/if}}
@@ -482,7 +482,7 @@ Curriculum: {{curriculum.version}}{{#if curriculum.bestSubjectRule.name}} • Be
 <div class="signature-section">
 {{#if includeSignature}}{{#if signatureUrl}}<img src="{{signatureUrl}}" class="stamp-image" style="max-height:35px; margin-bottom:2px"/>{{/if}}{{/if}}
 <div class="signature-line"></div>
-<div style="font-size:8px; margin-top:3px">Class Teacher</div>
+<div style="font-size:10px; margin-top:3px; font-weight:600">Class Teacher</div>
 </div>
 <div class="stamp-section">
 {{#if includeStamp}}{{#if stampUrl}}<img src="{{stampUrl}}" class="stamp-image"/>{{/if}}{{/if}}
@@ -490,7 +490,7 @@ Curriculum: {{curriculum.version}}{{#if curriculum.bestSubjectRule.name}} • Be
 <div class="signature-section">
 {{#if includeSignature}}{{#if signatureUrl}}<img src="{{signatureUrl}}" class="stamp-image" style="max-height:35px; margin-bottom:2px"/>{{/if}}{{/if}}
 <div class="signature-line"></div>
-<div style="font-size:8px; margin-top:3px">{{#if directorName}}{{directorName}}{{else}}Head Teacher{{/if}}</div>
+<div style="font-size:10px; margin-top:3px; font-weight:600">{{#if directorName}}{{directorName}}{{else}}Head Teacher{{/if}}</div>
 </div>
 </div>
 

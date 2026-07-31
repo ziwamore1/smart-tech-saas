@@ -205,7 +205,7 @@ export class CompositeSubjectService {
     if (composites.length === 0) return [];
 
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { classId, academicYear: { terms: { some: { id: termId } } }, status: 'ACTIVE' },
+      where: { classId, academicYear: { terms: { some: { id: termId } } }, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       select: { studentId: true },
     });
 
@@ -227,7 +227,7 @@ export class CompositeSubjectService {
 
   async findEnrollments(classId: string, termId: string) {
     return this.prisma.enrollment.findMany({
-      where: { classId, academicYear: { terms: { some: { id: termId } } }, status: 'ACTIVE' },
+      where: { classId, academicYear: { terms: { some: { id: termId } } }, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       select: { studentId: true },
     });
   }

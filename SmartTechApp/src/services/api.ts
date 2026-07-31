@@ -505,6 +505,16 @@ class ApiService {
     return response.data;
   }
 
+  async changeStudentStatus(studentId: string, status: string) {
+    const response = await this.client.post(`/students/${studentId}/status`, { status });
+    return response.data;
+  }
+
+  async getStudentStatusHistory(studentId: string) {
+    const response = await this.client.get(`/students/${studentId}/status-history`);
+    return response.data;
+  }
+
   async previewAdmission(academicYearId?: string, classId?: string) {
     const params: any = {};
     if (academicYearId) params.academicYearId = academicYearId;
@@ -2495,6 +2505,11 @@ class ApiService {
 
   async createEnrollment(data: { studentId: string; classId: string; academicYearId: string }) {
     const response = await this.client.post('/enrollments', data);
+    return response.data;
+  }
+
+  async removeFromClass(enrollmentId: string) {
+    const response = await this.client.delete(`/enrollments/${enrollmentId}`);
     return response.data;
   }
 
