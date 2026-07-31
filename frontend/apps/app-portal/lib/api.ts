@@ -380,7 +380,7 @@ export const studentApi = {
   getByParent: (parentId: string) => api.get(`/student/parent/${parentId}`),
   create: (data: any) => api.post('/student', data),
   update: (id: string, data: any) => api.patch(`/student/${id}`, data),
-  delete: (id: string) => api.delete(`/student/${id}`),
+  delete: (id: string) => api.delete(`/student/${id}`, { timeout: 120000 }),
   changeStatus: (id: string, status: string) =>
     api.post(`/student/${id}/status`, { status }),
   getStatusHistory: (id: string) => api.get(`/student/${id}/status-history`),

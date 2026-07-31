@@ -687,7 +687,12 @@ export class StudentService {
       select: { classId: true, academicYearId: true, schoolId: true },
     });
 
-    await this.prisma.$transaction(async (tx) => {
+    // Deleting one student touches every table that references them (~20 queries).
+    // On slow connections (e.g. Supabase pooler) that exceeds Prisma's default
+    // 5s interactive-transaction timeout and silently rolls the delete back,
+    // so give the transaction generous time to finish.
+    await this.prisma.$transaction(
+      async (tx) => {
       // Detach any linked login account without deleting it, so the student's
       // original credentials survive re-registration under a new student number.
       await tx.user.updateMany({
@@ -712,7 +717,9 @@ export class StudentService {
       await tx.resultSmsLog.deleteMany({ where: { studentId: id } });
       await tx.generatedReport.deleteMany({ where: { studentId: id } });
       await tx.student.delete({ where: { id } });
-    });
+    },
+      { timeout: 120000, maxWait: 10000 },
+    );
 
     // Auto-reset class sequencing for every class the student was removed from,
     // so the remaining registers stay contiguous without manual backfilling.

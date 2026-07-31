@@ -448,9 +448,27 @@ export default function StudentsPage() {
                   }
                 }}
                 disabled={removeFromClassMutation.isPending}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors disabled:opacity-50"
-              >↩️ Remove</button>
-              <button onClick={() => { if (confirm(`Delete ${student.firstName} ${student.lastName}?`)) { deleteStudentMutation.mutate(student.id); } }} disabled={deleteStudentMutation.isPending} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50">🗑️ Delete</button>
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {removeFromClassMutation.isPending ? (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="inline-block w-3 h-3 border-2 border-orange-300 border-t-orange-600 rounded-full animate-spin"></span>
+                    Removing...
+                  </span>
+                ) : '↩️ Remove'}
+              </button>
+              <button
+                onClick={() => { if (confirm(`Delete ${student.firstName} ${student.lastName}? This will permanently remove them and all their records.`)) { deleteStudentMutation.mutate(student.id); } }}
+                disabled={deleteStudentMutation.isPending}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleteStudentMutation.isPending ? (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="inline-block w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin"></span>
+                    Deleting...
+                  </span>
+                ) : '🗑️ Delete'}
+              </button>
             </div>
           </td>
         </tr>
@@ -1080,9 +1098,14 @@ export default function StudentsPage() {
                                 }
                               }}
                               disabled={removeFromClassMutation.isPending}
-                              className="px-2 py-1 rounded text-xs font-medium bg-orange-50 text-orange-600 hover:bg-orange-100 disabled:opacity-50"
+                              className="px-2 py-1 rounded text-xs font-medium bg-orange-50 text-orange-600 hover:bg-orange-100 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              Remove
+                              {removeFromClassMutation.isPending ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <span className="inline-block w-3 h-3 border-2 border-orange-300 border-t-orange-600 rounded-full animate-spin"></span>
+                                  Removing...
+                                </span>
+                              ) : 'Remove'}
                             </button>
                           </div>
                         </div>
@@ -1131,9 +1154,10 @@ export default function StudentsPage() {
                         <span className="text-sm">{sp.parent?.firstName} {sp.parent?.lastName} ({sp.parent?.email})</span>
                         <button
                           onClick={() => { if (confirm('Unlink this parent?')) { unlinkParentMutation.mutate({ parentId: sp.parentId, studentId: selectedStudent.id }); } }}
-                          className="text-red-500 hover:text-red-700 text-xs"
+                          disabled={unlinkParentMutation.isPending}
+                          className="text-red-500 hover:text-red-700 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Unlink
+                          {unlinkParentMutation.isPending ? 'Unlinking...' : 'Unlink'}
                         </button>
                       </div>
                     ))}
