@@ -116,7 +116,7 @@ export default function DashboardPage() {
     { name: 'Results', href: '/dashboard/results', icon3d: 'results' },
     { name: 'Classes', href: '/dashboard/classes', icon3d: 'classes' },
     { name: 'Subjects', href: '/dashboard/subjects', icon3d: 'subjects' },
-    { name: 'Assessments', href: '/dashboard/assessments', icon3d: 'assessments' },
+    { name: 'Result Entry', href: '/dashboard/results-management/result-entry', icon3d: 'assessments' },
     { name: 'Fees', href: '/dashboard/fees', icon3d: 'fees' },
   ];
 

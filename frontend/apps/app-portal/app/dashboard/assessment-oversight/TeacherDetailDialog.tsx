@@ -120,7 +120,7 @@ export default function TeacherDetailDialog({
         <div className="p-4 border-t border-gray-100 flex justify-end gap-2">
           {teacher.pendingCount > 0 && (
             <a
-              href="/dashboard/assessment-entry"
+              href="/dashboard/results-management/result-entry"
               className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
             >
               Enter Scores

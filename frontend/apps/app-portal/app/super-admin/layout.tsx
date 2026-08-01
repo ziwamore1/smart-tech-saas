@@ -21,8 +21,8 @@ const superAdminNav = [
     color: '#f97316'
   },
   { 
-    name: 'Assessments', 
-    href: '/dashboard/assessments', 
+    name: 'Result Entry', 
+    href: '/dashboard/results-management/result-entry', 
     icon: 'fa-tasks',
     color: '#8b5cf6'
   },

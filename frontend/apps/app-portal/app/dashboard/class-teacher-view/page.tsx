@@ -62,8 +62,7 @@ function ClassTeacherDashboardContent() {
     { name: 'Attendance Register', href: '/dashboard/attendance-register', icon: 'fa-clipboard-list', desc: 'Take class attendance daily', color: '#059669' },
     { name: 'Report Cards', href: '/dashboard/report-cards', icon: 'fa-file-text', desc: 'Generate and review report cards', color: '#0891b2' },
     { name: 'Results Management', href: '/dashboard/results-management', icon: 'fa-file-alt', desc: 'Manage class results', color: '#ea6645' },
-    { name: 'Score Entry', href: '/dashboard/assessment-entry', icon: 'fa-edit', desc: 'Enter assessment scores', color: '#2563eb' },
-    { name: 'Assessments', href: '/dashboard/assessments', icon: 'fa-clipboard-check', desc: 'View assessments', color: '#f97316' },
+    { name: 'Result Entry', href: '/dashboard/results-management/result-entry', icon: 'fa-edit', desc: 'Enter assessment & final scores', color: '#059669' },
     { name: 'Online Exams', href: '/dashboard/exams', icon: 'fa-file-signature', desc: 'Class exams', color: '#dc2626' },
   ];
 

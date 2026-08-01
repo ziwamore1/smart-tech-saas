@@ -301,20 +301,12 @@ const regularNav: NavItem[] = [
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
-    name: 'Assessments', 
-    href: '/dashboard/assessments', 
-    icon: 'fa-clipboard-check',
-    color: '#f97316',
+    name: 'Result Entry', 
+    href: '/dashboard/results-management/result-entry', 
+    icon: 'fa-edit',
+    color: '#059669',
     typeRoles: ROLE_MAP.teaching,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
-  },
-  { 
-    name: 'Score Entry', 
-    href: '/dashboard/assessment-entry', 
-    icon: 'fa-edit',
-    color: '#2563eb',
-    typeRoles: ROLE_MAP.teaching,
-    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
     name: 'Assessment Config', 

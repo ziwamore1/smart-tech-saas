@@ -78,7 +78,7 @@ export default function PrimaryDashboardPage() {
     { key: 'primary.students', name: 'New Pupil Registration', href: '/dashboard/primary/students', icon: 'fa-user-plus', color: '#3b82f6', desc: 'Register new pupil (intake or transfer)' },
     { key: 'primary.classes', name: 'Assign Class Teacher', href: '/dashboard/primary/classes', icon: 'fa-chalkboard-teacher', color: '#10b981', desc: 'Assign teachers to Grade 1–7 classes' },
     { key: 'primary.attendance', name: 'Record Attendance', href: '/dashboard/attendance-register', icon: 'fa-clipboard-check', color: '#059669', desc: 'Mark daily class attendance' },
-    { key: 'primary.results', name: 'Enter Scores', href: '/dashboard/assessment-entry', icon: 'fa-pencil-alt', color: '#d97706', desc: 'Continuous assessment scores' },
+    { key: 'primary.results', name: 'Enter Scores', href: '/dashboard/results-management/result-entry', icon: 'fa-pencil-alt', color: '#d97706', desc: 'Assessment & final scores' },
     { key: 'primary.classes', name: 'Manage Subjects', href: '/dashboard/primary/subjects', icon: 'fa-book', color: '#f59e0b', desc: 'Primary subject allocation' },
     { key: 'primary.dashboard', name: 'School Settings', href: '/dashboard/settings', icon: 'fa-cog', color: '#64748b', desc: 'Academic years, terms & grading' },
   ];
@@ -589,7 +589,7 @@ export default function PrimaryDashboardPage() {
                         <Link href="/dashboard/attendance-register" className="text-blue-600 hover:text-blue-800 text-sm">
                           Attendance
                         </Link>
-                        <Link href="/dashboard/assessment-entry" className="text-emerald-600 hover:text-emerald-800 text-sm">
+                        <Link href="/dashboard/results-management/result-entry" className="text-emerald-600 hover:text-emerald-800 text-sm">
                           Scores
                         </Link>
                       </div>

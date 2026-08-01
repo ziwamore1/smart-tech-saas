@@ -515,7 +515,7 @@ export default function SuperAdminPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
           {[
             { href: '/dashboard/exams', icon: 'fa-file-alt', label: 'Exam Builder', desc: 'Create rich exams with equations, tables, and images', color: '#f97316', bg: '#fff7ed' },
-            { href: '/dashboard/assessments', icon: 'fa-tasks', label: 'Assessments', desc: 'Manage candidate assessments and grading', color: '#8b5cf6', bg: '#f5f3ff' },
+            { href: '/dashboard/results-management/result-entry', icon: 'fa-tasks', label: 'Result Entry', desc: 'Centralised result and assessment entry', color: '#8b5cf6', bg: '#f5f3ff' },
             { href: '/dashboard/results', icon: 'fa-chart-bar', label: 'Results & Analytics', desc: 'Auto-marking, scoring and performance dashboards', color: '#10b981', bg: '#f0fdf4' },
             { href: '/dashboard/grading', icon: 'fa-check-double', label: 'Grading Engine', desc: 'AI-assisted marking and feedback', color: '#3b82f6', bg: '#eff6ff' },
             { href: '/dashboard/exam-quality', icon: 'fa-chart-line', label: 'Exam Quality', desc: 'Item analysis and question performance', color: '#f59e0b', bg: '#fffbeb' },

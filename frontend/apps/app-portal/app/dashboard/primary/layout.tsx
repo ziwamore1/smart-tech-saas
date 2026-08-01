@@ -10,7 +10,7 @@ const primaryNavItems = [
   { name: 'Classes', href: '/dashboard/primary/classes', icon: 'fa-school', color: '#8b5cf6' },
   { name: 'Subjects', href: '/dashboard/primary/subjects', icon: 'fa-book', color: '#f59e0b' },
   { name: 'Curriculum', href: '/dashboard/primary/curriculum', icon: 'fa-book-open', color: '#0891b2' },
-  { name: 'Score Entry', href: '/dashboard/assessment-entry', icon: 'fa-edit', color: '#2563eb' },
+  { name: 'Result Entry', href: '/dashboard/results-management/result-entry', icon: 'fa-edit', color: '#059669' },
   { name: 'Assessment Config', href: '/dashboard/assessment-config', icon: 'fa-cogs', color: '#7c3aed' },
   { name: 'Assessment Defs', href: '/dashboard/assessments/definitions', icon: 'fa-layer-group', color: '#0891b2' },
   { name: 'ECE Module', href: '/dashboard/primary/ece', icon: 'fa-baby', color: '#ec4899' },

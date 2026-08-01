@@ -12,7 +12,7 @@ const quickActions = [
   { name: 'Lecturers', href: '/dashboard/teachers', icon3d: 'teachers', desc: 'Faculty management' },
   { name: 'Courses', href: '/dashboard/subjects', icon3d: 'subjects', desc: 'Course catalog' },
   { name: 'Timetable', href: '/timetable', icon3d: 'timetable', desc: 'Lecture scheduling' },
-  { name: 'Assessments', href: '/dashboard/assessments', icon3d: 'assessments', desc: 'Continuous assessment' },
+  { name: 'Result Entry', href: '/dashboard/results-management/result-entry', icon3d: 'assessments', desc: 'Continuous assessment' },
   { name: 'Transcripts', href: '/dashboard/report-cards', icon3d: 'reports', desc: 'Academic transcripts' },
   { name: 'Enrollment', href: '/dashboard/enrollment', icon3d: 'students', desc: 'Semester enrollment' },
 ];
