@@ -126,6 +126,44 @@ export class ResultsManagementController {
     return { data, message: 'Result sheet unlocked successfully' };
   }
 
+  @Get('sheets/:id/rankings')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
+  async getRankings(@Param('id') id: string, @Query('type') type: string) {
+    const data = await this.resultsManagement.getRankings(id, type || 'class');
+    return { data, message: 'Rankings retrieved successfully' };
+  }
+
+  @Get('sheets/:id/analysis')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
+  async getAnalysis(@Param('id') id: string) {
+    const data = await this.resultsManagement.getAnalysis(id);
+    return { data, message: 'Analysis retrieved successfully' };
+  }
+
+  @Get('sheets/:id/mark-schedule')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
+  async getMarkSchedule(@Param('id') id: string) {
+    const data = await this.resultsManagement.getMarkSchedule(id);
+    return { data, message: 'Mark schedule retrieved successfully' };
+  }
+
+  @Get('sheets/:id/mark-schedule/html')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
+  async getMarkScheduleHtml(@Param('id') id: string, @Request() req, @Res() res: Response) {
+    const html = await this.resultsManagement.generateMarkScheduleHtml(id, req.user.schoolId);
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  }
+
+  @Get('sheets/:id/mark-schedule/pdf')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
+  async getMarkSchedulePdf(@Param('id') id: string, @Request() req, @Res() res: Response) {
+    const pdfBuffer = await this.resultsManagement.generateMarkSchedulePdf(id, req.user.schoolId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="mark-schedule-${id.slice(0, 8)}.pdf"`);
+    res.send(pdfBuffer);
+  }
+
   @Post('sheets/preview')
   @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   @UseInterceptors(FileInterceptor('file'))
