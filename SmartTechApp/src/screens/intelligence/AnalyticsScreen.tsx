@@ -15,6 +15,8 @@ export const AnalyticsScreen: React.FC = () => {
   const [trajectory, setTrajectory] = useState<any>(null);
   const [weaknesses, setWeaknesses] = useState<any>(null);
 
+  const isStudent = !!user?.roles?.some((r) => String(r).toLowerCase() === 'student');
+
   useEffect(() => {
     loadData();
   }, []);
@@ -23,35 +25,57 @@ export const AnalyticsScreen: React.FC = () => {
     try {
       if (!user?.id) return;
       const termId = dashboard?.currentTerm?.id;
-      const [statsRes, trajRes, weakRes] = await Promise.allSettled([
-        apiService.getStudentStats(user.id),
-        apiService.getStudentGrowthTrajectory(user.id),
-        termId ? apiService.getCompetencyDiagnosis(user.id, termId) : Promise.reject('no term'),
-      ]);
-      if (statsRes.status === 'fulfilled') {
-        const raw = statsRes.value?.data || statsRes.value;
-        if (raw?.descriptiveStats || raw?.comparativeStats) {
+
+      if (isStudent) {
+        const [statsRes, trajRes, weakRes] = await Promise.allSettled([
+          apiService.getStudentStats(user.id),
+          apiService.getStudentGrowthTrajectory(user.id),
+          termId ? apiService.getCompetencyDiagnosis(user.id, termId) : Promise.reject('no term'),
+        ]);
+        if (statsRes.status === 'fulfilled') {
+          const raw = statsRes.value?.data || statsRes.value;
+          if (raw?.descriptiveStats || raw?.comparativeStats) {
+            setStats({
+              mean: raw.descriptiveStats?.mean,
+              median: raw.descriptiveStats?.median,
+              stdDev: raw.descriptiveStats?.stdDev,
+              variance: raw.descriptiveStats?.variance,
+              mode: raw.descriptiveStats?.mode,
+              min: raw.descriptiveStats?.min,
+              max: raw.descriptiveStats?.max,
+              count: raw.descriptiveStats?.count,
+              percentile: raw.comparativeStats?.percentile,
+              zScore: raw.comparativeStats?.zScore,
+              schoolMean: raw.comparativeStats?.schoolMean,
+              interpretation: raw.comparativeStats?.interpretation,
+              subjectBreakdown: raw.subjectBreakdown,
+            });
+          } else {
+            setStats(raw);
+          }
+        }
+        if (trajRes.status === 'fulfilled') setTrajectory(trajRes.value?.data || trajRes.value);
+        if (weakRes.status === 'fulfilled') setWeaknesses(weakRes.value?.data || weakRes.value);
+      } else {
+        // Staff: school-wide descriptive statistics
+        const statsRes = await apiService.getSchoolDescriptiveStats(termId);
+        const raw = statsRes?.data || statsRes;
+        if (raw?.schoolStats || raw?.distribution) {
           setStats({
-            mean: raw.descriptiveStats?.mean,
-            median: raw.descriptiveStats?.median,
-            stdDev: raw.descriptiveStats?.stdDev,
-            variance: raw.descriptiveStats?.variance,
-            mode: raw.descriptiveStats?.mode,
-            min: raw.descriptiveStats?.min,
-            max: raw.descriptiveStats?.max,
-            count: raw.descriptiveStats?.count,
-            percentile: raw.comparativeStats?.percentile,
-            zScore: raw.comparativeStats?.zScore,
-            schoolMean: raw.comparativeStats?.schoolMean,
-            interpretation: raw.comparativeStats?.interpretation,
-            subjectBreakdown: raw.subjectBreakdown,
+            mean: raw.schoolStats?.mean,
+            median: raw.schoolStats?.median,
+            stdDev: raw.schoolStats?.stdDev,
+            variance: raw.schoolStats?.variance,
+            min: raw.schoolStats?.min,
+            max: raw.schoolStats?.max,
+            count: raw.schoolStats?.count,
+            studentCount: raw.schoolStats?.studentCount,
+            percentile: raw.distribution?.p75,
           });
         } else {
           setStats(raw);
         }
       }
-      if (trajRes.status === 'fulfilled') setTrajectory(trajRes.value?.data || trajRes.value);
-      if (weakRes.status === 'fulfilled') setWeaknesses(weakRes.value?.data || weakRes.value);
     } catch (err) { console.error('Analytics load error'); }
     finally { setLoading(false); }
   };
@@ -61,8 +85,8 @@ export const AnalyticsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Analytics</Text>
-        <Text style={styles.headerSub}>Performance insights</Text>
+        <Text style={styles.headerTitle}>{isStudent ? 'My Analytics' : 'School Analytics'}</Text>
+        <Text style={styles.headerSub}>{isStudent ? 'Performance insights' : 'School-wide performance insights'}</Text>
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {stats && (
@@ -89,7 +113,7 @@ export const AnalyticsScreen: React.FC = () => {
           </Card>
         )}
 
-        {trajectory?.history && (
+        {isStudent && trajectory?.history && (
           <Card style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Growth Trajectory</Text>
             <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 160, paddingVertical: spacing.sm }}>
@@ -116,7 +140,7 @@ export const AnalyticsScreen: React.FC = () => {
           </Card>
         )}
 
-        {weaknesses?.weaknesses && weaknesses.weaknesses.length > 0 && (
+        {isStudent && weaknesses?.weaknesses && weaknesses.weaknesses.length > 0 && (
           <Card style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Areas to Improve</Text>
             {weaknesses.weaknesses.map((w: any, i: number) => (

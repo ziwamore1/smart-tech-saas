@@ -40,6 +40,11 @@ export class IntelligenceController {
     return this.descriptiveStats.getStudentStats(req.user.schoolId, studentId);
   }
 
+  @Get('descriptive-stats/school')
+  async getSchoolStats(@Req() req: any, @Query('termId') termId?: string) {
+    return this.descriptiveStats.getSchoolStats(req.user.schoolId, termId);
+  }
+
   @Get('descriptive-stats/class/:classId')
   async getClassStats(
     @Req() req: any,

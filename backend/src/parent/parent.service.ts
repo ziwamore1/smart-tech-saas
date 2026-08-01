@@ -328,11 +328,23 @@ export class ParentService {
   }
 
   async getReportCard(schoolId: string, studentId: string, termId: string) {
-    return this.reportCardService.generateReportCardPdf(
-      schoolId,
-      studentId,
-      termId,
-    );
+    try {
+      // Use the same enhanced curriculum report card as the web Report Hub
+      return await this.reportCardService.generateCurriculumReportCardPdf(
+        schoolId,
+        studentId,
+        termId,
+      );
+    } catch (error: any) {
+      this.logger.warn(
+        `Enhanced report card generation failed (${error?.message}), falling back to basic`,
+      );
+      return this.reportCardService.generateReportCardPdf(
+        schoolId,
+        studentId,
+        termId,
+      );
+    }
   }
 
   async getAllChildrenResults(parentId: string) {

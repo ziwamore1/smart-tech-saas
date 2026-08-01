@@ -150,30 +150,61 @@ export const DirectorReportsScreen: React.FC<Props> = ({ onToggleDrawer, onNavig
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handleDownload = async (report: any) => {
-    if (!report.fileUri && !report.downloadUrl && !report.blobUrl) {
-      Alert.alert('Unavailable', 'This report file is not available for download.');
-      return;
+  const saveReportBlob = async (blob: Blob, fileName: string): Promise<string> => {
+    const reader = new FileReader();
+    const base64: string = await new Promise((resolve, reject) => {
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Failed to read report file'));
+      reader.readAsDataURL(blob);
+    });
+    const fileUri = FileSystem.documentDirectory + fileName;
+    await FileSystem.writeAsStringAsync(fileUri, base64.split(',')[1], {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    return fileUri;
+  };
+
+  const resolveReportFile = async (report: any): Promise<string | null> => {
+    if (report.fileUri) return report.fileUri;
+
+    const reportId = report.id || report._id;
+    const filename = report.fileName || `report-${reportId || Date.now()}.pdf`;
+
+    // Prefer the authenticated download endpoint for persisted reports
+    if (reportId) {
+      try {
+        const blob = await apiService.downloadGeneratedReport(reportId);
+        return await saveReportBlob(blob, filename);
+      } catch {
+        // fall through to URL-based download
+      }
     }
+
+    const url = report.downloadUrl || report.blobUrl || report.fileUrl || report.pdfUrl;
+    if (url) {
+      const downloadResult = await FileSystem.downloadAsync(url, FileSystem.documentDirectory + filename);
+      return downloadResult.uri;
+    }
+
+    return null;
+  };
+
+  const handleDownload = async (report: any) => {
     setDownloading(report.id || report._id);
     try {
-      let fileUri = report.fileUri;
-      if (!fileUri && (report.downloadUrl || report.blobUrl)) {
-        const url = report.downloadUrl || report.blobUrl;
-        const filename = report.fileName || `report-${report.id || Date.now()}.pdf`;
-        const downloadResult = await FileSystem.downloadAsync(url, FileSystem.documentDirectory + filename);
-        fileUri = downloadResult.uri;
+      const fileUri = await resolveReportFile(report);
+      if (!fileUri) {
+        Alert.alert('Unavailable', 'This report file is not available for download. Please regenerate it.');
+        return;
       }
-      if (fileUri) {
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(fileUri, {
-            mimeType: 'application/pdf',
-            dialogTitle: `Share ${report.title || 'Report'}`,
-          });
-        } else {
-          Alert.alert('Downloaded', `Report saved to: ${fileUri}`);
-        }
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/pdf',
+          dialogTitle: `Share ${report.title || 'Report'}`,
+        });
+      } else {
+        Alert.alert('Downloaded', `Report saved to: ${fileUri}`);
       }
     } catch (err: any) {
       if (err?.message !== 'User did not share') {
@@ -185,28 +216,20 @@ export const DirectorReportsScreen: React.FC<Props> = ({ onToggleDrawer, onNavig
   };
 
   const handleShare = async (report: any) => {
-    if (!report.fileUri && !report.downloadUrl && !report.blobUrl) {
-      Alert.alert('Unavailable', 'This report file is not available for sharing.');
-      return;
-    }
     try {
-      let fileUri = report.fileUri;
-      if (!fileUri && (report.downloadUrl || report.blobUrl)) {
-        const url = report.downloadUrl || report.blobUrl;
-        const filename = report.fileName || `report-${report.id || Date.now()}.pdf`;
-        const downloadResult = await FileSystem.downloadAsync(url, FileSystem.documentDirectory + filename);
-        fileUri = downloadResult.uri;
+      const fileUri = await resolveReportFile(report);
+      if (!fileUri) {
+        Alert.alert('Unavailable', 'This report file is not available for sharing.');
+        return;
       }
-      if (fileUri) {
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(fileUri, {
-            mimeType: 'application/pdf',
-            dialogTitle: `Share ${report.title || 'Report'}`,
-          });
-        } else {
-          Alert.alert('Not Supported', 'Sharing is not available on this device.');
-        }
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/pdf',
+          dialogTitle: `Share ${report.title || 'Report'}`,
+        });
+      } else {
+        Alert.alert('Not Supported', 'Sharing is not available on this device.');
       }
     } catch (err: any) {
       if (err?.message !== 'User did not share') {
@@ -309,13 +332,17 @@ export const DirectorReportsScreen: React.FC<Props> = ({ onToggleDrawer, onNavig
           {report.fileSize && (
             <Text style={styles.fileSizeText}>{formatFileSize(report.fileSize)}</Text>
           )}
-          {report.status && (
-            <View style={[styles.statusBadge, report.status === 'completed' ? styles.statusCompleted : report.status === 'pending' ? styles.statusPending : styles.statusDefault]}>
-              <Text style={[styles.statusText, report.status === 'completed' ? styles.statusTextCompleted : report.status === 'pending' ? styles.statusTextPending : styles.statusTextDefault]}>
-                {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
-              </Text>
-            </View>
-          )}
+          {report.status && (() => {
+            const statusKey = String(report.status).toLowerCase();
+            const statusLabel = statusKey.charAt(0).toUpperCase() + statusKey.slice(1);
+            return (
+              <View style={[styles.statusBadge, statusKey === 'completed' ? styles.statusCompleted : statusKey === 'pending' ? styles.statusPending : styles.statusDefault]}>
+                <Text style={[styles.statusText, statusKey === 'completed' ? styles.statusTextCompleted : statusKey === 'pending' ? styles.statusTextPending : styles.statusTextDefault]}>
+                  {statusLabel}
+                </Text>
+              </View>
+            );
+          })()}
         </View>
 
         <View style={styles.reportCardActions}>

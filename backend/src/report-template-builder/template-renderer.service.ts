@@ -42,7 +42,7 @@ export class TemplateRendererService {
       const result = await this.cloudinary.uploadBuffer(buffer, {
         folder: `${FOLDERS.system}/render-templates`,
         publicId: `render-${templateId}-${Date.now()}`,
-        resourceType: 'image',
+        resourceType: 'raw',
       });
       return { buffer, url: result.secureUrl, publicId: result.publicId };
     } catch {
@@ -1035,7 +1035,7 @@ export class TemplateRendererService {
       const result = await this.cloudinary.uploadBuffer(buffer, {
         folder: `${FOLDERS.system}/render-templates`,
         publicId: `render-${templateId}-${Date.now()}`,
-        resourceType: 'image',
+        resourceType: 'raw',
       });
       return { buffer, url: result.secureUrl, publicId: result.publicId };
     } catch {

@@ -184,6 +184,61 @@ export class DescriptiveStatsService {
     };
   }
 
+  async getSchoolStats(schoolId: string, termId?: string) {
+    const where: any = { schoolId };
+    if (termId) where.termId = termId;
+
+    const results = await this.prisma.result.findMany({
+      where,
+      include: { student: true, subject: true },
+    });
+
+    if (!results.length) return { error: 'No results found' };
+
+    const scores = results.map(r => r.score);
+    const q = this.quartiles(scores);
+    const sorted = [...scores].sort((a, b) => a - b);
+
+    const bySubject: Record<string, number[]> = {};
+    for (const r of results) {
+      if (!bySubject[r.subjectId]) bySubject[r.subjectId] = [];
+      bySubject[r.subjectId].push(r.score);
+    }
+
+    return {
+      schoolStats: {
+        mean: Number(this.mean(scores).toFixed(2)),
+        median: Number(this.median(scores).toFixed(2)),
+        stdDev: Number(this.stdDev(scores).toFixed(2)),
+        variance: Number(this.variance(scores).toFixed(2)),
+        q1: Number(q.q1.toFixed(2)),
+        q3: Number(q.q3.toFixed(2)),
+        iqr: Number((q.q3 - q.q1).toFixed(2)),
+        min: Math.min(...scores),
+        max: Math.max(...scores),
+        range: Math.max(...scores) - Math.min(...scores),
+        count: scores.length,
+        studentCount: new Set(results.map(r => r.studentId)).size,
+      },
+      distribution: {
+        p10: Number(this.percentile(sorted, 10).toFixed(2)),
+        p25: Number(q.q1.toFixed(2)),
+        p50: Number(q.q2.toFixed(2)),
+        p75: Number(q.q3.toFixed(2)),
+        p90: Number(this.percentile(sorted, 90).toFixed(2)),
+      },
+      subjectStats: Object.entries(bySubject).map(([subjectId, subjScores]) => ({
+        subjectId,
+        subjectName: results.find(r => r.subjectId === subjectId)?.subject.name,
+        mean: Number(this.mean(subjScores).toFixed(2)),
+        median: Number(this.median(subjScores).toFixed(2)),
+        stdDev: Number(this.stdDev(subjScores).toFixed(2)),
+        min: Math.min(...subjScores),
+        max: Math.max(...subjScores),
+      })),
+    };
+  }
+
   async getZScoreAnalysis(schoolId: string, classId: string, termId: string) {
     const results = await this.prisma.result.findMany({
       where: {

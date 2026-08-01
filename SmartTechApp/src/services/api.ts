@@ -334,6 +334,13 @@ class ApiService {
     return response.data;
   }
 
+  async getSchoolDescriptiveStats(termId?: string) {
+    const response = await this.client.get('/intelligence/descriptive-stats/school', {
+      params: termId ? { termId } : undefined,
+    });
+    return response.data;
+  }
+
   async getLearningStyleProfile(studentId: string) {
     const response = await this.client.get(`/intelligence/learning-style/profile/${studentId}`);
     return response.data;
@@ -471,6 +478,11 @@ class ApiService {
 
   async getTerms(academicYearId: string) {
     const response = await this.client.get(`/mobile/terms/${academicYearId}`);
+    return response.data;
+  }
+
+  async getAllTerms() {
+    const response = await this.client.get('/term');
     return response.data;
   }
 
@@ -2905,6 +2917,19 @@ class ApiService {
   async getGeneratedReport(id: string) {
     const response = await this.client.get(`/report-engine/reports/${id}`);
     return response.data;
+  }
+
+  async downloadGeneratedReport(reportId: string) {
+    const response = await this.client.get(`/report-engine/download/${reportId}`, { responseType: 'blob' });
+    const blob = response.data as Blob;
+    if (blob.type === 'application/json') {
+      const text = await blob.text();
+      const parsed = JSON.parse(text);
+      const err = new Error(parsed.message || 'Report download failed');
+      (err as any).response = { data: parsed, status: parsed.statusCode || 500 };
+      throw err;
+    }
+    return blob;
   }
 
   async deleteGeneratedReport(id: string) {

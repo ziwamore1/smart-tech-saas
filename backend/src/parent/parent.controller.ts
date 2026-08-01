@@ -65,7 +65,7 @@ export class ParentController {
       'Content-Disposition': 'attachment; filename=report-card.pdf',
     });
 
-    res.send(pdf);
+    res.send(pdf.buffer);
   }
 
   @Get()

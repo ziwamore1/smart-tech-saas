@@ -188,19 +188,44 @@ export const ReportCardsScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate 
         const raw = yearData.value;
         const years = Array.isArray(raw) ? raw : raw?.data || raw?.data?.data || [];
         const currentYear = years.find((y: any) => y.isCurrent) || years[0];
+
+        let termList: any[] = [];
         if (currentYear) {
           try {
             const termData = await apiService.getTerms(currentYear.id);
-            const rawTerms = termData;
-            const termList = Array.isArray(rawTerms) ? rawTerms : rawTerms?.data || rawTerms?.data?.data || [];
-            setTerms(termList);
-            const currentTerm = termList.find((t: any) => t.isCurrent) || termList[0];
-            if (currentTerm) {
-              setSelectedTermId(currentTerm.id);
-            }
+            termList = Array.isArray(termData) ? termData : termData?.data || termData?.data?.data || [];
           } catch (termErr) {
             console.warn('Failed to load terms:', termErr);
           }
+        }
+
+        // Fallback: load all school terms if the current year has none
+        if (termList.length === 0) {
+          try {
+            const allTermData = await apiService.getAllTerms();
+            termList = Array.isArray(allTermData) ? allTermData : allTermData?.data || allTermData?.data?.data || [];
+          } catch (termErr) {
+            console.warn('Failed to load all terms:', termErr);
+          }
+        }
+
+        // Fallback: use the dashboard's current term so termId is always populated
+        if (termList.length === 0) {
+          try {
+            const dashboard = await apiService.getDashboard();
+            const currentTerm = dashboard?.currentTerm;
+            if (currentTerm?.id) {
+              termList = [{ id: currentTerm.id, name: currentTerm.name, isCurrent: true }];
+            }
+          } catch (dashErr) {
+            console.warn('Failed to load terms from dashboard:', dashErr);
+          }
+        }
+
+        setTerms(termList);
+        const currentTerm = termList.find((t: any) => t.isCurrent) || termList[0];
+        if (currentTerm) {
+          setSelectedTermId(currentTerm.id);
         }
       }
 
