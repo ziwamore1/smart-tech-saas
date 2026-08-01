@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, classApi, termApi, gradingSystemApi, teacherApi } from '@/lib/api';
+import { api, classApi, termApi, gradingSystemApi, teacherApi, assessmentEngineApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import { socket } from '@/lib/socket';
@@ -32,6 +32,81 @@ function getGrade(result: any, score: number | null, gradeScales?: any[]) {
   }
   return '-';
 }
+
+function computeComponentTotal(cell: any, configs: any[]): number | null {
+  if (!cell || !configs?.length) return null;
+  let totalWeighted = 0;
+  let totalWeight = 0;
+  for (const c of configs) {
+    const entry = cell[c.assessmentDefId];
+    if (entry?.rawScore != null) {
+      const pct = (entry.rawScore / (c.maxScore || 100)) * 100;
+      totalWeighted += pct * (c.weightPercentage / 100);
+      totalWeight += c.weightPercentage;
+    }
+  }
+  if (totalWeight === 0) return null;
+  return (totalWeighted / totalWeight) * 100;
+}
+
+function componentCellStatus(cell: any, configs: any[]): 'complete' | 'partial' | 'pending' {
+  if (!configs?.length) return 'pending';
+  const filled = configs.filter((c: any) => {
+    const entry = cell?.[c.assessmentDefId];
+    return entry && (entry.rawScore != null || entry.isAbsent);
+  }).length;
+  if (filled === 0) return 'pending';
+  if (filled === configs.length) return 'complete';
+  return 'partial';
+}
+
+const WORKFLOW_STEPS = [
+  {
+    step: 1,
+    icon: 'fa-edit',
+    title: 'Enter Results',
+    who: 'Teacher / Class Teacher',
+    where: 'This page',
+    href: '',
+    what: 'Select a Class, Term and Subject (or use Bulk Mode), then type each learner\u2019s score. Use X or A to mark a learner absent. Click Save.',
+  },
+  {
+    step: 2,
+    icon: 'fa-paper-plane',
+    title: 'Submit for Review',
+    who: 'Teacher / Class Teacher',
+    where: 'Result Sheets',
+    href: '/dashboard/results-management',
+    what: 'Open Result Sheets, find your sheet and use the \u2026 menu \u2192 Submit. This moves the sheet from DRAFT to SUBMITTED.',
+  },
+  {
+    step: 3,
+    icon: 'fa-check-circle',
+    title: 'Verify',
+    who: 'HOD / Director',
+    where: 'Moderation',
+    href: '/dashboard/results-management/moderation',
+    what: 'Your HOD or Director opens Moderation, reviews the submitted sheet and clicks Verify. The sheet moves to VERIFIED.',
+  },
+  {
+    step: 4,
+    icon: 'fa-globe',
+    title: 'Publish',
+    who: 'Director / Head Teacher',
+    where: 'Publish Results',
+    href: '/dashboard/results-management/publish',
+    what: 'The Director opens Publish Results and clicks Publish to All (or Publish to Parents). Results become visible to students and parents. Sheet moves to PUBLISHED.',
+  },
+  {
+    step: 5,
+    icon: 'fa-lock',
+    title: 'Lock (optional)',
+    who: 'Director / Head Teacher',
+    where: 'Result Sheets',
+    href: '/dashboard/results-management',
+    what: 'Once results are final, the Director can Lock the sheet to stop further edits. Sheet moves to LOCKED.',
+  },
+];
 
 export default function ResultEntryPage() {
   const { user, isClassTeacher, isTeacher } = useAuth();
@@ -63,6 +138,9 @@ export default function ResultEntryPage() {
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [showSavedBanner, setShowSavedBanner] = useState(false);
   const [lastSavedCount, setLastSavedCount] = useState(0);
+  const [componentScores, setComponentScores] = useState<Record<string, Record<string, { rawScore: number | null; isAbsent: boolean }>>>({});
+  const [savingComponents, setSavingComponents] = useState(false);
+  const [showWorkflow, setShowWorkflow] = useState(true);
   const tableRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -116,6 +194,48 @@ export default function ResultEntryPage() {
     enabled: !!selectedClass,
     staleTime: 5 * 60 * 1000,
   });
+
+  const { data: subjectConfigsData } = useQuery({
+    queryKey: ['assessment-configs-single', selectedClass, selectedSubject, selectedTerm],
+    queryFn: async () => {
+      if (!selectedClass || !selectedSubject || !selectedTerm || selectedSubject === 'all') return [];
+      const r = await assessmentEngineApi.configurations.get(selectedClass, selectedSubject, selectedTerm);
+      const d = r.data?.data || r.data;
+      return Array.isArray(d) ? d : [];
+    },
+    enabled: !!selectedClass && !!selectedSubject && selectedSubject !== 'all' && !!selectedTerm,
+    staleTime: 5 * 60 * 1000,
+  });
+  const subjectConfigs = useMemo(() => Array.isArray(subjectConfigsData) ? subjectConfigsData : [], [subjectConfigsData]);
+
+  const componentMode = entryMode === 'single' && selectedSubject !== 'all' && subjectConfigs.length > 0;
+
+  const { data: existingComponentsData } = useQuery({
+    queryKey: ['assessment-results-single', selectedClass, selectedSubject, selectedTerm],
+    queryFn: async () => {
+      if (!selectedClass || !selectedSubject || !selectedTerm || selectedSubject === 'all') return [];
+      const r = await assessmentEngineApi.results.class(selectedClass, selectedSubject, selectedTerm);
+      const d = r.data?.data || r.data;
+      return Array.isArray(d) ? d : [];
+    },
+    enabled: componentMode,
+  });
+
+  useEffect(() => {
+    setComponentScores({});
+  }, [selectedClass, selectedSubject, selectedTerm, entryMode]);
+
+  useEffect(() => {
+    const data = existingComponentsData;
+    if (!Array.isArray(data) || data.length === 0) return;
+    const map: Record<string, Record<string, { rawScore: number | null; isAbsent: boolean }>> = {};
+    data.forEach((r: any) => {
+      const key = `${r.studentId}::${r.subjectId}`;
+      map[key] = map[key] || {};
+      map[key][r.assessmentDefId] = { rawScore: r.rawScore ?? null, isAbsent: !!r.isAbsent };
+    });
+    setComponentScores(map);
+  }, [existingComponentsData]);
 
   const { data: studentsData, isLoading: studentsLoading } = useQuery({
     queryKey: ['sheet-students', selectedClass, selectedTerm],
@@ -254,6 +374,109 @@ export default function ResultEntryPage() {
     setEditingCell(null);
   }, []);
 
+  const handleComponentCell = useCallback((studentId: string, subjectId: string, defId: string, max: number, value: string) => {
+    const key = `${studentId}::${subjectId}`;
+    const trimmed = value.trim().toUpperCase();
+    setComponentScores(prev => {
+      const cell = { ...(prev[key] || {}) };
+      if (trimmed === 'X' || trimmed === 'A') {
+        cell[defId] = { rawScore: null, isAbsent: true };
+      } else if (trimmed === '' || trimmed === 'null') {
+        delete cell[defId];
+      } else {
+        const num = parseFloat(trimmed);
+        if (isNaN(num) || num < 0 || num > max) {
+          toast.error(`Score must be between 0 and ${max}, or X/A for absent`);
+          return prev;
+        }
+        cell[defId] = { rawScore: num, isAbsent: false };
+      }
+      return { ...prev, [key]: cell };
+    });
+  }, []);
+
+  const componentEntryCount = useMemo(() => {
+    let n = 0;
+    Object.values(componentScores).forEach(cell => { n += Object.keys(cell).length; });
+    return n;
+  }, [componentScores]);
+
+  const handleSaveComponents = useCallback(async () => {
+    if (!selectedClass || !selectedSubject || !selectedTerm || selectedSubject === 'all') {
+      toast.error('Please select class, subject, term and subject');
+      return;
+    }
+    if (savingComponents) return;
+    const subjectId = selectedSubject;
+
+    const entriesForDef: Record<string, Array<{ studentId: string; rawScore: number | null; isAbsent: boolean }>> = {};
+    Object.entries(componentScores).forEach(([key, cell]) => {
+      const [studentId, subjId] = key.split('::');
+      if (subjId !== subjectId) return;
+      Object.entries(cell).forEach(([defId, entry]) => {
+        entriesForDef[defId] = entriesForDef[defId] || [];
+        entriesForDef[defId].push({ studentId, rawScore: entry.rawScore, isAbsent: entry.isAbsent });
+      });
+    });
+
+    const defIds = Object.keys(entriesForDef);
+    if (defIds.length === 0) {
+      toast.error('No component scores to save');
+      return;
+    }
+
+    setSavingComponents(true);
+    toast.info(`Saving ${defIds.length} assessment component${defIds.length !== 1 ? 's' : ''}...`);
+    try {
+      for (const defId of defIds) {
+        const config = subjectConfigs.find((c: any) => c.assessmentDefId === defId);
+        await assessmentEngineApi.scores.bulk({
+          classId: selectedClass,
+          subjectId,
+          termId: selectedTerm,
+          assessmentDefId: defId,
+          maxScore: config?.maxScore || 100,
+          scores: entriesForDef[defId].map(e => ({
+            studentId: e.studentId,
+            rawScore: e.rawScore,
+            isAbsent: e.isAbsent,
+            absentCode: e.isAbsent ? 'X' : undefined,
+          })),
+        });
+      }
+
+      // Persist complete component totals into the final results table so no downstream component misses them
+      const finalResults: Array<{ studentId: string; subjectId: string; termId: string; score: number }> = [];
+      students.forEach((s: any) => {
+        const cell = componentScores[`${s.id}::${subjectId}`];
+        if (componentCellStatus(cell, subjectConfigs) !== 'complete') return;
+        const total = computeComponentTotal(cell, subjectConfigs);
+        if (total != null) finalResults.push({ studentId: s.id, subjectId, termId: selectedTerm, score: parseFloat(total.toFixed(2)) });
+      });
+      if (finalResults.length > 0) {
+        await api.post('/results/bulk', { results: finalResults }, { timeout: 120000 });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['sheet-students'] });
+      queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
+      queryClient.invalidateQueries({ queryKey: ['assessment-results-single'] });
+      setLastSavedCount(defIds.length);
+      setLastSavedAt(new Date().toLocaleTimeString());
+      setShowSavedBanner(true);
+      setTimeout(() => setShowSavedBanner(false), 8000);
+      toast.success(`${defIds.length} assessment component${defIds.length !== 1 ? 's' : ''} saved`, {
+        description: finalResults.length > 0
+          ? `${finalResults.length} final result${finalResults.length !== 1 ? 's' : ''} computed and synced to the results sheet.`
+          : 'Final results will sync once every component is entered.',
+        duration: 8000,
+      });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to save component scores');
+    } finally {
+      setSavingComponents(false);
+    }
+  }, [selectedClass, selectedSubject, selectedTerm, componentScores, students, subjectConfigs, savingComponents, queryClient]);
+
   const handleBulkSaveAll = useCallback(() => {
     if (dirtyCells.size === 0) {
       toast.error('No changes to save');
@@ -391,8 +614,30 @@ export default function ResultEntryPage() {
     return { entered, total, missing: total - entered };
   }, [students, displaySubjects, scores, absentCells]);
 
+  const componentStats = useMemo(() => {
+    if (!students.length || !subjectConfigs.length) return { complete: 0, partial: 0, pending: 0 };
+    let complete = 0, partial = 0, pending = 0;
+    students.forEach((s: any) => {
+      const cell = componentScores[`${s.id}::${selectedSubject}`];
+      const st = componentCellStatus(cell, subjectConfigs);
+      if (st === 'complete') complete++;
+      else if (st === 'partial') partial++;
+      else pending++;
+    });
+    return { complete, partial, pending };
+  }, [students, subjectConfigs, componentScores, selectedSubject]);
+
   const userRoles = user?.allRoles || user?.roles || [];
   const isDirector = userRoles.some((r: string) => ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head'].includes(r));
+
+  const selectedSubjectName = useMemo(() => {
+    if (selectedSubject === 'all') return 'All Subjects';
+    const cs = classSubjects.find((c: any) => (c.subject?.id || c.subjectId) === selectedSubject);
+    return cs?.subject?.name || cs?.subjectName || 'Subject';
+  }, [classSubjects, selectedSubject]);
+
+  const saveCount = componentMode ? componentEntryCount : dirtyCells.size;
+  const saving = componentMode ? savingComponents : (bulkSaving || bulkSaveMutation.isPending);
 
   return (
     <div>
@@ -417,7 +662,11 @@ export default function ResultEntryPage() {
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#1f2937', margin: 0 }}>Result Entry</h1>
           <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0 0' }}>
-            {entryMode === 'bulk' ? 'Enter scores for all subjects at once (Class Teacher Mode)' : 'Enter scores for one subject at a time'}
+            {componentMode
+              ? `Enter assessment component scores for ${selectedSubjectName} — total % and grade are computed automatically.`
+              : entryMode === 'bulk'
+                ? 'Enter scores for all subjects at once (Class Teacher Mode)'
+                : 'Enter scores for one subject at a time'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -445,6 +694,104 @@ export default function ResultEntryPage() {
             Paste from Excel
           </button>
         </div>
+      </div>
+
+      {/* Step-by-step workflow guide */}
+      <div style={{
+        background: '#fdfaf7', border: '1px solid #e8ddd0', borderRadius: '12px',
+        marginBottom: '24px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '12px',
+          padding: '14px 20px', background: '#f5efe8', borderBottom: '1px solid #e8ddd0',
+          cursor: 'pointer'
+        }} onClick={() => setShowWorkflow(!showWorkflow)}>
+          <span style={{
+            width: '32px', height: '32px', borderRadius: '8px', flexShrink: 0,
+            background: '#ea6645', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <i className="fa fa-shoe-prints"></i>
+          </span>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#1f2937' }}>
+              How results go from entry to published — 5 steps
+            </h3>
+            <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6b7280' }}>
+              {showWorkflow ? 'Click to hide. Follow these steps in order; each step happens on its own page.' : 'Click to show the exact steps.'}
+            </p>
+          </div>
+          <i className={`fa fa-chevron-${showWorkflow ? 'up' : 'down'}`} style={{ marginLeft: 'auto', color: '#6b7280' }}></i>
+        </div>
+
+        {showWorkflow && (
+          <div style={{ padding: '20px' }}>
+            {/* Status flow bar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '20px', flexWrap: 'wrap' }}>
+              {(['DRAFT', 'SUBMITTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] as const).map((status, idx) => {
+                const statusColors: Record<string, { bg: string; color: string }> = {
+                  DRAFT: { bg: '#f3f4f6', color: '#6b7280' },
+                  SUBMITTED: { bg: '#dbeafe', color: '#2563eb' },
+                  VERIFIED: { bg: '#d1fae5', color: '#059669' },
+                  PUBLISHED: { bg: '#f3e8ff', color: '#7c3aed' },
+                  LOCKED: { bg: '#fee2e2', color: '#dc2626' },
+                };
+                const c = statusColors[status];
+                return (
+                  <div key={status} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: '110px' }}>
+                    <span style={{
+                      display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
+                      padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                      background: c.bg, color: c.color, border: '1px solid #e8ddd0'
+                    }}>
+                      {idx + 1}. {status}
+                    </span>
+                    {idx < 4 && <i className="fa fa-arrow-right" style={{ margin: '0 4px', color: '#d1d5db', fontSize: '11px' }}></i>}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Step cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+              {WORKFLOW_STEPS.map((s) => (
+                <div key={s.step} style={{
+                  background: s.step === 1 ? '#fff7ed' : '#ffffff',
+                  border: s.step === 1 ? '1px solid #fdba74' : '1px solid #e8ddd0',
+                  borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0,
+                      background: s.step === 1 ? '#ea6645' : '#374151', color: 'white',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '13px', fontWeight: 700
+                    }}>{s.step}</span>
+                    <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#1f2937' }}>
+                      {s.title}
+                    </h4>
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#6b7280', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ padding: '2px 8px', borderRadius: '10px', background: '#f5efe8', fontWeight: 600 }}>
+                      <i className="fa fa-user" style={{ marginRight: '4px' }}></i>{s.who}
+                    </span>
+                    {s.href ? (
+                      <a href={s.href} style={{ padding: '2px 8px', borderRadius: '10px', background: '#eef2ff', color: '#4f46e5', fontWeight: 600, textDecoration: 'none' }}>
+                        <i className="fa fa-link" style={{ marginRight: '4px' }}></i>{s.where}
+                      </a>
+                    ) : (
+                      <span style={{ padding: '2px 8px', borderRadius: '10px', background: '#ecfdf5', color: '#059669', fontWeight: 600 }}>
+                        <i className="fa fa-location-arrow" style={{ marginRight: '4px' }}></i>{s.where}
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', lineHeight: 1.5, flex: 1 }}>
+                    {s.what}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Paste Modal */}
@@ -527,6 +874,14 @@ export default function ResultEntryPage() {
             </select>
           </div>
         )}
+        {entryMode === 'single' && selectedSubject !== 'all' && subjectConfigs.length > 0 && (
+          <div style={{ flex: '1', minWidth: '200px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', padding: '10px 14px' }}>
+            <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: '#166534' }}>
+              <i className="fa fa-layer-group" style={{ marginRight: '6px' }}></i>
+              {subjectConfigs.length} assessment component{subjectConfigs.length !== 1 ? 's' : ''} configured — entering components will auto-compute the final total & grade.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Stats bar */}
@@ -536,31 +891,50 @@ export default function ResultEntryPage() {
             <p style={{ fontSize: '22px', fontWeight: 700, color: '#1f2937', margin: 0 }}>{students.length}</p>
             <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>Students</p>
           </div>
-          <div style={{ flex: 1, minWidth: '120px', background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '10px', padding: '14px 18px' }}>
-            <p style={{ fontSize: '22px', fontWeight: 700, color: '#059669', margin: 0 }}>{stats.entered}</p>
-            <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>Entered</p>
-          </div>
-          <div style={{ flex: 1, minWidth: '120px', background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '10px', padding: '14px 18px' }}>
-            <p style={{ fontSize: '22px', fontWeight: 700, color: '#d97706', margin: 0 }}>{stats.missing}</p>
-            <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>Missing</p>
-          </div>
-          <div style={{ flex: 1, minWidth: '120px', background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '10px', padding: '14px 18px' }}>
-            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
-              <span>Progress</span>
-              <span>{stats.total > 0 ? Math.round((stats.entered / stats.total) * 100) : 0}%</span>
-            </div>
-            <div style={{ height: '8px', background: '#e5e7eb', borderRadius: '4px' }}>
-              <div style={{
-                width: `${stats.total > 0 ? Math.round((stats.entered / stats.total) * 100) : 0}%`,
-                height: '100%', background: '#059669', borderRadius: '4px', transition: 'width 0.3s'
-              }}></div>
-            </div>
-            {lastSavedAt && !showSavedBanner && (
-              <p style={{ fontSize: '11px', color: '#9ca3af', margin: '6px 0 0', textAlign: 'right' }}>
-                Last saved: {lastSavedAt}
-              </p>
-            )}
-          </div>
+          {componentMode ? (
+            <>
+              <div style={{ flex: 1, minWidth: '120px', background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '10px', padding: '14px 18px' }}>
+                <p style={{ fontSize: '22px', fontWeight: 700, color: '#059669', margin: 0 }}>{componentStats.complete}</p>
+                <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>Complete</p>
+              </div>
+              <div style={{ flex: 1, minWidth: '120px', background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '10px', padding: '14px 18px' }}>
+                <p style={{ fontSize: '22px', fontWeight: 700, color: '#d97706', margin: 0 }}>{componentStats.partial}</p>
+                <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>Partial</p>
+              </div>
+              <div style={{ flex: 1, minWidth: '120px', background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '10px', padding: '14px 18px' }}>
+                <p style={{ fontSize: '22px', fontWeight: 700, color: '#9ca3af', margin: 0 }}>{componentStats.pending}</p>
+                <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>Pending</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ flex: 1, minWidth: '120px', background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '10px', padding: '14px 18px' }}>
+                <p style={{ fontSize: '22px', fontWeight: 700, color: '#059669', margin: 0 }}>{stats.entered}</p>
+                <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>Entered</p>
+              </div>
+              <div style={{ flex: 1, minWidth: '120px', background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '10px', padding: '14px 18px' }}>
+                <p style={{ fontSize: '22px', fontWeight: 700, color: '#d97706', margin: 0 }}>{stats.missing}</p>
+                <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>Missing</p>
+              </div>
+              <div style={{ flex: 1, minWidth: '120px', background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '10px', padding: '14px 18px' }}>
+                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Progress</span>
+                  <span>{stats.total > 0 ? Math.round((stats.entered / stats.total) * 100) : 0}%</span>
+                </div>
+                <div style={{ height: '8px', background: '#e5e7eb', borderRadius: '4px' }}>
+                  <div style={{
+                    width: `${stats.total > 0 ? Math.round((stats.entered / stats.total) * 100) : 0}%`,
+                    height: '100%', background: '#059669', borderRadius: '4px', transition: 'width 0.3s'
+                  }}></div>
+                </div>
+                {lastSavedAt && !showSavedBanner && (
+                  <p style={{ fontSize: '11px', color: '#9ca3af', margin: '6px 0 0', textAlign: 'right' }}>
+                    Last saved: {lastSavedAt}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -575,32 +949,153 @@ export default function ResultEntryPage() {
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
-              onClick={handleBulkSaveAll}
-              disabled={dirtyCells.size === 0 || bulkSaveMutation.isPending || bulkSaving}
+              onClick={componentMode ? handleSaveComponents : handleBulkSaveAll}
+              disabled={saveCount === 0 || saving}
               style={{
                 padding: '10px 20px', fontSize: '13px', fontWeight: 600, color: 'white',
-                background: dirtyCells.size === 0 ? '#d1d5db' : '#059669',
-                border: 'none', borderRadius: '8px', cursor: dirtyCells.size === 0 ? 'not-allowed' : 'pointer',
+                background: saveCount === 0 ? '#d1d5db' : '#059669',
+                border: 'none', borderRadius: '8px', cursor: saveCount === 0 ? 'not-allowed' : 'pointer',
                 display: 'flex', alignItems: 'center', gap: '6px'
               }}
             >
-              <i className={`fa ${bulkSaveMutation.isPending ? 'fa-spinner fa-spin' : 'fa-save'}`}></i>
-              {bulkSaveMutation.isPending ? 'Saving...' : `Save All (${dirtyCells.size})`}
+              <i className={`fa ${saving ? 'fa-spinner fa-spin' : 'fa-save'}`}></i>
+              {saving ? 'Saving...' : componentMode ? `Save Components (${saveCount})` : `Save All (${saveCount})`}
             </button>
           </div>
         </div>
       )}
 
-      {/* Spreadsheet */}
-      {studentsLoading ? (
-        <div style={{ background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '12px', padding: '60px', textAlign: 'center' }}>
-          <i className="fa fa-spinner fa-spin" style={{ fontSize: '32px', color: '#4f46e5' }}></i>
-          <p style={{ color: '#6b7280', marginTop: '12px' }}>Loading students...</p>
-        </div>
+      {/* Component grid (single-subject mode with configured assessments) */}
+      {componentMode ? (
+        studentsLoading ? (
+          <div style={{ background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '12px', padding: '60px', textAlign: 'center' }}>
+            <i className="fa fa-spinner fa-spin" style={{ fontSize: '32px', color: '#4f46e5' }}></i>
+            <p style={{ color: '#6b7280', marginTop: '12px' }}>Loading students...</p>
+          </div>
+        ) : students.length === 0 ? (
+          <div style={{ background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '12px', padding: '60px', textAlign: 'center' }}>
+            <i className="fa fa-user-graduate" style={{ fontSize: '40px', color: '#d1d5db' }}></i>
+            <p style={{ color: '#9ca3af', marginTop: '12px' }}>No students found. Enroll students first.</p>
+          </div>
+        ) : (
+          <div style={{ background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#1f2937' }}>
+                  <i className="fa fa-layer-group" style={{ marginRight: '8px', color: '#4f46e5' }}></i>
+                  Assessment Components — {selectedSubjectName}
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#6b7280' }}>
+                  Enter raw score per component, or type <strong>X</strong>/<strong>A</strong> for absent. Total % and grade compute automatically.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#6b7280' }}>
+                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#ecfdf5', borderRadius: '2px', marginRight: '4px', border: '1px solid #059669' }}></span>Complete</span>
+                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#fef3c7', borderRadius: '2px', marginRight: '4px', border: '1px solid #d97706' }}></span>Partial</span>
+                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#f9fafb', borderRadius: '2px', marginRight: '4px', border: '1px solid #d1d5db' }}></span>Pending</span>
+              </div>
+            </div>
+            <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 440px)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ background: '#374151', position: 'sticky', top: 0, zIndex: 10 }}>
+                    <th style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.3px', minWidth: '36px' }}>#</th>
+                    <th style={{ textAlign: 'left', padding: '10px 14px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.3px', position: 'sticky', left: 0, background: '#374151', zIndex: 11, minWidth: '180px' }}>Student Name</th>
+                    <th style={{ textAlign: 'left', padding: '10px 14px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.3px', minWidth: '110px' }}>Admission No.</th>
+                    {subjectConfigs.map((c: any, idx: number) => (
+                      <th key={c.assessmentDefId} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.3px', minWidth: '110px', borderLeft: idx > 0 ? '1px solid rgba(255,255,255,0.1)' : 'none' }}>
+                        <div>{c.assessmentDef?.name || 'Component'}</div>
+                        <div style={{ fontSize: '9px', opacity: 0.7, fontWeight: 400 }}>Max {c.maxScore || 100} · {c.weightPercentage}%</div>
+                      </th>
+                    ))}
+                    <th style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.3px', minWidth: '80px', background: '#1f2937' }}>Total %</th>
+                    <th style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.3px', minWidth: '70px', background: '#1f2937' }}>Grade</th>
+                    <th style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.3px', minWidth: '90px', background: '#1f2937' }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStudents.map((student: any, idx: number) => {
+                    const cell = componentScores[`${student.id}::${selectedSubject}`];
+                    const total = computeComponentTotal(cell, subjectConfigs);
+                    const status = componentCellStatus(cell, subjectConfigs);
+                    const gradeColors = getGradeColor(total);
+                    const rowClass = idx % 2 === 0 ? '#ffffff' : '#f9fafb';
+                    return (
+                      <tr key={student.id} style={{ background: rowClass }}>
+                        <td style={{ textAlign: 'center', padding: '8px 6px', color: '#9ca3af', borderBottom: '1px solid #e5e7eb' }}>{idx + 1}</td>
+                        <td style={{ position: 'sticky', left: 0, background: rowClass, zIndex: 2, padding: '8px 14px', fontWeight: 600, color: '#1f2937', borderBottom: '1px solid #e5e7eb' }}>
+                          {student.firstName} {student.lastName}
+                        </td>
+                        <td style={{ padding: '8px 14px', color: '#6b7280', fontSize: '12px', borderBottom: '1px solid #e5e7eb' }}>
+                          {student.admissionNumber || '-'}
+                        </td>
+                        {subjectConfigs.map((c: any, cIdx: number) => {
+                          const entry = cell?.[c.assessmentDefId];
+                          const isAbsent = !!entry?.isAbsent;
+                          const value = isAbsent ? 'X' : entry?.rawScore != null ? String(entry.rawScore) : '';
+                          return (
+                            <td key={c.assessmentDefId} style={{ textAlign: 'center', padding: '4px 6px', borderBottom: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', background: isAbsent ? '#fef3c7' : value !== '' ? '#ecfdf5' : '#fef9c3' }}>
+                              <input
+                                type="text" inputMode="decimal"
+                                value={value}
+                                placeholder={entry?.isAbsent ? 'X' : `0-${c.maxScore || 100}`}
+                                onChange={e => handleComponentCell(student.id, selectedSubject, c.assessmentDefId, c.maxScore || 100, e.target.value)}
+                                style={{
+                                  width: '72px', padding: '6px 8px', textAlign: 'center',
+                                  border: isAbsent ? '2px solid #d97706' : '1px solid #d1d5db',
+                                  borderRadius: '6px', fontSize: '13px', fontWeight: isAbsent ? 700 : 600,
+                                  outline: 'none', background: '#ffffff',
+                                  color: isAbsent ? '#92400e' : '#1f2937', fontStyle: isAbsent ? 'italic' : 'normal'
+                                }}
+                              />
+                            </td>
+                          );
+                        })}
+                        <td style={{ textAlign: 'center', padding: '8px 6px', borderBottom: '1px solid #e5e7eb', fontWeight: 700, color: total != null ? gradeColors.text : '#d1d5db' }}>
+                          {total != null ? `${total.toFixed(1)}%` : '-'}
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>
+                          {total != null ? (
+                            <span style={{ fontSize: '12px', fontWeight: 700, padding: '3px 10px', borderRadius: '10px', background: gradeColors.bg, color: gradeColors.text }}>
+                              {getGrade(null, total, gradeScales)}
+                            </span>
+                          ) : <span style={{ color: '#d1d5db' }}>-</span>}
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>
+                          {status === 'complete' ? (
+                            <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '10px', background: '#d1fae5', color: '#059669' }}>Complete</span>
+                          ) : status === 'partial' ? (
+                            <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '10px', background: '#fef3c7', color: '#d97706' }}>Partial</span>
+                          ) : (
+                            <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '10px', background: '#f3f4f6', color: '#6b7280' }}>Pending</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                <strong>{componentEntryCount}</strong> component score{componentEntryCount !== 1 ? 's' : ''} staged · <strong>{componentStats.complete}</strong> student{componentStats.complete !== 1 ? 's' : ''} complete
+              </span>
+              <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                <i className="fa fa-info-circle" style={{ marginRight: '4px', color: '#3b82f6' }}></i>
+                Complete rows are synced as final results. Partial rows remain saved as components until finished.
+              </span>
+            </div>
+          </div>
+        )
       ) : !selectedClass || !selectedTerm ? (
         <div style={{ background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '12px', padding: '60px', textAlign: 'center' }}>
           <i className="fa fa-hand-pointer" style={{ fontSize: '40px', color: '#d1d5db' }}></i>
           <p style={{ color: '#9ca3af', marginTop: '12px' }}>Select a class and term to start entering results</p>
+        </div>
+      ) : studentsLoading ? (
+        <div style={{ background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '12px', padding: '60px', textAlign: 'center' }}>
+          <i className="fa fa-spinner fa-spin" style={{ fontSize: '32px', color: '#4f46e5' }}></i>
+          <p style={{ color: '#6b7280', marginTop: '12px' }}>Loading students...</p>
         </div>
       ) : students.length === 0 ? (
         <div style={{ background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '12px', padding: '60px', textAlign: 'center' }}>
@@ -759,28 +1254,37 @@ export default function ResultEntryPage() {
 
       {/* Keyboard shortcuts help */}
       <div style={{ marginTop: '16px', background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '10px', padding: '12px 20px', display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ fontSize: '12px', color: '#6b7280' }}>
-          <kbd style={{ padding: '2px 6px', background: '#f3f4f6', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>Enter</kbd> Move down
-        </span>
-        <span style={{ fontSize: '12px', color: '#6b7280' }}>
-          <kbd style={{ padding: '2px 6px', background: '#f3f4f6', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>Tab</kbd> Move right
-        </span>
-        <span style={{ fontSize: '12px', color: '#6b7280' }}>
-          <kbd style={{ padding: '2px 6px', background: '#f3f4f6', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>Shift+Tab</kbd> Move left
-        </span>
-        <span style={{ fontSize: '12px', color: '#6b7280' }}>
-          <kbd style={{ padding: '2px 6px', background: '#f3f4f6', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>Esc</kbd> Cancel edit
-        </span>
-        <span style={{ fontSize: '12px', color: '#6b7280' }}>
-          <i className="fa fa-paste" style={{ marginRight: '4px' }}></i>
-          <kbd style={{ padding: '2px 6px', background: '#f3f4f6', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>Paste</kbd> Import from Excel
-        </span>
-        <span style={{ fontSize: '12px', color: '#6b7280' }}>
-          <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#fef9c3', borderRadius: '2px', marginRight: '4px', border: '1px solid #f59e0b' }}></span> Yellow = Missing,
-          <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#ecfdf5', borderRadius: '2px', marginLeft: '6px', marginRight: '4px', border: '1px solid #059669' }}></span> Green = Saved,
-          <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#fef2f2', borderRadius: '2px', marginLeft: '6px', marginRight: '4px', border: '1px solid #dc2626' }}></span> Red = Below 50%,
-          <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#fef3c7', borderRadius: '2px', marginLeft: '6px', marginRight: '4px', border: '1px solid #92400e' }}></span> Amber = Absent (X/A)
-        </span>
+        {componentMode ? (
+          <span style={{ fontSize: '12px', color: '#6b7280' }}>
+            <i className="fa fa-user-slash" style={{ marginRight: '4px', color: '#92400e' }}></i>
+            Type <strong>X</strong> or <strong>A</strong> in any component to mark a learner absent.
+          </span>
+        ) : (
+          <>
+            <span style={{ fontSize: '12px', color: '#6b7280' }}>
+              <kbd style={{ padding: '2px 6px', background: '#f3f4f6', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>Enter</kbd> Move down
+            </span>
+            <span style={{ fontSize: '12px', color: '#6b7280' }}>
+              <kbd style={{ padding: '2px 6px', background: '#f3f4f6', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>Tab</kbd> Move right
+            </span>
+            <span style={{ fontSize: '12px', color: '#6b7280' }}>
+              <kbd style={{ padding: '2px 6px', background: '#f3f4f6', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>Shift+Tab</kbd> Move left
+            </span>
+            <span style={{ fontSize: '12px', color: '#6b7280' }}>
+              <kbd style={{ padding: '2px 6px', background: '#f3f4f6', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>Esc</kbd> Cancel edit
+            </span>
+            <span style={{ fontSize: '12px', color: '#6b7280' }}>
+              <i className="fa fa-paste" style={{ marginRight: '4px' }}></i>
+              <kbd style={{ padding: '2px 6px', background: '#f3f4f6', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>Paste</kbd> Import from Excel
+            </span>
+            <span style={{ fontSize: '12px', color: '#6b7280' }}>
+              <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#fef9c3', borderRadius: '2px', marginRight: '4px', border: '1px solid #f59e0b' }}></span> Yellow = Missing,
+              <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#ecfdf5', borderRadius: '2px', marginLeft: '6px', marginRight: '4px', border: '1px solid #059669' }}></span> Green = Saved,
+              <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#fef2f2', borderRadius: '2px', marginLeft: '6px', marginRight: '4px', border: '1px solid #dc2626' }}></span> Red = Below 50%,
+              <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#fef3c7', borderRadius: '2px', marginLeft: '6px', marginRight: '4px', border: '1px solid #92400e' }}></span> Amber = Absent (X/A)
+            </span>
+          </>
+        )}
         {stats.entered > 0 && (
           <a href="/dashboard/results-management/view-results" style={{ marginLeft: 'auto', padding: '6px 14px', fontSize: '12px', fontWeight: 600, color: '#059669', background: '#d1fae5', borderRadius: '6px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <i className="fa fa-eye"></i> View Results
