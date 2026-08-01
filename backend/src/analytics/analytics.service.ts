@@ -181,17 +181,21 @@ export class AnalyticsService {
       subjects: s.subjects,
     }));
 
-    ranking.sort((a, b) => b.totalPoints - a.totalPoints);
+    ranking.sort((a, b) => b.average - a.average);
 
+    const byPoints = [...ranking].sort((a, b) => a.totalPoints - b.totalPoints);
+    const positions = new Map<string, number>();
     let lastPoints: number | null = null;
     let position = 0;
-    return ranking.map((s, i) => {
+    byPoints.forEach((s, i) => {
       if (s.totalPoints !== lastPoints) {
         position = i + 1;
         lastPoints = s.totalPoints;
       }
-      return { position, ...s };
+      positions.set(s.studentId, position);
     });
+
+    return ranking.map((s) => ({ position: positions.get(s.studentId) ?? 0, ...s }));
   }
   // ----------------------
   // 2️⃣ Student Comment
