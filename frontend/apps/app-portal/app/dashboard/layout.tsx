@@ -308,6 +308,14 @@ const regularNav: NavItem[] = [
     typeRoles: ROLE_MAP.teaching,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
+  {
+    name: 'Results',
+    href: '/dashboard/results',
+    icon: 'fa-chart-bar',
+    color: '#10b981',
+    typeRoles: ROLE_MAP.teaching,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
+  },
   { 
     name: 'Assessment Config', 
     href: '/dashboard/assessment-config', 

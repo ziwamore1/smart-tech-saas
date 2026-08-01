@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { analyticsApi, classApi, termApi } from '@/lib/api';
 import HeatmapChart from '@/components/charts-echarts/HeatmapChart';
@@ -37,6 +37,13 @@ export default function AnalyticsEnhancedPage() {
       return Array.isArray(d) ? d : [];
     },
   });
+
+  useEffect(() => {
+    if (!selectedClass && classes && classes.length > 0) setSelectedClass(classes[0].id);
+    if (!selectedTerm && terms && terms.length > 0) {
+      setSelectedTerm(terms.find((term: any) => term.isCurrent)?.id || terms[0].id);
+    }
+  }, [classes, terms, selectedClass, selectedTerm]);
 
   const { data: heatmapData, isLoading: heatmapLoading } = useQuery({
     queryKey: ['heatmap', selectedClass, selectedTerm],
@@ -83,17 +90,24 @@ export default function AnalyticsEnhancedPage() {
   ];
 
   const heatmapChartData = heatmapData ? {
-    subjects: heatmapData.subjects || heatmapData.labels || [],
-    students: heatmapData.students || [],
-    values: heatmapData.values || heatmapData.matrix || [],
+    subjects: (heatmapData.subjects || heatmapData.labels || []).map((subject: any) => subject.name || subject.label || subject),
+    students: heatmapData.students || heatmapData.heatmap?.map((row: any) => row.studentName) || [],
+    values: heatmapData.values || heatmapData.matrix || (heatmapData.heatmap || []).map((row: any) =>
+      (heatmapData.subjects || []).map((subject: any) => row[subject.subjectId] === '🟢' ? 80 : row[subject.subjectId] === '🟡' ? 60 : row[subject.subjectId] === '🔴' ? 40 : 0),
+    ),
   } : undefined;
 
-  const radarIndicators = subjectPerf?.subjects
-    ? subjectPerf.subjects.map((s: any) => ({ name: s.name || s.subject, max: 100 }))
+  const subjectRows = Array.isArray(subjectPerf) ? subjectPerf : subjectPerf?.subjects || [];
+  const gradeBreakdown = gradeDist?.gradeBreakdown || (gradeDist && !Array.isArray(gradeDist) ? gradeDist : {});
+  const genderRows = Array.isArray(genderPerf) ? genderPerf : genderPerf?.rows || [];
+  const rankingRows = Array.isArray(classRanking) ? classRanking : classRanking?.students || [];
+
+  const radarIndicators = subjectRows.length > 0
+    ? subjectRows.map((s: any) => ({ name: s.name || s.subject, max: 100 }))
     : [];
 
-  const radarSeries = subjectPerf?.subjects
-    ? [{ name: 'Average', value: subjectPerf.subjects.map((s: any) => s.average || 0) }]
+  const radarSeries = subjectRows.length > 0
+    ? [{ name: 'Average', value: subjectRows.map((s: any) => s.average || 0) }]
     : [];
 
   const cohortTerms = classPerf?.history?.map((h: any) => h.term || h.label) || [];
@@ -104,19 +118,26 @@ export default function AnalyticsEnhancedPage() {
     ]
     : [];
 
-  const rankingEntries = classRanking?.students
-    ? classRanking.students.map((s: any, i: number) => ({
+  const rankingEntries = rankingRows.map((s: any, i: number) => ({
       rank: i + 1,
       name: `${s.firstName || ''} ${s.lastName || ''}`.trim() || s.name,
       value: s.average || s.score || 0,
       change: s.change as 'up' | 'down' | 'same' | undefined,
       secondaryValue: s.grade,
-    }))
-    : [];
+    }));
 
-  const distributionData = gradeDist?.distribution
-    ? gradeDist.distribution.map((d: any) => ({ value: d.score || d.grade || 0, frequency: d.count || 0 }))
-    : [];
+  const distributionData = Object.entries(gradeBreakdown).map(([grade, count], index) => ({
+    value: index,
+    frequency: Number(count),
+    label: grade,
+  }));
+
+  const genderComparison = genderRows.reduce((acc: { male: number; female: number }, row: any) => {
+    const gender = String(row.gender || '').toLowerCase();
+    if (gender === 'male') acc.male = row.average || 0;
+    if (gender === 'female') acc.female = row.average || 0;
+    return acc;
+  }, { male: 0, female: 0 });
 
   return (
     <div className="space-y-6">
@@ -176,6 +197,27 @@ export default function AnalyticsEnhancedPage() {
         ))}
       </div>
 
+      {classPerf && (
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="bg-white rounded-lg shadow p-4">
+            <p className="text-xs uppercase text-gray-500">Class Average</p>
+            <p className="text-2xl font-bold text-orange-600">{Number(classPerf.classAverage || 0).toFixed(1)}%</p>
+          </div>
+          <div className="bg-white rounded-lg shadow p-4">
+            <p className="text-xs uppercase text-gray-500">Pass Rate</p>
+            <p className="text-2xl font-bold text-green-600">{Number(classPerf.passRate || 0).toFixed(1)}%</p>
+          </div>
+          <div className="bg-white rounded-lg shadow p-4">
+            <p className="text-xs uppercase text-gray-500">Highest Score</p>
+            <p className="text-2xl font-bold text-blue-600">{Number(classPerf.highestScore || 0).toFixed(1)}%</p>
+          </div>
+          <div className="bg-white rounded-lg shadow p-4">
+            <p className="text-xs uppercase text-gray-500">Students</p>
+            <p className="text-2xl font-bold text-purple-600">{classPerf.totalStudents || 0}</p>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'overview' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -187,18 +229,18 @@ export default function AnalyticsEnhancedPage() {
             )}
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {genderPerf && (
+            {genderRows.length > 0 && (
               <ComparisonChart
                 categories={['Male', 'Female']}
-                groups={[{ name: 'Performance', values: [genderPerf.maleAverage || 0, genderPerf.femaleAverage || 0], color: '#8b5cf6' }]}
+                groups={[{ name: 'Performance', values: [genderComparison.male, genderComparison.female], color: '#8b5cf6' }]}
                 title="Gender Performance Comparison"
                 loading={genderLoading}
               />
             )}
-            {gradeDist?.gradeBreakdown && (
+            {Object.keys(gradeBreakdown).length > 0 && (
               <ComparisonChart
-                categories={Object.keys(gradeDist.gradeBreakdown)}
-                groups={[{ name: 'Students', values: Object.values(gradeDist.gradeBreakdown), color: '#ea6645' }]}
+                categories={Object.keys(gradeBreakdown)}
+                groups={[{ name: 'Students', values: Object.values(gradeBreakdown).map(Number), color: '#ea6645' }]}
                 title="Grade Breakdown"
                 loading={gradeLoading}
               />
@@ -210,26 +252,21 @@ export default function AnalyticsEnhancedPage() {
       {activeTab === 'comparison' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {subjectPerf?.subjects && (
+            {subjectRows.length > 0 && (
               <ComparisonChart
-                categories={subjectPerf.subjects.map((s: any) => s.name || s.subject)}
+                categories={subjectRows.map((s: any) => s.name || s.subject)}
                 groups={[
-                  { name: 'Average', values: subjectPerf.subjects.map((s: any) => s.average || 0), color: '#ea6645' },
-                  { name: 'Highest', values: subjectPerf.subjects.map((s: any) => s.highest || s.max || 0), color: '#10b981' },
-                  { name: 'Lowest', values: subjectPerf.subjects.map((s: any) => s.lowest || s.min || 0), color: '#ef4444' },
+                  { name: 'Average', values: subjectRows.map((s: any) => s.average || 0), color: '#ea6645' },
                 ]}
                 title="Subject Performance Comparison"
                 loading={subjectLoading}
               />
             )}
-            {genderPerf?.subjectBreakdown && (
+            {genderRows.length > 0 && (
               <ComparisonChart
-                categories={genderPerf.subjectBreakdown.map((s: any) => s.name || s.subject)}
-                groups={[
-                  { name: 'Male', values: genderPerf.subjectBreakdown.map((s: any) => s.maleAvg || s.male || 0), color: '#3b82f6' },
-                  { name: 'Female', values: genderPerf.subjectBreakdown.map((s: any) => s.femaleAvg || s.female || 0), color: '#ec4899' },
-                ]}
-                title="Gender by Subject"
+                categories={['Male', 'Female']}
+                groups={[{ name: 'Average', values: [genderComparison.male, genderComparison.female], color: '#8b5cf6' }]}
+                title="Gender Performance"
                 loading={genderLoading}
               />
             )}
@@ -253,7 +290,7 @@ export default function AnalyticsEnhancedPage() {
               />
             )}
             <BoxPlotChart
-              data={(subjectPerf?.subjects || []).map((s: any) => ({
+              data={subjectRows.map((s: any) => ({
                 name: s.name || s.subject,
                 min: s.min || 0,
                 q1: s.q1 || s.lowerQuartile || 0,
@@ -314,12 +351,12 @@ export default function AnalyticsEnhancedPage() {
             valueLabel="Average"
             loading={rankingLoading}
           />
-          {subjectPerf?.subjects && (
-            <ComparisonChart
-              categories={subjectPerf.subjects.map((s: any) => s.name || s.subject)}
-              groups={[{
-                name: 'Average Score',
-                values: subjectPerf.subjects.map((s: any) => s.average || 0),
+            {subjectRows.length > 0 && (
+              <ComparisonChart
+                categories={subjectRows.map((s: any) => s.name || s.subject)}
+                groups={[{
+                  name: 'Average Score',
+                  values: subjectRows.map((s: any) => s.average || 0),
                 color: '#ea6645',
               }]}
               title="Subject Performance Overview"

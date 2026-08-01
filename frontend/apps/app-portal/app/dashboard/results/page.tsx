@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { resultApi, classApi, termApi, subjectApi, assessmentApi, publishingApi, reportCardApi } from '@/lib/api';
+import { resultApi, classApi, termApi, subjectApi, assessmentApi, publishingApi, reportEngineApi } from '@/lib/api';
 
 type Tab = 'upload' | 'entry' | 'assessments' | 'review' | 'publish' | 'reports';
 
@@ -859,7 +859,11 @@ function ReportsTab({ selectedClass, selectedTerm, publishStatus, onMessage }: R
     if (!selectedClass || !selectedTerm) return;
     setLoading('class');
     try {
-      const response = await reportCardApi.downloadClassReportsPdf(selectedClass, selectedTerm);
+      const response = await reportEngineApi.generatePdf({
+        type: 'CLASS_REPORT',
+        classId: selectedClass,
+        termId: selectedTerm,
+      });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -898,7 +902,7 @@ function ReportsTab({ selectedClass, selectedTerm, publishStatus, onMessage }: R
   };
 
   const handleViewAnalytics = () => {
-    window.location.href = `/dashboard/analytics?class=${selectedClass}&term=${selectedTerm}`;
+    window.location.href = `/dashboard/result-analytics?classId=${selectedClass}&termId=${selectedTerm}`;
   };
 
   return (
@@ -962,6 +966,19 @@ function ReportsTab({ selectedClass, selectedTerm, publishStatus, onMessage }: R
             className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
           >
             View Analytics
+          </button>
+        </div>
+
+        <div className="border rounded-lg p-4">
+          <h3 className="font-medium mb-2">Professional Report Hub</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Generate branded report cards, transcripts, certificates, and class reports using the current templates.
+          </p>
+          <button
+            onClick={() => { window.location.href = '/dashboard/report-hub'; }}
+            className="w-full px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+          >
+            Open Report Hub
           </button>
         </div>
       </div>
@@ -1611,5 +1628,3 @@ export default function ResultsPage() {
     </div>
   );
 }
-
-

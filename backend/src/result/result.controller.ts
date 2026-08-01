@@ -50,6 +50,34 @@ export class ResultController {
     );
   }
 
+  @Get('computed')
+  @Roles('Director', 'Teacher', 'Class Teacher')
+  async findComputed(
+    @Query('classId') classId: string,
+    @Query('termId') termId: string,
+    @Req() req: any,
+  ) {
+    return this.prisma.computedResult.findMany({
+      where: {
+        schoolId: req.user.schoolId,
+        classId,
+        termId,
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        student: { status: 'ACTIVE' },
+      },
+      include: {
+        student: {
+          select: { id: true, firstName: true, lastName: true, admissionNumber: true },
+        },
+        subject: { select: { id: true, name: true, code: true } },
+      },
+      orderBy: [
+        { student: { firstName: 'asc' } },
+        { subject: { name: 'asc' } },
+      ],
+    });
+  }
+
   @Get(':id')
   @Roles('Director', 'Teacher', 'Class Teacher')
   findOne(@Param('id') id: string, @Req() req: any) {

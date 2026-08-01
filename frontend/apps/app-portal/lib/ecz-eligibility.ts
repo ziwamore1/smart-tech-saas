@@ -14,6 +14,8 @@ export interface EczEligibilityResult {
   hasFailingSubject: boolean;
   englishPassed: boolean;
   mathPassed: boolean;
+  englishSubject?: EczSubjectGrade;
+  mathSubject?: EczSubjectGrade;
   failingSubjects: string[];
   details: string;
 }
@@ -47,12 +49,12 @@ function normalizeSubjectName(name: string): string {
 
 function isEnglish(name: string): boolean {
   const n = normalizeSubjectName(name);
-  return n === 'english' || n === 'english language' || n === 'eng';
+  return n === 'english' || n === 'english language' || n === 'eng' || n.startsWith('english ');
 }
 
 function isMath(name: string): boolean {
   const n = normalizeSubjectName(name);
-  return n === 'mathematics' || n === 'math' || n === 'maths';
+  return n === 'mathematics' || n === 'math' || n === 'maths' || n.startsWith('mathematics ') || n.startsWith('math ');
 }
 
 export function checkEczEligibility(subjects: EczSubjectGrade[]): EczEligibilityResult {
@@ -73,8 +75,8 @@ export function checkEczEligibility(subjects: EczSubjectGrade[]): EczEligibility
   const meetsSubjectCount = subjects.length >= MIN_SUBJECTS;
   const noFails = failingSubjects.length === 0;
   const meetsPointsThreshold = bestSixTotal <= MAX_BEST_SIX_POINTS;
-  const englishOk = !english || englishPassed;
-  const mathOk = !math || mathPassed;
+  const englishOk = !!english && englishPassed;
+  const mathOk = !!math && mathPassed;
 
   const eligible = meetsSubjectCount && noFails && meetsPointsThreshold && englishOk && mathOk;
 
@@ -101,6 +103,8 @@ export function checkEczEligibility(subjects: EczSubjectGrade[]): EczEligibility
     hasFailingSubject: failingSubjects.length > 0,
     englishPassed,
     mathPassed,
+    englishSubject: english,
+    mathSubject: math,
     failingSubjects: failingSubjects.map((s) => s.name),
     details,
   };

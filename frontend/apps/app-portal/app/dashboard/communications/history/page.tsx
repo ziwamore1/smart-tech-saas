@@ -49,6 +49,10 @@ const statusOptions = [
 
 const ITEMS_PER_PAGE = 10;
 
+function unwrapApiData(payload: any): any {
+  return payload?.data?.data ?? payload?.data ?? payload;
+}
+
 const statusStyles: Record<string, { bg: string; color: string; icon: string }> = {
   delivered: { bg: '#ecfdf5', color: '#065f46', icon: 'fa-check-circle' },
   failed: { bg: '#fef2f2', color: '#991b1b', icon: 'fa-times-circle' },
@@ -80,7 +84,23 @@ export default function SchoolMessageHistoryPage() {
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['school-stats'],
-    queryFn: () => communicationsCloudApi.getSchoolStats().then(r => r.data),
+    queryFn: () => communicationsCloudApi.getSchoolStats().then(r => {
+      const data = unwrapApiData(r.data) || {};
+      const byStatus = data.byStatus || {};
+      const delivered = Number(byStatus.DELIVERED ?? byStatus.delivered ?? 0);
+      const failed = Number(byStatus.FAILED ?? byStatus.failed ?? 0);
+      const pending = Number(
+        byStatus.QUEUED ?? byStatus.queued ?? 0,
+      ) + Number(byStatus.PROCESSING ?? byStatus.processing ?? 0);
+      const totalSent = Number(data.total ?? data.totalSent ?? 0);
+      return {
+        totalSent,
+        delivered,
+        failed,
+        pending,
+        deliveryRate: totalSent ? Number(((delivered / totalSent) * 100).toFixed(1)) : 0,
+      };
+    }),
     retry: 1,
     refetchOnWindowFocus: false,
   });
@@ -92,7 +112,22 @@ export default function SchoolMessageHistoryPage() {
       status: statusFilter || undefined,
       limit: ITEMS_PER_PAGE,
       offset: (currentPage - 1) * ITEMS_PER_PAGE,
-    }).then(r => r.data),
+    }).then(r => {
+      const data = unwrapApiData(r.data) || {};
+      const rawMessages = Array.isArray(data) ? data : data.messages || [];
+      return {
+        total: Number(data.total ?? rawMessages.length),
+        messages: rawMessages.map((message: any) => ({
+          ...message,
+          date: message.date || message.createdAt || message.sentAt,
+          channel: String(message.channel || 'SMS').toUpperCase(),
+          recipient: message.recipient || message.recipientAddress || message.to || 'Unknown recipient',
+          message: message.message || message.body || message.content || '',
+          status: String(message.status || 'pending').toLowerCase(),
+          cost: Number(message.cost ?? message.totalCost ?? 0),
+        })),
+      };
+    }),
     retry: 1,
     refetchOnWindowFocus: false,
   });
@@ -113,8 +148,8 @@ export default function SchoolMessageHistoryPage() {
   });
 
   const statsData = stats || MOCK_STATS;
-  const messages = messagesData?.messages || messagesData || MOCK_MESSAGES;
-  const totalMessages = messagesData?.total || MOCK_MESSAGES.length;
+  const messages = messagesData?.messages || MOCK_MESSAGES;
+  const totalMessages = messagesData?.total ?? messages.length;
   const totalPages = Math.ceil(totalMessages / ITEMS_PER_PAGE);
   const isMock = !stats && !statsLoading;
 

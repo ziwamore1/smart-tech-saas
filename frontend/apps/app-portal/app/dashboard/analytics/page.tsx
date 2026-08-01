@@ -48,6 +48,13 @@ export default function AnalyticsPage() {
 
   const terms = Array.isArray(termsResponse) ? termsResponse : [];
 
+  useEffect(() => {
+    if (!selectedClass && classes.length > 0) setSelectedClass(classes[0].id);
+    if (!selectedTerm && terms.length > 0) {
+      setSelectedTerm(terms.find((term: any) => term.isCurrent)?.id || terms[0].id);
+    }
+  }, [classes, terms, selectedClass, selectedTerm]);
+
   const { data: pieData, isLoading: pieLoading } = useQuery<ChartData>({
     queryKey: ['pie-chart', selectedClass],
     queryFn: () => analyticsApi.getPieChartData(selectedClass || undefined).then(res => res.data),

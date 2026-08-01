@@ -1,16 +1,22 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { resultAnalyticsApi, rankingApi, classApi, termApi, resultApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { checkEczEligibility } from '@/lib/ecz-eligibility';
+import { checkEczEligibility, scoreToEczGrade } from '@/lib/ecz-eligibility';
 
 export default function ResultAnalyticsPage() {
   const { user } = useAuth();
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'at-risk' | 'rankings' | 'trends' | 'ecz'>('overview');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setSelectedClass(params.get('classId') || '');
+    setSelectedTerm(params.get('termId') || '');
+  }, []);
 
   const { data: classes } = useQuery({
     queryKey: ['classes'],
@@ -53,7 +59,7 @@ export default function ResultAnalyticsPage() {
   const { data: classResults } = useQuery({
     queryKey: ['class-results-ecy', selectedClass, selectedTerm],
     queryFn: () =>
-      resultApi.getByClass(selectedClass, selectedTerm).then(r => r.data?.data || r.data || []),
+      resultApi.getComputedByClass(selectedClass, selectedTerm).then(r => r.data?.data || r.data || []),
     enabled: !!(selectedClass && selectedTerm),
   });
 
@@ -66,17 +72,17 @@ export default function ResultAnalyticsPage() {
       if (!grouped[sid]) {
         grouped[sid] = {
           studentId: sid,
-          studentName: r.studentName || r.student?.firstName + ' ' + r.student?.lastName || r.student?.name || sid,
+         studentName: r.studentName || [r.student?.firstName, r.student?.lastName].filter(Boolean).join(' ') || r.student?.name || sid,
           admissionNumber: r.admissionNumber || r.student?.admissionNumber,
           subjects: [],
         };
       }
       grouped[sid].subjects.push({
         name: r.subject?.name || r.subjectName || 'Unknown',
-        score: r.score ?? r.finalPercentage ?? 0,
-        grade: r.grade ?? r.finalGrade ?? '-',
-        points: r.points ?? 0,
-        remark: r.remark ?? r.finalRemark ?? '-',
+        score: r.finalPercentage ?? r.score ?? 0,
+        grade: r.finalGrade ?? r.grade ?? '-',
+        points: r.points ?? (r.finalPercentage != null ? scoreToEczGrade(r.finalPercentage).points : 0),
+        remark: r.finalRemark ?? r.remark ?? '-',
       });
     }
     const entries = Object.values(grouped).map((s) => ({
@@ -425,14 +431,25 @@ export default function ResultAnalyticsPage() {
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
                           <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Subjects</th>
                           <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Best 6 Pts</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">English</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Math</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">English Result</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mathematics Result</th>
                           <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {eczEligibilityData.entries.map((entry: any, i: number) => {
                           const e = entry.eligibility;
+                          const formatSubject = (subject: any, passed: boolean) => subject ? (
+                            <div>
+                              <div className="font-medium text-gray-800">{subject.name}</div>
+                              <div className="text-xs text-gray-500">
+                                {Number(subject.score).toFixed(1)}% · Grade {subject.grade} · {subject.points} pts
+                              </div>
+                              <span className={`text-xs font-semibold ${passed ? 'text-green-600' : 'text-red-600'}`}>
+                                {passed ? '✓ Passed' : '✗ Not passed'}
+                              </span>
+                            </div>
+                          ) : <span className="text-xs text-red-600">Not found</span>;
                           return (
                             <tr key={entry.studentId} className={i % 2 === 0 ? 'bg-gray-50' : ''}>
                               <td className="px-4 py-3 text-sm font-medium text-gray-900">
@@ -445,15 +462,11 @@ export default function ResultAnalyticsPage() {
                               <td className={`px-4 py-3 text-sm text-center font-semibold ${e.bestSixTotal <= 36 ? 'text-green-600' : 'text-red-600'}`}>
                                 {e.bestSixTotal}
                               </td>
-                              <td className="px-4 py-3 text-sm text-center">
-                                <span className={e.englishPassed ? 'text-green-600' : 'text-red-600'}>
-                                  {entry.studentId ? (e.englishPassed ? '✓' : '✗') : '-'}
-                                </span>
+                              <td className="px-4 py-3 text-sm">
+                                {formatSubject(e.englishSubject, e.englishPassed)}
                               </td>
-                              <td className="px-4 py-3 text-sm text-center">
-                                <span className={e.mathPassed ? 'text-green-600' : 'text-red-600'}>
-                                  {entry.studentId ? (e.mathPassed ? '✓' : '✗') : '-'}
-                                </span>
+                              <td className="px-4 py-3 text-sm">
+                                {formatSubject(e.mathSubject, e.mathPassed)}
                               </td>
                               <td className="px-4 py-3 text-sm text-center">
                                 <span className={`px-2 py-1 text-xs rounded-full font-medium ${

@@ -470,6 +470,8 @@ export const resultApi = {
   getById: (id: string) => api.get(`/results/${id}`),
   getByClass: (classId: string, termId: string) =>
     api.get('/results', { params: { classId, termId } }),
+  getComputedByClass: (classId: string, termId: string) =>
+    api.get('/results/computed', { params: { classId, termId } }),
   getByStudent: (studentId: string, termId: string) =>
     api.get(`/results/student/${studentId}`, { params: { termId } }),
   create: (data: { studentId: string; subjectId: string; termId: string; score: number }) =>

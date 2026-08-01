@@ -988,7 +988,13 @@ Respond with ONLY valid JSON, no markdown.`;
       subjectId: a.subjectId,
       name: a.subject.name,
     }));
-    return { heatmap, subjects };
+    const students = enrollments.map((e) => `${e.student.firstName} ${e.student.lastName}`.trim());
+    const values = subjectIds.map((subjectId) => enrollments.map((e) => {
+      const result = results.find((r) => r.studentId === e.studentId && r.subjectId === subjectId);
+      return result?.finalPercentage ?? 0;
+    }));
+
+    return { heatmap, subjects, students, values };
   }
 
   // ----------------------
