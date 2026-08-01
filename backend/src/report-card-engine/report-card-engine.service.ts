@@ -132,26 +132,26 @@ export class ReportCardEngineService {
           finalPercentage = legacy.score;
           finalGrade = legacy.grade ?? null;
           finalRemark = legacy.remark ?? null;
+        }
+      }
 
-          // Compute points from grading engine if not available
-          if (points == null && finalPercentage != null) {
-            try {
-              const gradeResult = await this.gradingEngine.computeGradeFull(
-                finalPercentage, enrollment.classId, result.subjectId, termId, schoolId,
-              );
-              points = gradeResult.points ?? null;
-              gpa = gradeResult.gpa ?? null;
-              if (!finalGrade && gradeResult.grade) finalGrade = gradeResult.grade;
-              if (!finalRemark && gradeResult.remark) finalRemark = gradeResult.remark;
-            } catch {
-              // Grading engine failed, use inline fallback
-              if (finalPercentage >= 75) { points = 1; finalGrade = finalGrade ?? 'A'; }
-              else if (finalPercentage >= 65) { points = 2; finalGrade = finalGrade ?? 'B'; }
-              else if (finalPercentage >= 50) { points = 3; finalGrade = finalGrade ?? 'C'; }
-              else if (finalPercentage >= 40) { points = 4; finalGrade = finalGrade ?? 'D'; }
-              else { points = 5; finalGrade = finalGrade ?? 'E'; }
-            }
-          }
+      // Compute points from grading engine if not available
+      if (points == null && finalPercentage != null) {
+        try {
+          const gradeResult = await this.gradingEngine.computeGradeFull(
+            finalPercentage, enrollment.classId, result.subjectId, termId, schoolId,
+          );
+          points = gradeResult.points ?? null;
+          gpa = gradeResult.gpa ?? null;
+          if (!finalGrade && gradeResult.grade) finalGrade = gradeResult.grade;
+          if (!finalRemark && gradeResult.remark) finalRemark = gradeResult.remark;
+        } catch {
+          // Grading engine failed, use inline fallback
+          if (finalPercentage >= 75) { points = 1; finalGrade = finalGrade ?? 'A'; }
+          else if (finalPercentage >= 65) { points = 2; finalGrade = finalGrade ?? 'B'; }
+          else if (finalPercentage >= 50) { points = 3; finalGrade = finalGrade ?? 'C'; }
+          else if (finalPercentage >= 40) { points = 4; finalGrade = finalGrade ?? 'D'; }
+          else { points = 5; finalGrade = finalGrade ?? 'E'; }
         }
       }
 

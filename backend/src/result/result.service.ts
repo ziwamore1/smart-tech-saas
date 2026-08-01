@@ -191,6 +191,8 @@ export class ResultService {
           finalPercentage: score,
           finalGrade: gradeData.grade,
           finalRemark: gradeData.remark,
+          points: gradeData.points,
+          gpa: gradeData.gpa,
           status: 'COMPUTED',
           computedAt: new Date(),
         },
@@ -204,6 +206,8 @@ export class ResultService {
           finalPercentage: score,
           finalGrade: gradeData.grade,
           finalRemark: gradeData.remark,
+          points: gradeData.points,
+          gpa: gradeData.gpa,
           status: 'COMPUTED',
           computedAt: new Date(),
         },
@@ -242,6 +246,8 @@ export class ResultService {
           finalPercentage: score,
           finalGrade: gradeData.grade,
           finalRemark: gradeData.remark,
+          points: gradeData.points,
+          gpa: gradeData.gpa,
           status: 'COMPUTED',
           computedAt: new Date(),
         },
@@ -255,6 +261,8 @@ export class ResultService {
           finalPercentage: score,
           finalGrade: gradeData.grade,
           finalRemark: gradeData.remark,
+          points: gradeData.points,
+          gpa: gradeData.gpa,
           status: 'COMPUTED',
           computedAt: new Date(),
         },
@@ -350,6 +358,8 @@ export class ResultService {
             finalPercentage: item.score,
             finalGrade: gradeData.grade,
             finalRemark: gradeData.remark,
+            points: gradeData.points,
+            gpa: gradeData.gpa,
             status: 'COMPUTED',
             computedAt: new Date(),
           },
@@ -363,6 +373,8 @@ export class ResultService {
             finalPercentage: item.score,
             finalGrade: gradeData.grade,
             finalRemark: gradeData.remark,
+            points: gradeData.points,
+            gpa: gradeData.gpa,
             status: 'COMPUTED',
             computedAt: new Date(),
           },
@@ -451,6 +463,8 @@ export class ResultService {
         finalPercentage: score,
         finalGrade: gradeData.grade,
         finalRemark: gradeData.remark,
+        points: gradeData.points,
+        gpa: gradeData.gpa,
         status: 'COMPUTED',
         computedAt: new Date(),
       },
@@ -464,6 +478,8 @@ export class ResultService {
         finalPercentage: score,
         finalGrade: gradeData.grade,
         finalRemark: gradeData.remark,
+        points: gradeData.points,
+        gpa: gradeData.gpa,
         status: 'COMPUTED',
         computedAt: new Date(),
       },
@@ -557,7 +573,7 @@ export class ResultService {
 
     if (!gradingSystem) {
       this.logger.warn(`No grading system found for school ${schoolId}, classId ${classId}`);
-      return { grade: 'N/A', remark: 'No grading system configured' };
+      return { grade: 'N/A', remark: 'No grading system configured', points: null, gpa: null };
     }
 
     this.logger.debug(
@@ -572,12 +588,14 @@ export class ResultService {
       this.logger.warn(
         `Score ${score} not covered by any grade scale in "${gradingSystem.name}" (${gradingSystem.gradeScales.map(s => `${s.minScore}-${s.maxScore}=${s.grade}`).join(', ')})`,
       );
-      return { grade: 'N/A', remark: 'Score out of range' };
+      return { grade: 'N/A', remark: 'Score out of range', points: null, gpa: null };
     }
 
     return {
       grade: scale.grade,
       remark: scale.remark,
+      points: (scale as any).points ?? null,
+      gpa: (scale as any).gpa ?? null,
     };
   }
 

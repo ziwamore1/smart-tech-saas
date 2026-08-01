@@ -212,19 +212,41 @@ export class ReportCardService {
 
     const studentIds = classEnrollments.map((e) => e.studentId);
 
-    const allResults = await this.prisma.result.findMany({
+    let allComputed = await this.prisma.computedResult.findMany({
       where: {
         studentId: { in: studentIds },
         termId,
         schoolId,
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        isAbsent: false,
         student: { status: 'ACTIVE' },
       },
     });
 
+    if (allComputed.length === 0) {
+      const legacyResults = await this.prisma.result.findMany({
+        where: {
+          studentId: { in: studentIds },
+          termId,
+          schoolId,
+          student: { status: 'ACTIVE' },
+        },
+      });
+      allComputed = legacyResults.map(r => ({
+        ...r,
+        finalPercentage: r.score,
+        finalGrade: r.grade,
+        finalRemark: r.remark,
+        points: null,
+      })) as any;
+    }
+
     const pointsMap: Record<string, number> = {};
 
-    for (const r of allResults) {
-      const grade = await this.getGradeFromScore(schoolId, r.score, enrollment.classId);
+    for (const r of allComputed) {
+      const grade = r.points != null
+        ? { points: r.points }
+        : await this.getGradeFromScore(schoolId, r.finalPercentage ?? r.score, enrollment.classId);
 
       if (!pointsMap[r.studentId]) {
         pointsMap[r.studentId] = 0;
@@ -242,17 +264,40 @@ export class ReportCardService {
 
     const position = ranking.findIndex((r) => r.studentId === studentId) + 1;
 
-    const results = await this.prisma.result.findMany({
+    let results = await this.prisma.computedResult.findMany({
       where: {
         studentId,
         termId,
         schoolId,
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        isAbsent: false,
         student: { status: 'ACTIVE' },
       },
       include: {
         subject: true,
       },
     });
+
+    if (results.length === 0) {
+      const legacyResults = await this.prisma.result.findMany({
+        where: {
+          studentId,
+          termId,
+          schoolId,
+          student: { status: 'ACTIVE' },
+        },
+        include: {
+          subject: true,
+        },
+      });
+      results = legacyResults.map(r => ({
+        ...r,
+        finalPercentage: r.score,
+        finalGrade: r.grade,
+        finalRemark: r.remark,
+        points: null,
+      })) as any;
+    }
 
     if (results.length === 0) {
       throw new NotFoundException('No results found');
@@ -270,14 +315,16 @@ export class ReportCardService {
     }[] = [];
 
     for (const r of results) {
-      const gradeScale = await this.getGradeFromScore(schoolId, r.score, enrollment.classId);
+      const gradeScale = r.finalGrade != null && r.points != null
+        ? { grade: r.finalGrade, remark: r.finalRemark ?? '', points: r.points }
+        : await this.getGradeFromScore(schoolId, r.finalPercentage ?? 0, enrollment.classId);
 
-      totalMarks += r.score;
+      totalMarks += r.finalPercentage ?? 0;
       totalPoints += gradeScale.points;
 
       subjectsWithGrades.push({
         subject: r.subject.name,
-        score: r.score,
+        score: r.finalPercentage ?? 0,
         grade: gradeScale.grade,
         remark: gradeScale.remark,
         points: gradeScale.points,
@@ -608,11 +655,12 @@ export class ReportCardService {
 
     for (const enrollment of enrollments) {
       for (const term of enrollment.academicYear.terms) {
-        const results = await this.prisma.result.findMany({
+        let results = await this.prisma.computedResult.findMany({
           where: {
             studentId,
             termId: term.id,
             schoolId,
+            status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
             student: { status: 'ACTIVE' },
           },
           include: {
@@ -620,8 +668,29 @@ export class ReportCardService {
           },
         });
 
+        if (results.length === 0) {
+          const legacyResults = await this.prisma.result.findMany({
+            where: {
+              studentId,
+              termId: term.id,
+              schoolId,
+              student: { status: 'ACTIVE' },
+            },
+            include: { subject: true },
+          });
+          results = legacyResults.map(r => ({
+            ...r,
+            finalPercentage: r.score,
+            finalGrade: r.grade,
+            finalRemark: r.remark,
+          }));
+        }
+
         for (const r of results) {
-          const grade = await this.getGradeFromScore(schoolId, r.score, enrollment.classId);
+          const finalPercentage = r.finalPercentage ?? 0;
+          const grade = (r.finalGrade != null && r.points != null)
+            ? { grade: r.finalGrade, points: r.points }
+            : await this.getGradeFromScore(schoolId, finalPercentage, enrollment.classId);
 
           transcriptRows += `
             <tr>
@@ -629,7 +698,7 @@ export class ReportCardService {
               <td>${term.name}</td>
               <td>${enrollment.class.name}</td>
               <td>${r.subject.name}</td>
-              <td>${r.score}</td>
+              <td>${finalPercentage}</td>
               <td>${grade.grade}</td>
               <td>${grade.points}</td>
             </tr>

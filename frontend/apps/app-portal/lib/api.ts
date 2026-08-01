@@ -517,11 +517,11 @@ export const assessmentApi = {
 
 export const publishingApi = {
   publish: (classId: string, termId: string) =>
-    api.post('/publishing/publish-results', { classId, termId }),
+    api.post('/publishing/publish-results', { classId, termId }, { timeout: 300000 }),
   unpublish: (classId: string, termId: string) =>
-    api.post('/publishing/unpublish-results', { classId, termId }),
+    api.post('/publishing/unpublish-results', { classId, termId }, { timeout: 120000 }),
   publishAll: (termId: string) =>
-    api.post('/publishing/publish-all', { termId }),
+    api.post('/publishing/publish-all', { termId }, { timeout: 300000 }),
   getStatus: () => api.get('/publishing/status'),
   getTermLockStatus: (termId: string) => api.get(`/publishing/status/${termId}`),
   checkCompleteness: (classId: string, termId: string) =>
@@ -841,6 +841,9 @@ export const analyticsApi = {
   getSubscriptionStats: () => api.get('/analytics/subscription-stats'),
   
   getDashboardCharts: () => api.get('/analytics/dashboard-charts'),
+
+  getAiInsights: (params?: { classId?: string; termId?: string; teacherId?: string }) =>
+    api.get('/analytics/ai-insights', { params }),
 };
 
 export const attendanceApi = {
@@ -2413,9 +2416,9 @@ export const reportEngineApi = {
   generate: (data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string; options?: any }) =>
     api.post('/report-engine/generate', data),
   generatePdf: (data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string }) =>
-    api.post('/report-engine/generate-pdf', data, { responseType: 'blob', timeout: 120000 }),
+    api.post('/report-engine/generate-pdf', data, { responseType: 'blob', timeout: 300000 }),
   generateBulk: (data: { type: string; classId?: string; termId?: string; templateId?: string; studentIds?: string[] }) =>
-    api.post('/report-engine/generate-bulk', data),
+    api.post('/report-engine/generate-bulk', data, { timeout: 600000 }),
   listReports: (params?: { reportType?: string; classId?: string; termId?: string; page?: number; limit?: number }) =>
     api.get('/report-engine/reports', { params }),
   getReport: (id: string) => api.get(`/report-engine/reports/${id}`),

@@ -82,8 +82,8 @@ const REPORT_TYPE_CONFIG: Record<ReportType, {
     label: 'Certificate',
     description: 'Achievement, merit, or graduation certificate',
     icon: '🏆',
-    requiredFields: ['studentId', 'termId', 'templateId'],
-    optionalFields: [],
+    requiredFields: ['studentId', 'termId'],
+    optionalFields: ['templateId'],
     supportsBulk: false,
   },
   [ReportType.ATTENDANCE_REPORT]: {
@@ -379,26 +379,22 @@ export class ReportEngineService {
     const reports: ReportGenerationResult[] = [];
 
     if (request.type === ReportType.CLASS_REPORT && request.classId && request.termId) {
-      const enrollments = await this.prisma.enrollment.findMany({
-        where: { classId: request.classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
-        select: { studentId: true },
-      });
-
-      for (const enrollment of enrollments) {
-        try {
-          const report = await this.generateReport({
-            ...request,
-            studentId: enrollment.studentId,
-            type: ReportType.REPORT_CARD,
-          });
-          reports.push(report);
-        } catch (error) {
-          this.logger.error(
-            `Failed to generate report for student ${enrollment.studentId}: ${error.message}`,
-          );
-        }
+      // Generate ONE combined class PDF (single Puppeteer render) instead of
+      // launching a browser per student — this is what made bulk generation time out.
+      try {
+        const report = await this.generateReport({
+          ...request,
+          type: ReportType.CLASS_REPORT,
+        });
+        reports.push(report);
+        return reports;
+      } catch (error) {
+        this.logger.error(`Failed to generate combined class report: ${error.message}`);
+        return reports;
       }
-    } else if (
+    }
+
+    if (
       request.type === ReportType.ATTENDANCE_REPORT ||
       request.type === ReportType.ANALYTICS_SUMMARY ||
       request.type === ReportType.MARK_SCHEDULE
@@ -410,8 +406,40 @@ export class ReportEngineService {
       } catch (error) {
         this.logger.error(`Failed to generate bulk ${request.type}: ${error.message}`);
       }
+      return reports;
     }
 
+    // Per-student bulk types (TRANSCRIPT, CERTIFICATE, PERFORMANCE_REPORT) — run
+    // with limited concurrency so large batches don't blow the request timeout.
+    const studentIds = request.studentIds?.length
+      ? request.studentIds
+      : request.classId && request.termId
+        ? (await this.prisma.enrollment.findMany({
+            where: { classId: request.classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+            select: { studentId: true },
+          })).map(e => e.studentId)
+        : [];
+
+    let index = 0;
+    const worker = async () => {
+      while (index < studentIds.length) {
+        const studentId = studentIds[index++];
+        try {
+          const report = await this.generateReport({
+            ...request,
+            studentId,
+          });
+          reports.push(report);
+        } catch (error) {
+          this.logger.error(
+            `Failed to generate ${request.type} for student ${studentId}: ${error.message}`,
+          );
+        }
+      }
+    };
+
+    const workers = Array.from({ length: Math.min(3, studentIds.length || 1) }, worker);
+    await Promise.all(workers);
     return reports;
   }
 
@@ -567,13 +595,33 @@ export class ReportEngineService {
   private async generateCertificate(request: ReportGenerationRequest) {
     const school = await this.prisma.school.findUnique({ where: { id: request.schoolId } });
     const student = await this.prisma.student.findUnique({ where: { id: request.studentId } });
-    const template = await this.prisma.reportTemplate.findFirst({
-      where: { id: request.templateId, schoolId: request.schoolId },
-      include: { certificate: true },
-    });
+
+    // Resolve template: explicit -> first school certificate template -> any template
+    let template = request.templateId
+      ? await this.prisma.reportTemplate.findFirst({
+          where: { id: request.templateId, schoolId: request.schoolId },
+          include: { certificate: true },
+        })
+      : null;
+    if (!template) {
+      template = await this.prisma.reportTemplate.findFirst({
+        where: { schoolId: request.schoolId, certificate: { isNot: null } },
+        include: { certificate: true },
+        orderBy: { createdAt: 'asc' },
+      });
+    }
+    if (!template) {
+      template = await this.prisma.reportTemplate.findFirst({
+        where: { schoolId: request.schoolId },
+        include: { certificate: true },
+        orderBy: { createdAt: 'asc' },
+      });
+    }
 
     if (!template?.certificate) {
-      throw new BadRequestException('Template does not have certificate configuration');
+      throw new BadRequestException(
+        'No certificate template configured for this school. Create one in the Template Builder first.',
+      );
     }
 
     const enrollment = await this.prisma.enrollment.findFirst({
@@ -588,7 +636,7 @@ export class ReportEngineService {
 
     const html = await this.templateRenderer.renderPreview(
       request.schoolId,
-      request.templateId!,
+      template.id,
       {
         student: {
           firstName: student?.firstName,
@@ -602,7 +650,7 @@ export class ReportEngineService {
       },
     );
 
-    return this.templateRenderer.renderPdfFromHtml(request.schoolId, request.templateId!, html);
+    return this.templateRenderer.renderPdfFromHtml(request.schoolId, template.id, html);
   }
 
   private async generateAttendanceReport(request: ReportGenerationRequest) {

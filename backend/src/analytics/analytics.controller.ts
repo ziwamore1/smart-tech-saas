@@ -79,6 +79,22 @@ export class AnalyticsController {
     const user = (req as any).user;
     return this.analyticsService.getTeacherPerformance(user?.schoolId, termId);
   }
+  @UseGuards(JwtAuthGuard)
+  @Get('ai-insights')
+  async getAiInsights(
+    @Req() req: any,
+    @Query('classId') classId: string,
+    @Query('termId') termId: string,
+    @Query('teacherId') teacherId: string,
+  ) {
+    const user = (req as any).user;
+    return this.analyticsService.getAiInsights({
+      schoolId: user.schoolId,
+      classId,
+      termId,
+      teacherId,
+    });
+  }
   @Get('director-dashboard')
   @Roles('Director')
   getDirectorDashboard(
