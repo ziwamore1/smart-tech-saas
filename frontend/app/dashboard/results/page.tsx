@@ -795,7 +795,12 @@ export default function ResultsPage() {
   const [selectedTerm, setSelectedTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [editingResult, setEditingResult] = useState<{ id: string; score: number } | null>(null);
+  const [editingCell, setEditingCell] = useState<{
+    studentId: string;
+    subjectId: string;
+    resultId?: string | null;
+    score?: number | null;
+  } | null>(null);
 
   const { data: classesData = [], isLoading: classesLoading, error: classesError } = useQuery({
     queryKey: ['classes'],
@@ -853,6 +858,34 @@ export default function ResultsPage() {
   });
 
   const results = Array.isArray(resultsData) ? resultsData : [];
+
+  // Pivot results into one row per student, one column per subject so the
+  // table stays compact even with many students and subjects.
+  const subjectColumns = useMemo(() => {
+    const order = new Map<string, number>();
+    (Array.isArray(subjectsData) ? subjectsData : []).forEach((s: any, i: number) => {
+      if (s?.id) order.set(s.id, i);
+    });
+    const map = new Map<string, { id: string; name: string }>();
+    for (const r of results) {
+      const sid = r.subject?.id;
+      if (sid && !map.has(sid)) map.set(sid, { id: sid, name: r.subject?.name || 'Subject' });
+    }
+    return [...map.values()].sort(
+      (a, b) => (order.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.id) ?? Number.MAX_SAFE_INTEGER),
+    );
+  }, [results, subjectsData]);
+
+  const studentRows = useMemo(() => {
+    const byStudent = new Map<string, { student: any; cells: Map<string, any> }>();
+    for (const r of results) {
+      const sid = r.student?.id;
+      if (!sid) continue;
+      if (!byStudent.has(sid)) byStudent.set(sid, { student: r.student, cells: new Map() });
+      byStudent.get(sid)!.cells.set(r.subject?.id, r);
+    }
+    return [...byStudent.values()];
+  }, [results]);
 
   const { data: publishStatusData = [] } = useQuery({
     queryKey: ['publish-status'],
@@ -1262,90 +1295,161 @@ export default function ResultsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">Student</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">Subject</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">Score</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">Grade</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">Points</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700 sticky left-0 bg-gray-50 z-10 min-w-[190px]">
+                      Student
+                    </th>
+                    {subjectColumns.map((subject) => (
+                      <th key={subject.id} className="text-center py-3 px-2 font-medium text-gray-700 min-w-[92px]">
+                        {subject.name}
+                      </th>
+                    ))}
+                    <th className="text-center py-3 px-3 font-medium text-gray-700">Total Points</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {results.map((result: any) => {
-                    const isAbsent = result.isAbsent || result.absentCode || result.computed?.isAbsent;
-                    const points = result.points ?? result.computed?.points ?? null;
+                  {studentRows.map((row) => {
+                    const totalPoints = [...row.cells.values()].reduce(
+                      (sum, r: any) => sum + (r.points ?? r.computed?.points ?? 0),
+                      0,
+                    );
                     return (
-                    <tr key={result.id} className="border-t hover:bg-gray-50">
-                      <td className="py-3 px-4 font-medium">
-                        {result.student?.firstName} {result.student?.lastName}
-                      </td>
-                      <td className="py-3 px-4">{result.subject?.name || '-'}</td>
-                      <td className="py-3 px-4">
-                        {editingResult?.id === result.id ? (
-                          <div className="flex gap-2">
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={editingResult?.score ?? result.score}
-                              onChange={(e) => setEditingResult({ id: result.id, score: Number(e.target.value) })}
-                              className="w-20 px-2 py-1 border rounded"
-                            />
-                            <button
-                              onClick={() => editingResult && updateResultMutation.mutate({ id: result.id, score: editingResult.score })}
-                              className="px-2 py-1 bg-green-600 text-white rounded text-sm"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setEditingResult(null)}
-                              className="px-2 py-1 border rounded text-sm"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : isAbsent ? (
-                          <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded font-medium text-sm">
-                            ABSENT{result.absentCode ? ` (${result.absentCode})` : ''}
-                          </span>
-                        ) : (
-                          <span className="font-mono">{result.score?.toFixed(1) || '-'}</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded font-bold ${isAbsent ? 'bg-gray-100 text-gray-500' : result.score >= 75 ? 'bg-green-100 text-green-800' : result.score >= 60 ? 'bg-blue-100 text-blue-800' : result.score >= 50 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
-                          {isAbsent ? 'ABSENT' : result.grade || '-'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="font-mono">{points !== null && points !== undefined ? points : '—'}</span>
-                      </td>
-                      <td className="py-3 px-4">
-                        {!isLocked && (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setEditingResult({ id: result.id, score: result.score })}
-                              className="text-blue-600 hover:text-blue-800 text-sm"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (confirm('Delete this result?')) {
-                                  deleteResultMutation.mutate(result.id);
-                                }
-                              }}
-                              className="text-red-600 hover:text-red-800 text-sm"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
+                      <tr key={row.student?.id} className="border-t hover:bg-gray-50">
+                        <td className="py-2 px-4 font-medium sticky left-0 bg-white z-10">
+                          {row.student?.firstName} {row.student?.lastName}
+                        </td>
+                        {subjectColumns.map((subject) => {
+                          const result = row.cells.get(subject.id);
+                          const isEditingThis =
+                            editingCell &&
+                            editingCell.studentId === row.student?.id &&
+                            editingCell.subjectId === subject.id;
+                          const canEdit = !isLocked;
+
+                          if (!result) {
+                            return (
+                              <td key={subject.id} className="text-center py-2 px-2">
+                                {canEdit ? (
+                                  <button
+                                    onClick={() =>
+                                      setEditingCell({
+                                        studentId: row.student?.id,
+                                        subjectId: subject.id,
+                                        resultId: null,
+                                        score: null,
+                                      })
+                                    }
+                                    className="text-gray-400 hover:text-blue-600 text-xs"
+                                    title={`Add score for ${subject.name}`}
+                                  >
+                                    +
+                                  </button>
+                                ) : (
+                                  <span className="text-gray-300">—</span>
+                                )}
+                              </td>
+                            );
+                          }
+
+                          const isAbsent =
+                            result.isAbsent || result.absentCode || result.computed?.isAbsent;
+
+                          if (isEditingThis) {
+                            return (
+                              <td key={subject.id} className="text-center py-2 px-2">
+                                <div className="flex justify-center gap-1">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    autoFocus
+                                    value={editingCell?.score ?? result.score ?? ''}
+                                    onChange={(e) =>
+                                      editingCell && setEditingCell({ ...editingCell, score: Number(e.target.value) })
+                                    }
+                                    className="w-16 px-1 py-0.5 border rounded text-center"
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      const score = editingCell?.score;
+                                      if (score === null || score === undefined || isNaN(score)) return;
+                                      if (result.id) {
+                                        updateResultMutation.mutate({ id: result.id, score });
+                                      } else {
+                                        createResultMutation.mutate({
+                                          studentId: row.student?.id,
+                                          subjectId: subject.id,
+                                          termId: selectedTerm,
+                                          score,
+                                        });
+                                      }
+                                      setEditingCell(null);
+                                    }}
+                                    className="px-1.5 py-0.5 bg-green-600 text-white rounded text-xs"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingCell(null)}
+                                    className="px-1.5 py-0.5 border rounded text-xs"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </td>
+                            );
+                          }
+
+                          return (
+                            <td key={subject.id} className="text-center py-2 px-2">
+                              <div className="flex flex-col items-center group">
+                                {isAbsent ? (
+                                  <span className="px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
+                                    ABSENT
+                                  </span>
+                                ) : (
+                                  <span className={`font-mono font-semibold ${result.score >= 75 ? 'text-green-700' : result.score >= 60 ? 'text-blue-700' : result.score >= 50 ? 'text-yellow-700' : 'text-red-700'}`}>
+                                    {result.score?.toFixed(1) ?? '-'}
+                                  </span>
+                                )}
+                                <span className="text-[10px] text-gray-400">
+                                  {isAbsent ? '' : result.grade ? `Grade ${result.grade}` : ''}
+                                </span>
+                                {canEdit && (
+                                  <span className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={() =>
+                                        setEditingCell({
+                                          studentId: row.student?.id,
+                                          subjectId: subject.id,
+                                          resultId: result.id,
+                                          score: result.score,
+                                        })
+                                      }
+                                      className="text-blue-600 text-[10px] hover:underline"
+                                    >
+                                      edit
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (confirm('Delete this result?')) {
+                                          deleteResultMutation.mutate(result.id);
+                                        }
+                                      }}
+                                      className="text-red-600 text-[10px] hover:underline"
+                                    >
+                                      del
+                                    </button>
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        })}
+                        <td className="text-center py-2 px-3 font-semibold">{totalPoints}</td>
+                      </tr>
                     );
                   })}
                 </tbody>
