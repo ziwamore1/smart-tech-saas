@@ -1182,10 +1182,12 @@ export default function ResultsPage() {
       refetchResults();
       refetchSummary();
       refetchCompleteness();
-      setMessage({ 
-        type: 'success', 
-        text: `Upload successful! ${data?.resultsInserted || 0} inserted, ${data?.resultsUpdated || 0} updated, ${data?.resultsAbsent || 0} marked absent.` 
-      });
+      const errs = Array.isArray(data?.errors) ? data.errors : [];
+      const base = `Upload successful! ${data?.resultsInserted || 0} inserted, ${data?.resultsUpdated || 0} updated, ${data?.resultsAbsent || 0} marked absent.`;
+      const text = errs.length
+        ? `${base} ${errs.length} item(s) skipped: ${errs.slice(0, 3).join('; ')}${errs.length > 3 ? '...' : ''}`
+        : base;
+      setMessage({ type: errs.length ? 'error' : 'success', text });
       setTimeout(() => setMessage(null), 5000);
     },
     onError: (error: any) => {

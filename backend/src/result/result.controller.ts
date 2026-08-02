@@ -89,37 +89,13 @@ export class ResultController {
     this.logger.log(`downloadTemplate called - termId: ${termId}, classId: ${classId}`);
     this.logger.log(`User: ${JSON.stringify(req.user)}`);
 
-    const userId = req.user.id;
-    let teacherId = userId;
-
-    let teacher = await this.prisma.teacher.findFirst({
-      where: { userId },
-    });
-
-    this.logger.log(`Teacher found: ${JSON.stringify(teacher)}`);
-
-    if (!teacher && req.user.roles?.includes('DIRECTOR')) {
-      this.logger.log('Creating teacher record for director...');
-      teacher = await this.prisma.teacher.create({
-        data: {
-          userId,
-          schoolId: req.user.schoolId,
-        },
-      });
-    }
-
-    if (teacher) {
-      teacherId = teacher.id;
-    }
-
-    this.logger.log(`Using teacherId: ${teacherId}`);
-
     try {
       const buffer = await this.resultService.generateResultTemplate(
-        teacherId,
+        req.user.id,
         req.user.schoolId,
         termId,
         classId,
+        req.user.roles || [],
       );
 
       res.set({
@@ -308,6 +284,7 @@ export class ResultController {
       req.user.schoolId,
       termId,
       file,
+      req.user.roles || [],
     );
   }
 

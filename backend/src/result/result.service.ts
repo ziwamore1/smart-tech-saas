@@ -650,12 +650,13 @@ export class ResultService {
   }
 
   async generateResultTemplate(
-    teacherId: string,
+    userId: string,
     schoolId: string,
     termId: string,
-    classId?: string,
+    classId: string | undefined,
+    roles: string[],
   ) {
-    this.logger.log(`generateResultTemplate: teacherId=${teacherId}, schoolId=${schoolId}, termId=${termId}, classId=${classId}`);
+    this.logger.log(`generateResultTemplate: userId=${userId}, schoolId=${schoolId}, termId=${termId}, classId=${classId}, roles=${JSON.stringify(roles)}`);
 
     const [school, term] = await Promise.all([
       this.prisma.school.findUnique({ where: { id: schoolId } }),
@@ -673,6 +674,11 @@ export class ResultService {
       throw new ForbiddenException('Results for this term have been finalized');
     }
 
+    const normalizedRoles = (roles || []).map((r) => r.toUpperCase());
+    const isFullAccess =
+      normalizedRoles.includes('DIRECTOR') ||
+      normalizedRoles.includes('CLASS TEACHER');
+
     let className = '';
     let classEntity: any = null;
 
@@ -684,19 +690,23 @@ export class ResultService {
       className = classEntity.name;
     }
 
+    // When a class is selected, pull every subject assigned to that class so
+    // non-assigned subjects can be rendered as read-only columns. Without a
+    // class, fall back to the current user's own assignments.
     let assignments = await this.prisma.teachingAssignment.findMany({
       where: {
-        ...(teacherId ? { teacherId } : {}),
         schoolId,
         academicYearId: term.academicYearId,
-        ...(classId ? { classId } : {}),
+        ...(classId ? { classId } : { teacherId: userId }),
       },
       include: { subject: true, class: true },
     });
 
-    if (assignments.length === 0 && classId) {
+    // Full-access users (Director/Class Teacher) see every subject assigned
+    // for this term even when no class is selected.
+    if (!classId && isFullAccess && assignments.length === 0) {
       assignments = await this.prisma.teachingAssignment.findMany({
-        where: { classId, academicYearId: term.academicYearId },
+        where: { schoolId, academicYearId: term.academicYearId },
         include: { subject: true, class: true },
       });
     }
@@ -705,7 +715,29 @@ export class ResultService {
       throw new ForbiddenException('No teaching assignments found');
     }
 
-    const subjectNames = [...new Set(assignments.map((a) => a.subject.name))];
+    // Deduplicate subjects while preserving first-seen order.
+    const subjectById = new Map<string, { id: string; name: string }>();
+    for (const a of assignments) {
+      if (!subjectById.has(a.subjectId)) {
+        subjectById.set(a.subjectId, { id: a.subjectId, name: a.subject.name });
+      }
+    }
+
+    // Subject teachers may only edit subjects from their own teaching
+    // assignment; Directors and Class Teachers may edit every column.
+    const editableSubjectIds = new Set<string>();
+    if (isFullAccess) {
+      for (const id of subjectById.keys()) editableSubjectIds.add(id);
+    } else {
+      for (const a of assignments) {
+        if (a.teacherId === userId) editableSubjectIds.add(a.subjectId);
+      }
+    }
+
+    const subjects = [...subjectById.values()].map((s) => ({
+      ...s,
+      editable: editableSubjectIds.has(s.id),
+    }));
 
     const enrollments = await this.prisma.enrollment.findMany({
       where: {
@@ -723,7 +755,7 @@ export class ResultService {
       term,
       classId,
       className,
-      subjectNames,
+      subjects,
       enrollments,
     });
   }
@@ -733,10 +765,11 @@ export class ResultService {
     term: any;
     classId?: string;
     className: string;
-    subjectNames: string[];
+    subjects: Array<{ id: string; name: string; editable: boolean }>;
     enrollments: any[];
   }): Promise<Buffer> {
-    const { school, term, className, subjectNames, enrollments } = data;
+    const { school, term, className, subjects, enrollments } = data;
+    const subjectNames = subjects.map((s) => s.name);
     const totalCols = 4 + subjectNames.length;
 
     const brandColor = '5F4B3A';
@@ -836,11 +869,19 @@ export class ResultService {
     headerRow.height = 28;
     headers.forEach((name, idx) => {
       const cell = headerRow.getCell(idx + 1);
-      cell.value = name;
+      const isSubject = idx >= 4;
+      const subjectMeta = isSubject ? subjects[idx - 4] : null;
+      const isReadOnly = !!subjectMeta && !subjectMeta.editable;
+      cell.value = isReadOnly ? `${name} (READ-ONLY)` : name;
       cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: whiteText } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx >= 4 ? brandColor : darkColor } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: isReadOnly ? '8A8578' : idx >= 4 ? brandColor : darkColor },
+      };
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       cell.border = thinBorder;
+      cell.protection = { locked: true };
     });
 
     // Data rows
@@ -861,8 +902,9 @@ export class ResultService {
         cell.alignment = { horizontal: idx === 0 ? 'center' : 'left', vertical: 'middle' };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 === 0 ? lightBg : secondaryBg } };
         cell.border = thinBorder;
+        cell.protection = { locked: true };
       });
-      subjectNames.forEach((_, idx) => {
+      subjects.forEach((subject, idx) => {
         const col = idx + 5;
         const cell = row.getCell(col);
         cell.font = { name: 'Calibri', size: 11, color: { argb: darkColor } };
@@ -870,6 +912,9 @@ export class ResultService {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 === 0 ? lightBg : secondaryBg } };
         cell.border = thinBorder;
         cell.numFmt = '0.0';
+        // Only subjects the current user is assigned to teach (plus full-access
+        // roles) are editable; the rest stay locked/read-only.
+        cell.protection = { locked: !subject.editable };
       });
       rowIndex++;
     });
@@ -878,10 +923,13 @@ export class ResultService {
     ws.mergeCells(rowIndex + 1, 1, rowIndex + 1, totalCols);
     const legendCell = ws.getCell(rowIndex + 1, 1);
     legendCell.value =
-      'LEGEND:  X = absent (excused)  |  A = absent (unexcused)  |  blank = not yet entered  |  Do NOT modify the AdmissionNumber, FirstName, LastName or Class columns.';
+      'LEGEND:  X = absent (excused)  |  A = absent (unexcused)  |  blank = not yet entered  |  Do NOT modify the AdmissionNumber, FirstName, LastName or Class columns.  Columns marked READ-ONLY are protected and cannot be edited.';
     legendCell.font = { name: 'Calibri', size: 9, italic: true, color: { argb: '6B7280' } };
     legendCell.alignment = { horizontal: 'left', vertical: 'middle' };
     ws.getRow(rowIndex + 1).height = 18;
+
+    // Protect the worksheet so locked (read-only) cells cannot be edited.
+    await ws.protect('', { selectLockedCells: true, selectUnlockedCells: true });
 
     // ── Instructions sheet ──
     const instructions = workbook.addWorksheet('Instructions');
@@ -899,6 +947,7 @@ export class ResultService {
       '6. Save the file, then upload it on the "Upload Results" page. Existing results are updated, new ones are added.',
       '7. After uploading, verify entries on the "Review Results" tab, then publish from the "Publish Results" tab.',
       '8. Absent students (X/A) are respected in analytics and reports - they are not counted as zero scores.',
+      '9. Subject columns marked READ-ONLY are protected. You can only enter scores for subjects you are assigned to teach.',
     ];
     steps.forEach((step, i) => {
       const cell = instructions.getCell(i + 2, 1);
@@ -916,6 +965,7 @@ export class ResultService {
     schoolId: string,
     termId: string,
     file: Express.Multer.File,
+    roles: string[],
   ) {
     if (!file) {
       throw new BadRequestException('Excel file is required');
@@ -935,6 +985,11 @@ export class ResultService {
         'Results are locked. Contact administrator to unlock.',
       );
     }
+
+    const normalizedRoles = (roles || []).map((r) => r.toUpperCase());
+    const isFullAccess =
+      normalizedRoles.includes('DIRECTOR') ||
+      normalizedRoles.includes('CLASS TEACHER');
 
     const workbook = XLSX.read(file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
@@ -975,8 +1030,23 @@ export class ResultService {
         continue;
       }
 
+      // Resolve the student's class once per row.
+      const enrollment = await this.prisma.enrollment.findFirst({
+        where: {
+          studentId: student.id,
+          academicYearId: term.academicYearId,
+          status: 'ACTIVE',
+          student: { status: 'ACTIVE' },
+        },
+        include: { class: true },
+      });
+
       for (const column in row) {
-        const colLower = column.toLowerCase();
+        // Read-only columns carry a "(READ-ONLY)" suffix on the template
+        // header; strip it so the subject can still be validated and rejected
+        // with a clear error if a subject teacher tries to fill it in.
+        const rawColLower = column.toLowerCase();
+        const colLower = rawColLower.replace(/\s*\(read-only\)\s*$/, '').trim();
         if (['admissionnumber', 'firstname', 'lastname', 'class'].includes(colLower)) continue;
 
         const subjectId = subjectMap.get(colLower);
@@ -985,6 +1055,30 @@ export class ResultService {
 
         const val = row[column];
         if (val === undefined || val === '' || val === null) continue;
+
+        // Subject-level access control: subject teachers may only enter
+        // results for the subject/class they are assigned to teach.
+        if (!isFullAccess) {
+          const allowed = await this.prisma.teachingAssignment.findFirst({
+            where: {
+              teacherId: userId,
+              subjectId,
+              academicYearId: term.academicYearId,
+              schoolId,
+              ...(enrollment ? { classId: enrollment.classId } : {}),
+            },
+          });
+          if (!allowed) {
+            const subject = subjects.find((s) => s.id === subjectId);
+            const context = enrollment?.class?.name
+              ? ` in ${enrollment.class.name}`
+              : '';
+            errors.push(
+              `Not allowed: you are not assigned to teach ${subject?.name || column}${context}`,
+            );
+            continue;
+          }
+        }
 
         const valStr = String(val).trim();
         const isAbsent = /^(X|A)$/i.test(valStr);
@@ -1000,17 +1094,6 @@ export class ResultService {
             continue;
           }
         }
-
-        // Find the correct teacher from teaching assignments
-        // First, find the student's enrollment for this academic year
-        const enrollment = await this.prisma.enrollment.findFirst({
-          where: {
-            studentId: student.id,
-            academicYearId: term.academicYearId,
-            status: 'ACTIVE',
-            student: { status: 'ACTIVE' },
-          },
-        });
 
         let assignedTeacherId = userId;
 
