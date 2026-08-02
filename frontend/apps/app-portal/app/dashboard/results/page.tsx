@@ -1357,28 +1357,8 @@ export default function ResultsPage() {
           onDownloadTemplate={async () => {
             if (!selectedTerm) return;
             try {
-              const token = localStorage.getItem('auth_token');
-              if (!token) {
-                setMessage({ type: 'error', text: 'Not authenticated. Please login again.' });
-                return;
-              }
-              let url = `/api/v1/results/template/${selectedTerm}`;
-              if (selectedClass) {
-                url += `?classId=${selectedClass}`;
-              }
-              const response = await fetch(url, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              if (!response.ok) {
-                const text = await response.text();
-                let errorMsg = 'Failed to download template';
-                try {
-                  const errorData = JSON.parse(text);
-                  errorMsg = errorData.message || errorData.error || errorMsg;
-                } catch {}
-                throw new Error(errorMsg);
-              }
-              const blob = await response.blob();
+              const response = await resultApi.getTemplate(selectedTerm, { classId: selectedClass || undefined });
+              const blob = new Blob([response.data]);
               const downloadUrl = window.URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = downloadUrl;
@@ -1389,7 +1369,7 @@ export default function ResultsPage() {
               document.body.removeChild(a);
             } catch (error: any) {
               console.error('Download error:', error);
-              setMessage({ type: 'error', text: error.message || 'Failed to download template' });
+              setMessage({ type: 'error', text: error.response?.data?.message || error.message || 'Failed to download template' });
               setTimeout(() => setMessage(null), 5000);
             }
           }}
@@ -1451,38 +1431,8 @@ export default function ResultsPage() {
                 onClick={async () => {
                   if (!selectedTerm) return;
                   try {
-                    const token = localStorage.getItem('auth_token');
-                    if (!token) {
-                      throw new Error('Not authenticated. Please login again.');
-                    }
-                    let url = `/api/v1/results/template/${selectedTerm}`;
-                    if (selectedClass) {
-                      url += `?classId=${selectedClass}`;
-                    }
-                    console.log('Downloading template from:', url);
-                    const response = await fetch(url, {
-                      headers: {
-                        Authorization: `Bearer ${token}`,
-                      },
-                    });
-                    
-                    console.log('Response status:', response.status);
-                    console.log('Response status text:', response.statusText);
-                    
-                    if (!response.ok) {
-                      const text = await response.text();
-                      console.log('Error response text:', text);
-                      let errorMsg = 'Failed to download template';
-                      try {
-                        const errorData = JSON.parse(text);
-                        errorMsg = errorData.message || errorData.error || errorMsg;
-                      } catch {
-                        errorMsg = text || errorMsg;
-                      }
-                      throw new Error(errorMsg);
-                    }
-                    
-                    const blob = await response.blob();
+                    const response = await resultApi.getTemplate(selectedTerm, { classId: selectedClass || undefined });
+                    const blob = new Blob([response.data]);
                     const downloadUrl = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = downloadUrl;
@@ -1493,7 +1443,7 @@ export default function ResultsPage() {
                     document.body.removeChild(a);
                   } catch (error: any) {
                     console.error('Download error:', error);
-                    setMessage({ type: 'error', text: error.message || 'Failed to download template' });
+                    setMessage({ type: 'error', text: error.response?.data?.message || error.message || 'Failed to download template' });
                     setTimeout(() => setMessage(null), 5000);
                   }
                 }}

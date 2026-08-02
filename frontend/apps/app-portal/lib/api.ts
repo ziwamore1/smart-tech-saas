@@ -484,8 +484,8 @@ export const resultApi = {
     api.post(`/results/upload/${termId}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
-  getTemplate: (termId: string) =>
-    api.get(`/results/template/${termId}`, { responseType: 'blob' }),
+  getTemplate: (termId: string, params?: { classId?: string }) =>
+    api.get(`/results/template/${termId}`, { params, responseType: 'blob' }),
   recalculateGrades: (classId: string, termId: string) =>
     api.post('/results/recalculate-grades', { classId, termId }),
   recalculatePoints: (classId: string, termId: string) =>

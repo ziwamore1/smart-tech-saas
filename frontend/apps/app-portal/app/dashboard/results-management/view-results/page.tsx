@@ -24,7 +24,7 @@ export default function ViewResultsPage() {
   const [selectedTerm, setSelectedTerm] = useState('');
   const [selectedExamType, setSelectedExamType] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'summary'>('table');
-  const [sortField, setSortField] = useState<'name' | 'average' | 'grade' | 'rank'>('rank');
+  const [sortField, setSortField] = useState<'name' | 'subject' | 'score' | 'rank'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const { data: classesData } = useQuery({
@@ -181,17 +181,38 @@ export default function ViewResultsPage() {
     return Array.from(allSubjects);
   }, [students]);
 
-  const sortedStudents = useMemo(() => {
-    const sorted = [...students];
+  // Subjects as rows: one flat entry per student-subject pair.
+  const rows = useMemo(() => {
+    const flat: any[] = [];
+    students.forEach((s: any) => {
+      (s.results || []).forEach((r: any) => {
+        flat.push({
+          id: `${s.admissionNumber || s.firstName || 'student'}-${r.subject}`,
+          firstName: s.firstName,
+          lastName: s.lastName,
+          admissionNumber: s.admissionNumber,
+          subject: r.subject,
+          score: r.score,
+          grade: r.grade,
+          points: r.points ?? null,
+          rank: (s as any).rank || 0,
+        });
+      });
+    });
+    return flat;
+  }, [students]);
+
+  const sortedRows = useMemo(() => {
+    const sorted = [...rows];
     sorted.sort((a, b) => {
-      if (sortField === 'name') return `${a.firstName}${a.lastName}`.localeCompare(`${b.firstName}${b.lastName}`);
-      if (sortField === 'average') return (b.average || 0) - (a.average || 0);
-      if (sortField === 'grade') return (a.grade || 'Z').localeCompare(b.grade || 'Z');
-      return ((a as any).rank || 999) - ((b as any).rank || 999);
+      if (sortField === 'subject') return a.subject.localeCompare(b.subject);
+      if (sortField === 'score') return (b.score ?? -1) - (a.score ?? -1);
+      if (sortField === 'rank') return (a.rank || 999) - (b.rank || 999);
+      return `${a.firstName}${a.lastName}`.localeCompare(`${b.firstName}${b.lastName}`);
     });
     if (sortDir === 'desc') sorted.reverse();
     return sorted;
-  }, [students, sortField, sortDir]);
+  }, [rows, sortField, sortDir]);
 
   const stats = useMemo(() => {
     const total = students.length;
@@ -416,7 +437,7 @@ export default function ViewResultsPage() {
         </div>
       )}
 
-      {/* Results Table */}
+      {/* Results Table - Subjects as Rows */}
       {!sheetLoading && !studentsLoading && students.length > 0 && viewMode === 'table' && (
         <div style={{ background: '#fdfaf7', border: '1px solid #e8ddd0', borderRadius: '12px' }}>
           <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 420px)' }}>
@@ -428,58 +449,51 @@ export default function ViewResultsPage() {
                     Student {sortField === 'name' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                   </th>
                   <th style={{ textAlign: 'left', padding: '10px 12px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '100px', background: '#5f4b3a' }}>Admission</th>
-                  {subjects.map(subj => (
-                    <th key={subj} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '70px', background: '#5f4b3a' }}>
-                      {subj.length > 10 ? subj.slice(0, 8) + '..' : subj}
-                    </th>
-                  ))}
-                  <th onClick={() => handleSort('average')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '70px', background: '#5f4b3a' }}>
-                    Average {sortField === 'average' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                  <th onClick={() => handleSort('subject')} style={{ textAlign: 'left', padding: '10px 12px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '140px', background: '#5f4b3a' }}>
+                    Subject {sortField === 'subject' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                   </th>
-                  <th onClick={() => handleSort('grade')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '50px', background: '#5f4b3a' }}>
-                    Grade {sortField === 'grade' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                  <th onClick={() => handleSort('score')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '80px', background: '#5f4b3a' }}>
+                    Score {sortField === 'score' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                   </th>
+                  <th style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '60px', background: '#5f4b3a' }}>Grade</th>
+                  <th style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '60px', background: '#5f4b3a' }}>Points</th>
                   <th onClick={() => handleSort('rank')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '50px', background: '#5f4b3a' }}>
                     Rank {sortField === 'rank' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {sortedStudents.map((student: ReportStudent, idx: number) => {
-                  const gc = student.grade ? (getGradeColorLocal(student.grade)) : { text: '#9ca3af', bg: '#f3f4f6' };
+                {sortedRows.map((row: any, idx: number) => {
+                  const isAbsent = row.score == null;
+                  const sc = getScoreColorLocal(row.score);
+                  const gc = row.grade ? getGradeColorLocal(row.grade) : null;
                   return (
-                    <tr key={student.admissionNumber || idx} style={{ background: idx % 2 === 0 ? '#fefcf9' : '#faf7f4', transition: 'background 0.1s' }}
+                    <tr key={row.id} style={{ background: idx % 2 === 0 ? '#fefcf9' : '#faf7f4', transition: 'background 0.1s' }}
                       onMouseEnter={e => e.currentTarget.style.background = '#f5efe8'}
                       onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fefcf9' : '#faf7f4'}>
                       <td style={{ textAlign: 'center', padding: '8px', color: '#6b7280', fontSize: '12px', borderBottom: '1px solid #e8ddd0' }}>{idx + 1}</td>
-                      <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1f2937', borderBottom: '1px solid #e8ddd0' }}>{student.firstName} {student.lastName}</td>
-                      <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: '12px', borderBottom: '1px solid #e8ddd0' }}>{student.admissionNumber || '-'}</td>
-                      {subjects.map(subj => {
-                        const r = student.results.find(res => res.subject === subj);
-                        const score = r?.score;
-                        const grade = r?.grade;
-                        const sc = getScoreColorLocal(score);
-                        return (
-                          <td key={subj} style={{ textAlign: 'center', padding: '6px 8px', borderBottom: '1px solid #e8ddd0', background: score != null && score < 50 ? '#fef2f2' : 'transparent' }}>
-                            {score != null ? (
-                              <div>
-                                <span style={{ fontWeight: 600, fontSize: '13px', color: sc }}>{score.toFixed(1)}%</span>
-                                {grade && <div style={{ fontSize: '10px', color: '#6b7280' }}>{grade}</div>}
-                              </div>
-                            ) : <span style={{ color: '#d1d5db' }}>-</span>}
-                          </td>
-                        );
-                      })}
-                      <td style={{ textAlign: 'center', padding: '8px', fontWeight: 700, borderBottom: '1px solid #e8ddd0', background: '#f5efe8', color: getScoreColorLocal(student.average) }}>
-                        {student.average != null ? `${student.average.toFixed(1)}%` : '-'}
+                      <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1f2937', borderBottom: '1px solid #e8ddd0' }}>{row.firstName} {row.lastName}</td>
+                      <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: '12px', borderBottom: '1px solid #e8ddd0' }}>{row.admissionNumber || '-'}</td>
+                      <td style={{ padding: '8px 12px', color: '#374151', borderBottom: '1px solid #e8ddd0' }}>{row.subject}</td>
+                      <td style={{ textAlign: 'center', padding: '6px 8px', borderBottom: '1px solid #e8ddd0', background: row.score != null && row.score < 50 ? '#fef2f2' : 'transparent' }}>
+                        {row.score != null ? (
+                          <span style={{ fontWeight: 600, fontSize: '13px', color: sc }}>{row.score.toFixed(1)}%</span>
+                        ) : (
+                          <span style={{ display: 'inline-block', padding: '1px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, background: '#f3f4f6', color: '#6b7280' }}>ABSENT</span>
+                        )}
                       </td>
                       <td style={{ textAlign: 'center', padding: '8px', borderBottom: '1px solid #e8ddd0' }}>
-                        <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: 700, background: gc.bg, color: gc.text }}>
-                          {student.grade || '-'}
-                        </span>
+                        {gc ? (
+                          <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: 700, background: gc.bg, color: gc.text }}>
+                            {row.grade}
+                          </span>
+                        ) : <span style={{ color: '#9ca3af' }}>-</span>}
                       </td>
-                      <td style={{ textAlign: 'center', padding: '8px', fontWeight: 600, borderBottom: '1px solid #e8ddd0', background: '#f5efe8', color: (student as any).rank != null && (student as any).rank <= 3 ? '#d97706' : '#1f2937' }}>
-                        {(student as any).rank || idx + 1}
+                      <td style={{ textAlign: 'center', padding: '8px', fontWeight: 600, borderBottom: '1px solid #e8ddd0' }}>
+                        {row.points != null ? row.points : '—'}
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '8px', fontWeight: 600, borderBottom: '1px solid #e8ddd0', background: '#f5efe8', color: row.rank != null && row.rank <= 3 ? '#d97706' : '#1f2937' }}>
+                        {row.rank || idx + 1}
                       </td>
                     </tr>
                   );
