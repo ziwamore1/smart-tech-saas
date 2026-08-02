@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Alert, Dimensions, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Device from 'expo-device';
 import { Input } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useAuthStore } from '../../store';
@@ -51,15 +50,14 @@ export const LoginScreen: React.FC = () => {
       return;
     }
     try {
-      const deviceToken = `${Device.deviceName || 'Unknown Device'} (${Platform.OS})`;
       if (loginMode === 'student') {
-        await login('', password, deviceToken, email.trim());
+        await login('', password, undefined, email.trim());
       } else if (loginMode === 'phone') {
-        await login('', password, deviceToken, email.trim());
+        await login('', password, undefined, email.trim());
       } else if (loginMode === 'username') {
-        await login('', password, deviceToken, email.trim());
+        await login('', password, undefined, email.trim());
       } else {
-        await login(email.trim(), password, deviceToken);
+        await login(email.trim(), password, undefined);
       }
     } catch (err: any) {
       Alert.alert('Login Failed', err.response?.data?.message || 'Invalid credentials');

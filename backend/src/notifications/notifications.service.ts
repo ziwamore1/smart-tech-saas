@@ -4,6 +4,7 @@ import { FirebaseService } from '../firebase/firebase.service';
 import { NotificationQueueService, NotificationJobData } from './notification-queue.service';
 import { SendNotificationDto, BroadcastNotificationDto } from './dto/send-notification.dto';
 import { StudentFilterService } from '../common/services/student-filter.service';
+import axios from 'axios';
 import type { Message } from 'firebase-admin/messaging';
 
 const VALID_CATEGORIES = [
@@ -262,7 +263,7 @@ export class NotificationsService {
     }
 
     for (const userId of userIds) {
-      await this.sendViaFcm(userId, {
+      await this.deliverPush(userId, {
         title: jobData.title,
         body: jobData.body,
         data: jobData.data || {},
@@ -271,7 +272,66 @@ export class NotificationsService {
     }
   }
 
-  private async sendViaFcm(
+  async processPendingBatch(batchSize = 20): Promise<number> {
+    const jobs = await this.prisma.notificationJob.findMany({
+      where: {
+        status: 'pending',
+        AND: [
+          { scheduledAt: null },
+          { OR: [{ scheduledAt: { lte: new Date() } }, { scheduledAt: null }] },
+        ],
+      },
+      take: batchSize,
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (jobs.length === 0) return 0;
+
+    let processed = 0;
+    for (const job of jobs) {
+      try {
+        await this.prisma.notificationJob.update({
+          where: { id: job.id },
+          data: { status: 'processing', attempts: { increment: 1 } },
+        });
+
+        const jobData: NotificationJobData = {
+          type: job.type as NotificationJobData['type'],
+          title: job.title,
+          body: job.body,
+          data: (job.data as Record<string, string>) || {},
+          category: job.category,
+          userId: job.userId || undefined,
+          userIds: (job.userIds as string[]) || undefined,
+          role: job.role || undefined,
+          classId: job.classId || undefined,
+          schoolId: job.schoolId || undefined,
+          schoolIds: (job.schoolIds as string[]) || undefined,
+          createdBy: job.createdBy || undefined,
+        };
+
+        await this.processJob(jobData);
+
+        await this.prisma.notificationJob.update({
+          where: { id: job.id },
+          data: { status: 'sent', processedAt: new Date() },
+        });
+        processed++;
+      } catch (error: any) {
+        this.logger.error(`Notification job ${job.id} failed: ${error.message}`);
+        await this.prisma.notificationJob.update({
+          where: { id: job.id },
+          data: {
+            status: job.attempts >= 2 ? 'failed' : 'pending',
+            error: error.message,
+          },
+        });
+      }
+    }
+    return processed;
+  }
+
+  private async deliverPush(
     userId: string,
     payload: {
       title: string;
@@ -303,8 +363,78 @@ export class NotificationsService {
       },
     });
 
+    const expoDevices = devices.filter((d) => d.deviceToken.startsWith('ExponentPushToken['));
+    const fcmDevices = devices.filter((d) => !d.deviceToken.startsWith('ExponentPushToken['));
+
+    if (expoDevices.length > 0) {
+      await this.sendViaExpo(expoDevices, payload, now);
+    }
+
+    if (fcmDevices.length > 0) {
+      await this.sendViaFcm(fcmDevices, payload, now);
+    }
+  }
+
+  private async sendViaExpo(
+    devices: any[],
+    payload: { title: string; body: string; data: Record<string, string> },
+    now: Date,
+  ): Promise<void> {
+    const messages = devices.map((device) => ({
+      to: device.deviceToken,
+      title: payload.title,
+      body: payload.body,
+      data: payload.data,
+      sound: 'default',
+      channelId: 'smart_tech_notifications',
+      priority: 'high' as const,
+    }));
+
+    try {
+      const response = await axios.post('https://exp.host/--/api/v2/push/send', messages, {
+        timeout: 15000,
+      });
+
+      const tickets: Array<{
+        status: string;
+        message?: string;
+        details?: { error?: string };
+      }> = response.data?.data || [];
+
+      tickets.forEach((ticket, index) => {
+        const device = devices[index];
+        if (!device) return;
+
+        if (ticket.status === 'error') {
+          const code = ticket.details?.error || '';
+          this.logger.error(
+            `Expo push failed for ${device.deviceToken.substring(0, 20)}...: ${ticket.message || JSON.stringify(ticket.details || {})}`,
+          );
+
+          if (code === 'DeviceNotRegistered' || code === 'DEVICE_NOT_REGISTERED') {
+            this.prisma.notificationDevice
+              .update({ where: { id: device.id }, data: { active: false } })
+              .catch(() => {});
+          }
+        } else {
+          this.logger.log(`Expo push sent to ${device.deviceToken.substring(0, 20)}...`);
+          this.prisma.notificationDevice
+            .update({ where: { id: device.id }, data: { lastSeenAt: now } })
+            .catch(() => {});
+        }
+      });
+    } catch (error) {
+      this.logger.error(`Expo push request failed: ${error.message}`);
+    }
+  }
+
+  private async sendViaFcm(
+    devices: any[],
+    payload: { title: string; body: string; data: Record<string, string> },
+    now: Date,
+  ): Promise<void> {
     if (!this.firebase.messaging) {
-      this.logger.warn('Firebase not initialized, notification stored but not pushed');
+      this.logger.warn('Firebase not initialized, FCM push skipped');
       return;
     }
 
@@ -486,6 +616,32 @@ export class NotificationsService {
 
   async sendTestNotification(token?: string): Promise<string> {
     if (token) {
+      if (token.startsWith('ExponentPushToken[')) {
+        try {
+          const response = await axios.post(
+            'https://exp.host/--/api/v2/push/send',
+            [
+              {
+                to: token,
+                title: 'SmartTech Test',
+                body: 'This is a test notification from SmartTech.',
+                sound: 'default',
+                channelId: 'smart_tech_notifications',
+                priority: 'high',
+              },
+            ],
+            { timeout: 15000 },
+          );
+          const ticket = response.data?.data?.[0];
+          if (ticket?.status === 'ok') {
+            return 'Test sent successfully via Expo Push';
+          }
+          return `Test failed: ${ticket?.message || JSON.stringify(ticket) || 'unknown error'}`;
+        } catch (error) {
+          return `Test failed: ${error.message}`;
+        }
+      }
+
       if (!this.firebase.messaging) {
         return 'Firebase not initialized. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY env vars.';
       }

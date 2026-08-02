@@ -2675,6 +2675,31 @@ model NotificationLog {
   @@index([createdAt])
 }
 
+model NotificationJob {
+  id          String    @id @default(uuid())
+  type        String
+  title       String
+  body        String
+  data        Json?
+  category    String    @default("System Notifications")
+  userId      String?
+  userIds     Json?
+  role        String?
+  classId     String?
+  schoolId    String?
+  schoolIds   Json?
+  createdBy   String?
+  status      String    @default("pending")
+  attempts    Int       @default(0)
+  scheduledAt DateTime?
+  processedAt DateTime?
+  error       String?
+  createdAt   DateTime  @default(now())
+
+  @@index([status])
+  @@index([scheduledAt])
+}
+
 model Exam {
   id               String         @id @default(uuid())
   title            String

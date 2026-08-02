@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailQueueService } from './email-queue.service';
 import { SmsQueueService } from './sms-queue.service';
 import { WhatsAppQueueService } from './whatsapp-queue.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PgQueueWorker {
@@ -13,6 +14,7 @@ export class PgQueueWorker {
     private readonly emailQueue: EmailQueueService,
     private readonly smsQueue: SmsQueueService,
     private readonly whatsAppQueue: WhatsAppQueueService,
+    private readonly notificationsService: NotificationsService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -29,6 +31,18 @@ export class PgQueueWorker {
   }
 
   @Cron('1/3 * * * *')
+  async processNotificationQueue() {
+    try {
+      const count = await this.notificationsService.processPendingBatch();
+      if (count > 0) {
+        this.logger.log(`Processed ${count} notification jobs`);
+      }
+    } catch (error: any) {
+      this.logger.error(`Notification queue processing failed: ${error.message}`);
+    }
+  }
+
+  @Cron('2/3 * * * *')
   async processSmsQueue() {
     try {
       const count = await this.smsQueue.processBatch();
@@ -40,7 +54,7 @@ export class PgQueueWorker {
     }
   }
 
-  @Cron('2/3 * * * *')
+  @Cron('3/3 * * * *')
   async processWhatsAppQueue() {
     try {
       const count = await this.whatsAppQueue.processBatch();
