@@ -385,4 +385,38 @@ export class ResultController {
       body.termId,
     );
   }
+
+  @Post('recalculate-points')
+  @Roles('Director', 'Teacher', 'Class Teacher')
+  async recalculatePoints(
+    @Body() body: { classId: string; termId: string },
+    @Req() req: any,
+  ) {
+    const userId = req.user.id;
+    let teacherId = userId;
+
+    let teacher = await this.prisma.teacher.findFirst({
+      where: { userId },
+    });
+
+    if (!teacher && req.user.roles?.includes('DIRECTOR')) {
+      teacher = await this.prisma.teacher.create({
+        data: {
+          userId,
+          schoolId: req.user.schoolId,
+        },
+      });
+    }
+
+    if (teacher) {
+      teacherId = teacher.id;
+    }
+
+    return this.resultService.recalculatePoints(
+      teacherId,
+      req.user.schoolId,
+      body.classId,
+      body.termId,
+    );
+  }
 }

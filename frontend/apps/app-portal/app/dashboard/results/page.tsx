@@ -194,6 +194,7 @@ function UploadResultsTab({
           <li>Select the class and term for the results you want to upload</li>
           <li>Click "Download Template" to get the Excel file with student data</li>
           <li>Fill in the scores for each student and subject in the template</li>
+          <li>Enter <strong>X</strong> or <strong>A</strong> in a score cell to mark a student absent for that subject</li>
           <li>Save the Excel file and upload it using the "Upload Results" button</li>
           <li>After upload, go to "Review Results" tab to verify the entries</li>
           <li>Once all results are complete, go to "Publish Results" to publish</li>
@@ -1163,7 +1164,7 @@ export default function ResultsPage() {
       refetchCompleteness();
       setMessage({ 
         type: 'success', 
-        text: `Upload successful! ${data?.resultsInserted || 0} results inserted, ${data?.resultsUpdated || 0} updated.` 
+        text: `Upload successful! ${data?.resultsInserted || 0} inserted, ${data?.resultsUpdated || 0} updated, ${data?.resultsAbsent || 0} marked absent.` 
       });
       setTimeout(() => setMessage(null), 5000);
     },
@@ -1197,6 +1198,20 @@ export default function ResultsPage() {
     },
     onError: (error: any) => {
       setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to calculate grades' });
+      setTimeout(() => setMessage(null), 5000);
+    },
+  });
+
+  const recalculatePointsMutation = useMutation({
+    mutationFn: ({ classId, termId }: { classId: string; termId: string }) =>
+      resultApi.recalculatePoints(classId, termId),
+    onSuccess: (response: any) => {
+      refetchResults();
+      setMessage({ type: 'success', text: `Points calculated for ${response?.data?.resultsUpdated || 0} results!` });
+      setTimeout(() => setMessage(null), 5000);
+    },
+    onError: (error: any) => {
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to calculate points' });
       setTimeout(() => setMessage(null), 5000);
     },
   });
@@ -1411,6 +1426,28 @@ export default function ResultsPage() {
                 )}
               </button>
               <button
+                onClick={() => {
+                  if (!selectedClass || !selectedTerm) return;
+                  if (confirm('This will recalculate grades and points for all results in this class. Continue?')) {
+                    recalculatePointsMutation.mutate({ classId: selectedClass, termId: selectedTerm });
+                  }
+                }}
+                disabled={!selectedClass || !selectedTerm || isLocked || recalculatePointsMutation.isPending}
+                className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
+                title="Calculate grades and points for all results"
+              >
+                {recalculatePointsMutation.isPending ? (
+                  <>
+                    <span className="animate-spin">⏳</span>
+                    Calculating...
+                  </>
+                ) : (
+                  <>
+                    ⭐ Calculate All Points
+                  </>
+                )}
+              </button>
+              <button
                 onClick={async () => {
                   if (!selectedTerm) return;
                   try {
@@ -1485,11 +1522,15 @@ export default function ResultsPage() {
                     <th className="text-left py-3 px-4 font-medium text-gray-700">Subject</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-700">Score</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-700">Grade</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Points</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {results.map((result: any) => (
+                  {results.map((result: any) => {
+                    const isAbsent = result.isAbsent || result.absentCode || result.computed?.isAbsent;
+                    const points = result.points ?? result.computed?.points ?? null;
+                    return (
                     <tr key={result.id} className="border-t hover:bg-gray-50">
                       <td className="py-3 px-4 font-medium">
                         {result.student?.firstName} {result.student?.lastName}
@@ -1519,14 +1560,21 @@ export default function ResultsPage() {
                               Cancel
                             </button>
                           </div>
+                        ) : isAbsent ? (
+                          <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded font-medium text-sm">
+                            ABSENT{result.absentCode ? ` (${result.absentCode})` : ''}
+                          </span>
                         ) : (
                           <span className="font-mono">{result.score?.toFixed(1) || '-'}</span>
                         )}
                       </td>
                       <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded font-bold ${result.score >= 75 ? 'bg-green-100 text-green-800' : result.score >= 60 ? 'bg-blue-100 text-blue-800' : result.score >= 50 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
-                          {result.grade || '-'}
+                        <span className={`px-2 py-1 rounded font-bold ${isAbsent ? 'bg-gray-100 text-gray-500' : result.score >= 75 ? 'bg-green-100 text-green-800' : result.score >= 60 ? 'bg-blue-100 text-blue-800' : result.score >= 50 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                          {isAbsent ? 'ABSENT' : result.grade || '-'}
                         </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="font-mono">{points !== null && points !== undefined ? points : '—'}</span>
                       </td>
                       <td className="py-3 px-4">
                         {!isLocked && (
@@ -1551,7 +1599,8 @@ export default function ResultsPage() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

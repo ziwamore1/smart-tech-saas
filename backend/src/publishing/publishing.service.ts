@@ -14,7 +14,7 @@ export class PublishingService {
     private pushNotificationService: PushNotificationService,
   ) {}
 
-  async publishResults(schoolId: string, classId: string, termId: string) {
+  async publishResults(schoolId: string, classId: string, termId: string, userId?: string) {
     const term = await this.prisma.term.findUnique({
       where: { id: termId },
       include: { academicYear: true },
@@ -107,6 +107,28 @@ export class PublishingService {
       data: { resultsLocked: true },
     });
 
+    // Auto-sync to Results Management (Central Hub): mark the class/term
+    // result sheet as PUBLISHED and its computed results as PUBLISHED.
+    await this.syncResultSheetToHub(schoolId, classId, termId, userId, 'PUBLISHED');
+    await this.prisma.computedResult.updateMany({
+      where: { classId, termId, schoolId },
+      data: { status: 'PUBLISHED' },
+    });
+
+    if (userId) {
+      await this.prisma.resultAuditLog.create({
+        data: {
+          schoolId,
+          action: 'PUBLISHED',
+          entityType: 'COMPUTED_RESULT',
+          entityId: `${classId}-${termId}`,
+          classId,
+          termId,
+          performedBy: userId,
+        },
+      });
+    }
+
     for (const enrollment of enrollments) {
       const studentUser = enrollment.student?.user;
       if (studentUser) {
@@ -145,7 +167,7 @@ export class PublishingService {
     };
   }
 
-  async publishAllClasses(schoolId: string, termId: string) {
+  async publishAllClasses(schoolId: string, termId: string, userId?: string) {
     const term = await this.prisma.term.findUnique({
       where: { id: termId },
     });
@@ -176,7 +198,7 @@ export class PublishingService {
       if (cls.enrollments.length === 0) continue;
 
       try {
-        await this.publishResults(schoolId, cls.id, termId);
+        await this.publishResults(schoolId, cls.id, termId, userId);
         results.push({ classId: cls.id, className: cls.name, status: 'success' });
       } catch (error: any) {
         results.push({ classId: cls.id, className: cls.name, status: 'failed', error: error.message });
@@ -191,7 +213,7 @@ export class PublishingService {
     };
   }
 
-  async unpublishResults(schoolId: string, classId: string, termId: string) {
+  async unpublishResults(schoolId: string, classId: string, termId: string, userId?: string) {
     const term = await this.prisma.term.findUnique({
       where: { id: termId },
       include: { academicYear: true },
@@ -215,7 +237,102 @@ export class PublishingService {
       data: { resultsLocked: false },
     });
 
+    // Auto-sync to Results Management (Central Hub): revert the sheet to DRAFT
+    // and computed results back to COMPUTED so the workflow can run again.
+    await this.syncResultSheetToHub(schoolId, classId, termId, userId, 'DRAFT');
+    await this.prisma.computedResult.updateMany({
+      where: { classId, termId, schoolId },
+      data: { status: 'COMPUTED' },
+    });
+
+    if (userId) {
+      await this.prisma.resultAuditLog.create({
+        data: {
+          schoolId,
+          action: 'UNLOCKED',
+          entityType: 'COMPUTED_RESULT',
+          entityId: `${classId}-${termId}`,
+          classId,
+          termId,
+          performedBy: userId,
+        },
+      });
+    }
+
     return { message: 'Results unpublished successfully' };
+  }
+
+  private async syncResultSheetToHub(
+    schoolId: string,
+    classId: string,
+    termId: string,
+    userId?: string,
+    status: 'DRAFT' | 'SUBMITTED' | 'VERIFIED' | 'PUBLISHED' | 'LOCKED' = 'DRAFT',
+  ) {
+    const term = await this.prisma.term.findUnique({
+      where: { id: termId },
+      include: { academicYear: true },
+    });
+
+    if (!term) return;
+
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: {
+        classId,
+        academicYearId: term.academicYearId,
+        status: 'ACTIVE',
+      },
+    });
+
+    const studentIds = enrollments.map((e) => e.studentId);
+    const enteredCount = studentIds.length > 0
+      ? await this.prisma.result.count({
+          where: { termId, studentId: { in: studentIds } },
+        })
+      : 0;
+
+    const classInfo = await this.prisma.class.findUnique({
+      where: { id: classId },
+    });
+
+    const base = {
+      status,
+      totalStudents: enrollments.length,
+      enteredCount,
+    } as any;
+
+    if (status === 'PUBLISHED') {
+      base.publishedAt = new Date();
+    }
+    if (status === 'LOCKED') {
+      base.lockedAt = new Date();
+      base.lockedBy = userId || null;
+    }
+    if (status === 'DRAFT') {
+      base.publishedAt = null;
+      base.lockedAt = null;
+      base.lockedBy = null;
+    }
+
+    await this.prisma.resultSheet.upsert({
+      where: {
+        classId_termId_examType: { classId, termId, examType: 'END_TERM' },
+      },
+      update: base,
+      create: {
+        schoolId,
+        classId,
+        termId,
+        academicYearId: term.academicYearId,
+        examType: 'END_TERM',
+        title: `${classInfo?.name || 'Class'} - ${term.name} (END OF TERM)`,
+        status,
+        createdBy: userId || 'system',
+        totalStudents: enrollments.length,
+        enteredCount,
+        ...(status === 'PUBLISHED' ? { publishedAt: new Date() } : {}),
+      },
+    });
   }
 
   async checkResultsCompleteness(

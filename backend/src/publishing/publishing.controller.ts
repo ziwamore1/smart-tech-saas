@@ -30,6 +30,7 @@ export class PublishingController {
       req.user.schoolId,
       body.classId,
       body.termId,
+      req.user.id,
     );
   }
 
@@ -39,7 +40,7 @@ export class PublishingController {
     @Body() body: { termId: string },
     @Req() req: any,
   ) {
-    return this.service.publishAllClasses(req.user.schoolId, body.termId);
+    return this.service.publishAllClasses(req.user.schoolId, body.termId, req.user.id);
   }
 
   @Post('unpublish-results')
@@ -52,6 +53,7 @@ export class PublishingController {
       req.user.schoolId,
       body.classId,
       body.termId,
+      req.user.id,
     );
   }
 

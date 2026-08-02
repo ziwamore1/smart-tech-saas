@@ -488,6 +488,8 @@ export const resultApi = {
     api.get(`/results/template/${termId}`, { responseType: 'blob' }),
   recalculateGrades: (classId: string, termId: string) =>
     api.post('/results/recalculate-grades', { classId, termId }),
+  recalculatePoints: (classId: string, termId: string) =>
+    api.post('/results/recalculate-points', { classId, termId }),
 };
 
 export const assessmentApi = {
