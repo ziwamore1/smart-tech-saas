@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import * as XLSX from 'xlsx';
 import * as ExcelJS from 'exceljs';
+import { getSubjectShortcut } from '../common/subject-shortcuts';
 
 @Injectable()
 export class ResultService {
@@ -716,10 +717,14 @@ export class ResultService {
     }
 
     // Deduplicate subjects while preserving first-seen order.
-    const subjectById = new Map<string, { id: string; name: string }>();
+    const subjectById = new Map<string, { id: string; name: string; code?: string }>();
     for (const a of assignments) {
       if (!subjectById.has(a.subjectId)) {
-        subjectById.set(a.subjectId, { id: a.subjectId, name: a.subject.name });
+        subjectById.set(a.subjectId, {
+          id: a.subjectId,
+          name: a.subject.name,
+          code: a.subject.code || undefined,
+        });
       }
     }
 
@@ -765,7 +770,7 @@ export class ResultService {
     term: any;
     classId?: string;
     className: string;
-    subjects: Array<{ id: string; name: string; editable: boolean }>;
+    subjects: Array<{ id: string; name: string; code?: string; editable: boolean }>;
     enrollments: any[];
   }): Promise<Buffer> {
     const { school, term, className, subjects, enrollments } = data;
@@ -863,8 +868,9 @@ export class ResultService {
     // Row 6: spacer
     ws.getRow(6).height = 6;
 
-    // Row 7: Column headers
-    const headers = ['AdmissionNumber', 'FirstName', 'LastName', 'Class', ...subjectNames];
+    // Row 7: Column headers (use subject shortcuts, never the numeric codes)
+    const subjectLabels = subjects.map((s) => getSubjectShortcut(s.name));
+    const headers = ['AdmissionNumber', 'FirstName', 'LastName', 'Class', ...subjectLabels];
     const headerRow = ws.getRow(7);
     headerRow.height = 28;
     headers.forEach((name, idx) => {
@@ -956,6 +962,19 @@ export class ResultService {
       instructions.getRow(i + 2).height = 22;
     });
 
+    // Subject shortcut legend (shortcuts used as column headers)
+    const legendStart = steps.length + 3;
+    const legendTitle = instructions.getCell(legendStart, 1);
+    legendTitle.value = 'SUBJECT SHORTCUTS USED IN THIS TEMPLATE:';
+    legendTitle.font = { name: 'Calibri', size: 12, bold: true, color: { argb: brandColor } };
+    instructions.getRow(legendStart).height = 22;
+    subjects.forEach((s, i) => {
+      const cell = instructions.getCell(legendStart + 1 + i, 1);
+      cell.value = `${getSubjectShortcut(s.name)}   =   ${s.name}`;
+      cell.font = { name: 'Calibri', size: 11, color: { argb: darkColor } };
+      instructions.getRow(legendStart + 1 + i).height = 18;
+    });
+
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
   }
@@ -1004,9 +1023,14 @@ export class ResultService {
       where: { schoolId },
     });
 
-    const subjectMap = new Map(
-      subjects.map((s) => [s.name.toLowerCase(), s.id]),
-    );
+    // Match subject columns by shortcut, name OR code so templates using
+    // shortcuts (new), full names (older) or numeric codes all upload correctly.
+    const subjectMap = new Map<string, string>();
+    for (const s of subjects) {
+      subjectMap.set(s.name.toLowerCase(), s.id);
+      subjectMap.set(getSubjectShortcut(s.name).toLowerCase(), s.id);
+      if (s.code) subjectMap.set(s.code.toLowerCase(), s.id);
+    }
 
     let inserted = 0;
     let updated = 0;

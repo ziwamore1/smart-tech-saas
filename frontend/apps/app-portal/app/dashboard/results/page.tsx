@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resultApi, classApi, termApi, subjectApi, assessmentApi, publishingApi, reportEngineApi } from '@/lib/api';
+import { getSubjectShortcut } from '@/config/subjectColors';
 
 async function downloadTemplateFile(termId: string, classId: string | undefined) {
   const response = await resultApi.getTemplate(termId, { classId: classId || undefined });
@@ -1515,7 +1516,7 @@ export default function ResultsPage() {
                     </th>
                     {subjectColumns.map((subject) => (
                       <th key={subject.id} title={subject.name} className="text-center py-3 px-2 font-medium text-gray-700 min-w-[92px]">
-                        {subject.code || subject.name}
+                        {getSubjectShortcut(subject.name)}
                       </th>
                     ))}
                     <th className="text-center py-3 px-3 font-medium text-gray-700">Total Points</th>
