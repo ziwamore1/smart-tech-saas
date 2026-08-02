@@ -1085,10 +1085,15 @@ export default function ResultsPage() {
     (Array.isArray(subjectsData) ? subjectsData : []).forEach((s: any, i: number) => {
       if (s?.id) order.set(s.id, i);
     });
-    const map = new Map<string, { id: string; name: string }>();
+    const map = new Map<string, { id: string; name: string; code?: string }>();
     for (const r of results) {
       const sid = r.subject?.id;
-      if (sid && !map.has(sid)) map.set(sid, { id: sid, name: r.subject?.name || 'Subject' });
+      if (sid && !map.has(sid))
+        map.set(sid, {
+          id: sid,
+          name: r.subject?.name || 'Subject',
+          code: r.subject?.code || undefined,
+        });
     }
     return [...map.values()].sort(
       (a, b) => (order.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.id) ?? Number.MAX_SAFE_INTEGER),
@@ -1509,8 +1514,8 @@ export default function ResultsPage() {
                       Student
                     </th>
                     {subjectColumns.map((subject) => (
-                      <th key={subject.id} className="text-center py-3 px-2 font-medium text-gray-700 min-w-[92px]">
-                        {subject.name}
+                      <th key={subject.id} title={subject.name} className="text-center py-3 px-2 font-medium text-gray-700 min-w-[92px]">
+                        {subject.code || subject.name}
                       </th>
                     ))}
                     <th className="text-center py-3 px-3 font-medium text-gray-700">Total Points</th>
