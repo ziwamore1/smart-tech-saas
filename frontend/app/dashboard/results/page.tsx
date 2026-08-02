@@ -4,6 +4,26 @@ import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resultApi, classApi, termApi, subjectApi, publishingApi, reportCardApi } from '@/lib/api';
 
+async function downloadTemplateFile(termId: string, classId: string | undefined) {
+  const response = await resultApi.getTemplate(termId, { classId: classId || undefined });
+  const contentType = response.headers?.['content-type'] || '';
+  if (
+    !contentType.includes('spreadsheetml') &&
+    !contentType.includes('octet-stream')
+  ) {
+    throw new Error('The server returned an invalid response instead of the Excel template. Please try again.');
+  }
+  const blob = new Blob([response.data]);
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = downloadUrl;
+  a.download = 'results-template.xlsx';
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(downloadUrl);
+  document.body.removeChild(a);
+}
+
 type Tab = 'upload' | 'entry' | 'review' | 'publish' | 'reports';
 
 interface UploadResultsTabProps {
@@ -1150,16 +1170,7 @@ export default function ResultsPage() {
           onDownloadTemplate={async () => {
             if (!selectedTerm) return;
             try {
-              const response = await resultApi.getTemplate(selectedTerm, { classId: selectedClass || undefined });
-              const blob = new Blob([response.data]);
-              const downloadUrl = window.URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = downloadUrl;
-              a.download = 'results-template.xlsx';
-              document.body.appendChild(a);
-              a.click();
-              window.URL.revokeObjectURL(downloadUrl);
-              document.body.removeChild(a);
+              await downloadTemplateFile(selectedTerm, selectedClass);
             } catch (error: any) {
               console.error('Download error:', error);
               setMessage({ type: 'error', text: error.response?.data?.message || error.message || 'Failed to download template' });
@@ -1224,16 +1235,7 @@ export default function ResultsPage() {
                 onClick={async () => {
                   if (!selectedTerm) return;
                   try {
-                    const response = await resultApi.getTemplate(selectedTerm, { classId: selectedClass || undefined });
-                    const blob = new Blob([response.data]);
-                    const downloadUrl = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = downloadUrl;
-                    a.download = 'results-template.xlsx';
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(downloadUrl);
-                    document.body.removeChild(a);
+                    await downloadTemplateFile(selectedTerm, selectedClass);
                   } catch (error: any) {
                     console.error('Download error:', error);
                     setMessage({ type: 'error', text: error.response?.data?.message || error.message || 'Failed to download template' });

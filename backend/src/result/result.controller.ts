@@ -78,6 +78,63 @@ export class ResultController {
     });
   }
 
+  @Get('template/:termId')
+  @Roles('Director', 'Teacher', 'Class Teacher')
+  async downloadTemplate(
+    @Param('termId') termId: string,
+    @Query('classId') classId: string,
+    @Req() req,
+    @Res() res: Response,
+  ) {
+    this.logger.log(`downloadTemplate called - termId: ${termId}, classId: ${classId}`);
+    this.logger.log(`User: ${JSON.stringify(req.user)}`);
+
+    const userId = req.user.id;
+    let teacherId = userId;
+
+    let teacher = await this.prisma.teacher.findFirst({
+      where: { userId },
+    });
+
+    this.logger.log(`Teacher found: ${JSON.stringify(teacher)}`);
+
+    if (!teacher && req.user.roles?.includes('DIRECTOR')) {
+      this.logger.log('Creating teacher record for director...');
+      teacher = await this.prisma.teacher.create({
+        data: {
+          userId,
+          schoolId: req.user.schoolId,
+        },
+      });
+    }
+
+    if (teacher) {
+      teacherId = teacher.id;
+    }
+
+    this.logger.log(`Using teacherId: ${teacherId}`);
+
+    try {
+      const buffer = await this.resultService.generateResultTemplate(
+        teacherId,
+        req.user.schoolId,
+        termId,
+        classId,
+      );
+
+      res.set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="results-template.xlsx"',
+      });
+
+      res.send(buffer);
+    } catch (error) {
+      this.logger.error(`Error generating template: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
   @Get(':id')
   @Roles('Director', 'Teacher', 'Class Teacher')
   findOne(@Param('id') id: string, @Req() req: any) {
@@ -139,63 +196,6 @@ export class ResultController {
         subjectRank: r.subjectRank,
       })),
     };
-  }
-
-  @Get('template/:termId')
-  @Roles('Director', 'Teacher', 'Class Teacher')
-  async downloadTemplate(
-    @Param('termId') termId: string,
-    @Query('classId') classId: string,
-    @Req() req,
-    @Res() res: Response,
-  ) {
-    this.logger.log(`downloadTemplate called - termId: ${termId}, classId: ${classId}`);
-    this.logger.log(`User: ${JSON.stringify(req.user)}`);
-
-    const userId = req.user.id;
-    let teacherId = userId;
-
-    let teacher = await this.prisma.teacher.findFirst({
-      where: { userId },
-    });
-
-    this.logger.log(`Teacher found: ${JSON.stringify(teacher)}`);
-
-    if (!teacher && req.user.roles?.includes('DIRECTOR')) {
-      this.logger.log('Creating teacher record for director...');
-      teacher = await this.prisma.teacher.create({
-        data: {
-          userId,
-          schoolId: req.user.schoolId,
-        },
-      });
-    }
-
-    if (teacher) {
-      teacherId = teacher.id;
-    }
-
-    this.logger.log(`Using teacherId: ${teacherId}`);
-
-    try {
-      const buffer = await this.resultService.generateResultTemplate(
-        teacherId,
-        req.user.schoolId,
-        termId,
-        classId,
-      );
-
-      res.set({
-        'Content-Type':
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': 'attachment; filename="results-template.xlsx"',
-      });
-
-      res.send(buffer);
-    } catch (error) {
-      this.logger.error(`Error generating template: ${error.message}`, error.stack);
-      throw error;
-    }
   }
 
   @Post()
