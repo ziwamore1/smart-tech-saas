@@ -150,18 +150,18 @@ export const TeacherMarksScreen: React.FC<TeacherMarksProps> = ({ onToggleDrawer
       setActionLoading(true);
       const termId = dashboard?.currentTerm?.id;
       if (termId && selectedClass?.id) {
-        const blob = await apiService.getReportCard(selectedClass.id, termId) as Blob;
-        const reader = new FileReader();
-        reader.onload = async () => {
-          const fileUri = FileSystem.documentDirectory + `${selectedClass?.name || 'Class'}_Report.pdf`;
-          await FileSystem.writeAsStringAsync(fileUri, (reader.result as string).split(',')[1], { encoding: FileSystem.EncodingType.Base64 });
-          await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Save Report', UTI: 'com.adobe.pdf' });
-        };
-        reader.readAsDataURL(blob);
+        const { base64 } = await apiService.getReportCard(selectedClass.id, termId);
+        const fileUri = FileSystem.documentDirectory + `${selectedClass?.name || 'Class'}_Report.pdf`;
+        await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+        await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Save Report', UTI: 'com.adobe.pdf' });
       } else {
         Alert.alert('Unavailable', 'Report PDF not available. Try sharing as text instead.');
       }
-    } catch { Alert.alert('Unavailable', 'Report PDF not available yet.'); }
+    } catch (e: any) {
+      if (e?.message !== 'User did not share') {
+        Alert.alert('Unavailable', e?.response?.data?.message || e?.message || 'Report PDF not available yet.');
+      }
+    }
     finally { setActionLoading(false); }
   };
 

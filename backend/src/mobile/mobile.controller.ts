@@ -35,6 +35,12 @@ export class MobileController {
     return this.mobileService.getDashboard(userId, schoolId, roles);
   }
 
+  @Get('intelligence-summary/:studentId')
+  async getMobileIntelligenceSummary(@Req() req: any, @Param('studentId') studentId: string) {
+    const { id: userId, schoolId, roles } = req.user;
+    return this.mobileService.getMobileIntelligenceSummary(userId, schoolId, roles, studentId || undefined);
+  }
+
   @Get('profile')
   async getProfile(@Req() req: any) {
     const { id: userId, schoolId } = req.user;

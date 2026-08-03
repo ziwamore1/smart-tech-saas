@@ -6,9 +6,10 @@ import { IntelligenceModule } from '../intelligence/intelligence.module';
 import { StaffPositionModule } from '../staff-position/staff-position.module';
 import { StudentModule } from '../student/student.module';
 import { AdmissionNumberModule } from '../admission-number/admission-number.module';
+import { ReportCardEngineModule } from '../report-card-engine/report-card-engine.module';
 
 @Module({
-  imports: [IntelligenceModule, StaffPositionModule, StudentModule, AdmissionNumberModule],
+  imports: [IntelligenceModule, StaffPositionModule, StudentModule, AdmissionNumberModule, ReportCardEngineModule],
   controllers: [MobileController, AppInfoController],
   providers: [MobileService],
 })

@@ -124,18 +124,14 @@ export const StudentReportCardsScreen: React.FC = () => {
     }
     setDownloading(true);
     try {
-      const blob = await apiService.getReportCardPdf(studentId, selectedTermId) as Blob;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result as string;
-        const fileUri = FileSystem.documentDirectory + 'My_Report_Card.pdf';
-        await FileSystem.writeAsStringAsync(fileUri, base64.split(',')[1], { encoding: FileSystem.EncodingType.Base64 });
-        await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download Report Card' });
-      };
-      reader.readAsDataURL(blob);
+      const { base64 } = await apiService.getReportCardPdf(studentId, selectedTermId);
+      const fileUri = FileSystem.documentDirectory + 'My_Report_Card.pdf';
+      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+      await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download Report Card' });
     } catch (err: any) {
       if (err?.message !== 'User did not share') {
-        Alert.alert('Unavailable', 'Report card PDF is not available yet.');
+        const msg = err?.response?.data?.message || err?.message || 'Report card PDF is not available yet.';
+        Alert.alert('Unavailable', msg);
       }
     } finally {
       setDownloading(false);

@@ -55,38 +55,50 @@ export const ParentAnalyticsScreen: React.FC = () => {
       const childName = childData?.name || `${childData?.firstName || ''} ${childData?.lastName || ''}`.trim() || 'Child';
       const termId = dashboard?.currentTerm?.id;
 
-      const [statsRes, trendRes, recRes, compRes] = await Promise.allSettled([
+      const [statsRes, trendRes, recRes, compRes, reportRes] = await Promise.allSettled([
         apiService.getParentStudentStats(selectedChildId),
         termId ? apiService.getParentAnalytics(selectedChildId) : Promise.reject('no term'),
         termId ? apiService.getParentRecommendations(selectedChildId, termId) : Promise.reject('no term'),
         termId ? apiService.getParentCompetencyDiagnosis(selectedChildId, termId) : Promise.reject('no term'),
+        termId ? apiService.getReportCardData(selectedChildId, termId) : Promise.reject('no term'),
       ]);
 
       const stats = statsRes.status === 'fulfilled' ? statsRes.value?.data || statsRes.value : undefined;
       const trend = trendRes.status === 'fulfilled' ? trendRes.value?.data || trendRes.value : undefined;
       const recs = recRes.status === 'fulfilled' ? recRes.value?.data || recRes.value : undefined;
       const comp = compRes.status === 'fulfilled' ? compRes.value?.data || compRes.value : undefined;
+      const report = reportRes.status === 'fulfilled' ? reportRes.value?.data || reportRes.value : undefined;
+
+      const reportTs = report?.termSummary;
+      const reportSubjects = Array.isArray(report?.subjectBreakdown) ? report.subjectBreakdown : [];
+      const reportRecommendations = Array.isArray(reportTs?.aiInsights) ? reportTs.aiInsights : [];
 
       const childAnalytics: ChildAnalytics = {
         id: selectedChildId,
         name: childName,
         stats: {
-          average: stats?.average || stats?.avgScore,
-          grade: stats?.grade || stats?.overallGrade,
-          rank: stats?.rank,
-          totalStudents: stats?.totalStudents,
-          subjectsCount: stats?.subjectsCount,
-          attendanceRate: stats?.attendanceRate,
+          average: stats?.average ?? stats?.avgScore ?? reportTs?.overallPercentage ?? report?.bestSubjectsAverage,
+          grade: stats?.grade ?? stats?.overallGrade ?? reportTs?.overallGrade ?? report?.performanceCategory?.label,
+          rank: stats?.rank ?? reportTs?.classRank,
+          totalStudents: stats?.totalStudents ?? reportTs?.classSize,
+          subjectsCount: stats?.subjectsCount ?? (reportSubjects.length > 0 ? reportSubjects.length : undefined),
+          attendanceRate: stats?.attendanceRate ?? report?.attendance?.attendanceRate,
         },
-        trend: trend ? {
+        trend: trend && !trend.error ? {
           direction: trend.direction || 'stable',
           change: trend.change || 0,
           periods: trend.periods || trend.trend || [],
         } : undefined,
-        performanceCategory: stats?.performanceCategory,
-        strengths: comp?.strengths || stats?.strengths || [],
-        weaknesses: comp?.weaknesses || stats?.weaknesses || [],
-        recommendations: recs?.recommendations || recs || [],
+        performanceCategory: report?.performanceCategory || stats?.performanceCategory,
+        strengths: comp?.strengths || reportTs?.strengths || stats?.strengths || [],
+        weaknesses: comp?.weaknesses || reportTs?.weaknesses || stats?.weaknesses || [],
+        recommendations: reportRecommendations.length > 0
+          ? reportRecommendations
+          : Array.isArray(recs?.recommendations)
+            ? recs.recommendations
+            : Array.isArray(recs)
+              ? recs
+              : [],
       };
 
       setAnalytics(childAnalytics);

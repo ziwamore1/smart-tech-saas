@@ -124,18 +124,14 @@ export const ParentReportCardsScreen: React.FC = () => {
       const termId = selectedTermId || dashboard?.currentTerm?.id;
       if (!termId || !selectedChildId) { Alert.alert('Error', 'Missing term or student'); return; }
 
-      const blob = await apiService.getParentReportCard(selectedChildId, termId) as Blob;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result as string;
-        const fileUri = FileSystem.documentDirectory + `${childName.replace(/\s+/g, '_')}_Report_Card.pdf`;
-        await FileSystem.writeAsStringAsync(fileUri, base64.split(',')[1], { encoding: FileSystem.EncodingType.Base64 });
-        await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: `Save ${childName}'s Report Card`, UTI: 'com.adobe.pdf' });
-      };
-      reader.readAsDataURL(blob);
+      const { base64 } = await apiService.getParentReportCard(selectedChildId, termId);
+      const fileUri = FileSystem.documentDirectory + `${childName.replace(/\s+/g, '_')}_Report_Card.pdf`;
+      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+      await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: `Save ${childName}'s Report Card`, UTI: 'com.adobe.pdf' });
     } catch (e: any) {
       if (e?.message !== 'User did not share') {
-        Alert.alert('Unavailable', 'Report card PDF is not available yet. Try printing instead.');
+        const msg = e?.response?.data?.message || e?.message || 'Report card PDF is not available yet. Try printing instead.';
+        Alert.alert('Unavailable', msg);
       }
     } finally { setActionLoading(false); }
   };

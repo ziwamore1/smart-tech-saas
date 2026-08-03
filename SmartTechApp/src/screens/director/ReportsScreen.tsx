@@ -150,15 +150,9 @@ export const DirectorReportsScreen: React.FC<Props> = ({ onToggleDrawer, onNavig
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const saveReportBlob = async (blob: Blob, fileName: string): Promise<string> => {
-    const reader = new FileReader();
-    const base64: string = await new Promise((resolve, reject) => {
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error('Failed to read report file'));
-      reader.readAsDataURL(blob);
-    });
+  const saveReportBase64 = async (base64: string, fileName: string): Promise<string> => {
     const fileUri = FileSystem.documentDirectory + fileName;
-    await FileSystem.writeAsStringAsync(fileUri, base64.split(',')[1], {
+    await FileSystem.writeAsStringAsync(fileUri, base64, {
       encoding: FileSystem.EncodingType.Base64,
     });
     return fileUri;
@@ -173,8 +167,8 @@ export const DirectorReportsScreen: React.FC<Props> = ({ onToggleDrawer, onNavig
     // Prefer the authenticated download endpoint for persisted reports
     if (reportId) {
       try {
-        const blob = await apiService.downloadGeneratedReport(reportId);
-        return await saveReportBlob(blob, filename);
+        const { base64 } = await apiService.downloadGeneratedReport(reportId);
+        return await saveReportBase64(base64, filename);
       } catch {
         // fall through to URL-based download
       }

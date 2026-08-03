@@ -358,7 +358,7 @@ export const ReportCardsScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate 
       if (selectedStudentId) payload.studentId = selectedStudentId;
       if (selectedTemplateId) payload.templateId = selectedTemplateId;
 
-      const blob = await apiService.generateReportPdf(payload) as Blob;
+      const { base64 } = await apiService.generateReportPdf(payload);
 
       const reportEntry = {
         id: Date.now().toString(),
@@ -370,60 +370,55 @@ export const ReportCardsScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate 
         fileName: '',
       };
 
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result as string;
-        const safeFileName = `${selectedType}_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`;
-        const fileUri = FileSystem.documentDirectory + safeFileName;
+      const safeFileName = `${selectedType}_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`;
+      const fileUri = FileSystem.documentDirectory + safeFileName;
 
-        await FileSystem.writeAsStringAsync(fileUri, base64.split(',')[1], {
-          encoding: FileSystem.EncodingType.Base64,
-        });
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
 
-        reportEntry.fileName = safeFileName;
-        setGeneratedPdfUrl(fileUri);
-        setGeneratedFileName(safeFileName);
-        setRecentReports((prev) => [reportEntry, ...prev].slice(0, 10));
+      reportEntry.fileName = safeFileName;
+      setGeneratedPdfUrl(fileUri);
+      setGeneratedFileName(safeFileName);
+      setRecentReports((prev) => [reportEntry, ...prev].slice(0, 10));
 
-        Alert.alert(
-          'Report Generated',
-          `${activeConfig?.label || 'Report'} has been generated successfully.`,
-          [
-            {
-              text: 'Share',
-              onPress: async () => {
-                try {
-                  await Sharing.shareAsync(fileUri, {
-                    mimeType: 'application/pdf',
-                    dialogTitle: `Share ${activeConfig?.label || 'Report'}`,
-                  });
-                } catch (shareErr: any) {
-                  if (shareErr?.message !== 'User did not share') {
-                    Alert.alert('Error', 'Failed to share file.');
-                  }
+      Alert.alert(
+        'Report Generated',
+        `${activeConfig?.label || 'Report'} has been generated successfully.`,
+        [
+          {
+            text: 'Share',
+            onPress: async () => {
+              try {
+                await Sharing.shareAsync(fileUri, {
+                  mimeType: 'application/pdf',
+                  dialogTitle: `Share ${activeConfig?.label || 'Report'}`,
+                });
+              } catch (shareErr: any) {
+                if (shareErr?.message !== 'User did not share') {
+                  Alert.alert('Error', 'Failed to share file.');
                 }
-              },
+              }
             },
-            {
-              text: 'Download',
-              onPress: async () => {
-                try {
-                  await Sharing.shareAsync(fileUri, {
-                    mimeType: 'application/pdf',
-                    dialogTitle: `Download ${activeConfig?.label || 'Report'}`,
-                  });
-                } catch (shareErr: any) {
-                  if (shareErr?.message !== 'User did not share') {
-                    Alert.alert('Error', 'Failed to download file.');
-                  }
+          },
+          {
+            text: 'Download',
+            onPress: async () => {
+              try {
+                await Sharing.shareAsync(fileUri, {
+                  mimeType: 'application/pdf',
+                  dialogTitle: `Download ${activeConfig?.label || 'Report'}`,
+                });
+              } catch (shareErr: any) {
+                if (shareErr?.message !== 'User did not share') {
+                  Alert.alert('Error', 'Failed to download file.');
                 }
-              },
+              }
             },
-            { text: 'OK' },
-          ]
-        );
-      };
-      reader.readAsDataURL(blob);
+          },
+          { text: 'OK' },
+        ]
+      );
     } catch (err: any) {
       if (err?.message !== 'User did not share') {
         const msg = err?.response?.data?.message || err?.message || 'Failed to generate report.';

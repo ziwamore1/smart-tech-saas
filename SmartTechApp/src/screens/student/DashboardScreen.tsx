@@ -111,7 +111,7 @@ export const StudentDashboardScreen: React.FC<Props> = ({ onToggleDrawer, onNavi
               <View key={key} style={styles.barRow}>
                 <Text style={styles.barLabel}>{key === 'readWrite' ? 'R/W' : key.slice(0, 2)}</Text>
                 <View style={styles.barBg}>
-                  <View style={[styles.barFill, { width: `${(intelligence.learningStyle[key] / 8) * 100}%` }]} />
+                  <View style={[styles.barFill, { width: `${Math.min(Math.max(intelligence.learningStyle[key] ?? 0, 0), 100)}%` }]} />
                 </View>
               </View>
             ))}

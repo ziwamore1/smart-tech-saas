@@ -17,14 +17,30 @@ export const ParentChildResultsScreen: React.FC = () => {
   const route = useRoute<RouteProp<any>>();
   const { dashboard } = useAppStore();
   const { user } = useAuthStore();
-  const childId = route.params?.childId || dashboard?.children?.[0]?.id;
-  const childName = route.params?.childName || dashboard?.children?.[0]?.name;
+  const [children, setChildren] = useState<any[]>(dashboard?.children || []);
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(route.params?.childId || null);
+  const [childName, setChildName] = useState<string>(route.params?.childName || '');
   const [results, setResults] = useState<any[]>([]);
   const [terms, setTerms] = useState<any[]>([]);
   const [selectedTermId, setSelectedTermId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    const kids = dashboard?.children || [];
+    if (kids.length > 0) {
+      setChildren(kids);
+      setSelectedChildId((prev) => (prev && kids.some((k) => k.id === prev) ? prev : kids[0].id));
+    }
+  }, [dashboard]);
+
+  useEffect(() => {
+    const kid = children.find((c) => c.id === selectedChildId);
+    setChildName(kid?.name || `${kid?.firstName || ''} ${kid?.lastName || ''}`.trim() || route.params?.childName || 'Child');
+  }, [selectedChildId, children]);
+
+  const childId = selectedChildId ?? '';
 
   useEffect(() => {
     const loadTerms = async () => {
@@ -199,24 +215,20 @@ export const ParentChildResultsScreen: React.FC = () => {
         Alert.alert('Error', 'Missing term or student information');
         return;
       }
-      const blob = await apiService.getParentReportCard(childId, termId) as Blob;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result as string;
-        const fileUri = FileSystem.documentDirectory + `${childName || 'child'}_Report_Card.pdf`;
-        await FileSystem.writeAsStringAsync(fileUri, base64.split(',')[1], {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'application/pdf',
-          dialogTitle: `Save ${childName || 'Child'}'s Report Card`,
-          UTI: 'com.adobe.pdf',
-        });
-      };
-      reader.readAsDataURL(blob);
+      const { base64 } = await apiService.getParentReportCard(childId, termId);
+      const fileUri = FileSystem.documentDirectory + `${childName || 'child'}_Report_Card.pdf`;
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `Save ${childName || 'Child'}'s Report Card`,
+        UTI: 'com.adobe.pdf',
+      });
     } catch (e: any) {
       if (e?.message !== 'User did not share') {
-        Alert.alert('Download Unavailable', 'Report card PDF is not available yet. You can share the text results instead.');
+        const msg = e?.response?.data?.message || e?.message || 'Report card PDF is not available yet. You can share the text results instead.';
+        Alert.alert('Download Unavailable', msg);
       }
     } finally {
       setActionLoading(false);
@@ -269,6 +281,19 @@ export const ParentChildResultsScreen: React.FC = () => {
           </View>
         )}
       </View>
+      {children.length > 1 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.childStrip}>
+          {children.map((c: any) => (
+            <TouchableOpacity
+              key={c.id}
+              style={[styles.childChip, selectedChildId === c.id && styles.childChipActive]}
+              onPress={() => { setSelectedChildId(c.id); setResults([]); setLoading(true); }}
+            >
+              <Text style={[styles.childChipText, selectedChildId === c.id && styles.childChipTextActive]}>{c.name || 'Child'}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
       {terms.length > 1 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.termScroll} contentContainerStyle={styles.termContent}>
           {terms.map((term: any) => (
@@ -324,6 +349,11 @@ const styles = StyleSheet.create({
   actionBtnText: { color: colors.white, fontSize: 13, fontWeight: '600' },
   actionBtnTextSecondary: { color: colors.white, fontSize: 13, fontWeight: '600' },
   actionBtnTextOutline: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  childStrip: { maxHeight: 44, marginHorizontal: spacing.md, marginTop: spacing.sm },
+  childChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.white, marginRight: 8, borderWidth: 1, borderColor: colors.border },
+  childChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  childChipText: { fontSize: 13, fontWeight: '600', color: colors.text },
+  childChipTextActive: { color: colors.white },
   termScroll: { maxHeight: 48, marginTop: spacing.sm },
   termContent: { paddingHorizontal: spacing.md, gap: spacing.sm },
   termChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.full, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },

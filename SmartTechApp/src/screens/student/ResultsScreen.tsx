@@ -162,39 +162,34 @@ export const StudentResultsScreen: React.FC = () => {
     }
     setDownloading(true);
     try {
-      const blob = await apiService.generateReportPdf({ type: 'REPORT_CARD', studentId, termId }) as Blob;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result as string;
-        const fileName = `Report_Card_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`;
-        const fileUri = FileSystem.documentDirectory + fileName;
-        await FileSystem.writeAsStringAsync(fileUri, base64.split(',')[1], {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        Alert.alert(
-          'Report Card Downloaded',
-          'Your report card has been generated with the school template.',
-          [
-            {
-              text: 'Share',
-              onPress: async () => {
-                try {
-                  await Sharing.shareAsync(fileUri, {
-                    mimeType: 'application/pdf',
-                    dialogTitle: 'Share Report Card',
-                  });
-                } catch (shareErr: any) {
-                  if (shareErr?.message !== 'User did not share') {
-                    Alert.alert('Error', 'Failed to share file.');
-                  }
+      const { base64 } = await apiService.generateReportPdf({ type: 'REPORT_CARD', studentId, termId });
+      const fileName = `Report_Card_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`;
+      const fileUri = FileSystem.documentDirectory + fileName;
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      Alert.alert(
+        'Report Card Downloaded',
+        'Your report card has been generated with the school template.',
+        [
+          {
+            text: 'Share',
+            onPress: async () => {
+              try {
+                await Sharing.shareAsync(fileUri, {
+                  mimeType: 'application/pdf',
+                  dialogTitle: 'Share Report Card',
+                });
+              } catch (shareErr: any) {
+                if (shareErr?.message !== 'User did not share') {
+                  Alert.alert('Error', 'Failed to share file.');
                 }
-              },
+              }
             },
-            { text: 'OK' },
-          ]
-        );
-      };
-      reader.readAsDataURL(blob);
+          },
+          { text: 'OK' },
+        ]
+      );
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Failed to generate report card.';
       Alert.alert('Download Failed', msg);

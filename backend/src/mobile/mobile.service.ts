@@ -4,6 +4,7 @@ import { PushNotificationService } from '../push-notification/push-notification.
 import { AiTutorService } from '../intelligence/services/ai-tutor.service';
 import { StudentService } from '../student/student.service';
 import { AdmissionNumberService } from '../admission-number/admission-number.service';
+import { ReportCardEngineService } from '../report-card-engine/report-card-engine.service';
 import { CreateStudentDto } from '../student/dto/create-student.dto';
 
 @Injectable()
@@ -16,6 +17,7 @@ export class MobileService {
     private aiTutorService: AiTutorService,
     private studentService: StudentService,
     private admissionNumberService: AdmissionNumberService,
+    private reportCardEngine: ReportCardEngineService,
   ) {}
 
   async getDashboard(userId: string, schoolId: string, roles: string[]) {
@@ -229,6 +231,73 @@ export class MobileService {
     dashboard.recentAnnouncements = recentAnnouncements;
 
     return dashboard;
+  }
+
+  async getMobileIntelligenceSummary(
+    userId: string,
+    schoolId: string,
+    roles: string[],
+    requestedStudentId?: string,
+  ) {
+    let studentId: string | undefined;
+    if (roles.includes('Student')) {
+      const student = await this.prisma.student.findFirst({
+        where: { user: { id: userId } },
+      });
+      studentId = student?.id || undefined;
+    } else if (requestedStudentId) {
+      studentId = requestedStudentId;
+    }
+
+    if (!studentId) {
+      return { studentStats: null, learningStyle: null };
+    }
+
+    const term = await this.prisma.term.findFirst({
+      where: {
+        academicYear: { schoolId, isCurrent: true },
+        isCurrent: true,
+      },
+    });
+
+    let studentStats: any = null;
+    if (term) {
+      const publishedCount = await this.prisma.computedResult.count({
+        where: {
+          studentId,
+          termId: term.id,
+          schoolId,
+          status: { in: ['PUBLISHED', 'LOCKED'] },
+        },
+      });
+
+      if (publishedCount > 0) {
+        const data = await this.reportCardEngine.generateReportCardData(studentId, term.id, schoolId);
+        studentStats = {
+          average: data?.termSummary?.overallPercentage ?? data?.bestSubjectsAverage ?? null,
+          grade: data?.termSummary?.overallGrade ?? data?.performanceCategory?.label ?? null,
+          rank: data?.termSummary?.classRank ?? null,
+          totalStudents: data?.termSummary?.classSize ?? null,
+          subjectsCount: Array.isArray(data?.subjectBreakdown) ? data.subjectBreakdown.length : 0,
+          attendanceRate: data?.attendance?.attendanceRate ?? null,
+        };
+      }
+    }
+
+    const learningProfile = await this.prisma.learningStyleProfile.findUnique({
+      where: { studentId },
+    });
+    const learningStyle = learningProfile && learningProfile.schoolId === schoolId
+      ? {
+          dominantStyle: learningProfile.dominantStyle || 'NONE',
+          visual: learningProfile.visualScore,
+          aural: learningProfile.auralScore,
+          readWrite: learningProfile.readWriteScore,
+          kinesthetic: learningProfile.kinestheticScore,
+        }
+      : null;
+
+    return { studentStats, learningStyle };
   }
 
   private async getUserEmail(userId: string): Promise<string | null> {

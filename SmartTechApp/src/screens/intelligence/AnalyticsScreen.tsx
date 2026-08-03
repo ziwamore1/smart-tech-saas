@@ -16,6 +16,7 @@ export const AnalyticsScreen: React.FC = () => {
   const [weaknesses, setWeaknesses] = useState<any>(null);
 
   const isStudent = !!user?.roles?.some((r) => String(r).toLowerCase() === 'student');
+  const studentId = dashboard?.student?.id || user?.studentId || user?.id;
 
   useEffect(() => {
     loadData();
@@ -23,14 +24,14 @@ export const AnalyticsScreen: React.FC = () => {
 
   const loadData = async () => {
     try {
-      if (!user?.id) return;
+      if (!studentId) return;
       const termId = dashboard?.currentTerm?.id;
 
       if (isStudent) {
         const [statsRes, trajRes, weakRes] = await Promise.allSettled([
-          apiService.getStudentStats(user.id),
-          apiService.getStudentGrowthTrajectory(user.id),
-          termId ? apiService.getCompetencyDiagnosis(user.id, termId) : Promise.reject('no term'),
+          apiService.getStudentStats(studentId),
+          apiService.getStudentGrowthTrajectory(studentId),
+          termId ? apiService.getCompetencyDiagnosis(studentId, termId) : Promise.reject('no term'),
         ]);
         if (statsRes.status === 'fulfilled') {
           const raw = statsRes.value?.data || statsRes.value;
@@ -50,12 +51,16 @@ export const AnalyticsScreen: React.FC = () => {
               interpretation: raw.comparativeStats?.interpretation,
               subjectBreakdown: raw.subjectBreakdown,
             });
-          } else {
-            setStats(raw);
           }
         }
-        if (trajRes.status === 'fulfilled') setTrajectory(trajRes.value?.data || trajRes.value);
-        if (weakRes.status === 'fulfilled') setWeaknesses(weakRes.value?.data || weakRes.value);
+        if (trajRes.status === 'fulfilled') {
+          const trajRaw = trajRes.value?.data || trajRes.value;
+          if (trajRaw && !trajRaw.error && (trajRaw.history || trajRaw.prediction)) setTrajectory(trajRaw);
+        }
+        if (weakRes.status === 'fulfilled') {
+          const weakRaw = weakRes.value?.data || weakRes.value;
+          if (weakRaw && !weakRaw.error && Array.isArray(weakRaw?.weaknesses) && weakRaw.weaknesses.length > 0) setWeaknesses(weakRaw);
+        }
       } else {
         // Staff: school-wide descriptive statistics
         const statsRes = await apiService.getSchoolDescriptiveStats(termId);
@@ -72,8 +77,6 @@ export const AnalyticsScreen: React.FC = () => {
             studentCount: raw.schoolStats?.studentCount,
             percentile: raw.distribution?.p75,
           });
-        } else {
-          setStats(raw);
         }
       }
     } catch (err) { console.error('Analytics load error'); }

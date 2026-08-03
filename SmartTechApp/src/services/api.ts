@@ -28,6 +28,49 @@ export function resolveImageUrl(url?: string | null): string | undefined {
   return url;
 }
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function decodeUtf8(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return decodeURIComponent(escape(binary));
+}
+
+function normalizeArrayBufferError(err: any): any {
+  const data = err?.response?.data;
+  if (data && typeof data === 'object' && data.byteLength !== undefined && !(data instanceof Uint8Array)) {
+    try {
+      const parsed = JSON.parse(decodeUtf8(data));
+      if (parsed?.message) err.message = parsed.message;
+      err.response = { ...err.response, data: parsed, status: parsed.statusCode || err.response?.status };
+    } catch {
+      return err;
+    }
+  }
+  return err;
+}
+
+async function extractPdfBase64(response: any): Promise<{ base64: string }> {
+  const contentType = String(response?.headers?.['content-type'] || '');
+  if (contentType.includes('application/json')) {
+    const parsed = JSON.parse(decodeUtf8(response.data));
+    const err = new Error(parsed.message || 'Report generation failed');
+    (err as any).response = { data: parsed, status: parsed.statusCode || 500 };
+    throw err;
+  }
+  return { base64: arrayBufferToBase64(response.data) };
+}
+
 class ApiService {
   private client: AxiosInstance;
   private token: string | null = null;
@@ -2718,8 +2761,12 @@ class ApiService {
 
   // ===== Report Card PDF Downloads =====
   async getClassReportCardsPdf(classId: string, termId: string) {
-    const response = await this.client.get(`/report-card/class/${classId}/term/${termId}/pdf`, { responseType: 'blob' });
-    return response.data;
+    try {
+      const response = await this.client.get(`/report-card/class/${classId}/term/${termId}/pdf`, { responseType: 'arraybuffer' });
+      return await extractPdfBase64(response);
+    } catch (err) {
+      throw normalizeArrayBufferError(err);
+    }
   }
 
   async getReportCardPdf(studentId: string, termId: string) {
@@ -2883,16 +2930,12 @@ class ApiService {
   }
 
   async generateReportPdf(data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string }) {
-    const response = await this.client.post('/report-engine/generate-pdf', data, { responseType: 'blob' });
-    const blob = response.data as Blob;
-    if (blob.type === 'application/json') {
-      const text = await blob.text();
-      const parsed = JSON.parse(text);
-      const err = new Error(parsed.message || 'Report generation failed');
-      (err as any).response = { data: parsed, status: parsed.statusCode || 500 };
-      throw err;
+    try {
+      const response = await this.client.post('/report-engine/generate-pdf', data, { responseType: 'arraybuffer' });
+      return await extractPdfBase64(response);
+    } catch (err) {
+      throw normalizeArrayBufferError(err);
     }
-    return blob;
   }
 
   async generateBulkReports(data: { type: string; classId?: string; termId?: string; templateId?: string; studentIds?: string[] }) {
@@ -2911,16 +2954,12 @@ class ApiService {
   }
 
   async downloadGeneratedReport(reportId: string) {
-    const response = await this.client.get(`/report-engine/download/${reportId}`, { responseType: 'blob' });
-    const blob = response.data as Blob;
-    if (blob.type === 'application/json') {
-      const text = await blob.text();
-      const parsed = JSON.parse(text);
-      const err = new Error(parsed.message || 'Report download failed');
-      (err as any).response = { data: parsed, status: parsed.statusCode || 500 };
-      throw err;
+    try {
+      const response = await this.client.get(`/report-engine/download/${reportId}`, { responseType: 'arraybuffer' });
+      return await extractPdfBase64(response);
+    } catch (err) {
+      throw normalizeArrayBufferError(err);
     }
-    return blob;
   }
 
   async deleteGeneratedReport(id: string) {

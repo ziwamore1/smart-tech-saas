@@ -394,18 +394,13 @@ export const ResultsManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
       return;
     }
     try {
-      const blob = await apiService.getReportCardPdf(studentId, selectedTermId) as Blob;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result as string;
-        const fileUri = FileSystem.documentDirectory + `${studentName.replace(/\s+/g, '_')}_Report_Card.pdf`;
-        await FileSystem.writeAsStringAsync(fileUri, base64.split(',')[1], { encoding: FileSystem.EncodingType.Base64 });
-        await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: `${studentName} Report Card` });
-      };
-      reader.readAsDataURL(blob);
+      const { base64 } = await apiService.getReportCardPdf(studentId, selectedTermId);
+      const fileUri = FileSystem.documentDirectory + `${studentName.replace(/\s+/g, '_')}_Report_Card.pdf`;
+      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+      await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: `${studentName} Report Card` });
     } catch (err: any) {
       if (err?.message !== 'User did not share') {
-        Alert.alert('Error', 'Failed to download report card. Ensure results are published.');
+        Alert.alert('Error', err?.response?.data?.message || err?.message || 'Failed to download report card. Ensure results are published.');
       }
     }
   };
@@ -416,18 +411,13 @@ export const ResultsManagementScreen: React.FC<Props> = ({ onToggleDrawer, onNav
       return;
     }
     try {
-      const blob = await apiService.getClassReportCardsPdf(selectedClassId, selectedTermId) as Blob;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result as string;
-        const fileUri = FileSystem.documentDirectory + `class-report-cards.pdf`;
-        await FileSystem.writeAsStringAsync(fileUri, base64.split(',')[1], { encoding: FileSystem.EncodingType.Base64 });
-        await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download Class Report Cards' });
-      };
-      reader.readAsDataURL(blob);
+      const { base64 } = await apiService.getClassReportCardsPdf(selectedClassId, selectedTermId);
+      const fileUri = FileSystem.documentDirectory + `class-report-cards.pdf`;
+      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+      await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download Class Report Cards' });
     } catch (err: any) {
       if (err?.message !== 'User did not share') {
-        Alert.alert('Error', 'Failed to download class report cards. Ensure results are published.');
+        Alert.alert('Error', err?.response?.data?.message || err?.message || 'Failed to download class report cards. Ensure results are published.');
       }
     }
   };
