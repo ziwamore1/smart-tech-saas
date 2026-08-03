@@ -144,6 +144,18 @@ export class ReportEngineService {
     }));
   }
 
+  async hasPublishedResults(studentId: string, termId: string, schoolId: string): Promise<boolean> {
+    const count = await this.prisma.computedResult.count({
+      where: {
+        studentId,
+        termId,
+        schoolId,
+        status: { in: ['PUBLISHED', 'LOCKED'] },
+      },
+    });
+    return count > 0;
+  }
+
   async validateGenerationRequest(request: ReportGenerationRequest): Promise<{
     valid: boolean;
     errors: string[];
@@ -535,45 +547,56 @@ export class ReportEngineService {
     const termId = request.termId!;
     const schoolId = request.schoolId;
 
-    // Check if there's a custom template with components
-    if (request.templateId) {
-      const template = await this.prisma.reportTemplate.findFirst({
-        where: { id: request.templateId, schoolId },
+    // Resolve template: explicit -> school default -> any template with components.
+    // This guarantees report cards always render with the school's professional
+    // Web Platform template rather than silently falling back to the basic
+    // curriculum pipeline.
+    let template = request.templateId
+      ? await this.prisma.reportTemplate.findFirst({
+          where: { id: request.templateId, schoolId },
+          include: { components: true },
+        })
+      : null;
+
+    if (!template) {
+      template = await this.prisma.reportTemplate.findFirst({
+        where: { schoolId, isDefault: true },
         include: { components: true },
       });
-
-      if (template && template.components && template.components.length > 0) {
-        // Use template builder rendering
-        const engineData = await this.reportCardEngine.generateReportCardData(
-          studentId, termId, schoolId,
-        );
-        const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
-        const html = await this.templateRenderer.renderPreview(schoolId, request.templateId, {
-          ...engineData,
-          schoolName: school?.name,
-          schoolLogo: school?.logoUrl || school?.logo,
-          subjects: engineData.subjectBreakdown?.map((s: any) => ({
-            subject: s.subjectName,
-            score: s.finalPercentage,
-            grade: s.finalGrade,
-            points: s.points,
-            remark: s.finalRemark,
-          })) || [],
-          summary: {
-            totalMarks: engineData.subjectBreakdown?.reduce((sum: number, s: any) => sum + (s.totalRawScore || 0), 0) || 0,
-            average: engineData.bestSubjectsAverage || 0,
-            totalPoints: engineData.totalPoints || 0,
-            positionInClass: engineData.termSummary?.classRank || 0,
-            totalStudents: engineData.termSummary?.classSize || 0,
-            bestSixTotal: engineData.totalPoints || 0,
-            eligibleForUniversity: 'YES',
-          },
-        });
-        return this.templateRenderer.renderPdfFromHtml(schoolId, request.templateId, html);
-      }
     }
 
-    // Default: use the curriculum report card pipeline
+    if (template && template.components && template.components.length > 0) {
+      // Use template builder rendering
+      request.templateId = template.id;
+      const engineData = await this.reportCardEngine.generateReportCardData(
+        studentId, termId, schoolId,
+      );
+      const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+      const html = await this.templateRenderer.renderPreview(schoolId, template.id, {
+        ...engineData,
+        schoolName: school?.name,
+        schoolLogo: school?.logoUrl || school?.logo,
+        subjects: engineData.subjectBreakdown?.map((s: any) => ({
+          subject: s.subjectName,
+          score: s.finalPercentage,
+          grade: s.finalGrade,
+          points: s.points,
+          remark: s.finalRemark,
+        })) || [],
+        summary: {
+          totalMarks: engineData.subjectBreakdown?.reduce((sum: number, s: any) => sum + (s.totalRawScore || 0), 0) || 0,
+          average: engineData.bestSubjectsAverage || 0,
+          totalPoints: engineData.totalPoints || 0,
+          positionInClass: engineData.termSummary?.classRank || 0,
+          totalStudents: engineData.termSummary?.classSize || 0,
+          bestSixTotal: engineData.totalPoints || 0,
+          eligibleForUniversity: 'YES',
+        },
+      });
+      return this.templateRenderer.renderPdfFromHtml(schoolId, template.id, html);
+    }
+
+    // Last resort: use the curriculum report card pipeline
     return this.reportCardService.generateCurriculumReportCardPdf(schoolId, studentId, termId);
   }
 

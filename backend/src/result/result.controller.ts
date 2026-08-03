@@ -22,6 +22,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { StudentSubjectService } from '../student-subject/student-subject.service';
+import { OwnershipService } from '../common/services/ownership.service';
 
 @Controller('results')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -32,6 +33,7 @@ export class ResultController {
     private readonly resultService: ResultService,
     private prisma: PrismaService,
     private studentSubjectService: StudentSubjectService,
+    private ownership: OwnershipService,
   ) {}
 
   @Get()
@@ -118,28 +120,45 @@ export class ResultController {
   }
 
   @Get('student/:studentId')
-  @Roles('Director', 'Teacher', 'Class Teacher')
-  findByStudent(
+  @Roles('Director', 'Teacher', 'Class Teacher', 'Parent', 'Student')
+  async findByStudent(
     @Param('studentId') studentId: string,
     @Query('termId') termId: string,
     @Req() req: any,
   ) {
-    return this.resultService.findByStudent(studentId, termId, req.user.schoolId);
+    const resolvedId = await this.ownership.resolveStudentId(req.user, studentId);
+    await this.ownership.assertCanViewStudent(req.user, resolvedId);
+    return this.resultService.findByStudent(resolvedId, termId, req.user.schoolId);
   }
 
   @Get(':studentId/:termId')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Teacher', 'Class Teacher', 'Parent', 'Student')
   async findByStudentAlt(
     @Param('studentId') studentId: string,
     @Param('termId') termId: string,
     @Req() req: any,
   ) {
+    const resolvedId = await this.ownership.resolveStudentId(req.user, studentId);
+    await this.ownership.assertCanViewStudent(req.user, resolvedId);
+
+    if (!termId) {
+      const currentYear = await this.prisma.academicYear.findFirst({
+        where: { schoolId: req.user.schoolId, isCurrent: true },
+      });
+      if (currentYear) {
+        const currentTerm = await this.prisma.term.findFirst({
+          where: { academicYearId: currentYear.id, isCurrent: true },
+        });
+        if (currentTerm) termId = currentTerm.id;
+      }
+    }
+
     let results = await this.prisma.computedResult.findMany({
       where: {
-        studentId,
+        studentId: resolvedId,
         termId,
         schoolId: req.user.schoolId,
-        status: 'PUBLISHED',
+        status: { in: ['PUBLISHED', 'LOCKED'] },
       },
       include: {
         subject: { select: { id: true, name: true, code: true } },
@@ -149,12 +168,12 @@ export class ResultController {
 
     if (results.length > 0) {
       const classId = results[0].classId;
-      const validSubjectIds = await this.studentSubjectService.getClassSubjectsForStudent(studentId, classId);
+      const validSubjectIds = await this.studentSubjectService.getClassSubjectsForStudent(resolvedId, classId);
       results = results.filter(r => validSubjectIds.includes(r.subjectId));
     }
 
     return {
-      studentId,
+      studentId: resolvedId,
       termId,
       results: results.map(r => ({
         id: r.id,

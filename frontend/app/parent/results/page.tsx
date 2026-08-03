@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { studentApi, termApi, resultApi } from '@/lib/api';
+import { studentApi, termApi, resultApi, reportEngineApi } from '@/lib/api';
 import { checkEczEligibility, scoreToEczGrade } from '@/lib/ecz-eligibility';
 
 export default function ParentResultsPage() {
   const [selectedChild, setSelectedChild] = useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const { data: childrenData } = useQuery({
     queryKey: ['my-children'],
@@ -56,6 +57,31 @@ export default function ParentResultsPage() {
     if (results.length === 0) return 0;
     const total = results.reduce((sum: number, r: any) => sum + r.score, 0);
     return (total / results.length).toFixed(1);
+  };
+
+  const downloadReportCard = async () => {
+    if (!selectedChild || !selectedTermId) return;
+    setDownloading(true);
+    try {
+      const res = await reportEngineApi.generatePdf({
+        type: 'REPORT_CARD',
+        studentId: selectedChild,
+        termId: selectedTermId,
+      });
+      const blob = res.data as Blob;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${selectedChildData?.firstName || 'Child'}_${selectedChildData?.lastName || ''}_Report_Card.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Failed to generate report card.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -165,9 +191,16 @@ export default function ParentResultsPage() {
                       {selectedChildData?.class?.name} - {terms.find((t: any) => t.id === selectedTermId)?.name}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex flex-col items-end gap-2">
                     <p className="text-sm text-gray-500">Average Score</p>
                     <p className="text-3xl font-bold text-blue-600">{calculateAverage()}%</p>
+                    <button
+                      onClick={downloadReportCard}
+                      disabled={downloading}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg"
+                    >
+                      {downloading ? 'Generating...' : '📄 Download Report Card (PDF)'}
+                    </button>
                   </div>
                 </div>
 

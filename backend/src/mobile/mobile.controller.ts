@@ -273,8 +273,8 @@ export class MobileController {
       status?: string;
     },
   ) {
-    const { id: userId, schoolId } = req.user;
-    return this.mobileService.createStudent(userId, schoolId, body);
+    const { id: userId, schoolId, roles } = req.user;
+    return this.mobileService.createStudent(userId, schoolId, body, roles);
   }
 
   @Get('staff')

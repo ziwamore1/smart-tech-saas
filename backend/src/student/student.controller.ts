@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Patch, Delete, Body, Param, Req, Query, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Post, Get, Put, Patch, Delete, Body, Param, Req, Query, UseGuards, UseInterceptors, UploadedFile, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StudentService } from './student.service';
 import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
@@ -65,6 +65,27 @@ export class StudentController {
   @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
   findByAdmissionNumber(@Param('admissionNumber') admissionNumber: string, @Req() req: any) {
     return this.service.findByAdmissionNumber(admissionNumber, req.user.schoolId);
+  }
+
+  @Get('me')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher', 'Parent', 'Student')
+  async findMe(@Req() req: any) {
+    const roles = (req.user.roles || []).map((r: string) => String(r).toUpperCase());
+    if (roles.includes('STUDENT')) {
+      return this.service.findByUserId(req.user.id);
+    }
+    if (roles.includes('PARENT')) {
+      const children = await this.service.findByParent('me', req.user.id);
+      if (children.length === 0) throw new NotFoundException('No children linked to your account');
+      return children[0];
+    }
+    throw new ForbiddenException('Access denied');
+  }
+
+  @Get('parent/:parentId')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher', 'Parent')
+  findByParent(@Param('parentId') parentId: string, @Req() req: any) {
+    return this.service.findByParent(parentId, req.user.id);
   }
 
   @Get(':id')

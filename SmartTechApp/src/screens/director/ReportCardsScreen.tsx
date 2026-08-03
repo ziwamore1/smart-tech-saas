@@ -222,6 +222,18 @@ export const ReportCardsScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate 
           }
         }
 
+        // Dedupe by id and sort by start date so the term selector is stable
+        const seen = new Set<string>();
+        termList = termList
+          .filter((t: any) => {
+            if (!t?.id || seen.has(t.id)) return false;
+            seen.add(t.id);
+            return true;
+          })
+          .sort((a: any, b: any) =>
+            String(a.startDate || '').localeCompare(String(b.startDate || '')),
+          );
+
         setTerms(termList);
         const currentTerm = termList.find((t: any) => t.isCurrent) || termList[0];
         if (currentTerm) {

@@ -556,6 +556,83 @@ export class StudentService {
     return { ...student, className: null, grade: null };
   }
 
+  async findByUserId(userId: string) {
+    const student = await this.prisma.student.findFirst({
+      where: { user: { id: userId } },
+      select: {
+        id: true, admissionNumber: true, studentUuid: true, status: true,
+        dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
+        gender: true, photoUrl: true, photoPublicId: true,
+        enrollments: {
+          include: { class: true, academicYear: true },
+          orderBy: { academicYear: { startDate: 'desc' } },
+        },
+        parents: { include: { parent: true } },
+        user: { select: { username: true, email: true } },
+      },
+    });
+    if (!student) throw new NotFoundException('No student profile linked to your account');
+    const latest = student.enrollments?.[0];
+    return {
+      ...student,
+      class: latest?.class || null,
+      classId: latest?.classId || null,
+      className: latest?.class?.name || null,
+      grade: null,
+    };
+  }
+
+  async findByParent(parentId: string, userId: string) {
+    let parent: { id: string } | null = null;
+    if (parentId === 'me') {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+      parent = user?.email
+        ? await this.prisma.parent.findFirst({
+            where: { email: user.email },
+            select: { id: true },
+          })
+        : null;
+    } else {
+      parent = await this.prisma.parent.findUnique({
+        where: { id: parentId },
+        select: { id: true },
+      });
+    }
+    if (!parent) throw new NotFoundException('Parent not found');
+
+    const links = await this.prisma.parentStudent.findMany({
+      where: { parentId: parent.id },
+      select: {
+        student: {
+          select: {
+            id: true, admissionNumber: true, studentUuid: true, status: true,
+            dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
+            gender: true, photoUrl: true, photoPublicId: true,
+            enrollments: {
+              include: { class: true, academicYear: true },
+              orderBy: { academicYear: { startDate: 'desc' } },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    return links.map((l) => {
+      const latest = l.student.enrollments?.[0];
+      return {
+        ...l.student,
+        class: latest?.class || null,
+        classId: latest?.classId || null,
+        className: latest?.class?.name || null,
+        grade: null,
+      };
+    });
+  }
+
   async findByAdmissionNumber(admissionNumber: string, schoolId: string) {
     const student = await this.prisma.student.findFirst({
       where: { admissionNumber, schoolId },
@@ -660,7 +737,7 @@ export class StudentService {
   async uploadPhoto(id: string, photoUrl: string, photoPublicId: string, schoolId: string): Promise<string | null> {
     const student = await this.prisma.student.findUnique({ where: { id }, select: {
       id: true, admissionNumber: true, studentUuid: true, status: true, schoolId: true,
-      firstName: true, lastName: true, gender: true, photoUrl: true,
+      firstName: true, lastName: true, gender: true, photoUrl: true, photoPublicId: true,
     }});
     if (!student) throw new NotFoundException('Student not found');
     if (student.schoolId !== schoolId) throw new ForbiddenException('Invalid student');

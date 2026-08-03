@@ -219,10 +219,7 @@ class ApiService {
   }
 
   async getReportCard(studentId: string, termId: string) {
-    const response = await this.client.get(`/report-card/${studentId}/${termId}/pdf`, {
-      responseType: 'blob',
-    });
-    return response.data;
+    return this.generateReportPdf({ type: 'REPORT_CARD', studentId, termId });
   }
 
   async getParentChildren() {
@@ -231,18 +228,13 @@ class ApiService {
   }
 
   async getParentChildResults(studentId: string, termId?: string) {
-    const params: any = { studentId };
-    if (termId) params.termId = termId;
-    const response = await this.client.get('/parent/results', { params });
+    const resolvedTermId = termId || '';
+    const response = await this.client.get(`/results/${studentId}/${resolvedTermId}`);
     return response.data;
   }
 
   async getParentReportCard(studentId: string, termId: string) {
-    const response = await this.client.get('/parent/report-card', {
-      params: { studentId, termId },
-      responseType: 'blob',
-    });
-    return response.data;
+    return this.generateReportPdf({ type: 'REPORT_CARD', studentId, termId });
   }
 
   async getTeacherClasses() {
@@ -2731,8 +2723,7 @@ class ApiService {
   }
 
   async getReportCardPdf(studentId: string, termId: string) {
-    const response = await this.client.get(`/report-card/${studentId}/${termId}/pdf`, { responseType: 'blob' });
-    return response.data;
+    return this.generateReportPdf({ type: 'REPORT_CARD', studentId, termId });
   }
 
   async getTranscriptPdf(studentId: string) {

@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { resultApi, termApi, studentApi } from '@/lib/api';
+import { resultApi, termApi, studentApi, reportEngineApi } from '@/lib/api';
 import Link from 'next/link';
 import { checkEczEligibility, scoreToEczGrade } from '@/lib/ecz-eligibility';
 
 export default function StudentResultsPage() {
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const { data: studentData } = useQuery({
     queryKey: ['my-profile'],
@@ -77,6 +78,31 @@ export default function StudentResultsPage() {
 
   const getPosition = () => {
     return results[0]?.classRank || null;
+  };
+
+  const downloadReportCard = async () => {
+    if (!selectedTermId) return;
+    setDownloading(true);
+    try {
+      const res = await reportEngineApi.generatePdf({
+        type: 'REPORT_CARD',
+        studentId: 'me',
+        termId: selectedTermId,
+      });
+      const blob = res.data as Blob;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Report_Card_${selectedTerm?.name?.replace(/\s+/g, '_') || 'Current_Term'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Failed to generate report card.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -173,15 +199,24 @@ export default function StudentResultsPage() {
                       <h2 className="text-2xl font-bold text-gray-900">{selectedTerm?.name}</h2>
                       <p className="text-gray-500">{student?.class?.name} - {new Date().getFullYear()}</p>
                     </div>
-                    {selectedTerm?.resultsLocked ? (
-                      <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                        Published
-                      </span>
-                    ) : (
-                      <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-medium">
-                        Draft
-                      </span>
-                    )}
+                    <div className="flex flex-col items-end gap-2">
+                      {selectedTerm?.resultsLocked ? (
+                        <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                          Published
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-medium">
+                          Draft
+                        </span>
+                      )}
+                      <button
+                        onClick={downloadReportCard}
+                        disabled={downloading}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg"
+                      >
+                        {downloading ? 'Generating...' : '📄 Download Report Card (PDF)'}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

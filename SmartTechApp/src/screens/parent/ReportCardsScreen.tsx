@@ -37,18 +37,32 @@ export const ParentReportCardsScreen: React.FC = () => {
   const loadTerms = async () => {
     try {
       let termList: any[] = [];
-      const yearData = await apiService.getAcademicYears();
-      const years = Array.isArray(yearData) ? yearData : yearData?.data || yearData?.data?.data || [];
-      const currentYear = years.find((y: any) => y.isCurrent) || years[0];
-      if (currentYear) {
-        const termData = await apiService.getTerms(currentYear.id);
-        termList = Array.isArray(termData) ? termData : termData?.data || termData?.data?.data || [];
+      try {
+        const allTermData = await apiService.getAllTerms();
+        termList = Array.isArray(allTermData) ? allTermData : allTermData?.data || allTermData?.data?.data || [];
+      } catch (err) {
+        console.warn('Failed to load all terms:', err);
       }
       if (termList.length === 0 && dashboard?.currentTerm) {
         termList = [dashboard.currentTerm];
       }
+
+      const seen = new Set<string>();
+      termList = termList
+        .filter((t: any) => {
+          if (!t?.id || seen.has(t.id)) return false;
+          seen.add(t.id);
+          return true;
+        })
+        .sort((a: any, b: any) =>
+          String(a.startDate || '').localeCompare(String(b.startDate || '')),
+        );
+
       setTerms(termList);
-      const currentTerm = termList.find((t: any) => t.isCurrent) || termList[0] || dashboard?.currentTerm;
+      const currentTerm = termList.find((t: any) => t.isCurrent)
+        || (dashboard?.currentTerm?.id
+          ? termList.find((t: any) => t.id === dashboard?.currentTerm?.id)
+          : undefined);
       if (currentTerm && !selectedTermId) {
         setSelectedTermId(currentTerm.id);
       }

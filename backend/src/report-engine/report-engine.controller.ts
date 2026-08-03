@@ -4,12 +4,16 @@ import { ReportEngineService, ReportType, ReportGenerationRequest } from './repo
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { OwnershipService } from '../common/services/ownership.service';
 
 @Controller('report-engine')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ReportEngineController {
   private readonly logger = new Logger(ReportEngineController.name);
-  constructor(private readonly reportEngine: ReportEngineService) {}
+  constructor(
+    private readonly reportEngine: ReportEngineService,
+    private readonly ownership: OwnershipService,
+  ) {}
 
   @Get('types')
   @Roles('Director', 'Class Teacher', 'Teacher')
@@ -89,7 +93,7 @@ export class ReportEngineController {
   }
 
   @Post('generate-pdf')
-  @Roles('Director', 'Class Teacher')
+  @Roles('Director', 'Class Teacher', 'Parent', 'Student')
   async generateAndDownloadPdf(
     @Req() req,
     @Body() body: {
@@ -103,6 +107,54 @@ export class ReportEngineController {
     @Res() res: ExpressResponse,
   ) {
     try {
+      const roles = (req.user.roles || []).map((r: string) => String(r).toUpperCase());
+      const isStaff = roles.some(r =>
+        ['DIRECTOR', 'DEPUTY DIRECTOR', 'HEAD TEACHER', 'DEPUTY HEAD', 'DEPUTY', 'HOD', 'TEACHER', 'CLASS TEACHER'].includes(r),
+      );
+      if (!isStaff) {
+        if (body.type !== ReportType.REPORT_CARD && body.type !== ReportType.PERFORMANCE_REPORT) {
+          res.status(403).json({
+            statusCode: 403,
+            timestamp: new Date().toISOString(),
+            message: 'Parents and students can only download report cards',
+          });
+          return;
+        }
+        if (!body.studentId) {
+          res.status(400).json({
+            statusCode: 400,
+            timestamp: new Date().toISOString(),
+            message: 'studentId is required',
+          });
+          return;
+        }
+        body.studentId = await this.ownership.resolveStudentId(req.user, body.studentId);
+        await this.ownership.assertCanViewStudent(req.user, body.studentId);
+
+        if (!body.termId) {
+          res.status(400).json({
+            statusCode: 400,
+            timestamp: new Date().toISOString(),
+            message: 'termId is required',
+          });
+          return;
+        }
+
+        const published = await this.reportEngine.hasPublishedResults(
+          body.studentId,
+          body.termId,
+          req.user.schoolId,
+        );
+        if (!published) {
+          res.status(404).json({
+            statusCode: 404,
+            timestamp: new Date().toISOString(),
+            message: 'Results for this term are not published yet',
+          });
+          return;
+        }
+      }
+
       const report = await this.reportEngine.generateReport({
         ...body,
         schoolId: req.user.schoolId,

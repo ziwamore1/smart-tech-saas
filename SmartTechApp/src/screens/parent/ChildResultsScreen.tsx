@@ -20,13 +20,47 @@ export const ParentChildResultsScreen: React.FC = () => {
   const childId = route.params?.childId || dashboard?.children?.[0]?.id;
   const childName = route.params?.childName || dashboard?.children?.[0]?.name;
   const [results, setResults] = useState<any[]>([]);
+  const [terms, setTerms] = useState<any[]>([]);
+  const [selectedTermId, setSelectedTermId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  useEffect(() => {
+    const loadTerms = async () => {
+      let termList: any[] = [];
+      try {
+        const data = await apiService.getAllTerms();
+        termList = Array.isArray(data) ? data : data?.data || data?.data?.data || [];
+      } catch (err) {
+        console.warn('Failed to load all terms:', err);
+      }
+      if (termList.length === 0 && dashboard?.currentTerm) {
+        termList = [dashboard.currentTerm];
+      }
+      const seen = new Set<string>();
+      termList = termList
+        .filter((t: any) => {
+          if (!t?.id || seen.has(t.id)) return false;
+          seen.add(t.id);
+          return true;
+        })
+        .sort((a: any, b: any) =>
+          String(a.startDate || '').localeCompare(String(b.startDate || '')),
+        );
+      setTerms(termList);
+      const currentTerm = termList.find((t: any) => t.isCurrent)
+        || (dashboard?.currentTerm?.id
+          ? termList.find((t: any) => t.id === dashboard?.currentTerm?.id)
+          : undefined);
+      setSelectedTermId(currentTerm?.id || termList[0]?.id || dashboard?.currentTerm?.id || '');
+    };
+    loadTerms();
+  }, [dashboard?.currentTerm?.id]);
+
   const loadResults = useCallback(async (isRefresh = false) => {
     try {
-      const termId = dashboard?.currentTerm?.id;
+      const termId = selectedTermId || dashboard?.currentTerm?.id;
       if (termId) {
         const res = await apiService.getParentChildResults(childId, termId);
         const data = res?.data || res;
@@ -62,7 +96,7 @@ export const ParentChildResultsScreen: React.FC = () => {
       }
     } catch (err) { console.error('Failed to load results:', err); }
     finally { setLoading(false); setRefreshing(false); }
-  }, [childId, user?.schoolId, dashboard?.currentTerm?.id]);
+  }, [childId, selectedTermId, user?.schoolId, dashboard?.currentTerm?.id]);
 
   useEffect(() => {
     if (childId) loadResults();
@@ -86,11 +120,11 @@ export const ParentChildResultsScreen: React.FC = () => {
         socketService.leaveSchool(user.schoolId);
       }
     };
-  }, [childId]);
+  }, [childId, loadResults]);
 
   const generateResultsContent = (): string => {
     const date = new Date().toLocaleDateString();
-    const term = dashboard?.currentTerm?.name || 'Current Term';
+    const term = terms.find((t: any) => t.id === selectedTermId)?.name || dashboard?.currentTerm?.name || 'Current Term';
     const school = dashboard?.school?.name || 'SmartTech School';
     let content = `${school} - Results Report\nChild: ${childName || 'Student'}\nTerm: ${term}\nGenerated: ${date}\n${'='.repeat(40)}\n\n`;
 
@@ -112,7 +146,7 @@ export const ParentChildResultsScreen: React.FC = () => {
 
   const generateHtmlReport = (): string => {
     const date = new Date().toLocaleDateString();
-    const term = dashboard?.currentTerm?.name || 'Current Term';
+    const term = terms.find((t: any) => t.id === selectedTermId)?.name || dashboard?.currentTerm?.name || 'Current Term';
     const school = dashboard?.school?.name || 'SmartTech School';
     const avg = results.length > 0
       ? (results.reduce((sum: number, r: any) => sum + (r.score || 0), 0) / results.length).toFixed(1)
@@ -160,7 +194,7 @@ export const ParentChildResultsScreen: React.FC = () => {
     }
     try {
       setActionLoading(true);
-      const termId = dashboard?.currentTerm?.id;
+      const termId = selectedTermId || dashboard?.currentTerm?.id;
       if (!termId || !childId) {
         Alert.alert('Error', 'Missing term or student information');
         return;
@@ -214,11 +248,13 @@ export const ParentChildResultsScreen: React.FC = () => {
 
   if (loading) return <Loading fullScreen />;
 
+  const selectedTermName = terms.find((t: any) => t.id === selectedTermId)?.name || dashboard?.currentTerm?.name;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{childName || 'Child'}'s Results</Text>
-        <Text style={styles.headerSub}>{dashboard?.currentTerm?.name}</Text>
+        <Text style={styles.headerSub}>{selectedTermName}</Text>
         {results.length > 0 && (
           <View style={styles.actions}>
             <TouchableOpacity style={styles.actionBtn} onPress={handleShareResults} disabled={actionLoading}>
@@ -233,6 +269,21 @@ export const ParentChildResultsScreen: React.FC = () => {
           </View>
         )}
       </View>
+      {terms.length > 1 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.termScroll} contentContainerStyle={styles.termContent}>
+          {terms.map((term: any) => (
+            <TouchableOpacity
+              key={term.id}
+              style={[styles.termChip, selectedTermId === term.id && styles.termChipActive]}
+              onPress={() => { setSelectedTermId(term.id); setResults([]); setLoading(true); }}
+            >
+              <Text style={[styles.termChipText, selectedTermId === term.id && styles.termChipTextActive]}>
+                {term.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
@@ -273,6 +324,12 @@ const styles = StyleSheet.create({
   actionBtnText: { color: colors.white, fontSize: 13, fontWeight: '600' },
   actionBtnTextSecondary: { color: colors.white, fontSize: 13, fontWeight: '600' },
   actionBtnTextOutline: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  termScroll: { maxHeight: 48, marginTop: spacing.sm },
+  termContent: { paddingHorizontal: spacing.md, gap: spacing.sm },
+  termChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.full, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
+  termChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  termChipText: { fontSize: 13, fontWeight: '600', color: colors.text },
+  termChipTextActive: { color: colors.white },
   scrollContent: { padding: spacing.md, gap: spacing.sm },
   resultCard: { padding: spacing.md },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

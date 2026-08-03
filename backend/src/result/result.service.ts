@@ -130,20 +130,38 @@ export class ResultService {
   }
 
   async findByStudent(studentId: string, termId: string, schoolId: string) {
-    return this.prisma.result.findMany({
+    const results = await this.prisma.computedResult.findMany({
       where: {
         studentId,
         termId,
         schoolId,
+        status: { in: ['PUBLISHED', 'LOCKED'] },
         student: { status: 'ACTIVE' },
       },
       include: {
-        student: true,
-        subject: true,
-        term: true,
+        subject: { select: { id: true, name: true, code: true } },
       },
       orderBy: { subject: { name: 'asc' } },
     });
+
+    return results.map(r => ({
+      id: r.id,
+      studentId: r.studentId,
+      subjectId: r.subjectId,
+      subject: { id: r.subject.id, name: r.subject.name, code: r.subject.code },
+      score: r.finalPercentage,
+      finalPercentage: r.finalPercentage,
+      totalRawScore: r.totalRawScore,
+      totalWeightedScore: r.totalWeightedScore,
+      grade: r.finalGrade,
+      remark: r.finalRemark,
+      points: r.points,
+      gradePoints: r.points,
+      gpa: r.gpa,
+      classRank: r.classRank,
+      subjectRank: r.subjectRank,
+      isAbsent: r.isAbsent,
+    }));
   }
 
   async create(

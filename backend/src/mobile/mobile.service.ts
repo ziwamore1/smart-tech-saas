@@ -875,8 +875,8 @@ export class MobileService {
   async getAcademicYears(schoolId: string) {
     return this.prisma.academicYear.findMany({
       where: { schoolId },
-      orderBy: { year: 'desc' },
-      select: { id: true, name: true, year: true, startDate: true, endDate: true, isCurrent: true },
+      orderBy: { startDate: 'desc' },
+      select: { id: true, name: true, startDate: true, endDate: true, isCurrent: true },
     });
   }
 
@@ -981,7 +981,7 @@ export class MobileService {
       select: { id: true },
     }))?.id;
     if (!yearId) return { admissionNumber: null };
-    return this.admissionNumberService.previewNextAdmission(schoolId, yearId, classId);
+    return this.admissionNumberService.previewNextAdmissionNumber(schoolId, yearId, classId);
   }
 
   async createStudent(
@@ -1004,10 +1004,11 @@ export class MobileService {
       manualOverride?: boolean;
       status?: string;
     },
+    roles?: string[],
   ) {
     const createDto = new CreateStudentDto();
     Object.assign(createDto, dto);
-    return this.studentService.create(createDto, userId, schoolId);
+    return this.studentService.create(createDto, schoolId, userId, roles || []);
   }
 
   async getStaff(schoolId: string) {
