@@ -405,6 +405,7 @@ ${parts.join('\n')}
     const cy = s / 2;
     const r = s / 2 - 3;
     const innerR = r - 18;
+    const outerTextR = r - 7;
     const isGold = color === '#b8860b' || color === '#ffd700' || color === '#c0a030';
 
     const goldDefs = isGold ? `
@@ -429,7 +430,7 @@ ${parts.join('\n')}
     return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     ${goldDefs}
-    <path id="sealTopArc" d="M ${cx - innerR + 4},${cy} A ${innerR - 4},${innerR - 4} 0 0,1 ${cx + innerR - 4},${cy}" fill="none"/>
+     <path id="sealTopArc" d="M ${cx - outerTextR + 4},${cy} A ${outerTextR - 4},${outerTextR - 4} 0 0,1 ${cx + outerTextR - 4},${cy}" fill="none"/>
     <path id="sealBottomArc" d="M ${cx - innerR + 8},${cy} A ${innerR - 8},${innerR - 8} 0 0,0 ${cx + innerR - 8},${cy}" fill="none"/>
   </defs>
   <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${strokeColor}" stroke-width="3"/>
@@ -547,15 +548,15 @@ ${parts.join('\n')}
     }
     .cert-inner {
       position: relative;
-      width: 88%; max-width: 700px;
-      min-height: ${isLandscape ? '460px' : '660px'};
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; padding: 36px 40px; z-index: 1;
+       width: 84%; max-width: 660px;
+       min-height: ${isLandscape ? '460px' : '660px'};
+       display: flex; flex-direction: column; align-items: center;
+       justify-content: center; padding: 44px 58px 88px; z-index: 1;
     }
     .border-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
     .border-layer svg { width: 100%; height: 100%; }
-     .seal-area { position: absolute; bottom: 34px; right: 34px; opacity: 1; z-index: 0; pointer-events: none; }
-     .seal-area svg { width: 150px; height: 150px; }
+     .seal-area { position: absolute; bottom: 22px; right: 22px; opacity: 1; z-index: 0; pointer-events: none; }
+     .seal-area svg { width: 128px; height: 128px; }
     .ribbon-area { margin: 6px 0; z-index: 1; }
     .watermark-text {
       position: absolute; top: 50%; left: 50%;
@@ -635,8 +636,8 @@ ${parts.join('\n')}
       .cert-page { margin: 0; padding: 0; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
-    @media screen and (max-width: 600px) {
-      .cert-inner { padding: 20px; width: 95%; }
+     @media screen and (max-width: 600px) {
+       .cert-inner { padding: 28px 24px 80px; width: 92%; }
       .student-name { font-size: 26px; }
       .signatures { flex-direction: column; align-items: center; gap: 16px; }
     }
