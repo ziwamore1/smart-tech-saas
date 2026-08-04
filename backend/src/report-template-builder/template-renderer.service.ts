@@ -877,7 +877,8 @@ export class TemplateRendererService {
           className: defaultData.class.name,
           termName: defaultData.term.name,
           academicYear: defaultData.term.academicYear,
-          certificateNumber: 'XXXXXXXX',
+           certificateNumber: 'XXXXXXXX',
+           certificateComment: defaultData.certificateComment || defaultData.teacherComment || '',
           verificationUrl: '',
           schoolLogo: school?.logoUrl || school?.logo || '',
           studentPhoto: defaultData.student.photoUrl || '',
@@ -895,7 +896,7 @@ export class TemplateRendererService {
           watermarkText: cert.watermarkText || 'CERTIFICATE',
           orientation: template.orientation || 'portrait',
           pageSize: template.pageSize || 'A4',
-          stamps: templateStamps,
+           stamps: templateStamps,
         });
       } catch {
         mainContent = this.renderCertificateHtml(template, defaultData, school);
@@ -978,14 +979,15 @@ export class TemplateRendererService {
     return `<div style="position:relative;width:100%;min-height:${isLandscape ? '190' : '260'}mm;padding:30px;border:${borderCss};display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:white;">
       ${cert.showWatermark && cert.watermarkText ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)rotate(-30deg);font-size:80px;color:${borderColor};opacity:0.04;pointer-events:none;white-space:nowrap;font-weight:bold;">${cert.watermarkText}</div>` : ''}
       ${school?.logoUrl ? `<img src="${school.logoUrl}" style="height:60px;margin-bottom:10px;" />` : ''}
-      <div style="font-size:28px;font-weight:bold;color:${borderColor};margin-bottom:5px;">${school?.name || 'School Name'}</div>
-      <div style="font-size:9px;color:#999;margin-bottom:10px;text-transform:uppercase;letter-spacing:3px;">${cert.borderStyle === 'university' ? 'Official University Document' : 'Official Academic Document'}</div>
+       <div style="font-size:34px;font-weight:800;color:${borderColor};margin-bottom:7px;">${school?.name || 'School Name'}</div>
+       <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:10px;text-transform:uppercase;letter-spacing:3px;">${cert.borderStyle === 'university' ? 'Official University Document' : 'Official Academic Document'}</div>
       <hr style="width:160px;border:none;height:1px;background:linear-gradient(90deg,transparent,${borderColor},transparent);margin:10px auto;opacity:0.6;" />
-      <div style="font-size:9px;color:#999;margin-bottom:6px;text-transform:uppercase;letter-spacing:5px;">${cert.certificateType === 'SPORTS_AWARD' ? 'Certificate of Athletic Achievement' : cert.certificateType === 'ATTENDANCE' ? 'Certificate of Attendance' : cert.certificateType === 'MERIT_AWARD' ? 'Certificate of Merit' : cert.certificateType === 'GRADUATION' ? 'Diploma of Graduation' : 'Certificate of Achievement'}</div>
-      <div style="font-size:13px;color:#666;margin:6px 0;font-style:italic;">${cert.awardText || 'This certificate is awarded to'}</div>
-      <div style="font-size:32px;font-weight:bold;color:${borderColor};margin:6px 0;font-family:'Georgia',serif;">${studentName}</div>
-      <div style="font-size:11px;color:#777;margin:3px 0;line-height:1.6;">${cert.certificateType === 'SPORTS_AWARD' ? 'In recognition of outstanding athletic achievement and sportsmanship' : cert.certificateType === 'ATTENDANCE' ? 'In recognition of exemplary attendance and punctuality' : cert.certificateType === 'MERIT_AWARD' ? 'In recognition of outstanding merit, dedication, and service' : cert.certificateType === 'GRADUATION' ? 'In recognition of successful completion of academic requirements' : 'In recognition of outstanding academic performance and demonstrated excellence'}</div>
-      <div style="font-size:11px;color:#777;margin:5px 0;">Class: ${data?.class?.name || ''} | Term: ${data?.term?.name || ''} ${data?.term?.academicYear || ''}</div>
+       <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:7px;text-transform:uppercase;letter-spacing:5px;">${cert.certificateType === 'SPORTS_AWARD' ? 'Certificate of Athletic Achievement' : cert.certificateType === 'ATTENDANCE' ? 'Certificate of Attendance' : cert.certificateType === 'MERIT_AWARD' ? 'Certificate of Merit' : cert.certificateType === 'GRADUATION' ? 'Diploma of Graduation' : 'Certificate of Academic Excellence'}</div>
+       <div style="font-size:17px;font-weight:600;color:#111827;margin:8px 0;font-style:italic;">${cert.awardText || 'This certificate is awarded to'}</div>
+       <div style="font-size:40px;font-weight:800;color:${borderColor};margin:8px 0;font-family:'Georgia',serif;">${studentName}</div>
+       <div style="font-size:14px;font-weight:600;color:#1f2937;margin:5px 0;line-height:1.6;">${cert.certificateType === 'SPORTS_AWARD' ? 'In recognition of outstanding athletic achievement and sportsmanship' : cert.certificateType === 'ATTENDANCE' ? 'In recognition of exemplary attendance and punctuality' : cert.certificateType === 'MERIT_AWARD' ? 'In recognition of outstanding merit, dedication, and service' : cert.certificateType === 'GRADUATION' ? 'In recognition of successful completion of academic requirements' : 'In recognition of outstanding academic performance and demonstrated excellence'}</div>
+       <div style="font-size:13px;font-weight:600;color:#374151;margin:6px 0;">Class: ${data?.class?.name || ''} | Term: ${data?.term?.name || ''} ${data?.term?.academicYear || ''}</div>
+       ${data?.certificateComment ? `<div style="max-width:620px;margin:12px auto 5px;padding:10px 18px;border-left:4px solid #0f766e;border-right:4px solid #0f766e;background:#f0fdfa;color:#134e4a;font-size:13px;font-weight:600;line-height:1.5;">${this.escapeHtml(String(data.certificateComment))}</div>` : ''}
       ${cert.showBadge ? `<div style="margin:15px 0;">
         <svg width="50" height="50" viewBox="0 0 50 50"><polygon points="25,3 31,18 47,19 35,30 38,47 25,38 12,47 15,30 3,19 19,18" fill="#f59e0b"/></svg>
       </div>` : ''}
@@ -1000,8 +1002,18 @@ export class TemplateRendererService {
           ${cert.signature2Label || 'Director'}<br/>${cert.signature2Name || ''}
         </div>
       </div>
-      <div style="font-size:9px;color:#999;margin-top:15px;">Certificate No: ${data?.certificateNumber || 'XXXXXXXX'}</div>
+       <div style="font-size:16px;color:#0f766e;font-weight:900;margin-top:16px;letter-spacing:2px;font-family:'Courier New',monospace;">Certificate No: ${data?.certificateNumber || 'XXXXXXXX'}</div>
     </div>`;
+  }
+
+  private escapeHtml(value: string): string {
+    return value.replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    })[character] || character);
   }
 
   async renderPdf(schoolId: string, templateId: string, data?: any): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {

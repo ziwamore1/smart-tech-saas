@@ -488,6 +488,7 @@ ${parts.join('\n')}
       verificationUrl?: string;
       schoolLogo?: string;
       studentPhoto?: string;
+      certificateComment?: string;
       signature1Name?: string;
       signature1Label?: string;
       signature2Name?: string;
@@ -515,10 +516,11 @@ ${parts.join('\n')}
     }
 
     const stampOverlay = data.stamps ? this.generateStampOverlayHtml(data.stamps) : '';
+    const certificateComment = this.escapeHtml(data.certificateComment || '');
 
     const borderSvg = this.generateBorderSvg(760, isLandscape ? 520 : 760, data.borderStyle, data.borderColor);
     const badgeSvg = data.showBadge ? this.generateBadgeSvg(data.badgeStyle, data.borderColor) : '';
-    const sealSvg = this.generateSealSvg(data.borderColor);
+    const sealSvg = this.generateSealSvg('#0f766e', 'SMART TECH');
     const ribbonSvg = this.generateRibbonSvg(data.borderColor);
 
     return `<!DOCTYPE html>
@@ -550,8 +552,8 @@ ${parts.join('\n')}
     }
     .border-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
     .border-layer svg { width: 100%; height: 100%; }
-    .seal-area { position: absolute; bottom: 40px; right: 40px; opacity: 0.15; z-index: 0; pointer-events: none; }
-    .seal-area svg { width: 100px; height: 100px; }
+     .seal-area { position: absolute; bottom: 34px; right: 34px; opacity: 0.92; z-index: 0; pointer-events: none; }
+     .seal-area svg { width: 150px; height: 150px; }
     .ribbon-area { margin: 6px 0; z-index: 1; }
     .watermark-text {
       position: absolute; top: 50%; left: 50%;
@@ -564,7 +566,7 @@ ${parts.join('\n')}
     .logo-area { margin-bottom: 6px; z-index: 1; }
     .logo-area img { height: 65px; width: auto; object-fit: contain; }
     .school-name {
-      font-size: 22px; font-weight: bold;
+       font-size: 30px; font-weight: 800;
       color: ${data.borderColor}; margin-bottom: 2px;
       z-index: 1; text-align: center;
       letter-spacing: 1px;
@@ -574,7 +576,7 @@ ${parts.join('\n')}
       letter-spacing: 3px; margin-bottom: 10px; z-index: 1;
     }
     .cert-title {
-      font-size: 10px; color: #999;
+       font-size: 13px; color: #374151; font-weight: 700;
       text-transform: uppercase; letter-spacing: 5px;
       margin-bottom: 6px; z-index: 1;
     }
@@ -584,17 +586,18 @@ ${parts.join('\n')}
       margin: 10px auto; opacity: 0.6; z-index: 1;
     }
     .award-text {
-      font-size: 13px; color: #666; margin: 6px 0;
+       font-size: 17px; color: #111827; font-weight: 600; margin: 7px 0;
       z-index: 1; text-align: center; font-style: italic;
     }
     .student-name {
-      font-size: 36px; font-weight: bold;
+       font-size: 42px; font-weight: 800;
       color: ${data.borderColor}; margin: 8px 0;
       font-family: 'Georgia', 'Palatino Linotype', serif;
       z-index: 1; text-align: center;
       letter-spacing: 1px;
     }
-    .detail-text { font-size: 12px; color: #777; margin: 3px 0; z-index: 1; text-align: center; line-height: 1.6; }
+     .detail-text { font-size: 14px; color: #1f2937; font-weight: 600; margin: 4px 0; z-index: 1; text-align: center; line-height: 1.6; }
+     .comment-box { max-width: 620px; margin: 10px auto 4px; padding: 10px 18px; border-left: 4px solid #0f766e; border-right: 4px solid #0f766e; background: #f0fdfa; color: #134e4a; font-size: 13px; font-weight: 600; line-height: 1.5; z-index: 1; text-align: center; }
     .badge-area { margin: 10px 0; z-index: 1; }
     .badge-area svg { width: 55px; height: 55px; }
     .photo-area { margin: 6px 0; z-index: 1; }
@@ -618,7 +621,7 @@ ${parts.join('\n')}
     .sig-name { font-size: 11px; color: #333; font-weight: bold; }
     .sig-title { font-size: 8px; color: #aaa; font-style: italic; }
     .cert-number {
-      font-size: 8px; color: #bbb; margin-top: 14px;
+       font-size: 16px; color: #0f766e; font-weight: 900; margin-top: 16px;
       z-index: 1; font-family: 'Courier New', monospace;
       letter-spacing: 1px;
     }
@@ -653,8 +656,9 @@ ${parts.join('\n')}
       <div class="award-text"><em>${data.awardText || 'This certificate is proudly awarded to'}</em></div>
       <div class="student-name">${data.studentName}</div>
       ${data.studentPhoto ? `<div class="photo-area"><img src="${data.studentPhoto}" alt="Student"/></div>` : ''}
-      <div class="detail-text">In recognition of outstanding academic performance and demonstrated excellence</div>
-      <div class="detail-text">${data.className ? `Class: ${data.className}` : ''}${data.className && data.termName ? ' &middot; ' : ''}${data.termName} ${data.academicYear}</div>
+       <div class="detail-text">In recognition of outstanding academic performance and demonstrated excellence</div>
+       <div class="detail-text">${data.className ? `Class: ${data.className}` : ''}${data.className && data.termName ? ' &middot; ' : ''}${data.termName} ${data.academicYear}</div>
+       ${certificateComment ? `<div class="comment-box">${certificateComment}</div>` : ''}
       ${badgeSvg ? `<div class="badge-area">${badgeSvg}</div>` : ''}
       <div class="signatures">
         <div class="sig-box">
@@ -678,5 +682,15 @@ ${parts.join('\n')}
   </div>
 </body>
 </html>`;
+  }
+
+  private escapeHtml(value: string): string {
+    return value.replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    })[character] || character);
   }
 }

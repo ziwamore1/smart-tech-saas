@@ -8,6 +8,9 @@ import { RankingService } from '../ranking-service/ranking.service';
 import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
+import { CertificateTemplateService } from '../report-template-builder/certificate-template.service';
+import { CertificateCommentService } from '../report-template-builder/certificate-comment.service';
+import * as crypto from 'crypto';
 
 export enum ReportType {
   REPORT_CARD = 'REPORT_CARD',
@@ -134,6 +137,8 @@ export class ReportEngineService {
     private rankingService: RankingService,
     private gradingEngine: GradingEngineService,
     private cloudinary: CloudinaryService,
+    private certificateTemplateService: CertificateTemplateService,
+    private certificateCommentService: CertificateCommentService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
   ) {}
 
@@ -813,6 +818,30 @@ export class ReportEngineService {
       );
     }
 
+    const performance = request.termId
+      ? await this.reportCardEngine.generateReportCardData(request.studentId!, request.termId, request.schoolId)
+      : null;
+    const cert = template.certificate;
+    const certificateNumber = cert.autoNumbering
+      ? await this.certificateTemplateService.issueCertificateNumber(request.schoolId, template.id)
+      : `ST-${new Date().getFullYear()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const summary = performance?.termSummary || {};
+    const certificateComment = await this.certificateCommentService.generate({
+      certificateType: cert.certificateType,
+      awardText: cert.awardText,
+      studentName: `${student?.firstName || ''} ${student?.lastName || ''}`.trim(),
+      termName: performance?.term?.name,
+      average: summary.overallPercentage,
+      classRank: summary.classRank,
+      classSize: summary.classSize,
+      attendanceRate: performance?.attendance?.attendanceRate,
+      subjects: (performance?.subjectBreakdown || []).map((subject: any) => ({
+        name: subject.subjectName,
+        score: subject.finalPercentage,
+        grade: subject.finalGrade,
+      })),
+    });
+
     const enrollment = await this.prisma.enrollment.findFirst({
       where: {
         studentId: request.studentId!,
@@ -834,8 +863,10 @@ export class ReportEngineService {
           photoUrl: student?.photoUrl,
         },
         class: { name: enrollment?.class?.name || '' },
-        term: { name: '', academicYear: enrollment?.academicYear?.name || '' },
-        certificateNumber: `CERT-${Date.now()}`,
+        term: { name: performance?.term?.name || '', academicYear: enrollment?.academicYear?.name || '' },
+        certificateNumber,
+        certificateComment,
+        teacherComment: certificateComment,
       },
     );
 

@@ -259,7 +259,7 @@ export class ReportTemplateBuilderController {
     const school = await this.rendererService.getSchool(req.user.schoolId);
     const cert = await this.certificateService.getCertificateSettings(req.user.schoolId, id);
 
-    const certNumber = await this.certificateService.getNextCertificateNumber(req.user.schoolId, id);
+    const certNumber = await this.certificateService.issueCertificateNumber(req.user.schoolId, id);
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const verificationUrl = await this.certificateRendererService.createVerificationUrl(baseUrl, certNumber || id);
 
