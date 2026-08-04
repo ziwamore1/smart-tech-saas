@@ -429,7 +429,7 @@ ${parts.join('\n')}
     return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     ${goldDefs}
-     <path id="sealTopArc" d="M 28,19 Q 60,4 92,19" fill="none"/>
+     <path id="sealTopArc" d="M 28,22 Q 60,9 92,22" fill="none"/>
      <path id="sealBottomArc" d="M ${cx - innerR + 8},${cy} A ${innerR - 8},${innerR - 8} 0 0,0 ${cx + innerR - 8},${cy}" fill="none"/>
   </defs>
   <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${strokeColor}" stroke-width="3"/>

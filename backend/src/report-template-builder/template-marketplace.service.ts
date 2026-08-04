@@ -6,6 +6,7 @@ export class TemplateMarketplaceService {
   constructor(private prisma: PrismaService) {}
 
   async getMarketplaceTemplates(filters?: { category?: string; featured?: boolean; search?: string }) {
+    await this.ensureSystemTemplatesPublished();
     const where: any = {};
     if (filters?.category) where.category = filters.category;
     if (filters?.featured) where.featured = true;
@@ -24,6 +25,35 @@ export class TemplateMarketplaceService {
       }),
       15000,
     );
+  }
+
+  private async ensureSystemTemplatesPublished(): Promise<void> {
+    const systemTemplates = await this.prisma.reportTemplate.findMany({
+      where: { schoolId: null, isDefault: true },
+      include: { category: { select: { slug: true } } },
+    });
+    if (systemTemplates.length === 0) return;
+
+    const published = await this.prisma.templateMarketplace.findMany({
+      where: { templateId: { in: systemTemplates.map((template) => template.id) } },
+      select: { templateId: true },
+    });
+    const publishedIds = new Set(published.map((item) => item.templateId));
+    const missing = systemTemplates.filter((template) => !publishedIds.has(template.id));
+    if (missing.length === 0) return;
+
+    await this.prisma.templateMarketplace.createMany({
+      data: missing.map((template) => ({
+        templateId: template.id,
+        schoolId: null,
+        title: template.name,
+        description: template.description || '',
+        category: template.category?.slug || 'Report Cards',
+        tags: [template.templateType],
+        featured: false,
+      })),
+      skipDuplicates: true,
+    });
   }
 
   async publishToMarketplace(schoolId: string, templateId: string, data: {
@@ -119,7 +149,18 @@ export class TemplateMarketplaceService {
   }
 
   async getCategories() {
-    return ['Report Cards', 'Certificates', 'Transcripts', 'Attendance', 'Progress Reports', 'Analytics', 'ID Cards', 'Letters', 'Other'];
+    await this.ensureSystemTemplatesPublished();
+    const rows = await this.prisma.templateMarketplace.findMany({
+      where: { category: { not: null } },
+      select: { category: true },
+      distinct: ['category'],
+      orderBy: { category: 'asc' },
+    });
+    return rows.map((row) => ({
+      id: row.category!,
+      slug: row.category!,
+      name: row.category!.replace(/[-_]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
+    }));
   }
 }
 
