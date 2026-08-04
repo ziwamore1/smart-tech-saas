@@ -83,6 +83,108 @@ export class HealthService {
     };
   }
 
+  /**
+   * Provisions system Marketplace templates into every school-owned library.
+   * Safe to run repeatedly; existing named Marketplace copies are skipped.
+   */
+  async backfillMarketplaceTemplates() {
+    const [schools, systemTemplates] = await Promise.all([
+      this.prisma.school.findMany({ select: { id: true } }),
+      this.prisma.reportTemplate.findMany({
+        where: { schoolId: null, isDefault: true },
+        include: { components: true, certificate: true },
+      }),
+    ]);
+
+    let created = 0;
+    let skipped = 0;
+    for (const school of schools) {
+      for (const source of systemTemplates) {
+        const name = `${source.name} (from Marketplace)`;
+        const existing = await this.prisma.reportTemplate.findFirst({
+          where: { schoolId: school.id, name },
+          select: { id: true },
+        });
+        if (existing) {
+          skipped++;
+          continue;
+        }
+
+        const copy = await this.prisma.reportTemplate.create({
+          data: {
+            name,
+            schoolId: school.id,
+            templateType: source.templateType,
+            pageSize: source.pageSize,
+            orientation: source.orientation,
+            fontFamily: source.fontFamily,
+            fontSize: source.fontSize,
+            primaryColor: source.primaryColor,
+            secondaryColor: source.secondaryColor,
+            layoutJson: source.layoutJson as any,
+            metadata: { ...(source.metadata as any || {}), source: 'marketplace-backfill', sourceTemplateId: source.id },
+            status: 'ACTIVE',
+            version: 1,
+          },
+        });
+
+        if (source.components.length > 0) {
+          await this.prisma.templateComponent.createMany({
+            data: source.components.map((component) => ({
+              templateId: copy.id,
+              type: component.type,
+              label: component.label,
+              content: component.content as any,
+              styles: component.styles as any,
+              position: component.position as any,
+              size: component.size as any,
+              settings: component.settings as any,
+              placeholder: component.placeholder,
+              isRequired: component.isRequired,
+              isLocked: component.isLocked,
+              sortOrder: component.sortOrder,
+            })),
+          });
+        }
+        if (source.certificate) {
+          await this.prisma.certificateTemplate.create({
+            data: {
+              templateId: copy.id,
+              certificateType: source.certificate.certificateType,
+              borderStyle: source.certificate.borderStyle,
+              borderColor: source.certificate.borderColor,
+              sealUrl: source.certificate.sealUrl,
+              showQrCode: source.certificate.showQrCode,
+              autoNumbering: source.certificate.autoNumbering,
+              showPhoto: source.certificate.showPhoto,
+              signature1Label: source.certificate.signature1Label,
+              signature1Name: source.certificate.signature1Name,
+              signature1Title: source.certificate.signature1Title,
+              signature2Label: source.certificate.signature2Label,
+              signature2Name: source.certificate.signature2Name,
+              signature2Title: source.certificate.signature2Title,
+              awardText: source.certificate.awardText,
+              showBadge: source.certificate.showBadge,
+              badgeStyle: source.certificate.badgeStyle,
+              showWatermark: source.certificate.showWatermark,
+              watermarkText: source.certificate.watermarkText,
+              layoutJson: source.certificate.layoutJson as any,
+            },
+          });
+        }
+        created++;
+      }
+    }
+
+    return {
+      status: 'completed',
+      schools: schools.length,
+      sourceTemplates: systemTemplates.length,
+      created,
+      skipped,
+    };
+  }
+
   private async checkClassIdBackfill(): Promise<HealthCheck> {
     try {
       const total = await this.prisma.student.count();

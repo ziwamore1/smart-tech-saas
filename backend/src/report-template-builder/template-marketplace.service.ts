@@ -93,7 +93,7 @@ export class TemplateMarketplaceService {
 
     const template = await this.prisma.reportTemplate.findUnique({
       where: { id: item.templateId },
-      select: { id: true, name: true, templateType: true, pageSize: true, orientation: true, fontFamily: true, fontSize: true, primaryColor: true, secondaryColor: true },
+      include: { certificate: true },
     });
     if (!template) throw new NotFoundException('Source template not found');
 
@@ -108,7 +108,8 @@ export class TemplateMarketplaceService {
         fontSize: template.fontSize || 12,
         primaryColor: template.primaryColor || '#1a365d',
         secondaryColor: template.secondaryColor || '#f5f5f5',
-        layoutJson: {},
+         layoutJson: {},
+         metadata: { source: 'marketplace-download', sourceTemplateId: template.id },
          status: 'ACTIVE',
         version: 1,
       },
@@ -133,6 +134,33 @@ export class TemplateMarketplaceService {
           sortOrder: c.sortOrder || 0,
           isRequired: c.isRequired || false,
         })),
+      });
+    }
+
+    if (template.certificate) {
+      await this.prisma.certificateTemplate.create({
+        data: {
+          templateId: copy.id,
+          certificateType: template.certificate.certificateType,
+          borderStyle: template.certificate.borderStyle,
+          borderColor: template.certificate.borderColor,
+          sealUrl: template.certificate.sealUrl,
+          showQrCode: template.certificate.showQrCode,
+          autoNumbering: template.certificate.autoNumbering,
+          showPhoto: template.certificate.showPhoto,
+          signature1Label: template.certificate.signature1Label,
+          signature1Name: template.certificate.signature1Name,
+          signature1Title: template.certificate.signature1Title,
+          signature2Label: template.certificate.signature2Label,
+          signature2Name: template.certificate.signature2Name,
+          signature2Title: template.certificate.signature2Title,
+          awardText: template.certificate.awardText,
+          showBadge: template.certificate.showBadge,
+          badgeStyle: template.certificate.badgeStyle,
+          showWatermark: template.certificate.showWatermark,
+          watermarkText: template.certificate.watermarkText,
+          layoutJson: template.certificate.layoutJson as any,
+        },
       });
     }
 

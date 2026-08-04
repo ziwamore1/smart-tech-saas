@@ -20,6 +20,11 @@ export class HealthController {
     return this.healthService.checkDetailed();
   }
 
+  @Get('backfill-marketplace-templates')
+  async backfillMarketplaceTemplates() {
+    return this.healthService.backfillMarketplaceTemplates();
+  }
+
   @Get('prisma-test')
   async prismaTest() {
     const start = Date.now();
