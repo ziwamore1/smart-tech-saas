@@ -877,7 +877,7 @@ export class TemplateRendererService {
           className: defaultData.class.name,
           termName: defaultData.term.name,
           academicYear: defaultData.term.academicYear,
-           certificateNumber: 'XXXXXXXX',
+           certificateNumber: defaultData.certificateNumber || 'ST-PREVIEW-00000000',
            certificateComment: defaultData.certificateComment || defaultData.teacherComment || '',
           verificationUrl: '',
           schoolLogo: school?.logoUrl || school?.logo || '',
@@ -1002,7 +1002,7 @@ export class TemplateRendererService {
           ${cert.signature2Label || 'Director'}<br/>${cert.signature2Name || ''}
         </div>
       </div>
-       <div style="font-size:16px;color:#0f766e;font-weight:900;margin-top:16px;letter-spacing:2px;font-family:'Courier New',monospace;">Certificate No: ${data?.certificateNumber || 'XXXXXXXX'}</div>
+       <div style="font-size:16px;color:#0f766e;font-weight:900;margin-top:16px;letter-spacing:2px;font-family:'Courier New',monospace;">Certificate No: ${data?.certificateNumber || 'ST-PREVIEW-00000000'}</div>
     </div>`;
   }
 

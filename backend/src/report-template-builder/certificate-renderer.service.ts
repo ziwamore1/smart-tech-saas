@@ -423,6 +423,8 @@ ${parts.join('\n')}
 
     const strokeColor = isGold ? 'url(#sealGold)' : color;
     const fillColor = isGold ? 'url(#sealGoldInner)' : color;
+    const sealTextSize = Math.max(6, Math.min(9, Math.floor(80 / Math.max(text.length, 1))));
+    const sealTextSpacing = text.length > 8 ? 0.5 : 2;
 
     return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -433,7 +435,7 @@ ${parts.join('\n')}
   <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${strokeColor}" stroke-width="3"/>
   <circle cx="${cx}" cy="${cy}" r="${r - 5}" fill="none" stroke="${strokeColor}" stroke-width="1.5" stroke-dasharray="4,3"/>
   <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" stroke="${strokeColor}" stroke-width="2"/>
-  <text font-size="${Math.max(9, Math.floor(innerR / 5))}" font-family="Georgia, 'Times New Roman', serif" fill="${isGold ? '#ffd700' : color}" font-weight="bold" text-anchor="middle" letter-spacing="2">
+   <text font-size="${sealTextSize}" font-family="Georgia, 'Times New Roman', serif" fill="${isGold ? '#ffd700' : color}" font-weight="900" text-anchor="middle" letter-spacing="${sealTextSpacing}">
     <textPath href="#sealTopArc" startOffset="50%">${text}</textPath>
   </text>
   <text font-size="${Math.max(7, Math.floor(innerR / 7))}" font-family="Georgia, serif" fill="${isGold ? '#b8860b' : this.darkenColor(color, 20)}" text-anchor="middle" letter-spacing="1">
@@ -552,7 +554,7 @@ ${parts.join('\n')}
     }
     .border-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
     .border-layer svg { width: 100%; height: 100%; }
-     .seal-area { position: absolute; bottom: 34px; right: 34px; opacity: 0.92; z-index: 0; pointer-events: none; }
+     .seal-area { position: absolute; bottom: 34px; right: 34px; opacity: 1; z-index: 0; pointer-events: none; }
      .seal-area svg { width: 150px; height: 150px; }
     .ribbon-area { margin: 6px 0; z-index: 1; }
     .watermark-text {
@@ -617,8 +619,8 @@ ${parts.join('\n')}
       border-top: 2px solid ${data.borderColor};
       width: 85%; margin: 0 auto 6px; padding-top: 8px;
     }
-    .sig-label { font-size: 9px; color: #999; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
-    .sig-name { font-size: 11px; color: #333; font-weight: bold; }
+     .sig-label { font-size: 10px; color: #1f2937; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+     .sig-name { font-size: 12px; color: #111827; font-weight: 800; }
     .sig-title { font-size: 8px; color: #aaa; font-style: italic; }
     .cert-number {
        font-size: 16px; color: #0f766e; font-weight: 900; margin-top: 16px;

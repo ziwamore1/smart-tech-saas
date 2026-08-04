@@ -278,7 +278,7 @@ export class ReportTemplateBuilderController {
         className: body.className || '',
         termName: body.termName || '',
         academicYear: body.academicYear || '',
-        certificateNumber: certNumber || 'XXXXXX',
+         certificateNumber: certNumber || `ST-${new Date().getFullYear()}-PREVIEW`,
         verificationUrl,
         schoolLogo: school?.logoUrl || school?.logo,
         studentPhoto: body.studentPhoto,

@@ -597,21 +597,21 @@ export class ReportEngineService {
     // curriculum pipeline.
     let template = request.templateId
       ? await this.prisma.reportTemplate.findFirst({
-          where: { id: request.templateId, schoolId },
+           where: { id: request.templateId, schoolId, templateType: 'REPORT_CARD' },
           include: { components: true },
         })
       : null;
 
     if (!template) {
       template = await this.prisma.reportTemplate.findFirst({
-        where: { schoolId, isDefault: true },
+        where: { schoolId, isDefault: true, templateType: 'REPORT_CARD' },
         include: { components: true },
       });
     }
 
     if (!template || !template.components || template.components.length === 0) {
       template = await this.prisma.reportTemplate.findFirst({
-        where: { schoolId, components: { some: {} } },
+        where: { schoolId, templateType: 'REPORT_CARD', components: { some: {} } },
         include: { components: true },
         orderBy: { updatedAt: 'desc' },
       });
@@ -788,7 +788,16 @@ export class ReportEngineService {
 
   private async generateCertificate(request: ReportGenerationRequest) {
     const school = await this.prisma.school.findUnique({ where: { id: request.schoolId } });
-    const student = await this.prisma.student.findUnique({ where: { id: request.studentId } });
+    const student = await this.prisma.student.findUnique({
+      where: { id: request.studentId },
+      include: {
+        studentPhotos: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { imageUrl: true, thumbnailUrl: true },
+        },
+      },
+    });
 
     // Resolve template: explicit -> first school certificate template -> any template
     let template = request.templateId
@@ -860,7 +869,7 @@ export class ReportEngineService {
           firstName: student?.firstName,
           lastName: student?.lastName,
           admissionNumber: student?.admissionNumber,
-          photoUrl: student?.photoUrl,
+           photoUrl: student?.photoUrl || student?.studentPhotos?.[0]?.imageUrl || student?.studentPhotos?.[0]?.thumbnailUrl,
         },
         class: { name: enrollment?.class?.name || '' },
         term: { name: performance?.term?.name || '', academicYear: enrollment?.academicYear?.name || '' },

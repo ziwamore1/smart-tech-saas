@@ -137,7 +137,7 @@ async function main() {
     { type: 'SIGNATURE', label: 'Signature 1', content: { label: 'Head Teacher' }, styles: {}, position: { x: 100, y: 370 }, size: { width: 150, height: 40 }, sortOrder: 9 },
     { type: 'SIGNATURE', label: 'Signature 2', content: { label: 'Director' }, styles: {}, position: { x: 350, y: 370 }, size: { width: 150, height: 40 }, sortOrder: 10 },
     { type: 'QR_CODE', label: 'QR Code', content: {}, styles: {}, position: { x: 520, y: 360 }, size: { width: 50, height: 50 }, sortOrder: 11 },
-    { type: 'CUSTOM_TEXT', label: 'Certificate Number', content: { text: 'Certificate No: XXXXXX', fontSize: 9, color: '#aaa' }, styles: { color: '#aaa', textAlign: 'center' }, position: { x: 200, y: 420 }, size: { width: 200, height: 12 }, sortOrder: 12 },
+    { type: 'CUSTOM_TEXT', label: 'Certificate Number', content: { text: 'Certificate No: ST-PREVIEW-00000000', fontSize: 9, color: '#0f766e' }, styles: { color: '#0f766e', fontWeight: '800', textAlign: 'center' }, position: { x: 200, y: 420 }, size: { width: 200, height: 12 }, sortOrder: 12 },
   ];
 
   const transcriptComponents: any[] = [

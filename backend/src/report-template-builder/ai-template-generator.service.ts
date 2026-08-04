@@ -47,7 +47,7 @@ export class AiTemplateGeneratorService {
           { type: 'QR_CODE', label: 'QR Code', content: {}, styles: {}, position: { x: 560, y: 340 }, size: { width: 60, height: 60 } },
           { type: 'SIGNATURE', label: 'Sig 1', content: {}, styles: {}, position: { x: 100, y: 400 }, size: { width: 150, height: 30 } },
           { type: 'SIGNATURE', label: 'Sig 2', content: {}, styles: {}, position: { x: 350, y: 400 }, size: { width: 150, height: 30 } },
-          { type: 'CUSTOM_TEXT', label: 'Cert Number', content: { text: 'Certificate No: XXXXXX', fontSize: 9, color: '#aaa' }, styles: { color: '#aaa' }, position: { x: 300, y: 450 }, size: { width: 150, height: 12 } },
+          { type: 'CUSTOM_TEXT', label: 'Cert Number', content: { text: 'Certificate No: ST-PREVIEW-00000000', fontSize: 9, color: '#0f766e' }, styles: { color: '#0f766e', fontWeight: '800' }, position: { x: 300, y: 450 }, size: { width: 150, height: 12 } },
         ],
       },
       TRANSCRIPT: {
