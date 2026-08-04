@@ -601,8 +601,8 @@ export class ReportEngineService {
     const termId = request.termId!;
     const schoolId = request.schoolId;
 
-    const school = await this.prisma.school.findUnique({ where: { id: schoolId }, select: { subscriptionTier: true } });
-    if (String(school?.subscriptionTier || '').toUpperCase() === 'PREMIUM') {
+    const schoolAccess = await this.prisma.school.findUnique({ where: { id: schoolId }, select: { subscriptionTier: true } });
+    if (String(schoolAccess?.subscriptionTier || '').toUpperCase() === 'PREMIUM') {
       await this.reportTemplateBuilder.ensureEnhancedProfessionalTemplate(schoolId);
     }
 
