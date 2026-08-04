@@ -32,7 +32,13 @@ export class ReportTemplateBuilderService {
     }
     const where: any = { ...(schoolId ? { schoolId } : {}) };
     if (filters?.type) where.templateType = filters.type;
-    if (filters?.status) where.status = filters.status;
+    if (filters?.status) {
+      // Marketplace copies created by older versions were saved as DRAFT;
+      // keep them visible to the owning school so they can be personalized.
+      where.status = filters.status === 'ACTIVE' && schoolId
+        ? { in: ['ACTIVE', 'DRAFT'] }
+        : filters.status;
+    }
     if (filters?.categoryId) where.categoryId = filters.categoryId;
     return this.prisma.reportTemplate.findMany({
       where,

@@ -921,6 +921,9 @@ export class TemplateRendererService {
 
     const pageSize = template.pageSize || 'A4';
     const orientation = template.orientation || 'portrait';
+    const pageMargins = template.certificate
+      ? '0'
+      : `${template.marginTop || 15}mm ${template.marginRight || 15}mm ${template.marginBottom || 15}mm ${template.marginLeft || 15}mm`;
     const isLandscape = orientation === 'landscape';
     const pageWidth = isLandscape ? '297mm' : '210mm';
     const pageHeight = isLandscape ? '210mm' : '297mm';
@@ -932,9 +935,9 @@ export class TemplateRendererService {
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>${template.name}</title>
   <style>
-    @page { size: ${pageSize} ${orientation}; margin: ${template.marginTop || 15}mm ${template.marginRight || 15}mm ${template.marginBottom || 15}mm ${template.marginLeft || 15}mm; }
+     @page { size: ${pageSize} ${orientation}; margin: ${pageMargins}; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: ${template.fontFamily || 'Arial'}, sans-serif; font-size: ${template.fontSize || 12}px; color: #111827; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+     body { font-family: ${template.fontFamily || 'Arial'}, sans-serif; font-size: ${template.fontSize || 12}px; color: #111827; line-height: 1.5; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     img { max-width: 100%; }
     table { page-break-inside: avoid; }
     @media print { body { margin: 0; padding: 0; } }

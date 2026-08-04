@@ -79,7 +79,7 @@ export class TemplateMarketplaceService {
         primaryColor: template.primaryColor || '#1a365d',
         secondaryColor: template.secondaryColor || '#f5f5f5',
         layoutJson: {},
-        status: 'DRAFT',
+         status: 'ACTIVE',
         version: 1,
       },
     });

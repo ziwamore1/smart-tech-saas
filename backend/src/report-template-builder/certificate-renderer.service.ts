@@ -429,12 +429,15 @@ ${parts.join('\n')}
     return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     ${goldDefs}
+     <path id="sealTopArc" d="M 28,19 Q 60,4 92,19" fill="none"/>
      <path id="sealBottomArc" d="M ${cx - innerR + 8},${cy} A ${innerR - 8},${innerR - 8} 0 0,0 ${cx + innerR - 8},${cy}" fill="none"/>
   </defs>
   <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${strokeColor}" stroke-width="3"/>
   <circle cx="${cx}" cy="${cy}" r="${r - 5}" fill="none" stroke="${strokeColor}" stroke-width="1.5" stroke-dasharray="4,3"/>
   <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" stroke="${strokeColor}" stroke-width="2"/>
-   <text x="${cx}" y="15" font-size="${sealTextSize}" font-family="Georgia, 'Times New Roman', serif" fill="${isGold ? '#ffd700' : color}" font-weight="900" text-anchor="middle" letter-spacing="${sealTextSpacing}">${text}</text>
+   <text font-size="${sealTextSize}" font-family="Georgia, 'Times New Roman', serif" fill="${isGold ? '#ffd700' : color}" font-weight="900" text-anchor="middle" letter-spacing="${sealTextSpacing}">
+     <textPath href="#sealTopArc" startOffset="50%">${text}</textPath>
+   </text>
   <text font-size="${Math.max(7, Math.floor(innerR / 7))}" font-family="Georgia, serif" fill="${isGold ? '#b8860b' : this.darkenColor(color, 20)}" text-anchor="middle" letter-spacing="1">
     <textPath href="#sealBottomArc" startOffset="50%">AUTHENTICATED</textPath>
   </text>
@@ -549,13 +552,13 @@ ${parts.join('\n')}
        height: ${isLandscape ? '650px' : '900px'};
        max-height: 100%;
        display: flex; flex-direction: column; align-items: center;
-       justify-content: center; padding: 30px 58px 64px; z-index: 1; overflow: hidden;
+       justify-content: flex-start; padding: 20px 58px 50px; z-index: 1; overflow: hidden;
     }
     .border-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
     .border-layer svg { width: 100%; height: 100%; }
-     .seal-area { position: absolute; bottom: 22px; right: 22px; opacity: 1; z-index: 0; pointer-events: none; }
-     .seal-area svg { width: 128px; height: 128px; }
-    .ribbon-area { margin: 6px 0; z-index: 1; }
+     .seal-area { position: absolute; bottom: 34px; right: 34px; opacity: 1; z-index: 0; pointer-events: none; }
+     .seal-area svg { width: 112px; height: 112px; }
+     .ribbon-area { margin: 2px 0; z-index: 1; }
     .watermark-text {
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%) rotate(-28deg);
@@ -564,71 +567,72 @@ ${parts.join('\n')}
       font-family: Georgia, serif; z-index: 0;
       letter-spacing: 8px;
     }
-    .logo-area { margin-bottom: 6px; z-index: 1; }
-    .logo-area img { height: 65px; width: auto; object-fit: contain; }
+     .logo-area { margin-bottom: 3px; z-index: 1; }
+     .logo-area img { height: 48px; width: auto; object-fit: contain; }
     .school-name {
-       font-size: 30px; font-weight: 800;
-      color: ${data.borderColor}; margin-bottom: 2px;
+       font-size: 26px; font-weight: 800;
+       color: ${data.borderColor}; margin-bottom: 1px;
       z-index: 1; text-align: center;
       letter-spacing: 1px;
     }
     .school-subtitle {
       font-size: 9px; color: #999; text-transform: uppercase;
-      letter-spacing: 3px; margin-bottom: 10px; z-index: 1;
+       letter-spacing: 2px; margin-bottom: 4px; z-index: 1;
     }
     .cert-title {
-       font-size: 13px; color: #374151; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 5px;
-      margin-bottom: 6px; z-index: 1;
+       font-size: 10px; color: #374151; font-weight: 700;
+       text-transform: uppercase; letter-spacing: 3px;
+       margin-bottom: 3px; z-index: 1;
     }
     .divider {
       width: 160px; height: 1px;
       background: linear-gradient(90deg, transparent, ${data.borderColor}, transparent);
-      margin: 10px auto; opacity: 0.6; z-index: 1;
+       margin: 4px auto; opacity: 0.6; z-index: 1;
     }
     .award-text {
-       font-size: 17px; color: #111827; font-weight: 600; margin: 7px 0;
+       font-size: 14px; color: #111827; font-weight: 600; margin: 3px 0;
       z-index: 1; text-align: center; font-style: italic;
     }
     .student-name {
-       font-size: 42px; font-weight: 800;
-      color: ${data.borderColor}; margin: 8px 0;
+       font-size: 34px; font-weight: 800;
+       color: ${data.borderColor}; margin: 4px 0;
       font-family: 'Georgia', 'Palatino Linotype', serif;
       z-index: 1; text-align: center;
       letter-spacing: 1px;
     }
-     .detail-text { font-size: 14px; color: #1f2937; font-weight: 600; margin: 4px 0; z-index: 1; text-align: center; line-height: 1.6; }
-     .comment-box { max-width: 620px; margin: 10px auto 4px; padding: 10px 18px; border-left: 4px solid #0f766e; border-right: 4px solid #0f766e; background: #f0fdfa; color: #134e4a; font-size: 13px; font-weight: 600; line-height: 1.5; z-index: 1; text-align: center; }
-    .badge-area { margin: 10px 0; z-index: 1; }
-    .badge-area svg { width: 55px; height: 55px; }
-    .photo-area { margin: 6px 0; z-index: 1; }
+     .detail-text { font-size: 11px; color: #1f2937; font-weight: 600; margin: 2px 0; z-index: 1; text-align: center; line-height: 1.35; }
+     .comment-box { max-width: 620px; margin: 5px auto 2px; padding: 6px 12px; border-left: 3px solid #0f766e; border-right: 3px solid #0f766e; background: #f0fdfa; color: #134e4a; font-size: 10px; font-weight: 600; line-height: 1.3; z-index: 1; text-align: center; }
+     .badge-area { margin: 4px 0; z-index: 1; }
+     .badge-area svg { width: 42px; height: 42px; }
+     .photo-area { margin: 3px 0; z-index: 1; }
     .photo-area img {
-      width: 72px; height: 72px; border-radius: 50%;
+       width: 56px; height: 56px; border-radius: 50%;
       object-fit: cover; border: 2px solid ${data.borderColor};
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
-    .qr-area { margin: 6px 0; z-index: 1; }
-    .qr-area svg { width: 55px; height: 55px; }
+     .qr-area { margin: 3px 0; z-index: 1; }
+     .qr-area svg { width: 40px; height: 40px; }
     .signatures {
       display: flex; justify-content: space-around;
-      width: 80%; margin-top: 24px; z-index: 1;
+       width: 80%; margin-top: 9px; z-index: 1;
     }
     .sig-box { text-align: center; width: 200px; }
     .sig-line {
-      border-top: 2px solid ${data.borderColor};
-      width: 85%; margin: 0 auto 6px; padding-top: 8px;
+       border-top: 2px solid ${data.borderColor};
+       width: 85%; margin: 0 auto 3px; padding-top: 3px;
     }
      .sig-label { font-size: 10px; color: #1f2937; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
      .sig-name { font-size: 12px; color: #111827; font-weight: 800; }
     .sig-title { font-size: 8px; color: #aaa; font-style: italic; }
     .cert-number {
-       font-size: 16px; color: #0f766e; font-weight: 900; margin-top: 16px;
+       font-size: 11px; color: #0f766e; font-weight: 900; margin-top: 0;
       z-index: 1; font-family: 'Courier New', monospace;
       letter-spacing: 1px;
     }
     .verification-row {
       display: flex; align-items: center; gap: 12px;
-      margin-top: 10px; z-index: 1;
+       margin-top: 4px; z-index: 1;
+       position: absolute; right: 150px; bottom: 28px;
     }
     @media print {
       .cert-page { margin: 0; padding: 0; }
