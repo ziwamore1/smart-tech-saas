@@ -88,6 +88,7 @@ export class HealthService {
    * Safe to run repeatedly; existing named Marketplace copies are skipped.
    */
   async backfillMarketplaceTemplates() {
+    const start = Date.now();
     const [schools, systemTemplates] = await Promise.all([
       this.prisma.school.findMany({ select: { id: true } }),
       this.prisma.reportTemplate.findMany({
@@ -96,92 +97,135 @@ export class HealthService {
       }),
     ]);
 
-    let created = 0;
-    let skipped = 0;
+    if (schools.length === 0 || systemTemplates.length === 0) {
+      return {
+        status: 'completed',
+        latencyMs: Date.now() - start,
+        schools: schools.length,
+        sourceTemplates: systemTemplates.length,
+        created: 0,
+        skipped: 0,
+      };
+    }
+
+    const schoolIds = schools.map((s) => s.id);
+    const names = systemTemplates.map((source) => `${source.name} (from Marketplace)`);
+
+    const fetchCopies = () =>
+      this.prisma.reportTemplate.findMany({
+        where: { schoolId: { in: schoolIds }, name: { in: names } },
+        select: {
+          id: true,
+          schoolId: true,
+          name: true,
+          _count: { select: { components: true } },
+          certificate: { select: { id: true } },
+        },
+      });
+
+    const before = await fetchCopies();
+    const existingKeys = new Set(before.map((c) => `${c.schoolId}::${c.name}`));
+
+    const toCreate: any[] = [];
     for (const school of schools) {
       for (const source of systemTemplates) {
         const name = `${source.name} (from Marketplace)`;
-        const existing = await this.prisma.reportTemplate.findFirst({
-          where: { schoolId: school.id, name },
-          select: { id: true },
+        if (existingKeys.has(`${school.id}::${name}`)) continue;
+        toCreate.push({
+          name,
+          schoolId: school.id,
+          templateType: source.templateType,
+          pageSize: source.pageSize,
+          orientation: source.orientation,
+          fontFamily: source.fontFamily,
+          fontSize: source.fontSize,
+          primaryColor: source.primaryColor,
+          secondaryColor: source.secondaryColor,
+          layoutJson: (source.layoutJson as any) ?? {},
+          metadata: { ...((source.metadata as any) || {}), source: 'marketplace-backfill', sourceTemplateId: source.id },
+          status: 'ACTIVE',
+          version: 1,
         });
-        if (existing) {
-          skipped++;
-          continue;
-        }
+      }
+    }
 
-        const copy = await this.prisma.reportTemplate.create({
-          data: {
-            name,
-            schoolId: school.id,
-            templateType: source.templateType,
-            pageSize: source.pageSize,
-            orientation: source.orientation,
-            fontFamily: source.fontFamily,
-            fontSize: source.fontSize,
-            primaryColor: source.primaryColor,
-            secondaryColor: source.secondaryColor,
-            layoutJson: source.layoutJson as any,
-            metadata: { ...(source.metadata as any || {}), source: 'marketplace-backfill', sourceTemplateId: source.id },
-            status: 'ACTIVE',
-            version: 1,
-          },
-        });
+    if (toCreate.length > 0) {
+      // Backed by @@unique([name, schoolId]) so partial/timed-out runs stay idempotent.
+      await this.prisma.reportTemplate.createMany({ data: toCreate, skipDuplicates: true });
+    }
 
-        if (source.components.length > 0) {
-          await this.prisma.templateComponent.createMany({
-            data: source.components.map((component) => ({
+    const after = await fetchCopies();
+    const copyByKey = new Map(after.map((c) => [`${c.schoolId}::${c.name}`, c]));
+
+    // Self-heal: backfill components/certificates for any copy (new or from a timed-out
+    // earlier run) that is missing them.
+    const components: any[] = [];
+    const certificates: any[] = [];
+    for (const school of schools) {
+      for (const source of systemTemplates) {
+        const name = `${source.name} (from Marketplace)`;
+        const copy = copyByKey.get(`${school.id}::${name}`);
+        if (!copy) continue;
+
+        if (copy._count.components === 0 && source.components.length > 0) {
+          for (const component of source.components) {
+            components.push({
               templateId: copy.id,
               type: component.type,
               label: component.label,
               content: component.content as any,
-              styles: component.styles as any,
-              position: component.position as any,
-              size: component.size as any,
-              settings: component.settings as any,
+              styles: (component.styles as any) ?? {},
+              position: (component.position as any) ?? {},
+              size: (component.size as any) ?? {},
+              settings: (component.settings as any) ?? {},
               placeholder: component.placeholder,
               isRequired: component.isRequired,
               isLocked: component.isLocked,
               sortOrder: component.sortOrder,
-            })),
+            });
+          }
+        }
+        if (!copy.certificate && source.certificate) {
+          certificates.push({
+            templateId: copy.id,
+            certificateType: source.certificate.certificateType,
+            borderStyle: source.certificate.borderStyle,
+            borderColor: source.certificate.borderColor,
+            sealUrl: source.certificate.sealUrl,
+            showQrCode: source.certificate.showQrCode,
+            autoNumbering: source.certificate.autoNumbering,
+            showPhoto: source.certificate.showPhoto,
+            signature1Label: source.certificate.signature1Label,
+            signature1Name: source.certificate.signature1Name,
+            signature1Title: source.certificate.signature1Title,
+            signature2Label: source.certificate.signature2Label,
+            signature2Name: source.certificate.signature2Name,
+            signature2Title: source.certificate.signature2Title,
+            awardText: source.certificate.awardText,
+            showBadge: source.certificate.showBadge,
+            badgeStyle: source.certificate.badgeStyle,
+            showWatermark: source.certificate.showWatermark,
+            watermarkText: source.certificate.watermarkText,
+            layoutJson: (source.certificate.layoutJson as any) ?? {},
           });
         }
-        if (source.certificate) {
-          await this.prisma.certificateTemplate.create({
-            data: {
-              templateId: copy.id,
-              certificateType: source.certificate.certificateType,
-              borderStyle: source.certificate.borderStyle,
-              borderColor: source.certificate.borderColor,
-              sealUrl: source.certificate.sealUrl,
-              showQrCode: source.certificate.showQrCode,
-              autoNumbering: source.certificate.autoNumbering,
-              showPhoto: source.certificate.showPhoto,
-              signature1Label: source.certificate.signature1Label,
-              signature1Name: source.certificate.signature1Name,
-              signature1Title: source.certificate.signature1Title,
-              signature2Label: source.certificate.signature2Label,
-              signature2Name: source.certificate.signature2Name,
-              signature2Title: source.certificate.signature2Title,
-              awardText: source.certificate.awardText,
-              showBadge: source.certificate.showBadge,
-              badgeStyle: source.certificate.badgeStyle,
-              showWatermark: source.certificate.showWatermark,
-              watermarkText: source.certificate.watermarkText,
-              layoutJson: source.certificate.layoutJson as any,
-            },
-          });
-        }
-        created++;
       }
+    }
+
+    if (components.length > 0) {
+      await this.prisma.templateComponent.createMany({ data: components, skipDuplicates: true });
+    }
+    if (certificates.length > 0) {
+      await this.prisma.certificateTemplate.createMany({ data: certificates, skipDuplicates: true });
     }
 
     return {
       status: 'completed',
+      latencyMs: Date.now() - start,
       schools: schools.length,
       sourceTemplates: systemTemplates.length,
-      created,
-      skipped,
+      created: after.length - before.length,
+      skipped: before.length,
     };
   }
 
