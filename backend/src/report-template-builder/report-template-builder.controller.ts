@@ -98,6 +98,24 @@ export class ReportTemplateBuilderController {
     return this.builderService.getTemplates(req.user.schoolId, { type, status, categoryId });
   }
 
+  @Get('class-assignments/report-cards')
+  @Roles('Director')
+  async getClassReportTemplateAssignments(@Req() req) {
+    return this.builderService.getClassReportTemplateAssignments(req.user.schoolId);
+  }
+
+  @Patch('classes/:classId/report-template')
+  @Roles('Director')
+  async assignClassReportTemplate(@Req() req, @Param('classId') classId: string, @Body('templateId') templateId?: string | null) {
+    return this.builderService.assignClassReportTemplate(req.user.schoolId, classId, templateId || null);
+  }
+
+  @Patch(':id/report-card-default')
+  @Roles('Director')
+  async setReportCardTemplateDefault(@Req() req, @Param('id') id: string, @Body('isDefault') isDefault: boolean) {
+    return this.builderService.setTemplateDefault(req.user.schoolId, id, Boolean(isDefault));
+  }
+
   @Get('stats')
   @Roles('Director', 'Teacher')
   async getStats() {

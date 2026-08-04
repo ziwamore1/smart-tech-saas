@@ -10,6 +10,7 @@ import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
 import { CertificateTemplateService } from '../report-template-builder/certificate-template.service';
 import { CertificateCommentService } from '../report-template-builder/certificate-comment.service';
+import { ReportTemplateBuilderService } from '../report-template-builder/report-template-builder.service';
 import * as crypto from 'crypto';
 
 export enum ReportType {
@@ -139,6 +140,7 @@ export class ReportEngineService {
     private cloudinary: CloudinaryService,
     private certificateTemplateService: CertificateTemplateService,
     private certificateCommentService: CertificateCommentService,
+    private reportTemplateBuilder: ReportTemplateBuilderService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
   ) {}
 
@@ -572,6 +574,14 @@ export class ReportEngineService {
       return this.templateRenderer.renderPdfFromHtml(schoolId, rendered.templateId, rendered.html);
     }
 
+    const selectedTemplate = request.templateId
+      ? await this.prisma.reportTemplate.findFirst({ where: { id: request.templateId, schoolId } })
+      : null;
+    if ((selectedTemplate?.metadata as any)?.enhancedProfessional) {
+      const preview = await this.previewReportCardHtml(request);
+      return this.templateRenderer.renderPdfFromHtml(schoolId, selectedTemplate.id, preview.html);
+    }
+
     // Last resort: use the curriculum report card pipeline
     return this.reportCardService.generateCurriculumReportCardPdf(schoolId, studentId, termId);
   }
@@ -590,6 +600,22 @@ export class ReportEngineService {
     const studentId = request.studentId!;
     const termId = request.termId!;
     const schoolId = request.schoolId;
+
+    const school = await this.prisma.school.findUnique({ where: { id: schoolId }, select: { subscriptionTier: true } });
+    if (String(school?.subscriptionTier || '').toUpperCase() === 'PREMIUM') {
+      await this.reportTemplateBuilder.ensureEnhancedProfessionalTemplate(schoolId);
+    }
+
+    if (!request.templateId) {
+      const enrollment = await this.prisma.enrollment.findFirst({
+        where: { studentId, academicYear: { terms: { some: { id: termId } } }, status: 'ACTIVE' },
+        select: { classId: true },
+      });
+      if (enrollment?.classId) {
+        const classTemplate = await this.prisma.class.findUnique({ where: { id: enrollment.classId }, select: { reportTemplateId: true } });
+        request.templateId = classTemplate?.reportTemplateId || undefined;
+      }
+    }
 
     // Resolve template: explicit -> school default -> any template with components.
     // This guarantees report cards always render with the school's professional
@@ -610,6 +636,7 @@ export class ReportEngineService {
     }
 
     if (!template || !template.components || template.components.length === 0) {
+      if ((template?.metadata as any)?.enhancedProfessional) return null;
       template = await this.prisma.reportTemplate.findFirst({
         where: { schoolId, templateType: 'REPORT_CARD', components: { some: {} } },
         include: { components: true },

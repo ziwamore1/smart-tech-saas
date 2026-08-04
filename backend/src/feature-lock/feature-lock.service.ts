@@ -59,6 +59,7 @@ const DEFAULT_FEATURES: Omit<FeatureLockDto, 'isEnabled' | 'isLocked'>[] = [
   { key: 'results.reports', name: 'Result Reports', description: 'Generate comprehensive result reports', category: 'results', minTier: 'STANDARD' },
   { key: 'results.grading', name: 'Grading Policies', description: 'Custom grading scales and policies', category: 'results', minTier: 'STANDARD' },
   { key: 'results.reportCards', name: 'Report Cards', description: 'Generate and customize report cards', category: 'results', minTier: 'STANDARD' },
+  { key: 'results.enhancedReportTemplate', name: 'Enhanced Professional Report Template', description: 'Use the premium enhanced report card template for classes and mobile reports', category: 'results', minTier: 'PREMIUM' },
   { key: 'results.certificate', name: 'Certificate Designer', description: 'Design and issue certificates', category: 'results', minTier: 'PREMIUM' },
 
   // ── Assessments ──

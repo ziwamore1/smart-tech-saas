@@ -405,7 +405,6 @@ ${parts.join('\n')}
     const cy = s / 2;
     const r = s / 2 - 3;
     const innerR = r - 18;
-    const outerTextR = r - 7;
     const isGold = color === '#b8860b' || color === '#ffd700' || color === '#c0a030';
 
     const goldDefs = isGold ? `
@@ -430,15 +429,12 @@ ${parts.join('\n')}
     return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     ${goldDefs}
-     <path id="sealTopArc" d="M ${cx - outerTextR + 4},${cy} A ${outerTextR - 4},${outerTextR - 4} 0 0,1 ${cx + outerTextR - 4},${cy}" fill="none"/>
-    <path id="sealBottomArc" d="M ${cx - innerR + 8},${cy} A ${innerR - 8},${innerR - 8} 0 0,0 ${cx + innerR - 8},${cy}" fill="none"/>
+     <path id="sealBottomArc" d="M ${cx - innerR + 8},${cy} A ${innerR - 8},${innerR - 8} 0 0,0 ${cx + innerR - 8},${cy}" fill="none"/>
   </defs>
   <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${strokeColor}" stroke-width="3"/>
   <circle cx="${cx}" cy="${cy}" r="${r - 5}" fill="none" stroke="${strokeColor}" stroke-width="1.5" stroke-dasharray="4,3"/>
   <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" stroke="${strokeColor}" stroke-width="2"/>
-   <text font-size="${sealTextSize}" font-family="Georgia, 'Times New Roman', serif" fill="${isGold ? '#ffd700' : color}" font-weight="900" text-anchor="middle" letter-spacing="${sealTextSpacing}">
-    <textPath href="#sealTopArc" startOffset="50%">${text}</textPath>
-  </text>
+   <text x="${cx}" y="15" font-size="${sealTextSize}" font-family="Georgia, 'Times New Roman', serif" fill="${isGold ? '#ffd700' : color}" font-weight="900" text-anchor="middle" letter-spacing="${sealTextSpacing}">${text}</text>
   <text font-size="${Math.max(7, Math.floor(innerR / 7))}" font-family="Georgia, serif" fill="${isGold ? '#b8860b' : this.darkenColor(color, 20)}" text-anchor="middle" letter-spacing="1">
     <textPath href="#sealBottomArc" startOffset="50%">AUTHENTICATED</textPath>
   </text>
@@ -535,23 +531,25 @@ ${parts.join('\n')}
   <style>
     @page { size: ${data.pageSize || 'A4'} ${isLandscape ? 'landscape' : 'portrait'}; margin: 0; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Georgia', 'Palatino Linotype', 'Times New Roman', serif;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-      color-adjust: exact;
-    }
-    .cert-page {
-      width: 100%; min-height: ${pageH};
-      position: relative; display: flex; align-items: center; justify-content: center;
-      background: #fefcf9; overflow: hidden;
-    }
+     body {
+       font-family: 'Georgia', 'Palatino Linotype', 'Times New Roman', serif;
+       -webkit-print-color-adjust: exact;
+       print-color-adjust: exact;
+       color-adjust: exact;
+       overflow: hidden;
+     }
+     .cert-page {
+       width: 100%; height: ${pageH}; max-height: ${pageH};
+       position: relative; display: flex; align-items: center; justify-content: center;
+       background: #fefcf9; overflow: hidden; page-break-after: avoid;
+     }
     .cert-inner {
       position: relative;
        width: 84%; max-width: 660px;
-       min-height: ${isLandscape ? '460px' : '660px'};
+       height: ${isLandscape ? '650px' : '900px'};
+       max-height: 100%;
        display: flex; flex-direction: column; align-items: center;
-       justify-content: center; padding: 44px 58px 88px; z-index: 1;
+       justify-content: center; padding: 30px 58px 64px; z-index: 1; overflow: hidden;
     }
     .border-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
     .border-layer svg { width: 100%; height: 100%; }

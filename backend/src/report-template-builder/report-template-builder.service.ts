@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ReportTemplateType, TemplateStatus, ComponentType } from '@prisma/client';
+import { FeatureLockService } from '../feature-lock/feature-lock.service';
 
 @Injectable()
 export class ReportTemplateBuilderService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private featureLock: FeatureLockService) {}
 
   async getCategories(schoolId?: string) {
     return this.prisma.templateCategory.findMany({
@@ -26,6 +27,9 @@ export class ReportTemplateBuilderService {
   }
 
   async getTemplates(schoolId?: string, filters?: { type?: string; status?: string; categoryId?: string }) {
+    if (schoolId && (!filters?.type || filters.type === 'REPORT_CARD')) {
+      await this.ensureEnhancedProfessionalTemplate(schoolId);
+    }
     const where: any = { ...(schoolId ? { schoolId } : {}) };
     if (filters?.type) where.templateType = filters.type;
     if (filters?.status) where.status = filters.status;
@@ -38,6 +42,84 @@ export class ReportTemplateBuilderService {
       },
       orderBy: { updatedAt: 'desc' },
     });
+  }
+
+  async ensureEnhancedProfessionalTemplate(schoolId: string) {
+    const school = await this.prisma.school.findUnique({ where: { id: schoolId }, select: { subscriptionTier: true } });
+    const isPremium = String(school?.subscriptionTier || '').toUpperCase() === 'PREMIUM';
+    const existing = await this.prisma.reportTemplate.findFirst({
+      where: { schoolId, name: 'Enhanced Professional Report Card' },
+    });
+    if (existing) return existing;
+    if (isPremium) {
+      await this.prisma.reportTemplate.updateMany({
+        where: { schoolId, templateType: 'REPORT_CARD', isDefault: true },
+        data: { isDefault: false },
+      });
+    }
+    return this.prisma.reportTemplate.create({
+      data: {
+        schoolId,
+        name: 'Enhanced Professional Report Card',
+        description: 'Premium professional report card with charts, rankings, attendance, summaries, and narrative insights.',
+        templateType: 'REPORT_CARD',
+        status: 'ACTIVE',
+        isDefault: isPremium,
+        primaryColor: '#1e3a8a',
+        secondaryColor: '#eff6ff',
+        metadata: { enhancedProfessional: true, premiumOnly: true },
+      },
+    });
+  }
+
+  async getClassReportTemplateAssignments(schoolId: string) {
+    await this.ensureEnhancedProfessionalTemplate(schoolId);
+    return this.prisma.class.findMany({
+      where: { schoolId },
+      select: {
+        id: true,
+        name: true,
+        reportTemplateId: true,
+        reportTemplate: { select: { id: true, name: true, templateType: true, isDefault: true, metadata: true } },
+      },
+      orderBy: { order: 'asc' },
+    });
+  }
+
+  async assignClassReportTemplate(schoolId: string, classId: string, templateId: string | null) {
+    const cls = await this.prisma.class.findFirst({ where: { id: classId, schoolId } });
+    if (!cls) throw new NotFoundException('Class not found');
+    if (templateId) {
+      const template = await this.prisma.reportTemplate.findFirst({ where: { id: templateId, schoolId, templateType: 'REPORT_CARD' } });
+      if (!template) throw new NotFoundException('Report card template not found');
+      await this.assertEnhancedTemplateAccess(schoolId, template);
+    }
+    return this.prisma.class.update({
+      where: { id: classId },
+      data: { reportTemplateId: templateId },
+      select: { id: true, name: true, reportTemplateId: true, reportTemplate: { select: { id: true, name: true, metadata: true } } },
+    });
+  }
+
+  async setTemplateDefault(schoolId: string, templateId: string, isDefault: boolean) {
+    const template = await this.prisma.reportTemplate.findFirst({ where: { id: templateId, schoolId, templateType: 'REPORT_CARD' } });
+    if (!template) throw new NotFoundException('Report card template not found');
+    await this.assertEnhancedTemplateAccess(schoolId, template);
+    if (isDefault) {
+      await this.prisma.reportTemplate.updateMany({ where: { schoolId, templateType: 'REPORT_CARD', id: { not: templateId } }, data: { isDefault: false } });
+    }
+    return this.prisma.reportTemplate.update({ where: { id: templateId }, data: { isDefault } });
+  }
+
+  private async assertEnhancedTemplateAccess(schoolId: string, template: { metadata: any }) {
+    if ((template.metadata as any)?.enhancedProfessional) {
+      const school = await this.prisma.school.findUnique({ where: { id: schoolId }, select: { subscriptionTier: true } });
+      if (String(school?.subscriptionTier || '').toUpperCase() !== 'PREMIUM') {
+        throw new BadRequestException('Enhanced report templates require a Premium subscription');
+      }
+      const access = await this.featureLock.checkAccess(schoolId, 'results.enhancedReportTemplate');
+      if (!access.hasAccess) throw new BadRequestException(access.reason || 'Enhanced report templates require a Premium subscription');
+    }
   }
 
   async getTemplate(id: string, schoolId?: string) {

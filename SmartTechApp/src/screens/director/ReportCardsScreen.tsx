@@ -139,6 +139,8 @@ export const ReportCardsScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate 
   const [terms, setTerms] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
+  const [classAssignments, setClassAssignments] = useState<any[]>([]);
+  const [assignmentSaving, setAssignmentSaving] = useState<string | null>(null);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedTermId, setSelectedTermId] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -242,6 +244,7 @@ export const ReportCardsScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate 
       }
 
       loadTemplates();
+      loadClassAssignments();
     } catch (err) {
       console.error('Failed to load initial data:', err);
     } finally {
@@ -270,6 +273,43 @@ export const ReportCardsScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate 
     } catch (err) {
       console.error('Failed to load templates:', err);
       setTemplates([]);
+    }
+  };
+
+  const loadClassAssignments = async () => {
+    try {
+      const data = await apiService.getClassReportTemplateAssignments();
+      const list = Array.isArray(data) ? data : data?.data || data?.data?.data || [];
+      setClassAssignments(list);
+    } catch (err) {
+      console.error('Failed to load report-card assignments:', err);
+    }
+  };
+
+  const reportCardTemplates = templates.filter((template: any) =>
+    (template.templateType || template.type) === 'REPORT_CARD',
+  );
+
+  const handleAssignClassTemplate = async (classId: string, templateId: string | null) => {
+    setAssignmentSaving(classId);
+    try {
+      await apiService.assignClassReportTemplate(classId, templateId);
+      await loadClassAssignments();
+      Alert.alert('Template Assigned', 'This class will use the selected report-card template.');
+    } catch (err: any) {
+      Alert.alert('Premium Template', err?.response?.data?.message || err?.message || 'This enhanced template requires a Premium subscription.');
+    } finally {
+      setAssignmentSaving(null);
+    }
+  };
+
+  const handleSetReportCardDefault = async (template: any) => {
+    try {
+      await apiService.setReportCardTemplateDefault(template.id, !template.isDefault);
+      await loadTemplates();
+      Alert.alert('Default Updated', template.isDefault ? 'The template is no longer the school default.' : 'This template is now the school default.');
+    } catch (err: any) {
+      Alert.alert('Premium Template', err?.response?.data?.message || err?.message || 'This enhanced template requires a Premium subscription.');
     }
   };
 
@@ -453,7 +493,7 @@ export const ReportCardsScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate 
   };
 
   const handleUseTemplate = (template: any) => {
-    setSelectedType(template.type || 'REPORT_CARD');
+    setSelectedType(template.templateType || template.type || 'REPORT_CARD');
     setSelectedTemplateId(template.id);
     setActiveTab('generate');
   };
@@ -721,8 +761,9 @@ export const ReportCardsScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate 
   };
 
   const renderTemplateItem = (template: any) => {
-    const typeLabel = REPORT_TYPES.find((rt) => rt.key === template.type)?.label || template.type || 'Unknown';
-    const typeConfig = REPORT_TYPES.find((rt) => rt.key === template.type);
+    const templateType = template.templateType || template.type;
+    const typeLabel = REPORT_TYPES.find((rt) => rt.key === templateType)?.label || templateType || 'Unknown';
+    const typeConfig = REPORT_TYPES.find((rt) => rt.key === templateType);
     const typeColor = typeConfig?.color || colors.primaryLight;
     const typeIcon = typeConfig?.icon || '\u{1F4C4}';
     const isActive = selectedTemplateId === template.id;
@@ -744,18 +785,70 @@ export const ReportCardsScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate 
             <Text style={styles.templateDesc} numberOfLines={2}>{template.description}</Text>
           )}
         </View>
-        <TouchableOpacity
-          style={styles.templateUseBtn}
-          onPress={() => handleUseTemplate(template)}
-        >
-          <Text style={styles.templateUseBtnText}>Use</Text>
-        </TouchableOpacity>
+        <View style={styles.templateActions}>
+          <TouchableOpacity
+            style={styles.templateUseBtn}
+            onPress={() => handleUseTemplate(template)}
+          >
+            <Text style={styles.templateUseBtnText}>Use</Text>
+          </TouchableOpacity>
+          {((template.templateType || template.type) === 'REPORT_CARD') && (
+            <TouchableOpacity
+              style={[styles.templateDefaultBtn, template.isDefault && styles.templateDefaultBtnActive]}
+              onPress={() => handleSetReportCardDefault(template)}
+            >
+              <Text style={[styles.templateDefaultBtnText, template.isDefault && styles.templateDefaultBtnTextActive]}>
+                {template.isDefault ? 'Default' : 'Set Default'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </TouchableOpacity>
     );
   };
 
   const renderTemplatesTab = () => (
     <View>
+      {reportCardTemplates.length > 0 && classAssignments.length > 0 && (
+        <WidgetCard title="Class Report Card Templates">
+          {classAssignments.map((assignment: any) => {
+            const currentId = assignment.reportTemplateId;
+            return (
+              <View key={assignment.id} style={styles.assignmentRow}>
+                <View style={styles.assignmentHeader}>
+                  <Text style={styles.assignmentClassName}>{assignment.name}</Text>
+                  {assignmentSaving === assignment.id && <ActivityIndicator size="small" color={colors.primary} />}
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.assignmentOptions}>
+                  <TouchableOpacity
+                    style={[styles.assignmentOption, !currentId && styles.assignmentOptionActive]}
+                    onPress={() => handleAssignClassTemplate(assignment.id, null)}
+                    disabled={assignmentSaving === assignment.id}
+                  >
+                    <Text style={[styles.assignmentOptionText, !currentId && styles.assignmentOptionTextActive]}>School Default</Text>
+                  </TouchableOpacity>
+                  {reportCardTemplates.map((template: any) => {
+                    const enhanced = !!template.metadata?.enhancedProfessional;
+                    const active = currentId === template.id;
+                    return (
+                      <TouchableOpacity
+                        key={template.id}
+                        style={[styles.assignmentOption, active && styles.assignmentOptionActive, enhanced && styles.assignmentOptionPremium]}
+                        onPress={() => handleAssignClassTemplate(assignment.id, template.id)}
+                        disabled={assignmentSaving === assignment.id}
+                      >
+                        <Text style={[styles.assignmentOptionText, active && styles.assignmentOptionTextActive]} numberOfLines={1}>
+                          {enhanced ? '★ Enhanced Professional' : template.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            );
+          })}
+        </WidgetCard>
+      )}
       {templates.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>{'\u{1F4D1}'}</Text>
@@ -1176,6 +1269,73 @@ const styles = StyleSheet.create({
   templateUseBtnText: {
     fontSize: 12,
     fontWeight: '700',
+    color: colors.white,
+  },
+  templateActions: {
+    alignItems: 'flex-end',
+    gap: spacing.xs,
+  },
+  templateDefaultBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.primaryLight,
+  },
+  templateDefaultBtnActive: {
+    backgroundColor: colors.success,
+    borderColor: colors.success,
+  },
+  templateDefaultBtnText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  templateDefaultBtnTextActive: {
+    color: colors.white,
+  },
+  assignmentRow: {
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  assignmentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  assignmentClassName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  assignmentOptions: {
+    gap: spacing.xs,
+    paddingVertical: 2,
+  },
+  assignmentOption: {
+    maxWidth: 210,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  assignmentOptionActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  assignmentOptionPremium: {
+    borderColor: colors.warning,
+  },
+  assignmentOptionText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textLight,
+  },
+  assignmentOptionTextActive: {
     color: colors.white,
   },
 

@@ -665,6 +665,21 @@ class ApiService {
     return response.data;
   }
 
+  async getClassReportTemplateAssignments() {
+    const response = await this.client.get('/template-builder/class-assignments/report-cards');
+    return response.data;
+  }
+
+  async assignClassReportTemplate(classId: string, templateId: string | null) {
+    const response = await this.client.patch(`/template-builder/classes/${classId}/report-template`, { templateId });
+    return response.data;
+  }
+
+  async setReportCardTemplateDefault(templateId: string, isDefault: boolean) {
+    const response = await this.client.patch(`/template-builder/${templateId}/report-card-default`, { isDefault });
+    return response.data;
+  }
+
   async getTemplate(id: string) {
     const response = await this.client.get(`/template-builder/${id}`);
     return response.data;

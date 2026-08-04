@@ -12,8 +12,10 @@ import { DigitalSignatureService } from './digital-signature.service';
 import { DigitalStampService } from './digital-stamp.service';
 import { CertificateCommentService } from './certificate-comment.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { FeatureLockModule } from '../feature-lock/feature-lock.module';
 
 @Module({
+  imports: [FeatureLockModule],
   controllers: [ReportTemplateBuilderController],
   providers: [
     ReportTemplateBuilderService,
