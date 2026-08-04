@@ -145,15 +145,28 @@ export class ReportEngineService {
   }
 
   async hasPublishedResults(studentId: string, termId: string, schoolId: string): Promise<boolean> {
-    const count = await this.prisma.computedResult.count({
-      where: {
-        studentId,
-        termId,
-        schoolId,
-        status: { in: ['PUBLISHED', 'LOCKED'] },
-      },
-    });
-    return count > 0;
+    // Consider a term published when the school locked it, when computed results
+    // exist in any computed state (COMPUTED/VERIFIED/PUBLISHED/LOCKED), or when
+    // legacy/excel-imported Result rows exist for this student+term. The report
+    // card engine renders all of these sources, so the gate must match.
+    const [computedCount, legacyCount, term] = await Promise.all([
+      this.prisma.computedResult.count({
+        where: {
+          studentId,
+          termId,
+          schoolId,
+          status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        },
+      }),
+      this.prisma.result.count({
+        where: { studentId, termId, schoolId },
+      }),
+      this.prisma.term.findUnique({
+        where: { id: termId },
+        select: { resultsLocked: true },
+      }),
+    ]);
+    return computedCount > 0 || legacyCount > 0 || term?.resultsLocked === true;
   }
 
   async validateGenerationRequest(request: ReportGenerationRequest): Promise<{
@@ -547,6 +560,30 @@ export class ReportEngineService {
     const termId = request.termId!;
     const schoolId = request.schoolId;
 
+    const rendered = await this.renderReportCardWithTemplate(request);
+    if (rendered) {
+      return this.templateRenderer.renderPdfFromHtml(schoolId, rendered.templateId, rendered.html);
+    }
+
+    // Last resort: use the curriculum report card pipeline
+    return this.reportCardService.generateCurriculumReportCardPdf(schoolId, studentId, termId);
+  }
+
+  /**
+   * Renders the professional report card HTML using the school's template
+   * (explicit -> default -> any template with components). Returns null when
+   * no template with components is configured so callers can fall back to the
+   * basic curriculum pipeline.
+   */
+  private async renderReportCardWithTemplate(request: ReportGenerationRequest): Promise<{
+    html: string;
+    templateId: string;
+    engineData: any;
+  } | null> {
+    const studentId = request.studentId!;
+    const termId = request.termId!;
+    const schoolId = request.schoolId;
+
     // Resolve template: explicit -> school default -> any template with components.
     // This guarantees report cards always render with the school's professional
     // Web Platform template rather than silently falling back to the basic
@@ -565,39 +602,158 @@ export class ReportEngineService {
       });
     }
 
-    if (template && template.components && template.components.length > 0) {
-      // Use template builder rendering
-      request.templateId = template.id;
-      const engineData = await this.reportCardEngine.generateReportCardData(
-        studentId, termId, schoolId,
-      );
-      const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
-      const html = await this.templateRenderer.renderPreview(schoolId, template.id, {
-        ...engineData,
-        schoolName: school?.name,
-        schoolLogo: school?.logoUrl || school?.logo,
-        subjects: engineData.subjectBreakdown?.map((s: any) => ({
-          subject: s.subjectName,
-          score: s.finalPercentage,
-          grade: s.finalGrade,
-          points: s.points,
-          remark: s.finalRemark,
-        })) || [],
-        summary: {
-          totalMarks: engineData.subjectBreakdown?.reduce((sum: number, s: any) => sum + (s.totalRawScore || 0), 0) || 0,
-          average: engineData.bestSubjectsAverage || 0,
-          totalPoints: engineData.totalPoints || 0,
-          positionInClass: engineData.termSummary?.classRank || 0,
-          totalStudents: engineData.termSummary?.classSize || 0,
-          bestSixTotal: engineData.totalPoints || 0,
-          eligibleForUniversity: 'YES',
-        },
-      });
-      return this.templateRenderer.renderPdfFromHtml(schoolId, template.id, html);
+    if (!template || !template.components || template.components.length === 0) {
+      return null;
     }
 
-    // Last resort: use the curriculum report card pipeline
-    return this.reportCardService.generateCurriculumReportCardPdf(schoolId, studentId, termId);
+    request.templateId = template.id;
+    const engineData = await this.reportCardEngine.generateReportCardData(
+      studentId, termId, schoolId,
+    );
+    const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+    const html = await this.templateRenderer.renderPreview(schoolId, template.id, {
+      ...engineData,
+      schoolName: school?.name,
+      schoolLogo: school?.logoUrl || school?.logo,
+      subjects: engineData.subjectBreakdown?.map((s: any) => ({
+        subject: s.subjectName,
+        score: s.finalPercentage,
+        grade: s.finalGrade,
+        points: s.points,
+        remark: s.finalRemark,
+      })) || [],
+      summary: {
+        totalMarks: engineData.subjectBreakdown?.reduce((sum: number, s: any) => sum + (s.totalRawScore || 0), 0) || 0,
+        average: engineData.bestSubjectsAverage || 0,
+        totalPoints: engineData.totalPoints || 0,
+        positionInClass: engineData.termSummary?.classRank || 0,
+        totalStudents: engineData.termSummary?.classSize || 0,
+        bestSixTotal: engineData.totalPoints || 0,
+        eligibleForUniversity: 'YES',
+      },
+    });
+    return { html, templateId: template.id, engineData };
+  }
+
+  /**
+   * Generates the professional report card HTML for in-platform viewing
+   * ("View Report Card"). Uses the school template when available, otherwise
+   * renders a complete standalone report card from the report card engine data.
+   */
+  async previewReportCardHtml(request: ReportGenerationRequest): Promise<{ html: string; data: any }> {
+    const rendered = await this.renderReportCardWithTemplate(request);
+    if (rendered) {
+      return { html: rendered.html, data: rendered.engineData };
+    }
+
+    const studentId = request.studentId!;
+    const termId = request.termId!;
+    const schoolId = request.schoolId;
+    const engineData = await this.reportCardEngine.generateReportCardData(studentId, termId, schoolId);
+    const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+    const html = this.buildFallbackReportCardHtml(engineData, school);
+    return { html, data: engineData };
+  }
+
+  private buildFallbackReportCardHtml(engineData: any, school: any): string {
+    const subjects = engineData?.subjectBreakdown || [];
+    const summary = engineData?.termSummary || {};
+    const student = engineData?.student || {};
+    const cls = engineData?.class || {};
+    const term = engineData?.term || {};
+    const attendance = engineData?.attendance || {};
+
+    const subjectRows = subjects.map((s: any, i: number) =>
+      `<tr style="background:${i % 2 === 0 ? 'white' : '#f8fafc'};">
+        <td style="padding:7px 8px;border:1px solid #e5e7eb;font-size:11px;font-weight:600;">${s.subjectName || ''}</td>
+        <td style="padding:7px 8px;border:1px solid #e5e7eb;text-align:center;font-size:11px;font-weight:bold;">${s.finalPercentage != null ? s.finalPercentage.toFixed(1) + '%' : ''}</td>
+        <td style="padding:7px 8px;border:1px solid #e5e7eb;text-align:center;font-size:11px;">${s.finalGrade || ''}</td>
+        <td style="padding:7px 8px;border:1px solid #e5e7eb;text-align:center;font-size:11px;">${s.points != null ? s.points : ''}</td>
+        <td style="padding:7px 8px;border:1px solid #e5e7eb;font-size:10px;color:#555;">${s.finalRemark || ''}</td>
+      </tr>`
+    ).join('');
+
+    const strengths = Array.isArray(summary.strengths) && summary.strengths.length
+      ? `<ul style="margin:4px 0;padding-left:18px;">${summary.strengths.map((x: string) => `<li style="font-size:11px;color:#166534;">${x}</li>`).join('')}</ul>`
+      : '';
+    const weaknesses = Array.isArray(summary.weaknesses) && summary.weaknesses.length
+      ? `<ul style="margin:4px 0;padding-left:18px;">${summary.weaknesses.map((x: string) => `<li style="font-size:11px;color:#b91c1c;">${x}</li>`).join('')}</ul>`
+      : '';
+
+    const stat = (label: string, value: string, bg: string, color: string) =>
+      `<div style="flex:1;min-width:110px;background:${bg};padding:10px;border-radius:8px;text-align:center;">
+        <div style="font-size:20px;font-weight:bold;color:${color};">${value}</div>
+        <div style="font-size:10px;color:#666;font-weight:600;">${label}</div>
+      </div>`;
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Report Card</title>
+<style>
+  @page { size: A4 portrait; margin: 14mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #111827; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  table { page-break-inside: avoid; width: 100%; border-collapse: collapse; }
+  @media print { body { margin: 0; padding: 0; } }
+</style>
+</head>
+<body>
+  <div style="text-align:center;border-bottom:2px solid #1a365d;padding-bottom:12px;margin-bottom:18px;">
+    ${school?.logoUrl ? `<img src="${school.logoUrl}" alt="School Logo" style="height:54px;margin-bottom:6px;"/>` : ''}
+    <div style="font-size:24px;font-weight:bold;color:#1a365d;">${school?.name || 'School'}</div>
+    <div style="font-size:14px;color:#374151;margin-top:3px;">Academic Report Card — ${term?.name || ''} (${engineData?.academicYear?.name || ''})</div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:16px;">
+    <div style="font-size:12px;line-height:1.7;">
+      <div><strong>Student:</strong> ${student?.firstName || ''} ${student?.lastName || ''}</div>
+      <div><strong>Admission No:</strong> ${student?.admissionNumber || ''}</div>
+      <div><strong>Class:</strong> ${cls?.name || ''}</div>
+    </div>
+    <div style="text-align:right;font-size:12px;line-height:1.7;">
+      <div><strong>Term:</strong> ${term?.name || ''}</div>
+      <div><strong>Year:</strong> ${engineData?.academicYear?.name || ''}</div>
+      <div><strong>Generated:</strong> ${new Date().toLocaleDateString()}</div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;">
+    ${stat('Average', summary.overallPercentage != null ? summary.overallPercentage.toFixed(1) + '%' : '—', '#eff6ff', '#2563eb')}
+    ${stat('GPA', summary.gpa != null ? summary.gpa : '—', '#f0fdf4', '#16a34a')}
+    ${stat('Total Points', summary.totalPoints != null ? String(summary.totalPoints) : '—', '#fefce8', '#ca8a04')}
+    ${stat('Position', summary.classRank != null ? '#' + summary.classRank + ' of ' + (summary.classSize || '—') : '—', '#f5f3ff', '#7c3aed')}
+    ${stat('Attendance', attendance.attendanceRate != null ? attendance.attendanceRate + '%' : '—', '#fff7ed', '#ea580c')}
+  </div>
+
+  <table>
+    <thead>
+      <tr style="background:#1a365d;color:white;">
+        <th style="padding:8px;border:1px solid #1a365d;text-align:left;font-size:11px;">Subject</th>
+        <th style="padding:8px;border:1px solid #1a365d;text-align:center;font-size:11px;">Score</th>
+        <th style="padding:8px;border:1px solid #1a365d;text-align:center;font-size:11px;">Grade</th>
+        <th style="padding:8px;border:1px solid #1a365d;text-align:center;font-size:11px;">Points</th>
+        <th style="padding:8px;border:1px solid #1a365d;text-align:left;font-size:11px;">Remark</th>
+      </tr>
+    </thead>
+    <tbody>${subjectRows || '<tr><td colspan="5" style="padding:10px;border:1px solid #e5e7eb;text-align:center;font-size:12px;">No subject results available.</td></tr>'}</tbody>
+  </table>
+
+  ${strengths || weaknesses ? `<div style="margin-top:18px;display:flex;gap:24px;">
+    ${strengths ? `<div style="flex:1;background:#f0fdf4;padding:10px;border-radius:8px;"><strong style="font-size:12px;color:#15803d;">Strengths</strong>${strengths}</div>` : ''}
+    ${weaknesses ? `<div style="flex:1;background:#fef2f2;padding:10px;border-radius:8px;"><strong style="font-size:12px;color:#b91c1c;">Areas for Improvement</strong>${weaknesses}</div>` : ''}
+  </div>` : ''}
+
+  ${summary.teacherRemarks ? `<div style="margin-top:18px;padding:10px;background:#f8fafc;border-left:3px solid #1a365d;border-radius:6px;font-size:11px;"><strong>Teacher's Remarks:</strong><br/>${summary.teacherRemarks}</div>` : ''}
+
+  <div style="display:flex;justify-content:space-between;margin-top:28px;padding-top:12px;border-top:1px solid #e5e7eb;">
+    <div style="width:40%;"><div style="border-top:1px solid #000;margin-top:28px;font-size:10px;color:#666;">Class Teacher</div></div>
+    <div style="width:40%;"><div style="border-top:1px solid #000;margin-top:28px;font-size:10px;color:#666;">Head Teacher</div></div>
+  </div>
+</body>
+</html>`;
   }
 
   private async generateClassReport(request: ReportGenerationRequest) {

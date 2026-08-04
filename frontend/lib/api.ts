@@ -580,6 +580,8 @@ export const superAdminApi = {
   
   getStats: () => api.get('/super-admin/stats'),
   
+  getResultsAnalytics: () => api.get('/super-admin/results-analytics'),
+  
   getAuditLogs: (params?: { schoolId?: string; limit?: number }) => 
     api.get('/super-admin/audit-logs', { params }),
   
@@ -2055,6 +2057,8 @@ export const reportEngineApi = {
     api.post('/report-engine/generate', data),
   generatePdf: (data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string }) =>
     api.post('/report-engine/generate-pdf', data, { responseType: 'blob', timeout: 120000 }),
+  previewReportCard: (data: { studentId: string; termId: string; templateId?: string }) =>
+    api.post('/report-engine/report-card-html', data, { timeout: 120000 }),
   generateBulk: (data: { type: string; classId?: string; termId?: string; templateId?: string; studentIds?: string[] }) =>
     api.post('/report-engine/generate-bulk', data),
   listReports: (params?: { reportType?: string; classId?: string; termId?: string; page?: number; limit?: number }) =>

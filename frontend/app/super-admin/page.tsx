@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { superAdminApi, templateBuilderApi } from '@/lib/api';
 import Link from 'next/link';
 import Icon3D from '@/components/Icon3D';
+import ReactECharts from 'echarts-for-react';
 
 const gradBlue = 'linear-gradient(135deg, #3b82f6, #2563eb)';
 const gradGreen = 'linear-gradient(135deg, #10b981, #059669)';
@@ -36,6 +37,9 @@ export default function SuperAdminPage() {
   const [templateStats, setTemplateStats] = useState<any>(null);
   const [templateStatsLoading, setTemplateStatsLoading] = useState(true);
 
+  const [resultsAnalytics, setResultsAnalytics] = useState<any>(null);
+  const [resultsAnalyticsLoading, setResultsAnalyticsLoading] = useState(true);
+
   const loadStats = async () => {
     try {
       const response = await superAdminApi.getStats();
@@ -58,10 +62,22 @@ export default function SuperAdminPage() {
     }
   };
 
+  const loadResultsAnalytics = async () => {
+    try {
+      const response = await superAdminApi.getResultsAnalytics();
+      setResultsAnalytics(response.data?.data || response.data);
+    } catch (error) {
+      console.error('Failed to load results analytics:', error);
+    } finally {
+      setResultsAnalyticsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
       loadStats();
       loadTemplateStats();
+      loadResultsAnalytics();
     }
   }, [isAuthenticated]);
 
@@ -98,6 +114,87 @@ export default function SuperAdminPage() {
   }
 
   if (!isAuthenticated) return null;
+
+  const PIE_COLORS = ['#ea6645', '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#14b8a6', '#ec4899', '#6366f1'];
+  const gradeDist = resultsAnalytics?.gradeDistribution || [];
+  const histogram = resultsAnalytics?.scoreHistogram || [];
+  const schoolPerf = resultsAnalytics?.schoolPerformance || [];
+  const heatmap = resultsAnalytics?.subjectHeatmap || { schools: [], subjects: [], values: [] };
+
+  const heatmapCells: [number, number, number][] = [];
+  (heatmap.schools || []).forEach((school: string, si: number) => {
+    (heatmap.subjects || []).forEach((subject: string, ti: number) => {
+      heatmapCells.push([ti, si, heatmap.values?.[si]?.[ti] ?? 0]);
+    });
+  });
+
+  const gradePieOption = {
+    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+    legend: { bottom: 0, type: 'scroll', textStyle: { fontSize: 11 } },
+    color: PIE_COLORS,
+    series: [{
+      type: 'pie',
+      radius: ['42%', '68%'],
+      center: ['50%', '45%'],
+      itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+      label: { fontSize: 11 },
+      data: gradeDist.map((d: any) => ({ name: d.grade, value: d.count })),
+    }],
+  };
+
+  const histogramOption = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { left: '10%', right: '4%', bottom: '16%', top: '10%' },
+    xAxis: { type: 'category', data: histogram.map((b: any) => b.bucket), axisLabel: { fontSize: 10, rotate: 30 } },
+    yAxis: { type: 'value', minInterval: 1, splitLine: { lineStyle: { color: '#f3f4f6' } } },
+    series: [{
+      type: 'bar',
+      data: histogram.map((b: any) => b.count),
+      itemStyle: { color: '#ea6645', borderRadius: [4, 4, 0, 0] },
+      barMaxWidth: 28,
+    }],
+  };
+
+  const schoolBarOption = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { left: '10%', right: '4%', bottom: '18%', top: '10%' },
+    xAxis: { type: 'category', data: schoolPerf.map((s: any) => s.schoolName), axisLabel: { fontSize: 10, rotate: 35 } },
+    yAxis: { type: 'value', max: 100, name: 'Avg Score', nameTextStyle: { fontSize: 11 } },
+    series: [{
+      type: 'bar',
+      data: schoolPerf.map((s: any) => s.average),
+      itemStyle: { color: '#3b82f6', borderRadius: [4, 4, 0, 0] },
+      barMaxWidth: 30,
+    }],
+  };
+
+  const heatmapOption = {
+    tooltip: {
+      position: 'top',
+      formatter: (p: any) => {
+        const [ti, si, v] = p.data;
+        return `${heatmap.schools[si]} - ${heatmap.subjects[ti]}: ${Number(v).toFixed(1)}`;
+      },
+    },
+    grid: { left: '14%', right: '4%', bottom: '20%', top: '8%' },
+    xAxis: { type: 'category', data: heatmap.subjects, splitArea: { show: true }, axisLabel: { rotate: 45, fontSize: 10 } },
+    yAxis: { type: 'category', data: heatmap.schools, splitArea: { show: true }, axisLabel: { fontSize: 10 } },
+    visualMap: {
+      min: 0,
+      max: 100,
+      calculable: true,
+      orient: 'horizontal',
+      left: 'center',
+      bottom: '0%',
+      inRange: { color: ['#fee2e2', '#fca5a5', '#ef4444', '#b91c1c'] },
+    },
+    series: [{
+      type: 'heatmap',
+      data: heatmapCells,
+      label: { show: true, fontSize: 9, formatter: (p: any) => p.value[2]?.toFixed(0) },
+      emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.5)' } },
+    }],
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -362,7 +459,76 @@ export default function SuperAdminPage() {
               )}
             </div>
 
-            {/* Quick Actions */}
+      {/* Results Analytics */}
+      <div style={{ background: '#fefcf9', borderRadius: '16px', padding: '24px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1f2937', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ width: '36px', height: '36px', background: 'linear-gradient(135deg, #ea6645, #f59e0b)', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <i className="fa fa-chart-line" style={{ fontSize: '16px', color: 'white' }}></i>
+              </span>
+              Results Analytics
+            </h2>
+            <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>Performance across schools that have published results</p>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+          <div style={{ padding: '16px', background: '#fff7ed', borderRadius: '12px', border: '1px solid #fed7aa' }}>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#ea580c' }}>{resultsAnalytics?.publishedSchools || 0}</div>
+            <div style={{ fontSize: '13px', color: '#9a3412', fontWeight: 500 }}>Schools Publishing</div>
+          </div>
+          <div style={{ padding: '16px', background: '#eff6ff', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#2563eb' }}>{resultsAnalytics?.publishedClasses || 0}</div>
+            <div style={{ fontSize: '13px', color: '#1e40af', fontWeight: 500 }}>Published Classes</div>
+          </div>
+          <div style={{ padding: '16px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#16a34a' }}>{resultsAnalytics?.publishedResults?.toLocaleString() || 0}</div>
+            <div style={{ fontSize: '13px', color: '#166534', fontWeight: 500 }}>Published Scores</div>
+          </div>
+        </div>
+
+        {resultsAnalyticsLoading ? (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: '#9ca3af' }}>
+            <i className="fa fa-spinner fa-spin" style={{ fontSize: '20px', marginBottom: '12px', display: 'block' }}></i>
+            <p>Loading results analytics...</p>
+          </div>
+        ) : resultsAnalytics?.publishedResults ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '20px' }}>
+            <div style={{ background: '#fffdf9', borderRadius: '12px', border: '1px solid #e8ddd0', padding: '16px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#374151', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <i className="fa fa-chart-pie" style={{ color: '#ea6645' }}></i> Grade Distribution
+              </h3>
+              <ReactECharts option={gradePieOption} style={{ height: 320 }} />
+            </div>
+            <div style={{ background: '#fffdf9', borderRadius: '12px', border: '1px solid #e8ddd0', padding: '16px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#374151', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <i className="fa fa-chart-bar" style={{ color: '#8b5cf6' }}></i> Score Histogram
+              </h3>
+              <ReactECharts option={histogramOption} style={{ height: 320 }} />
+            </div>
+            <div style={{ background: '#fffdf9', borderRadius: '12px', border: '1px solid #e8ddd0', padding: '16px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#374151', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <i className="fa fa-trophy" style={{ color: '#f59e0b' }}></i> School Performance
+              </h3>
+              <ReactECharts option={schoolBarOption} style={{ height: 320 }} />
+            </div>
+            <div style={{ background: '#fffdf9', borderRadius: '12px', border: '1px solid #e8ddd0', padding: '16px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#374151', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <i className="fa fa-th-large" style={{ color: '#14b8a6' }}></i> Subject Heatmap by School
+              </h3>
+              <ReactECharts option={heatmapOption} style={{ height: Math.max(320, (heatmap.schools || []).length * 36 + 140) }} />
+            </div>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '32px 0', color: '#9ca3af' }}>
+            <i className="fa fa-chart-bar" style={{ fontSize: '28px', marginBottom: '12px', color: '#d1d5db', display: 'block' }}></i>
+            <p>No published results yet — analytics will appear once schools publish results</p>
+          </div>
+        )}
+      </div>
+
+      {/* Quick Actions */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '16px' }}>
               {[
                 { href: '/dashboard/primary', icon: 'fa-chart-pie', label: 'Primary Dashboard', color: '#059669', bg: '#f0fdf4' },

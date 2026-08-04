@@ -1100,10 +1100,21 @@ class ApiService {
 
   // ===== Student Report Cards =====
   async getStudentReportCard(studentId: string, termId?: string) {
-    const params: any = {};
-    if (termId) params.termId = termId;
-    const response = await this.client.get(`/report-card/${studentId}/${termId || ''}/pdf`, { params, responseType: 'blob' });
-    return response.data;
+    if (!termId) return this.generateReportPdf({ type: 'REPORT_CARD', studentId });
+    return this.generateReportPdf({ type: 'REPORT_CARD', studentId, termId });
+  }
+
+  // ===== Professional Report Card HTML (View Report Card / Print) =====
+  async getReportCardHtml(studentId: string, termId: string): Promise<{ html: string; data?: any }> {
+    const response = await this.client.post('/report-engine/report-card-html', {
+      studentId,
+      termId,
+    });
+    const payload = response.data || {};
+    return {
+      html: payload.html || '',
+      data: payload.data || null,
+    };
   }
 
   async deleteStudentPhoto(studentId: string) {

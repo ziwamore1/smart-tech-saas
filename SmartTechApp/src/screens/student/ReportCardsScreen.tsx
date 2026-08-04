@@ -6,7 +6,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useAuthStore, useAppStore } from '../../store';
 import { apiService } from '../../services/api';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
-import { HeaderBar } from '../../components';
+import { HeaderBar, ReportCardPdfViewer } from '../../components';
 
 export const StudentReportCardsScreen: React.FC = () => {
   const { user } = useAuthStore();
@@ -16,6 +16,10 @@ export const StudentReportCardsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [reportHtml, setReportHtml] = useState('');
+  const [loadingHtml, setLoadingHtml] = useState(false);
 
   const [terms, setTerms] = useState<any[]>([]);
   const [selectedTermId, setSelectedTermId] = useState<string>('');
@@ -135,6 +139,60 @@ export const StudentReportCardsScreen: React.FC = () => {
       }
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleViewReportCard = async () => {
+    if (!studentId || !selectedTermId) {
+      Alert.alert('Error', 'Missing student or term information');
+      return;
+    }
+    setLoadingHtml(true);
+    try {
+      const { html } = await apiService.getReportCardHtml(studentId, selectedTermId);
+      if (!html) throw new Error('Report card is not available for this term yet.');
+      setReportHtml(html);
+      setViewerVisible(true);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Report card preview is not available yet.';
+      Alert.alert('Unavailable', msg);
+    } finally {
+      setLoadingHtml(false);
+    }
+  };
+
+  const buildShareMessage = () => {
+    const studentName = user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'Student';
+    const termName = selectedTerm?.name || dashboard?.currentTerm?.name || 'Current Term';
+    let msg = `SmartTech School — Report Card\n\n`;
+    msg += `Student: ${studentName}\n`;
+    msg += `Term: ${termName}\n`;
+    msg += `Overall Average: ${avg.toFixed(1)}%\n`;
+    if (classAvg > 0) msg += `Class Average: ${classAvg.toFixed(1)}%\n`;
+    if (position && totalStudents) msg += `Position: #${position} of ${totalStudents}\n`;
+    msg += `Performance: ${getPerformanceLabel(avg)}\n\n`;
+    msg += '='.repeat(34) + '\n';
+    msg += 'SUBJECT RESULTS\n';
+    results.forEach((r: any, i: number) => {
+      const score = r.score || r.finalPercentage || 0;
+      const grade = r.grade || r.finalGrade || '-';
+      const subjectName = r.subject?.name || r.subject || 'Subject';
+      msg += `\n${i + 1}. ${subjectName}: ${score.toFixed(1)}% (${grade})${r.remark ? ' — ' + r.remark : ''}`;
+    });
+    msg += `\n\nGenerated ${new Date().toLocaleString()}\nSmartTech School Management System`;
+    return msg;
+  };
+
+  const handleShare = async () => {
+    const message = buildShareMessage();
+    try {
+      const uri = FileSystem.cacheDirectory + 'report_card_summary.txt';
+      await FileSystem.writeAsStringAsync(uri, message, { encoding: FileSystem.EncodingType.UTF8 });
+      await Sharing.shareAsync(uri, { mimeType: 'text/plain', dialogTitle: 'Share Report Card Summary' });
+    } catch (err: any) {
+      if (err?.message !== 'User did not share') {
+        Alert.alert('Error', 'Failed to share report card summary');
+      }
     }
   };
 
@@ -258,10 +316,18 @@ export const StudentReportCardsScreen: React.FC = () => {
               )}
             </View>
 
-            {/* PDF Download Button */}
-            <TouchableOpacity style={styles.downloadBtn} onPress={handleDownloadPdf} disabled={downloading}>
-              <Text style={styles.downloadBtnText}>{downloading ? 'Generating PDF...' : '📄 Download Full Report Card (PDF)'}</Text>
-            </TouchableOpacity>
+            {/* Actions: View / Download / Share */}
+            <View style={styles.actionsRow}>
+              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnPrimary]} onPress={handleViewReportCard} disabled={loadingHtml}>
+                <Text style={styles.actionBtnTextPrimary}>{loadingHtml ? 'Loading...' : '👁 View Report Card'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnSecondary]} onPress={handleDownloadPdf} disabled={downloading}>
+                <Text style={styles.actionBtnTextSecondary}>{downloading ? 'Generating...' : '⬇ Download PDF'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnSecondary]} onPress={handleShare}>
+                <Text style={styles.actionBtnTextSecondary}>📤 Share Summary</Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Subject Results */}
             <View style={styles.sectionCard}>
@@ -320,6 +386,16 @@ export const StudentReportCardsScreen: React.FC = () => {
         )}
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
+
+      {viewerVisible && (
+        <ReportCardPdfViewer
+          visible={viewerVisible}
+          html={reportHtml}
+          studentName={user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'Student'}
+          termName={selectedTerm?.name || dashboard?.currentTerm?.name || 'Current Term'}
+          onClose={() => setViewerVisible(false)}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -367,6 +443,13 @@ const styles = StyleSheet.create({
 
   downloadBtn: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.md, alignItems: 'center', marginBottom: spacing.md, ...shadows.sm },
   downloadBtnText: { fontSize: 15, fontWeight: '700', color: colors.primary },
+
+  actionsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  actionBtn: { flex: 1, paddingVertical: spacing.md, borderRadius: borderRadius.lg, alignItems: 'center', justifyContent: 'center' },
+  actionBtnPrimary: { backgroundColor: colors.primary, ...shadows.sm },
+  actionBtnSecondary: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.primary, ...shadows.sm },
+  actionBtnTextPrimary: { fontSize: 14, fontWeight: '700', color: colors.white },
+  actionBtnTextSecondary: { fontSize: 14, fontWeight: '700', color: colors.primary },
 
   sectionCard: { backgroundColor: colors.white, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, ...shadows.sm },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: spacing.md },

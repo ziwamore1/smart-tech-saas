@@ -5,10 +5,12 @@ import { useQuery } from '@tanstack/react-query';
 import { resultApi, termApi, studentApi, reportEngineApi } from '@/lib/api';
 import Link from 'next/link';
 import { checkEczEligibility, scoreToEczGrade } from '@/lib/ecz-eligibility';
+import { ReportCardViewer } from '@/components/report-card-viewer';
 
 export default function StudentResultsPage() {
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const { data: studentData } = useQuery({
     queryKey: ['my-profile'],
@@ -102,6 +104,46 @@ export default function StudentResultsPage() {
       alert(err?.response?.data?.message || err?.message || 'Failed to generate report card.');
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleViewReportCard = () => {
+    if (!selectedTermId) return;
+    setViewerOpen(true);
+  };
+
+  const buildShareMessage = () => {
+    let msg = `${student?.school?.name || 'SmartTech School'} - Report Card\n`;
+    msg += `Student: ${student?.firstName || ''} ${student?.lastName || ''}`.trim() + '\n';
+    msg += `Class: ${student?.class?.name || ''}\n`;
+    msg += `Term: ${selectedTerm?.name || 'Current Term'}\n`;
+    msg += `Average: ${calculateAverage()}% | GPA: ${getGPA()} | Points: ${calculateTotalPoints().toFixed(1)}${getPosition() ? ` | Position: #${getPosition()}` : ''}\n\n`;
+    msg += `${'='.repeat(32)}\nSUBJECT RESULTS\n`;
+    results.forEach((r: any) => {
+      const gradeInfo = getGrade(r);
+      msg += `\n${r.subject?.name || 'Subject'}: ${r.score?.toFixed(1) || '—'}% (${gradeInfo.letter})${gradeInfo.remark ? ' - ' + gradeInfo.remark : ''}`;
+    });
+    msg += `\n\nGenerated ${new Date().toLocaleString()}\nSmartTech School Management System`;
+    return msg;
+  };
+
+  const handleShare = async () => {
+    if (results.length === 0) return;
+    const message = buildShareMessage();
+    const nav: any = typeof navigator !== 'undefined' ? navigator : null;
+    if (nav?.share) {
+      try {
+        await nav.share({ title: 'Report Card', text: message });
+        return;
+      } catch {
+        // user cancelled — fall through to clipboard
+      }
+    }
+    try {
+      await nav?.clipboard?.writeText(message);
+      alert('Report card summary copied to clipboard.');
+    } catch {
+      alert('Sharing is not supported on this browser.');
     }
   };
 
@@ -209,13 +251,27 @@ export default function StudentResultsPage() {
                           Draft
                         </span>
                       )}
-                      <button
-                        onClick={downloadReportCard}
-                        disabled={downloading}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg"
-                      >
-                        {downloading ? 'Generating...' : '📄 Download Report Card (PDF)'}
-                      </button>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <button
+                          onClick={handleViewReportCard}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg"
+                        >
+                          👁 View Report Card
+                        </button>
+                        <button
+                          onClick={downloadReportCard}
+                          disabled={downloading}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg"
+                        >
+                          {downloading ? 'Generating...' : '📄 Download PDF'}
+                        </button>
+                        <button
+                          onClick={handleShare}
+                          className="px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-semibold rounded-lg"
+                        >
+                          📤 Share
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -344,6 +400,16 @@ export default function StudentResultsPage() {
           </div>
         </div>
       </div>
+
+      {viewerOpen && selectedTermId && (
+        <ReportCardViewer
+          studentId="me"
+          termId={selectedTermId}
+          termName={selectedTerm?.name}
+          studentName={`${student?.firstName || ''} ${student?.lastName || ''}`.trim() || 'My Report Card'}
+          onClose={() => setViewerOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Req, UseGuards, Res, Param, Query, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Req, UseGuards, Res, Param, Query, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import type { Response as ExpressResponse } from 'express';
 import { ReportEngineService, ReportType, ReportGenerationRequest } from './report-engine.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -214,6 +214,43 @@ export class ReportEngineController {
         message: error.message || 'Failed to generate report',
       });
     }
+  }
+
+  @Post('report-card-html')
+  @Roles('Director', 'Class Teacher', 'Teacher', 'Parent', 'Student')
+  async previewReportCard(
+    @Req() req,
+    @Body() body: { studentId?: string; termId?: string; templateId?: string },
+  ) {
+    if (!body.studentId) {
+      throw new BadRequestException('studentId is required');
+    }
+    const roles = (req.user.roles || []).map((r: string) => String(r).toUpperCase());
+    const isStaff = roles.some(r =>
+      ['DIRECTOR', 'DEPUTY DIRECTOR', 'HEAD TEACHER', 'DEPUTY HEAD', 'DEPUTY', 'HOD', 'TEACHER', 'CLASS TEACHER'].includes(r),
+    );
+    if (!isStaff) {
+      body.studentId = await this.ownership.resolveStudentId(req.user, body.studentId);
+      await this.ownership.assertCanViewStudent(req.user, body.studentId);
+
+      if (!body.termId) {
+        throw new BadRequestException('termId is required');
+      }
+      const published = await this.reportEngine.hasPublishedResults(
+        body.studentId,
+        body.termId,
+        req.user.schoolId,
+      );
+      if (!published) {
+        throw new NotFoundException('Results for this term are not published yet');
+      }
+    }
+
+    const { html, data } = await this.reportEngine.previewReportCardHtml({
+      ...body,
+      schoolId: req.user.schoolId,
+    });
+    return { html, data };
   }
 
   @Post('generate-bulk')

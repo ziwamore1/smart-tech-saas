@@ -16,6 +16,7 @@ import { StaffSyncEngineService } from '../shared/staff-sync-engine/staff-sync-e
 
 const STATS_CACHE_TTL = 300_000;
 const STATS_CACHE_KEY = 'super-admin:system-stats';
+const RESULTS_ANALYTICS_CACHE_KEY = 'super-admin:results-analytics';
 
 @Injectable()
 export class SuperAdminService {
@@ -716,6 +717,158 @@ Email: ${director.email}
     };
 
     this.cacheService.set(STATS_CACHE_KEY, result, STATS_CACHE_TTL);
+    return result;
+  }
+
+  async getResultsAnalytics() {
+    const cached = this.cacheService.get<any>(RESULTS_ANALYTICS_CACHE_KEY);
+    if (cached) {
+      return cached;
+    }
+
+    this.logger.log('Computing results analytics (uncached)');
+
+    const empty = {
+      publishedSchools: 0,
+      publishedClasses: 0,
+      publishedResults: 0,
+      gradeDistribution: [],
+      scoreHistogram: [],
+      schoolPerformance: [],
+      subjectHeatmap: { schools: [], subjects: [], values: [] },
+    };
+
+    const publishedSheets = await this.prisma.resultSheet.findMany({
+      where: { status: 'PUBLISHED' },
+      select: { classId: true, termId: true, schoolId: true },
+    });
+
+    if (publishedSheets.length === 0) {
+      return empty;
+    }
+
+    const schoolIds = [...new Set(publishedSheets.map((s) => s.schoolId))];
+    const classIds = [...new Set(publishedSheets.map((s) => s.classId))];
+    const termIds = [...new Set(publishedSheets.map((s) => s.termId))];
+
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { classId: { in: classIds }, status: 'ACTIVE' },
+      select: { studentId: true },
+    });
+    const studentIds = [...new Set(enrollments.map((e) => e.studentId))];
+
+    const where: any = {
+      schoolId: { in: schoolIds },
+      termId: { in: termIds },
+    };
+    if (studentIds.length > 0) {
+      where.studentId = { in: studentIds };
+    }
+
+    const results = await this.prisma.result.findMany({
+      where,
+      select: {
+        score: true,
+        grade: true,
+        schoolId: true,
+        subjectId: true,
+        subject: { select: { name: true } },
+      },
+    });
+
+    if (results.length === 0) {
+      return empty;
+    }
+
+    const schoolNames = await this.prisma.school.findMany({
+      where: { id: { in: schoolIds } },
+      select: { id: true, name: true },
+    });
+    const schoolNameMap = new Map(schoolNames.map((s) => [s.id, s.name]));
+
+    const gradeMap: Record<string, number> = {};
+    for (const r of results) {
+      const g = r.grade || 'No Grade';
+      gradeMap[g] = (gradeMap[g] || 0) + 1;
+    }
+    const gradeDistribution = Object.entries(gradeMap)
+      .map(([grade, count]) => ({ grade, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const buckets = Array.from({ length: 10 }, (_, i) => ({
+      bucket: `${i * 10}-${i * 10 + 9}`,
+      min: i * 10,
+      max: i * 10 + 9,
+      count: 0,
+    }));
+    for (const r of results) {
+      const idx = Math.min(9, Math.floor(Math.max(0, r.score || 0) / 10));
+      buckets[idx].count += 1;
+    }
+
+    const schoolScoreMap: Record<string, { total: number; count: number }> = {};
+    for (const r of results) {
+      if (!schoolScoreMap[r.schoolId]) {
+        schoolScoreMap[r.schoolId] = { total: 0, count: 0 };
+      }
+      schoolScoreMap[r.schoolId].total += r.score || 0;
+      schoolScoreMap[r.schoolId].count += 1;
+    }
+    const schoolPerformance = Object.entries(schoolScoreMap)
+      .map(([schoolId, v]) => ({
+        schoolId,
+        schoolName: schoolNameMap.get(schoolId) || 'Unknown School',
+        average: Number((v.total / v.count).toFixed(1)),
+        resultCount: v.count,
+      }))
+      .sort((a, b) => b.average - a.average)
+      .slice(0, 12);
+
+    const cellMap: Record<
+      string,
+      { total: number; count: number; schoolName: string; subjectName: string }
+    > = {};
+    for (const r of results) {
+      const key = `${r.schoolId}|${r.subjectId}`;
+      if (!cellMap[key]) {
+        cellMap[key] = {
+          total: 0,
+          count: 0,
+          schoolName: schoolNameMap.get(r.schoolId) || 'Unknown School',
+          subjectName: r.subject?.name || 'Unknown Subject',
+        };
+      }
+      cellMap[key].total += r.score || 0;
+      cellMap[key].count += 1;
+    }
+    const cells = Object.values(cellMap);
+    const schoolsOrder = [...new Set(cells.map((c) => c.schoolName))].slice(0, 10);
+    const subjectsOrder = [...new Set(cells.map((c) => c.subjectName))].slice(0, 12);
+    const valueMap: Record<string, number> = {};
+    for (const c of cells) {
+      valueMap[`${c.schoolName}|${c.subjectName}`] = Number(
+        (c.total / c.count).toFixed(1),
+      );
+    }
+    const subjectHeatmap = {
+      schools: schoolsOrder,
+      subjects: subjectsOrder,
+      values: schoolsOrder.map((school) =>
+        subjectsOrder.map((subj) => valueMap[`${school}|${subj}`] ?? 0),
+      ),
+    };
+
+    const result = {
+      publishedSchools: schoolIds.length,
+      publishedClasses: classIds.length,
+      publishedResults: results.length,
+      gradeDistribution,
+      scoreHistogram: buckets,
+      schoolPerformance,
+      subjectHeatmap,
+    };
+
+    this.cacheService.set(RESULTS_ANALYTICS_CACHE_KEY, result, STATS_CACHE_TTL);
     return result;
   }
 

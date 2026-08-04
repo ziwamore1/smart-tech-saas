@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshCon
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Card, Loading } from '../../components';
+import { Card, Loading, ReportCardPdfViewer } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useAuthStore, useAppStore } from '../../store';
 import { apiService } from '../../services/api';
@@ -19,6 +19,10 @@ export const StudentResultsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [downloading, setDownloading] = useState(false);
+
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [reportHtml, setReportHtml] = useState('');
+  const [loadingHtml, setLoadingHtml] = useState(false);
 
   const studentId = dashboard?.student?.id || user?.studentId || user?.id;
 
@@ -198,6 +202,26 @@ export const StudentResultsScreen: React.FC = () => {
     }
   };
 
+  const handleViewReportCard = async () => {
+    const termId = selectedTermId || dashboard?.currentTerm?.id;
+    if (!studentId || !termId) {
+      Alert.alert('Unavailable', 'No term selected to view a report card.');
+      return;
+    }
+    setLoadingHtml(true);
+    try {
+      const { html } = await apiService.getReportCardHtml(studentId, termId);
+      if (!html) throw new Error('Report card is not available for this term yet.');
+      setReportHtml(html);
+      setViewerVisible(true);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Report card preview is not available yet.';
+      Alert.alert('Unavailable', msg);
+    } finally {
+      setLoadingHtml(false);
+    }
+  };
+
   const generateResultsContent = (): string => {
     const date = new Date().toLocaleDateString();
     const term = terms.find((t: any) => t.id === selectedTermId)?.name || dashboard?.currentTerm?.name || 'Current Term';
@@ -277,25 +301,47 @@ export const StudentResultsScreen: React.FC = () => {
           ))
         )}
         {studentId && (
-          <TouchableOpacity
-            style={[styles.downloadBtn, downloading && styles.downloadBtnDisabled]}
-            onPress={handleDownloadReportCard}
-            disabled={downloading}
-          >
-            {downloading ? (
+          <>
+            <TouchableOpacity
+              style={[styles.downloadBtn, (downloading || loadingHtml) && styles.downloadBtnDisabled]}
+              onPress={handleViewReportCard}
+              disabled={downloading || loadingHtml}
+            >
               <View style={styles.downloadBtnInner}>
-                <ActivityIndicator size="small" color={colors.white} />
-                <Text style={styles.downloadBtnText}>Generating Report Card...</Text>
+                <Text style={styles.downloadBtnIcon}>👁</Text>
+                <Text style={styles.downloadBtnText}>{loadingHtml ? 'Loading...' : 'View Report Card'}</Text>
               </View>
-            ) : (
-              <View style={styles.downloadBtnInner}>
-                <Text style={styles.downloadBtnIcon}>📄</Text>
-                <Text style={styles.downloadBtnText}>Download Report Card (PDF)</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.downloadBtn, styles.downloadBtnSecondary, downloading && styles.downloadBtnDisabled]}
+              onPress={handleDownloadReportCard}
+              disabled={downloading}
+            >
+              {downloading ? (
+                <View style={styles.downloadBtnInner}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.downloadBtnTextSecondary}>Generating Report Card...</Text>
+                </View>
+              ) : (
+                <View style={styles.downloadBtnInner}>
+                  <Text style={styles.downloadBtnIcon}>📄</Text>
+                  <Text style={styles.downloadBtnTextSecondary}>Download PDF</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </>
         )}
       </ScrollView>
+
+      {viewerVisible && (
+        <ReportCardPdfViewer
+          visible={viewerVisible}
+          html={reportHtml}
+          studentName={user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'Student'}
+          termName={selectedTermName}
+          onClose={() => setViewerVisible(false)}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -322,8 +368,10 @@ const styles = StyleSheet.create({
   scoreBadge: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 8 },
   scoreText: { fontSize: 18, fontWeight: '700' },
   downloadBtn: { marginTop: spacing.md, backgroundColor: colors.primary, borderRadius: borderRadius.md, paddingVertical: spacing.md, alignItems: 'center', justifyContent: 'center', ...shadows.md },
+  downloadBtnSecondary: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.primary },
   downloadBtnDisabled: { backgroundColor: colors.textMuted, shadowOpacity: 0, elevation: 0 },
   downloadBtnInner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   downloadBtnIcon: { fontSize: 16 },
   downloadBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
+  downloadBtnTextSecondary: { fontSize: 15, fontWeight: '700', color: colors.primary },
 });

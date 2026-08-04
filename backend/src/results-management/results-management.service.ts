@@ -7,6 +7,7 @@ import { ReportCardEngineService } from '../report-card-engine/report-card-engin
 import { AssessmentEngineService } from '../assessment-engine/assessment-engine.service';
 import { ResultsSmsService } from '../results-sms/results-sms.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
+import { PushNotificationService } from '../push-notification/push-notification.service';
 import { Prisma } from '@prisma/client';
 import * as XLSX from 'xlsx';
 
@@ -24,6 +25,7 @@ export class ResultsManagementService {
     @Optional() @Inject(forwardRef(() => ResultsSmsService))
     private resultsSmsService?: ResultsSmsService,
     private schoolEvents?: SchoolEventsGateway,
+    private pushNotification?: PushNotificationService,
   ) {}
 
   private computingKeys = new Set<string>();
@@ -571,6 +573,24 @@ export class ResultsManagementService {
         termId: sheet.termId,
         publishedBy: userId,
       });
+    }
+
+    if (this.pushNotification) {
+      try {
+        const termName = (await this.prisma.term.findUnique({ where: { id: sheet.termId }, select: { name: true } }))?.name || '';
+        const className = (await this.prisma.class.findUnique({ where: { id: sheet.classId }, select: { name: true } }))?.name || '';
+        await this.pushNotification.sendByRole(
+          'Director',
+          {
+            title: 'Results Published',
+            body: `Results for ${className}${termName ? ' - ' + termName : ''} were published.`,
+            data: { type: 'result_published', classId: sheet.classId, termId: sheet.termId },
+          },
+          sheet.schoolId,
+        );
+      } catch (error: any) {
+        this.logger.error(`[Director Notification] Failed: ${error.message}`);
+      }
     }
 
     return result;

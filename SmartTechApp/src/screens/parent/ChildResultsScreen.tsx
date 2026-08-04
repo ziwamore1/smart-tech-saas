@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
-import { Card, Loading } from '../../components';
+import { Card, Loading, ReportCardPdfViewer } from '../../components';
 import { colors, spacing, borderRadius } from '../../theme';
 import { useAppStore } from '../../store';
 import { useAuthStore } from '../../store';
@@ -26,6 +26,10 @@ export const ParentChildResultsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [reportHtml, setReportHtml] = useState('');
+  const [loadingHtml, setLoadingHtml] = useState(false);
 
   useEffect(() => {
     const kids = dashboard?.children || [];
@@ -242,7 +246,14 @@ export const ParentChildResultsScreen: React.FC = () => {
     }
     try {
       setActionLoading(true);
-      const html = generateHtmlReport();
+      const termId = selectedTermId || dashboard?.currentTerm?.id;
+      let html = generateHtmlReport();
+      if (childId && termId) {
+        try {
+          const { html: professionalHtml } = await apiService.getReportCardHtml(childId, termId);
+          if (professionalHtml) html = professionalHtml;
+        } catch { /* keep fallback */ }
+      }
       await Print.printAsync({ html });
     } catch (e: any) {
       if (e?.message !== 'User did not share') {
@@ -250,6 +261,26 @@ export const ParentChildResultsScreen: React.FC = () => {
       }
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleViewReportCard = async () => {
+    const termId = selectedTermId || dashboard?.currentTerm?.id;
+    if (!childId || !termId) {
+      Alert.alert('Error', 'Missing term or student information');
+      return;
+    }
+    setLoadingHtml(true);
+    try {
+      const { html } = await apiService.getReportCardHtml(childId, termId);
+      if (!html) throw new Error('Report card is not available for this term yet.');
+      setReportHtml(html);
+      setViewerVisible(true);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Report card preview is not available yet.';
+      Alert.alert('Unavailable', msg);
+    } finally {
+      setLoadingHtml(false);
     }
   };
 
@@ -269,6 +300,9 @@ export const ParentChildResultsScreen: React.FC = () => {
         <Text style={styles.headerSub}>{selectedTermName}</Text>
         {results.length > 0 && (
           <View style={styles.actions}>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleViewReportCard} disabled={actionLoading || loadingHtml}>
+              <Text style={styles.actionBtnText}>{loadingHtml ? '...' : '👁 View'}</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.actionBtn} onPress={handleShareResults} disabled={actionLoading}>
               <Text style={styles.actionBtnText}>📤 Share</Text>
             </TouchableOpacity>
@@ -333,6 +367,16 @@ export const ParentChildResultsScreen: React.FC = () => {
           ))
         )}
       </ScrollView>
+
+      {viewerVisible && (
+        <ReportCardPdfViewer
+          visible={viewerVisible}
+          html={reportHtml}
+          studentName={childName || 'Child'}
+          termName={selectedTermName}
+          onClose={() => setViewerVisible(false)}
+        />
+      )}
     </SafeAreaView>
   );
 };

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { useAppStore } from '../store';
 import { colors, spacing, typography, shadows } from '../theme';
 
 interface HeaderBarProps {
@@ -23,6 +24,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 }) => {
   const { isConnected, isOnline } = useNetworkStatus();
   const isOffline = !isConnected || !isOnline;
+  const unreadCount = useAppStore((s) => s.unreadCount);
+  const isBell = rightIcon?.name === '🔔';
+  const badgeCount = isBell && unreadCount > 0 ? (unreadCount > 99 ? '99+' : String(unreadCount)) : null;
 
   return (
     <>
@@ -47,6 +51,11 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           {rightIcon ? (
             <TouchableOpacity onPress={rightIcon.onPress} style={styles.iconBtn}>
               <Text style={styles.iconText}>{rightIcon.name}</Text>
+              {badgeCount && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{badgeCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           ) : <View style={styles.iconPlaceholder} />}
         </View>
@@ -82,6 +91,26 @@ const styles = StyleSheet.create({
   },
   iconText: {
     fontSize: 18,
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: colors.white,
+  },
+  badgeText: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 12,
   },
   iconPlaceholder: {
     width: 40,

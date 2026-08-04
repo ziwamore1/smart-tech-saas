@@ -6,16 +6,21 @@ import * as Notifications from 'expo-notifications';
 import { HeaderBar, WidgetCard } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { apiService } from '../../services/api';
+import { useAppStore } from '../../store';
 
 export const NotificationsScreen: React.FC = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [localNotifs, setLocalNotifs] = useState<Notifications.NotificationRequest[]>([]);
+  const setUnreadCount = useAppStore((s) => s.setUnreadCount);
 
   useEffect(() => {
     apiService.getNotifications().then(r => {
       const data = r?.data || r;
       setNotifications(Array.isArray(data) ? data : data?.notifications || []);
     }).catch(() => setNotifications([]));
+    apiService.getUnreadNotificationCount()
+      .then(r => setUnreadCount(Number(r?.count ?? r ?? 0) || 0))
+      .catch(() => {});
     loadLocalNotifications();
   }, []);
 
@@ -32,6 +37,7 @@ export const NotificationsScreen: React.FC = () => {
     try {
       await apiService.markAllNotificationsAsRead();
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setUnreadCount(0);
     } catch (e) {
       Alert.alert('Error', 'Failed to mark all as read');
     }
@@ -49,7 +55,8 @@ export const NotificationsScreen: React.FC = () => {
   const handleDismissNotification = async (notif: any) => {
     try {
       if (notif.id) {
-        await apiService.markNotificationRead(notif.id);
+        await apiService.markNotificationAsRead(notif.id);
+        setUnreadCount((useAppStore.getState().unreadCount || 1) - 1);
       }
       setNotifications(prev => prev.filter(n => n.id !== notif.id));
     } catch (e) {

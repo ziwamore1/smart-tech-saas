@@ -1,7 +1,7 @@
 // Must be first import - patches TurboModuleProxy before any native module imports
 import './src/turboModulePatcher';
 import React, { useEffect, useState, useRef, Component, useCallback } from 'react';
-import { StyleSheet, View, Platform, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Platform, Text, TouchableOpacity, AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
@@ -14,9 +14,11 @@ import * as Sentry from '@sentry/react-native';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { Loading } from './src/components';
 import { apiService } from './src/services/api';
-import { useAuthStore } from './src/store';
+import { useAuthStore, useAppStore } from './src/store';
 
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN || '';
+
+const UNREAD_REFRESH_INTERVAL = 30000; // 30 seconds
 
 if (SENTRY_DSN) {
   Sentry.init({
@@ -79,7 +81,42 @@ export default function App() {
   const [updateState, setUpdateState] = useState<{ available: boolean; downloading: boolean; downloaded: boolean; apkInfo?: any }>({ available: false, downloading: false, downloaded: false });
   const notificationListener = useRef<any>();
   const responseListener = useRef<any>();
+  const unreadTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { isAuthenticated } = useAuthStore();
+
+  const refreshUnreadCount = useCallback(async () => {
+    try {
+      const res = await apiService.getUnreadNotificationCount();
+      const count = res?.count ?? res ?? 0;
+      useAppStore.getState().setUnreadCount(Number(count) || 0);
+    } catch (e) {
+      // silent - badge will refresh on next interval
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    useAppStore.getState().fetchNotifications().catch(() => {
+      refreshUnreadCount();
+    });
+
+    unreadTimer.current = setInterval(refreshUnreadCount, UNREAD_REFRESH_INTERVAL);
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        refreshUnreadCount();
+      }
+    });
+
+    return () => {
+      if (unreadTimer.current) {
+        clearInterval(unreadTimer.current);
+        unreadTimer.current = null;
+      }
+      sub.remove();
+    };
+  }, [isAuthenticated, refreshUnreadCount]);
 
   useEffect(() => {
     (async () => {

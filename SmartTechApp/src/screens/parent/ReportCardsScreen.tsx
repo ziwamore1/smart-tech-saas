@@ -8,6 +8,7 @@ import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useAppStore } from '../../store';
 import { apiService } from '../../services/api';
 import { getGradeTextColor, getGradeBgColor, getScoreTextColor, getScoreBgColor } from '../../utils/gradeColors';
+import { ReportCardPdfViewer } from '../../components';
 
 export const ParentReportCardsScreen: React.FC = () => {
   const { dashboard } = useAppStore();
@@ -20,6 +21,10 @@ export const ParentReportCardsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [reportHtml, setReportHtml] = useState('');
+  const [loadingHtml, setLoadingHtml] = useState(false);
 
   useEffect(() => {
     const kids = dashboard?.children || [];
@@ -136,31 +141,88 @@ export const ParentReportCardsScreen: React.FC = () => {
     } finally { setActionLoading(false); }
   };
 
+  const buildFallbackPrintHtml = () => {
+    const term = selectedTerm?.name || dashboard?.currentTerm?.name || 'Current Term';
+    const school = dashboard?.school?.name || 'SmartTech School';
+
+    const subjectRows = results.map((r: any) => {
+      const score = r.score || r.finalPercentage || 0;
+      const grade = r.grade || '-';
+      const bgColor = grade !== '-' ? getGradeBgColor(grade) : getScoreBgColor(score);
+      const textColor = grade !== '-' ? getGradeTextColor(grade) : getScoreTextColor(score);
+      const prevScore = r.previousScore || r.midTermScore || null;
+      const trendHtml = prevScore != null ? `<span style="color:${score > prevScore ? '#16a34a' : score < prevScore ? '#dc2626' : '#6b7280'};font-size:11px;margin-left:6px">${score > prevScore ? '▲' : score < prevScore ? '▼' : '→'} ${Math.abs(score - prevScore).toFixed(1)}</span>` : '';
+      return `<tr><td style="padding:10px;border-bottom:1px solid #e5e7eb;font-weight:600">${r.subject?.name || r.subject || 'Subject'}</td><td style="padding:10px;border-bottom:1px solid #e5e7eb"><span style="background:${bgColor};color:${textColor};padding:4px 12px;border-radius:8px;font-weight:700">${grade}</span></td><td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700">${Math.round(score)}%${trendHtml}</td></tr>`;
+    }).join('');
+
+    const rankHtml = position && totalStudents ? `<p style="font-size:16px;font-weight:700;color:#1e40af">Position: #${position} of ${totalStudents} students</p>` : '';
+    const classAvgHtml = classAvg > 0 ? `<p style="color:#6b7280">Class Average: ${Math.round(classAvg)}%</p>` : '';
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:24px;color:#333}h1{color:#1e40af;margin:0}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#1e40af;color:#fff;padding:10px;text-align:left}</style></head><body><h1>${school}</h1><p style="color:#6b7280">Report Card - ${term}</p><p><strong>Student:</strong> ${childName}</p>${rankHtml}${classAvgHtml}<table><thead><tr><th>Subject</th><th>Grade</th><th>Score</th></tr></thead><tbody>${subjectRows}</tbody></table><p style="text-align:center;font-size:18px;font-weight:700;color:#1e40af;margin-top:16px">Overall Average: ${Math.round(avg)}%</p></body></html>`;
+  };
+
   const handlePrint = async () => {
     if (results.length === 0) { Alert.alert('No Data', 'No results to print'); return; }
     try {
       setActionLoading(true);
-      const term = dashboard?.currentTerm?.name || 'Current Term';
-      const school = dashboard?.school?.name || 'SmartTech School';
-
-      const subjectRows = results.map((r: any) => {
-        const score = r.score || r.finalPercentage || 0;
-        const grade = r.grade || '-';
-        const bgColor = grade !== '-' ? getGradeBgColor(grade) : getScoreBgColor(score);
-        const textColor = grade !== '-' ? getGradeTextColor(grade) : getScoreTextColor(score);
-        const prevScore = r.previousScore || r.midTermScore || null;
-        const trendHtml = prevScore != null ? `<span style="color:${score > prevScore ? '#16a34a' : score < prevScore ? '#dc2626' : '#6b7280'};font-size:11px;margin-left:6px">${score > prevScore ? '▲' : score < prevScore ? '▼' : '→'} ${Math.abs(score - prevScore).toFixed(1)}</span>` : '';
-        return `<tr><td style="padding:10px;border-bottom:1px solid #e5e7eb;font-weight:600">${r.subject?.name || r.subject || 'Subject'}</td><td style="padding:10px;border-bottom:1px solid #e5e7eb"><span style="background:${bgColor};color:${textColor};padding:4px 12px;border-radius:8px;font-weight:700">${grade}</span></td><td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700">${Math.round(score)}%${trendHtml}</td></tr>`;
-      }).join('');
-
-      const rankHtml = position && totalStudents ? `<p style="font-size:16px;font-weight:700;color:#1e40af">Position: #${position} of ${totalStudents} students</p>` : '';
-      const classAvgHtml = classAvg > 0 ? `<p style="color:#6b7280">Class Average: ${Math.round(classAvg)}%</p>` : '';
-
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:24px;color:#333}h1{color:#1e40af;margin:0}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#1e40af;color:#fff;padding:10px;text-align:left}</style></head><body><h1>${school}</h1><p style="color:#6b7280">Report Card - ${term}</p><p><strong>Student:</strong> ${childName}</p>${rankHtml}${classAvgHtml}<table><thead><tr><th>Subject</th><th>Grade</th><th>Score</th></tr></thead><tbody>${subjectRows}</tbody></table><p style="text-align:center;font-size:18px;font-weight:700;color:#1e40af;margin-top:16px">Overall Average: ${Math.round(avg)}%</p></body></html>`;
-      await Print.printAsync({ html });
+      const termId = selectedTermId || dashboard?.currentTerm?.id;
+      let htmlToPrint = buildFallbackPrintHtml();
+      if (selectedChildId && termId) {
+        try {
+          const { html } = await apiService.getReportCardHtml(selectedChildId, termId);
+          if (html) htmlToPrint = html;
+        } catch { /* keep fallback */ }
+      }
+      await Print.printAsync({ html: htmlToPrint });
     } catch (e: any) {
       if (e?.message !== 'User did not share') Alert.alert('Error', 'Failed to print');
     } finally { setActionLoading(false); }
+  };
+
+  const handleViewReportCard = async () => {
+    if (!selectedChildId) { Alert.alert('Error', 'Missing student information'); return; }
+    const termId = selectedTermId || dashboard?.currentTerm?.id;
+    if (!termId) { Alert.alert('Error', 'Missing term information'); return; }
+    setLoadingHtml(true);
+    try {
+      const { html } = await apiService.getReportCardHtml(selectedChildId, termId);
+      if (!html) throw new Error('Report card is not available for this term yet.');
+      setReportHtml(html);
+      setViewerVisible(true);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Report card preview is not available yet.';
+      Alert.alert('Unavailable', msg);
+    } finally {
+      setLoadingHtml(false);
+    }
+  };
+
+  const handleShareSummary = async () => {
+    const term = selectedTerm?.name || dashboard?.currentTerm?.name || 'Current Term';
+    const school = dashboard?.school?.name || 'SmartTech School';
+    let msg = `${school} — Report Card\n\n`;
+    msg += `Student: ${childName}\n`;
+    msg += `Term: ${term}\n`;
+    msg += `Overall Average: ${Math.round(avg)}%\n`;
+    if (classAvg > 0) msg += `Class Average: ${Math.round(classAvg)}%\n`;
+    if (position && totalStudents) msg += `Position: #${position} of ${totalStudents}\n`;
+    msg += '\n' + '='.repeat(34) + '\n';
+    msg += 'SUBJECT RESULTS\n';
+    results.forEach((r: any, i: number) => {
+      const score = r.score || r.finalPercentage || 0;
+      const grade = r.grade || '-';
+      msg += `\n${i + 1}. ${r.subject?.name || r.subject || 'Subject'}: ${Math.round(score)}% (${grade})${r.remark ? ' — ' + r.remark : ''}`;
+    });
+    msg += `\n\nGenerated ${new Date().toLocaleString()}\n${school}`;
+    try {
+      const uri = FileSystem.cacheDirectory + 'report_card_summary.txt';
+      await FileSystem.writeAsStringAsync(uri, msg, { encoding: FileSystem.EncodingType.UTF8 });
+      await Sharing.shareAsync(uri, { mimeType: 'text/plain', dialogTitle: 'Share Report Card Summary' });
+    } catch (err: any) {
+      if (err?.message !== 'User did not share') {
+        Alert.alert('Error', 'Failed to share report card summary');
+      }
+    }
   };
 
   const selectedTerm = terms.find((t: any) => t.id === selectedTermId);
@@ -257,13 +319,21 @@ export const ParentReportCardsScreen: React.FC = () => {
 
             {/* Actions */}
             <View style={styles.actionsRow}>
-              <TouchableOpacity style={styles.actionBtn} onPress={handleDownloadPDF} disabled={actionLoading}>
+              <TouchableOpacity style={styles.actionBtn} onPress={handleViewReportCard} disabled={actionLoading || loadingHtml}>
+                <Text style={styles.actionBtnIcon}>👁</Text>
+                <Text style={styles.actionBtnText}>{loadingHtml ? 'Loading...' : 'View'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnSecondary]} onPress={handleDownloadPDF} disabled={actionLoading}>
                 <Text style={styles.actionBtnIcon}>⬇️</Text>
                 <Text style={styles.actionBtnText}>PDF</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.actionBtn, styles.actionBtnSecondary]} onPress={handlePrint} disabled={actionLoading}>
                 <Text style={styles.actionBtnIcon}>🖨️</Text>
                 <Text style={styles.actionBtnText}>Print</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnSecondary]} onPress={handleShareSummary} disabled={actionLoading}>
+                <Text style={styles.actionBtnIcon}>📤</Text>
+                <Text style={styles.actionBtnText}>Share</Text>
               </TouchableOpacity>
             </View>
 
@@ -322,6 +392,16 @@ export const ParentReportCardsScreen: React.FC = () => {
           </>
         )}
       </ScrollView>
+
+      {viewerVisible && (
+        <ReportCardPdfViewer
+          visible={viewerVisible}
+          html={reportHtml}
+          studentName={childName}
+          termName={selectedTerm?.name || dashboard?.currentTerm?.name || 'Current Term'}
+          onClose={() => setViewerVisible(false)}
+        />
+      )}
     </SafeAreaView>
   );
 };

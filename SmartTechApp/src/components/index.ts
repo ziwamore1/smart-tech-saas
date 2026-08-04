@@ -8,6 +8,7 @@ export { QuickActionItem } from './QuickActionItem';
 export { GradientCard } from './GradientCard';
 export { WidgetCard } from './WidgetCard';
 export { Avatar } from './Avatar';
+export { ReportCardPdfViewer } from './ReportCardPdfViewer';
 export { Toolbar } from './editor/Toolbar';
 export { LayerPanel } from './editor/LayerPanel';
 export { PropertyPanel } from './editor/PropertyPanel';

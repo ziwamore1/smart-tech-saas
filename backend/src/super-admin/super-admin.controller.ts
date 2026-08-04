@@ -133,6 +133,11 @@ export class SuperAdminController {
     return this.superAdminService.getSystemStats();
   }
 
+  @Get('results-analytics')
+  async getResultsAnalytics() {
+    return this.superAdminService.getResultsAnalytics();
+  }
+
   @Get('settings')
   async getAllSettings() {
     return this.superAdminService.getAllSettings();

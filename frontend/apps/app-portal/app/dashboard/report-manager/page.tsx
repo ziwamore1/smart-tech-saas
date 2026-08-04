@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { reportEngineApi } from '@/lib/api';
+import { ReportDocumentViewer } from '@/components/report-document-viewer';
 import { toast } from 'sonner';
 
 const REPORT_TYPE_LABELS: Record<string, { label: string; color: string; icon: string }> = {
@@ -20,6 +21,7 @@ export default function ReportManagerPage() {
   const queryClient = useQueryClient();
   const [filterType, setFilterType] = useState('ALL');
   const [page, setPage] = useState(1);
+  const [viewingReport, setViewingReport] = useState<any>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['generated-reports', filterType, page],
@@ -155,6 +157,9 @@ export default function ReportManagerPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex gap-1.5 justify-end">
+                        <button onClick={() => setViewingReport(report)} title="View" className="w-8 h-8 rounded-md border border-gray-200 bg-white flex items-center justify-center text-green-600 hover:bg-green-50 text-xs">
+                          <i className="fas fa-eye" />
+                        </button>
                         <button onClick={() => handleDownload(report)} title="Download" className="w-8 h-8 rounded-md border border-gray-200 bg-white flex items-center justify-center text-blue-500 hover:bg-blue-50 text-xs">
                           <i className="fas fa-download" />
                         </button>
@@ -186,6 +191,10 @@ export default function ReportManagerPage() {
             </div>
           )}
         </div>
+      )}
+
+      {viewingReport && (
+        <ReportDocumentViewer report={viewingReport} onClose={() => setViewingReport(null)} />
       )}
     </div>
   );

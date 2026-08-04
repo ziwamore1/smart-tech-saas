@@ -5,11 +5,13 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { studentApi, termApi, resultApi, reportEngineApi } from '@/lib/api';
 import { checkEczEligibility, scoreToEczGrade } from '@/lib/ecz-eligibility';
+import { ReportCardViewer } from '@/components/report-card-viewer';
 
 export default function ParentResultsPage() {
   const [selectedChild, setSelectedChild] = useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const { data: childrenData } = useQuery({
     queryKey: ['my-children'],
@@ -81,6 +83,49 @@ export default function ParentResultsPage() {
       alert(err?.response?.data?.message || err?.message || 'Failed to generate report card.');
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleViewReportCard = () => {
+    if (!selectedChild || !selectedTermId) return;
+    setViewerOpen(true);
+  };
+
+  const buildShareMessage = () => {
+    const term = terms.find((t: any) => t.id === selectedTermId)?.name || 'Current Term';
+    const childName = selectedChildData
+      ? `${selectedChildData.firstName || ''} ${selectedChildData.lastName || ''}`.trim()
+      : 'Child';
+    let msg = `${selectedChildData?.school?.name || 'SmartTech School'} - Report Card\n`;
+    msg += `Student: ${childName}\n`;
+    msg += `Class: ${selectedChildData?.class?.name || ''}\n`;
+    msg += `Term: ${term}\n`;
+    msg += `Average: ${calculateAverage()}%\n\n`;
+    msg += `${'='.repeat(32)}\nSUBJECT RESULTS\n`;
+    results.forEach((r: any) => {
+      msg += `\n${r.subject?.name || 'Subject'}: ${r.score?.toFixed(1) || '—'}% (${getGrade(r)})${r.remark ? ' - ' + r.remark : ''}`;
+    });
+    msg += `\n\nGenerated ${new Date().toLocaleString()}\nSmartTech School Management System`;
+    return msg;
+  };
+
+  const handleShare = async () => {
+    if (results.length === 0) return;
+    const message = buildShareMessage();
+    const nav: any = typeof navigator !== 'undefined' ? navigator : null;
+    if (nav?.share) {
+      try {
+        await nav.share({ title: 'Report Card', text: message });
+        return;
+      } catch {
+        // user cancelled — fall through to clipboard
+      }
+    }
+    try {
+      await nav?.clipboard?.writeText(message);
+      alert('Report card summary copied to clipboard.');
+    } catch {
+      alert('Sharing is not supported on this browser.');
     }
   };
 
@@ -194,13 +239,27 @@ export default function ParentResultsPage() {
                   <div className="text-right flex flex-col items-end gap-2">
                     <p className="text-sm text-gray-500">Average Score</p>
                     <p className="text-3xl font-bold text-blue-600">{calculateAverage()}%</p>
-                    <button
-                      onClick={downloadReportCard}
-                      disabled={downloading}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg"
-                    >
-                      {downloading ? 'Generating...' : '📄 Download Report Card (PDF)'}
-                    </button>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <button
+                        onClick={handleViewReportCard}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg"
+                      >
+                        👁 View Report Card
+                      </button>
+                      <button
+                        onClick={downloadReportCard}
+                        disabled={downloading}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg"
+                      >
+                        {downloading ? 'Generating...' : '📄 Download PDF'}
+                      </button>
+                      <button
+                        onClick={handleShare}
+                        className="px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-semibold rounded-lg"
+                      >
+                        📤 Share
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -309,6 +368,20 @@ export default function ParentResultsPage() {
           )}
         </div>
       </div>
+
+      {viewerOpen && selectedChild && selectedTermId && (
+        <ReportCardViewer
+          studentId={selectedChild}
+          termId={selectedTermId}
+          termName={terms.find((t: any) => t.id === selectedTermId)?.name}
+          studentName={
+            selectedChildData
+              ? `${selectedChildData.firstName || ''} ${selectedChildData.lastName || ''}`.trim()
+              : 'Child'
+          }
+          onClose={() => setViewerOpen(false)}
+        />
+      )}
     </div>
   );
 }

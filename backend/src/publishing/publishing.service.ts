@@ -159,6 +159,17 @@ export class PublishingService {
       }
     }
 
+    // Notify all Directors of the school so they can monitor result publications.
+    await this.pushNotificationService.sendByRole(
+      'Director',
+      {
+        title: 'Results Published',
+        body: `Results for ${classInfo.name} - ${term.name} were published (${enrollments.length} students).`,
+        data: { type: 'result_published', classId, termId },
+      },
+      schoolId,
+    );
+
     return {
       message: 'Results published successfully',
       reportsGenerated: reports.length,
