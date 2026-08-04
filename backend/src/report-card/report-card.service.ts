@@ -652,6 +652,10 @@ export class ReportCardService {
     });
 
     let transcriptRows = '';
+    const allScores: number[] = [];
+    let totalPoints = 0;
+    let rowCount = 0;
+    const gradeDistribution: Record<string, number> = {};
 
     for (const enrollment of enrollments) {
       for (const term of enrollment.academicYear.terms) {
@@ -692,15 +696,21 @@ export class ReportCardService {
             ? { grade: r.finalGrade, points: r.points }
             : await this.getGradeFromScore(schoolId, finalPercentage, enrollment.classId);
 
+          allScores.push(finalPercentage);
+          totalPoints += grade.points || 0;
+          rowCount++;
+          gradeDistribution[grade.grade] = (gradeDistribution[grade.grade] || 0) + 1;
+
+          const pctColor = finalPercentage >= 75 ? '#059669' : finalPercentage >= 50 ? '#3b82f6' : finalPercentage >= 40 ? '#d97706' : '#dc2626';
           transcriptRows += `
             <tr>
               <td>${enrollment.academicYear.name}</td>
               <td>${term.name}</td>
-              <td>${enrollment.class.name}</td>
-              <td>${r.subject.name}</td>
-              <td>${finalPercentage}</td>
-              <td>${grade.grade}</td>
-              <td>${grade.points}</td>
+              <td style="text-align:left">${enrollment.class.name}</td>
+              <td style="text-align:left">${r.subject.name}</td>
+              <td class="text-center font-bold" style="color:${pctColor}">${Number(finalPercentage).toFixed(1)}</td>
+              <td class="text-center"><span class="grade-badge">${grade.grade}</span></td>
+              <td class="text-center font-semibold">${grade.points}</td>
             </tr>
           `;
         }
@@ -708,7 +718,7 @@ export class ReportCardService {
     }
 
     if (!transcriptRows) {
-      transcriptRows = '<tr><td colspan="7" style="text-align:center">No results found</td></tr>';
+      transcriptRows = '<tr><td colspan="7" style="text-align:center;color:#9ca3af">No results found</td></tr>';
     }
 
     const school = await this.prisma.school.findUnique({
@@ -716,116 +726,91 @@ export class ReportCardService {
     });
 
     const schoolName = school?.name || 'SCHOOL NAME';
+    const overallAvg = allScores.length > 0 ? (allScores.reduce((a, b) => a + b, 0) / allScores.length).toFixed(1) : '0';
+    const highest = allScores.length > 0 ? Math.max(...allScores).toFixed(1) : '0';
+    const lowest = allScores.length > 0 ? Math.min(...allScores).toFixed(1) : '0';
+    const maxGradeCount = Math.max(...Object.values(gradeDistribution), 1);
+    const gradeChart = Object.entries(gradeDistribution).map(([grade, count]) => {
+      const width = Math.max(4, (count / maxGradeCount) * 100);
+      const color = grade.startsWith('A') ? '#059669' : grade.startsWith('B') ? '#2563eb' : grade.startsWith('C') ? '#d97706' : '#dc2626';
+      return `<div class="chart-row"><span class="chart-label">${grade}</span><div class="chart-track"><div class="chart-fill" style="width:${width}%;background:${color}"></div></div><strong>${count}</strong></div>`;
+    }).join('');
 
     const html = `
     <html>
     <head>
-
     <style>
-
-    body{
-      font-family: Arial, Helvetica, sans-serif;
-      padding:40px;
-    }
-
-    .header{
-      text-align:center;
-      margin-bottom:30px;
-    }
-
-    .school-name{
-      font-size:26px;
-      font-weight:bold;
-    }
-
-    table{
-      width:100%;
-      border-collapse:collapse;
-      margin-top:20px;
-    }
-
-    th, td{
-      border:1px solid #ccc;
-      padding:8px;
-      text-align:center;
-    }
-
-    th{
-      background:#f4f4f4;
-    }
-
-    .student-info{
-      margin-top:20px;
-    }
-
-    .footer{
-      margin-top:50px;
-      display:flex;
-      justify-content:space-between;
-    }
-
-    .signature-line{
-      margin-top:40px;
-      border-top:1px solid black;
-      width:200px;
-    }
-
+      @page { margin: 15mm; size: A4 portrait; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif; color: #1f2937; background: white; padding: 24px; line-height: 1.4; }
+      .report-header { text-align: center; margin-bottom: 24px; padding: 16px 20px; background: linear-gradient(135deg, #5f4b3a 0%, #7a6b5a 100%); border-radius: 8px; color: white; }
+      .school-name { font-size: 22px; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+      .report-title { font-size: 16px; font-weight: 600; color: white; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.95; }
+      .report-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; font-size: 13px; color: #374151; background: #f5f0eb; padding: 10px 16px; border-radius: 6px; border: 1px solid #e8ddd0; }
+      .report-meta strong { color: #5f4b3a; }
+      .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 20px 0; }
+      .summary-card { background: #faf7f4; border: 1px solid #e8ddd0; border-radius: 8px; padding: 12px 16px; text-align: center; }
+      .summary-value { font-size: 24px; font-weight: 700; color: #5f4b3a; }
+      .summary-label { font-size: 11px; color: #6b7280; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+      table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 20px; }
+      th { background: #5f4b3a; color: white; padding: 8px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; border: 1px solid #7a6b5a; }
+      td { padding: 6px 10px; border: 1px solid #e5e7eb; }
+      tr:nth-child(even) { background: #faf7f4; }
+      .text-center { text-align: center; }
+      .font-bold { font-weight: 700; }
+      .font-semibold { font-weight: 600; }
+       .grade-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; background: #d1fae5; color: #059669; }
+       .chart { margin: 20px 0; padding: 14px 16px; background: #faf7f4; border: 1px solid #e8ddd0; border-radius: 8px; }
+       .chart-title { color: #5f4b3a; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+       .chart-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 11px; }
+       .chart-label { width: 32px; font-weight: 700; }
+       .chart-track { flex: 1; height: 12px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
+       .chart-fill { height: 100%; border-radius: 4px; }
+      .signatures { margin-top: 50px; display: flex; justify-content: space-between; }
+      .sig { text-align: center; flex: 1; }
+      .sig-line { width: 200px; border-top: 1px solid #1f2937; margin: 40px auto 0; padding-top: 6px; font-size: 11px; color: #6b7280; }
+      .footer { text-align: center; margin-top: 20px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #9ca3af; }
     </style>
-
     </head>
-
     <body>
-
-    <div class="header">
-
-    <div class="school-name">
-    ${schoolName}
+    <div class="report-header">
+      <div class="school-name">${schoolName}</div>
+      <div class="report-title">Official Academic Transcript</div>
     </div>
-
-    <h2>Official Academic Transcript</h2>
-
+    <div class="report-meta">
+      <span><strong>Student:</strong> ${student.firstName} ${student.lastName}</span>
+      <span><strong>Admission No:</strong> ${student.admissionNumber}</span>
+      <span><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
     </div>
-
-
-    <div class="student-info">
-
-    <p><strong>Student:</strong> ${student.firstName} ${student.lastName}</p>
-    <p><strong>Admission Number:</strong> ${student.admissionNumber}</p>
-
-    </div>
-
-
-    <table>
-
-    <tr>
-    <th>Academic Year</th>
-    <th>Term</th>
-    <th>Class</th>
-    <th>Subject</th>
-    <th>Score</th>
-    <th>Grade</th>
-    <th>Points</th>
-    </tr>
-
-    ${transcriptRows}
-
+     <div class="summary-grid">
+      <div class="summary-card"><div class="summary-value">${enrollments.length}</div><div class="summary-label">Academic Years</div></div>
+      <div class="summary-card"><div class="summary-value">${rowCount}</div><div class="summary-label">Subject Entries</div></div>
+      <div class="summary-card"><div class="summary-value" style="color:#059669">${overallAvg}%</div><div class="summary-label">Overall Average</div></div>
+      <div class="summary-card"><div class="summary-value" style="color:#7c3aed">${highest}%</div><div class="summary-label">Highest Score</div></div>
+      <div class="summary-card"><div class="summary-value" style="color:#dc2626">${lowest}%</div><div class="summary-label">Lowest Score</div></div>
+       <div class="summary-card"><div class="summary-value" style="color:#2563eb">${totalPoints}</div><div class="summary-label">Total Points</div></div>
+     </div>
+     ${gradeChart ? `<div class="chart"><div class="chart-title">Grade Distribution</div>${gradeChart}</div>` : ''}
+     <table>
+      <thead><tr>
+        <th>Academic Year</th>
+        <th>Term</th>
+        <th>Class</th>
+        <th>Subject</th>
+        <th class="text-center">Score</th>
+        <th class="text-center">Grade</th>
+        <th class="text-center">Points</th>
+      </tr></thead>
+      <tbody>
+      ${transcriptRows}
+      </tbody>
     </table>
-
-
-    <div class="footer">
-
-    <div>
-    <div class="signature-line"></div>
-    Head Teacher
+    <div class="signatures">
+      <div class="sig"><div class="sig-line">Head Teacher</div></div>
+      <div class="sig"><div class="sig-line">Director of Studies</div></div>
+      <div class="sig"><div class="sig-line">School Stamp</div></div>
     </div>
-
-    <div>
-    <div class="signature-line"></div>
-    School Stamp
-    </div>
-
-    </div>
-
+    <div class="footer">Smart Tech SaaS - Results Management System | Confidential</div>
     </body>
     </html>
     `;

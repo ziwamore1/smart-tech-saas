@@ -577,19 +577,81 @@ export class ResultsManagementService {
 
     if (this.pushNotification) {
       try {
-        const termName = (await this.prisma.term.findUnique({ where: { id: sheet.termId }, select: { name: true } }))?.name || '';
-        const className = (await this.prisma.class.findUnique({ where: { id: sheet.classId }, select: { name: true } }))?.name || '';
+        const [termInfo, classInfo, enrollments] = await Promise.all([
+          this.prisma.term.findUnique({ where: { id: sheet.termId }, select: { name: true, academicYearId: true } }),
+          this.prisma.class.findUnique({ where: { id: sheet.classId }, select: { name: true } }),
+          this.prisma.enrollment.findMany({
+            where: {
+              classId: sheet.classId,
+              status: 'ACTIVE',
+            },
+            include: {
+              student: {
+                include: {
+                  user: { select: { id: true } },
+                  parents: { include: { parent: { select: { email: true } } } },
+                },
+              },
+            },
+          }),
+        ]);
+        const termName = termInfo?.name || '';
+        const className = classInfo?.name || '';
+        const baseData = { type: 'result_published', classId: sheet.classId, termId: sheet.termId };
+
+        const parentTargets: { userId: string; childName: string; studentId: string }[] = [];
+          for (const enrollment of enrollments) {
+            const student = enrollment.student;
+            // Some legacy student records have the User -> Student foreign key
+            // but the inverse relation is not populated consistently. Resolve
+            // by studentId as a fallback so student accounts are not skipped.
+            const studentUserId = student?.user?.id || (await this.prisma.user.findUnique({
+              where: { studentId: student.id },
+              select: { id: true },
+            }))?.id;
+            if (studentUserId) {
+              await this.pushNotification.sendToUser(studentUserId, {
+                title: 'Results Published',
+                body: `Your results for ${className}${termName ? ' - ' + termName : ''} are now available.`,
+                data: baseData,
+            });
+          }
+          for (const link of student?.parents || []) {
+            if (link.parent?.email) {
+              const parentUser = await this.prisma.user.findFirst({
+                where: { email: link.parent.email },
+                select: { id: true },
+              });
+              if (parentUser) {
+                parentTargets.push({
+                  userId: parentUser.id,
+                  childName: `${student.firstName} ${student.lastName}`,
+                  studentId: student.id,
+                });
+              }
+            }
+          }
+        }
+
+        for (const target of parentTargets) {
+          await this.pushNotification.sendToUser(target.userId, {
+            title: `${target.childName}'s Results Published`,
+            body: `Results for ${className}${termName ? ' - ' + termName : ''} are now available.`,
+            data: { ...baseData, studentId: target.studentId },
+          });
+        }
+
         await this.pushNotification.sendByRole(
           'Director',
           {
             title: 'Results Published',
             body: `Results for ${className}${termName ? ' - ' + termName : ''} were published.`,
-            data: { type: 'result_published', classId: sheet.classId, termId: sheet.termId },
+            data: baseData,
           },
           sheet.schoolId,
         );
       } catch (error: any) {
-        this.logger.error(`[Director Notification] Failed: ${error.message}`);
+        this.logger.error(`[Results Published Notification] Failed: ${error.message}`);
       }
     }
 

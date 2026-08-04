@@ -6,6 +6,7 @@ import { Input } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useAuthStore } from '../../store';
 import Constants from 'expo-constants';
+import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ForgotPasswordScreen } from './ForgotPasswordScreen';
 
@@ -50,14 +51,31 @@ export const LoginScreen: React.FC = () => {
       return;
     }
     try {
+      let deviceToken: string | undefined;
+      if (Platform.OS !== 'web') {
+        try {
+          const permissions = await Notifications.getPermissionsAsync();
+          let status = permissions.status;
+          if (status !== 'granted') {
+            status = (await Notifications.requestPermissionsAsync()).status;
+          }
+          if (status === 'granted') {
+            const projectId = Constants.easConfig?.projectId || Constants.expoConfig?.extra?.eas?.projectId;
+            const token = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+            deviceToken = token.data;
+          }
+        } catch (notificationError) {
+          console.warn('Push token registration unavailable:', notificationError);
+        }
+      }
       if (loginMode === 'student') {
-        await login('', password, undefined, email.trim());
+        await login('', password, deviceToken, email.trim());
       } else if (loginMode === 'phone') {
-        await login('', password, undefined, email.trim());
+        await login('', password, deviceToken, email.trim());
       } else if (loginMode === 'username') {
-        await login('', password, undefined, email.trim());
+        await login('', password, deviceToken, email.trim());
       } else {
-        await login(email.trim(), password, undefined);
+        await login(email.trim(), password, deviceToken);
       }
     } catch (err: any) {
       Alert.alert('Login Failed', err.response?.data?.message || 'Invalid credentials');

@@ -12,6 +12,7 @@ import { apiService } from '../../services/api';
 import { socketService } from '../../services/socket';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { getGradeTextColor, getGradeBgColor, getScoreTextColor, getScoreBgColor } from '../../utils/gradeColors';
+import { generatePdfFromHtml } from '../../utils/pdfReport';
 
 export const ParentChildResultsScreen: React.FC = () => {
   const route = useRoute<RouteProp<any>>();
@@ -219,11 +220,9 @@ export const ParentChildResultsScreen: React.FC = () => {
         Alert.alert('Error', 'Missing term or student information');
         return;
       }
-      const { base64 } = await apiService.getParentReportCard(childId, termId);
-      const fileUri = FileSystem.documentDirectory + `${childName || 'child'}_Report_Card.pdf`;
-      await FileSystem.writeAsStringAsync(fileUri, base64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      const { html } = await apiService.getReportCardHtml(childId, termId);
+      if (!html) throw new Error('Report card is not available for this term yet.');
+      const fileUri = await generatePdfFromHtml(html, `${childName || 'child'}_Report_Card.pdf`);
       await Sharing.shareAsync(fileUri, {
         mimeType: 'application/pdf',
         dialogTitle: `Save ${childName || 'Child'}'s Report Card`,
@@ -294,7 +293,7 @@ export const ParentChildResultsScreen: React.FC = () => {
   const selectedTermName = terms.find((t: any) => t.id === selectedTermId)?.name || dashboard?.currentTerm?.name;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{childName || 'Child'}'s Results</Text>
         <Text style={styles.headerSub}>{selectedTermName}</Text>
@@ -386,8 +385,8 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
   headerTitle: { fontSize: 22, fontWeight: '700', color: colors.text },
   headerSub: { fontSize: 14, color: colors.textLight, marginTop: 2 },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  actionBtn: { backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.md },
+   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+   actionBtn: { backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.md, minHeight: 36, justifyContent: 'center' },
   actionBtnSecondary: { backgroundColor: colors.secondary },
   actionBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.primary },
   actionBtnText: { color: colors.white, fontSize: 13, fontWeight: '600' },
@@ -404,7 +403,7 @@ const styles = StyleSheet.create({
   termChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   termChipText: { fontSize: 13, fontWeight: '600', color: colors.text },
   termChipTextActive: { color: colors.white },
-  scrollContent: { padding: spacing.md, gap: spacing.sm },
+   scrollContent: { padding: spacing.md, gap: spacing.sm, paddingBottom: spacing.xxl + 140 },
   resultCard: { padding: spacing.md },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   info: { flex: 1 },

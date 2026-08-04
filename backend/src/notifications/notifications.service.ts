@@ -344,11 +344,6 @@ export class NotificationsService {
       where: { userId, active: true },
     });
 
-    if (devices.length === 0) {
-      this.logger.warn(`No active NotificationDevice for user ${userId}`);
-      return;
-    }
-
     const now = new Date();
     await this.prisma.notification.create({
       data: {
@@ -362,6 +357,11 @@ export class NotificationsService {
         sentAt: now,
       },
     });
+
+    if (devices.length === 0) {
+      this.logger.warn(`No active NotificationDevice for user ${userId}`);
+      return;
+    }
 
     const expoDevices = devices.filter((d) => d.deviceToken.startsWith('ExponentPushToken['));
     const fcmDevices = devices.filter((d) => !d.deviceToken.startsWith('ExponentPushToken['));

@@ -7,6 +7,7 @@ import { useAuthStore, useAppStore } from '../../store';
 import { apiService } from '../../services/api';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { HeaderBar, ReportCardPdfViewer } from '../../components';
+import { downloadAndShareReportCardHtml } from '../../utils/pdfReport';
 
 export const StudentReportCardsScreen: React.FC = () => {
   const { user } = useAuthStore();
@@ -128,15 +129,17 @@ export const StudentReportCardsScreen: React.FC = () => {
     }
     setDownloading(true);
     try {
-      const { base64 } = await apiService.getReportCardPdf(studentId, selectedTermId);
-      const fileUri = FileSystem.documentDirectory + 'My_Report_Card.pdf';
-      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
-      await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download Report Card' });
+      const { html } = await apiService.getReportCardHtml(studentId, selectedTermId);
+      if (!html) throw new Error('Report card is not available for this term yet.');
+      await downloadAndShareReportCardHtml(
+        html,
+        `My_Report_Card_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`,
+        'Download Report Card',
+      );
     } catch (err: any) {
-      if (err?.message !== 'User did not share') {
-        const msg = err?.response?.data?.message || err?.message || 'Report card PDF is not available yet.';
-        Alert.alert('Unavailable', msg);
-      }
+      if (err?.message === 'User did not share') return;
+      const msg = err?.response?.data?.message || err?.message || 'Report card PDF is not available yet.';
+      Alert.alert('Unavailable', msg);
     } finally {
       setDownloading(false);
     }
@@ -402,7 +405,7 @@ export const StudentReportCardsScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  list: { padding: spacing.md },
+  list: { padding: spacing.md, paddingBottom: spacing.xxl + 60 },
 
   termScroll: { maxHeight: 48, marginTop: spacing.sm },
   termContent: { paddingHorizontal: spacing.md, gap: spacing.sm },

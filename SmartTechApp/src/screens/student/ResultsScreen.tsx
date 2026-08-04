@@ -9,6 +9,7 @@ import { useAuthStore, useAppStore } from '../../store';
 import { apiService } from '../../services/api';
 import { socketService } from '../../services/socket';
 import { getGradeTextColor, getGradeBgColor } from '../../utils/gradeColors';
+import { downloadAndShareReportCardHtml } from '../../utils/pdfReport';
 
 export const StudentResultsScreen: React.FC = () => {
   const { user } = useAuthStore();
@@ -166,35 +167,16 @@ export const StudentResultsScreen: React.FC = () => {
     }
     setDownloading(true);
     try {
-      const { base64 } = await apiService.generateReportPdf({ type: 'REPORT_CARD', studentId, termId });
+      const { html } = await apiService.getReportCardHtml(studentId, termId);
+      if (!html) throw new Error('Report card is not available for this term yet.');
       const fileName = `Report_Card_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`;
-      const fileUri = FileSystem.documentDirectory + fileName;
-      await FileSystem.writeAsStringAsync(fileUri, base64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      Alert.alert(
-        'Report Card Downloaded',
-        'Your report card has been generated with the school template.',
-        [
-          {
-            text: 'Share',
-            onPress: async () => {
-              try {
-                await Sharing.shareAsync(fileUri, {
-                  mimeType: 'application/pdf',
-                  dialogTitle: 'Share Report Card',
-                });
-              } catch (shareErr: any) {
-                if (shareErr?.message !== 'User did not share') {
-                  Alert.alert('Error', 'Failed to share file.');
-                }
-              }
-            },
-          },
-          { text: 'OK' },
-        ]
+      await downloadAndShareReportCardHtml(
+        html,
+        fileName,
+        'Share Report Card',
       );
     } catch (err: any) {
+      if (err?.message === 'User did not share') return;
       const msg = err?.response?.data?.message || err?.message || 'Failed to generate report card.';
       Alert.alert('Download Failed', msg);
     } finally {
@@ -248,7 +230,7 @@ export const StudentResultsScreen: React.FC = () => {
   const selectedTermName = terms.find((t: any) => t.id === selectedTermId)?.name || dashboard?.currentTerm?.name || 'Current Term';
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Results</Text>
         <Text style={styles.headerSub}>{selectedTermName}</Text>
@@ -353,7 +335,7 @@ const styles = StyleSheet.create({
   headerSub: { fontSize: 14, color: colors.textLight, marginTop: 2 },
   shareBtn: { marginTop: spacing.sm, backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.md, alignSelf: 'flex-start' },
   shareBtnText: { color: colors.white, fontSize: 13, fontWeight: '600' },
-  scrollContent: { padding: spacing.md, gap: spacing.sm },
+   scrollContent: { padding: spacing.md, gap: spacing.sm, paddingBottom: spacing.xxl + 140 },
   termScroll: { marginBottom: spacing.xs },
   chip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.full, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, marginRight: spacing.sm },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },

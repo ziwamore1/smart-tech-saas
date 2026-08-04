@@ -318,7 +318,9 @@ export class ReportEngineService {
         break;
 
       case ReportType.PERFORMANCE_REPORT:
-        result = await this.generatePerformanceReport(request);
+        // Performance reports use the same complete report-card presentation,
+        // including the student summary and performance charts.
+        result = await this.generateReportCard(request);
         fileName = `performance-report-${request.studentId}-${request.termId}.pdf`;
         break;
 
@@ -603,6 +605,14 @@ export class ReportEngineService {
     }
 
     if (!template || !template.components || template.components.length === 0) {
+      template = await this.prisma.reportTemplate.findFirst({
+        where: { schoolId, components: { some: {} } },
+        include: { components: true },
+        orderBy: { updatedAt: 'desc' },
+      });
+    }
+
+    if (!template || !template.components || template.components.length === 0) {
       return null;
     }
 
@@ -873,41 +883,41 @@ export class ReportEngineService {
     const late = attendance.filter(a => a.status === 'LATE').length;
     const rate = total > 0 ? ((present + late) / total * 100).toFixed(1) : '0';
 
-    const html = `
-<!DOCTYPE html>
-<html>
-<head><style>
-  body { font-family: Arial, sans-serif; padding: 40px; font-size: 13px; color: #111827; }
-  .header { text-align: center; margin-bottom: 30px; }
-  .school-name { font-size: 24px; font-weight: bold; color: #1a365d; }
-  .subtitle { font-size: 15px; color: #374151; margin-top: 5px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-  th, td { border: 1px solid #9ca3af; padding: 8px; text-align: center; font-size: 13px; }
-  th { background: #1a365d; color: white; font-weight: 700; }
-  .stat-grid { display: flex; gap: 15px; margin: 20px 0; }
-  .stat-box { flex: 1; background: #f8fafc; border: 1px solid #9ca3af; border-radius: 8px; padding: 15px; text-align: center; }
-  .stat-value { font-size: 26px; font-weight: bold; }
-  .stat-label { font-size: 12px; color: #374151; margin-top: 4px; font-weight: 600; }
-</style></head>
-<body>
-  <div class="header">
-    <div class="school-name">${school?.name || 'School'}</div>
-    <div class="subtitle">Attendance Report — ${term.name} (${term.academicYear?.name || ''})</div>
-  </div>
-  <div class="stat-grid">
-    <div class="stat-box"><div class="stat-value" style="color:#1d4ed8">${total}</div><div class="stat-label">Total Records</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#047857">${present}</div><div class="stat-label">Present</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#b91c1c">${absent}</div><div class="stat-label">Absent</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#b45309">${late}</div><div class="stat-label">Late</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#6d28d9">${rate}%</div><div class="stat-label">Attendance Rate</div></div>
-  </div>
-  <table>
-    <thead><tr><th>#</th><th>Student</th><th>Admission No</th><th>Present</th><th>Absent</th><th>Late</th><th>Rate</th></tr></thead>
-    <tbody>
-      ${this.groupAttendanceByStudent(attendance)}
-    </tbody>
-  </table>
-</body></html>`;
+    const content = `
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-value" style="color:#1d4ed8">${total}</div><div class="summary-label">Total Records</div></div>
+        <div class="summary-card"><div class="summary-value pass">${present}</div><div class="summary-label">Present</div></div>
+        <div class="summary-card"><div class="summary-value fail">${absent}</div><div class="summary-label">Absent</div></div>
+        <div class="summary-card"><div class="summary-value warn">${late}</div><div class="summary-label">Late</div></div>
+        <div class="summary-card"><div class="summary-value" style="color:#6d28d9">${rate}%</div><div class="summary-label">Attendance Rate</div></div>
+      </div>
+      <table>
+        <thead><tr>
+          <th class="text-center" style="width:30px">#</th>
+          <th style="min-width:150px">Student</th>
+          <th class="text-center">Admission No</th>
+          <th class="text-center">Total</th>
+          <th class="text-center">Present</th>
+          <th class="text-center">Absent</th>
+          <th class="text-center">Late</th>
+          <th class="text-center">Rate</th>
+          <th class="text-center" style="min-width:150px">Attendance Rate</th>
+        </tr></thead>
+        <tbody>${this.groupAttendanceByStudent(attendance)}</tbody>
+      </table>`;
+
+    const html = this.buildEnhancedReportShell({
+      schoolName: school?.name || 'School',
+      subtitle: `Attendance Report — ${term.name} (${term.academicYear?.name || ''})`,
+      title: 'Attendance Report',
+      content: this.buildMetaBar([
+        { label: 'Scope', value: request.studentId ? 'Single Student' : request.classId ? 'Class' : 'School' },
+        { label: 'Term', value: term.name },
+        { label: 'Year', value: term.academicYear?.name || '' },
+        { label: 'Period', value: `${term.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${term.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` },
+      ]) + content,
+      orientation: 'landscape',
+    });
 
     const buffer = await this.renderHtmlToPdf(html);
     const result = await this.cloudinary.uploadBuffer(buffer, {
@@ -936,13 +946,21 @@ export class ReportEngineService {
       const late = records.filter(r => r.status === 'LATE').length;
       const total = records.length;
       const rate = total > 0 ? ((present + late) / total * 100).toFixed(1) : '0';
+      const barColor = Number(rate) >= 80 ? '#059669' : Number(rate) >= 60 ? '#d97706' : '#dc2626';
+      const barWidth = Math.min(100, Number(rate));
 
       rows += `<tr>
-        <td>${idx++}</td>
+        <td class="text-center">${idx++}</td>
         <td style="text-align:left">${student?.firstName || ''} ${student?.lastName || ''}</td>
-        <td>${student?.admissionNumber || ''}</td>
-        <td>${present}</td><td>${absent}</td><td>${late}</td>
-        <td style="font-weight:bold;color:${Number(rate) >= 80 ? '#047857' : Number(rate) >= 60 ? '#b45309' : '#b91c1c'}">${rate}%</td>
+        <td class="text-center">${student?.admissionNumber || ''}</td>
+        <td class="text-center">${total}</td>
+        <td class="text-center pass font-semibold">${present}</td>
+        <td class="text-center fail font-semibold">${absent}</td>
+        <td class="text-center warn font-semibold">${late}</td>
+        <td class="text-center font-bold" style="color:${barColor}">${rate}%</td>
+        <td style="min-width:140px">
+          <div class="bar-track"><div class="chart-bar" style="width:${barWidth}%;background:${barColor}"></div></div>
+        </td>
       </tr>`;
     }
     return rows;
@@ -1017,7 +1035,7 @@ export class ReportEngineService {
 
     let computedResults = await this.prisma.computedResult.findMany({
       where: whereCondition,
-      include: { student: { select: { id: true, firstName: true, lastName: true } }, subject: { select: { id: true, name: true } } },
+      include: { student: { select: { id: true, firstName: true, lastName: true, gender: true } }, subject: { select: { id: true, name: true } } },
     });
 
     // Fallback: students enrolled but missing from ComputedResult — use Result table
@@ -1032,7 +1050,7 @@ export class ReportEngineService {
           schoolId: request.schoolId,
           student: { status: 'ACTIVE' },
         },
-        include: { subject: { select: { id: true, name: true } }, student: { select: { id: true, firstName: true, lastName: true } } },
+        include: { subject: { select: { id: true, name: true } }, student: { select: { id: true, firstName: true, lastName: true, gender: true } } },
       });
 
       const gradingCategories = await this.prisma.performanceCategory.findMany({
@@ -1117,47 +1135,225 @@ export class ReportEngineService {
 
     const classLabel = className ? ` — ${className}` : '';
 
-    const html = `
-<!DOCTYPE html>
-<html>
-<head><style>
-  body { font-family: Arial, sans-serif; padding: 40px; font-size: 13px; color: #111827; }
-  .header { text-align: center; margin-bottom: 30px; }
-  .school-name { font-size: 24px; font-weight: bold; color: #1a365d; }
-  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-  th, td { border: 1px solid #9ca3af; padding: 8px; text-align: center; font-size: 13px; }
-  th { background: #1a365d; color: white; font-weight: 700; }
-  .stat-grid { display: flex; gap: 15px; margin: 20px 0; }
-  .stat-box { flex: 1; background: #f8fafc; border: 1px solid #9ca3af; border-radius: 8px; padding: 15px; text-align: center; }
-  .stat-value { font-size: 26px; font-weight: bold; }
-  .stat-label { font-size: 12px; color: #374151; margin-top: 4px; font-weight: 600; }
-</style></head>
-<body>
-  <div class="header">
-    <div class="school-name">${school?.name || 'School'}</div>
-    <div style="font-size:15px;color:#374151;margin-top:5px">Subject Performance Analytics${classLabel} — ${term?.name || ''} (${term?.academicYear?.name || ''})</div>
-  </div>
-  <div class="stat-grid">
-    <div class="stat-box"><div class="stat-value" style="color:#1d4ed8">${totalStudents}</div><div class="stat-label">Students</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#047857">${avg}%</div><div class="stat-label">Average</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#6d28d9">${highest}%</div><div class="stat-label">Highest</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#b91c1c">${lowest}%</div><div class="stat-label">Lowest</div></div>
-    <div class="stat-box"><div class="stat-value" style="color:#b45309">${passRate}%</div><div class="stat-label">Pass Rate</div></div>
-  </div>
-  <h3 style="margin-top:30px;color:#1a365d">Subject Performance</h3>
-  <table>
-    <thead><tr>
-      <th style="text-align:left">Subject</th>
-      <th style="text-align:left">Teacher</th>
-      <th>Students</th>
-      <th>Average</th>
-      <th>Highest</th>
-      <th>Lowest</th>
-      <th>Pass</th>
-    </tr></thead>
-    <tbody>${subjectRows}</tbody>
-  </table>
-</body></html>`;
+    // Grade distribution
+    const gradeDistribution: Record<string, number> = {};
+    for (const r of computedResults) {
+      const g = (r.finalGrade || '—').trim() || '—';
+      gradeDistribution[g] = (gradeDistribution[g] || 0) + 1;
+    }
+
+    // Per-student aggregates
+    const studentMap = new Map<string, { name: string; gender: string; pcts: number[] }>();
+    for (const r of computedResults) {
+      const s = (r as any).student as any;
+      const name = `${s?.firstName || ''} ${s?.lastName || ''}`.trim();
+      const gender = (s?.gender || '').toUpperCase();
+      if (!studentMap.has(r.studentId)) {
+        studentMap.set(r.studentId, { name, gender, pcts: [] });
+      }
+      if (r.finalPercentage != null) studentMap.get(r.studentId)!.pcts.push(r.finalPercentage);
+    }
+
+    const studentAvg = (v: { pcts: number[] }) =>
+      v.pcts.length > 0 ? v.pcts.reduce((a, b) => a + b, 0) / v.pcts.length : 0;
+
+    const studentRowsForRank = Array.from(studentMap.entries()).map(([studentId, v]) => ({
+      studentId,
+      name: v.name || 'Student',
+      gender: v.gender.startsWith('M') ? 'M' : v.gender ? 'F' : '-',
+      avg: studentAvg(v),
+    }));
+
+    // Top performers (Ranking section)
+    const rankings = [...studentRowsForRank].sort((a, b) => b.avg - a.avg);
+    const rankRows = rankings.slice(0, 20).map((s, i) => {
+      const avgColor = this.scoreColor(s.avg);
+      const grade = s.avg >= 75 ? 'A' : s.avg >= 65 ? 'B' : s.avg >= 50 ? 'C' : s.avg >= 40 ? 'D' : 'E';
+      const gc = this.gradeColor(grade);
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : String(i + 1);
+      return `<tr>
+        <td class="text-center font-bold" style="font-size:14px;color:${i < 3 ? '#d97706' : '#6b7280'}">${medal}</td>
+        <td style="font-weight:600">${s.name}</td>
+        <td class="text-center" style="color:#6b7280">${s.gender}</td>
+        <td class="text-center font-bold" style="color:${avgColor}">${s.avg.toFixed(1)}%</td>
+        <td class="text-center"><span class="grade-badge" style="background:${gc.bg};color:${gc.text}">${grade}</span></td>
+      </tr>`;
+    }).join('');
+
+    // At-risk students
+    const atRisk = studentRowsForRank.filter(s => s.avg < 40).sort((a, b) => a.avg - b.avg);
+    const atRiskCount = atRisk.length;
+    const atRiskRows = atRisk.slice(0, 25).map((s, i) => {
+      const gc = this.gradeColor('E');
+      return `<tr>
+        <td class="text-center" style="color:#6b7280">${i + 1}</td>
+        <td style="font-weight:600">${s.name}</td>
+        <td class="text-center" style="color:${s.gender === 'M' ? '#2563eb' : '#db2777'};font-weight:600">${s.gender}</td>
+        <td class="text-center font-bold fail">${s.avg.toFixed(1)}%</td>
+        <td class="text-center"><span class="grade-badge" style="background:${gc.bg};color:${gc.text}">E</span></td>
+      </tr>`;
+    }).join('');
+
+    // Gender performance overview
+    const maleStudents = studentRowsForRank.filter(s => s.gender === 'M');
+    const femaleStudents = studentRowsForRank.filter(s => s.gender === 'F');
+    const genderStats = maleStudents.length + femaleStudents.length > 0 ? {
+      maleCount: maleStudents.length,
+      femaleCount: femaleStudents.length,
+      maleAverage: maleStudents.length > 0 ? maleStudents.reduce((a, b) => a + b.avg, 0) / maleStudents.length : 0,
+      femaleAverage: femaleStudents.length > 0 ? femaleStudents.reduce((a, b) => a + b.avg, 0) / femaleStudents.length : 0,
+      malePassRate: maleStudents.length > 0 ? maleStudents.filter(s => s.avg >= 50).length / maleStudents.length * 100 : 0,
+      femalePassRate: femaleStudents.length > 0 ? femaleStudents.filter(s => s.avg >= 50).length / femaleStudents.length * 100 : 0,
+    } : null;
+
+    // Subject-level gender breakdown
+    const subjectGenderMap = new Map<string, { maleScores: number[]; femaleScores: number[] }>();
+    for (const r of computedResults) {
+      const sname = (r.subject as any)?.name || 'Unknown';
+      const gender = ((r.student as any)?.gender || '').toUpperCase();
+      if (r.finalPercentage == null) continue;
+      if (!subjectGenderMap.has(sname)) subjectGenderMap.set(sname, { maleScores: [], femaleScores: [] });
+      const entry = subjectGenderMap.get(sname)!;
+      if (gender.startsWith('M')) entry.maleScores.push(r.finalPercentage);
+      else entry.femaleScores.push(r.finalPercentage);
+    }
+
+    const enhancedSubjectRows = Array.from(subjectMap.entries()).map(([name, data]) => {
+      const subjectAvg = data.scores.length > 0 ? data.scores.reduce((a, b) => a + b, 0) / data.scores.length : 0;
+      let teacher = teacherMap.get(name) || '';
+      if (!teacher && className) teacher = teacherMap.get(`${name}__${className}`) || '';
+      const passCount = data.scores.filter(p => p >= 50).length;
+      const passRatePct = data.scores.length > 0 ? passCount / data.scores.length * 100 : 0;
+      const distinction = data.scores.filter(p => p >= 75).length;
+      const distinctionPct = data.scores.length > 0 ? distinction / data.scores.length * 100 : 0;
+      const sg = subjectGenderMap.get(name);
+      const maleAvg = sg && sg.maleScores.length > 0 ? (sg.maleScores.reduce((a, b) => a + b, 0) / sg.maleScores.length).toFixed(1) : '-';
+      const femaleAvg = sg && sg.femaleScores.length > 0 ? (sg.femaleScores.reduce((a, b) => a + b, 0) / sg.femaleScores.length).toFixed(1) : '-';
+      const malePass = sg && sg.maleScores.length > 0 ? (sg.maleScores.filter(p => p >= 50).length / sg.maleScores.length * 100).toFixed(0) : '-';
+      const femalePass = sg && sg.femaleScores.length > 0 ? (sg.femaleScores.filter(p => p >= 50).length / sg.femaleScores.length * 100).toFixed(0) : '-';
+      const avgColor = this.scoreColor(subjectAvg);
+      return `<tr>
+        <td style="font-weight:600">${name}</td>
+        <td style="text-align:left">${teacher || '<span style="color:#9ca3af">N/A</span>'}</td>
+        <td class="text-center font-semibold" style="color:${avgColor}">${subjectAvg.toFixed(1)}%</td>
+        <td class="text-center pass">${Math.max(...data.scores).toFixed(1)}%</td>
+        <td class="text-center fail">${Math.min(...data.scores).toFixed(1)}%</td>
+        <td class="text-center"><span class="grade-badge" style="background:${passRatePct >= 70 ? '#d1fae5' : passRatePct >= 40 ? '#fef3c7' : '#fee2e2'};color:${passRatePct >= 70 ? '#059669' : passRatePct >= 40 ? '#d97706' : '#dc2626'}">${passRatePct.toFixed(1)}%</span></td>
+        <td class="text-center"><span class="grade-badge" style="background:#f3e8ff;color:#7c3aed">${distinctionPct.toFixed(1)}%</span></td>
+        <td class="text-center" style="color:#2563eb;font-weight:600">${maleAvg}</td>
+        <td class="text-center" style="color:#db2777;font-weight:600">${femaleAvg}</td>
+        <td class="text-center" style="color:#2563eb">${malePass}</td>
+        <td class="text-center" style="color:#db2777">${femalePass}</td>
+      </tr>`;
+    }).join('');
+
+    // Grade distribution pie chart (SVG)
+    const gradePieColors: Record<string, string> = {
+      'A+': '#059669', 'A': '#10b981', 'A-': '#34d399',
+      'B+': '#2563eb', 'B': '#3b82f6', 'B-': '#60a5fa',
+      'C+': '#d97706', 'C': '#f59e0b', 'C-': '#fbbf24',
+      'D+': '#dc2626', 'D': '#ef4444', 'D-': '#f87171',
+      'E': '#991b1b', 'F': '#7f1d1d',
+      '1': '#059669', '2': '#2563eb', '3': '#d97706', '4': '#dc2626', '5': '#991b1b',
+    };
+    const distEntries = Object.entries(gradeDistribution);
+    let cumulativePercent = 0;
+    const pieSlices = distEntries.map(([grade, count]) => {
+      const pct = totalStudents > 0 ? (count as number) / totalStudents * 100 : 0;
+      const startAngle = cumulativePercent / 100 * 360;
+      cumulativePercent += pct;
+      const endAngle = cumulativePercent / 100 * 360;
+      const color = gradePieColors[grade] || '#9ca3af';
+      const largeArc = pct > 50 ? 1 : 0;
+      const startRad = (startAngle - 90) * Math.PI / 180;
+      const endRad = (endAngle - 90) * Math.PI / 180;
+      const x1 = 100 + 80 * Math.cos(startRad);
+      const y1 = 100 + 80 * Math.sin(startRad);
+      const x2 = 100 + 80 * Math.cos(endRad);
+      const y2 = 100 + 80 * Math.sin(endRad);
+      if (pct < 0.5) return '';
+      return `<path d="M100,100 L${x1},${y1} A80,80 0 ${largeArc},1 ${x2},${y2} Z" fill="${color}" stroke="white" stroke-width="1"/>`;
+    }).join('');
+    const distLegend = distEntries.map(([grade, count]) => {
+      const pct = totalStudents > 0 ? ((count as number) / totalStudents * 100).toFixed(1) : '0.0';
+      const color = gradePieColors[grade] || '#9ca3af';
+      return `<tr>
+        <td class="text-center font-bold" style="color:${color};font-size:13px">${grade}</td>
+        <td class="text-center font-semibold">${count}</td>
+        <td class="text-center">${pct}%</td>
+        <td><div style="width:16px;height:16px;border-radius:3px;background:${color};display:inline-block;vertical-align:middle;margin-right:6px"></div></td>
+      </tr>`;
+    }).join('');
+
+    const distinctionRate = percentages.length > 0
+      ? (percentages.filter(p => p >= 75).length / percentages.length * 100).toFixed(1)
+      : '0';
+
+    const genderSection = genderStats ? `
+      <div class="section-title">Gender Performance Overview</div>
+      <div class="summary-grid">
+        <div class="summary-card" style="border-left:4px solid #2563eb"><div class="summary-value" style="color:#2563eb">${genderStats.maleCount}</div><div class="summary-label">Male Students</div></div>
+        <div class="summary-card" style="border-left:4px solid #db2777"><div class="summary-value" style="color:#db2777">${genderStats.femaleCount}</div><div class="summary-label">Female Students</div></div>
+        <div class="summary-card" style="border-left:4px solid #2563eb"><div class="summary-value" style="color:#2563eb">${genderStats.malePassRate.toFixed(1)}%</div><div class="summary-label">Male Pass Rate</div></div>
+        <div class="summary-card" style="border-left:4px solid #db2777"><div class="summary-value" style="color:#db2777">${genderStats.femalePassRate.toFixed(1)}%</div><div class="summary-label">Female Pass Rate</div></div>
+        <div class="summary-card" style="border-left:4px solid #2563eb"><div class="summary-value" style="color:#2563eb">${genderStats.maleAverage.toFixed(1)}%</div><div class="summary-label">Male Average</div></div>
+        <div class="summary-card" style="border-left:4px solid #db2777"><div class="summary-value" style="color:#db2777">${genderStats.femaleAverage.toFixed(1)}%</div><div class="summary-label">Female Average</div></div>
+      </div>` : '';
+
+    const content = `
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-value">${totalStudents}</div><div class="summary-label">Total Students</div></div>
+        <div class="summary-card"><div class="summary-value pass">${passRate}%</div><div class="summary-label">Class Pass Rate</div></div>
+        <div class="summary-card"><div class="summary-value" style="color:#ea6645">${avg}%</div><div class="summary-label">Class Average</div></div>
+        <div class="summary-card"><div class="summary-value" style="color:#7c3aed">${distinctionRate}%</div><div class="summary-label">Distinction Rate</div></div>
+        <div class="summary-card"><div class="summary-value fail">${atRiskCount}</div><div class="summary-label">At Risk Students</div></div>
+      </div>
+
+      ${genderSection}
+
+      <div class="section-title">Grade Distribution</div>
+      <div style="display:flex;gap:24px;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap">
+        <div style="flex-shrink:0">
+          <svg width="200" height="200" viewBox="0 0 200 200">${pieSlices || '<circle cx="100" cy="100" r="80" fill="#e5e7eb"/>'}<circle cx="100" cy="100" r="35" fill="white"/><text x="100" y="105" text-anchor="middle" font-size="12" fill="#374151" font-weight="700">${totalStudents}</text><text x="100" y="118" text-anchor="middle" font-size="8" fill="#9ca3af">STUDENTS</text></svg>
+        </div>
+        <table style="max-width:350px;margin:0">
+          <thead><tr><th class="text-center">Grade</th><th class="text-center">Count</th><th class="text-center">%</th><th></th></tr></thead>
+          <tbody>${distLegend || '<tr><td colspan="4" class="text-center" style="color:#9ca3af">No graded results</td></tr>'}</tbody>
+        </table>
+      </div>
+
+      <div class="section-title">Top Performers</div>
+      <table>
+        <thead><tr><th class="text-center" style="width:50px">Rank</th><th>Student Name</th><th class="text-center" style="width:60px">Gender</th><th class="text-center" style="min-width:80px">Average</th><th class="text-center" style="width:50px">Grade</th></tr></thead>
+        <tbody>${rankRows || '<tr><td colspan="5" class="text-center" style="color:#9ca3af">No data available</td></tr>'}</tbody>
+      </table>
+
+      <div class="section-title">Subject Performance Breakdown</div>
+      <table>
+        <thead><tr><th>Subject</th><th>Teacher</th><th class="text-center">Class Avg</th><th class="text-center">Highest</th><th class="text-center">Lowest</th><th class="text-center">Pass Rate</th><th class="text-center">Distinction</th><th class="text-center">Male Avg</th><th class="text-center">Female Avg</th><th class="text-center">Male Pass%</th><th class="text-center">Female Pass%</th></tr></thead>
+        <tbody>${enhancedSubjectRows || '<tr><td colspan="11" class="text-center" style="color:#9ca3af">No data available</td></tr>'}</tbody>
+      </table>
+
+      ${atRiskRows ? `
+      <div class="section-title">At-Risk Students (Below 40%)</div>
+      <table>
+        <thead><tr><th class="text-center">#</th><th>Student Name</th><th class="text-center">Gender</th><th class="text-center">Score</th><th class="text-center">Grade</th></tr></thead>
+        <tbody>${atRiskRows}</tbody>
+      </table>` : ''}`;
+
+    const html = this.buildEnhancedReportShell({
+      schoolName: school?.name || 'School',
+      subtitle: `Results Analysis${classLabel} — ${term?.name || ''} (${term?.academicYear?.name || ''})`,
+      title: 'Analytics Summary',
+      content: this.buildMetaBar([
+        { label: 'Scope', value: className || 'School' },
+        { label: 'Term', value: term?.name || '' },
+        { label: 'Year', value: term?.academicYear?.name || '' },
+        { label: 'Exam', value: 'END OF TERM' },
+        { label: 'Date', value: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) },
+      ]) + content,
+      orientation: 'landscape',
+    });
 
     const buffer = await this.renderHtmlToPdf(html);
     const result = await this.cloudinary.uploadBuffer(buffer, {
@@ -1175,6 +1371,12 @@ export class ReportEngineService {
       where: { id: request.termId },
       include: { academicYear: true },
     });
+    if (!term) throw new BadRequestException('Term not found');
+
+    const classInfo = await this.prisma.class.findUnique({
+      where: { id: request.classId },
+      select: { name: true, classTeacher: true },
+    });
 
     const classSubjects = await this.prisma.classSubject.findMany({
       where: { classId: request.classId },
@@ -1182,8 +1384,8 @@ export class ReportEngineService {
     });
 
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { classId: request.classId, academicYearId: term?.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
-      include: { student: { select: { firstName: true, lastName: true, admissionNumber: true } } },
+      where: { classId: request.classId, academicYearId: term.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+      include: { student: { select: { firstName: true, lastName: true, admissionNumber: true, gender: true } } },
     });
 
     const studentIds = enrollments.map(e => e.studentId);
@@ -1198,45 +1400,111 @@ export class ReportEngineService {
     });
 
     const subjectHeaders = classSubjects.map(cs =>
-      `<th style="padding:6px 8px;border:1px solid #9ca3af;background:#1a365d;color:white;font-size:12px;font-weight:700">${cs.subject.name}</th>`
+      `<th class="text-center">${cs.subject.name}</th>`
     ).join('');
 
-    const studentRows = enrollments.map((e, idx) => {
+    const studentRowsData = enrollments.map((e, idx) => {
+      const studentResults = results.filter(r => r.studentId === e.studentId);
       const cells = classSubjects.map(cs => {
-        const result = results.find(r => r.studentId === e.studentId && r.subjectId === cs.subjectId);
-        return `<td style="padding:5px 8px;border:1px solid #9ca3af;text-align:center;font-size:12px">${result?.finalPercentage != null ? result.finalPercentage.toFixed(1) : '—'}</td>`;
+        const result = studentResults.find(r => r.subjectId === cs.subjectId);
+        const pct = result?.finalPercentage;
+        const grade = result?.finalGrade || null;
+        const remark = result?.finalRemark || null;
+        if (pct == null) {
+          return `<td class="text-center" style="background:#fffbeb"><span style="color:#d1d5db">-</span></td>`;
+        }
+        const color = this.scoreColor(pct);
+        return `<td class="text-center" style="background:${pct < 50 ? '#fef2f2' : 'transparent'}">
+          <div style="font-weight:600;font-size:12px;color:${color}">${pct.toFixed(1)}%</div>
+          <div style="font-size:10px;color:#6b7280">${grade || '-'}${remark ? ` (${remark})` : ''}</div>
+        </td>`;
       }).join('');
 
-      return `<tr style="background:${idx % 2 === 0 ? 'white' : '#f3f4f6'}">
-        <td style="padding:5px 8px;border:1px solid #9ca3af;font-size:12px">${e.student.admissionNumber}</td>
-        <td style="padding:5px 8px;border:1px solid #9ca3af;text-align:left;font-size:12px;font-weight:600">${e.student.firstName} ${e.student.lastName}</td>
-        ${cells}
+      const scored = studentResults.map(r => r.finalPercentage).filter((p): p is number => p != null);
+      const avg = scored.length > 0 ? scored.reduce((a, b) => a + b, 0) / scored.length : 0;
+      const totalPoints = studentResults.reduce((sum, r) => sum + (r.points || 0), 0);
+      const grade = avg >= 75 ? 'A' : avg >= 65 ? 'B' : avg >= 50 ? 'C' : avg >= 40 ? 'D' : 'E';
+
+      return {
+        idx: idx + 1,
+        firstName: e.student.firstName,
+        lastName: e.student.lastName,
+        admissionNumber: e.student.admissionNumber,
+        gender: e.student.gender || '-',
+        cells,
+        avg,
+        totalPoints,
+        grade,
+      };
+    });
+
+    const ranked = [...studentRowsData].sort((a, b) => b.avg - a.avg);
+    const rankMap = new Map<string, number>();
+    ranked.forEach((s, i) => rankMap.set(`${s.firstName}_${s.lastName}_${s.admissionNumber}`, i + 1));
+
+    const studentRows = studentRowsData.map(s => {
+      const avgColor = this.scoreColor(s.avg);
+      const gc = this.gradeColor(s.grade);
+      const rank = rankMap.get(`${s.firstName}_${s.lastName}_${s.admissionNumber}`) || s.idx;
+      return `<tr style="background:${(s.idx - 1) % 2 === 0 ? 'white' : '#faf7f4'}">
+        <td class="text-center" style="color:#6b7280;width:30px">${s.idx}</td>
+        <td style="font-weight:600">${s.firstName} ${s.lastName}</td>
+        <td style="color:#6b7280;font-size:11px">${s.admissionNumber || '-'}</td>
+        <td class="text-center" style="color:#6b7280">${s.gender}</td>
+        ${s.cells}
+        <td class="text-center font-bold" style="color:${avgColor}">${s.avg.toFixed(1)}%</td>
+        <td class="text-center font-semibold" style="color:#059669">${s.totalPoints}</td>
+        <td class="text-center"><span class="grade-badge" style="background:${gc.bg};color:${gc.text}">${s.grade}</span></td>
+        <td class="text-center font-semibold">${rank}</td>
       </tr>`;
     }).join('');
 
-    const html = `
-<!DOCTYPE html>
-<html>
-<head><style>
-  body { font-family: Arial, sans-serif; padding: 30px; font-size: 12px; color: #111827; }
-  .header { text-align: center; margin-bottom: 20px; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { border: 1px solid #9ca3af; }
-</style></head>
-<body>
-  <div class="header">
-    <div style="font-size:22px;font-weight:bold;color:#1a365d">${school?.name || 'School'}</div>
-    <div style="font-size:14px;color:#374151;margin-top:4px">Mark Schedule — ${term?.name || ''}</div>
-  </div>
-  <table>
-    <thead><tr>
-      <th style="padding:6px 8px;border:1px solid #9ca3af;background:#1a365d;color:white;font-size:12px;font-weight:700">Adm. No</th>
-      <th style="padding:6px 8px;border:1px solid #9ca3af;background:#1a365d;color:white;font-size:12px;font-weight:700;text-align:left">Student</th>
-      ${subjectHeaders}
-    </tr></thead>
-    <tbody>${studentRows}</tbody>
-  </table>
-</body></html>`;
+    const allScores = results.map(r => r.finalPercentage).filter((p): p is number => p != null);
+    const classAvg = allScores.length > 0 ? (allScores.reduce((a, b) => a + b, 0) / allScores.length).toFixed(1) : '0';
+    const passRate = allScores.length > 0 ? (allScores.filter(p => p >= 50).length / allScores.length * 100).toFixed(1) : '0';
+    const topScore = allScores.length > 0 ? Math.max(...allScores).toFixed(1) : '0';
+
+    const content = `
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-value">${enrollments.length}</div><div class="summary-label">Total Students</div></div>
+        <div class="summary-card"><div class="summary-value pass">${classAvg}%</div><div class="summary-label">Class Average</div></div>
+        <div class="summary-card"><div class="summary-value" style="color:#ea6645">${passRate}%</div><div class="summary-label">Pass Rate</div></div>
+        <div class="summary-card"><div class="summary-value" style="color:#7c3aed">${classSubjects.length}</div><div class="summary-label">Subjects</div></div>
+        <div class="summary-card"><div class="summary-value" style="color:#2563eb">${topScore}%</div><div class="summary-label">Top Score</div></div>
+      </div>
+      <table>
+        <thead><tr>
+          <th class="text-center" style="width:30px">#</th>
+          <th style="min-width:150px">Student Name</th>
+          <th style="min-width:90px">Admission No.</th>
+          <th class="text-center" style="width:50px">Gender</th>
+          ${subjectHeaders}
+          <th class="text-center" style="min-width:60px">Average</th>
+          <th class="text-center" style="width:50px">Points</th>
+          <th class="text-center" style="width:50px">Grade</th>
+          <th class="text-center" style="width:40px">Rank</th>
+        </tr></thead>
+        <tbody>${studentRows}</tbody>
+      </table>
+      <div class="signatures">
+        <div class="sig"><div class="sig-line">Class Teacher: ${classInfo?.classTeacher || '________________'}</div></div>
+        <div class="sig"><div class="sig-line">Head of Department</div></div>
+        <div class="sig"><div class="sig-line">Director / Principal</div></div>
+      </div>`;
+
+    const html = this.buildEnhancedReportShell({
+      schoolName: school?.name || 'School',
+      subtitle: `Mark Schedule — ${classInfo?.name || ''} — ${term.name} (${term.academicYear?.name || ''})`,
+      title: 'Mark Schedule',
+      content: this.buildMetaBar([
+        { label: 'Class', value: classInfo?.name || '' },
+        { label: 'Term', value: term.name },
+        { label: 'Year', value: term.academicYear?.name || '' },
+        { label: 'Exam', value: 'END OF TERM' },
+        { label: 'Date', value: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) },
+      ]) + content,
+      orientation: 'landscape',
+    });
 
     const buffer = await this.renderHtmlToPdf(html);
     const result = await this.cloudinary.uploadBuffer(buffer, {
@@ -1333,5 +1601,95 @@ export class ReportEngineService {
     if (score >= 50) return 'C';
     if (score >= 40) return 'D';
     return 'E';
+  }
+
+  // ===== Enhanced report shell (matches Web Platform Results Management templates) =====
+
+  private scoreColor(pct: number | null | undefined): string {
+    if (pct == null) return '#9ca3af';
+    if (pct >= 75) return '#059669';
+    if (pct >= 50) return '#3b82f6';
+    if (pct >= 40) return '#d97706';
+    return '#dc2626';
+  }
+
+  private gradeColor(grade?: string | null): { text: string; bg: string } {
+    const map: Record<string, [string, string]> = {
+      'A+': ['#059669', '#d1fae5'], 'A': ['#059669', '#d1fae5'], 'A-': ['#059669', '#d1fae5'],
+      'B+': ['#2563eb', '#dbeafe'], 'B': ['#2563eb', '#dbeafe'], 'B-': ['#2563eb', '#dbeafe'],
+      'C+': ['#d97706', '#fef3c7'], 'C': ['#d97706', '#fef3c7'], 'C-': ['#d97706', '#fef3c7'],
+      'D+': ['#dc2626', '#fee2e2'], 'D': ['#dc2626', '#fee2e2'], 'D-': ['#dc2626', '#fee2e2'],
+      'E': ['#dc2626', '#fee2e2'], 'F': ['#dc2626', '#fee2e2'],
+      '1': ['#059669', '#d1fae5'], '2': ['#2563eb', '#dbeafe'], '3': ['#d97706', '#fef3c7'], '4': ['#dc2626', '#fee2e2'], '5': ['#dc2626', '#fee2e2'],
+    };
+    const entry = grade ? map[grade.trim()] : undefined;
+    return entry ? { text: entry[0], bg: entry[1] } : { text: '#9ca3af', bg: '#f3f4f6' };
+  }
+
+  private enhancedReportStyles(orientation: 'landscape' | 'portrait' = 'portrait'): string {
+    return `
+      @page { margin: 15mm; size: A4 ${orientation}; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif; color: #1f2937; background: white; padding: 24px; line-height: 1.4; }
+      .report-header { text-align: center; margin-bottom: 24px; padding: 16px 20px; background: linear-gradient(135deg, #5f4b3a 0%, #7a6b5a 100%); border-radius: 8px; color: white; }
+      .school-name { font-size: 22px; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+      .school-sub { font-size: 12px; color: #e8ddd0; margin-top: 4px; }
+      .report-title { font-size: 16px; font-weight: 600; color: white; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.95; }
+      .report-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; font-size: 13px; color: #374151; background: #f5f0eb; padding: 10px 16px; border-radius: 6px; border: 1px solid #e8ddd0; }
+      .report-meta strong { color: #5f4b3a; }
+      table { width: 100%; border-collapse: collapse; font-size: 11px; }
+      th { background: #5f4b3a; color: white; padding: 8px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; border: 1px solid #7a6b5a; }
+      td { padding: 6px 10px; border: 1px solid #e5e7eb; }
+      tr:nth-child(even) { background: #faf7f4; }
+      .text-center { text-align: center; }
+      .text-right { text-align: right; }
+      .font-bold { font-weight: 700; }
+      .font-semibold { font-weight: 600; }
+      .pass { color: #059669; }
+      .fail { color: #dc2626; }
+      .warn { color: #d97706; }
+      .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+      .summary-card { background: #faf7f4; border: 1px solid #e8ddd0; border-radius: 8px; padding: 12px 16px; text-align: center; }
+      .summary-value { font-size: 24px; font-weight: 700; color: #5f4b3a; }
+      .summary-label { font-size: 11px; color: #6b7280; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+      .grade-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+      .signatures { margin-top: 40px; display: flex; justify-content: space-between; }
+      .sig { text-align: center; flex: 1; }
+      .sig-line { width: 180px; border-top: 1px solid #1f2937; margin: 40px auto 0; padding-top: 6px; font-size: 11px; color: #6b7280; }
+      .footer { text-align: center; margin-top: 20px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #9ca3af; }
+      .section-title { font-size: 14px; font-weight: 600; color: #5f4b3a; margin: 20px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #e8ddd0; }
+      .chart-bar { height: 18px; border-radius: 4px; }
+      .bar-track { background: #f3f4f6; border-radius: 4px; height: 18px; overflow: hidden; }
+    `;
+  }
+
+  private buildEnhancedReportShell(opts: {
+    schoolName: string;
+    subtitle?: string;
+    title: string;
+    content: string;
+    orientation?: 'landscape' | 'portrait';
+  }): string {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>${opts.title}</title>
+<style>${this.enhancedReportStyles(opts.orientation || 'portrait')}</style>
+</head>
+<body>
+<div class="report-header">
+  <div class="school-name">${opts.schoolName}</div>
+  ${opts.subtitle ? `<div class="report-title">${opts.subtitle}</div>` : ''}
+</div>
+${opts.content}
+<div class="footer">Smart Tech SaaS - Results Management System | Confidential</div>
+</body></html>`;
+  }
+
+  private buildMetaBar(meta: Array<{ label: string; value: string }>): string {
+    const spans = meta
+      .filter(m => m.value)
+      .map(m => `<span><strong>${m.label}:</strong> ${m.value}</span>`)
+      .join('');
+    return `<div class="report-meta">${spans}</div>`;
   }
 }

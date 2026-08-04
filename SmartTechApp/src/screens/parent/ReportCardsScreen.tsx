@@ -9,6 +9,7 @@ import { useAppStore } from '../../store';
 import { apiService } from '../../services/api';
 import { getGradeTextColor, getGradeBgColor, getScoreTextColor, getScoreBgColor } from '../../utils/gradeColors';
 import { ReportCardPdfViewer } from '../../components';
+import { downloadAndShareReportCardHtml } from '../../utils/pdfReport';
 
 export const ParentReportCardsScreen: React.FC = () => {
   const { dashboard } = useAppStore();
@@ -129,15 +130,17 @@ export const ParentReportCardsScreen: React.FC = () => {
       const termId = selectedTermId || dashboard?.currentTerm?.id;
       if (!termId || !selectedChildId) { Alert.alert('Error', 'Missing term or student'); return; }
 
-      const { base64 } = await apiService.getParentReportCard(selectedChildId, termId);
-      const fileUri = FileSystem.documentDirectory + `${childName.replace(/\s+/g, '_')}_Report_Card.pdf`;
-      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
-      await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: `Save ${childName}'s Report Card`, UTI: 'com.adobe.pdf' });
+      const { html } = await apiService.getReportCardHtml(selectedChildId, termId);
+      if (!html) throw new Error('Report card is not available for this term yet.');
+      await downloadAndShareReportCardHtml(
+        html,
+        `${childName.replace(/\s+/g, '_')}_Report_Card.pdf`,
+        `Save ${childName}'s Report Card`,
+      );
     } catch (e: any) {
-      if (e?.message !== 'User did not share') {
-        const msg = e?.response?.data?.message || e?.message || 'Report card PDF is not available yet. Try printing instead.';
-        Alert.alert('Unavailable', msg);
-      }
+      if (e?.message === 'User did not share') return;
+      const msg = e?.response?.data?.message || e?.message || 'Report card PDF is not available yet. Try printing instead.';
+      Alert.alert('Unavailable', msg);
     } finally { setActionLoading(false); }
   };
 
@@ -423,7 +426,7 @@ const styles = StyleSheet.create({
   childChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   childChipText: { fontSize: 13, fontWeight: '600', color: colors.text },
   childChipTextActive: { color: colors.white },
-  scroll: { padding: spacing.md, paddingBottom: 40 },
+  scroll: { padding: spacing.md, paddingBottom: spacing.xxl + 60 },
   loader: { marginTop: 40 },
   emptyState: { alignItems: 'center', marginTop: 60 },
   emptyIcon: { fontSize: 48, marginBottom: spacing.md },

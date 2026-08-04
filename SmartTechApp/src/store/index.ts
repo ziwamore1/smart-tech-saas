@@ -9,7 +9,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  login: (email: string, password: string, deviceToken?: string) => Promise<void>;
+  login: (email: string, password: string, deviceToken?: string, username?: string) => Promise<void>;
   superAdminLogin: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
