@@ -33,12 +33,15 @@ interface PersonalizationSettings {
 export default function TemplatePersonalizationPage() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'branding' | 'layout' | 'rules' | 'remarks' | 'marketplace'>('branding');
+  const [activeTab, setActiveTab] = useState<'branding' | 'layout' | 'rules' | 'remarks' | 'marketplace' | 'classes'>('branding');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [school, setSchool] = useState<any>(null);
   const [templates, setTemplates] = useState<any[]>([]);
   const [marketplaceTemplates, setMarketplaceTemplates] = useState<any[]>([]);
+  const [classAssignments, setClassAssignments] = useState<any[]>([]);
+  const [assignmentSavingId, setAssignmentSavingId] = useState<string | null>(null);
+  const [defaultSavingId, setDefaultSavingId] = useState<string | null>(null);
   const [settings, setSettings] = useState<PersonalizationSettings>({
     logo: '', motto: '', primaryColor: '#1a365d', secondaryColor: '#f5f5f5',
     directorSignature: '', schoolStamp: '', headerText: 'ACADEMIC REPORT',
@@ -61,21 +64,24 @@ export default function TemplatePersonalizationPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [schoolRes, tplRes, marketRes, brandingRes] = await Promise.all([
+      const [schoolRes, tplRes, marketRes, brandingRes, classRes] = await Promise.all([
         api.get('/school/current'),
         api.get('/template-builder'),
         api.get('/template-builder/marketplace'),
         api.get('/template-builder/branding'),
+        api.get('/template-builder/class-assignments/report-cards'),
       ]);
 
       const schoolData = schoolRes.data?.data || schoolRes.data;
       const tplData = tplRes.data?.data || tplRes.data || [];
       const marketData = marketRes.data?.data || marketRes.data || [];
       const brandingData = brandingRes.data?.data || brandingRes.data || [];
+      const classData = classRes.data?.data || classRes.data || [];
 
       setSchool(schoolData);
       setTemplates(Array.isArray(tplData) ? tplData : []);
       setMarketplaceTemplates(Array.isArray(marketData) ? marketData : []);
+      setClassAssignments(Array.isArray(classData) ? classData : []);
 
       if (schoolData) {
         setSettings(prev => ({
@@ -164,6 +170,49 @@ export default function TemplatePersonalizationPage() {
     }
   };
 
+  const reloadTemplatesAndClasses = async () => {
+    const [tplRes, classRes] = await Promise.all([
+      api.get('/template-builder'),
+      api.get('/template-builder/class-assignments/report-cards'),
+    ]);
+    const tplData = tplRes.data?.data || tplRes.data || [];
+    const classData = classRes.data?.data || classRes.data || [];
+    setTemplates(Array.isArray(tplData) ? tplData : []);
+    setClassAssignments(Array.isArray(classData) ? classData : []);
+  };
+
+  const handleAssignClassTemplate = async (classId: string, templateId: string | null) => {
+    if (assignmentSavingId) return;
+    setAssignmentSavingId(classId);
+    try {
+      await api.patch(`/template-builder/classes/${classId}/report-template`, { templateId });
+      await reloadTemplatesAndClasses();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Assignment failed';
+      alert(`Failed to assign template: ${msg}`);
+      console.error('assignClassReportTemplate error:', err);
+    } finally {
+      setAssignmentSavingId(null);
+    }
+  };
+
+  const handleSetDefault = async (templateId: string, isDefault: boolean) => {
+    if (defaultSavingId) return;
+    setDefaultSavingId(templateId);
+    try {
+      await api.patch(`/template-builder/${templateId}/report-card-default`, { isDefault });
+      await reloadTemplatesAndClasses();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to update default';
+      alert(`Failed to update default: ${msg}`);
+      console.error('setReportCardTemplateDefault error:', err);
+    } finally {
+      setDefaultSavingId(null);
+    }
+  };
+
+  const reportCardTemplates = templates.filter((t: any) => (t.templateType || 'REPORT_CARD') === 'REPORT_CARD');
+
   if (isLoading || loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5efe8' }}>
@@ -207,6 +256,7 @@ export default function TemplatePersonalizationPage() {
           { key: 'rules', label: 'Rules', icon: 'clipboard-list' },
           { key: 'remarks', label: 'AI Remarks', icon: 'comment-dots' },
           { key: 'marketplace', label: 'Marketplace', icon: 'store' },
+          { key: 'classes', label: 'Class Templates', icon: 'chalkboard' },
         ].map(tab => (
           <button
             key={tab.key}
@@ -544,6 +594,94 @@ export default function TemplatePersonalizationPage() {
                 <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px' }}>
                   <i className="fa fa-file-alt" style={{ fontSize: '36px', color: '#d1d5db', marginBottom: '8px', display: 'block' }}></i>
                   <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>No templates yet. Download from marketplace above!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Class Templates Tab */}
+      {activeTab === 'classes' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ background: '#fefcf9', borderRadius: '16px', border: '1px solid #f3f4f6', padding: '24px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#1f2937', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <i className="fa fa-star" style={{ color: '#ea6645' }}></i>
+              Default Report Card Template
+            </h3>
+            <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 20px' }}>
+              The default is used for classes without a specific template assigned, and when generating reports for a whole class.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {reportCardTemplates.map((t: any) => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#f9fafb', borderRadius: '10px', border: t.isDefault ? '1px solid #10b981' : '1px solid #f3f4f6', flexWrap: 'wrap' }}>
+                  <div style={{ width: '36px', height: '36px', background: `linear-gradient(135deg, ${t.primaryColor || '#1a365d'}, ${t.secondaryColor || '#f5f5f5'})`, borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <i className="fa fa-file-alt" style={{ color: 'white', fontSize: '13px' }}></i>
+                  </div>
+                  <div style={{ flex: 1, minWidth: '180px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>
+                      {t.name}
+                      {(t.metadata as any)?.enhancedProfessional && <span style={{ marginLeft: '8px', padding: '2px 6px', borderRadius: '4px', background: '#ede9fe', color: '#6d28d9', fontSize: '11px', fontWeight: 600 }}>Premium</span>}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>{t.status} · {t.templateType}</div>
+                  </div>
+                  <button
+                    onClick={() => handleSetDefault(t.id, !t.isDefault)}
+                    disabled={defaultSavingId === t.id}
+                    style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '12px', background: t.isDefault ? gradGreen : gradBlue, color: 'white', opacity: defaultSavingId === t.id ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {defaultSavingId === t.id ? <i className="fa fa-spinner fa-spin"></i> : <i className={`fa ${t.isDefault ? 'fa-check-circle' : 'fa-circle'} `}></i>}
+                    {t.isDefault ? 'Default' : 'Set Default'}
+                  </button>
+                </div>
+              ))}
+              {reportCardTemplates.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '32px' }}>
+                  <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>No report card templates yet. Create one in the Template Builder or download from the Marketplace tab.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ background: '#fefcf9', borderRadius: '16px', border: '1px solid #f3f4f6', padding: '24px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#1f2937', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <i className="fa fa-chalkboard" style={{ color: '#ea6645' }}></i>
+              Class Report Card Templates
+            </h3>
+            <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 20px' }}>
+              Assign a report card template to each class. Pick &ldquo;School Default&rdquo; to let the class use the default template.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {classAssignments.map((cls: any) => (
+                <div key={cls.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '180px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>{cls.name}</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                      {cls.reportTemplate ? `Using: ${cls.reportTemplate.name}` : 'Using school default'}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <select
+                      value={cls.reportTemplateId || ''}
+                      disabled={assignmentSavingId === cls.id}
+                      onChange={(e) => handleAssignClassTemplate(cls.id, e.target.value || null)}
+                      style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '13px', background: '#fefcf9', outline: 'none', minWidth: '240px' }}
+                    >
+                      <option value="">School Default</option>
+                      {!reportCardTemplates.some((t: any) => t.id === cls.reportTemplateId) && cls.reportTemplateId ? (
+                        <option value={cls.reportTemplateId}>{cls.reportTemplate?.name || 'Assigned Template'}</option>
+                      ) : null}
+                      {reportCardTemplates.map((t: any) => (
+                        <option key={t.id} value={t.id}>{t.isDefault ? '★ ' : ''}{t.name}{t.isDefault ? ' (Default)' : ''}</option>
+                      ))}
+                    </select>
+                    {assignmentSavingId === cls.id && <i className="fa fa-spinner fa-spin" style={{ color: '#ea6645' }}></i>}
+                  </div>
+                </div>
+              ))}
+              {classAssignments.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '32px' }}>
+                  <i className="fa fa-chalkboard" style={{ fontSize: '32px', color: '#d1d5db', marginBottom: '8px', display: 'block' }}></i>
+                  <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>No classes found for your school.</p>
                 </div>
               )}
             </div>

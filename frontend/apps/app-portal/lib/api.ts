@@ -1267,6 +1267,14 @@ export const templateBuilderApi = {
 
   getTemplate: (id: string) => api.get(`/template-builder/${id}`),
 
+  getClassReportTemplateAssignments: () => api.get('/template-builder/class-assignments/report-cards'),
+
+  assignClassReportTemplate: (classId: string, templateId: string | null) =>
+    api.patch(`/template-builder/classes/${classId}/report-template`, { templateId }),
+
+  setReportCardTemplateDefault: (id: string, isDefault: boolean) =>
+    api.patch(`/template-builder/${id}/report-card-default`, { isDefault }),
+
   createTemplate: (data: any) => api.post('/template-builder', data),
 
   updateTemplate: (id: string, data: any) => api.patch(`/template-builder/${id}`, data),
