@@ -110,7 +110,7 @@ export class TemplateMarketplaceService {
         secondaryColor: template.secondaryColor || '#f5f5f5',
          layoutJson: {},
          metadata: { source: 'marketplace-download', sourceTemplateId: template.id },
-         status: 'ACTIVE',
+         status: 'PUBLISHED',
         version: 1,
       },
     });

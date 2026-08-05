@@ -69,7 +69,7 @@ export class ReportTemplateBuilderService {
         name: 'Enhanced Professional Report Card',
         description: 'Premium professional report card with charts, rankings, attendance, summaries, and narrative insights.',
         templateType: 'REPORT_CARD',
-        status: 'ACTIVE',
+        status: 'PUBLISHED',
         isDefault: isPremium,
         primaryColor: '#1e3a8a',
         secondaryColor: '#eff6ff',

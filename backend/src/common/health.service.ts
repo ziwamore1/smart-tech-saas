@@ -85,147 +85,96 @@ export class HealthService {
 
   /**
    * Provisions system Marketplace templates into every school-owned library.
-   * Safe to run repeatedly; existing named Marketplace copies are skipped.
+   * Implemented with three batched INSERT ... SELECT statements so the heavy
+   * copying happens inside Postgres — keeps this endpoint fast and low-memory
+   * on memory-constrained instances. Safe to run repeatedly:
+   *   - templates: unique (name, schoolId) + ON CONFLICT DO NOTHING
+   *   - components/certificates: NOT EXISTS guards (self-heals partial runs)
    */
   async backfillMarketplaceTemplates() {
     const start = Date.now();
-    const [schools, systemTemplates] = await Promise.all([
-      this.prisma.school.findMany({ select: { id: true } }),
-      this.prisma.reportTemplate.findMany({
-        where: { schoolId: null, isDefault: true },
-        include: { components: true, certificate: true },
-      }),
+
+    const [sourceTemplates, schools] = await Promise.all([
+      this.prisma.reportTemplate.count({ where: { schoolId: null, isDefault: true } }),
+      this.prisma.school.count(),
     ]);
 
-    if (schools.length === 0 || systemTemplates.length === 0) {
+    if (sourceTemplates === 0 || schools === 0) {
       return {
         status: 'completed',
         latencyMs: Date.now() - start,
-        schools: schools.length,
-        sourceTemplates: systemTemplates.length,
+        schools,
+        sourceTemplates,
         created: 0,
         skipped: 0,
       };
     }
 
-    const schoolIds = schools.map((s) => s.id);
-    const names = systemTemplates.map((source) => `${source.name} (from Marketplace)`);
+    const created = await this.prisma.$executeRawUnsafe(`
+      INSERT INTO "ReportTemplate"
+        ("id", "name", "schoolId", "templateType", "pageSize", "orientation", "fontFamily", "fontSize",
+         "primaryColor", "secondaryColor", "layoutJson", "metadata", "status", "version", "createdAt", "updatedAt")
+      SELECT gen_random_uuid(), src."name" || ' (from Marketplace)', s."id",
+             src."templateType", src."pageSize", src."orientation", src."fontFamily", src."fontSize",
+             src."primaryColor", src."secondaryColor", src."layoutJson",
+             (COALESCE(src."metadata", '{}'::jsonb) || jsonb_build_object('source', 'marketplace-backfill', 'sourceTemplateId', src."id")),
+             'PUBLISHED', 1, now(), now()
+      FROM "ReportTemplate" src
+      CROSS JOIN "School" s
+      WHERE src."schoolId" IS NULL AND src."isDefault" = true AND s."id" <> 'system'
+      ON CONFLICT ("name", "schoolId") DO NOTHING
+    `);
 
-    const fetchCopies = () =>
-      this.prisma.reportTemplate.findMany({
-        where: { schoolId: { in: schoolIds }, name: { in: names } },
-        select: {
-          id: true,
-          schoolId: true,
-          name: true,
-          _count: { select: { components: true } },
-          certificate: { select: { id: true } },
-        },
-      });
+    const componentsCreated = await this.prisma.$executeRawUnsafe(`
+      INSERT INTO "TemplateComponent"
+        ("templateId", "type", "label", "content", "styles", "position", "size", "settings",
+         "placeholder", "isRequired", "isLocked", "sortOrder", "createdAt", "updatedAt")
+      SELECT c."id", sc."type", sc."label", sc."content", sc."styles", sc."position", sc."size", sc."settings",
+             sc."placeholder", sc."isRequired", sc."isLocked", sc."sortOrder", now(), now()
+      FROM "TemplateComponent" sc
+      JOIN "ReportTemplate" src ON sc."templateId" = src."id"
+      JOIN "ReportTemplate" c ON c."metadata"->>'sourceTemplateId' = src."id"
+      WHERE src."schoolId" IS NULL AND src."isDefault" = true
+        AND c."name" = src."name" || ' (from Marketplace)'
+        AND c."schoolId" <> 'system'
+        AND NOT EXISTS (SELECT 1 FROM "TemplateComponent" e WHERE e."templateId" = c."id" LIMIT 1)
+    `);
 
-    const before = await fetchCopies();
-    const existingKeys = new Set(before.map((c) => `${c.schoolId}::${c.name}`));
+    const certificatesCreated = await this.prisma.$executeRawUnsafe(`
+      INSERT INTO "CertificateTemplate"
+        ("templateId", "certificateType", "borderStyle", "borderColor", "sealUrl", "showQrCode", "autoNumbering",
+         "nextNumber", "showPhoto", "signature1Label", "signature1Name", "signature1Title", "signature2Label",
+         "signature2Name", "signature2Title", "awardText", "showBadge", "badgeStyle", "showWatermark",
+         "watermarkText", "layoutJson", "createdAt", "updatedAt")
+      SELECT c."id", cert."certificateType", cert."borderStyle", cert."borderColor", cert."sealUrl",
+             cert."showQrCode", cert."autoNumbering", 1, cert."showPhoto",
+             cert."signature1Label", cert."signature1Name", cert."signature1Title",
+             cert."signature2Label", cert."signature2Name", cert."signature2Title",
+             cert."awardText", cert."showBadge", cert."badgeStyle", cert."showWatermark",
+             cert."watermarkText", cert."layoutJson", now(), now()
+      FROM "CertificateTemplate" cert
+      JOIN "ReportTemplate" src ON cert."templateId" = src."id"
+      JOIN "ReportTemplate" c ON c."metadata"->>'sourceTemplateId' = src."id"
+      WHERE src."schoolId" IS NULL AND src."isDefault" = true
+        AND c."name" = src."name" || ' (from Marketplace)'
+        AND c."schoolId" <> 'system'
+        AND NOT EXISTS (SELECT 1 FROM "CertificateTemplate" e WHERE e."templateId" = c."id" LIMIT 1)
+    `);
 
-    const toCreate: any[] = [];
-    for (const school of schools) {
-      for (const source of systemTemplates) {
-        const name = `${source.name} (from Marketplace)`;
-        if (existingKeys.has(`${school.id}::${name}`)) continue;
-        toCreate.push({
-          name,
-          schoolId: school.id,
-          templateType: source.templateType,
-          pageSize: source.pageSize,
-          orientation: source.orientation,
-          fontFamily: source.fontFamily,
-          fontSize: source.fontSize,
-          primaryColor: source.primaryColor,
-          secondaryColor: source.secondaryColor,
-          layoutJson: (source.layoutJson as any) ?? {},
-          metadata: { ...((source.metadata as any) || {}), source: 'marketplace-backfill', sourceTemplateId: source.id },
-          status: 'ACTIVE',
-          version: 1,
-        });
-      }
-    }
-
-    if (toCreate.length > 0) {
-      // Backed by @@unique([name, schoolId]) so partial/timed-out runs stay idempotent.
-      await this.prisma.reportTemplate.createMany({ data: toCreate, skipDuplicates: true });
-    }
-
-    const after = await fetchCopies();
-    const copyByKey = new Map(after.map((c) => [`${c.schoolId}::${c.name}`, c]));
-
-    // Self-heal: backfill components/certificates for any copy (new or from a timed-out
-    // earlier run) that is missing them.
-    const components: any[] = [];
-    const certificates: any[] = [];
-    for (const school of schools) {
-      for (const source of systemTemplates) {
-        const name = `${source.name} (from Marketplace)`;
-        const copy = copyByKey.get(`${school.id}::${name}`);
-        if (!copy) continue;
-
-        if (copy._count.components === 0 && source.components.length > 0) {
-          for (const component of source.components) {
-            components.push({
-              templateId: copy.id,
-              type: component.type,
-              label: component.label,
-              content: component.content as any,
-              styles: (component.styles as any) ?? {},
-              position: (component.position as any) ?? {},
-              size: (component.size as any) ?? {},
-              settings: (component.settings as any) ?? {},
-              placeholder: component.placeholder,
-              isRequired: component.isRequired,
-              isLocked: component.isLocked,
-              sortOrder: component.sortOrder,
-            });
-          }
-        }
-        if (!copy.certificate && source.certificate) {
-          certificates.push({
-            templateId: copy.id,
-            certificateType: source.certificate.certificateType,
-            borderStyle: source.certificate.borderStyle,
-            borderColor: source.certificate.borderColor,
-            sealUrl: source.certificate.sealUrl,
-            showQrCode: source.certificate.showQrCode,
-            autoNumbering: source.certificate.autoNumbering,
-            showPhoto: source.certificate.showPhoto,
-            signature1Label: source.certificate.signature1Label,
-            signature1Name: source.certificate.signature1Name,
-            signature1Title: source.certificate.signature1Title,
-            signature2Label: source.certificate.signature2Label,
-            signature2Name: source.certificate.signature2Name,
-            signature2Title: source.certificate.signature2Title,
-            awardText: source.certificate.awardText,
-            showBadge: source.certificate.showBadge,
-            badgeStyle: source.certificate.badgeStyle,
-            showWatermark: source.certificate.showWatermark,
-            watermarkText: source.certificate.watermarkText,
-            layoutJson: (source.certificate.layoutJson as any) ?? {},
-          });
-        }
-      }
-    }
-
-    if (components.length > 0) {
-      await this.prisma.templateComponent.createMany({ data: components, skipDuplicates: true });
-    }
-    if (certificates.length > 0) {
-      await this.prisma.certificateTemplate.createMany({ data: certificates, skipDuplicates: true });
-    }
+    const totalCopies = await this.prisma.reportTemplate.count({
+      where: { schoolId: { not: null }, name: { contains: ' (from Marketplace)' } },
+    });
 
     return {
       status: 'completed',
       latencyMs: Date.now() - start,
-      schools: schools.length,
-      sourceTemplates: systemTemplates.length,
-      created: after.length - before.length,
-      skipped: before.length,
+      schools,
+      sourceTemplates,
+      created,
+      skipped: totalCopies - created,
+      componentsCreated,
+      certificatesCreated,
+      totalCopies,
     };
   }
 
