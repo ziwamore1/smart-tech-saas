@@ -601,10 +601,13 @@ export class ReportEngineService {
     const termId = request.termId!;
     const schoolId = request.schoolId;
 
+    const t0 = Date.now();
+    this.logger.log(`[TRACE report-card] start student=${studentId} term=${termId}`);
     const schoolAccess = await this.prisma.school.findUnique({ where: { id: schoolId }, select: { subscriptionTier: true } });
     if (String(schoolAccess?.subscriptionTier || '').toUpperCase() === 'PREMIUM') {
       await this.reportTemplateBuilder.ensureEnhancedProfessionalTemplate(schoolId);
     }
+    this.logger.log(`[TRACE report-card] after ensureEnhancedProfessionalTemplate ${Date.now() - t0}ms`);
 
     if (!request.templateId) {
       const enrollment = await this.prisma.enrollment.findFirst({
@@ -649,15 +652,18 @@ export class ReportEngineService {
     }
 
     request.templateId = template.id;
+    this.logger.log(`[TRACE report-card] template resolved=${template.id} comps=${template.components?.length} ${Date.now() - t0}ms`);
     const engineData = await this.reportCardEngine.generateReportCardData(
       studentId, termId, schoolId,
     );
+    this.logger.log(`[TRACE report-card] after generateReportCardData ${Date.now() - t0}ms`);
     const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
     const html = await this.templateRenderer.renderPreview(
       schoolId,
       template.id,
       this.buildTemplateRenderData(engineData, school),
     );
+    this.logger.log(`[TRACE report-card] after renderPreview ${Date.now() - t0}ms`);
     return { html, templateId: template.id, engineData };
   }
 

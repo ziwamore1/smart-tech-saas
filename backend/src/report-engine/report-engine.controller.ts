@@ -222,6 +222,8 @@ export class ReportEngineController {
     @Req() req,
     @Body() body: { studentId?: string; termId?: string; templateId?: string },
   ) {
+    const t0 = Date.now();
+    this.logger.log(`[TRACE preview] entered studentId=${body.studentId}`);
     if (!body.studentId) {
       throw new BadRequestException('studentId is required');
     }
@@ -250,6 +252,7 @@ export class ReportEngineController {
       ...body,
       schoolId: req.user.schoolId,
     });
+    this.logger.log(`[TRACE preview] done ${Date.now() - t0}ms html=${html?.length || 0}`);
     return { html, data };
   }
 
