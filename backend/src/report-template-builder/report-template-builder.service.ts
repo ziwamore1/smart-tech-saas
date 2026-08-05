@@ -3,6 +3,30 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { ReportTemplateType, TemplateStatus, ComponentType } from '@prisma/client';
 import { FeatureLockService } from '../feature-lock/feature-lock.service';
 
+const ENHANCED_PROFESSIONAL_COMPONENTS: any[] = [
+  { type: 'HEADER', label: 'Report Header', content: { text: 'ENHANCED PROFESSIONAL REPORT CARD', color: '#1e3a8a', fontSize: 16 }, styles: { color: '#1e3a8a', textAlign: 'center' }, position: { x: 30, y: 20 }, size: { width: 535, height: 30 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 0 },
+  { type: 'DIVIDER', label: 'Divider', content: {}, styles: { borderTop: '1px solid #1e3a8a' }, position: { x: 30, y: 55 }, size: { width: 535, height: 1 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 1 },
+  { type: 'SCHOOL_LOGO', label: 'School Logo', content: {}, styles: {}, position: { x: 30, y: 65 }, size: { width: 60, height: 60 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 2 },
+  { type: 'SCHOOL_NAME', label: 'School Name', content: { color: '#1e3a8a', fontSize: 18 }, styles: { color: '#1e3a8a', fontWeight: 'bold' }, position: { x: 100, y: 70 }, size: { width: 300, height: 22 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 3 },
+  { type: 'SCHOOL_INFO', label: 'School Info', content: { color: '#666', fontSize: 10 }, styles: { color: '#666' }, position: { x: 100, y: 95 }, size: { width: 300, height: 30 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 4 },
+  { type: 'STUDENT_PHOTO', label: 'Student Photo', content: {}, styles: { border: '1px solid #ccc' }, position: { x: 495, y: 65 }, size: { width: 70, height: 70 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 5 },
+  { type: 'STUDENT_INFO', label: 'Student Information', content: { color: '#333', fontSize: 11 }, styles: { color: '#333' }, position: { x: 30, y: 140 }, size: { width: 535, height: 45 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 6 },
+  { type: 'ATTENDANCE_TABLE', label: 'Attendance', content: { showPercentage: true }, styles: { headerBg: '#1e3a8a', headerColor: '#fff' }, position: { x: 30, y: 195 }, size: { width: 535, height: 35 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 7 },
+  { type: 'RESULTS_TABLE', label: 'Subject Results', content: { showGrade: true, showScore: true, showPoints: true, showRemark: true }, styles: { headerBg: '#1e3a8a', headerColor: '#fff' }, position: { x: 30, y: 240 }, size: { width: 535, height: 200 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 8 },
+  { type: 'RANKING_TABLE', label: 'Class Ranking', content: { showPosition: true, showTotalStudents: true }, styles: { headerBg: '#047857', headerColor: '#fff' }, position: { x: 30, y: 450 }, size: { width: 535, height: 30 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 9 },
+  { type: 'PERFORMANCE_CHART', label: 'Performance Chart', content: { chartType: 'bar' }, styles: {}, position: { x: 30, y: 490 }, size: { width: 250, height: 130 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 10 },
+  { type: 'ANALYTICS_SUMMARY', label: 'Summary', content: { showGPA: true, showTotal: true, showAverage: true }, styles: { bgColor: '#f8fafc' }, position: { x: 300, y: 490 }, size: { width: 265, height: 130 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 11 },
+  { type: 'AI_NARRATIVE', label: 'AI Narrative', content: { color: '#555', fontSize: 11 }, styles: { color: '#555', bgColor: '#f5f3ff' }, position: { x: 30, y: 630 }, size: { width: 535, height: 45 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 12 },
+  { type: 'STRENGTHS_WEAKNESSES', label: 'Strengths & Weaknesses', content: { color: '#555', fontSize: 11 }, styles: { color: '#555', bgColor: '#ecfdf5' }, position: { x: 30, y: 680 }, size: { width: 535, height: 45 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 13 },
+  { type: 'RECOMMENDATIONS', label: 'Recommendations', content: { color: '#555', fontSize: 11 }, styles: { color: '#555', bgColor: '#fffbeb' }, position: { x: 30, y: 730 }, size: { width: 535, height: 40 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 14 },
+  { type: 'TEACHER_REMARKS', label: 'Class Teacher Remarks', content: { color: '#555', fontSize: 11 }, styles: { color: '#555', bgColor: '#fefce8' }, position: { x: 30, y: 780 }, size: { width: 535, height: 40 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 15 },
+  { type: 'HEAD_TEACHER_REMARKS', label: 'Head Teacher Remarks', content: { color: '#555', fontSize: 11 }, styles: { color: '#555', bgColor: '#eff6ff' }, position: { x: 30, y: 830 }, size: { width: 535, height: 40 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 16 },
+  { type: 'PROMOTION_STATUS', label: 'Promotion Status', content: { color: '#047857', fontSize: 12 }, styles: { color: '#047857', fontWeight: 'bold' }, position: { x: 30, y: 880 }, size: { width: 535, height: 20 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 17 },
+  { type: 'SIGNATURE', label: 'Signatures', content: { showHeadSig: true, showTeacherSig: true }, styles: {}, position: { x: 30, y: 910 }, size: { width: 400, height: 30 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 18 },
+  { type: 'QR_CODE', label: 'QR Code', content: {}, styles: {}, position: { x: 500, y: 905 }, size: { width: 50, height: 50 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 19 },
+  { type: 'FOOTER', label: 'Footer', content: { text: 'Smart Tech SaaS - Enhanced Professional Report' }, styles: { color: '#999', fontSize: 8 }, position: { x: 30, y: 945 }, size: { width: 535, height: 15 }, settings: {}, isRequired: false, isLocked: false, sortOrder: 20 },
+];
+
 @Injectable()
 export class ReportTemplateBuilderService {
   constructor(private prisma: PrismaService, private featureLock: FeatureLockService) {}
@@ -55,15 +79,21 @@ export class ReportTemplateBuilderService {
     const isPremium = String(school?.subscriptionTier || '').toUpperCase() === 'PREMIUM';
     const existing = await this.prisma.reportTemplate.findFirst({
       where: { schoolId, name: 'Enhanced Professional Report Card' },
+      include: { _count: { select: { components: true } } },
     });
-    if (existing) return existing;
+    if (existing) {
+      if (existing._count.components === 0) {
+        await this.seedEnhancedProfessionalComponents(existing.id);
+      }
+      return existing;
+    }
     if (isPremium) {
       await this.prisma.reportTemplate.updateMany({
         where: { schoolId, templateType: 'REPORT_CARD', isDefault: true },
         data: { isDefault: false },
       });
     }
-    return this.prisma.reportTemplate.create({
+    const created = await this.prisma.reportTemplate.create({
       data: {
         schoolId,
         name: 'Enhanced Professional Report Card',
@@ -75,6 +105,15 @@ export class ReportTemplateBuilderService {
         secondaryColor: '#eff6ff',
         metadata: { enhancedProfessional: true, premiumOnly: true },
       },
+    });
+    await this.seedEnhancedProfessionalComponents(created.id);
+    return created;
+  }
+
+  private async seedEnhancedProfessionalComponents(templateId: string) {
+    await this.prisma.templateComponent.deleteMany({ where: { templateId } });
+    await this.prisma.templateComponent.createMany({
+      data: ENHANCED_PROFESSIONAL_COMPONENTS.map((c) => ({ ...c, templateId })),
     });
   }
 
