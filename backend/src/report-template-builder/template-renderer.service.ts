@@ -312,8 +312,14 @@ export class TemplateRendererService {
     }
   }
 
-  renderComponentsToHtml(components: any[], data: any, school?: any): string {
-    return components.map((c: any) => this.renderComponent(c, data, school)).join('\n');
+  renderComponentsToHtml(components: any[], data: any, school?: any, pageWidthPx = 680): string {
+    const inner = components.map((c: any) => this.renderComponent(c, data, school)).join('\n');
+    const bottom = components.reduce((max, c) => {
+      const b = (c.position?.y || 0) + (c.size?.height || 0);
+      return Math.max(max, b);
+    }, 0);
+    const height = Math.max(bottom + 20, 500);
+    return `<div style="position:relative;width:${pageWidthPx}px;height:${height}px;margin:0 auto;">${inner}</div>`;
   }
 
   private renderComponent(component: any, data: any, school?: any): string {
@@ -321,7 +327,7 @@ export class TemplateRendererService {
     const content = component.content || {};
     const pos = component.position || {};
     const size = component.size || {};
-    const styleStr = this.styleObjectToString({ ...styles, ...pos, ...size });
+    const styleStr = 'position:absolute;' + this.styleObjectToString({ ...styles, ...pos, ...size });
     const placeholder = component.placeholder;
 
     switch (component.type) {
@@ -337,7 +343,7 @@ export class TemplateRendererService {
         return `<p style="${styleStr}">${this.resolvePlaceholders(content.text || '', data)}</p>`;
 
       case 'DIVIDER':
-        return `<hr style="${styleStr}border:none;border-top:1px solid #ddd;" />`;
+        return `<div style="${styleStr};border-top:${styles.borderTop || '1px solid #ddd'};"></div>`;
 
       case 'SPACER':
         return `<div style="${styleStr};height:${content.height || 20}px"></div>`;
@@ -398,31 +404,31 @@ export class TemplateRendererService {
 
       case 'PERFORMANCE_CHART':
         if (!data?.charts?.bar) return '';
-        return this.generateSvgBarChart(data.charts.bar);
+        return `<div style="${styleStr};overflow:hidden;">${this.generateSvgBarChart({ ...data.charts.bar, width: size.width || 250, height: size.height || 130 })}</div>`;
 
       case 'RADAR_CHART':
         if (!data?.charts?.radar) return '';
-        return this.generateSvgRadarChart(data.charts.radar);
+        return `<div style="${styleStr};overflow:hidden;">${this.generateSvgRadarChart({ ...data.charts.radar, size: Math.min(size.width || 200, size.height || 200) })}</div>`;
 
       case 'LINE_CHART':
         if (!data?.charts?.line) return '';
-        return this.generateSvgLineChart(data.charts.line);
+        return `<div style="${styleStr};overflow:hidden;">${this.generateSvgLineChart({ ...data.charts.line, width: size.width || 400, height: size.height || 200 })}</div>`;
 
       case 'HEATMAP':
         if (!data?.charts?.heatmap) return '';
-        return this.generateSvgHeatmap(data.charts.heatmap);
+        return `<div style="${styleStr};overflow:hidden;">${this.generateSvgHeatmap({ ...data.charts.heatmap, width: size.width || 400, height: size.height || 300 })}</div>`;
 
       case 'DISTRIBUTION_CURVE':
         if (!data?.charts?.distribution) return '';
-        return this.generateSvgDistributionCurve(data.charts.distribution);
+        return `<div style="${styleStr};overflow:hidden;">${this.generateSvgDistributionCurve({ ...data.charts.distribution, width: size.width || 400, height: size.height || 200 })}</div>`;
 
       case 'COMPETENCY_HEATMAP':
         if (!data?.charts?.competency) return '';
-        return this.generateSvgHeatmap(data.charts.competency);
+        return `<div style="${styleStr};overflow:hidden;">${this.generateSvgHeatmap({ ...data.charts.competency, width: size.width || 400, height: size.height || 300 })}</div>`;
 
       case 'ATTENDANCE_CHART':
         if (!data?.charts?.attendance) return '';
-        return this.generateSvgBarChart(data.charts.attendance);
+        return `<div style="${styleStr};overflow:hidden;">${this.generateSvgBarChart({ ...data.charts.attendance, width: size.width || 250, height: size.height || 130 })}</div>`;
 
       case 'ANALYTICS_SUMMARY':
         return this.renderAnalyticsSummary(component, data, styleStr);
@@ -431,6 +437,17 @@ export class TemplateRendererService {
         return `<div style="${styleStr}">
           <strong>Teacher's Remarks:</strong><br/>
           ${data?.teacherComment || ''}
+        </div>`;
+
+      case 'HEAD_TEACHER_REMARKS':
+        return `<div style="${styleStr}">
+          <strong>Head Teacher's Remarks:</strong><br/>
+          ${data?.headComment || data?.headTeacherComment || ''}
+        </div>`;
+
+      case 'PROMOTION_STATUS':
+        return `<div style="${styleStr}">
+          ${data?.promotionStatus || ''}
         </div>`;
 
       case 'AI_NARRATIVE':
@@ -631,7 +648,38 @@ export class TemplateRendererService {
 
   private renderAttendanceTable(component: any, data: any, styleStr: string): string {
     const attendance = data?.attendance || [];
-    if (!attendance.length) return '<div>No attendance data</div>';
+
+    if (!Array.isArray(attendance)) {
+      const present = attendance.presentDays ?? 0;
+      const late = attendance.lateDays ?? 0;
+      const absent = attendance.absentDays ?? 0;
+      const total = attendance.totalDays ?? present + late + absent;
+      const rate = attendance.attendanceRate != null
+        ? attendance.attendanceRate + '%'
+        : (total ? Math.round(((present + late) / total) * 100) + '%' : '—');
+      const cell = 'padding:4px 6px;border:1px solid #e5e7eb;text-align:center;font-size:9px;';
+      const head = 'padding:4px 6px;border:1px solid #1a365d;text-align:center;font-size:9px;';
+      return `<table style="width:100%;border-collapse:collapse;${styleStr}">
+        <thead>
+          <tr style="background:#1a365d;color:white;">
+            <th style="${head}">Total Days</th>
+            <th style="${head}">Present</th>
+            <th style="${head}">Absent</th>
+            <th style="${head}">Late</th>
+            <th style="${head}">Attendance Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="${cell}">${total || ''}</td>
+            <td style="${cell}">${present || ''}</td>
+            <td style="${cell}">${absent || ''}</td>
+            <td style="${cell}">${late || ''}</td>
+            <td style="${cell}font-weight:bold;color:#047857;">${rate}</td>
+          </tr>
+        </tbody>
+      </table>`;
+    }
 
     const rows = attendance.map((a: any) =>
       `<tr>
@@ -679,24 +727,26 @@ export class TemplateRendererService {
 
   private renderAnalyticsSummary(component: any, data: any, styleStr: string): string {
     const s = data?.summary || {};
-    return `<div style="${styleStr};display:flex;flex-wrap:wrap;gap:8px;">
-      <div style="flex:1;min-width:80px;background:#eff6ff;padding:8px;border-radius:4px;text-align:center;">
-        <div style="font-size:18px;font-weight:bold;color:#2563eb;">${s.totalMarks ?? ''}</div>
-        <div style="font-size:9px;color:#666;">Total Marks</div>
-      </div>
-      <div style="flex:1;min-width:80px;background:#f0fdf4;padding:8px;border-radius:4px;text-align:center;">
-        <div style="font-size:18px;font-weight:bold;color:#16a34a;">${s.average ?? ''}</div>
-        <div style="font-size:9px;color:#666;">Average</div>
-      </div>
-      <div style="flex:1;min-width:80px;background:#fefce8;padding:8px;border-radius:4px;text-align:center;">
-        <div style="font-size:18px;font-weight:bold;color:#ca8a04;">${s.totalPoints ?? ''}</div>
-        <div style="font-size:9px;color:#666;">Points</div>
-      </div>
-      <div style="flex:1;min-width:80px;background:#f5f3ff;padding:8px;border-radius:4px;text-align:center;">
-        <div style="font-size:18px;font-weight:bold;color:#7c3aed;">${s.positionInClass ?? ''}/${s.totalStudents ?? ''}</div>
-        <div style="font-size:9px;color:#666;">Position</div>
-      </div>
-    </div>`;
+    const content = component.content || {};
+    const showTotal = content.showTotal !== false;
+    const showAverage = content.showAverage !== false;
+    const showPoints = content.showPoints ?? content.showGPA !== false;
+    const showPosition = content.showPosition !== false;
+
+    const stat = (label: string, value: any, bg: string, color: string) =>
+      `<div style="flex:1;min-width:80px;background:${bg};padding:8px;border-radius:4px;text-align:center;">
+        <div style="font-size:18px;font-weight:bold;color:${color};">${value ?? ''}</div>
+        <div style="font-size:9px;color:#666;">${label}</div>
+      </div>`;
+
+    const cards: string[] = [];
+    if (showTotal) cards.push(stat('Total Marks', s.totalMarks, '#eff6ff', '#2563eb'));
+    if (showAverage) cards.push(stat('Average', s.average, '#f0fdf4', '#16a34a'));
+    if (showPoints) cards.push(stat('Points', s.totalPoints, '#fefce8', '#ca8a04'));
+    if (showPosition) cards.push(stat('Position', s.positionInClass ? `${s.positionInClass}/${s.totalStudents || ''}` : '', '#f5f3ff', '#7c3aed'));
+
+    if (!cards.length) return `<div style="${styleStr}"></div>`;
+    return `<div style="${styleStr};display:flex;flex-wrap:wrap;gap:8px;">${cards.join('')}</div>`;
   }
 
   private renderRecommendations(component: any, data: any, styleStr: string): string {
@@ -824,10 +874,18 @@ export class TemplateRendererService {
       padding: 'padding', margin: 'margin', borderRadius: 'border-radius',
       border: 'border', opacity: 'opacity', transform: 'transform',
     };
+    const lengthKeys = new Set([
+      'width', 'height', 'left', 'right', 'top', 'bottom',
+      'font-size', 'border-radius', 'border-width', 'gap',
+      'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+      'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+    ]);
+    const internalKeys = new Set(['headerBg', 'headerColor', 'altRowBg']);
     return Object.entries(styles)
-      .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+      .filter(([k, v]) => v !== undefined && v !== null && v !== '' && !internalKeys.has(k))
       .map(([k, v]) => {
         const cssKey = map[k] || k.replace(/([A-Z])/g, '-$1').toLowerCase();
+        if (lengthKeys.has(cssKey) && typeof v === 'number') return `${cssKey}:${v}px`;
         return `${cssKey}:${v}`;
       })
       .join(';');
@@ -862,7 +920,17 @@ export class TemplateRendererService {
       headComment: 'Keep up the good work.',
     };
 
-    const componentsHtml = this.renderComponentsToHtml(template.components, defaultData, school);
+    const pageSize = template.pageSize || 'A4';
+    const orientation = template.orientation || 'portrait';
+    const pageMargins = template.certificate
+      ? '0'
+      : `${template.marginTop || 15}mm ${template.marginRight || 15}mm ${template.marginBottom || 15}mm ${template.marginLeft || 15}mm`;
+    const isLandscape = orientation === 'landscape';
+    const marginLeftMm = template.certificate ? 0 : (template.marginLeft ?? 15);
+    const marginRightMm = template.certificate ? 0 : (template.marginRight ?? 15);
+    const pageWidthPx = Math.round(((isLandscape ? 297 : 210) - marginLeftMm - marginRightMm) * 96 / 25.4);
+
+    const componentsHtml = this.renderComponentsToHtml(template.components, defaultData, school, pageWidthPx);
 
     let stampOverlay = '';
     let mainContent: string;
@@ -919,12 +987,6 @@ export class TemplateRendererService {
       }
     }
 
-    const pageSize = template.pageSize || 'A4';
-    const orientation = template.orientation || 'portrait';
-    const pageMargins = template.certificate
-      ? '0'
-      : `${template.marginTop || 15}mm ${template.marginRight || 15}mm ${template.marginBottom || 15}mm ${template.marginLeft || 15}mm`;
-    const isLandscape = orientation === 'landscape';
     const pageWidth = isLandscape ? '297mm' : '210mm';
     const pageHeight = isLandscape ? '210mm' : '297mm';
 
@@ -937,7 +999,7 @@ export class TemplateRendererService {
   <style>
      @page { size: ${pageSize} ${orientation}; margin: ${pageMargins}; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-     body { font-family: ${template.fontFamily || 'Arial'}, sans-serif; font-size: ${template.fontSize || 12}px; color: #111827; line-height: 1.5; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+     body { font-family: ${template.fontFamily || 'Arial'}, sans-serif; font-size: ${template.fontSize || 12}px; color: #111827; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     img { max-width: 100%; }
     table { page-break-inside: avoid; }
     @media print { body { margin: 0; padding: 0; } }

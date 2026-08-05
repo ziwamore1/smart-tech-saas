@@ -653,11 +653,37 @@ export class ReportEngineService {
       studentId, termId, schoolId,
     );
     const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
-    const html = await this.templateRenderer.renderPreview(schoolId, template.id, {
+    const html = await this.templateRenderer.renderPreview(
+      schoolId,
+      template.id,
+      this.buildTemplateRenderData(engineData, school),
+    );
+    return { html, templateId: template.id, engineData };
+  }
+
+  /**
+   * Maps report-card engine data into the shape the template renderer's
+   * components expect (tables, charts, narratives, remarks, rankings, etc.).
+   */
+  private buildTemplateRenderData(engineData: any, school?: any) {
+    const termSummary = engineData?.termSummary || {};
+    const breakdown = engineData?.subjectBreakdown || [];
+    const toList = (v: any) => {
+      if (!v) return '';
+      if (Array.isArray(v)) return v.filter(Boolean).join('; ');
+      return String(v);
+    };
+    const toArray = (v: any) => {
+      if (!v) return [];
+      if (Array.isArray(v)) return v.filter(Boolean);
+      return [String(v)];
+    };
+    const overallPct = termSummary.overallPercentage;
+    return {
       ...engineData,
       schoolName: school?.name,
       schoolLogo: school?.logoUrl || school?.logo,
-      subjects: engineData.subjectBreakdown?.map((s: any) => ({
+      subjects: breakdown.map((s: any) => ({
         subject: s.subjectName,
         score: s.finalPercentage,
         grade: s.finalGrade,
@@ -665,16 +691,37 @@ export class ReportEngineService {
         remark: s.finalRemark,
       })) || [],
       summary: {
-        totalMarks: engineData.subjectBreakdown?.reduce((sum: number, s: any) => sum + (s.totalRawScore || 0), 0) || 0,
+        totalMarks: breakdown.reduce((sum: number, s: any) => sum + (s.totalRawScore || 0), 0) || 0,
         average: engineData.bestSubjectsAverage || 0,
         totalPoints: engineData.totalPoints || 0,
-        positionInClass: engineData.termSummary?.classRank || 0,
-        totalStudents: engineData.termSummary?.classSize || 0,
+        positionInClass: termSummary.classRank || 0,
+        totalStudents: termSummary.classSize || 0,
         bestSixTotal: engineData.totalPoints || 0,
         eligibleForUniversity: 'YES',
       },
-    });
-    return { html, templateId: template.id, engineData };
+      teacherComment: termSummary.teacherRemarks || '',
+      headComment: engineData.headComment || '',
+      aiNarrative: toList(termSummary.aiInsights),
+      strengths: toArray(termSummary.strengths),
+      weaknesses: toArray(termSummary.weaknesses),
+      recommendations: toArray(termSummary.recommendations),
+      promotionStatus: overallPct != null ? (overallPct >= 50 ? 'PROMOTED' : 'REPEAT') : '',
+      rankings: termSummary.classRank
+        ? [{
+            studentName: `${engineData?.student?.firstName || ''} ${engineData?.student?.lastName || ''}`.trim(),
+            totalPoints: engineData.totalPoints || 0,
+            average: engineData.bestSubjectsAverage || 0,
+          }]
+        : [],
+      charts: {
+        bar: {
+          labels: breakdown.map((s: any) => (s.subjectName || '').slice(0, 8)),
+          values: breakdown.map((s: any) => s.finalPercentage ?? 0),
+          title: 'Subject Performance',
+          color: '#1e3a8a',
+        },
+      },
+    };
   }
 
   /**
@@ -1600,25 +1647,11 @@ export class ReportEngineService {
     }
 
     if (templateId) {
-      const html = await this.templateRenderer.renderPreview(request.schoolId, templateId, {
-        ...engineData,
-        schoolName: school?.name,
-        schoolLogo: school?.logoUrl || school?.logo,
-        subjects: engineData.subjectBreakdown?.map((s: any) => ({
-          subject: s.subjectName,
-          score: s.finalPercentage,
-          grade: s.finalGrade,
-          points: s.points,
-          remark: s.finalRemark,
-        })) || [],
-        summary: {
-          totalMarks: engineData.subjectBreakdown?.reduce((sum: number, s: any) => sum + (s.totalRawScore || 0), 0) || 0,
-          average: engineData.bestSubjectsAverage || 0,
-          totalPoints: engineData.totalPoints || 0,
-          positionInClass: engineData.termSummary?.classRank || 0,
-          totalStudents: engineData.termSummary?.classSize || 0,
-        },
-      });
+      const html = await this.templateRenderer.renderPreview(
+        request.schoolId,
+        templateId,
+        this.buildTemplateRenderData(engineData, school),
+      );
       return this.templateRenderer.renderPdfFromHtml(request.schoolId, templateId, html);
     }
 
