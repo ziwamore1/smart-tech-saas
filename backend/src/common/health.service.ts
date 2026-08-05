@@ -127,9 +127,9 @@ export class HealthService {
 
     const componentsCreated = await this.prisma.$executeRawUnsafe(`
       INSERT INTO "TemplateComponent"
-        ("templateId", "type", "label", "content", "styles", "position", "size", "settings",
+        ("id", "templateId", "type", "label", "content", "styles", "position", "size", "settings",
          "placeholder", "isRequired", "isLocked", "sortOrder", "createdAt", "updatedAt")
-      SELECT c."id", sc."type", sc."label", sc."content", sc."styles", sc."position", sc."size", sc."settings",
+      SELECT gen_random_uuid(), c."id", sc."type", sc."label", sc."content", sc."styles", sc."position", sc."size", sc."settings",
              sc."placeholder", sc."isRequired", sc."isLocked", sc."sortOrder", now(), now()
       FROM "TemplateComponent" sc
       JOIN "ReportTemplate" src ON sc."templateId" = src."id"
@@ -142,11 +142,11 @@ export class HealthService {
 
     const certificatesCreated = await this.prisma.$executeRawUnsafe(`
       INSERT INTO "CertificateTemplate"
-        ("templateId", "certificateType", "borderStyle", "borderColor", "sealUrl", "showQrCode", "autoNumbering",
+        ("id", "templateId", "certificateType", "borderStyle", "borderColor", "sealUrl", "showQrCode", "autoNumbering",
          "nextNumber", "showPhoto", "signature1Label", "signature1Name", "signature1Title", "signature2Label",
          "signature2Name", "signature2Title", "awardText", "showBadge", "badgeStyle", "showWatermark",
          "watermarkText", "layoutJson", "createdAt", "updatedAt")
-      SELECT c."id", cert."certificateType", cert."borderStyle", cert."borderColor", cert."sealUrl",
+      SELECT gen_random_uuid(), c."id", cert."certificateType", cert."borderStyle", cert."borderColor", cert."sealUrl",
              cert."showQrCode", cert."autoNumbering", 1, cert."showPhoto",
              cert."signature1Label", cert."signature1Name", cert."signature1Title",
              cert."signature2Label", cert."signature2Name", cert."signature2Title",
