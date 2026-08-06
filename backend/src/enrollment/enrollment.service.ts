@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdmissionNumberService } from '../admission-number/admission-number.service';
-import { EnrollmentStatus, StudentStatus } from '@prisma/client';
+import { EnrollmentStatus, Prisma, StudentStatus } from '@prisma/client';
 
 @Injectable()
 export class EnrollmentService {
@@ -44,47 +44,38 @@ export class EnrollmentService {
     if (!classEntity) throw new NotFoundException('Class not found');
     if (classEntity.schoolId !== data.schoolId) throw new ForbiddenException('Invalid class');
 
-    const existing = await this.prisma.enrollment.findFirst({
-      where: {
-        studentId: data.studentId,
-        academicYearId: data.academicYearId,
-      },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.enrollment.findFirst({
+        where: { studentId: data.studentId, academicYearId: data.academicYearId },
+      });
 
-    if (existing) throw new ForbiddenException('Student already enrolled in this academic year');
+      if (existing) throw new ForbiddenException('Student already enrolled in this academic year');
 
-    const enrollment = await this.prisma.enrollment.create({
-      data: {
-        studentId: data.studentId,
-        classId: data.classId,
-        academicYearId: data.academicYearId,
-        schoolId: data.schoolId,
-        streamId: data.streamId,
-        status: EnrollmentStatus.ACTIVE,
-      },
-    });
+      const enrollment = await tx.enrollment.create({
+        data: {
+          studentId: data.studentId,
+          classId: data.classId,
+          academicYearId: data.academicYearId,
+          schoolId: data.schoolId,
+          streamId: data.streamId,
+          status: EnrollmentStatus.ACTIVE,
+        },
+      });
 
-    const updateData: any = { classId: data.classId };
-    if (student.status !== StudentStatus.ACTIVE) {
-      updateData.status = StudentStatus.ACTIVE;
-    }
+      await tx.student.update({
+        where: { id: data.studentId },
+        data: {
+          classId: data.classId,
+          ...(student.status !== StudentStatus.ACTIVE ? { status: StudentStatus.ACTIVE } : {}),
+        },
+      });
 
-    try {
-      const newAdmissionNumber = await this.admissionNumberService.getNextAdmissionNumber(
-        data.schoolId, data.academicYearId, data.classId,
+      await this.admissionNumberService.resequenceClassInTransaction(
+        tx, data.schoolId, data.academicYearId, data.classId,
       );
-      updateData.admissionNumber = newAdmissionNumber;
-      this.logger.log(`Re-sequenced student ${data.studentId} admission number to ${newAdmissionNumber} for class ${data.classId}`);
-    } catch (error) {
-      this.logger.error(`Failed to re-sequence admission number for student ${data.studentId}: ${(error as Error).message}`);
-    }
 
-    await this.prisma.student.update({
-      where: { id: data.studentId },
-      data: updateData,
-    });
-
-    return enrollment;
+      return enrollment;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
   }
 
   async getActiveEnrollmentsByClass(classId: string) {
@@ -136,10 +127,18 @@ export class EnrollmentService {
 
     if (!enrollment) throw new NotFoundException('Enrollment not found');
 
-    return this.prisma.enrollment.update({
-      where: { id: enrollmentId },
-      data: { status },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.enrollment.update({
+        where: { id: enrollmentId },
+        data: { status },
+      });
+      if (enrollment.status !== status) {
+        await this.admissionNumberService.resequenceClassInTransaction(
+          tx, enrollment.schoolId, enrollment.academicYearId, enrollment.classId,
+        );
+      }
+      return updated;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
   }
 
   /**
@@ -159,32 +158,37 @@ export class EnrollmentService {
     await this.prisma.$transaction(async (tx) => {
       await tx.enrollment.delete({ where: { id: enrollmentId } });
 
-      const otherActive = await tx.enrollment.count({
+      const remainingActive = await tx.enrollment.findMany({
         where: {
           studentId: enrollment.studentId,
           status: EnrollmentStatus.ACTIVE,
         },
+        select: { classId: true, academicYearId: true },
+        orderBy: { academicYear: { startDate: 'desc' } },
       });
 
-      if (otherActive === 0) {
+      if (remainingActive.length === 0) {
         await tx.student.update({
           where: { id: enrollment.studentId },
           data: { classId: null },
         });
+      } else {
+        await tx.student.update({
+          where: { id: enrollment.studentId },
+          data: { classId: remainingActive[0].classId },
+        });
       }
-    });
 
-    try {
-      await this.admissionNumberService.resequenceClass(
-        enrollment.schoolId,
-        enrollment.academicYearId,
-        enrollment.classId,
+      await this.admissionNumberService.resequenceClassInTransaction(
+        tx, enrollment.schoolId, enrollment.academicYearId, enrollment.classId,
       );
-    } catch (error) {
-      this.logger.error(
-        `Failed to re-sequence class ${enrollment.classId} after removing enrollment ${enrollmentId}: ${(error as Error).message}`,
-      );
-    }
+      if (remainingActive.length > 0) {
+        const current = remainingActive[0];
+        await this.admissionNumberService.resequenceClassInTransaction(
+          tx, enrollment.schoolId, current.academicYearId, current.classId,
+        );
+      }
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
 
     return { message: 'Student removed from class successfully' };
   }

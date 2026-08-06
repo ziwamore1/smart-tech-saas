@@ -34,6 +34,9 @@
         "migrate:cloudinary": "npx tsx prisma/migrate-cloudinary.ts",
         "backfill:computed-results": "npx tsx src/scripts/backfill-computed-results.ts",
         "backfill:computed-results:prod": "dotenv -e .env.production -- npx tsx src/scripts/backfill-computed-results.ts --apply",
+        "backfill:class-sequences": "npx tsx src/scripts/backfill-class-sequences.ts --apply",
+        "backfill:class-sequences:dry-run": "npx tsx src/scripts/backfill-class-sequences.ts",
+        "backfill:class-sequences:prod": "dotenv -e .env.production -- npx tsx src/scripts/backfill-class-sequences.ts --apply",
         "backfill:phone-numbers": "npx tsx src/scripts/backfill-phone-numbers.ts"
     },
     "dependencies": {

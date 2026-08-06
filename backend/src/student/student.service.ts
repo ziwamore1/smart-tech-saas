@@ -104,7 +104,8 @@ export class StudentService {
       try {
         await this.enroll(student.id, academicYearId, dto.classId, schoolId);
       } catch (err) {
-        this.logger.warn(`Auto-enrollment failed for student ${student.id}: ${err.message}`);
+        this.logger.error(`Auto-enrollment failed for student ${student.id}: ${err.message}`);
+        throw err;
       }
     }
 
@@ -520,6 +521,7 @@ export class StudentService {
             select: {
               id: true,
               status: true,
+              sequenceNumber: true,
               class: { select: { id: true, name: true } },
               academicYear: { select: { id: true, name: true } },
             },
@@ -828,30 +830,25 @@ export class StudentService {
     if (!student) throw new NotFoundException('Student not found');
     if (student.schoolId !== schoolId) throw new ForbiddenException('Invalid student');
 
-    const existing = await this.prisma.enrollment.findFirst({
-      where: { studentId, academicYearId },
-    });
-    if (existing) throw new ForbiddenException('Student already enrolled in this academic year');
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.enrollment.findFirst({ where: { studentId, academicYearId } });
+      if (existing) throw new ForbiddenException('Student already enrolled in this academic year');
 
-    const enrollment = await this.prisma.enrollment.create({
-      data: {
-        studentId,
-        academicYearId,
-        classId,
-        schoolId,
-        status: EnrollmentStatus.ACTIVE,
-      },
-    });
+      const enrollment = await tx.enrollment.create({
+        data: { studentId, academicYearId, classId, schoolId, status: EnrollmentStatus.ACTIVE },
+      });
 
-    await this.prisma.student.update({
-      where: { id: studentId },
-      data: {
-        classId,
-        ...(student.status !== StudentStatus.ACTIVE ? { status: StudentStatus.ACTIVE } : {}),
-      },
-    });
+      await tx.student.update({
+        where: { id: studentId },
+        data: {
+          classId,
+          ...(student.status !== StudentStatus.ACTIVE ? { status: StudentStatus.ACTIVE } : {}),
+        },
+      });
 
-    return enrollment;
+      await this.admissionNumberService.resequenceClassInTransaction(tx, schoolId, academicYearId, classId);
+      return enrollment;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
   }
 
   async promoteStudent(fromAcademicYearId: string, toAcademicYearId: string, schoolId: string) {
@@ -871,15 +868,21 @@ export class StudentService {
       });
       if (existing) continue;
 
-      const newEnrollment = await this.prisma.enrollment.create({
-        data: {
-          studentId: enrollment.studentId,
-          academicYearId: toAcademicYearId,
-          classId: enrollment.classId,
-          schoolId,
-          status: EnrollmentStatus.ACTIVE,
-        },
-      });
+      const newEnrollment = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.enrollment.create({
+          data: {
+            studentId: enrollment.studentId,
+            academicYearId: toAcademicYearId,
+            classId: enrollment.classId,
+            schoolId,
+            status: EnrollmentStatus.ACTIVE,
+          },
+        });
+        await this.admissionNumberService.resequenceClassInTransaction(
+          tx, schoolId, toAcademicYearId, enrollment.classId,
+        );
+        return created;
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
       promotions.push(newEnrollment);
     }
     return promotions;
@@ -894,17 +897,30 @@ export class StudentService {
 
     const oldStatus = student.status;
 
-    const updated = await this.prisma.student.update({
-      where: { id: studentId },
-      data: { status: newStatus },
-    });
-
-    if (newStatus !== StudentStatus.ACTIVE) {
-      await this.prisma.enrollment.updateMany({
-        where: { studentId, status: EnrollmentStatus.ACTIVE },
-        data: { status: EnrollmentStatus.INACTIVE },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.student.update({
+        where: { id: studentId },
+        data: { status: newStatus },
       });
-    }
+
+      if (newStatus !== StudentStatus.ACTIVE) {
+        const activeEnrollments = await tx.enrollment.findMany({
+          where: { studentId, status: EnrollmentStatus.ACTIVE },
+          select: { schoolId: true, academicYearId: true, classId: true },
+        });
+        await tx.enrollment.updateMany({
+          where: { studentId, status: EnrollmentStatus.ACTIVE },
+          data: { status: EnrollmentStatus.INACTIVE },
+        });
+        for (const enrollment of activeEnrollments) {
+          await this.admissionNumberService.resequenceClassInTransaction(
+            tx, enrollment.schoolId, enrollment.academicYearId, enrollment.classId,
+          );
+        }
+      }
+
+      return result;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
 
     if (oldStatus !== newStatus) {
       await this.createAuditLog(userId, student.schoolId, 'STATUS_CHANGED', 'Student', student.id, {

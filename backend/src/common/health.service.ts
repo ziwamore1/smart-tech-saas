@@ -4,6 +4,7 @@ import { MinistryAdapterFactory } from '../ministry-gateway/adapters/adapter-fac
 import { BlockchainService } from '../blockchain-service/blockchain.service';
 import { Pool } from 'pg';
 import { normalizeZambianPhone } from './utils/phone.util';
+import { AdmissionNumberService } from '../admission-number/admission-number.service';
 
 export interface HealthCheckResult {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -28,6 +29,7 @@ export class HealthService {
     private prisma: PrismaService,
     private ministryAdapterFactory: MinistryAdapterFactory,
     private blockchainService: BlockchainService,
+    private admissionNumberService: AdmissionNumberService,
   ) {}
 
   async check(): Promise<HealthCheckResult> {
@@ -124,6 +126,86 @@ export class HealthService {
       latencyMs: Date.now() - startedAt,
       results,
       totalUpdated: Object.values(results).reduce((sum, value) => sum + value.updated, 0),
+    };
+  }
+
+  async checkClassSequences() {
+    const startedAt = Date.now();
+    try {
+      const activeEnrollments = await this.prisma.enrollment.count({ where: { status: 'ACTIVE' } });
+      const missingSequence = await this.prisma.enrollment.count({
+        where: { status: 'ACTIVE', sequenceNumber: null },
+      });
+      const registers = await this.prisma.enrollment.groupBy({
+        by: ['schoolId', 'academicYearId', 'classId'],
+        where: { status: 'ACTIVE' },
+      });
+
+      return {
+        status: missingSequence === 0 ? 'ok' : 'degraded',
+        operation: 'check-class-sequences',
+        activeEnrollments,
+        registers: registers.length,
+        missingSequence,
+        consistent: missingSequence === 0,
+        latencyMs: Date.now() - startedAt,
+      };
+    } catch (error: any) {
+      return {
+        status: 'error',
+        operation: 'check-class-sequences',
+        message: error?.message || 'Sequence column is not available; run prisma migrate deploy first.',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+  }
+
+  async backfillClassSequences() {
+    const startedAt = Date.now();
+    const groups = await this.prisma.enrollment.groupBy({
+      by: ['schoolId', 'academicYearId', 'classId'],
+      where: { status: 'ACTIVE' },
+    });
+    let repaired = 0;
+    let students = 0;
+    const errors: Array<{ schoolId: string; academicYearId: string; classId: string; message: string }> = [];
+
+    for (const group of groups) {
+      try {
+        const count = await this.prisma.enrollment.count({
+          where: {
+            schoolId: group.schoolId,
+            academicYearId: group.academicYearId,
+            classId: group.classId,
+            status: 'ACTIVE',
+          },
+        });
+        await this.admissionNumberService.resequenceClass(
+          group.schoolId,
+          group.academicYearId,
+          group.classId,
+        );
+        repaired += 1;
+        students += count;
+      } catch (error: any) {
+        errors.push({
+          schoolId: group.schoolId,
+          academicYearId: group.academicYearId,
+          classId: group.classId,
+          message: error?.message || 'Failed to resequence register',
+        });
+      }
+    }
+
+    return {
+      status: errors.length > 0 ? 'partial' : 'ok',
+      operation: 'backfill-class-sequences',
+      idempotent: true,
+      registersScanned: groups.length,
+      registersRepaired: repaired,
+      activeEnrollmentsProcessed: students,
+      errors,
+      latencyMs: Date.now() - startedAt,
     };
   }
 

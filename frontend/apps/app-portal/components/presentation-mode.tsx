@@ -17,7 +17,7 @@ const THEMES: PresentationTheme[] = [
   { name: 'Sun', accent: '#d97706', soft: '#fff8e8', glow: 'rgba(217, 119, 6, 0.2)' },
 ];
 
-const ZOOM_LEVELS = [1, 1.15, 1.3, 1.5];
+const ZOOM_LEVELS = [1, 1.15, 1.2, 1.3, 1.5];
 
 export function PresentationMode() {
   const [mounted, setMounted] = useState(false);

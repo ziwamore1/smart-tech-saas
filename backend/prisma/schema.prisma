@@ -809,6 +809,7 @@ model Enrollment {
   studentId      String
   academicYearId String
   classId        String
+  sequenceNumber Int?
   schoolId       String
   streamId       String?
   status         EnrollmentStatus @default(ACTIVE)
@@ -818,6 +819,7 @@ model Enrollment {
   student        Student          @relation(fields: [studentId], references: [id])
 
   @@unique([studentId, academicYearId])
+  @@unique([classId, academicYearId, sequenceNumber])
   @@index([studentId])
   @@index([academicYearId])
   @@index([classId])

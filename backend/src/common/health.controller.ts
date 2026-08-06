@@ -30,6 +30,16 @@ export class HealthController {
     return this.healthService.backfillPhoneNumbers();
   }
 
+  @Get('class-sequences')
+  async checkClassSequences() {
+    return this.healthService.checkClassSequences();
+  }
+
+  @Get('backfill:class-sequences')
+  async backfillClassSequences() {
+    return this.healthService.backfillClassSequences();
+  }
+
   @Get('prisma-test')
   async prismaTest() {
     const start = Date.now();

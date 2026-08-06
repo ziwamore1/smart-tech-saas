@@ -1,5 +1,6 @@
 import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AdmissionNumberService {
@@ -78,7 +79,19 @@ export class AdmissionNumberService {
    * column is updated, never the linked User record.
    */
   async resequenceClass(schoolId: string, academicYearId: string, classId: string): Promise<void> {
-    const academicYear = await this.prisma.academicYear.findUnique({
+    await this.prisma.$transaction(
+      (tx) => this.resequenceClassInTransaction(tx, schoolId, academicYearId, classId),
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 },
+    );
+  }
+
+  async resequenceClassInTransaction(
+    tx: Prisma.TransactionClient,
+    schoolId: string,
+    academicYearId: string,
+    classId: string,
+  ): Promise<void> {
+    const academicYear = await tx.academicYear.findUnique({
       where: { id: academicYearId },
     });
 
@@ -89,59 +102,70 @@ export class AdmissionNumberService {
     const year = academicYear.startDate.getFullYear();
     const prefix = `ST-${year}-`;
 
-    const enrollments = await this.prisma.enrollment.findMany({
+    const enrollments = await tx.enrollment.findMany({
       where: {
         classId,
         academicYearId,
         schoolId,
         status: 'ACTIVE',
       },
-      orderBy: { student: { admissionNumber: 'asc' } },
-      select: { student: { select: { id: true, admissionNumber: true } } },
+      orderBy: [{ sequenceNumber: 'asc' }, { student: { admissionNumber: 'asc' } }, { studentId: 'asc' }],
+      select: { id: true, studentId: true, sequenceNumber: true, student: { select: { id: true, admissionNumber: true, classId: true } } },
     });
 
-    const operations = [];
+    const orderedEnrollments = [...enrollments].sort((a, b) => {
+      if (a.sequenceNumber != null && b.sequenceNumber != null && a.sequenceNumber !== b.sequenceNumber) {
+        return a.sequenceNumber - b.sequenceNumber;
+      }
+      if (a.sequenceNumber != null) return -1;
+      if (b.sequenceNumber != null) return 1;
+      const admissionCompare = a.student.admissionNumber.localeCompare(b.student.admissionNumber, undefined, { numeric: true });
+      return admissionCompare || a.studentId.localeCompare(b.studentId);
+    });
 
-    // Phase 1: move every remaining student to a unique temporary number so the
-    // final renumbering below cannot collide with the (admissionNumber, classId)
-    // unique constraint while gaps are being filled.
-    for (const enrollment of enrollments) {
-      operations.push(
-        this.prisma.student.update({
+    // Clear positions before assigning the contiguous range so the unique
+    // register constraint cannot collide with an existing position.
+    await tx.enrollment.updateMany({
+      where: { classId, academicYearId, schoolId, status: 'ACTIVE' },
+      data: { sequenceNumber: null },
+    });
+
+    const currentClassStudents = orderedEnrollments.filter((enrollment) => enrollment.student.classId === classId);
+    for (const enrollment of currentClassStudents) {
+      await tx.student.update({
+        where: { id: enrollment.student.id },
+        data: { admissionNumber: `TMP-${enrollment.student.id.slice(0, 12)}` },
+      });
+    }
+
+    for (let i = 0; i < orderedEnrollments.length; i++) {
+      const enrollment = orderedEnrollments[i];
+      await tx.enrollment.update({
+        where: { id: enrollment.id },
+        data: { sequenceNumber: i + 1 },
+      });
+      if (enrollment.student.classId === classId) {
+        await tx.student.update({
           where: { id: enrollment.student.id },
-          data: { admissionNumber: `TMP-${enrollment.student.id.slice(0, 12)}` },
-        }),
-      );
-    }
-
-    // Phase 2: assign the sequential numbers, preserving the existing register order.
-    for (let i = 0; i < enrollments.length; i++) {
-      operations.push(
-        this.prisma.student.update({
-          where: { id: enrollments[i].student.id },
           data: { admissionNumber: `${prefix}${String(i + 1).padStart(3, '0')}` },
-        }),
-      );
+        });
+      }
     }
 
-    if (operations.length > 0) {
-      await this.prisma.$transaction(operations);
-    }
-
-    await this.prisma.admissionSequence.upsert({
+    await tx.admissionSequence.upsert({
       where: { schoolId_academicYearId_classId: { schoolId, academicYearId, classId } },
-      update: { currentSequence: enrollments.length, year },
+      update: { currentSequence: orderedEnrollments.length, year },
       create: {
         schoolId,
         academicYearId,
         classId,
         year,
-        currentSequence: enrollments.length,
+        currentSequence: orderedEnrollments.length,
       },
     });
 
     this.logger.log(
-      `Re-sequenced class ${classId} (${academicYearId}): ${enrollments.length} student(s) → ${prefix}001..${String(enrollments.length).padStart(3, '0')}`,
+      `Re-sequenced class ${classId} (${academicYearId}): ${orderedEnrollments.length} student(s) → ${prefix}001..${String(orderedEnrollments.length).padStart(3, '0')}`,
     );
   }
 
