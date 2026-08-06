@@ -18,6 +18,20 @@ const STATS_CACHE_TTL = 300_000;
 const STATS_CACHE_KEY = 'super-admin:system-stats';
 const RESULTS_ANALYTICS_CACHE_KEY = 'super-admin:results-analytics';
 
+function schoolAnalysisBands(systemName: string) {
+  const name = systemName.toLowerCase();
+  if (name.includes('grade 7')) return { quality: { labels: ['ONE', 'TWO', 'THREE'], points: [1, 2, 3], label: 'Grades One to Three' }, quantity: { labels: ['ONE', 'TWO', 'THREE', 'FOUR'], points: [1, 2, 3, 4], label: 'Grades One to Four' } };
+  if (name.includes('secondary') || name.includes('ecz point')) return { quality: { labels: ['1', '2', '3', '4', '5', '6'], points: [1, 2, 3, 4, 5, 6], label: 'Grades/Points 1 to 6' }, quantity: { labels: ['1', '2', '3', '4', '5', '6', '7', '8'], points: [1, 2, 3, 4, 5, 6, 7, 8], label: 'Grades/Points 1 to 8' } };
+  if (name.includes('forms')) return { quality: { labels: ['1', '2', '3'], points: [1, 2, 3], label: 'Grades/Points 1 to 3' }, quantity: { labels: ['1', '2', '3', '4'], points: [1, 2, 3, 4], label: 'Grades/Points 1 to 4' } };
+  if (name.includes('university')) return { quality: { labels: ['A+', 'A', 'B+', 'B'], points: [4.5, 4, 3.5, 3], label: 'A+ to B' }, quantity: { labels: ['A+', 'A', 'B+', 'B', 'C+', 'C'], points: [4.5, 4, 3.5, 3, 2.5, 2], label: 'A+ to C' } };
+  if (name.includes('college')) return { quality: { labels: ['A', 'B'], points: [4, 3], label: 'Grades A to B' }, quantity: { labels: ['A', 'B', 'C'], points: [4, 3, 2], label: 'Grades A to C' } };
+  return { quality: { labels: ['A', 'B', 'C', 'D'], points: [5, 4, 3, 2], label: 'Grades/Points A=5 to D=2' }, quantity: { labels: ['A', 'B', 'C', 'D', 'E'], points: [5, 4, 3, 2, 1], label: 'Grades/Points A=5 to E=1' } };
+}
+
+function schoolBandIncludes(band: { labels: string[]; points: number[] }, grade: string | null, points: number | null) {
+  return Boolean((grade && band.labels.includes(String(grade).trim().toUpperCase())) || (points != null && band.points.some(point => Math.abs(point - points) < 0.01)));
+}
+
 @Injectable()
 export class SuperAdminService {
   private readonly logger = new Logger(SuperAdminService.name);
@@ -736,6 +750,9 @@ Email: ${director.email}
       scoreHistogram: [],
       schoolPerformance: [],
       subjectHeatmap: { schools: [], subjects: [], values: [] },
+      overallQuality: { passed: 0, assessed: 0, rate: 0, belowStandard: 0, label: 'Class-based quality analysis' },
+      overallQuantity: { passed: 0, assessed: 0, rate: 0, belowStandard: 0, label: 'Class-based quantity analysis' },
+      qualityQuantityBySchool: [],
     };
 
     const publishedSheets = await this.prisma.resultSheet.findMany({
@@ -750,6 +767,59 @@ Email: ${director.email}
     const schoolIds = [...new Set(publishedSheets.map((s) => s.schoolId))];
     const classIds = [...new Set(publishedSheets.map((s) => s.classId))];
     const termIds = [...new Set(publishedSheets.map((s) => s.termId))];
+
+    const publishedSheetKeys = new Set(publishedSheets.map((s) => `${s.schoolId}|${s.classId}|${s.termId}`));
+    const classes = await this.prisma.class.findMany({
+      where: { id: { in: classIds } },
+      select: { id: true, gradingSystem: { select: { name: true, gradeScales: true } } },
+    });
+    const classMap = new Map(classes.map(cls => [cls.id, cls]));
+
+    const computedResults = await this.prisma.computedResult.findMany({
+      where: {
+        schoolId: { in: schoolIds },
+        classId: { in: classIds },
+        termId: { in: termIds },
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        finalPercentage: { not: null },
+        student: { status: 'ACTIVE' },
+      },
+      select: { schoolId: true, classId: true, termId: true, finalPercentage: true, finalGrade: true, points: true },
+    });
+    const qualityRecords = computedResults.filter(result => publishedSheetKeys.has(`${result.schoolId}|${result.classId}|${result.termId}`));
+    let qualityPassed = 0;
+    let quantityPassed = 0;
+    const schoolQualityMap: Record<string, { qualityPassed: number; quantityPassed: number; assessed: number; qualityLabel: string; quantityLabel: string }> = {};
+    for (const result of qualityRecords) {
+      const systemName = classMap.get(result.classId)?.gradingSystem?.name || 'Primary Grading System';
+      const bands = schoolAnalysisBands(systemName);
+      const scale = classMap.get(result.classId)?.gradingSystem?.gradeScales.find((candidate: any) => result.finalPercentage! >= candidate.minScore && result.finalPercentage! <= candidate.maxScore);
+      const grade = scale?.grade || result.finalGrade;
+      const points = scale?.points ?? result.points;
+      const isQuality = schoolBandIncludes(bands.quality, grade, points);
+      const isQuantity = schoolBandIncludes(bands.quantity, grade, points);
+      if (isQuality) qualityPassed += 1;
+      if (isQuantity) quantityPassed += 1;
+      const aggregate = schoolQualityMap[result.schoolId] || { qualityPassed: 0, quantityPassed: 0, assessed: 0, qualityLabel: bands.quality.label, quantityLabel: bands.quantity.label };
+      aggregate.assessed += 1;
+      if (isQuality) aggregate.qualityPassed += 1;
+      if (isQuantity) aggregate.quantityPassed += 1;
+      schoolQualityMap[result.schoolId] = aggregate;
+    }
+    const overallQuality = {
+      passed: qualityPassed,
+      assessed: qualityRecords.length,
+      rate: qualityRecords.length ? Number((qualityPassed / qualityRecords.length * 100).toFixed(1)) : 0,
+      belowStandard: qualityRecords.length - qualityPassed,
+      label: 'Aggregated using each class assigned grading system',
+    };
+    const overallQuantity = {
+      passed: quantityPassed,
+      assessed: qualityRecords.length,
+      rate: qualityRecords.length ? Number((quantityPassed / qualityRecords.length * 100).toFixed(1)) : 0,
+      belowStandard: qualityRecords.length - quantityPassed,
+      label: 'Aggregated using each class assigned grading system',
+    };
 
     const enrollments = await this.prisma.enrollment.findMany({
       where: { classId: { in: classIds }, status: 'ACTIVE' },
@@ -820,6 +890,8 @@ Email: ${director.email}
         schoolName: schoolNameMap.get(schoolId) || 'Unknown School',
         average: Number((v.total / v.count).toFixed(1)),
         resultCount: v.count,
+        qualityPassRate: schoolQualityMap[schoolId]?.assessed ? Number((schoolQualityMap[schoolId].qualityPassed / schoolQualityMap[schoolId].assessed * 100).toFixed(1)) : 0,
+        quantityPassRate: schoolQualityMap[schoolId]?.assessed ? Number((schoolQualityMap[schoolId].quantityPassed / schoolQualityMap[schoolId].assessed * 100).toFixed(1)) : 0,
       }))
       .sort((a, b) => b.average - a.average)
       .slice(0, 12);
@@ -866,6 +938,17 @@ Email: ${director.email}
       scoreHistogram: buckets,
       schoolPerformance,
       subjectHeatmap,
+      overallQuality,
+      overallQuantity,
+      qualityQuantityBySchool: Object.entries(schoolQualityMap).map(([schoolId, value]) => ({
+        schoolId,
+        schoolName: schoolNameMap.get(schoolId) || 'Unknown School',
+        qualityPassRate: value.assessed ? Number((value.qualityPassed / value.assessed * 100).toFixed(1)) : 0,
+        quantityPassRate: value.assessed ? Number((value.quantityPassed / value.assessed * 100).toFixed(1)) : 0,
+        assessed: value.assessed,
+        qualityLabel: value.qualityLabel,
+        quantityLabel: value.quantityLabel,
+      })).sort((a, b) => b.qualityPassRate - a.qualityPassRate),
     };
 
     this.cacheService.set(RESULTS_ANALYTICS_CACHE_KEY, result, STATS_CACHE_TTL);

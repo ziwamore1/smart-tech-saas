@@ -15,6 +15,7 @@ const REPORT_TYPES = [
   { type: 'MARK_SCHEDULE', label: 'Mark Schedule', icon: 'fa-table', color: '#ea580c', desc: 'Subject-wise mark schedule for a class', bulk: true },
   { type: 'PERFORMANCE_REPORT', label: 'Performance Report', icon: 'fa-chart-line', color: '#ec4899', desc: 'Detailed student performance profile', bulk: false },
   { type: 'RANKING_REPORT', label: 'Class Ranking Report', icon: 'fa-trophy', color: '#d97706', desc: 'Ranked student performance and class distribution', bulk: true },
+  { type: 'RESULTS_ANALYSIS', label: 'Results Analysis Report', icon: 'fa-chart-bar', color: '#0891b2', desc: 'Advanced class-based Quality and Quantity results analysis', bulk: false },
 ];
 
 const BULK_TYPES = ['CLASS_REPORT', 'ATTENDANCE_REPORT', 'ANALYTICS_SUMMARY', 'MARK_SCHEDULE', 'TRANSCRIPT', 'CERTIFICATE', 'RANKING_REPORT'];
@@ -98,7 +99,7 @@ export default function ReportHubPage() {
 
   const config = REPORT_TYPES.find(t => t.type === selectedType);
   const needsStudent = selectedType && ['REPORT_CARD', 'TRANSCRIPT', 'CERTIFICATE', 'PERFORMANCE_REPORT'].includes(selectedType);
-  const needsClass = selectedType && ['CLASS_REPORT', 'MARK_SCHEDULE', 'ATTENDANCE_REPORT', 'ANALYTICS_SUMMARY', 'RANKING_REPORT'].includes(selectedType);
+  const needsClass = selectedType && ['CLASS_REPORT', 'MARK_SCHEDULE', 'ATTENDANCE_REPORT', 'ANALYTICS_SUMMARY', 'RANKING_REPORT', 'RESULTS_ANALYSIS'].includes(selectedType);
   const needsTerm = selectedType && !['TRANSCRIPT'].includes(selectedType);
   const needsTemplate = selectedType === 'CERTIFICATE';
 

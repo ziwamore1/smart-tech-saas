@@ -112,7 +112,7 @@ export default function AnalysisPage() {
   const atRiskStudents = useMemo(() => {
     if (!analysis?.students) return [];
     return analysis.students
-      .filter((s: any) => (s.percentage || s.totalPercentage || s.avgPercentage || 0) < 40)
+      .filter((s: any) => s.quantityPassed === false || (s.quantityPassed == null && (s.percentage || s.totalPercentage || s.avgPercentage || 0) < 40))
       .sort((a: any, b: any) => (a.percentage || a.totalPercentage || a.avgPercentage || 0) - (b.percentage || b.totalPercentage || b.avgPercentage || 0));
   }, [analysis]);
 
@@ -125,9 +125,9 @@ export default function AnalysisPage() {
     if (!analysis) return [];
     return [
       { label: 'Total Students', value: analysis.totalStudents || analysis.studentCount || 0, icon: 'fa-users', color: '#3b82f6', bg: '#eff6ff' },
-      { label: 'Pass Rate', value: analysis.passRate != null ? `${analysis.passRate.toFixed(1)}%` : '0%', icon: 'fa-check-circle', color: '#059669', bg: '#d1fae5' },
+      { label: 'Quantity Pass Rate', value: analysis.quantity?.rate != null ? `${analysis.quantity.rate.toFixed(1)}%` : `${(analysis.passRate || 0).toFixed(1)}%`, icon: 'fa-check-circle', color: '#2563eb', bg: '#dbeafe' },
+      { label: 'Quality Pass Rate', value: analysis.quality?.rate != null ? `${analysis.quality.rate.toFixed(1)}%` : `${(analysis.distinctionRate || 0).toFixed(1)}%`, icon: 'fa-star', color: '#059669', bg: '#d1fae5' },
       { label: 'Average %', value: analysis.averagePercentage != null ? `${analysis.averagePercentage.toFixed(1)}%` : '0%', icon: 'fa-chart-line', color: '#ea6645', bg: '#fff5f3' },
-      { label: 'Distinction Rate', value: analysis.distinctionRate != null ? `${analysis.distinctionRate.toFixed(1)}%` : '0%', icon: 'fa-star', color: '#7c3aed', bg: '#f3e8ff' },
       { label: 'At Risk', value: analysis.atRiskCount || atRiskStudents.length, icon: 'fa-exclamation-triangle', color: '#dc2626', bg: '#fee2e2' },
     ];
   }, [analysis, atRiskStudents]);
@@ -255,6 +255,21 @@ export default function AnalysisPage() {
             ))}
           </div>
 
+          {analysis.gradingProfile && (
+            <div style={{ background: '#fdfaf7', border: '1px solid #e8ddd0', borderRadius: '12px', padding: '20px 24px', marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#1f2937', margin: '0 0 12px' }}>
+                <i className="fa fa-sliders-h" style={{ color: '#ea6645', marginRight: '8px' }}></i>
+                Class-Based Grading Profile
+              </h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '13px', color: '#4b5563' }}>
+                <span><strong>System:</strong> {analysis.gradingProfile.systemName}</span>
+                <span><strong>Source:</strong> {analysis.gradingProfile.source === 'CLASS' ? 'Assigned to class' : 'School default fallback'}</span>
+                <span><strong>Quality:</strong> {analysis.gradingProfile.quality.description}</span>
+                <span><strong>Quantity:</strong> {analysis.gradingProfile.quantity.description}</span>
+              </div>
+            </div>
+          )}
+
           {/* Grade Distribution Chart */}
           <div style={{
             background: '#fdfaf7', border: '1px solid #e8ddd0', borderRadius: '12px',
@@ -304,8 +319,8 @@ export default function AnalysisPage() {
                       <th style={{ textAlign: 'center', padding: '12px 20px', fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Class Avg</th>
                       <th style={{ textAlign: 'center', padding: '12px 20px', fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Highest</th>
                       <th style={{ textAlign: 'center', padding: '12px 20px', fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Lowest</th>
-                      <th style={{ textAlign: 'center', padding: '12px 20px', fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Pass Rate</th>
-                      <th style={{ textAlign: 'center', padding: '12px 20px', fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Distinction</th>
+                       <th style={{ textAlign: 'center', padding: '12px 20px', fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Quantity Pass</th>
+                       <th style={{ textAlign: 'center', padding: '12px 20px', fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Quality Pass</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -332,7 +347,7 @@ export default function AnalysisPage() {
                             background: (subj.passRate || 0) >= 70 ? '#d1fae5' : (subj.passRate || 0) >= 40 ? '#fef3c7' : '#fee2e2',
                             color: (subj.passRate || 0) >= 70 ? '#059669' : (subj.passRate || 0) >= 40 ? '#d97706' : '#dc2626'
                           }}>
-                            {(subj.passRate || 0).toFixed(1)}%
+                             {(subj.quantityPassRate ?? subj.passRate ?? 0).toFixed(1)}%
                           </span>
                         </td>
                         <td style={{ padding: '12px 20px', textAlign: 'center' }}>
@@ -340,7 +355,7 @@ export default function AnalysisPage() {
                             padding: '3px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 600,
                             background: '#f3e8ff', color: '#7c3aed'
                           }}>
-                            {(subj.distinctionRate || 0).toFixed(1)}%
+                             {(subj.qualityPassRate ?? subj.distinctionRate ?? 0).toFixed(1)}%
                           </span>
                         </td>
                       </tr>
@@ -363,7 +378,7 @@ export default function AnalysisPage() {
                   At-Risk Students ({atRiskStudents.length})
                 </h3>
                 <span style={{ fontSize: '12px', color: '#9ca3af' }}>
-                  Students scoring below 40%
+                   Students below the configured quantity standard
                 </span>
               </div>
               <div style={{ padding: '16px 24px' }}>

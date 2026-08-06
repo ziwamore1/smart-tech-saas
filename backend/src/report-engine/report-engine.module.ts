@@ -9,6 +9,7 @@ import { RankingModule } from '../ranking-service/ranking.module';
 import { GradingEngineModule } from '../grading-engine/grading-engine.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { CommonModule } from '../common/common.module';
+import { ResultsManagementModule } from '../results-management/results-management.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { CommonModule } from '../common/common.module';
     RankingModule,
     GradingEngineModule,
     CloudinaryModule,
+    ResultsManagementModule,
   ],
   controllers: [ReportEngineController],
   providers: [ReportEngineService],

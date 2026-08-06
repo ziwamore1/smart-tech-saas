@@ -11,6 +11,7 @@ import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
 import { CertificateTemplateService } from '../report-template-builder/certificate-template.service';
 import { CertificateCommentService } from '../report-template-builder/certificate-comment.service';
 import { ReportTemplateBuilderService } from '../report-template-builder/report-template-builder.service';
+import { ResultsManagementService } from '../results-management/results-management.service';
 import * as crypto from 'crypto';
 
 export enum ReportType {
@@ -23,6 +24,7 @@ export enum ReportType {
   MARK_SCHEDULE = 'MARK_SCHEDULE',
   PERFORMANCE_REPORT = 'PERFORMANCE_REPORT',
   RANKING_REPORT = 'RANKING_REPORT',
+  RESULTS_ANALYSIS = 'RESULTS_ANALYSIS',
 }
 
 export interface ReportGenerationRequest {
@@ -131,6 +133,14 @@ const REPORT_TYPE_CONFIG: Record<ReportType, {
     optionalFields: [],
     supportsBulk: true,
   },
+  [ReportType.RESULTS_ANALYSIS]: {
+    label: 'Results Analysis Report',
+    description: 'Advanced class-based Quality and Quantity results analysis',
+    icon: '📊',
+    requiredFields: ['classId', 'termId'],
+    optionalFields: [],
+    supportsBulk: false,
+  },
 };
 
 @Injectable()
@@ -150,6 +160,7 @@ export class ReportEngineService {
     private certificateTemplateService: CertificateTemplateService,
     private certificateCommentService: CertificateCommentService,
     private reportTemplateBuilder: ReportTemplateBuilderService,
+    private resultsManagement: ResultsManagementService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
   ) {}
 
@@ -341,6 +352,11 @@ export class ReportEngineService {
       case ReportType.RANKING_REPORT:
         result = await this.generateRankingReport(request);
         fileName = `ranking-report-${request.classId}-${request.termId}.pdf`;
+        break;
+
+      case ReportType.RESULTS_ANALYSIS:
+        result = await this.generateResultsAnalysisReport(request);
+        fileName = `results-analysis-${request.classId}-${request.termId}.pdf`;
         break;
 
       default:
@@ -1763,6 +1779,99 @@ export class ReportEngineService {
       resourceType: 'raw',
     });
 
+    return { buffer, url: result.secureUrl, publicId: result.publicId };
+  }
+
+  private async generateResultsAnalysisReport(request: ReportGenerationRequest) {
+    const [school, term, classInfo, sheet] = await Promise.all([
+      this.prisma.school.findUnique({ where: { id: request.schoolId }, select: { name: true } }),
+      this.prisma.term.findUnique({ where: { id: request.termId }, include: { academicYear: true } }),
+      this.prisma.class.findUnique({ where: { id: request.classId }, select: { name: true } }),
+      this.prisma.resultSheet.findFirst({
+        where: { classId: request.classId, termId: request.termId, schoolId: request.schoolId },
+        orderBy: { updatedAt: 'desc' },
+        select: { id: true, examType: true },
+      }),
+    ]);
+    if (!term) throw new BadRequestException('Term not found');
+    if (!sheet) throw new BadRequestException('No result sheet found for this class and term');
+
+    const analysis: any = await this.resultsManagement.getAnalysis(sheet.id);
+    const profile = analysis.gradingProfile;
+    const quality = analysis.quality || { passed: 0, total: 0, rate: 0, failed: 0, label: 'Configured quality band' };
+    const quantity = analysis.quantity || { passed: 0, total: 0, rate: 0, failed: 0, label: 'Configured quantity band' };
+    const subjectRows = (analysis.subjectAnalysis || []).map((subject: any) => `<tr>
+      <td style="font-weight:600">${subject.subjectName}</td>
+      <td class="text-center">${Number(subject.average || 0).toFixed(1)}%</td>
+      <td class="text-center pass">${Number(subject.highest || 0).toFixed(1)}%</td>
+      <td class="text-center fail">${Number(subject.lowest || 0).toFixed(1)}%</td>
+      <td class="text-center">${Number(subject.quantityPassRate ?? subject.passRate ?? 0).toFixed(1)}%</td>
+      <td class="text-center">${Number(subject.qualityPassRate ?? subject.distinctionRate ?? 0).toFixed(1)}%</td>
+      <td class="text-center">${subject.gradedCount || 0}</td>
+    </tr>`).join('');
+    const studentRows = [...(analysis.students || [])]
+      .sort((a: any, b: any) => (b.percentage || 0) - (a.percentage || 0))
+      .map((student: any, index: number) => `<tr>
+        <td class="text-center">${index + 1}</td>
+        <td style="font-weight:600">${student.firstName || ''} ${student.lastName || ''}</td>
+        <td>${student.admissionNumber || '—'}</td>
+        <td class="text-center">${Number(student.percentage || 0).toFixed(1)}%</td>
+        <td class="text-center">${student.grade || '—'}</td>
+        <td class="text-center">${student.subjectCount || 0}</td>
+        <td class="text-center ${student.qualityPassed ? 'pass' : 'fail'}">${student.qualityPassed ? 'PASS' : 'BELOW'}</td>
+        <td class="text-center ${student.quantityPassed ? 'pass' : 'fail'}">${student.quantityPassed ? 'PASS' : 'BELOW'}</td>
+      </tr>`).join('');
+
+    const content = `
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-value">${analysis.totalStudents || 0}</div><div class="summary-label">Students</div></div>
+        <div class="summary-card" style="border-top-color:#2563eb"><div class="summary-value" style="color:#2563eb">${Number(quantity.rate || 0).toFixed(1)}%</div><div class="summary-label">Quantity Pass</div></div>
+        <div class="summary-card" style="border-top-color:#059669"><div class="summary-value" style="color:#059669">${Number(quality.rate || 0).toFixed(1)}%</div><div class="summary-label">Quality Pass</div></div>
+        <div class="summary-card"><div class="summary-value">${Number(analysis.averagePercentage || 0).toFixed(1)}%</div><div class="summary-label">Class Average</div></div>
+        <div class="summary-card"><div class="summary-value" style="color:#7c3aed">${Number(analysis.qualityStudentRate || 0).toFixed(1)}%</div><div class="summary-label">Students Passing Quality</div></div>
+        <div class="summary-card"><div class="summary-value fail">${analysis.atRiskCount || 0}</div><div class="summary-label">At Risk</div></div>
+      </div>
+      <div class="section-title">Class-Based Grading Profile</div>
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin-bottom:18px;color:#1e3a8a;font-size:12px;line-height:1.7;">
+        <strong>System:</strong> ${profile?.systemName || 'Not configured'} (${profile?.source === 'CLASS' ? 'Assigned to class' : 'School default fallback'})<br/>
+        <strong>Quality:</strong> ${profile?.quality?.description || quality.label}<br/>
+        <strong>Quantity:</strong> ${profile?.quantity?.description || quantity.label}
+      </div>
+      <div class="section-title">Quality and Quantity Summary</div>
+      <table><thead><tr><th>Measure</th><th>Definition</th><th class="text-center">Passed</th><th class="text-center">Assessed</th><th class="text-center">Rate</th><th class="text-center">Below Standard</th></tr></thead>
+        <tbody>
+          <tr><td class="font-semibold">Quality</td><td>${quality.label}</td><td class="text-center pass">${quality.passed}</td><td class="text-center">${quality.total}</td><td class="text-center font-bold">${Number(quality.rate || 0).toFixed(1)}%</td><td class="text-center fail">${quality.failed}</td></tr>
+          <tr><td class="font-semibold">Quantity</td><td>${quantity.label}</td><td class="text-center pass">${quantity.passed}</td><td class="text-center">${quantity.total}</td><td class="text-center font-bold">${Number(quantity.rate || 0).toFixed(1)}%</td><td class="text-center fail">${quantity.failed}</td></tr>
+        </tbody>
+      </table>
+      <div class="section-title">Subject-Level Analysis</div>
+      <table><thead><tr><th>Subject</th><th class="text-center">Average</th><th class="text-center">Highest</th><th class="text-center">Lowest</th><th class="text-center">Quantity%</th><th class="text-center">Quality%</th><th class="text-center">Assessed</th></tr></thead>
+        <tbody>${subjectRows || '<tr><td colspan="7" class="text-center">No subject data available</td></tr>'}</tbody>
+      </table>
+      <div class="section-title">Student Outcome Register</div>
+      <table><thead><tr><th class="text-center">Rank</th><th>Student</th><th>Admission No.</th><th class="text-center">Average</th><th class="text-center">Grade</th><th class="text-center">Subjects</th><th class="text-center">Quality</th><th class="text-center">Quantity</th></tr></thead>
+        <tbody>${studentRows || '<tr><td colspan="8" class="text-center">No student data available</td></tr>'}</tbody>
+      </table>`;
+
+    const html = this.buildEnhancedReportShell({
+      schoolName: school?.name || 'School',
+      subtitle: `Results Analysis — ${classInfo?.name || ''} — ${term.name} (${term.academicYear?.name || ''})`,
+      title: 'Results Analysis Report',
+      content: this.buildMetaBar([
+        { label: 'Class', value: classInfo?.name || '' },
+        { label: 'Term', value: term.name },
+        { label: 'Year', value: term.academicYear?.name || '' },
+        { label: 'Exam', value: sheet.examType || 'END_TERM' },
+        { label: 'Date', value: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) },
+      ]) + content,
+      orientation: 'landscape',
+    });
+    const buffer = await this.renderHtmlToPdf(html);
+    const result = await this.cloudinary.uploadBuffer(buffer, {
+      folder: `${FOLDERS.system}/reports`,
+      publicId: `results-analysis-${request.classId}-${request.termId}-${Date.now()}`,
+      resourceType: 'raw',
+    });
     return { buffer, url: result.secureUrl, publicId: result.publicId };
   }
 

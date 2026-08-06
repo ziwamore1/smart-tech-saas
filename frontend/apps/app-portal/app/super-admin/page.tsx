@@ -120,6 +120,9 @@ export default function SuperAdminPage() {
   const histogram = resultsAnalytics?.scoreHistogram || [];
   const schoolPerf = resultsAnalytics?.schoolPerformance || [];
   const heatmap = resultsAnalytics?.subjectHeatmap || { schools: [], subjects: [], values: [] };
+  const overallQuality = resultsAnalytics?.overallQuality || { passed: 0, assessed: 0, rate: 0, belowStandard: 0 };
+  const overallQuantity = resultsAnalytics?.overallQuantity || { passed: 0, assessed: 0, rate: 0, belowStandard: 0 };
+  const qualitySchools = resultsAnalytics?.qualityQuantityBySchool || [];
 
   const heatmapCells: [number, number, number][] = [];
   (heatmap.schools || []).forEach((school: string, si: number) => {
@@ -166,6 +169,18 @@ export default function SuperAdminPage() {
       itemStyle: { color: '#3b82f6', borderRadius: [4, 4, 0, 0] },
       barMaxWidth: 30,
     }],
+  };
+
+  const qualityQuantitySchoolOption = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: { bottom: 0, textStyle: { fontSize: 11 } },
+    grid: { left: '10%', right: '4%', bottom: '18%', top: '12%' },
+    xAxis: { type: 'category', data: qualitySchools.map((s: any) => s.schoolName), axisLabel: { fontSize: 10, rotate: 35 } },
+    yAxis: { type: 'value', max: 100, name: 'Pass %', nameTextStyle: { fontSize: 11 } },
+    series: [
+      { name: 'Quality', type: 'bar', data: qualitySchools.map((s: any) => s.qualityPassRate), itemStyle: { color: '#059669', borderRadius: [4, 4, 0, 0] }, barMaxWidth: 22 },
+      { name: 'Quantity', type: 'bar', data: qualitySchools.map((s: any) => s.quantityPassRate), itemStyle: { color: '#2563eb', borderRadius: [4, 4, 0, 0] }, barMaxWidth: 22 },
+    ],
   };
 
   const heatmapOption = {
@@ -370,12 +385,31 @@ export default function SuperAdminPage() {
         </div>
 
         {/* Primary Stat Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '20px' }}>
           <div className="stat-card" style={{ padding: '18px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
             <div style={{ fontSize: '28px', fontWeight: 700, color: '#16a34a' }}>{stats?.totalPrimarySchools || 0}</div>
             <div style={{ fontSize: '13px', color: '#166534', fontWeight: 500 }}>Primary Schools</div>
             <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>offering ECE & Primary levels</div>
           </div>
+
+         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+           <div style={{ padding: '16px', background: '#ecfdf5', borderRadius: '12px', border: '1px solid #a7f3d0' }}>
+             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+               <div style={{ fontSize: '28px', fontWeight: 700, color: '#059669' }}>{Number(overallQuality.rate || 0).toFixed(1)}%</div>
+               <i className="fa fa-star" style={{ color: '#059669' }}></i>
+             </div>
+             <div style={{ fontSize: '13px', color: '#065f46', fontWeight: 600 }}>Overall School Quality</div>
+             <div style={{ fontSize: '11px', color: '#047857', marginTop: '4px' }}>{overallQuality.passed || 0} of {overallQuality.assessed || 0} assessed results passed the quality standard</div>
+           </div>
+           <div style={{ padding: '16px', background: '#eff6ff', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
+             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+               <div style={{ fontSize: '28px', fontWeight: 700, color: '#2563eb' }}>{Number(overallQuantity.rate || 0).toFixed(1)}%</div>
+               <i className="fa fa-check-double" style={{ color: '#2563eb' }}></i>
+             </div>
+             <div style={{ fontSize: '13px', color: '#1e40af', fontWeight: 600 }}>Overall School Quantity</div>
+             <div style={{ fontSize: '11px', color: '#1d4ed8', marginTop: '4px' }}>{overallQuantity.passed || 0} of {overallQuantity.assessed || 0} assessed results passed the quantity standard</div>
+           </div>
+         </div>
           <div className="stat-card" style={{ padding: '18px', background: '#eff6ff', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
             <div style={{ fontSize: '28px', fontWeight: 700, color: '#2563eb' }}>{stats?.primaryStudents?.toLocaleString() || 0}</div>
             <div style={{ fontSize: '13px', color: '#1e40af', fontWeight: 500 }}>Primary Students</div>
@@ -495,7 +529,7 @@ export default function SuperAdminPage() {
           </div>
         ) : resultsAnalytics?.publishedResults ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '20px' }}>
-            <div style={{ background: '#fffdf9', borderRadius: '12px', border: '1px solid #e8ddd0', padding: '16px' }}>
+             <div style={{ background: '#fffdf9', borderRadius: '12px', border: '1px solid #e8ddd0', padding: '16px' }}>
               <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#374151', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <i className="fa fa-chart-pie" style={{ color: '#ea6645' }}></i> Grade Distribution
               </h3>
@@ -511,8 +545,14 @@ export default function SuperAdminPage() {
               <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#374151', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <i className="fa fa-trophy" style={{ color: '#f59e0b' }}></i> School Performance
               </h3>
-              <ReactECharts option={schoolBarOption} style={{ height: 320 }} />
-            </div>
+               <ReactECharts option={schoolBarOption} style={{ height: 320 }} />
+             </div>
+             <div style={{ background: '#fffdf9', borderRadius: '12px', border: '1px solid #e8ddd0', padding: '16px' }}>
+               <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#374151', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                 <i className="fa fa-balance-scale" style={{ color: '#0891b2' }}></i> Quality vs Quantity by School
+               </h3>
+               <ReactECharts option={qualityQuantitySchoolOption} style={{ height: 320 }} />
+             </div>
             <div style={{ background: '#fffdf9', borderRadius: '12px', border: '1px solid #e8ddd0', padding: '16px' }}>
               <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#374151', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <i className="fa fa-th-large" style={{ color: '#14b8a6' }}></i> Subject Heatmap by School

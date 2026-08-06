@@ -200,7 +200,7 @@ export interface AnalysisData {
   distinctionRate: number;
   atRiskCount: number;
   gradeDistribution: Record<string, number>;
-  subjectAnalysis: { subjectName: string; average: number; highest: number; lowest: number; passRate: number; distinctionRate: number }[];
+  subjectAnalysis: { subjectName: string; average: number; highest: number; lowest: number; passRate: number; distinctionRate: number; qualityPassRate?: number; quantityPassRate?: number; gradedCount?: number }[];
   students: { firstName: string; lastName: string; admissionNumber?: string; gender?: string; percentage: number; grade?: string }[];
   genderStats?: {
     maleCount: number;
@@ -219,6 +219,16 @@ export interface AnalysisData {
     malePassRate: number;
     femalePassRate: number;
   }[];
+  gradingProfile?: {
+    systemName: string;
+    source: string;
+    quality: { labels: string[]; points: number[]; description: string };
+    quantity: { labels: string[]; points: number[]; description: string };
+  };
+  quality?: { passed: number; total: number; rate: number; failed: number; label: string };
+  quantity?: { passed: number; total: number; rate: number; failed: number; label: string };
+  qualityStudentRate?: number;
+  quantityStudentRate?: number;
 }
 
 export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta): string {
@@ -230,7 +240,8 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
     'C+': '#d97706', 'C': '#f59e0b', 'C-': '#fbbf24',
     'D+': '#dc2626', 'D': '#ef4444', 'D-': '#f87171',
     'E': '#991b1b', 'F': '#7f1d1d',
-    '1': '#059669', '2': '#2563eb', '3': '#d97706', '4': '#dc2626', '5': '#991b1b',
+    '1': '#059669', '2': '#2563eb', '3': '#d97706', '4': '#dc2626', '5': '#991b1b', '6': '#991b1b', '7': '#7f1d1d', '8': '#7f1d1d', '9': '#450a0a',
+    'One': '#059669', 'Two': '#2563eb', 'Three': '#d97706', 'Four': '#dc2626', 'Five': '#991b1b',
   };
 
   let cumulativePercent = 0;
@@ -264,6 +275,9 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
 
   const genderStats = analysis.genderStats;
   const subjectGender = analysis.subjectGenderAnalysis || [];
+  const quality = analysis.quality || { passed: 0, total: 0, rate: analysis.distinctionRate || 0, failed: 0, label: 'Configured quality band' };
+  const quantity = analysis.quantity || { passed: 0, total: 0, rate: analysis.passRate || 0, failed: 0, label: 'Configured quantity band' };
+  const profile = analysis.gradingProfile;
 
   const subjectRows = (analysis.subjectAnalysis || []).map((s) => {
     const avgColor = scoreColor(s.average);
@@ -278,7 +292,9 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
       <td class="text-center">
         <span class="grade-badge" style="background:${s.passRate >= 70 ? '#d1fae5' : s.passRate >= 40 ? '#fef3c7' : '#fee2e2'};color:${s.passRate >= 70 ? '#059669' : s.passRate >= 40 ? '#d97706' : '#dc2626'}">${s.passRate.toFixed(1)}%</span>
       </td>
-      <td class="text-center"><span class="grade-badge" style="background:#f3e8ff;color:#7c3aed">${s.distinctionRate.toFixed(1)}%</span></td>
+       <td class="text-center"><span class="grade-badge" style="background:#d1fae5;color:#047857">${(s.qualityPassRate ?? s.distinctionRate).toFixed(1)}%</span></td>
+       <td class="text-center"><span class="grade-badge" style="background:#dbeafe;color:#1d4ed8">${(s.quantityPassRate ?? s.passRate).toFixed(1)}%</span></td>
+       <td class="text-center" style="color:#6b7280">${s.gradedCount ?? '-'}</td>
       <td class="text-center" style="color:#2563eb;font-weight:600">${sg ? sg.maleAverage.toFixed(1) + '%' : '-'}</td>
       <td class="text-center" style="color:#db2777;font-weight:600">${sg ? sg.femaleAverage.toFixed(1) + '%' : '-'}</td>
       <td class="text-center">${sg ? `<span style="color:#2563eb">${sg.malePassRate.toFixed(0)}%</span>` : '-'}</td>
@@ -286,23 +302,48 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
     </tr>`;
   }).join('');
 
-  const atRiskRows = (analysis.students || []).filter(s => (s.percentage || (s as any).avgPercentage || 0) < 40).sort((a, b) => (a.percentage || (a as any).avgPercentage || 0) - (b.percentage || (b as any).avgPercentage || 0)).slice(0, 25).map((s, i) => `<tr>
+   const atRiskRows = (analysis.students || []).filter(s => (s as any).quantityPassed === false || ((s as any).quantityPassed == null && (s.percentage || (s as any).avgPercentage || 0) < 40)).sort((a, b) => (a.percentage || (a as any).avgPercentage || 0) - (b.percentage || (b as any).avgPercentage || 0)).slice(0, 25).map((s, i) => `<tr>
     <td class="text-center" style="color:#6b7280">${i + 1}</td>
     <td style="font-weight:600">${s.firstName} ${s.lastName}</td>
     <td style="color:#6b7280;font-size:11px">${s.admissionNumber || '-'}</td>
     <td class="text-center" style="color:${(s.gender || '').startsWith('M') ? '#2563eb' : '#db2777'};font-weight:600">${s.gender || '-'}</td>
     <td class="text-center font-bold fail">${(s.percentage || (s as any).avgPercentage || 0).toFixed(1)}%</td>
     <td class="text-center"><span class="grade-badge" style="background:#fee2e2;color:#dc2626">${s.grade || '-'}</span></td>
-  </tr>`).join('');
+   </tr>`).join('');
+
+   const studentRows = [...(analysis.students || [])].sort((a, b) => (b.percentage || 0) - (a.percentage || 0)).slice(0, 50).map((s, i) => `<tr>
+     <td class="text-center">${i + 1}</td>
+     <td style="font-weight:600">${s.firstName} ${s.lastName}</td>
+     <td>${s.admissionNumber || '-'}</td>
+     <td class="text-center">${(s.percentage || 0).toFixed(1)}%</td>
+     <td class="text-center">${s.grade || '-'}</td>
+     <td class="text-center">${(s as any).subjectCount ?? '-'}</td>
+     <td class="text-center"><span class="grade-badge" style="background:${(s as any).qualityPassed ? '#d1fae5' : '#fee2e2'};color:${(s as any).qualityPassed ? '#047857' : '#dc2626'}">${(s as any).qualityPassed ? 'PASS' : 'BELOW'}</span></td>
+     <td class="text-center"><span class="grade-badge" style="background:${(s as any).quantityPassed ? '#dbeafe' : '#fee2e2'};color:${(s as any).quantityPassed ? '#1d4ed8' : '#dc2626'}">${(s as any).quantityPassed ? 'PASS' : 'BELOW'}</span></td>
+   </tr>`).join('');
 
   const content = `
-    <div class="summary-grid">
-      <div class="summary-card"><div class="summary-value">${analysis.totalStudents}</div><div class="summary-label">Total Students</div></div>
-      <div class="summary-card"><div class="summary-value pass">${analysis.passRate.toFixed(1)}%</div><div class="summary-label">Class Pass Rate</div></div>
-      <div class="summary-card"><div class="summary-value" style="color:#ea6645">${analysis.averagePercentage.toFixed(1)}%</div><div class="summary-label">Class Average</div></div>
-      <div class="summary-card"><div class="summary-value" style="color:#7c3aed">${analysis.distinctionRate.toFixed(1)}%</div><div class="summary-label">Distinction Rate</div></div>
-      <div class="summary-card"><div class="summary-value fail">${analysis.atRiskCount}</div><div class="summary-label">At Risk Students</div></div>
-    </div>
+     ${profile ? `<div class="section-title">Class Grading Profile</div>
+     <div class="report-meta" style="display:block">
+       <div><strong>System:</strong> ${profile.systemName} <span style="color:#6b7280">(${profile.source === 'CLASS' ? 'Assigned to this class' : 'School default fallback'})</span></div>
+       <div style="margin-top:5px"><strong>Quality band:</strong> ${profile.quality.description} &nbsp; | &nbsp; <strong>Quantity band:</strong> ${profile.quantity.description}</div>
+     </div>` : ''}
+
+     <div class="summary-grid">
+       <div class="summary-card"><div class="summary-value">${analysis.totalStudents}</div><div class="summary-label">Total Students</div></div>
+       <div class="summary-card" style="border-top:4px solid #2563eb"><div class="summary-value" style="color:#2563eb">${quantity.rate.toFixed(1)}%</div><div class="summary-label">Quantity Pass Rate</div></div>
+       <div class="summary-card" style="border-top:4px solid #059669"><div class="summary-value" style="color:#059669">${quality.rate.toFixed(1)}%</div><div class="summary-label">Quality Pass Rate</div></div>
+       <div class="summary-card"><div class="summary-value" style="color:#ea6645">${analysis.averagePercentage.toFixed(1)}%</div><div class="summary-label">Class Average</div></div>
+       <div class="summary-card"><div class="summary-value" style="color:#7c3aed">${(analysis.qualityStudentRate ?? 0).toFixed(1)}%</div><div class="summary-label">Students Passing Quality</div></div>
+       <div class="summary-card"><div class="summary-value fail">${analysis.atRiskCount}</div><div class="summary-label">At Risk Students</div></div>
+     </div>
+
+     <div class="section-title">Quality and Quantity Interpretation</div>
+     <table><thead><tr><th>Measure</th><th>Definition</th><th class="text-center">Passed</th><th class="text-center">Assessed</th><th class="text-center">Rate</th><th class="text-center">Not Passed</th></tr></thead>
+     <tbody>
+       <tr><td class="font-semibold">Quality</td><td>${quality.label}</td><td class="text-center pass">${quality.passed}</td><td class="text-center">${quality.total}</td><td class="text-center font-bold">${quality.rate.toFixed(1)}%</td><td class="text-center fail">${quality.failed}</td></tr>
+       <tr><td class="font-semibold">Quantity</td><td>${quantity.label}</td><td class="text-center pass">${quantity.passed}</td><td class="text-center">${quantity.total}</td><td class="text-center font-bold">${quantity.rate.toFixed(1)}%</td><td class="text-center fail">${quantity.failed}</td></tr>
+     </tbody></table>
 
     ${genderStats ? `
     <div class="section-title">Gender Performance Overview</div>
@@ -329,18 +370,25 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
     ${(analysis.subjectAnalysis || []).length > 0 ? `
     <div class="section-title">Subject Performance Breakdown</div>
     <table>
-      <thead><tr><th>Subject</th><th class="text-center">Class Avg</th><th class="text-center">Highest</th><th class="text-center">Lowest</th><th class="text-center">Pass Rate</th><th class="text-center">Distinction</th><th class="text-center" style="color:#dbeafe">Male Avg</th><th class="text-center" style="color:#fce7f3">Female Avg</th><th class="text-center" style="color:#dbeafe">Male Pass%</th><th class="text-center" style="color:#fce7f3">Female Pass%</th></tr></thead>
+       <thead><tr><th>Subject</th><th class="text-center">Class Avg</th><th class="text-center">Highest</th><th class="text-center">Lowest</th><th class="text-center">Quantity%</th><th class="text-center">Quality%</th><th class="text-center">Assessed</th><th class="text-center" style="color:#dbeafe">Male Avg</th><th class="text-center" style="color:#fce7f3">Female Avg</th><th class="text-center" style="color:#dbeafe">Male Quality%</th><th class="text-center" style="color:#fce7f3">Female Quality%</th></tr></thead>
       <tbody>${subjectRows}</tbody>
     </table>` : ''}
 
-    ${atRiskRows ? `
-    <div class="section-title">At-Risk Students (Below 40%)</div>
+     ${atRiskRows ? `
+     <div class="section-title">At-Risk Students (Below Quantity Standard)</div>
     <table>
       <thead><tr><th class="text-center">#</th><th>Student Name</th><th>Admission No.</th><th class="text-center">Gender</th><th class="text-center">Score</th><th class="text-center">Grade</th></tr></thead>
-      <tbody>${atRiskRows}</tbody>
-    </table>` : ''}`;
+     <tbody>${atRiskRows}</tbody>
+     </table>` : ''}`;
 
-  return buildReportShell(meta, `Results Analysis - ${meta.examType}`, content);
+   const studentSection = `
+     <div class="section-title">Student-Level Outcome Register</div>
+     <table>
+       <thead><tr><th class="text-center">Rank</th><th>Student Name</th><th>Admission No.</th><th class="text-center">Average</th><th class="text-center">Grade</th><th class="text-center">Subjects</th><th class="text-center">Quality</th><th class="text-center">Quantity</th></tr></thead>
+       <tbody>${studentRows || '<tr><td colspan="8" class="text-center">No student outcomes available</td></tr>'}</tbody>
+     </table>`;
+
+  return buildReportShell(meta, `Results Analysis - ${meta.examType}`, `${content}${studentSection}`);
 }
 
 export interface RankingStudent {
@@ -413,6 +461,11 @@ export function openAnalysisReport(analysis: AnalysisData, meta: ReportMeta) {
     students: analysis.students || [],
     genderStats: analysis.genderStats || undefined,
     subjectGenderAnalysis: analysis.subjectGenderAnalysis || [],
+    gradingProfile: analysis.gradingProfile,
+    quality: analysis.quality,
+    quantity: analysis.quantity,
+    qualityStudentRate: analysis.qualityStudentRate,
+    quantityStudentRate: analysis.quantityStudentRate,
   };
   openReport(generateAnalysisReport(normalizedAnalysis, meta), `Analysis - ${meta.className}`);
 }

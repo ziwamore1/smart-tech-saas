@@ -15,6 +15,8 @@ const REPORT_TYPE_LABELS: Record<string, { label: string; color: string; icon: s
   ANALYTICS_SUMMARY: { label: 'Analytics', color: '#4f46e5', icon: 'fa-chart-pie' },
   MARK_SCHEDULE: { label: 'Mark Schedule', color: '#ea580c', icon: 'fa-table' },
   PERFORMANCE_REPORT: { label: 'Performance', color: '#ec4899', icon: 'fa-chart-line' },
+  RANKING_REPORT: { label: 'Class Ranking', color: '#d97706', icon: 'fa-trophy' },
+  RESULTS_ANALYSIS: { label: 'Results Analysis', color: '#0891b2', icon: 'fa-chart-bar' },
 };
 
 export default function ReportManagerPage() {

@@ -11,6 +11,65 @@ import { PushNotificationService } from '../push-notification/push-notification.
 import { Prisma } from '@prisma/client';
 import * as XLSX from 'xlsx';
 
+type AnalysisBand = {
+  labels: string[];
+  points: number[];
+  description: string;
+};
+
+function normaliseGrade(value: string | null | undefined): string {
+  return String(value || '').trim().toUpperCase();
+}
+
+function analysisBands(systemName: string): { quality: AnalysisBand; quantity: AnalysisBand } {
+  const name = systemName.toLowerCase();
+  if (name.includes('grade 7')) {
+    return {
+      quality: { labels: ['ONE', 'TWO', 'THREE'], points: [1, 2, 3], description: 'Grades One to Three' },
+      quantity: { labels: ['ONE', 'TWO', 'THREE', 'FOUR'], points: [1, 2, 3, 4], description: 'Grades One to Four' },
+    };
+  }
+  if (name.includes('secondary')) {
+    return {
+      quality: { labels: ['1', '2', '3', '4', '5', '6'], points: [1, 2, 3, 4, 5, 6], description: 'Grades/Points 1 to 6' },
+      quantity: { labels: ['1', '2', '3', '4', '5', '6', '7', '8'], points: [1, 2, 3, 4, 5, 6, 7, 8], description: 'Grades/Points 1 to 8' },
+    };
+  }
+  if (name.includes('forms')) {
+    return {
+      quality: { labels: ['1', '2', '3'], points: [1, 2, 3], description: 'Grades/Points 1 to 3' },
+      quantity: { labels: ['1', '2', '3', '4'], points: [1, 2, 3, 4], description: 'Grades/Points 1 to 4' },
+    };
+  }
+  if (name.includes('university')) {
+    return {
+      quality: { labels: ['A+', 'A', 'B+', 'B'], points: [4.5, 4, 3.5, 3], description: 'A+ to B (CGPA quality band)' },
+      quantity: { labels: ['A+', 'A', 'B+', 'B', 'C+', 'C'], points: [4.5, 4, 3.5, 3, 2.5, 2], description: 'A+ to C (CGPA quantity band)' },
+    };
+  }
+  if (name.includes('college')) {
+    return {
+      quality: { labels: ['A', 'B'], points: [4, 3], description: 'Grades A to B' },
+      quantity: { labels: ['A', 'B', 'C'], points: [4, 3, 2], description: 'Grades A to C' },
+    };
+  }
+  return {
+    quality: { labels: ['A', 'B', 'C', 'D'], points: [5, 4, 3, 2], description: 'Grades/Points A=5 to D=2' },
+    quantity: { labels: ['A', 'B', 'C', 'D', 'E'], points: [5, 4, 3, 2, 1], description: 'Grades/Points A=5 to E=1' },
+  };
+}
+
+function bandIncludes(band: AnalysisBand, grade: string | null, points: number | null): boolean {
+  const gradeMatch = grade ? band.labels.includes(normaliseGrade(grade)) : false;
+  const pointMatch = points != null && band.points.some(point => Math.abs(point - points) < 0.01);
+  return gradeMatch || pointMatch;
+}
+
+function percentageScale(percentage: number | null, scales: any[]): any | null {
+  if (percentage == null) return null;
+  return scales.find(scale => percentage >= scale.minScore && percentage <= scale.maxScore) || null;
+}
+
 @Injectable()
 export class ResultsManagementService {
   private readonly logger = new Logger(ResultsManagementService.name);
@@ -879,6 +938,46 @@ export class ResultsManagementService {
 
     this.ensureComputedResults(sheet.classId, sheet.termId, sheet.schoolId);
 
+    const classRecord = await this.prisma.class.findUnique({
+      where: { id: sheet.classId },
+      select: {
+        id: true,
+        name: true,
+        gradingSystem: { select: { id: true, name: true, gradeScales: true } },
+      },
+    });
+    const configuredSystem = classRecord?.gradingSystem || await this.prisma.gradingSystem.findFirst({
+      where: { schoolId: sheet.schoolId, isDefault: true },
+      select: { id: true, name: true, gradeScales: true },
+    });
+    const systemName = configuredSystem?.name || 'Primary Grading System';
+    const scales = configuredSystem?.gradeScales || [];
+    const bands = analysisBands(systemName);
+    const gradingProfile = {
+      systemId: configuredSystem?.id || null,
+      systemName,
+      source: classRecord?.gradingSystem ? 'CLASS' : configuredSystem ? 'SCHOOL_DEFAULT' : 'FALLBACK',
+      quality: bands.quality,
+      quantity: bands.quantity,
+    };
+
+    const emptyAnalysis = {
+      totalStudents: 0,
+      passRate: 0,
+      averagePercentage: 0,
+      distinctionRate: 0,
+      atRiskCount: 0,
+      gradeDistribution: {},
+      subjectAnalysis: [],
+      students: [],
+      atRiskStudents: [],
+      gradingProfile,
+      quality: { passed: 0, total: 0, rate: 0, failed: 0, label: bands.quality.description },
+      quantity: { passed: 0, total: 0, rate: 0, failed: 0, label: bands.quantity.description },
+      qualityStudentRate: 0,
+      quantityStudentRate: 0,
+    };
+
     const computedResults = await this.prisma.computedResult.findMany({
       where: {
         classId: sheet.classId,
@@ -892,7 +991,10 @@ export class ResultsManagementService {
         subjectId: true,
         finalPercentage: true,
         finalGrade: true,
+        finalRemark: true,
         points: true,
+        totalRawScore: true,
+        isAbsent: true,
         student: {
           select: { id: true, firstName: true, lastName: true, admissionNumber: true, gender: true },
         },
@@ -904,17 +1006,7 @@ export class ResultsManagementService {
 
     if (computedResults.length === 0) {
       this.logger.warn(`No computed results for class ${sheet.classId}, term ${sheet.termId}`);
-      return {
-        totalStudents: 0,
-        passRate: 0,
-        averagePercentage: 0,
-        distinctionRate: 0,
-        atRiskCount: 0,
-        gradeDistribution: {},
-        subjectAnalysis: [],
-        students: [],
-        atRiskStudents: [],
-      };
+      return emptyAnalysis;
     }
 
     const studentIds = [...new Set(computedResults.map(r => r.studentId))];
@@ -942,8 +1034,7 @@ export class ResultsManagementService {
       }
     }
 
-    const studentAverages = new Map<string, { studentId: string; firstName: string; lastName: string; admissionNumber: string; gender: string | null; totalPercentage: number; count: number }>();
-    for (const cr of computedResults) {
+    const records = computedResults.map(cr => {
       let effectivePercentage = cr.finalPercentage;
       if (effectivePercentage == null || effectivePercentage === 0) {
         const rawScore = cr.subjectId ? rawScoreMap.get(`${cr.studentId}::${cr.subjectId}`) : undefined;
@@ -952,21 +1043,43 @@ export class ResultsManagementService {
         }
       }
 
-      const existing = studentAverages.get(cr.studentId);
-      if (existing) {
-        existing.totalPercentage += effectivePercentage ?? 0;
+      const scale = percentageScale(effectivePercentage, scales);
+      const grade = scale?.grade || cr.finalGrade || null;
+      const points = scale?.points ?? cr.points ?? null;
+      return {
+        ...cr,
+        effectivePercentage,
+        grade,
+        points,
+        qualityPassed: !cr.isAbsent && bandIncludes(bands.quality, grade, points),
+        quantityPassed: !cr.isAbsent && bandIncludes(bands.quantity, grade, points),
+      };
+    });
+
+    const studentAverages = new Map<string, any>();
+    for (const cr of records) {
+      const existing = studentAverages.get(cr.studentId) || {
+        studentId: cr.studentId,
+        firstName: cr.student.firstName,
+        lastName: cr.student.lastName,
+        admissionNumber: cr.student.admissionNumber,
+        gender: (cr.student as any).gender ?? null,
+        totalPercentage: 0,
+        count: 0,
+        qualityPassed: 0,
+        quantityPassed: 0,
+        gradedCount: 0,
+        qualitySubjects: 0,
+        quantitySubjects: 0,
+      };
+      if (cr.effectivePercentage != null && !cr.isAbsent) {
+        existing.totalPercentage += cr.effectivePercentage;
         existing.count += 1;
-      } else {
-        studentAverages.set(cr.studentId, {
-          studentId: cr.studentId,
-          firstName: cr.student.firstName,
-          lastName: cr.student.lastName,
-          admissionNumber: cr.student.admissionNumber,
-          gender: (cr.student as any).gender ?? null,
-          totalPercentage: effectivePercentage ?? 0,
-          count: 1,
-        });
+        existing.gradedCount += 1;
+        existing.qualityPassed += cr.qualityPassed ? 1 : 0;
+        existing.quantityPassed += cr.quantityPassed ? 1 : 0;
       }
+      studentAverages.set(cr.studentId, existing);
     }
 
     const students = Array.from(studentAverages.values()).map(s => ({
@@ -976,64 +1089,53 @@ export class ResultsManagementService {
       admissionNumber: s.admissionNumber,
       gender: s.gender,
       percentage: s.count > 0 ? parseFloat((s.totalPercentage / s.count).toFixed(2)) : 0,
-      grade: null as string | null,
+      grade: percentageScale(s.count > 0 ? s.totalPercentage / s.count : null, scales)?.grade || null,
+      qualitySubjects: s.qualityPassed,
+      quantitySubjects: s.quantityPassed,
+      subjectCount: s.gradedCount,
+      qualityPassed: s.gradedCount > 0 && s.qualityPassed === s.gradedCount,
+      quantityPassed: s.gradedCount > 0 && s.quantityPassed === s.gradedCount,
     }));
 
-    students.forEach(s => {
-      if (s.percentage >= 75) s.grade = 'A';
-      else if (s.percentage >= 65) s.grade = 'B';
-      else if (s.percentage >= 50) s.grade = 'C';
-      else if (s.percentage >= 40) s.grade = 'D';
-      else s.grade = 'E';
-    });
-
-    const overallScores = computedResults.map(r => {
-      let effectivePercentage = r.finalPercentage;
-      if (effectivePercentage == null || effectivePercentage === 0) {
-        const rawScore = r.subjectId ? rawScoreMap.get(`${r.studentId}::${r.subjectId}`) : undefined;
-        if (rawScore != null) {
-          effectivePercentage = rawScore;
-        }
-      }
-      return effectivePercentage ?? 0;
-    });
-    const totalStudents = new Set(computedResults.map(r => r.studentId)).size;
+    const validRecords = records.filter(r => r.effectivePercentage != null && !r.isAbsent);
+    const overallScores = validRecords.map(r => r.effectivePercentage as number);
+    const totalStudents = studentAverages.size;
     const overallAvg = overallScores.length > 0 ? overallScores.reduce((a, b) => a + b, 0) / overallScores.length : 0;
-    const passCount = overallScores.filter(s => s >= 50).length;
-    const passRate = overallScores.length > 0 ? parseFloat(((passCount / overallScores.length) * 100).toFixed(2)) : 0;
-    const distinctionCount = overallScores.filter(s => s >= 75).length;
-    const distinctionRate = overallScores.length > 0 ? parseFloat(((distinctionCount / overallScores.length) * 100).toFixed(2)) : 0;
+    const qualityPassed = validRecords.filter(r => r.qualityPassed).length;
+    const quantityPassed = validRecords.filter(r => r.quantityPassed).length;
+    const qualityStudentCount = students.filter(s => s.qualityPassed).length;
+    const quantityStudentCount = students.filter(s => s.quantityPassed).length;
+    const qualityRate = validRecords.length > 0 ? parseFloat(((qualityPassed / validRecords.length) * 100).toFixed(2)) : 0;
+    const quantityRate = validRecords.length > 0 ? parseFloat(((quantityPassed / validRecords.length) * 100).toFixed(2)) : 0;
+    const qualityStudentRate = totalStudents > 0 ? parseFloat(((qualityStudentCount / totalStudents) * 100).toFixed(2)) : 0;
+    const quantityStudentRate = totalStudents > 0 ? parseFloat(((quantityStudentCount / totalStudents) * 100).toFixed(2)) : 0;
 
     const gradeDistribution: Record<string, number> = {};
-    computedResults.forEach(r => {
-      const grade = r.finalGrade || 'Unknown';
+    students.forEach(student => {
+      const grade = student.grade || 'Unknown';
       gradeDistribution[grade] = (gradeDistribution[grade] || 0) + 1;
     });
 
-    const subjectAnalytics = computedResults.reduce((acc: Record<string, any>, result) => {
+    const subjectAnalytics = records.reduce((acc: Record<string, any>, result) => {
       if (!acc[result.subjectId]) {
-        acc[result.subjectId] = { subjectId: result.subjectId, subjectName: result.subject.name, scores: [] };
+        acc[result.subjectId] = { subjectId: result.subjectId, subjectName: result.subject.name, records: [] };
       }
-      let effectivePercentage = result.finalPercentage;
-      if (effectivePercentage == null || effectivePercentage === 0) {
-        const rawScore = result.subjectId ? rawScoreMap.get(`${result.studentId}::${result.subjectId}`) : undefined;
-        if (rawScore != null) {
-          effectivePercentage = rawScore;
-        }
-      }
-      acc[result.subjectId].scores.push(effectivePercentage ?? 0);
+      acc[result.subjectId].records.push(result);
       return acc;
     }, {});
 
     const subjectAnalysis = Object.values(subjectAnalytics).map((subject: any) => {
-      const scores = subject.scores.sort((a: number, b: number) => a - b);
+      const subjectRecords = subject.records.filter((r: any) => r.effectivePercentage != null && !r.isAbsent);
+      const scores = subjectRecords.map((r: any) => r.effectivePercentage).sort((a: number, b: number) => a - b);
       const total = scores.length;
       const sum = scores.reduce((a: number, b: number) => a + b, 0);
-      const avg = sum / total;
-      const min = scores[0];
-      const max = scores[total - 1];
-      const passRate = (scores.filter((s: number) => s >= 50).length / total) * 100;
-      const distinctionRate = (scores.filter((s: number) => s >= 75).length / total) * 100;
+      const avg = total > 0 ? sum / total : 0;
+      const min = scores[0] ?? 0;
+      const max = scores[total - 1] ?? 0;
+      const qualityCount = subjectRecords.filter((r: any) => r.qualityPassed).length;
+      const quantityCount = subjectRecords.filter((r: any) => r.quantityPassed).length;
+      const passRate = total > 0 ? (quantityCount / total) * 100 : 0;
+      const qualityRate = total > 0 ? (qualityCount / total) * 100 : 0;
       return {
         subjectId: subject.subjectId,
         subjectName: subject.subjectName,
@@ -1042,19 +1144,24 @@ export class ResultsManagementService {
         highest: parseFloat(max.toFixed(2)),
         lowest: parseFloat(min.toFixed(2)),
         passRate: parseFloat(passRate.toFixed(2)),
-        distinctionRate: parseFloat(distinctionRate.toFixed(2)),
+        distinctionRate: parseFloat(qualityRate.toFixed(2)),
+        qualityPassRate: parseFloat(qualityRate.toFixed(2)),
+        quantityPassRate: parseFloat(passRate.toFixed(2)),
+        qualityPassed: qualityCount,
+        quantityPassed: quantityCount,
+        gradedCount: total,
       };
     });
 
-    const atRiskStudents = students.filter(s => s.percentage < 40).sort((a, b) => a.percentage - b.percentage);
+    const atRiskStudents = students.filter(s => !s.quantityPassed).sort((a, b) => a.percentage - b.percentage);
 
     // Gender-based stats
     const isMale = (g: string | null) => g && ['MALE', 'M'].includes(g.trim().toUpperCase());
     const isFemale = (g: string | null) => g && ['FEMALE', 'F'].includes(g.trim().toUpperCase());
     const maleStudents = students.filter(s => isMale(s.gender));
     const femaleStudents = students.filter(s => isFemale(s.gender));
-    const malePassCount = maleStudents.filter(s => s.percentage >= 50).length;
-    const femalePassCount = femaleStudents.filter(s => s.percentage >= 50).length;
+    const malePassCount = maleStudents.filter(s => s.quantityPassed).length;
+    const femalePassCount = femaleStudents.filter(s => s.quantityPassed).length;
     const malePassRate = maleStudents.length > 0 ? parseFloat(((malePassCount / maleStudents.length) * 100).toFixed(2)) : 0;
     const femalePassRate = femaleStudents.length > 0 ? parseFloat(((femalePassCount / femaleStudents.length) * 100).toFixed(2)) : 0;
     const maleAverage = maleStudents.length > 0 ? parseFloat((maleStudents.reduce((sum, s) => sum + s.percentage, 0) / maleStudents.length).toFixed(2)) : 0;
@@ -1064,15 +1171,10 @@ export class ResultsManagementService {
     const subjectGenderAnalysis = Object.values(subjectAnalytics).map((subject: any) => {
       const maleScores: number[] = [];
       const femaleScores: number[] = [];
-      computedResults
+      records
         .filter(r => r.subjectId === subject.subjectId)
         .forEach(r => {
-          let effectivePercentage = r.finalPercentage;
-          if (effectivePercentage == null || effectivePercentage === 0) {
-            const rawScore = rawScoreMap.get(`${r.studentId}::${r.subjectId}`);
-            if (rawScore != null) effectivePercentage = rawScore;
-          }
-          const score = effectivePercentage ?? 0;
+          const score = r.effectivePercentage ?? 0;
           const gender = (r.student as any).gender;
           const gNorm = gender ? gender.trim().toUpperCase() : '';
           if (gNorm === 'MALE' || gNorm === 'M') maleScores.push(score);
@@ -1085,16 +1187,18 @@ export class ResultsManagementService {
         femaleCount: femaleScores.length,
         maleAverage: maleScores.length > 0 ? parseFloat((maleScores.reduce((a, b) => a + b, 0) / maleScores.length).toFixed(2)) : 0,
         femaleAverage: femaleScores.length > 0 ? parseFloat((femaleScores.reduce((a, b) => a + b, 0) / femaleScores.length).toFixed(2)) : 0,
-        malePassRate: maleScores.length > 0 ? parseFloat(((maleScores.filter(s => s >= 50).length / maleScores.length) * 100).toFixed(2)) : 0,
-        femalePassRate: femaleScores.length > 0 ? parseFloat(((femaleScores.filter(s => s >= 50).length / femaleScores.length) * 100).toFixed(2)) : 0,
-      };
-    });
+           malePassRate: maleScores.length > 0 ? parseFloat(((subject.records.filter((r: any) => r.qualityPassed && ['MALE', 'M'].includes(String(r.student.gender || '').toUpperCase())).length / maleScores.length) * 100).toFixed(2)) : 0,
+           femalePassRate: femaleScores.length > 0 ? parseFloat(((subject.records.filter((r: any) => r.qualityPassed && ['FEMALE', 'F'].includes(String(r.student.gender || '').toUpperCase())).length / femaleScores.length) * 100).toFixed(2)) : 0,
+           maleQualityPassRate: maleScores.length > 0 ? parseFloat(((subject.records.filter((r: any) => r.qualityPassed && ['MALE', 'M'].includes(String(r.student.gender || '').toUpperCase())).length / maleScores.length) * 100).toFixed(2)) : 0,
+           femaleQualityPassRate: femaleScores.length > 0 ? parseFloat(((subject.records.filter((r: any) => r.qualityPassed && ['FEMALE', 'F'].includes(String(r.student.gender || '').toUpperCase())).length / femaleScores.length) * 100).toFixed(2)) : 0,
+        };
+      });
 
     return {
       totalStudents,
-      passRate,
-      averagePercentage: parseFloat(overallAvg.toFixed(2)),
-      distinctionRate,
+       passRate: quantityRate,
+       averagePercentage: parseFloat(overallAvg.toFixed(2)),
+       distinctionRate: qualityRate,
       atRiskCount: atRiskStudents.length,
       gradeDistribution,
       subjectAnalysis,
@@ -1108,8 +1212,13 @@ export class ResultsManagementService {
         maleAverage,
         femaleAverage,
       },
-      subjectGenderAnalysis,
-    };
+       subjectGenderAnalysis,
+       gradingProfile,
+       quality: { passed: qualityPassed, total: validRecords.length, rate: qualityRate, failed: validRecords.length - qualityPassed, label: bands.quality.description },
+       quantity: { passed: quantityPassed, total: validRecords.length, rate: quantityRate, failed: validRecords.length - quantityPassed, label: bands.quantity.description },
+       qualityStudentRate,
+       quantityStudentRate,
+     };
   }
 
   async getAuditLogs(
