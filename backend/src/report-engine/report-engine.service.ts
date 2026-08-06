@@ -325,9 +325,7 @@ export class ReportEngineService {
         break;
 
       case ReportType.PERFORMANCE_REPORT:
-        // Performance reports use the same complete report-card presentation,
-        // including the student summary and performance charts.
-        result = await this.generateReportCard(request);
+        result = await this.generatePerformanceReport(request);
         fileName = `performance-report-${request.studentId}-${request.termId}.pdf`;
         break;
 
@@ -875,6 +873,101 @@ export class ReportEngineService {
       request.schoolId,
       request.studentId!,
     );
+  }
+
+  private async generatePerformanceReport(request: ReportGenerationRequest) {
+    const [school, term, performance] = await Promise.all([
+      this.prisma.school.findUnique({ where: { id: request.schoolId } }),
+      this.prisma.term.findUnique({ where: { id: request.termId }, include: { academicYear: true } }),
+      this.reportCardEngine.generateReportCardData(request.studentId!, request.termId!, request.schoolId),
+    ]);
+    if (!term) throw new BadRequestException('Term not found');
+
+    const [comparison] = await Promise.all([
+      this.reportCardEngine.getClassComparison(request.studentId!, request.termId!, performance.class.id).catch(() => []),
+    ]);
+    const summary = performance.termSummary || {};
+    const subjects = performance.subjectBreakdown || [];
+    const scoreAverage = summary.overallPercentage ?? (
+      subjects.length > 0
+        ? subjects.reduce((sum: number, subject: any) => sum + (subject.finalPercentage || 0), 0) / subjects.length
+        : 0
+    );
+    const student = performance.student || {};
+    const studentName = `${student.firstName || ''} ${student.lastName || ''}`.trim();
+    const comparisonMap = new Map((comparison || []).map((item: any) => [item.subjectName, item]));
+
+    const subjectRows = subjects.map((subject: any, index: number) => {
+      const score = subject.finalPercentage;
+      const classAverage = comparisonMap.get(subject.subjectName)?.classAverage;
+      const difference = score != null && classAverage != null ? score - classAverage : null;
+      const gradeStyle = this.gradeColor(subject.finalGrade);
+      return `<tr>
+        <td class="text-center">${index + 1}</td>
+        <td>${subject.subjectName || ''}</td>
+        <td class="text-center font-bold" style="color:${this.scoreColor(score)}">${score != null ? `${Number(score).toFixed(1)}%` : '—'}</td>
+        <td class="text-center"><span class="grade-badge" style="color:${gradeStyle.text};background:${gradeStyle.bg}">${subject.finalGrade || '—'}</span></td>
+        <td class="text-center">${classAverage != null ? `${Number(classAverage).toFixed(1)}%` : '—'}</td>
+        <td class="text-center font-semibold" style="color:${difference != null && difference >= 0 ? '#059669' : '#dc2626'}">${difference != null ? `${difference >= 0 ? '+' : ''}${difference.toFixed(1)}%` : '—'}</td>
+      </tr>`;
+    }).join('');
+
+    const performanceBars = subjects.map((subject: any) => {
+      const score = Math.max(0, Math.min(100, Number(subject.finalPercentage) || 0));
+      return `<div style="display:grid;grid-template-columns:150px 1fr 55px;gap:8px;align-items:center;margin:7px 0;font-size:11px;">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${subject.subjectName || ''}</span>
+        <div class="bar-track"><div class="chart-bar" style="width:${score}%;background:${this.scoreColor(score)}"></div></div>
+        <strong style="text-align:right;color:${this.scoreColor(score)}">${score.toFixed(1)}%</strong>
+      </div>`;
+    }).join('');
+
+    const strengths = Array.isArray(summary.strengths) ? summary.strengths : [];
+    const weaknesses = Array.isArray(summary.weaknesses) ? summary.weaknesses : [];
+    const insights = Array.isArray(summary.aiInsights) ? summary.aiInsights : [];
+    const list = (items: string[], color: string, empty: string) => items.length
+      ? `<ul style="margin:6px 0;padding-left:18px;color:${color}">${items.map(item => `<li style="margin:3px 0">${item}</li>`).join('')}</ul>`
+      : `<p style="margin:6px 0;color:#6b7280">${empty}</p>`;
+
+    const content = `
+      ${this.buildMetaBar([
+        { label: 'Student', value: studentName },
+        { label: 'Admission No.', value: student.admissionNumber || '' },
+        { label: 'Class', value: performance.class?.name || '' },
+        { label: 'Term', value: term.name },
+        { label: 'Academic Year', value: term.academicYear?.name || '' },
+      ])}
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-value">${Number(scoreAverage).toFixed(1)}%</div><div class="summary-label">Overall Average</div></div>
+        <div class="summary-card"><div class="summary-value">${summary.classRank ? `#${summary.classRank}` : '—'}</div><div class="summary-label">Class Position${summary.classSize ? ` of ${summary.classSize}` : ''}</div></div>
+        <div class="summary-card"><div class="summary-value">${summary.overallGrade || '—'}</div><div class="summary-label">Overall Grade</div></div>
+        <div class="summary-card"><div class="summary-value">${performance.attendance?.attendanceRate != null ? `${performance.attendance.attendanceRate}%` : '—'}</div><div class="summary-label">Attendance</div></div>
+        <div class="summary-card"><div class="summary-value">${subjects.length}</div><div class="summary-label">Subjects Analysed</div></div>
+      </div>
+      <div class="section-title">Subject Performance vs Class Average</div>
+      <table><thead><tr><th class="text-center">#</th><th>Subject</th><th class="text-center">Student Score</th><th class="text-center">Grade</th><th class="text-center">Class Average</th><th class="text-center">Difference</th></tr></thead><tbody>${subjectRows || '<tr><td colspan="6" class="text-center">No subject performance data available.</td></tr>'}</tbody></table>
+      <div class="section-title">Performance Profile</div>
+      <div style="background:#faf7f4;border:1px solid #e8ddd0;border-radius:8px;padding:12px 16px;">${performanceBars || '<p style="color:#6b7280">No performance data available.</p>'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;">
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;"><div class="section-title" style="margin-top:0;color:#166534;border-color:#bbf7d0">Strengths</div>${list(strengths, '#166534', 'No strengths recorded for this term.')}</div>
+        <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px 16px;"><div class="section-title" style="margin-top:0;color:#9a3412;border-color:#fed7aa">Areas for Improvement</div>${list(weaknesses, '#9a3412', 'No improvement areas recorded for this term.')}</div>
+      </div>
+      <div class="section-title">Performance Insights & Recommendations</div>
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;">${list(insights, '#1e40af', 'Continue consistent study, attendance, and teacher consultation.')}${summary.teacherRemarks ? `<p style="margin-top:10px"><strong>Teacher Remarks:</strong> ${summary.teacherRemarks}</p>` : ''}</div>`;
+
+    const html = this.buildEnhancedReportShell({
+      schoolName: school?.name || 'School',
+      subtitle: `Student Performance Profile — ${term.name} (${term.academicYear?.name || ''})`,
+      title: 'Performance Report',
+      content,
+      orientation: 'portrait',
+    });
+    const buffer = await this.renderHtmlToPdf(html);
+    const result = await this.cloudinary.uploadBuffer(buffer, {
+      folder: `${FOLDERS.system}/reports`,
+      publicId: `performance-${request.studentId}-${request.termId}-${Date.now()}`,
+      resourceType: 'raw',
+    });
+    return { buffer, url: result.secureUrl, publicId: result.publicId };
   }
 
   private async generateCertificate(request: ReportGenerationRequest) {
@@ -1645,37 +1738,6 @@ export class ReportEngineService {
     });
 
     return { buffer, url: result.secureUrl, publicId: result.publicId };
-  }
-
-  private async generatePerformanceReport(request: ReportGenerationRequest) {
-    const engineData = await this.reportCardEngine.generateReportCardData(
-      request.studentId!, request.termId!, request.schoolId,
-    );
-
-    const school = await this.prisma.school.findUnique({ where: { id: request.schoolId } });
-
-    // Get template or use default
-    let templateId = request.templateId;
-    if (!templateId) {
-      const defaultTemplate = await this.prisma.reportTemplate.findFirst({
-        where: { schoolId: request.schoolId, isDefault: true },
-      });
-      templateId = defaultTemplate?.id;
-    }
-
-    if (templateId) {
-      const html = await this.templateRenderer.renderPreview(
-        request.schoolId,
-        templateId,
-        this.buildTemplateRenderData(engineData, school),
-      );
-      return this.templateRenderer.renderPdfFromHtml(request.schoolId, templateId, html);
-    }
-
-    // Fallback to curriculum report card
-    return this.reportCardService.generateCurriculumReportCardPdf(
-      request.schoolId, request.studentId!, request.termId!,
-    );
   }
 
   private async renderHtmlToPdf(html: string): Promise<Buffer> {

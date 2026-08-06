@@ -1147,11 +1147,14 @@ export class TemplateRendererService {
     };
 
     const borderCss = borderMap[borderStyle] || borderMap.classic;
+    const sealImage = this.certificateRenderer.getSmartTechSealDataUrl();
+    const fallbackSeal = this.certificateRenderer.generateSealSvg('#0f766e', 'SMART TECH');
 
     const s = data?.student || {};
     const studentName = `${s.firstName || ''} ${s.lastName || ''}`;
 
-    return `<div style="position:relative;width:100%;min-height:${isLandscape ? '190' : '260'}mm;padding:30px;border:${borderCss};display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:white;">
+    return `<div style="position:relative;width:100%;min-height:${isLandscape ? '190' : '260'}mm;padding:30px;border:${borderCss};display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:white;overflow:hidden;">
+       <div style="position:absolute;right:40px;bottom:35px;width:70px;height:70px;z-index:1;overflow:hidden;">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal" style="display:block;width:70px;height:70px;max-width:70px;max-height:70px;object-fit:contain;" />` : `<div style="width:70px;height:70px;">${fallbackSeal}</div>`}</div>
       ${cert.showWatermark && cert.watermarkText ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)rotate(-30deg);font-size:80px;color:${borderColor};opacity:0.04;pointer-events:none;white-space:nowrap;font-weight:bold;">${cert.watermarkText}</div>` : ''}
       ${school?.logoUrl ? `<img src="${school.logoUrl}" style="height:60px;margin-bottom:10px;" />` : ''}
        <div style="font-size:34px;font-weight:800;color:${borderColor};margin-bottom:7px;">${school?.name || 'School Name'}</div>
