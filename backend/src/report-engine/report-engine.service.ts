@@ -1792,18 +1792,34 @@ export class ReportEngineService {
   }
 
   private async generateResultsAnalysisReport(request: ReportGenerationRequest) {
-    const [school, term, classInfo, sheet] = await Promise.all([
+    const [school, term, classInfo, sheets] = await Promise.all([
       this.prisma.school.findUnique({ where: { id: request.schoolId }, select: { name: true } }),
       this.prisma.term.findUnique({ where: { id: request.termId }, include: { academicYear: true } }),
       this.prisma.class.findUnique({ where: { id: request.classId }, select: { name: true } }),
-      this.prisma.resultSheet.findFirst({
-        where: { classId: request.classId, termId: request.termId, schoolId: request.schoolId, ...(request.examType ? { examType: request.examType } : {}) },
+      this.prisma.resultSheet.findMany({
+        where: { classId: request.classId, termId: request.termId, schoolId: request.schoolId },
         orderBy: { updatedAt: 'desc' },
         select: { id: true, examType: true },
       }),
     ]);
     if (!term) throw new BadRequestException('Term not found');
-    if (!sheet) throw new BadRequestException('No result sheet found for this class and term');
+
+    const requestedExamType = request.examType || 'END_TERM';
+    let sheet = sheets.find((candidate) => candidate.examType === requestedExamType) || sheets[0];
+    if (!sheet) {
+      if (!classInfo) throw new BadRequestException('Class not found');
+      sheet = await this.prisma.resultSheet.create({
+        data: {
+          schoolId: request.schoolId,
+          classId: request.classId!,
+          termId: request.termId!,
+          academicYearId: term.academicYearId,
+          examType: requestedExamType,
+          createdBy: request.options?.userId || 'SYSTEM',
+        },
+        select: { id: true, examType: true },
+      });
+    }
 
     const analysis: any = await this.resultsManagement.getAnalysis(sheet.id);
     const profile = analysis.gradingProfile;
@@ -2008,16 +2024,16 @@ export class ReportEngineService {
     return `
       @page { margin: 15mm; size: A4 ${orientation}; }
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif; color: #1f2937; background: white; padding: 24px; line-height: 1.4; }
+       body { font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif; font-size: 12px; color: #1f2937; background: white; padding: 24px; line-height: 1.4; }
        .report-header { text-align: center; margin-bottom: 24px; padding: 20px 24px; background: linear-gradient(135deg, #123b5d 0%, #0f766e 52%, #2563eb 100%); border-radius: 12px; color: white; box-shadow: 0 8px 20px rgba(15,118,110,0.16); }
       .school-name { font-size: 22px; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
        .school-sub { font-size: 12px; color: #dbeafe; margin-top: 4px; }
       .report-title { font-size: 16px; font-weight: 600; color: white; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.95; }
        .report-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; font-size: 13px; color: #334155; background: #f0fdfa; padding: 12px 16px; border-radius: 8px; border: 1px solid #99f6e4; }
        .report-meta strong { color: #115e59; }
-      table { width: 100%; border-collapse: collapse; font-size: 11px; }
-       th { background: #123b5d; color: white; padding: 9px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; border: 1px solid #1e4d70; }
-      td { padding: 6px 10px; border: 1px solid #e5e7eb; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { background: #123b5d; color: white; padding: 9px 10px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; border: 1px solid #1e4d70; }
+       td { padding: 6px 10px; border: 1px solid #e5e7eb; font-size: 12px; }
        tr:nth-child(even) { background: #f8fafc; }
       .text-center { text-align: center; }
       .text-right { text-align: right; }
@@ -2029,12 +2045,12 @@ export class ReportEngineService {
       .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
        .summary-card { background: linear-gradient(180deg, #ffffff, #f0fdfa); border: 1px solid #cbd5e1; border-top: 3px solid #0f766e; border-radius: 10px; padding: 14px 16px; text-align: center; box-shadow: 0 2px 7px rgba(15,23,42,0.05); }
        .summary-value { font-size: 24px; font-weight: 700; color: #123b5d; }
-      .summary-label { font-size: 11px; color: #6b7280; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
-      .grade-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+       .summary-label { font-size: 12px; color: #6b7280; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+       .grade-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 700; }
       .signatures { margin-top: 40px; display: flex; justify-content: space-between; }
       .sig { text-align: center; flex: 1; }
-      .sig-line { width: 180px; border-top: 1px solid #1f2937; margin: 40px auto 0; padding-top: 6px; font-size: 11px; color: #6b7280; }
-      .footer { text-align: center; margin-top: 20px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #9ca3af; }
+       .sig-line { width: 180px; border-top: 1px solid #1f2937; margin: 40px auto 0; padding-top: 6px; font-size: 12px; color: #6b7280; }
+       .footer { text-align: center; margin-top: 20px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; }
        .section-title { font-size: 14px; font-weight: 700; color: #123b5d; margin: 22px 0 12px; padding: 0 0 7px 10px; border-bottom: 2px solid #99f6e4; border-left: 4px solid #0f766e; }
       .chart-bar { height: 18px; border-radius: 4px; }
       .bar-track { background: #f3f4f6; border-radius: 4px; height: 18px; overflow: hidden; }
