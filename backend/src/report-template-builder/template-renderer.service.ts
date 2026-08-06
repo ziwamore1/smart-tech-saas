@@ -948,29 +948,43 @@ export class TemplateRendererService {
     };
 
     const templateMetadata = (template.metadata as any) || {};
-    const isProfessionalHbs = !template.certificate && (
+    const fallbackCertificate = template.templateType === 'CERTIFICATE' && !template.certificate
+      ? {
+          certificateType: /service|staff|teacher|leadership|merit|award/i.test(template.name) ? 'MERIT_AWARD' : 'ACADEMIC_EXCELLENCE',
+          borderStyle: 'classic',
+          borderColor: template.primaryColor || '#1a365d',
+          showQrCode: true,
+          showBadge: true,
+          badgeStyle: 'star',
+          awardText: template.components?.find((component: any) => component.type === 'AWARD_TEXT')?.content?.text || 'This certificate is awarded to',
+          signature1Label: 'Head Teacher',
+          signature2Label: 'Director',
+        }
+      : null;
+    const renderTemplate = fallbackCertificate ? { ...template, certificate: fallbackCertificate } : template;
+    const isProfessionalHbs = !renderTemplate.certificate && (
       templateMetadata.enhancedProfessional ||
       templateMetadata.professionalHbs ||
       templateMetadata.source === 'system-seed' ||
       templateMetadata.source === 'marketplace-download'
     );
     if (isProfessionalHbs) {
-      return this.renderProfessionalHbsPreview(template, defaultData, school);
+      return this.renderProfessionalHbsPreview(renderTemplate, defaultData, school);
     }
 
-    const pageSize = template.pageSize || 'A4';
-    const orientation = template.orientation || 'portrait';
-    const pageMargins = template.certificate
+    const pageSize = renderTemplate.pageSize || 'A4';
+    const orientation = renderTemplate.orientation || 'portrait';
+    const pageMargins = renderTemplate.certificate
       ? '0'
-      : `${template.marginTop || 15}mm ${template.marginRight || 15}mm ${template.marginBottom || 15}mm ${template.marginLeft || 15}mm`;
+      : `${renderTemplate.marginTop || 15}mm ${renderTemplate.marginRight || 15}mm ${renderTemplate.marginBottom || 15}mm ${renderTemplate.marginLeft || 15}mm`;
     const isLandscape = orientation === 'landscape';
-    const marginLeftMm = template.certificate ? 0 : (template.marginLeft ?? 15);
-    const marginRightMm = template.certificate ? 0 : (template.marginRight ?? 15);
+    const marginLeftMm = renderTemplate.certificate ? 0 : (renderTemplate.marginLeft ?? 15);
+    const marginRightMm = renderTemplate.certificate ? 0 : (renderTemplate.marginRight ?? 15);
     const pageWidthPx = Math.round(((isLandscape ? 297 : 210) - marginLeftMm - marginRightMm) * 96 / 25.4);
 
-    const isEnhancedTemplate = Boolean((template.metadata as any)?.enhancedProfessional);
+    const isEnhancedTemplate = Boolean((renderTemplate.metadata as any)?.enhancedProfessional);
     const componentsHtml = this.renderComponentsToHtml(
-      template.components,
+      renderTemplate.components,
       defaultData,
       school,
       pageWidthPx,
@@ -980,10 +994,10 @@ export class TemplateRendererService {
     let stampOverlay = '';
     let mainContent: string;
 
-    if (template.certificate) {
+    if (renderTemplate.certificate) {
       try {
         const templateStamps = await this.digitalStampService.getTemplateStamps(schoolId, templateId).catch(() => []);
-        const cert = template.certificate;
+        const cert = renderTemplate.certificate;
         mainContent = await this.certificateRenderer.generateCertificateHtml({}, {
           schoolName: school?.name || '',
           studentName: `${defaultData.student.firstName} ${defaultData.student.lastName}`,
@@ -1012,7 +1026,7 @@ export class TemplateRendererService {
            stamps: templateStamps,
         });
       } catch {
-        mainContent = this.renderCertificateHtml(template, defaultData, school);
+        mainContent = this.renderCertificateHtml(renderTemplate, defaultData, school);
         try {
           const templateStamps = await this.digitalStampService.getTemplateStamps(schoolId, templateId);
           if (templateStamps && templateStamps.length > 0) {
@@ -1040,21 +1054,21 @@ export class TemplateRendererService {
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>${template.name}</title>
+  <title>${renderTemplate.name}</title>
   <style>
      @page { size: ${pageSize} ${orientation}; margin: ${pageMargins}; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-     body { font-family: ${template.fontFamily || 'Arial'}, sans-serif; font-size: ${template.fontSize || 12}px; color: #111827; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow-x: hidden; }
+     body { font-family: ${renderTemplate.fontFamily || 'Arial'}, sans-serif; font-size: ${renderTemplate.fontSize || 12}px; color: #111827; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow-x: hidden; }
     img { max-width: 100%; }
     table { page-break-inside: avoid; }
     @media print { body { margin: 0; padding: 0; } }
   </style>
 </head>
 <body>
-  ${template.headerText ? `<div style="text-align:center;margin-bottom:10px;font-size:12px;color:#374151;border-bottom:1px solid #9ca3af;padding-bottom:5px;">${template.headerText}</div>` : ''}
+  ${renderTemplate.headerText ? `<div style="text-align:center;margin-bottom:10px;font-size:12px;color:#374151;border-bottom:1px solid #9ca3af;padding-bottom:5px;">${renderTemplate.headerText}</div>` : ''}
   ${mainContent}
   ${stampOverlay ? `<div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">${stampOverlay}</div>` : ''}
-  ${template.footerText ? `<div style="text-align:center;margin-top:10px;font-size:11px;color:#4b5563;border-top:1px solid #9ca3af;padding-top:5px;">${template.footerText}</div>` : ''}
+  ${renderTemplate.footerText ? `<div style="text-align:center;margin-top:10px;font-size:11px;color:#4b5563;border-top:1px solid #9ca3af;padding-top:5px;">${renderTemplate.footerText}</div>` : ''}
 </body>
 </html>`;
   }

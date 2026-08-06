@@ -122,7 +122,18 @@ function getCertTitle(certType: string): string {
 }
 
 function CertificatePreviewContent({ template }: { template: Template }) {
-  const cert = template.certificate || {};
+  const isAward = /service|staff|teacher|leadership|merit|award/i.test(template.name);
+  const cert = template.certificate || {
+    certificateType: isAward ? 'MERIT_AWARD' : 'ACADEMIC_EXCELLENCE',
+    borderStyle: 'classic',
+    borderColor: template.primaryColor || '#1a365d',
+    showQrCode: true,
+    showBadge: true,
+    badgeStyle: 'star',
+    awardText: template.components?.find(component => component.type === 'AWARD_TEXT')?.content?.text || 'This certificate is awarded to',
+    signature1Label: 'Head Teacher',
+    signature2Label: 'Director',
+  };
   const color = cert.borderColor || template.primaryColor || '#1a365d';
   const borderCss = getBorderCss(cert.borderStyle || 'classic', color);
   const isLandscape = template.orientation === 'landscape';
@@ -468,7 +479,7 @@ export default function TemplateDetailPage() {
             borderRadius: '8px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
             border: '1px solid #e5e7eb', padding: '18px', position: 'relative', overflow: 'hidden',
           }}>
-            {template.certificate ? (
+            {template.certificate || template.templateType === 'CERTIFICATE' ? (
               <CertificatePreviewContent template={template} />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minHeight: template.orientation === 'landscape' ? '460px' : '660px' }}>
