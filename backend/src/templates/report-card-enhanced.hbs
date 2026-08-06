@@ -133,7 +133,7 @@ tr:nth-child(even) { background: {{secondaryColor}}; }
 <div class="header">
 {{#if schoolLogo}}<div style="margin-bottom:6px"><img src="{{schoolLogo}}" height="45" style="max-width:110px"/></div>{{/if}}
 <div class="school-name">{{schoolName}}</div>
-<div class="report-title">Student Report Card</div>
+<div class="report-title">{{#if reportTitle}}{{reportTitle}}{{else}}STUDENT REPORT CARD{{/if}}</div>
 <div class="term-info">{{class.name}} | {{academicYear}} — {{termName}}</div>
 {{#if headerText}}<div class="header-text">{{headerText}}</div>{{/if}}
 </div>
@@ -198,6 +198,42 @@ tr:nth-child(even) { background: {{secondaryColor}}; }
 <div style="margin-top: 4px; font-size: 10px; color: #92400e; font-style: italic;">Lower aggregate = stronger university admission</div>
 </div>
 </div>
+
+{{#if isAssessmentVariant}}
+<div class="analysis-box avoid-break" style="border-color:{{primaryColor}};background:{{secondaryColor}};">
+<div class="analysis-title" style="color:{{primaryColor}}">Assessment Components & Learning Outcomes</div>
+<div class="analysis-text">This assessment-focused report combines continuous evaluation, subject mastery, attendance, and teacher recommendations for targeted learner support.</div>
+</div>
+{{/if}}
+{{#if isSelectionVariant}}
+<div class="analysis-box avoid-break" style="border-color:{{primaryColor}};background:{{secondaryColor}};">
+<div class="analysis-title" style="color:{{primaryColor}}">Selection & Placement Readiness</div>
+<div class="analysis-text">The learner's academic profile, class position, best-subject aggregate, and attendance are presented for secondary-school selection decisions.</div>
+</div>
+{{/if}}
+{{#if isExaminationVariant}}
+<div class="analysis-box avoid-break" style="border-color:{{primaryColor}};background:{{secondaryColor}};">
+<div class="analysis-title" style="color:{{primaryColor}}">Examination Readiness</div>
+<div class="analysis-text">Use this examination report to review subject strengths, priority areas, grade distribution, and readiness for the next assessment milestone.</div>
+</div>
+{{/if}}
+{{#if isAdvancedVariant}}
+<div class="analysis-box avoid-break" style="border-color:{{primaryColor}};background:{{secondaryColor}};">
+<div class="analysis-title" style="color:{{primaryColor}}">Advanced Secondary University Readiness</div>
+<div class="analysis-text">The best-subject aggregate, performance trends, and class standing provide an advanced-secondary view of university preparation.</div>
+</div>
+{{/if}}
+{{#if isTranscriptVariant}}
+<div class="analysis-box avoid-break" style="border-color:{{primaryColor}};background:{{secondaryColor}};">
+<div class="analysis-title" style="color:{{primaryColor}}">Academic Record Verification</div>
+<div class="analysis-text">This verified academic record preserves the learner's subject results, grading profile, attendance, and institutional remarks for official reference.</div>
+</div>
+{{/if}}
+{{#if isForm1Variant}}<div class="analysis-box avoid-break" style="border-color:{{primaryColor}};background:{{secondaryColor}};"><div class="analysis-title" style="color:{{primaryColor}}">Foundation Skills Profile</div><div class="analysis-text">Form 1 results establish the learner's foundation across core subjects and identify support priorities for the secondary phase.</div></div>{{/if}}
+{{#if isForm2Variant}}<div class="analysis-box avoid-break" style="border-color:{{primaryColor}};background:{{secondaryColor}};"><div class="analysis-title" style="color:{{primaryColor}}">Progression & Mastery Review</div><div class="analysis-text">Form 2 results track progression from foundational learning toward stronger subject mastery and independent study habits.</div></div>{{/if}}
+{{#if isGrade10Variant}}<div class="analysis-box avoid-break" style="border-color:{{primaryColor}};background:{{secondaryColor}};"><div class="analysis-title" style="color:{{primaryColor}}">Career Pathway Snapshot</div><div class="analysis-text">Grade 10 performance highlights subject strengths that can guide senior-secondary choices and future career pathways.</div></div>{{/if}}
+{{#if isGrade11Variant}}<div class="analysis-box avoid-break" style="border-color:{{primaryColor}};background:{{secondaryColor}};"><div class="analysis-title" style="color:{{primaryColor}}">University Preparation Snapshot</div><div class="analysis-text">Grade 11 results provide an early university-preparation view through subject performance, aggregate points, and attendance.</div></div>{{/if}}
+{{#if isGrade12Variant}}<div class="analysis-box avoid-break" style="border-color:{{primaryColor}};background:{{secondaryColor}};"><div class="analysis-title" style="color:{{primaryColor}}">Graduation & University Readiness</div><div class="analysis-text">Grade 12 performance summarizes final academic readiness, eligibility indicators, and areas requiring attention before graduation.</div></div>{{/if}}
 
 <!-- Subject Results Table -->
 <div class="section avoid-break">

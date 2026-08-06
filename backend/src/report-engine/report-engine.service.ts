@@ -649,11 +649,19 @@ export class ReportEngineService {
     }
 
     request.templateId = template.id;
-    if ((template.metadata as any)?.enhancedProfessional) {
+    const templateMetadata = (template.metadata as any) || {};
+    const professionalHbs = Boolean(
+      templateMetadata.enhancedProfessional ||
+      templateMetadata.professionalHbs ||
+      templateMetadata.source === 'system-seed' ||
+      templateMetadata.source === 'marketplace-download',
+    );
+    if (professionalHbs) {
       const enhanced = await this.reportCardService.generateEnhancedReportCardHtml(
         schoolId,
         studentId,
         termId,
+        template.id,
       );
       return { html: enhanced.html, templateId: template.id, engineData: enhanced.data };
     }

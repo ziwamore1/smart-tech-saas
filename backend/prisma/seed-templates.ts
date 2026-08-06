@@ -267,7 +267,12 @@ async function main() {
         marginBottom: 15,
         marginLeft: 15,
         marginRight: 15,
-        metadata: { source: 'system-seed', educationLevel: tpl.categorySlug },
+        metadata: {
+          source: 'system-seed',
+          educationLevel: tpl.categorySlug,
+          professionalHbs: tpl.templateType === 'REPORT_CARD' || tpl.templateType === 'PROGRESS_REPORT',
+          hbsVariant: tpl.slug,
+        },
       },
     });
 

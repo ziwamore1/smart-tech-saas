@@ -136,6 +136,18 @@ export class TemplateRendererService {
       if (!str) return '';
       return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
     });
+
+    handlebars.registerHelper('math', (lhs: any, operator: string, rhs: any) => {
+      const a = parseFloat(lhs) || 0;
+      const b = parseFloat(rhs) || 0;
+      if (operator === '+') return a + b;
+      if (operator === '-') return a - b;
+      return 0;
+    });
+    handlebars.registerHelper('gte', (a: any, b: any) => parseFloat(a) >= parseFloat(b));
+    handlebars.registerHelper('lt', (a: any, b: any) => parseFloat(a) < parseFloat(b));
+    handlebars.registerHelper('minus', (a: any, b: any) => Math.abs(parseFloat(a) - parseFloat(b)).toFixed(1));
+    handlebars.registerHelper('present', (value: any) => value != null && value !== '');
   }
 
   private generateSvgBarChart(data: { labels: string[]; values: number[]; title?: string; color?: string; height?: number; width?: number }): string {
@@ -935,6 +947,17 @@ export class TemplateRendererService {
       headComment: 'Keep up the good work.',
     };
 
+    const templateMetadata = (template.metadata as any) || {};
+    const isProfessionalHbs = !template.certificate && (
+      templateMetadata.enhancedProfessional ||
+      templateMetadata.professionalHbs ||
+      templateMetadata.source === 'system-seed' ||
+      templateMetadata.source === 'marketplace-download'
+    );
+    if (isProfessionalHbs) {
+      return this.renderProfessionalHbsPreview(template, defaultData, school);
+    }
+
     const pageSize = template.pageSize || 'A4';
     const orientation = template.orientation || 'portrait';
     const pageMargins = template.certificate
@@ -1034,6 +1057,65 @@ export class TemplateRendererService {
   ${template.footerText ? `<div style="text-align:center;margin-top:10px;font-size:11px;color:#4b5563;border-top:1px solid #9ca3af;padding-top:5px;">${template.footerText}</div>` : ''}
 </body>
 </html>`;
+  }
+
+  private renderProfessionalHbsPreview(template: any, data: any, school?: any): string {
+    const variant = String(template.metadata?.hbsVariant || template.name || 'secondary-report')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const subjects = data.subjectBreakdown || (data.subjects || []).map((subject: any) => ({
+      subjectName: subject.subject || subject.name,
+      totalRawScore: subject.score,
+      finalPercentage: subject.score,
+      finalGrade: subject.grade,
+      points: subject.points,
+      finalRemark: subject.remark,
+      subjectRank: null,
+      performanceCategory: null,
+    }));
+    const summary = data.termSummary || data.summary || {};
+    const reportTitle = variant.includes('assessment')
+      ? (variant.includes('term') ? 'TERM ASSESSMENT SUMMARY' : 'CONTINUOUS ASSESSMENT REPORT')
+      : variant.includes('selection') ? 'GRADE 7 SELECTION REPORT'
+      : variant.includes('mock') ? 'GRADE 7 MOCK EXAMINATION REPORT'
+      : variant.includes('ecz') ? 'GRADE 7 ECZ EXAMINATION REPORT'
+      : variant.includes('transcript') ? (variant.includes('abridged') ? 'ABRIDGED ACADEMIC TRANSCRIPT' : 'OFFICIAL ACADEMIC TRANSCRIPT')
+      : variant.includes('form-5') || variant.includes('form-6') ? 'ADVANCED SECONDARY REPORT CARD'
+      : variant.includes('form-1') ? 'FORM 1 ACADEMIC REPORT CARD'
+      : variant.includes('form-2') ? 'FORM 2 ACADEMIC REPORT CARD'
+      : variant.includes('grade-10') ? 'GRADE 10 ACADEMIC REPORT CARD'
+      : variant.includes('grade-11') ? 'GRADE 11 ACADEMIC REPORT CARD'
+      : variant.includes('grade-12') ? 'GRADE 12 ACADEMIC REPORT CARD'
+      : variant.includes('grade-1-6') ? 'GRADE 1-6 CONTINUOUS ASSESSMENT REPORT'
+      : 'STUDENT REPORT CARD';
+    const professionalData = {
+      ...data,
+      schoolName: school?.name || data.schoolName || '',
+      schoolLogo: school?.logoUrl || school?.logo || data.schoolLogo,
+      subjectBreakdown: subjects,
+      bestSubjects: data.bestSubjects || subjects.filter((s: any) => s.finalPercentage != null).slice(0, 6),
+      totalPoints: data.totalPoints ?? summary.totalPoints ?? 0,
+      bestSubjectsAverage: data.bestSubjectsAverage ?? summary.average ?? null,
+      termSummary: summary,
+      attendance: data.attendance || { totalDays: 0, presentDays: 0, attendanceRate: null },
+      gradingLegend: data.gradingLegend || [],
+      primaryColor: template.primaryColor || '#1e3a8a',
+      secondaryColor: template.secondaryColor || '#eff6ff',
+      reportTitle,
+      templateVariant: variant,
+      isAssessmentVariant: variant.includes('assessment'),
+      isSelectionVariant: variant.includes('selection'),
+      isAdvancedVariant: ['form-5-report', 'form-6-report'].includes(variant),
+      isExaminationVariant: ['grade-7-ecz', 'grade-7-mock'].includes(variant),
+      isTranscriptVariant: variant.includes('transcript'),
+      isForm1Variant: variant.includes('form-1'),
+      isForm2Variant: variant.includes('form-2'),
+      isGrade10Variant: variant.includes('grade-10'),
+      isGrade11Variant: variant.includes('grade-11'),
+      isGrade12Variant: variant.includes('grade-12'),
+      generatedAtFormatted: new Date().toLocaleString(),
+    };
+    const templatePath = path.join(process.cwd(), 'src', 'templates', 'report-card-enhanced.hbs');
+    return handlebars.compile(fs.readFileSync(templatePath, 'utf8'))(professionalData);
   }
 
   private renderCertificateHtml(template: any, data: any, school?: any): string {

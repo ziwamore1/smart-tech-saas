@@ -940,14 +940,17 @@ export class ReportCardService {
     schoolId: string,
     studentId: string,
     termId: string,
+    templateId?: string,
   ): Promise<{ html: string; data: any }> {
     const engineData = await this.reportCardEngineService.generateReportCardData(studentId, termId, schoolId);
     const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
     if (!school) throw new Error('School not found');
 
-    const reportTemplate = await this.prisma.reportTemplate.findFirst({
-      where: { schoolId, isDefault: true },
-    }) || await this.prisma.reportTemplate.findFirst({ where: { schoolId } });
+    const reportTemplate = (templateId
+      ? await this.prisma.reportTemplate.findFirst({ where: { id: templateId, schoolId } })
+      : null) || await this.prisma.reportTemplate.findFirst({
+        where: { schoolId, isDefault: true },
+      }) || await this.prisma.reportTemplate.findFirst({ where: { schoolId } });
     const templatePath = path.join(process.cwd(), 'src', 'templates', 'report-card-enhanced.hbs');
     const templateHtml = fs.readFileSync(templatePath, 'utf8');
     const commentData = await this.analyticsService.generateStudentComment(schoolId, studentId, termId);
@@ -989,6 +992,18 @@ export class ReportCardService {
       headerText: reportTemplate?.headerText || '',
       footerText: reportTemplate?.footerText || '',
       showRemarks: reportTemplate?.remarksEnabled !== false,
+      reportTitle: this.getProfessionalReportTitle(reportTemplate),
+      templateVariant: this.getProfessionalReportVariant(reportTemplate),
+      isAssessmentVariant: this.getProfessionalReportVariant(reportTemplate).includes('assessment'),
+      isSelectionVariant: this.getProfessionalReportVariant(reportTemplate).includes('selection'),
+      isAdvancedVariant: ['form-5-report', 'form-6-report'].includes(this.getProfessionalReportVariant(reportTemplate)),
+      isExaminationVariant: ['grade-7-ecz', 'grade-7-mock'].includes(this.getProfessionalReportVariant(reportTemplate)),
+      isTranscriptVariant: this.getProfessionalReportVariant(reportTemplate).includes('transcript'),
+      isForm1Variant: this.getProfessionalReportVariant(reportTemplate).includes('form-1'),
+      isForm2Variant: this.getProfessionalReportVariant(reportTemplate).includes('form-2'),
+      isGrade10Variant: this.getProfessionalReportVariant(reportTemplate).includes('grade-10'),
+      isGrade11Variant: this.getProfessionalReportVariant(reportTemplate).includes('grade-11'),
+      isGrade12Variant: this.getProfessionalReportVariant(reportTemplate).includes('grade-12'),
       generatedAt: engineData.generatedAt,
       generatedAtFormatted,
       classAverage: classStats?.classAverage ?? null,
@@ -1007,6 +1022,30 @@ export class ReportCardService {
     };
 
     return { html: handlebars.compile(templateHtml)(templateData), data: engineData };
+  }
+
+  private getProfessionalReportVariant(template: any): string {
+    return String(template?.metadata?.hbsVariant || template?.name || 'secondary-report')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+  }
+
+  private getProfessionalReportTitle(template: any): string {
+    const variant = this.getProfessionalReportVariant(template);
+    if (variant.includes('assessment')) return variant.includes('term') ? 'TERM ASSESSMENT SUMMARY' : 'CONTINUOUS ASSESSMENT REPORT';
+    if (variant.includes('selection')) return 'GRADE 7 SELECTION REPORT';
+    if (variant.includes('mock')) return 'GRADE 7 MOCK EXAMINATION REPORT';
+    if (variant.includes('ecz')) return 'GRADE 7 ECZ EXAMINATION REPORT';
+    if (variant.includes('transcript')) return variant.includes('abridged') ? 'ABRIDGED ACADEMIC TRANSCRIPT' : 'OFFICIAL ACADEMIC TRANSCRIPT';
+    if (variant.includes('form-5') || variant.includes('form-6')) return 'ADVANCED SECONDARY REPORT CARD';
+    if (variant.includes('form-1')) return 'FORM 1 ACADEMIC REPORT CARD';
+    if (variant.includes('form-2')) return 'FORM 2 ACADEMIC REPORT CARD';
+    if (variant.includes('grade-10')) return 'GRADE 10 ACADEMIC REPORT CARD';
+    if (variant.includes('grade-11')) return 'GRADE 11 ACADEMIC REPORT CARD';
+    if (variant.includes('grade-12')) return 'GRADE 12 ACADEMIC REPORT CARD';
+    if (variant.includes('grade-1-6')) return 'GRADE 1-6 CONTINUOUS ASSESSMENT REPORT';
+    return 'STUDENT REPORT CARD';
   }
 
   async generateClassCurriculumReportCardsPdf(

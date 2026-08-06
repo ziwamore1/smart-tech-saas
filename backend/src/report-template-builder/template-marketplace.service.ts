@@ -34,6 +34,26 @@ export class TemplateMarketplaceService {
     });
     if (systemTemplates.length === 0) return;
 
+    // Backfill the professional HBS contract for templates seeded before the
+    // marketplace renderer was introduced. Rendering uses this metadata to
+    // select a template variant instead of the old canvas component layout.
+    for (const template of systemTemplates) {
+      if (!['REPORT_CARD', 'PROGRESS_REPORT', 'TRANSCRIPT'].includes(template.templateType)) continue;
+      const metadata = (template.metadata as any) || {};
+      if (metadata.professionalHbs && metadata.hbsVariant) continue;
+      await this.prisma.reportTemplate.update({
+        where: { id: template.id },
+        data: {
+          metadata: {
+            ...metadata,
+            source: metadata.source || 'system-seed',
+            professionalHbs: true,
+            hbsVariant: template.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+          },
+        },
+      });
+    }
+
     const published = await this.prisma.templateMarketplace.findMany({
       where: { templateId: { in: systemTemplates.map((template) => template.id) } },
       select: { templateId: true },
@@ -109,7 +129,12 @@ export class TemplateMarketplaceService {
         primaryColor: template.primaryColor || '#1a365d',
         secondaryColor: template.secondaryColor || '#f5f5f5',
          layoutJson: {},
-         metadata: { source: 'marketplace-download', sourceTemplateId: template.id },
+          metadata: {
+            ...(template.metadata as any || {}),
+            source: 'marketplace-download',
+            sourceTemplateId: template.id,
+            professionalHbs: template.templateType === 'REPORT_CARD' || template.templateType === 'PROGRESS_REPORT',
+          },
          status: 'PUBLISHED',
         version: 1,
       },
