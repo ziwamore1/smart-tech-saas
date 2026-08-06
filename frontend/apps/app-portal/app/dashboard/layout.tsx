@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { schoolApi } from '@/lib/api';
 import '../dashboard-fix.css';
+import { PresentationMode } from '@/components/presentation-mode';
 
 type NavItem = {
   name: string;
@@ -1377,6 +1378,8 @@ export default function DashboardLayout({
           </div>
         </main>
       </div>
+
+      <PresentationMode />
 
       <style>{`
         @media (max-width: 768px) {
