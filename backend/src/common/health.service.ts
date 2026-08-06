@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MinistryAdapterFactory } from '../ministry-gateway/adapters/adapter-factory';
 import { BlockchainService } from '../blockchain-service/blockchain.service';
 import { Pool } from 'pg';
+import { normalizeZambianPhone } from './utils/phone.util';
 
 export interface HealthCheckResult {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -80,6 +81,39 @@ export class HealthService {
       uptime: Math.floor((Date.now() - this.startTime) / 1000),
       version: this.version,
       checks,
+    };
+  }
+
+  async backfillPhoneNumbers() {
+    const startedAt = Date.now();
+    const results: Record<string, { scanned: number; updated: number }> = {};
+    const models = ['user', 'parent', 'school', 'systemUser'];
+
+    for (const modelName of models) {
+      const model = (this.prisma as any)[modelName];
+      const rows = await model.findMany({
+        where: { phone: { not: null } },
+        select: { id: true, phone: true },
+      });
+      let updated = 0;
+      for (const row of rows) {
+        const normalized = normalizeZambianPhone(row.phone);
+        if (normalized && normalized !== row.phone) {
+          await model.update({ where: { id: row.id }, data: { phone: normalized } });
+          updated++;
+        }
+      }
+      results[modelName] = { scanned: rows.length, updated };
+    }
+
+    return {
+      status: 'ok',
+      operation: 'backfill-phone-numbers',
+      format: '+260XXXXXXXXX',
+      idempotent: true,
+      latencyMs: Date.now() - startedAt,
+      results,
+      totalUpdated: Object.values(results).reduce((sum, value) => sum + value.updated, 0),
     };
   }
 

@@ -25,6 +25,11 @@ export class HealthController {
     return this.healthService.backfillMarketplaceTemplates();
   }
 
+  @Get('backfill:phone-numbers')
+  async backfillPhoneNumbers() {
+    return this.healthService.backfillPhoneNumbers();
+  }
+
   @Get('prisma-test')
   async prismaTest() {
     const start = Date.now();

@@ -22,6 +22,7 @@ export enum ReportType {
   ANALYTICS_SUMMARY = 'ANALYTICS_SUMMARY',
   MARK_SCHEDULE = 'MARK_SCHEDULE',
   PERFORMANCE_REPORT = 'PERFORMANCE_REPORT',
+  RANKING_REPORT = 'RANKING_REPORT',
 }
 
 export interface ReportGenerationRequest {
@@ -121,6 +122,14 @@ const REPORT_TYPE_CONFIG: Record<ReportType, {
     requiredFields: ['studentId', 'termId'],
     optionalFields: [],
     supportsBulk: false,
+  },
+  [ReportType.RANKING_REPORT]: {
+    label: 'Class Ranking Report',
+    description: 'Ranked student performance with score bands and class distribution',
+    icon: '🏆',
+    requiredFields: ['classId', 'termId'],
+    optionalFields: [],
+    supportsBulk: true,
   },
 };
 
@@ -329,6 +338,11 @@ export class ReportEngineService {
         fileName = `performance-report-${request.studentId}-${request.termId}.pdf`;
         break;
 
+      case ReportType.RANKING_REPORT:
+        result = await this.generateRankingReport(request);
+        fileName = `ranking-report-${request.classId}-${request.termId}.pdf`;
+        break;
+
       default:
         throw new BadRequestException(`Unsupported report type: ${request.type}`);
     }
@@ -429,7 +443,8 @@ export class ReportEngineService {
     if (
       request.type === ReportType.ATTENDANCE_REPORT ||
       request.type === ReportType.ANALYTICS_SUMMARY ||
-      request.type === ReportType.MARK_SCHEDULE
+      request.type === ReportType.MARK_SCHEDULE ||
+      request.type === ReportType.RANKING_REPORT
     ) {
       // These types generate a single report per class/school
       try {
@@ -1687,6 +1702,10 @@ export class ReportEngineService {
     const classAvg = allScores.length > 0 ? (allScores.reduce((a, b) => a + b, 0) / allScores.length).toFixed(1) : '0';
     const passRate = allScores.length > 0 ? (allScores.filter(p => p >= 50).length / allScores.length * 100).toFixed(1) : '0';
     const topScore = allScores.length > 0 ? Math.max(...allScores).toFixed(1) : '0';
+    const expectedMarks = enrollments.length * classSubjects.length;
+    const completionRate = expectedMarks > 0 ? (allScores.length / expectedMarks * 100).toFixed(1) : '0';
+    const atRiskCount = studentRowsData.filter(s => s.avg < 40).length;
+    const topStudent = ranked[0];
 
     const content = `
       <div class="summary-grid">
@@ -1695,6 +1714,13 @@ export class ReportEngineService {
         <div class="summary-card"><div class="summary-value" style="color:#ea6645">${passRate}%</div><div class="summary-label">Pass Rate</div></div>
         <div class="summary-card"><div class="summary-value" style="color:#7c3aed">${classSubjects.length}</div><div class="summary-label">Subjects</div></div>
         <div class="summary-card"><div class="summary-value" style="color:#2563eb">${topScore}%</div><div class="summary-label">Top Score</div></div>
+        <div class="summary-card"><div class="summary-value" style="color:#0f766e">${completionRate}%</div><div class="summary-label">Mark Completion</div></div>
+        <div class="summary-card"><div class="summary-value" style="color:#dc2626">${atRiskCount}</div><div class="summary-label">At Risk (&lt;40%)</div></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;margin-bottom:18px;color:#1e3a8a;font-size:12px;">
+        <span><strong>Highest Student:</strong> ${topStudent ? `${topStudent.firstName} ${topStudent.lastName} (${topStudent.avg.toFixed(1)}%)` : '—'}</span>
+        <span><strong>Assessment Coverage:</strong> ${allScores.length} of ${expectedMarks} marks entered</span>
+        <span><strong>Quality Flag:</strong> ${Number(completionRate) >= 95 ? 'Ready for review' : 'Complete missing marks before publication'}</span>
       </div>
       <table>
         <thead><tr>
@@ -1737,6 +1763,50 @@ export class ReportEngineService {
       resourceType: 'raw',
     });
 
+    return { buffer, url: result.secureUrl, publicId: result.publicId };
+  }
+
+  private async generateRankingReport(request: ReportGenerationRequest) {
+    const [school, term, classInfo] = await Promise.all([
+      this.prisma.school.findUnique({ where: { id: request.schoolId } }),
+      this.prisma.term.findUnique({ where: { id: request.termId }, include: { academicYear: true } }),
+      this.prisma.class.findUnique({ where: { id: request.classId }, select: { name: true } }),
+    ]);
+    if (!term) throw new BadRequestException('Term not found');
+
+    const rankings = await this.rankingService.computeClassRankings(
+      request.classId!, request.termId!, request.schoolId,
+    );
+    const validRankings = rankings || [];
+    const average = validRankings.length > 0
+      ? validRankings.reduce((sum: number, row: any) => sum + (row.average || 0), 0) / validRankings.length
+      : 0;
+    const passCount = validRankings.filter((row: any) => (row.average || 0) >= 50).length;
+    const distinctionCount = validRankings.filter((row: any) => (row.average || 0) >= 75).length;
+    const atRiskCount = validRankings.filter((row: any) => (row.average || 0) < 40).length;
+    const topThree = validRankings.slice(0, 3);
+    const podium = topThree.map((row: any, index: number) => `<div class="summary-card" style="border-top-color:${['#d97706', '#64748b', '#b45309'][index]}"><div style="font-size:24px">${['🥇', '🥈', '🥉'][index]}</div><div style="font-weight:700;color:#123b5d">${row.firstName} ${row.lastName}</div><div class="summary-value" style="font-size:20px;color:${this.scoreColor(row.average)}">${Number(row.average || 0).toFixed(1)}%</div><div class="summary-label">Rank ${row.rank}</div></div>`).join('');
+    const rows = validRankings.map((row: any, index: number) => {
+      const grade = row.grade || (row.average >= 75 ? 'A' : row.average >= 65 ? 'B' : row.average >= 50 ? 'C' : row.average >= 40 ? 'D' : 'E');
+      const gc = this.gradeColor(grade);
+      const percentile = validRankings.length > 1 ? ((validRankings.length - (row.rank || index + 1)) / (validRankings.length - 1) * 100) : 100;
+      return `<tr><td class="text-center font-bold" style="color:${index < 3 ? '#d97706' : '#64748b'}">${index < 3 ? ['🥇', '🥈', '🥉'][index] : index + 1}</td><td style="font-weight:600">${row.firstName} ${row.lastName}</td><td>${row.admissionNumber || '—'}</td><td class="text-center">${row.gender || '—'}</td><td class="text-center font-bold" style="color:${this.scoreColor(row.average)}">${Number(row.average || 0).toFixed(1)}%</td><td class="text-center"><span class="grade-badge" style="color:${gc.text};background:${gc.bg}">${grade}</span></td><td class="text-center">${row.subjectCount || 0}</td><td class="text-center">${percentile.toFixed(0)}th</td></tr>`;
+    }).join('');
+
+    const html = this.buildEnhancedReportShell({
+      schoolName: school?.name || 'School',
+      subtitle: `Class Ranking Report — ${classInfo?.name || ''} — ${term.name} (${term.academicYear?.name || ''})`,
+      title: 'Class Ranking Report',
+      content: this.buildMetaBar([
+        { label: 'Class', value: classInfo?.name || '' },
+        { label: 'Term', value: term.name },
+        { label: 'Year', value: term.academicYear?.name || '' },
+        { label: 'Ranking Basis', value: 'Average subject performance' },
+      ]) + `<div class="summary-grid"><div class="summary-card"><div class="summary-value">${validRankings.length}</div><div class="summary-label">Students Ranked</div></div><div class="summary-card"><div class="summary-value">${average.toFixed(1)}%</div><div class="summary-label">Class Average</div></div><div class="summary-card"><div class="summary-value pass">${validRankings.length ? (passCount / validRankings.length * 100).toFixed(1) : '0.0'}%</div><div class="summary-label">Pass Rate</div></div><div class="summary-card"><div class="summary-value" style="color:#7c3aed">${distinctionCount}</div><div class="summary-label">Distinction (75%+)</div></div><div class="summary-card"><div class="summary-value fail">${atRiskCount}</div><div class="summary-label">At Risk (&lt;40%)</div></div></div><div class="section-title">Top Three Performers</div><div class="summary-grid">${podium || '<p>No ranked students available.</p>'}</div><div class="section-title">Full Class Ranking</div><table><thead><tr><th class="text-center">Rank</th><th>Student</th><th>Admission No.</th><th class="text-center">Gender</th><th class="text-center">Average</th><th class="text-center">Grade</th><th class="text-center">Subjects</th><th class="text-center">Percentile</th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="text-center">No ranking data available.</td></tr>'}</tbody></table>`,
+      orientation: 'portrait',
+    });
+    const buffer = await this.renderHtmlToPdf(html);
+    const result = await this.cloudinary.uploadBuffer(buffer, { folder: `${FOLDERS.system}/reports`, publicId: `ranking-${request.classId}-${request.termId}-${Date.now()}`, resourceType: 'raw' });
     return { buffer, url: result.secureUrl, publicId: result.publicId };
   }
 
@@ -1810,16 +1880,16 @@ export class ReportEngineService {
       @page { margin: 15mm; size: A4 ${orientation}; }
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body { font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif; color: #1f2937; background: white; padding: 24px; line-height: 1.4; }
-      .report-header { text-align: center; margin-bottom: 24px; padding: 16px 20px; background: linear-gradient(135deg, #5f4b3a 0%, #7a6b5a 100%); border-radius: 8px; color: white; }
+       .report-header { text-align: center; margin-bottom: 24px; padding: 20px 24px; background: linear-gradient(135deg, #123b5d 0%, #0f766e 52%, #2563eb 100%); border-radius: 12px; color: white; box-shadow: 0 8px 20px rgba(15,118,110,0.16); }
       .school-name { font-size: 22px; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
-      .school-sub { font-size: 12px; color: #e8ddd0; margin-top: 4px; }
+       .school-sub { font-size: 12px; color: #dbeafe; margin-top: 4px; }
       .report-title { font-size: 16px; font-weight: 600; color: white; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.95; }
-      .report-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; font-size: 13px; color: #374151; background: #f5f0eb; padding: 10px 16px; border-radius: 6px; border: 1px solid #e8ddd0; }
-      .report-meta strong { color: #5f4b3a; }
+       .report-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; font-size: 13px; color: #334155; background: #f0fdfa; padding: 12px 16px; border-radius: 8px; border: 1px solid #99f6e4; }
+       .report-meta strong { color: #115e59; }
       table { width: 100%; border-collapse: collapse; font-size: 11px; }
-      th { background: #5f4b3a; color: white; padding: 8px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; border: 1px solid #7a6b5a; }
+       th { background: #123b5d; color: white; padding: 9px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; border: 1px solid #1e4d70; }
       td { padding: 6px 10px; border: 1px solid #e5e7eb; }
-      tr:nth-child(even) { background: #faf7f4; }
+       tr:nth-child(even) { background: #f8fafc; }
       .text-center { text-align: center; }
       .text-right { text-align: right; }
       .font-bold { font-weight: 700; }
@@ -1828,15 +1898,15 @@ export class ReportEngineService {
       .fail { color: #dc2626; }
       .warn { color: #d97706; }
       .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
-      .summary-card { background: #faf7f4; border: 1px solid #e8ddd0; border-radius: 8px; padding: 12px 16px; text-align: center; }
-      .summary-value { font-size: 24px; font-weight: 700; color: #5f4b3a; }
+       .summary-card { background: linear-gradient(180deg, #ffffff, #f0fdfa); border: 1px solid #cbd5e1; border-top: 3px solid #0f766e; border-radius: 10px; padding: 14px 16px; text-align: center; box-shadow: 0 2px 7px rgba(15,23,42,0.05); }
+       .summary-value { font-size: 24px; font-weight: 700; color: #123b5d; }
       .summary-label { font-size: 11px; color: #6b7280; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
       .grade-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
       .signatures { margin-top: 40px; display: flex; justify-content: space-between; }
       .sig { text-align: center; flex: 1; }
       .sig-line { width: 180px; border-top: 1px solid #1f2937; margin: 40px auto 0; padding-top: 6px; font-size: 11px; color: #6b7280; }
       .footer { text-align: center; margin-top: 20px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #9ca3af; }
-      .section-title { font-size: 14px; font-weight: 600; color: #5f4b3a; margin: 20px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #e8ddd0; }
+       .section-title { font-size: 14px; font-weight: 700; color: #123b5d; margin: 22px 0 12px; padding: 0 0 7px 10px; border-bottom: 2px solid #99f6e4; border-left: 4px solid #0f766e; }
       .chart-bar { height: 18px; border-radius: 4px; }
       .bar-track { background: #f3f4f6; border-radius: 4px; height: 18px; overflow: hidden; }
     `;

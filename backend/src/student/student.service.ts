@@ -9,6 +9,7 @@ import { CredentialDeliveryService } from '../identity-service/credential-delive
 import { AdmissionNumberService } from '../admission-number/admission-number.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import * as bcrypt from 'bcrypt';
+import { normalizeZambianPhone } from '../common/utils/phone.util';
 
 @Injectable()
 export class StudentService {
@@ -213,6 +214,7 @@ export class StudentService {
     school: { id: string; name: string } | null,
     schoolUrl: string,
   ) {
+    const parentPhone = normalizeZambianPhone(info.parentPhone);
     const parentName = info.parentName || `${info.studentFirstName}'s Parent`;
     const nameParts = parentName.trim().split(/\s+/);
     const firstName = nameParts[0];
@@ -225,6 +227,10 @@ export class StudentService {
     if (existingParentUser) {
       const existingParent = await this.prisma.parent.findFirst({ where: { email: info.parentEmail } });
       if (existingParent) {
+        if (parentPhone) {
+          await this.prisma.parent.update({ where: { id: existingParent.id }, data: { phone: parentPhone } });
+          await this.prisma.user.update({ where: { id: existingParentUser.id }, data: { phone: parentPhone } });
+        }
         await this.prisma.parentStudent.upsert({
           where: { parentId_studentId: { parentId: existingParent.id, studentId } },
           create: { parentId: existingParent.id, studentId },
@@ -234,7 +240,7 @@ export class StudentService {
           parentUserId: existingParentUser.id,
           studentUserId: studentId,
           parentEmail: info.parentEmail,
-          parentPhone: info.parentPhone,
+          parentPhone,
           parentUsername: existingParentUser.username || existingParentUser.email,
           parentPassword: 'Use existing password',
           parentName: `${existingParent.firstName} ${existingParent.lastName}`,
@@ -260,7 +266,7 @@ export class StudentService {
           firstName: existingParentUser.firstName,
           lastName: existingParentUser.lastName,
           email: existingParentUser.email,
-          phone: info.parentPhone || existingParentUser.phone,
+           phone: parentPhone || normalizeZambianPhone(existingParentUser.phone),
           password: existingParentUser.password,
           schoolId,
           children: { create: { studentId } },
@@ -270,7 +276,7 @@ export class StudentService {
         parentUserId: existingParentUser.id,
         studentUserId: studentId,
         parentEmail: existingParentUser.email || undefined,
-        parentPhone: info.parentPhone,
+         parentPhone,
         parentUsername: existingParentUser.username || existingParentUser.email,
         parentPassword: 'See admin for password reset',
         parentName: `${parentRecord.firstName} ${parentRecord.lastName}`,
@@ -299,7 +305,7 @@ export class StudentService {
         firstName,
         lastName,
         email: parentEmail,
-        phone: info.parentPhone,
+         phone: parentPhone,
         password: hashedParentPwd,
         username: parentUsername,
         schoolId,
@@ -319,7 +325,7 @@ export class StudentService {
         firstName,
         lastName,
         email: parentEmail,
-        phone: info.parentPhone,
+         phone: parentPhone,
         password: hashedParentPwd,
         schoolId,
         children: { create: { studentId } },
@@ -330,7 +336,7 @@ export class StudentService {
       parentUserId: parentUser.id,
       studentUserId: studentId,
       parentEmail: info.parentEmail,
-      parentPhone: info.parentPhone,
+       parentPhone,
       parentUsername,
       parentPassword: parentPassword.password,
       parentName,

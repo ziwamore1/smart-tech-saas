@@ -14,9 +14,10 @@ const REPORT_TYPES = [
   { type: 'ANALYTICS_SUMMARY', label: 'Analytics Summary', icon: 'fa-chart-pie', color: '#4f46e5', desc: 'Class or school performance analytics', bulk: true },
   { type: 'MARK_SCHEDULE', label: 'Mark Schedule', icon: 'fa-table', color: '#ea580c', desc: 'Subject-wise mark schedule for a class', bulk: true },
   { type: 'PERFORMANCE_REPORT', label: 'Performance Report', icon: 'fa-chart-line', color: '#ec4899', desc: 'Detailed student performance profile', bulk: false },
+  { type: 'RANKING_REPORT', label: 'Class Ranking Report', icon: 'fa-trophy', color: '#d97706', desc: 'Ranked student performance and class distribution', bulk: true },
 ];
 
-const BULK_TYPES = ['CLASS_REPORT', 'ATTENDANCE_REPORT', 'ANALYTICS_SUMMARY', 'MARK_SCHEDULE', 'TRANSCRIPT', 'CERTIFICATE'];
+const BULK_TYPES = ['CLASS_REPORT', 'ATTENDANCE_REPORT', 'ANALYTICS_SUMMARY', 'MARK_SCHEDULE', 'TRANSCRIPT', 'CERTIFICATE', 'RANKING_REPORT'];
 
 function unwrap(data: any): any[] {
   if (Array.isArray(data)) return data;
@@ -97,7 +98,7 @@ export default function ReportHubPage() {
 
   const config = REPORT_TYPES.find(t => t.type === selectedType);
   const needsStudent = selectedType && ['REPORT_CARD', 'TRANSCRIPT', 'CERTIFICATE', 'PERFORMANCE_REPORT'].includes(selectedType);
-  const needsClass = selectedType && ['CLASS_REPORT', 'MARK_SCHEDULE', 'ATTENDANCE_REPORT', 'ANALYTICS_SUMMARY'].includes(selectedType);
+  const needsClass = selectedType && ['CLASS_REPORT', 'MARK_SCHEDULE', 'ATTENDANCE_REPORT', 'ANALYTICS_SUMMARY', 'RANKING_REPORT'].includes(selectedType);
   const needsTerm = selectedType && !['TRANSCRIPT'].includes(selectedType);
   const needsTemplate = selectedType === 'CERTIFICATE';
 

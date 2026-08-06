@@ -33,7 +33,8 @@
         "seed:g7-rules:supabase": "dotenv -e .env.production -- npx tsx prisma/seed-g7-rules.ts",
         "migrate:cloudinary": "npx tsx prisma/migrate-cloudinary.ts",
         "backfill:computed-results": "npx tsx src/scripts/backfill-computed-results.ts",
-        "backfill:computed-results:prod": "dotenv -e .env.production -- npx tsx src/scripts/backfill-computed-results.ts --apply"
+        "backfill:computed-results:prod": "dotenv -e .env.production -- npx tsx src/scripts/backfill-computed-results.ts --apply",
+        "backfill:phone-numbers": "npx tsx src/scripts/backfill-phone-numbers.ts"
     },
     "dependencies": {
         "@aws-sdk/client-ses": "^3.1079.0",
