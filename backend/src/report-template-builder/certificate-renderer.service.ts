@@ -4,9 +4,24 @@ import sharp from 'sharp';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
 
 @Injectable()
 export class CertificateRendererService {
+  private getSmartTechSealDataUrl(): string {
+    const candidates = [
+      path.join(process.cwd(), 'smart_tech_images', 'smarttech_seal 2.png'),
+      path.join(__dirname, '..', '..', 'smart_tech_images', 'smarttech_seal 2.png'),
+    ];
+    const sealPath = candidates.find((candidate) => fs.existsSync(candidate));
+    if (!sealPath) return '';
+    try {
+      return `data:image/png;base64,${fs.readFileSync(sealPath).toString('base64')}`;
+    } catch {
+      return '';
+    }
+  }
+
   generateStampOverlayHtml(stamps: any[]): string {
     if (!stamps || stamps.length === 0) return '';
 
@@ -522,6 +537,7 @@ ${parts.join('\n')}
 
     const borderSvg = this.generateBorderSvg(760, isLandscape ? 520 : 760, data.borderStyle, data.borderColor);
     const badgeSvg = data.showBadge ? this.generateBadgeSvg(data.badgeStyle, data.borderColor) : '';
+    const sealImage = this.getSmartTechSealDataUrl();
     const sealSvg = this.generateSealSvg('#0f766e', 'SMART TECH');
     const ribbonSvg = this.generateRibbonSvg(data.borderColor);
 
@@ -541,10 +557,10 @@ ${parts.join('\n')}
        color-adjust: exact;
        overflow: hidden;
      }
-     .cert-page {
-       width: 100%; height: ${pageH}; max-height: ${pageH};
-       position: relative; display: flex; align-items: center; justify-content: center;
-       background: #fefcf9; overflow: hidden; page-break-after: avoid;
+      .cert-page {
+        width: 100%; height: ${pageH}; max-height: ${pageH};
+        position: relative; display: flex; align-items: center; justify-content: center;
+        background: #fefcf9; overflow: hidden; page-break-after: avoid; break-after: avoid;
      }
     .cert-inner {
       position: relative;
@@ -556,8 +572,8 @@ ${parts.join('\n')}
     }
     .border-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
     .border-layer svg { width: 100%; height: 100%; }
-     .seal-area { position: absolute; bottom: 34px; right: 34px; opacity: 1; z-index: 0; pointer-events: none; }
-     .seal-area svg { width: 112px; height: 112px; }
+      .seal-area { position: absolute; bottom: 28px; right: 28px; width: 82px; height: 82px; opacity: 0.95; z-index: 0; pointer-events: none; overflow: hidden; }
+      .seal-area img, .seal-area svg { display: block; width: 82px; height: 82px; max-width: 82px; max-height: 82px; object-fit: contain; }
      .ribbon-area { margin: 2px 0; z-index: 1; }
     .watermark-text {
       position: absolute; top: 50%; left: 50%;
@@ -648,7 +664,7 @@ ${parts.join('\n')}
 <body>
   <div class="cert-page">
     <div class="border-layer">${borderSvg}</div>
-    <div class="seal-area">${sealSvg}</div>
+     <div class="seal-area">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal"/>` : sealSvg}</div>
     ${stampOverlay ? `<div class="stamp-layer" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:none;">${stampOverlay}</div>` : ''}
     ${data.showWatermark ? `<div class="watermark-text">${data.watermarkText || 'CERTIFICATE'}</div>` : ''}
     <div class="cert-inner">

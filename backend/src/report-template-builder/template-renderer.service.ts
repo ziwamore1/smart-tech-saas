@@ -312,8 +312,11 @@ export class TemplateRendererService {
     }
   }
 
-  renderComponentsToHtml(components: any[], data: any, school?: any, pageWidthPx = 680): string {
-    const inner = components.map((c: any) => this.renderComponent(c, data, school)).join('\n');
+  renderComponentsToHtml(components: any[], data: any, school?: any, pageWidthPx = 680, flowLayout = false): string {
+    const inner = components.map((c: any) => this.renderComponent(c, data, school, flowLayout)).join('\n');
+    if (flowLayout) {
+      return `<div style="position:relative;width:100%;max-width:${pageWidthPx}px;min-height:500px;margin:0 auto;overflow:visible;">${inner}</div>`;
+    }
     const bottom = components.reduce((max, c) => {
       const b = (c.position?.y || 0) + (c.size?.height || 0);
       return Math.max(max, b);
@@ -322,12 +325,24 @@ export class TemplateRendererService {
     return `<div style="position:relative;width:${pageWidthPx}px;height:${height}px;margin:0 auto;">${inner}</div>`;
   }
 
-  private renderComponent(component: any, data: any, school?: any): string {
+  private renderComponent(component: any, data: any, school?: any, flowLayout = false): string {
     const styles = component.styles || {};
     const content = component.content || {};
     const pos = component.position || {};
     const size = component.size || {};
-    const styleStr = 'position:absolute;' + this.styleObjectToString({ ...styles, ...pos, ...size });
+    let componentStyles: any = { ...styles, ...pos, ...size };
+    let styleStr: string;
+    if (flowLayout) {
+      // Enhanced templates contain variable-height tables and narratives. Let
+      // those sections grow naturally instead of painting over the next item.
+      delete componentStyles.x;
+      delete componentStyles.y;
+      delete componentStyles.height;
+      if (componentStyles.width !== undefined) componentStyles.width = '100%';
+      styleStr = `position:relative;min-height:${size.height || 0}px;` + this.styleObjectToString(componentStyles);
+    } else {
+      styleStr = 'position:absolute;' + this.styleObjectToString(componentStyles);
+    }
     const placeholder = component.placeholder;
 
     switch (component.type) {
@@ -930,7 +945,14 @@ export class TemplateRendererService {
     const marginRightMm = template.certificate ? 0 : (template.marginRight ?? 15);
     const pageWidthPx = Math.round(((isLandscape ? 297 : 210) - marginLeftMm - marginRightMm) * 96 / 25.4);
 
-    const componentsHtml = this.renderComponentsToHtml(template.components, defaultData, school, pageWidthPx);
+    const isEnhancedTemplate = Boolean((template.metadata as any)?.enhancedProfessional);
+    const componentsHtml = this.renderComponentsToHtml(
+      template.components,
+      defaultData,
+      school,
+      pageWidthPx,
+      isEnhancedTemplate,
+    );
 
     let stampOverlay = '';
     let mainContent: string;
@@ -999,7 +1021,7 @@ export class TemplateRendererService {
   <style>
      @page { size: ${pageSize} ${orientation}; margin: ${pageMargins}; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-     body { font-family: ${template.fontFamily || 'Arial'}, sans-serif; font-size: ${template.fontSize || 12}px; color: #111827; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+     body { font-family: ${template.fontFamily || 'Arial'}, sans-serif; font-size: ${template.fontSize || 12}px; color: #111827; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow-x: hidden; }
     img { max-width: 100%; }
     table { page-break-inside: avoid; }
     @media print { body { margin: 0; padding: 0; } }
