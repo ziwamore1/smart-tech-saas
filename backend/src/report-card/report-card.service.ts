@@ -377,6 +377,15 @@ export class ReportCardService {
     termId: string,
   ): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {
     const report = await this.getReportCard(schoolId, studentId, termId);
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: { studentId, academicYear: { terms: { some: { id: termId } } }, status: 'ACTIVE' },
+      select: { classId: true },
+    });
+    const resultSheet = enrollment ? await this.prisma.resultSheet.findFirst({
+      where: { schoolId, classId: enrollment.classId, termId },
+      orderBy: { updatedAt: 'desc' },
+      select: { examType: true },
+    }) : null;
 
     const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
@@ -419,6 +428,7 @@ export class ReportCardService {
 
       academicYear: report.term.academicYear,
       termName: report.term.name,
+      examType: resultSheet?.examType || 'END_TERM',
 
       student: report.student,
 
@@ -525,6 +535,12 @@ export class ReportCardService {
       throw new Error('No students found in class');
     }
 
+    const resultSheet = await this.prisma.resultSheet.findFirst({
+      where: { schoolId, classId, termId },
+      orderBy: { updatedAt: 'desc' },
+      select: { examType: true },
+    });
+
     let allHtml = '';
 
     for (const e of enrollments) {
@@ -545,6 +561,7 @@ export class ReportCardService {
 
         academicYear: report.term.academicYear,
         termName: report.term.name,
+        examType: resultSheet?.examType || 'END_TERM',
 
         student: report.student,
 
@@ -618,6 +635,7 @@ export class ReportCardService {
   async generateStudentTranscript(
     schoolId: string,
     studentId: string,
+    examType?: string,
   ): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {
     const student = await this.prisma.student.findUnique({
       where: { id: studentId },
@@ -781,6 +799,7 @@ export class ReportCardService {
     <div class="report-meta">
       <span><strong>Student:</strong> ${student.firstName} ${student.lastName}</span>
       <span><strong>Admission No:</strong> ${student.admissionNumber}</span>
+       <span><strong>Exam Type:</strong> ${examType || 'END_TERM'}</span>
       <span><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
     </div>
      <div class="summary-grid">
@@ -837,11 +856,13 @@ export class ReportCardService {
     schoolId: string,
     studentId: string,
     termId: string,
+    examType?: string,
   ): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {
     const engineData = await this.reportCardEngineService.generateReportCardData(
       studentId,
       termId,
       schoolId,
+      examType,
     );
 
     const school = await this.prisma.school.findUnique({
@@ -884,6 +905,7 @@ export class ReportCardService {
       secondaryColor: reportTemplate?.secondaryColor || '#f5f5f5',
       academicYear: engineData.academicYear?.name || '',
       termName: engineData.term?.name || '',
+      examType: engineData.examType || examType || 'END_TERM',
       student: engineData.student,
       class: engineData.class,
       subjectBreakdown: engineData.subjectBreakdown || [],
@@ -948,8 +970,9 @@ export class ReportCardService {
     studentId: string,
     termId: string,
     templateId?: string,
+    examType?: string,
   ): Promise<{ html: string; data: any }> {
-    const engineData = await this.reportCardEngineService.generateReportCardData(studentId, termId, schoolId);
+    const engineData = await this.reportCardEngineService.generateReportCardData(studentId, termId, schoolId, examType);
     const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
     if (!school) throw new Error('School not found');
 
@@ -982,6 +1005,7 @@ export class ReportCardService {
       secondaryColor: reportTemplate?.secondaryColor || '#f5f5f5',
       academicYear: engineData.academicYear?.name || '',
       termName: engineData.term?.name || '',
+      examType: engineData.examType || examType || 'END_TERM',
       student: engineData.student,
       class: engineData.class,
       subjectBreakdown: engineData.subjectBreakdown || [],
@@ -1106,6 +1130,7 @@ export class ReportCardService {
     schoolId: string,
     classId: string,
     termId: string,
+    examType?: string,
   ): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {
     const term = await this.prisma.term.findUnique({ where: { id: termId } });
     if (!term) throw new Error('Invalid term');
@@ -1148,7 +1173,7 @@ export class ReportCardService {
 
     for (const e of enrollments) {
       const engineData = await this.reportCardEngineService.generateReportCardData(
-        e.studentId, termId, schoolId,
+        e.studentId, termId, schoolId, examType,
       );
       const commentData = await this.analyticsService.generateStudentComment(schoolId, e.studentId, termId);
       const primaryContext = await this.getPrimaryReportContext(e.studentId, termId, reportTemplate);
@@ -1166,6 +1191,7 @@ export class ReportCardService {
         secondaryColor: reportTemplate?.secondaryColor || '#f5f5f5',
         academicYear: engineData.academicYear?.name || '',
         termName: engineData.term?.name || '',
+        examType: engineData.examType || examType || 'END_TERM',
         student: engineData.student,
         class: engineData.class,
         subjectBreakdown: engineData.subjectBreakdown || [],

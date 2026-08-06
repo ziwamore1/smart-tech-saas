@@ -501,6 +501,7 @@ ${parts.join('\n')}
       className: string;
       termName: string;
       academicYear: string;
+      examType?: string;
       certificateNumber: string;
       verificationUrl?: string;
       schoolLogo?: string;
@@ -678,7 +679,7 @@ ${parts.join('\n')}
       <div class="student-name">${data.studentName}</div>
       ${data.studentPhoto ? `<div class="photo-area"><img src="${data.studentPhoto}" alt="Student"/></div>` : ''}
        <div class="detail-text">In recognition of outstanding academic performance and demonstrated excellence</div>
-       <div class="detail-text">${data.className ? `Class: ${data.className}` : ''}${data.className && data.termName ? ' &middot; ' : ''}${data.termName} ${data.academicYear}</div>
+       <div class="detail-text">${data.className ? `Class: ${data.className}` : ''}${data.className && data.termName ? ' &middot; ' : ''}${data.termName} ${data.academicYear}${data.examType ? ` &middot; Exam: ${data.examType}` : ''}</div>
        ${certificateComment ? `<div class="comment-box">${certificateComment}</div>` : ''}
       ${badgeSvg ? `<div class="badge-area">${badgeSvg}</div>` : ''}
       <div class="signatures">

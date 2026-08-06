@@ -412,7 +412,7 @@ export class TemplateRendererService {
         return `<div style="${styleStr}">${data?.class?.name || ''}</div>`;
 
       case 'TERM_INFO':
-        return `<div style="${styleStr}">${data?.term?.name || ''} - ${data?.term?.academicYear || ''}</div>`;
+        return `<div style="${styleStr}">${data?.term?.name || ''} - ${data?.term?.academicYear || ''}${data?.examType ? ` | Exam: ${data.examType}` : ''}</div>`;
 
       case 'RESULTS_TABLE':
         return this.renderResultsTable(component, data, styleStr);
@@ -936,6 +936,7 @@ export class TemplateRendererService {
       student: { firstName: 'John', lastName: 'Doe', admissionNumber: '2024-001', photoUrl: '' },
       class: { name: 'Grade 10A' },
       term: { name: 'Term 1', academicYear: '2024' },
+      examType: 'END_TERM',
       subjects: [
         { subject: 'Mathematics', score: 85, grade: 'A', points: 1, remark: 'Excellent' },
         { subject: 'English', score: 72, grade: 'B', points: 3, remark: 'Good' },
@@ -1002,8 +1003,9 @@ export class TemplateRendererService {
           schoolName: school?.name || '',
           studentName: `${defaultData.student.firstName} ${defaultData.student.lastName}`,
           className: defaultData.class.name,
-          termName: defaultData.term.name,
-          academicYear: defaultData.term.academicYear,
+           termName: defaultData.term.name,
+           academicYear: defaultData.term.academicYear,
+           examType: defaultData.examType || 'END_TERM',
            certificateNumber: defaultData.certificateNumber || 'ST-PREVIEW-00000000',
            certificateComment: defaultData.certificateComment || defaultData.teacherComment || '',
           verificationUrl: '',
@@ -1108,6 +1110,7 @@ export class TemplateRendererService {
       ...data,
       schoolName: school?.name || data.schoolName || '',
       schoolLogo: school?.logoUrl || school?.logo || data.schoolLogo,
+      examType: data.examType || data.exam?.type || 'END_TERM',
       subjectBreakdown: subjects,
       bestSubjects: data.bestSubjects || subjects.filter((s: any) => s.finalPercentage != null).slice(0, 6),
       totalPoints: data.totalPoints ?? summary.totalPoints ?? 0,
@@ -1178,7 +1181,7 @@ export class TemplateRendererService {
        <div style="font-size:17px;font-weight:600;color:#111827;margin:8px 0;font-style:italic;">${cert.awardText || 'This certificate is awarded to'}</div>
        <div style="font-size:40px;font-weight:800;color:${borderColor};margin:8px 0;font-family:'Georgia',serif;">${studentName}</div>
        <div style="font-size:14px;font-weight:600;color:#1f2937;margin:5px 0;line-height:1.6;">${cert.certificateType === 'SPORTS_AWARD' ? 'In recognition of outstanding athletic achievement and sportsmanship' : cert.certificateType === 'ATTENDANCE' ? 'In recognition of exemplary attendance and punctuality' : cert.certificateType === 'MERIT_AWARD' ? 'In recognition of outstanding merit, dedication, and service' : cert.certificateType === 'GRADUATION' ? 'In recognition of successful completion of academic requirements' : 'In recognition of outstanding academic performance and demonstrated excellence'}</div>
-       <div style="font-size:13px;font-weight:600;color:#374151;margin:6px 0;">Class: ${data?.class?.name || ''} | Term: ${data?.term?.name || ''} ${data?.term?.academicYear || ''}</div>
+        <div style="font-size:13px;font-weight:600;color:#374151;margin:6px 0;">Class: ${data?.class?.name || ''} | Term: ${data?.term?.name || ''} ${data?.term?.academicYear || ''} | Exam: ${data?.examType || 'END_TERM'}</div>
        ${data?.certificateComment ? `<div style="max-width:620px;margin:12px auto 5px;padding:10px 18px;border-left:4px solid #0f766e;border-right:4px solid #0f766e;background:#f0fdfa;color:#134e4a;font-size:13px;font-weight:600;line-height:1.5;">${this.escapeHtml(String(data.certificateComment))}</div>` : ''}
       ${cert.showBadge ? `<div style="margin:15px 0;">
         <svg width="50" height="50" viewBox="0 0 50 50"><polygon points="25,3 31,18 47,19 35,30 38,47 25,38 12,47 15,30 3,19 19,18" fill="#f59e0b"/></svg>

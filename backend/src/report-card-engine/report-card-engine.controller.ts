@@ -28,6 +28,7 @@ export class ReportCardEngineController {
   async generateReportCard(
     @Param('studentId') studentId: string,
     @Query('termId') termId: string,
+    @Query('examType') examType: string,
     @Request() req,
   ) {
     if (!this.ownership.isStaff(req.user)) {
@@ -51,6 +52,7 @@ export class ReportCardEngineController {
       studentId,
       termId,
       req.user.schoolId,
+      examType,
     );
   }
 
@@ -58,12 +60,14 @@ export class ReportCardEngineController {
   generateBulkReportCards(
     @Query('classId') classId: string,
     @Query('termId') termId: string,
+    @Query('examType') examType: string,
     @Request() req,
   ) {
     return this.reportCardEngine.generateBulkReportCards(
       classId,
       termId,
       req.user.schoolId,
+      examType,
     );
   }
 

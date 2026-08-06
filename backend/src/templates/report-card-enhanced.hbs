@@ -134,7 +134,7 @@ tr:nth-child(even) { background: {{secondaryColor}}; }
 {{#if schoolLogo}}<div style="margin-bottom:6px"><img src="{{schoolLogo}}" height="45" style="max-width:110px"/></div>{{/if}}
 <div class="school-name">{{schoolName}}</div>
 <div class="report-title">{{#if reportTitle}}{{reportTitle}}{{else}}STUDENT REPORT CARD{{/if}}</div>
-<div class="term-info">{{class.name}} | {{academicYear}} — {{termName}}</div>
+<div class="term-info">{{class.name}} | {{academicYear}} — {{termName}}{{#if examType}} | Exam: {{examType}}{{/if}}</div>
 {{#if headerText}}<div class="header-text">{{headerText}}</div>{{/if}}
 </div>
 
@@ -145,6 +145,7 @@ tr:nth-child(even) { background: {{secondaryColor}}; }
   <div class="info-row"><span class="info-label">Full Name:</span><span class="info-value">{{student.firstName}} {{student.lastName}}</span></div>
   <div class="info-row"><span class="info-label">Admission No:</span><span class="info-value">{{student.admissionNumber}}</span></div>
   <div class="info-row"><span class="info-label">Class:</span><span class="info-value">{{class.name}}</span></div>
+  {{#if examType}}<div class="info-row"><span class="info-label">Exam Type:</span><span class="info-value">{{examType}}</span></div>{{/if}}
   {{#if student.gender}}<div class="info-row"><span class="info-label">Gender:</span><span class="info-value">{{student.gender}}</span></div>{{/if}}
   <div class="info-row"><span class="info-label">Subjects Taken:</span><span class="info-value">{{subjectBreakdown.length}}</span></div>
   {{#if attendance.attendanceRate}}<div class="info-row"><span class="info-label">Attendance:</span><span class="info-value">{{attendance.attendanceRate}}% ({{attendance.presentDays}}/{{attendance.totalDays}} days)</span></div>{{/if}}

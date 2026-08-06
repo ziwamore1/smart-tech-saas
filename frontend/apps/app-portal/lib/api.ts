@@ -2425,15 +2425,15 @@ export const holidayApi = {
 
 export const reportEngineApi = {
   getTypes: () => api.get('/report-engine/types'),
-  validate: (data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string }) =>
+  validate: (data: { type: string; studentId?: string; classId?: string; termId?: string; examType?: string; templateId?: string }) =>
     api.post('/report-engine/validate', data),
-  generate: (data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string; options?: any }) =>
+  generate: (data: { type: string; studentId?: string; classId?: string; termId?: string; examType?: string; templateId?: string; options?: any }) =>
     api.post('/report-engine/generate', data),
-  generatePdf: (data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string }) =>
+  generatePdf: (data: { type: string; studentId?: string; classId?: string; termId?: string; examType?: string; templateId?: string }) =>
     api.post('/report-engine/generate-pdf', data, { responseType: 'blob', timeout: 300000 }),
-  previewReportCard: (data: { studentId: string; termId: string; templateId?: string }) =>
+  previewReportCard: (data: { studentId: string; termId: string; examType?: string; templateId?: string }) =>
     api.post('/report-engine/report-card-html', data, { timeout: 120000 }),
-  generateBulk: (data: { type: string; classId?: string; termId?: string; templateId?: string; studentIds?: string[] }) =>
+  generateBulk: (data: { type: string; classId?: string; termId?: string; examType?: string; templateId?: string; studentIds?: string[] }) =>
     api.post('/report-engine/generate-bulk', data, { timeout: 600000 }),
   listReports: (params?: { reportType?: string; classId?: string; termId?: string; page?: number; limit?: number }) =>
     api.get('/report-engine/reports', { params }),

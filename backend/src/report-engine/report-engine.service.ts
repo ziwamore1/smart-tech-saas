@@ -33,6 +33,7 @@ export interface ReportGenerationRequest {
   studentId?: string;
   classId?: string;
   termId?: string;
+  examType?: string;
   templateId?: string;
   options?: Record<string, any>;
 }
@@ -366,6 +367,7 @@ export class ReportEngineService {
     const elapsed = Date.now() - startTime;
     metadata.generationTimeMs = elapsed;
     metadata.warnings = validation.warnings;
+    metadata.examType = request.examType || 'END_TERM';
 
     const title = this.buildReportTitle(request.type, request);
 
@@ -612,7 +614,7 @@ export class ReportEngineService {
     }
 
     // Last resort: use the curriculum report card pipeline
-    return this.reportCardService.generateCurriculumReportCardPdf(schoolId, studentId, termId);
+    return this.reportCardService.generateCurriculumReportCardPdf(schoolId, studentId, termId, request.examType);
   }
 
   /**
@@ -691,12 +693,13 @@ export class ReportEngineService {
         studentId,
         termId,
         template.id,
+        request.examType,
       );
       return { html: enhanced.html, templateId: template.id, engineData: enhanced.data };
     }
 
     const engineData = await this.reportCardEngine.generateReportCardData(
-      studentId, termId, schoolId,
+      studentId, termId, schoolId, request.examType,
     );
     const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
     const html = await this.templateRenderer.renderPreview(
@@ -784,7 +787,7 @@ export class ReportEngineService {
     const studentId = request.studentId!;
     const termId = request.termId!;
     const schoolId = request.schoolId;
-    const engineData = await this.reportCardEngine.generateReportCardData(studentId, termId, schoolId);
+    const engineData = await this.reportCardEngine.generateReportCardData(studentId, termId, schoolId, request.examType);
     const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
     const html = this.buildFallbackReportCardHtml(engineData, school);
     return { html, data: engineData };
@@ -851,6 +854,7 @@ export class ReportEngineService {
     <div style="text-align:right;font-size:12px;line-height:1.7;">
       <div><strong>Term:</strong> ${term?.name || ''}</div>
       <div><strong>Year:</strong> ${engineData?.academicYear?.name || ''}</div>
+      <div><strong>Exam:</strong> ${engineData?.examType || 'END_TERM'}</div>
       <div><strong>Generated:</strong> ${new Date().toLocaleDateString()}</div>
     </div>
   </div>
@@ -896,6 +900,7 @@ export class ReportEngineService {
       request.schoolId,
       request.classId!,
       request.termId!,
+      request.examType,
     );
   }
 
@@ -903,6 +908,7 @@ export class ReportEngineService {
     return this.reportCardService.generateStudentTranscript(
       request.schoolId,
       request.studentId!,
+      request.examType,
     );
   }
 
@@ -910,7 +916,7 @@ export class ReportEngineService {
     const [school, term, performance] = await Promise.all([
       this.prisma.school.findUnique({ where: { id: request.schoolId } }),
       this.prisma.term.findUnique({ where: { id: request.termId }, include: { academicYear: true } }),
-      this.reportCardEngine.generateReportCardData(request.studentId!, request.termId!, request.schoolId),
+      this.reportCardEngine.generateReportCardData(request.studentId!, request.termId!, request.schoolId, request.examType),
     ]);
     if (!term) throw new BadRequestException('Term not found');
 
@@ -966,6 +972,7 @@ export class ReportEngineService {
         { label: 'Class', value: performance.class?.name || '' },
         { label: 'Term', value: term.name },
         { label: 'Academic Year', value: term.academicYear?.name || '' },
+        { label: 'Exam', value: performance.examType || request.examType || 'END_TERM' },
       ])}
       <div class="summary-grid">
         <div class="summary-card"><div class="summary-value">${Number(scoreAverage).toFixed(1)}%</div><div class="summary-label">Overall Average</div></div>
@@ -1043,7 +1050,7 @@ export class ReportEngineService {
     }
 
     const performance = request.termId
-      ? await this.reportCardEngine.generateReportCardData(request.studentId!, request.termId, request.schoolId)
+      ? await this.reportCardEngine.generateReportCardData(request.studentId!, request.termId, request.schoolId, request.examType)
       : null;
     const cert = template.certificate;
     const certificateNumber = cert.autoNumbering
@@ -1088,6 +1095,7 @@ export class ReportEngineService {
         },
         class: { name: enrollment?.class?.name || '' },
         term: { name: performance?.term?.name || '', academicYear: enrollment?.academicYear?.name || '' },
+        examType: performance?.examType || request.examType || 'END_TERM',
         certificateNumber,
         certificateComment,
         teacherComment: certificateComment,
@@ -1169,6 +1177,7 @@ export class ReportEngineService {
         { label: 'Scope', value: request.studentId ? 'Single Student' : request.classId ? 'Class' : 'School' },
         { label: 'Term', value: term.name },
         { label: 'Year', value: term.academicYear?.name || '' },
+        { label: 'Exam', value: request.examType || 'END_TERM' },
         { label: 'Period', value: `${term.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${term.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` },
       ]) + content,
       orientation: 'landscape',
@@ -1604,7 +1613,7 @@ export class ReportEngineService {
         { label: 'Scope', value: className || 'School' },
         { label: 'Term', value: term?.name || '' },
         { label: 'Year', value: term?.academicYear?.name || '' },
-        { label: 'Exam', value: 'END OF TERM' },
+        { label: 'Exam', value: request.examType || 'END_TERM' },
         { label: 'Date', value: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) },
       ]) + content,
       orientation: 'landscape',
@@ -1766,7 +1775,7 @@ export class ReportEngineService {
         { label: 'Class', value: classInfo?.name || '' },
         { label: 'Term', value: term.name },
         { label: 'Year', value: term.academicYear?.name || '' },
-        { label: 'Exam', value: 'END OF TERM' },
+        { label: 'Exam', value: request.examType || 'END_TERM' },
         { label: 'Date', value: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) },
       ]) + content,
       orientation: 'landscape',
@@ -1788,7 +1797,7 @@ export class ReportEngineService {
       this.prisma.term.findUnique({ where: { id: request.termId }, include: { academicYear: true } }),
       this.prisma.class.findUnique({ where: { id: request.classId }, select: { name: true } }),
       this.prisma.resultSheet.findFirst({
-        where: { classId: request.classId, termId: request.termId, schoolId: request.schoolId },
+        where: { classId: request.classId, termId: request.termId, schoolId: request.schoolId, ...(request.examType ? { examType: request.examType } : {}) },
         orderBy: { updatedAt: 'desc' },
         select: { id: true, examType: true },
       }),
@@ -1861,7 +1870,7 @@ export class ReportEngineService {
         { label: 'Class', value: classInfo?.name || '' },
         { label: 'Term', value: term.name },
         { label: 'Year', value: term.academicYear?.name || '' },
-        { label: 'Exam', value: sheet.examType || 'END_TERM' },
+        { label: 'Exam', value: request.examType || sheet.examType || 'END_TERM' },
         { label: 'Date', value: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) },
       ]) + content,
       orientation: 'landscape',
@@ -1910,6 +1919,7 @@ export class ReportEngineService {
         { label: 'Class', value: classInfo?.name || '' },
         { label: 'Term', value: term.name },
         { label: 'Year', value: term.academicYear?.name || '' },
+        { label: 'Exam', value: request.examType || 'END_TERM' },
         { label: 'Ranking Basis', value: 'Average subject performance' },
       ]) + `<div class="summary-grid"><div class="summary-card"><div class="summary-value">${validRankings.length}</div><div class="summary-label">Students Ranked</div></div><div class="summary-card"><div class="summary-value">${average.toFixed(1)}%</div><div class="summary-label">Class Average</div></div><div class="summary-card"><div class="summary-value pass">${validRankings.length ? (passCount / validRankings.length * 100).toFixed(1) : '0.0'}%</div><div class="summary-label">Pass Rate</div></div><div class="summary-card"><div class="summary-value" style="color:#7c3aed">${distinctionCount}</div><div class="summary-label">Distinction (75%+)</div></div><div class="summary-card"><div class="summary-value fail">${atRiskCount}</div><div class="summary-label">At Risk (&lt;40%)</div></div></div><div class="section-title">Top Three Performers</div><div class="summary-grid">${podium || '<p>No ranked students available.</p>'}</div><div class="section-title">Full Class Ranking</div><table><thead><tr><th class="text-center">Rank</th><th>Student</th><th>Admission No.</th><th class="text-center">Gender</th><th class="text-center">Average</th><th class="text-center">Grade</th><th class="text-center">Subjects</th><th class="text-center">Percentile</th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="text-center">No ranking data available.</td></tr>'}</tbody></table>`,
       orientation: 'portrait',

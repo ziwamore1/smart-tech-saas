@@ -44,7 +44,7 @@ tr:nth-child(even) { background: {{secondaryColor}}; }
 {{/if}}
 <div class="school-name">{{schoolName}}</div>
 <div class="report-title">Curriculum Report Card</div>
-<div style="font-size:13px; margin-top:3px">{{academicYear}} — {{termName}}</div>
+<div style="font-size:13px; margin-top:3px">{{academicYear}} — {{termName}}{{#if examType}} | Exam: {{examType}}{{/if}}</div>
 {{#if headerText}}<div class="header-text">{{headerText}}</div>{{/if}}
 </div>
 
@@ -53,6 +53,7 @@ tr:nth-child(even) { background: {{secondaryColor}}; }
 <div class="info-box"><strong>Student:</strong> {{student.firstName}} {{student.lastName}}</div>
 <div class="info-box"><strong>Admission No:</strong> {{student.admissionNumber}}</div>
 <div class="info-box"><strong>Class:</strong> {{class.name}}</div>
+{{#if examType}}<div class="info-box"><strong>Exam Type:</strong> {{examType}}</div>{{/if}}
 <div class="info-box"><strong>Attendance:</strong> {{attendance.attendanceRate}}% ({{attendance.presentDays}}/{{attendance.totalDays}})</div>
 </div>
 </div>

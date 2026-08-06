@@ -35,6 +35,7 @@ export default function ReportHubPage() {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
+  const [selectedExamType, setSelectedExamType] = useState('END_TERM');
   const [selectedStudent, setSelectedStudent] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [generating, setGenerating] = useState(false);
@@ -102,6 +103,15 @@ export default function ReportHubPage() {
   const needsClass = selectedType && ['CLASS_REPORT', 'MARK_SCHEDULE', 'ATTENDANCE_REPORT', 'ANALYTICS_SUMMARY', 'RANKING_REPORT', 'RESULTS_ANALYSIS'].includes(selectedType);
   const needsTerm = selectedType && !['TRANSCRIPT'].includes(selectedType);
   const needsTemplate = selectedType === 'CERTIFICATE';
+  const examTypes = [
+    { value: 'END_TERM', label: 'End of Term' },
+    { value: 'MID_TERM', label: 'Mid-Term' },
+    { value: 'CAT', label: 'CAT' },
+    { value: 'ASSIGNMENT', label: 'Assignment' },
+    { value: 'PROJECT', label: 'Project' },
+    { value: 'PRACTICAL', label: 'Practical' },
+    { value: 'MOCK', label: 'Mock Examination' },
+  ];
 
   const canGenerate = selectedType && (!needsStudent || selectedStudent) && (!needsClass || selectedClass) && (!needsTerm || selectedTerm) && (!needsTemplate || selectedTemplate || ((templates || []).length === 0));
 
@@ -115,6 +125,7 @@ export default function ReportHubPage() {
       if (selectedStudent) payload.studentId = selectedStudent;
       if (selectedClass) payload.classId = selectedClass;
       if (selectedTerm) payload.termId = selectedTerm;
+      payload.examType = selectedExamType;
       if (needsTemplate && (selectedTemplate || (templates && templates.length === 1))) {
         payload.templateId = selectedTemplate || (templates as any)[0].id;
       }
@@ -237,6 +248,17 @@ export default function ReportHubPage() {
                 </select>
               </div>
             )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Exam Type</label>
+              <select
+                value={selectedExamType}
+                onChange={e => setSelectedExamType(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
+              >
+                {examTypes.map(exam => <option key={exam.value} value={exam.value}>{exam.label}</option>)}
+              </select>
+            </div>
 
             {needsStudent && selectedClass && (
               <div>

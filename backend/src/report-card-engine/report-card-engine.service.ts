@@ -19,6 +19,7 @@ export class ReportCardEngineService {
     studentId: string,
     termId: string,
     schoolId: string,
+    examType?: string,
   ) {
     const student = await this.prisma.student.findUnique({
       where: { id: studentId },
@@ -49,6 +50,17 @@ export class ReportCardEngineService {
     const term = await this.prisma.term.findUnique({
       where: { id: termId },
       include: { academicYear: true },
+    });
+
+    const resultSheet = await this.prisma.resultSheet.findFirst({
+      where: {
+        schoolId,
+        classId: enrollment.classId,
+        termId,
+        ...(examType ? { examType } : {}),
+      },
+      orderBy: { updatedAt: 'desc' },
+      select: { examType: true },
     });
 
     const computedResults = await this.prisma.computedResult.findMany({
@@ -486,6 +498,7 @@ export class ReportCardEngineService {
         startDate: term.startDate,
         endDate: term.endDate,
       },
+      examType: resultSheet?.examType || examType || 'END_TERM',
       subjectBreakdown: enrichedBreakdown,
       bestSubjects,
       totalPoints,
@@ -532,6 +545,7 @@ export class ReportCardEngineService {
     classId: string,
     termId: string,
     schoolId: string,
+    examType?: string,
   ) {
     const enrollments = await this.prisma.enrollment.findMany({
       where: { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
@@ -546,6 +560,7 @@ export class ReportCardEngineService {
           enrollment.studentId,
           termId,
           schoolId,
+          examType,
         );
         reportCards.push(data);
       } catch (error) {

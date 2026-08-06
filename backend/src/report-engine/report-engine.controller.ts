@@ -60,7 +60,7 @@ export class ReportEngineController {
   @Roles('Director', 'Class Teacher', 'Teacher')
   async validateRequest(
     @Req() req,
-    @Body() body: { type: ReportType; studentId?: string; classId?: string; termId?: string; templateId?: string },
+    @Body() body: { type: ReportType; studentId?: string; classId?: string; termId?: string; examType?: string; templateId?: string },
   ) {
     return this.reportEngine.validateGenerationRequest({
       ...body,
@@ -77,6 +77,7 @@ export class ReportEngineController {
       studentId?: string;
       classId?: string;
       termId?: string;
+      examType?: string;
       templateId?: string;
       options?: Record<string, any>;
     },
@@ -101,6 +102,7 @@ export class ReportEngineController {
       studentId?: string;
       classId?: string;
       termId?: string;
+      examType?: string;
       templateId?: string;
       options?: Record<string, any>;
     },
@@ -220,7 +222,7 @@ export class ReportEngineController {
   @Roles('Director', 'Class Teacher', 'Teacher', 'Parent', 'Student')
   async previewReportCard(
     @Req() req,
-    @Body() body: { studentId?: string; termId?: string; templateId?: string },
+    @Body() body: { studentId?: string; termId?: string; examType?: string; templateId?: string },
   ) {
     if (!body.studentId) {
       throw new BadRequestException('studentId is required');
@@ -261,6 +263,7 @@ export class ReportEngineController {
       type: ReportType;
       classId?: string;
       termId?: string;
+      examType?: string;
       templateId?: string;
       studentIds?: string[];
     },
