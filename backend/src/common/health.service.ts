@@ -86,28 +86,38 @@ export class HealthService {
 
   async backfillPhoneNumbers() {
     const startedAt = Date.now();
-    const results: Record<string, { scanned: number; updated: number }> = {};
+    const results: Record<string, { scanned: number; updated: number; error?: string }> = {};
     const models = ['user', 'parent', 'school', 'systemUser'];
 
     for (const modelName of models) {
-      const model = (this.prisma as any)[modelName];
-      const rows = await model.findMany({
-        where: { phone: { not: null } },
-        select: { id: true, phone: true },
-      });
-      let updated = 0;
-      for (const row of rows) {
-        const normalized = normalizeZambianPhone(row.phone);
-        if (normalized && normalized !== row.phone) {
-          await model.update({ where: { id: row.id }, data: { phone: normalized } });
-          updated++;
+      try {
+        const model = (this.prisma as any)[modelName];
+        const rows = await model.findMany({
+          where: { phone: { not: null } },
+          select: { id: true, phone: true },
+        });
+        const updates = rows
+          .map((row: { id: string; phone: string }) => ({ id: row.id, phone: normalizeZambianPhone(row.phone), original: row.phone }))
+          .filter((row: { phone: string | null; original: string }) => row.phone && row.phone !== row.original);
+        let updated = 0;
+
+        // Keep the endpoint below common reverse-proxy timeouts without
+        // creating an unbounded number of database connections.
+        for (let i = 0; i < updates.length; i += 50) {
+          const batch = updates.slice(i, i + 50);
+          const updatedRows = await Promise.all(batch.map((row: { id: string; phone: string | null }) =>
+            model.update({ where: { id: row.id }, data: { phone: row.phone } }),
+          ));
+          updated += updatedRows.length;
         }
+        results[modelName] = { scanned: rows.length, updated };
+      } catch (error: any) {
+        results[modelName] = { scanned: 0, updated: 0, error: error?.message || 'Backfill failed' };
       }
-      results[modelName] = { scanned: rows.length, updated };
     }
 
     return {
-      status: 'ok',
+      status: Object.values(results).some((value) => value.error) ? 'partial' : 'ok',
       operation: 'backfill-phone-numbers',
       format: '+260XXXXXXXXX',
       idempotent: true,
