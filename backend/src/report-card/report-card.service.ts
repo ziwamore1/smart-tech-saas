@@ -932,6 +932,83 @@ export class ReportCardService {
     return { buffer, url, publicId };
   }
 
+  /**
+   * Render the enhanced HBS report card for in-app previews and the report engine.
+   * Enhanced templates are document templates, not absolute-positioned builder canvases.
+   */
+  async generateEnhancedReportCardHtml(
+    schoolId: string,
+    studentId: string,
+    termId: string,
+  ): Promise<{ html: string; data: any }> {
+    const engineData = await this.reportCardEngineService.generateReportCardData(studentId, termId, schoolId);
+    const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+    if (!school) throw new Error('School not found');
+
+    const reportTemplate = await this.prisma.reportTemplate.findFirst({
+      where: { schoolId, isDefault: true },
+    }) || await this.prisma.reportTemplate.findFirst({ where: { schoolId } });
+    const templatePath = path.join(process.cwd(), 'src', 'templates', 'report-card-enhanced.hbs');
+    const templateHtml = fs.readFileSync(templatePath, 'utf8');
+    const commentData = await this.analyticsService.generateStudentComment(schoolId, studentId, termId);
+
+    const [midTermData, classComparison, classStats, gradingLegend] = await Promise.all([
+      this.reportCardEngineService.getMidTermComparison(studentId, termId, schoolId).catch(() => null),
+      this.reportCardEngineService.getClassComparison(studentId, termId, engineData.class?.id).catch(() => null),
+      this.reportCardEngineService.getClassStatistics(termId, engineData.class?.id, schoolId).catch(() => null),
+      this.reportCardEngineService.getGradingLegend(schoolId, engineData.class?.id).catch(() => null),
+    ]);
+
+    const now = new Date();
+    const generatedAtFormatted = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const templateData = {
+      schoolName: school.name,
+      schoolLogo: reportTemplate?.includeLogo !== false ? (school.logoUrl || school.logo) : undefined,
+      primaryColor: reportTemplate?.primaryColor || '#1976d2',
+      secondaryColor: reportTemplate?.secondaryColor || '#f5f5f5',
+      academicYear: engineData.academicYear?.name || '',
+      termName: engineData.term?.name || '',
+      student: engineData.student,
+      class: engineData.class,
+      subjectBreakdown: engineData.subjectBreakdown || [],
+      bestSubjects: engineData.bestSubjects || [],
+      totalPoints: engineData.totalPoints ?? 0,
+      bestSubjectsAverage: engineData.bestSubjectsAverage != null ? Math.round(engineData.bestSubjectsAverage * 100) / 100 : null,
+      division: engineData.division,
+      performanceCategory: engineData.performanceCategory,
+      attendance: engineData.attendance || { totalDays: 0, presentDays: 0, attendanceRate: 0 },
+      termSummary: engineData.termSummary,
+      curriculum: engineData.curriculum || { version: null, bestSubjectRule: null },
+      teacherComment: reportTemplate?.includeComments !== false ? commentData.teacherComment : undefined,
+      headComment: reportTemplate?.includeComments !== false ? commentData.headComment : undefined,
+      includeStamp: reportTemplate?.includeStamp || false,
+      includeSignature: reportTemplate?.includeSignature || false,
+      stampUrl: reportTemplate?.stampUrl,
+      signatureUrl: reportTemplate?.signatureUrl,
+      directorName: reportTemplate?.directorName || '',
+      headerText: reportTemplate?.headerText || '',
+      footerText: reportTemplate?.footerText || '',
+      showRemarks: reportTemplate?.remarksEnabled !== false,
+      generatedAt: engineData.generatedAt,
+      generatedAtFormatted,
+      classAverage: classStats?.classAverage ?? null,
+      midTermData,
+      classComparison,
+      gradeDistribution: classStats?.gradeDistribution ?? null,
+      histogramData: classStats?.histogramData ?? null,
+      gradingLegend: gradingLegend ?? [
+        { grade: 'A', range: '80-100', label: 'Distinction', color: '#10b981' },
+        { grade: 'B', range: '70-79', label: 'Merit', color: '#3b82f6' },
+        { grade: 'C', range: '60-69', label: 'Credit', color: '#f59e0b' },
+        { grade: 'D', range: '50-59', label: 'Pass', color: '#f97316' },
+        { grade: 'E', range: '40-49', label: 'Marginal Pass', color: '#fb923c' },
+        { grade: 'F', range: '0-39', label: 'Fail', color: '#ef4444' },
+      ],
+    };
+
+    return { html: handlebars.compile(templateHtml)(templateData), data: engineData };
+  }
+
   async generateClassCurriculumReportCardsPdf(
     schoolId: string,
     classId: string,

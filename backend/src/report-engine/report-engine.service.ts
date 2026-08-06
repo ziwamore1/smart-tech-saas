@@ -649,6 +649,15 @@ export class ReportEngineService {
     }
 
     request.templateId = template.id;
+    if ((template.metadata as any)?.enhancedProfessional) {
+      const enhanced = await this.reportCardService.generateEnhancedReportCardHtml(
+        schoolId,
+        studentId,
+        termId,
+      );
+      return { html: enhanced.html, templateId: template.id, engineData: enhanced.data };
+    }
+
     const engineData = await this.reportCardEngine.generateReportCardData(
       studentId, termId, schoolId,
     );
