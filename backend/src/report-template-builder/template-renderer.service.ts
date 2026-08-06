@@ -918,9 +918,9 @@ export class TemplateRendererService {
       .join(';');
   }
 
-  async renderPreview(schoolId: string, templateId: string, data?: any): Promise<string> {
+  async renderPreview(schoolId: string | undefined, templateId: string, data?: any): Promise<string> {
     const template = await this.prisma.reportTemplate.findFirst({
-      where: { id: templateId, schoolId },
+      where: { id: templateId, ...(schoolId ? { schoolId } : {}) },
       include: {
         components: { orderBy: { sortOrder: 'asc' } },
         certificate: true,
@@ -928,7 +928,7 @@ export class TemplateRendererService {
     });
     if (!template) throw new NotFoundException('Template not found');
 
-    const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+    const school = schoolId ? await this.prisma.school.findUnique({ where: { id: schoolId } }) : null;
 
     this.registerHelpers();
 

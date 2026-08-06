@@ -42,6 +42,7 @@ export default function TemplateDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [template, setTemplate] = useState<Template | null>(null);
+  const [previewHtml, setPreviewHtml] = useState('');
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -62,12 +63,14 @@ export default function TemplateDetailPage() {
   const loadTemplate = async () => {
     try {
       setLoading(true);
-      const [tplRes, marketRes] = await Promise.all([
+      const [tplRes, marketRes, previewRes] = await Promise.all([
         api.get(`/super-admin/academic-templates/${params.id}`),
         api.get('/template-builder/marketplace'),
+        api.post(`/super-admin/academic-templates/${params.id}/preview`, {}),
       ]);
       const tpl = tplRes.data?.data || tplRes.data;
       setTemplate(tpl);
+      setPreviewHtml(previewRes.data?.html || '');
 
       const marketItems = marketRes.data?.data || marketRes.data || [];
       const found = marketItems.find((m: any) => m.templateId === params.id);
@@ -284,7 +287,13 @@ export default function TemplateDetailPage() {
 
       {/* Tab Content */}
       {activeTab === 'preview' && (
-        <div style={{ background: '#fefcf9', borderRadius: '16px', border: '1px solid #f3f4f6', padding: '24px', minHeight: '500px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <>
+          {previewHtml && (
+            <div style={{ width: '100%', minHeight: '800px', background: '#d1d5db', borderRadius: '16px', overflow: 'hidden' }}>
+              <iframe title="Professional HBS template preview" srcDoc={previewHtml} style={{ width: '100%', height: '900px', border: '0', background: 'white' }} />
+            </div>
+          )}
+        <div style={{ display: previewHtml ? 'none' : 'flex', background: '#fefcf9', borderRadius: '16px', border: '1px solid #f3f4f6', padding: '24px', minHeight: '500px', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{
             width: template.orientation === 'landscape' ? '700px' : '500px',
             minHeight: template.orientation === 'landscape' ? '500px' : '700px',
@@ -461,6 +470,7 @@ export default function TemplateDetailPage() {
             <p style={{ fontSize: '13px', color: '#9ca3af', marginTop: '16px' }}>No components to display — this template has no components configured.</p>
           )}
         </div>
+        </>
       )}
 
       {activeTab === 'components' && (

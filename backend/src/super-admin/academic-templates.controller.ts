@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AcademicTemplatesService } from './academic-templates.service';
+import { TemplateRendererService } from '../report-template-builder/template-renderer.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -20,6 +21,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 export class AcademicTemplatesController {
   constructor(
     private readonly service: AcademicTemplatesService,
+    private readonly rendererService: TemplateRendererService,
   ) {}
 
   @Get('categories')
@@ -57,6 +59,12 @@ export class AcademicTemplatesController {
   @Get(':id')
   async getTemplate(@Param('id') id: string) {
     return this.service.getTemplate(id);
+  }
+
+  @Post(':id/preview')
+  async previewTemplate(@Param('id') id: string) {
+    const html = await this.rendererService.renderPreview(undefined, id);
+    return { html };
   }
 
   @Post()
