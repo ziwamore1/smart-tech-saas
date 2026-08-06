@@ -64,10 +64,10 @@ export class TemplateRendererService {
   private enforceMinimumFontSize(html: string): string {
     return html
       .replace(/(font-size\s*:\s*)(\d+(?:\.\d+)?)(px)/gi, (_match, prefix, value, unit) =>
-        `${prefix}${Math.max(12, Number(value))}${unit}`,
+        `${prefix}${Math.max(14, Number(value))}${unit}`,
       )
       .replace(/(font-size\s*=\s*["'])(\d+(?:\.\d+)?)(["'])/gi, (_match, prefix, value, suffix) =>
-        `${prefix}${Math.max(12, Number(value))}${suffix}`,
+        `${prefix}${Math.max(14, Number(value))}${suffix}`,
       );
   }
 
