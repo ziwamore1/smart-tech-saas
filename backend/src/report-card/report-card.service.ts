@@ -393,6 +393,7 @@ export class ReportCardService {
     const reportTemplate = template || await this.prisma.reportTemplate.findFirst({
       where: { schoolId },
     });
+    const primaryContext = await this.getPrimaryReportContext(studentId, termId, reportTemplate);
 
     const templatePath = path.join(
       process.cwd(),
@@ -856,6 +857,7 @@ export class ReportCardService {
     });
 
     // Select enhanced template (always use enhanced for curriculum reports)
+    const primaryContext = await this.getPrimaryReportContext(studentId, termId, reportTemplate);
     const templatePath = path.join(process.cwd(), 'src', 'templates', 'report-card-enhanced.hbs');
     let templateHtml = fs.readFileSync(templatePath, 'utf8');
 
@@ -868,6 +870,9 @@ export class ReportCardService {
       this.reportCardEngineService.getClassStatistics(termId, engineData.class?.id, schoolId).catch(() => null),
       this.reportCardEngineService.getGradingLegend(schoolId, engineData.class?.id).catch(() => null),
     ]);
+    const effectiveGradingLegend = primaryContext.isGrade7Ecz
+      ? await this.getGrade7GradingLegend(schoolId)
+      : gradingLegend;
 
     const now = new Date();
     const generatedAtFormatted = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
@@ -900,6 +905,8 @@ export class ReportCardService {
       headerText: reportTemplate?.headerText || '',
       footerText: reportTemplate?.footerText || '',
       showRemarks: reportTemplate?.remarksEnabled !== false,
+      reportTitle: this.getProfessionalReportTitle(reportTemplate),
+      ...primaryContext,
       generatedAt: engineData.generatedAt,
       generatedAtFormatted,
       // Enhanced data for charts and analysis
@@ -951,6 +958,7 @@ export class ReportCardService {
       : null) || await this.prisma.reportTemplate.findFirst({
         where: { schoolId, isDefault: true },
       }) || await this.prisma.reportTemplate.findFirst({ where: { schoolId } });
+    const primaryContext = await this.getPrimaryReportContext(studentId, termId, reportTemplate);
     const templatePath = path.join(process.cwd(), 'src', 'templates', 'report-card-enhanced.hbs');
     const templateHtml = fs.readFileSync(templatePath, 'utf8');
     const commentData = await this.analyticsService.generateStudentComment(schoolId, studentId, termId);
@@ -961,6 +969,9 @@ export class ReportCardService {
       this.reportCardEngineService.getClassStatistics(termId, engineData.class?.id, schoolId).catch(() => null),
       this.reportCardEngineService.getGradingLegend(schoolId, engineData.class?.id).catch(() => null),
     ]);
+    const effectiveGradingLegend = primaryContext.isGrade7Ecz
+      ? await this.getGrade7GradingLegend(schoolId)
+      : gradingLegend;
 
     const now = new Date();
     const generatedAtFormatted = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
@@ -1004,6 +1015,7 @@ export class ReportCardService {
       isGrade10Variant: this.getProfessionalReportVariant(reportTemplate).includes('grade-10'),
       isGrade11Variant: this.getProfessionalReportVariant(reportTemplate).includes('grade-11'),
       isGrade12Variant: this.getProfessionalReportVariant(reportTemplate).includes('grade-12'),
+      ...primaryContext,
       generatedAt: engineData.generatedAt,
       generatedAtFormatted,
       classAverage: classStats?.classAverage ?? null,
@@ -1011,7 +1023,7 @@ export class ReportCardService {
       classComparison,
       gradeDistribution: classStats?.gradeDistribution ?? null,
       histogramData: classStats?.histogramData ?? null,
-      gradingLegend: gradingLegend ?? [
+      gradingLegend: effectiveGradingLegend ?? [
         { grade: 'A', range: '80-100', label: 'Distinction', color: '#10b981' },
         { grade: 'B', range: '70-79', label: 'Merit', color: '#3b82f6' },
         { grade: 'C', range: '60-69', label: 'Credit', color: '#f59e0b' },
@@ -1029,6 +1041,48 @@ export class ReportCardService {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
+  }
+
+  private async getPrimaryReportContext(studentId: string, termId: string, template: any) {
+    const variant = this.getProfessionalReportVariant(template);
+    const isPrimarySchool = template?.metadata?.educationLevel === 'primary-school'
+      || variant.includes('grade-1-6')
+      || variant.includes('grade-7');
+    const grade7Result = isPrimarySchool
+      ? await this.prisma.grade7Result.findUnique({
+        where: { studentId_termId: { studentId, termId } },
+      })
+      : null;
+
+    return {
+      isPrimarySchool,
+      isGrade7Ecz: Boolean(grade7Result) || variant.includes('grade-7'),
+      grade7Result,
+    };
+  }
+
+  private async getGrade7GradingLegend(schoolId: string) {
+    const gradingSystem = await this.prisma.gradingSystem.findFirst({
+      where: { schoolId, name: 'ECZ Grade 7 Grading System' },
+      include: { gradeScales: true },
+    });
+    if (!gradingSystem?.gradeScales?.length) return null;
+
+    const colors: Record<string, string> = {
+      One: '#16a34a',
+      Two: '#2563eb',
+      Three: '#ca8a04',
+      Four: '#ea580c',
+      Five: '#dc2626',
+    };
+    return [...gradingSystem.gradeScales]
+      .sort((a, b) => (b.minScore ?? 0) - (a.minScore ?? 0))
+      .map((scale) => ({
+        grade: scale.grade,
+        range: `${scale.minScore ?? 0}-${scale.maxScore ?? 100}`,
+        label: scale.remark || scale.grade,
+        color: colors[scale.grade] || '#6b7280',
+      }));
   }
 
   private getProfessionalReportTitle(template: any): string {
@@ -1078,6 +1132,14 @@ export class ReportCardService {
       this.reportCardEngineService.getClassStatistics(termId, classId, schoolId).catch(() => null),
       this.reportCardEngineService.getGradingLegend(schoolId, classId).catch(() => null),
     ]);
+    const classPrimaryContext = await this.getPrimaryReportContext(
+      enrollments[0].studentId,
+      termId,
+      reportTemplate,
+    );
+    const effectiveClassGradingLegend = classPrimaryContext.isGrade7Ecz
+      ? await this.getGrade7GradingLegend(schoolId)
+      : gradingLegend;
 
     const now = new Date();
     const generatedAtFormatted = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
@@ -1089,6 +1151,7 @@ export class ReportCardService {
         e.studentId, termId, schoolId,
       );
       const commentData = await this.analyticsService.generateStudentComment(schoolId, e.studentId, termId);
+      const primaryContext = await this.getPrimaryReportContext(e.studentId, termId, reportTemplate);
 
       // Per-student enhanced data
       const [midTermData, classComparison] = await Promise.all([
@@ -1124,6 +1187,8 @@ export class ReportCardService {
         headerText: reportTemplate?.headerText || '',
         footerText: reportTemplate?.footerText || '',
         showRemarks: reportTemplate?.remarksEnabled !== false,
+        reportTitle: this.getProfessionalReportTitle(reportTemplate),
+        ...primaryContext,
         generatedAt: engineData.generatedAt,
         generatedAtFormatted,
         // Enhanced data
@@ -1132,7 +1197,7 @@ export class ReportCardService {
         classComparison,
         gradeDistribution: classStats?.gradeDistribution ?? null,
         histogramData: classStats?.histogramData ?? null,
-        gradingLegend: gradingLegend ?? [
+        gradingLegend: effectiveClassGradingLegend ?? [
           { grade: 'A', range: '80-100', label: 'Distinction', color: '#10b981' },
           { grade: 'B', range: '70-79', label: 'Merit', color: '#3b82f6' },
           { grade: 'C', range: '60-69', label: 'Credit', color: '#f59e0b' },

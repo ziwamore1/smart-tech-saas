@@ -1087,6 +1087,9 @@ export class TemplateRendererService {
       : variant.includes('grade-12') ? 'GRADE 12 ACADEMIC REPORT CARD'
       : variant.includes('grade-1-6') ? 'GRADE 1-6 CONTINUOUS ASSESSMENT REPORT'
       : 'STUDENT REPORT CARD';
+    const isPrimarySchool = template.metadata?.educationLevel === 'primary-school'
+      || variant.includes('grade-1-6')
+      || variant.includes('grade-7');
     const professionalData = {
       ...data,
       schoolName: school?.name || data.schoolName || '',
@@ -1107,6 +1110,9 @@ export class TemplateRendererService {
       isAdvancedVariant: ['form-5-report', 'form-6-report'].includes(variant),
       isExaminationVariant: ['grade-7-ecz', 'grade-7-mock'].includes(variant),
       isTranscriptVariant: variant.includes('transcript'),
+      isPrimarySchool,
+      isGrade7Ecz: variant.includes('grade-7'),
+      grade7Result: null,
       isForm1Variant: variant.includes('form-1'),
       isForm2Variant: variant.includes('form-2'),
       isGrade10Variant: variant.includes('grade-10'),
