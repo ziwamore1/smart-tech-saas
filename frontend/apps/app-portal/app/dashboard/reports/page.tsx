@@ -171,6 +171,19 @@ export default function ReportsPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [publishStatus, setPublishStatus] = useState<any>(null);
 
+  const createPdfPreviewUrl = (data: BlobPart) => {
+    const blob = data instanceof Blob && data.type === 'application/pdf'
+      ? data
+      : new Blob([data], { type: 'application/pdf' });
+    return URL.createObjectURL(blob);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
   const { data: classesData } = useQuery({
     queryKey: ['classes'],
     queryFn: async () => {
@@ -256,14 +269,14 @@ export default function ReportsPage() {
         const response = await api.get(`/report-card/${selectedStudent}/${selectedTerm}/pdf`, {
           responseType: 'blob',
         });
-        const url = URL.createObjectURL(new Blob([response.data]));
+        const url = createPdfPreviewUrl(response.data);
         setPreviewUrl(url);
         setSuccessMessage('Report card generated successfully!');
       } else if (reportType === 'class-report-cards') {
         const response = await api.get(`/report-card/class/${selectedClass}/term/${selectedTerm}/pdf`, {
           responseType: 'blob',
         });
-        const url = URL.createObjectURL(new Blob([response.data]));
+        const url = createPdfPreviewUrl(response.data);
         setPreviewUrl(url);
         setSuccessMessage('Class report cards generated successfully!');
       } else if (reportType === 'transcript') {
@@ -278,7 +291,7 @@ export default function ReportsPage() {
           const response = await api.get(`/report-card/transcript/${selectedStudent}/pdf`, {
             responseType: 'blob',
           });
-          const url = URL.createObjectURL(new Blob([response.data]));
+          const url = createPdfPreviewUrl(response.data);
           setPreviewUrl(url);
           setSuccessMessage('Transcript generated successfully!');
         } catch (transcriptErr: any) {
@@ -287,7 +300,7 @@ export default function ReportsPage() {
         }
       } else if (reportType === 'class-summary') {
         const response = await publishingApi.getClassSummaryPdf(selectedClass, selectedTerm);
-        const url = URL.createObjectURL(new Blob([response.data]));
+        const url = createPdfPreviewUrl(response.data);
         setPreviewUrl(url);
         setSuccessMessage('Class summary report generated successfully!');
       }

@@ -1946,7 +1946,7 @@ export class ReportEngineService {
 
     const page = await browser.newPage();
     page.setDefaultTimeout(60000);
-    await page.setContent(html, { waitUntil: 'networkidle0' as any });
+    await page.setContent(this.enforceMinimumFontSize(html), { waitUntil: 'networkidle0' as any });
 
     const pdf = await page.pdf({
       format: 'A4',
@@ -1955,6 +1955,16 @@ export class ReportEngineService {
 
     await browser.close();
     return Buffer.from(pdf);
+  }
+
+  private enforceMinimumFontSize(html: string): string {
+    return html
+      .replace(/(font-size\s*:\s*)(\d+(?:\.\d+)?)(px)/gi, (_match, prefix, value, unit) =>
+        `${prefix}${Math.max(12, Number(value))}${unit}`,
+      )
+      .replace(/(font-size\s*=\s*["'])(\d+(?:\.\d+)?)(["'])/gi, (_match, prefix, value, suffix) =>
+        `${prefix}${Math.max(12, Number(value))}${suffix}`,
+      );
   }
 
   private computeGrade(score: number, categories: any[]): string {
