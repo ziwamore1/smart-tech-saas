@@ -190,6 +190,96 @@ export class HealthService {
     return { status: 'started', operation: 'backfill-class-sequences', jobId };
   }
 
+  async auditClassRegisters() {
+    const startedAt = Date.now();
+    const registers: Array<Record<string, any>> = [];
+
+    try {
+      const academicYears = await this.prisma.academicYear.findMany({
+        select: { id: true, schoolId: true, name: true, startDate: true, isCurrent: true },
+        orderBy: { startDate: 'asc' },
+      });
+
+      for (const academicYear of academicYears) {
+        const classes = await this.prisma.class.findMany({
+          where: { schoolId: academicYear.schoolId },
+          select: { id: true, name: true },
+        });
+
+        for (const classItem of classes) {
+          const enrollments = await this.prisma.enrollment.findMany({
+            where: {
+              schoolId: academicYear.schoolId,
+              academicYearId: academicYear.id,
+              classId: classItem.id,
+              status: 'ACTIVE',
+            },
+            orderBy: [{ sequenceNumber: 'asc' }, { student: { admissionNumber: 'asc' } }],
+            select: {
+              id: true,
+              sequenceNumber: true,
+              status: true,
+              student: {
+                select: { id: true, firstName: true, lastName: true, admissionNumber: true, classId: true, status: true },
+              },
+            },
+          });
+
+          if (enrollments.length === 0) continue;
+
+          const year = academicYear.startDate.getFullYear();
+          let contiguous = true;
+          let allMatch = true;
+          enrollments.forEach((enrollment, index) => {
+            const expected = `ST-${year}-${String(index + 1).padStart(3, '0')}`;
+            if (enrollment.sequenceNumber !== index + 1) contiguous = false;
+            if (enrollment.student.admissionNumber !== expected) allMatch = false;
+          });
+
+          registers.push({
+            schoolId: academicYear.schoolId,
+            academicYearId: academicYear.id,
+            academicYear: academicYear.name,
+            isCurrent: academicYear.isCurrent,
+            classId: classItem.id,
+            className: classItem.name,
+            year,
+            count: enrollments.length,
+            sequenceContiguous: contiguous,
+            admissionMatchesSequence: allMatch,
+            students: enrollments.map((enrollment) => ({
+              position: enrollment.sequenceNumber,
+              name: `${enrollment.student.firstName} ${enrollment.student.lastName}`,
+              admissionNumber: enrollment.student.admissionNumber,
+              studentClassId: enrollment.student.classId,
+              enrollmentClassId: classItem.id,
+              classIdMatches: enrollment.student.classId === classItem.id,
+              studentStatus: enrollment.student.status,
+              enrollmentStatus: enrollment.status,
+            })),
+          });
+        }
+      }
+    } catch (error: any) {
+      return {
+        status: 'error',
+        operation: 'audit-class-registers',
+        message: error?.message || 'Audit failed',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    return {
+      status: 'ok',
+      operation: 'audit-class-registers',
+      registerCount: registers.length,
+      registersWithGaps: registers.filter((r) => !r.sequenceContiguous).length,
+      registersWithStaleAdmission: registers.filter((r) => !r.admissionMatchesSequence).length,
+      latencyMs: Date.now() - startedAt,
+      registers,
+    };
+  }
+
   getClassSequenceBackfillStatus(jobId?: string) {
     const jobIds = [...this.sequenceBackfillJobs.keys()];
     const selectedId = jobId || jobIds[jobIds.length - 1];

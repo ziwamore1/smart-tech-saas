@@ -476,10 +476,10 @@ export class StudentService {
   ) {
     const where: Prisma.StudentWhereInput = { schoolId };
 
-    if (!options?.includeInactive) {
-      where.status = StudentStatus.ACTIVE;
-    } else if (options?.status) {
+    if (options?.status) {
       where.status = options.status as StudentStatus;
+    } else if (!options?.includeInactive) {
+      where.status = StudentStatus.ACTIVE;
     }
 
     if (options?.classId) {
@@ -515,7 +515,12 @@ export class StudentService {
           dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
           gender: true, photoUrl: true, photoPublicId: true,
           enrollments: {
-            where: options?.classId ? { classId: options.classId, status: EnrollmentStatus.ACTIVE } : undefined,
+            where: options?.classId
+              ? {
+                  classId: options.classId,
+                  ...(options.includeInactive ? {} : { status: EnrollmentStatus.ACTIVE }),
+                }
+              : undefined,
             take: 1,
             orderBy: options?.classId
               ? [{ sequenceNumber: 'asc' as const }, { academicYear: { startDate: 'desc' as const } }]

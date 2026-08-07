@@ -35,6 +35,11 @@ export class HealthController {
     return this.healthService.checkClassSequences();
   }
 
+  @Get('audit:class-registers')
+  async auditClassRegisters() {
+    return this.healthService.auditClassRegisters();
+  }
+
   @Get('backfill:class-sequences')
   async backfillClassSequences() {
     return this.healthService.startClassSequenceBackfill();

@@ -363,7 +363,7 @@ export default function StudentsPage() {
       student.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.admissionNumber?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesClass = filterClass === '' || student.enrollments?.some((e: any) => e.classId === filterClass && e.status?.toUpperCase() === 'ACTIVE');
+    const matchesClass = filterClass === '' || student.enrollments?.some((e: any) => e.classId === filterClass && (includeInactive || e.status?.toUpperCase() === 'ACTIVE'));
     const matchesStatus = filterStatus === '' || student.status === filterStatus;
     return matchesSearch && matchesClass && matchesStatus;
   });
