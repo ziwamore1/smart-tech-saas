@@ -140,7 +140,6 @@ export class AdmissionNumberService {
       data: { sequenceNumber: null },
     });
 
-    const currentClassStudents = orderedEnrollments.filter((enrollment) => enrollment.student.classId === classId);
     const attachedStudents = await tx.student.findMany({
       where: { classId },
       select: { id: true, admissionNumber: true },
@@ -159,21 +158,18 @@ export class AdmissionNumberService {
         where: { id: enrollment.id },
         data: { sequenceNumber: i + 1 },
       });
-      if (enrollment.student.classId === classId) {
-        await tx.student.update({
-          where: { id: enrollment.student.id },
-          data: { admissionNumber: `${prefix}${String(i + 1).padStart(3, '0')}` },
-        });
-      }
+      await tx.student.update({
+        where: { id: enrollment.student.id },
+        data: { admissionNumber: `${prefix}${String(i + 1).padStart(3, '0')}` },
+      });
     }
 
-    const activeStudentIds = new Set(currentClassStudents.map((enrollment) => enrollment.student.id));
+    const activeStudentIds = new Set(orderedEnrollments.map((enrollment) => enrollment.student.id));
     for (const student of attachedStudents) {
       if (activeStudentIds.has(student.id)) continue;
       const original = originalNumbers.get(student.id)!;
       const isUsedByActive = orderedEnrollments.some((enrollment, index) =>
-        enrollment.student.classId === classId
-        && `ST-${year}-${String(index + 1).padStart(3, '0')}` === original,
+        `ST-${year}-${String(index + 1).padStart(3, '0')}` === original,
       );
       await tx.student.update({
         where: { id: student.id },
