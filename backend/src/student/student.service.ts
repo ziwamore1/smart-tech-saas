@@ -524,6 +524,7 @@ export class StudentService {
               id: true,
               status: true,
               sequenceNumber: true,
+              classId: true,
               class: { select: { id: true, name: true } },
               academicYear: { select: { id: true, name: true } },
             },
