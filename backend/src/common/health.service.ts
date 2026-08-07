@@ -190,17 +190,24 @@ export class HealthService {
     return { status: 'started', operation: 'backfill-class-sequences', jobId };
   }
 
-  async auditClassRegisters() {
+  async auditClassRegisters(schoolIdFilter?: string) {
     const startedAt = Date.now();
     const registers: Array<Record<string, any>> = [];
 
     try {
+      const schools = await this.prisma.school.findMany({
+        select: { id: true, name: true },
+      });
+      const schoolNameById = new Map(schools.map((school) => [school.id, school.name]));
+
       const academicYears = await this.prisma.academicYear.findMany({
         select: { id: true, schoolId: true, name: true, startDate: true, isCurrent: true },
         orderBy: { startDate: 'asc' },
       });
 
       for (const academicYear of academicYears) {
+        if (schoolIdFilter && academicYear.schoolId !== schoolIdFilter) continue;
+
         const classes = await this.prisma.class.findMany({
           where: { schoolId: academicYear.schoolId },
           select: { id: true, name: true },
@@ -238,6 +245,7 @@ export class HealthService {
 
           registers.push({
             schoolId: academicYear.schoolId,
+            schoolName: schoolNameById.get(academicYear.schoolId) || null,
             academicYearId: academicYear.id,
             academicYear: academicYear.name,
             isCurrent: academicYear.isCurrent,

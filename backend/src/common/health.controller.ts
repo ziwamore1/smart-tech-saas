@@ -36,8 +36,8 @@ export class HealthController {
   }
 
   @Get('audit:class-registers')
-  async auditClassRegisters() {
-    return this.healthService.auditClassRegisters();
+  async auditClassRegisters(@Query('schoolId') schoolId?: string) {
+    return this.healthService.auditClassRegisters(schoolId);
   }
 
   @Get('backfill:class-sequences')
