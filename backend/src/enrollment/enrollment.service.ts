@@ -84,9 +84,8 @@ export class EnrollmentService {
         classId,
         status: EnrollmentStatus.ACTIVE,
       },
-      include: {
-        student: true,
-      },
+      include: { student: true },
+      orderBy: [{ sequenceNumber: 'asc' }, { student: { admissionNumber: 'asc' } }],
     });
   }
 

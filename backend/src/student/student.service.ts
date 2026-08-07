@@ -504,20 +504,22 @@ export class StudentService {
     const page = options?.page || 1;
     const limit = options?.limit || 100;
     const skip = (page - 1) * limit;
+    const sortByClassSequence = Boolean(options?.classId);
 
     const [students, total] = await this.prisma.$transaction([
       this.prisma.student.findMany({
         where,
-        skip,
-        take: limit,
-        orderBy: { lastName: 'asc' },
+        ...(sortByClassSequence ? {} : { skip, take: limit, orderBy: { lastName: 'asc' as const } }),
         select: {
           id: true, admissionNumber: true, studentUuid: true, status: true,
           dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
           gender: true, photoUrl: true, photoPublicId: true,
           enrollments: {
+            where: options?.classId ? { classId: options.classId, status: EnrollmentStatus.ACTIVE } : undefined,
             take: 1,
-            orderBy: { academicYear: { startDate: 'desc' } },
+            orderBy: options?.classId
+              ? [{ sequenceNumber: 'asc' as const }, { academicYear: { startDate: 'desc' as const } }]
+              : { academicYear: { startDate: 'desc' as const } },
             select: {
               id: true,
               status: true,
@@ -532,8 +534,19 @@ export class StudentService {
       this.prisma.student.count({ where }),
     ]);
 
+    if (sortByClassSequence) {
+      students.sort((a, b) => {
+        const aSequence = a.enrollments[0]?.sequenceNumber;
+        const bSequence = b.enrollments[0]?.sequenceNumber;
+        if (aSequence != null && bSequence != null && aSequence !== bSequence) return aSequence - bSequence;
+        if (aSequence != null) return -1;
+        if (bSequence != null) return 1;
+        return a.admissionNumber.localeCompare(b.admissionNumber, undefined, { numeric: true });
+      });
+    }
+
     return {
-      data: students.map(s => ({
+      data: students.slice(sortByClassSequence ? skip : 0, sortByClassSequence ? skip + limit : undefined).map(s => ({
         ...s,
         className: (s as any).enrollments?.[0]?.class?.name || null,
         grade: null,
