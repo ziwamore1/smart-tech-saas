@@ -381,8 +381,8 @@ export default function StudentsPage() {
 
   sortedClassGroups.forEach(([, group]) => {
     group.sort((a: any, b: any) => {
-      const aSequence = a.enrollments?.[0]?.sequenceNumber;
-      const bSequence = b.enrollments?.[0]?.sequenceNumber;
+      const aSequence = a.sequenceNumber ?? a.enrollments?.[0]?.sequenceNumber;
+      const bSequence = b.sequenceNumber ?? b.enrollments?.[0]?.sequenceNumber;
       if (aSequence != null && bSequence != null && aSequence !== bSequence) return aSequence - bSequence;
       return (a.admissionNumber || '').localeCompare(b.admissionNumber || '', undefined, { numeric: true });
     });

@@ -548,6 +548,7 @@ export class StudentService {
     return {
       data: students.slice(sortByClassSequence ? skip : 0, sortByClassSequence ? skip + limit : undefined).map(s => ({
         ...s,
+        sequenceNumber: (s as any).enrollments?.[0]?.sequenceNumber ?? null,
         className: (s as any).enrollments?.[0]?.class?.name || null,
         grade: null,
         parentCount: (s as any).parents?.length || 0,

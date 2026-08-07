@@ -88,6 +88,7 @@ export default function ClassListPage() {
     const raw = Array.isArray(studentsData) ? studentsData : (studentsData.students || []);
     return raw.map((s: any) => ({
       id: s.id || s.studentId,
+      sequenceNumber: s.sequenceNumber ?? s.enrollments?.[0]?.sequenceNumber ?? null,
       admissionNumber: s.admissionNumber || '-',
       firstName: s.firstName || '',
       lastName: s.lastName || '',
@@ -96,7 +97,12 @@ export default function ClassListPage() {
       dateOfBirth: s.dateOfBirth || null,
       age: s.dateOfBirth ? calculateAge(s.dateOfBirth) : null,
       status: s.enrollments?.[0]?.status || 'ACTIVE',
-    }));
+    })).sort((a: any, b: any) => {
+      if (a.sequenceNumber != null && b.sequenceNumber != null && a.sequenceNumber !== b.sequenceNumber) return a.sequenceNumber - b.sequenceNumber;
+      if (a.sequenceNumber != null) return -1;
+      if (b.sequenceNumber != null) return 1;
+      return a.admissionNumber.localeCompare(b.admissionNumber, undefined, { numeric: true });
+    });
   }, [studentsData]);
 
   const filteredStudents = useMemo(() => {
