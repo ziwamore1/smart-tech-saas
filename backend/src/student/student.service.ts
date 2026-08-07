@@ -502,7 +502,7 @@ export class StudentService {
     }
 
     const page = options?.page || 1;
-    const limit = options?.limit || 100;
+    const limit = Math.min(options?.limit && options.limit > 0 ? options.limit : 10000, 10000);
     const skip = (page - 1) * limit;
     const sortByClassSequence = Boolean(options?.classId);
 
