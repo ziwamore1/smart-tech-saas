@@ -79,10 +79,20 @@ export class AdmissionNumberService {
    * column is updated, never the linked User record.
    */
   async resequenceClass(schoolId: string, academicYearId: string, classId: string): Promise<void> {
-    await this.prisma.$transaction(
-      (tx) => this.resequenceClassInTransaction(tx, schoolId, academicYearId, classId),
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 },
-    );
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        await this.prisma.$transaction(
+          (tx) => this.resequenceClassInTransaction(tx, schoolId, academicYearId, classId),
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 },
+        );
+        return;
+      } catch (error: any) {
+        const message = String(error?.message || '');
+        const retryable = error?.code === 'P2034' || message.includes('write conflict') || message.includes('deadlock');
+        if (!retryable || attempt === 3) throw error;
+        await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+      }
+    }
   }
 
   async resequenceClassInTransaction(
@@ -131,10 +141,15 @@ export class AdmissionNumberService {
     });
 
     const currentClassStudents = orderedEnrollments.filter((enrollment) => enrollment.student.classId === classId);
-    for (const enrollment of currentClassStudents) {
+    const attachedStudents = await tx.student.findMany({
+      where: { classId },
+      select: { id: true, admissionNumber: true },
+    });
+    const originalNumbers = new Map(attachedStudents.map((student) => [student.id, student.admissionNumber]));
+    for (const student of attachedStudents) {
       await tx.student.update({
-        where: { id: enrollment.student.id },
-        data: { admissionNumber: `TMP-${enrollment.student.id.slice(0, 12)}` },
+        where: { id: student.id },
+        data: { admissionNumber: `TMP-${student.id.slice(0, 12)}` },
       });
     }
 
@@ -150,6 +165,20 @@ export class AdmissionNumberService {
           data: { admissionNumber: `${prefix}${String(i + 1).padStart(3, '0')}` },
         });
       }
+    }
+
+    const activeStudentIds = new Set(currentClassStudents.map((enrollment) => enrollment.student.id));
+    for (const student of attachedStudents) {
+      if (activeStudentIds.has(student.id)) continue;
+      const original = originalNumbers.get(student.id)!;
+      const isUsedByActive = orderedEnrollments.some((enrollment, index) =>
+        enrollment.student.classId === classId
+        && `ST-${year}-${String(index + 1).padStart(3, '0')}` === original,
+      );
+      await tx.student.update({
+        where: { id: student.id },
+        data: { admissionNumber: isUsedByActive ? `HIST-${student.id.slice(0, 12)}` : original },
+      });
     }
 
     await tx.admissionSequence.upsert({
