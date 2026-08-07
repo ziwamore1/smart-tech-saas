@@ -111,6 +111,12 @@ export class AdmissionNumberService {
 
     const year = academicYear.startDate.getFullYear();
     const prefix = `ST-${year}-`;
+    const latestAcademicYear = await tx.academicYear.findFirst({
+      where: { schoolId },
+      orderBy: { startDate: 'desc' },
+      select: { id: true },
+    });
+    const isVisibleRegister = academicYear.isCurrent || latestAcademicYear?.id === academicYearId;
 
     const enrollments = await tx.enrollment.findMany({
       where: {
@@ -140,16 +146,12 @@ export class AdmissionNumberService {
       data: { sequenceNumber: null },
     });
 
-    const attachedStudents = await tx.student.findMany({
-      where: { classId },
-      select: { id: true, admissionNumber: true },
-    });
+    const attachedStudents = isVisibleRegister
+      ? await tx.student.findMany({ where: { classId }, select: { id: true, admissionNumber: true } })
+      : [];
     const originalNumbers = new Map(attachedStudents.map((student) => [student.id, student.admissionNumber]));
     for (const student of attachedStudents) {
-      await tx.student.update({
-        where: { id: student.id },
-        data: { admissionNumber: `TMP-${student.id.slice(0, 12)}` },
-      });
+      await tx.student.update({ where: { id: student.id }, data: { admissionNumber: `TMP-${student.id.slice(0, 12)}` } });
     }
 
     for (let i = 0; i < orderedEnrollments.length; i++) {
@@ -158,10 +160,12 @@ export class AdmissionNumberService {
         where: { id: enrollment.id },
         data: { sequenceNumber: i + 1 },
       });
-      await tx.student.update({
-        where: { id: enrollment.student.id },
-        data: { admissionNumber: `${prefix}${String(i + 1).padStart(3, '0')}` },
-      });
+      if (isVisibleRegister) {
+        await tx.student.update({
+          where: { id: enrollment.student.id },
+          data: { admissionNumber: `${prefix}${String(i + 1).padStart(3, '0')}` },
+        });
+      }
     }
 
     const activeStudentIds = new Set(orderedEnrollments.map((enrollment) => enrollment.student.id));
