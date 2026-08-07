@@ -37,7 +37,12 @@ export class HealthController {
 
   @Get('backfill:class-sequences')
   async backfillClassSequences() {
-    return this.healthService.backfillClassSequences();
+    return this.healthService.startClassSequenceBackfill();
+  }
+
+  @Get('backfill:class-sequences/status')
+  async classSequenceBackfillStatus(@Query('jobId') jobId?: string) {
+    return this.healthService.getClassSequenceBackfillStatus(jobId);
   }
 
   @Get('prisma-test')

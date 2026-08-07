@@ -5,6 +5,7 @@ import { BlockchainService } from '../blockchain-service/blockchain.service';
 import { Pool } from 'pg';
 import { normalizeZambianPhone } from './utils/phone.util';
 import { AdmissionNumberService } from '../admission-number/admission-number.service';
+import { randomUUID } from 'crypto';
 
 export interface HealthCheckResult {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -24,6 +25,15 @@ export interface HealthCheck {
 export class HealthService {
   private readonly startTime = Date.now();
   private readonly version = process.env.npm_package_version || '2.0.0';
+  private readonly sequenceBackfillJobs = new Map<string, {
+    status: 'queued' | 'running' | 'completed' | 'partial' | 'failed';
+    startedAt: string;
+    finishedAt?: string;
+    registersScanned: number;
+    registersRepaired: number;
+    activeEnrollmentsProcessed: number;
+    errors: Array<{ schoolId: string; academicYearId: string; classId: string; message: string }>;
+  }>();
 
   constructor(
     private prisma: PrismaService,
@@ -160,53 +170,76 @@ export class HealthService {
     }
   }
 
-  async backfillClassSequences() {
-    const startedAt = Date.now();
-    const groups = await this.prisma.enrollment.groupBy({
-      by: ['schoolId', 'academicYearId', 'classId'],
-      where: { status: 'ACTIVE' },
-    });
-    let repaired = 0;
-    let students = 0;
-    const errors: Array<{ schoolId: string; academicYearId: string; classId: string; message: string }> = [];
+  async startClassSequenceBackfill() {
+    const running = [...this.sequenceBackfillJobs.entries()].find(([, job]) => job.status === 'queued' || job.status === 'running');
+    if (running) {
+      return { status: 'already-running', operation: 'backfill-class-sequences', jobId: running[0] };
+    }
 
-    for (const group of groups) {
-      try {
-        const count = await this.prisma.enrollment.count({
-          where: {
+    const jobId = randomUUID();
+    this.sequenceBackfillJobs.set(jobId, {
+      status: 'queued',
+      startedAt: new Date().toISOString(),
+      registersScanned: 0,
+      registersRepaired: 0,
+      activeEnrollmentsProcessed: 0,
+      errors: [],
+    });
+
+    void this.runClassSequenceBackfill(jobId);
+    return { status: 'started', operation: 'backfill-class-sequences', jobId };
+  }
+
+  getClassSequenceBackfillStatus(jobId?: string) {
+    const jobIds = [...this.sequenceBackfillJobs.keys()];
+    const selectedId = jobId || jobIds[jobIds.length - 1];
+    if (!selectedId) return { status: 'not-found', operation: 'backfill-class-sequences' };
+    const job = this.sequenceBackfillJobs.get(selectedId);
+    if (!job) return { status: 'not-found', operation: 'backfill-class-sequences', jobId: selectedId };
+    return { operation: 'backfill-class-sequences', jobId: selectedId, ...job };
+  }
+
+  private async runClassSequenceBackfill(jobId: string) {
+    const job = this.sequenceBackfillJobs.get(jobId);
+    if (!job) return;
+    job.status = 'running';
+
+    try {
+      const groups = await this.prisma.enrollment.groupBy({
+        by: ['schoolId', 'academicYearId', 'classId'],
+        where: { status: 'ACTIVE' },
+      });
+      job.registersScanned = groups.length;
+
+      for (const group of groups) {
+        try {
+          const count = await this.prisma.enrollment.count({
+            where: {
+              schoolId: group.schoolId,
+              academicYearId: group.academicYearId,
+              classId: group.classId,
+              status: 'ACTIVE',
+            },
+          });
+          await this.admissionNumberService.resequenceClass(group.schoolId, group.academicYearId, group.classId);
+          job.registersRepaired += 1;
+          job.activeEnrollmentsProcessed += count;
+        } catch (error: any) {
+          job.errors.push({
             schoolId: group.schoolId,
             academicYearId: group.academicYearId,
             classId: group.classId,
-            status: 'ACTIVE',
-          },
-        });
-        await this.admissionNumberService.resequenceClass(
-          group.schoolId,
-          group.academicYearId,
-          group.classId,
-        );
-        repaired += 1;
-        students += count;
-      } catch (error: any) {
-        errors.push({
-          schoolId: group.schoolId,
-          academicYearId: group.academicYearId,
-          classId: group.classId,
-          message: error?.message || 'Failed to resequence register',
-        });
+            message: error?.message || 'Failed to resequence register',
+          });
+        }
       }
+      job.status = job.errors.length > 0 ? 'partial' : 'completed';
+    } catch (error: any) {
+      job.status = 'failed';
+      job.errors.push({ schoolId: '', academicYearId: '', classId: '', message: error?.message || 'Backfill failed' });
+    } finally {
+      job.finishedAt = new Date().toISOString();
     }
-
-    return {
-      status: errors.length > 0 ? 'partial' : 'ok',
-      operation: 'backfill-class-sequences',
-      idempotent: true,
-      registersScanned: groups.length,
-      registersRepaired: repaired,
-      activeEnrollmentsProcessed: students,
-      errors,
-      latencyMs: Date.now() - startedAt,
-    };
   }
 
   /**
