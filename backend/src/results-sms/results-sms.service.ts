@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsProviderFactory } from '../communications-cloud/providers/sms/sms-provider.factory';
 import { SmsProvider } from '../communications-cloud/interfaces/provider.interface';
+import { ReportCardEngineService } from '../report-card-engine/report-card-engine.service';
 
 const SINGLE_SMS_LIMIT = 160;
 
@@ -10,7 +11,11 @@ const SINGLE_SMS_LIMIT = 160;
 export class ResultsSmsService {
   private readonly logger = new Logger(ResultsSmsService.name);
 
-  constructor(private prisma: PrismaService, private smsProviderFactory: SmsProviderFactory) {}
+  constructor(
+    private prisma: PrismaService,
+    private smsProviderFactory: SmsProviderFactory,
+    private reportCardEngine: ReportCardEngineService,
+  ) {}
 
   /** The formatter consumes published computed results; it never grades or recalculates them. */
   async getRecipients(schoolId: string, classId: string, termId: string, studentIds?: string[]) {
@@ -32,7 +37,7 @@ export class ResultsSmsService {
       where: { schoolId, classId, termId, studentId: { in: students.map((s) => s.id) } },
     });
     const [school, term, klass] = await Promise.all([
-      this.prisma.school.findUnique({ where: { id: schoolId }, select: { name: true } }),
+      this.prisma.school.findUnique({ where: { id: schoolId }, select: { name: true, institutionType: { select: { code: true } } } }),
       this.prisma.term.findUnique({ where: { id: termId }, select: { name: true, academicYear: { select: { name: true } } } }),
       this.prisma.class.findUnique({ where: { id: classId }, select: { name: true } }),
     ]);
@@ -42,16 +47,28 @@ export class ResultsSmsService {
       const rows = computed.filter((r) => r.studentId === student.id);
       if (!rows.length) continue;
       const summary = summaries.find((s) => s.studentId === student.id);
-      const version = createHash('sha256').update(JSON.stringify({ rows, summary })).digest('hex');
+      const report = await this.reportCardEngine.generateReportCardData(student.id, termId, schoolId);
+      const isPrimary = school?.institutionType?.code === 'PRIMARY_SCHOOL';
+      const officialSubjects = report.subjectBreakdown.map((subject: any) => ({
+        name: subject.subjectName,
+        code: subject.subjectCode,
+        mark: isPrimary ? subject.totalRawScore : null,
+        grade: subject.finalGrade,
+        remark: subject.finalRemark,
+        points: subject.points,
+        absent: false,
+      }));
+      const version = createHash('sha256').update(JSON.stringify({ rows, summary, report })).digest('hex');
       const result = {
-        subjects: rows.map((r) => ({ name: r.subject.name, code: r.subject.code, mark: r.finalPercentage, grade: r.finalGrade, remark: r.finalRemark, points: r.points, absent: r.isAbsent })),
-        total: rows.some((r) => r.totalRawScore != null) ? Number(rows.reduce((sum, r) => sum + (r.totalRawScore || 0), 0).toFixed(1)) : null,
-        overall: summary?.overallPercentage == null ? null : Number(summary.overallPercentage.toFixed(1)),
-        grade: summary?.overallGrade ?? null,
-        division: (summary?.competencyScores as any)?.division ?? null,
-        position: summary?.classRank ?? rows[0]?.classRank ?? null,
-        classSize: summary?.classSize || undefined,
-        attendance: summary?.attendanceRate ?? null,
+        subjects: officialSubjects,
+        total: isPrimary ? Number(officialSubjects.reduce((sum: number, subject: any) => sum + (subject.mark || 0), 0).toFixed(1)) : null,
+        points: isPrimary ? null : report.termSummary.totalPoints ?? report.totalPoints ?? null,
+        overall: report.termSummary.overallPercentage == null ? null : Number(report.termSummary.overallPercentage.toFixed(1)),
+        grade: report.termSummary.overallGrade ?? null,
+        division: report.division?.division ?? null,
+        position: report.termSummary.classRank ?? null,
+        classSize: report.termSummary.classSize || undefined,
+        attendance: report.attendance.attendanceRate ?? null,
       };
       const message = this.formatMessage(school?.name || 'SCHOOL', student, klass?.name, term?.name, result);
       const length = message.length;
@@ -168,7 +185,35 @@ export class ResultsSmsService {
   private async resolveProvider(schoolId: string): Promise<SmsProvider> { try { const provider = await this.smsProviderFactory.getSchoolSmsProvider(schoolId); if (!provider) throw new Error('SMS provider is not configured.'); return provider; } catch (e: any) { throw new BadRequestException({ code: 'PROVIDER_NOT_CONFIGURED', message: e.message || 'Configure an SMS provider in Communications Settings.' }); } }
   private async getBalance(schoolId: string) { try { const p = await this.smsProviderFactory.getSchoolSmsProvider(schoolId); return await p.getBalance(); } catch { return null; } }
   private emptyPreview() { return { totalStudents: 0, totalRecipients: 0, validRecipients: 0, missingPhone: 0, invalidPhone: 0, estimatedUnits: 0, multiSegment: false, recipients: [] }; }
-  private formatMessage(school: string, student: any, className: string | undefined, term: string | undefined, result: any) { const subjects = result.subjects.map((s: any) => `${s.code || s.name} ${s.absent ? 'ABS' : s.mark == null ? '-' : Number(s.mark.toFixed(1))}${s.grade ? ` ${s.grade}` : ''}`).join(', '); const overall = [result.total != null ? `Total ${result.total}` : result.overall != null ? `Overall ${result.overall}%` : '', result.grade ? `Grade ${result.grade}` : '', result.division ? `Div ${result.division}` : '', result.position ? `Position ${result.position}${result.classSize ? `/${result.classSize}` : ''}` : '', result.attendance != null ? `Attendance ${Number(result.attendance.toFixed(1))}%` : ''].filter(Boolean).join('. '); return `${school}: ${student.firstName} ${student.lastName} (${student.admissionNumber || 'N/A'}), ${className || 'Class'}, ${term || 'Results'}: ${subjects}. ${overall}. Full report: app.smarttechsaas.com`; }
+  private formatMessage(school: string, student: any, className: string | undefined, term: string | undefined, result: any) {
+    const subjects = result.subjects.map((s: any) => {
+      const label = this.subjectShortcut(s.name);
+      if (result.points != null) return `${label} ${s.points ?? '-'}`;
+      return `${label} ${s.absent ? 'ABS' : s.mark == null ? '-' : Number(s.mark.toFixed(1))}`;
+    }).join(', ');
+    const overall = [
+      result.total != null ? `Total ${result.total}` : '',
+      result.points != null ? `Points ${result.points}` : '',
+      result.overall != null ? `Avg ${result.overall}%` : '',
+      result.grade ? `Grade ${result.grade}` : '',
+      result.division ? `Div ${result.division}` : '',
+      result.position ? `Pos ${result.position}${result.classSize ? `/${result.classSize}` : ''}` : '',
+      result.attendance != null ? `Att ${Number(result.attendance.toFixed(1))}%` : '',
+    ].filter(Boolean).join('. ');
+    return `${school}: ${student.firstName} ${student.lastName} (${student.admissionNumber || 'N/A'}), ${className || 'Class'}, ${term || 'Results'}: ${subjects}. ${overall}. Report: app.smarttechsaas.com`;
+  }
+  private subjectShortcut(name: string) {
+    const normalized = name.trim().toLowerCase();
+    const known: Record<string, string> = {
+      english: 'Eng', 'english language': 'Eng', mathematics: 'Math', maths: 'Math', science: 'Sci',
+      'social studies': 'SS', 'religious education': 'RE', 'computer studies': 'Comp', 'computer science': 'Comp',
+      biology: 'Bio', chemistry: 'Chem', physics: 'Phys', geography: 'Geo', history: 'Hist',
+      'civic education': 'Civ', 'business studies': 'Bus', accounting: 'Acct', economics: 'Econ',
+    };
+    if (known[normalized]) return known[normalized];
+    const words = name.split(/\s+/).filter(Boolean);
+    return words.length > 1 ? words.map((word) => word[0]).join('').slice(0, 4).toUpperCase() : name.slice(0, 5);
+  }
   private isValidPhone(phone: string) { return /^\+?\d{9,15}$/.test(phone.replace(/[\s\-\(\)]/g, '')); }
   private hash(message: string) { return createHash('sha256').update(message).digest('hex'); }
   private failureStatus(error?: string) { const code = this.diagnostic(error).code; return code === 'INVALID_PHONE_NUMBER' ? 'INVALID_NUMBER' : code === 'INSUFFICIENT_BALANCE' ? 'INSUFFICIENT_BALANCE' : code === 'RATE_LIMITED' ? 'QUEUED' : 'PROVIDER_ERROR'; }
