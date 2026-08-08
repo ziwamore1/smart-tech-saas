@@ -1,527 +1,85 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { resultsSmsApi, classApi, termApi } from '@/lib/api';
+import { PermissionGuard } from '@/components/permissions/PermissionGuard';
+
+const statusStyles: Record<string, string> = {
+  VALID: 'bg-emerald-50 text-emerald-700', MISSING: 'bg-amber-50 text-amber-700', INVALID: 'bg-rose-50 text-rose-700',
+  SENT: 'bg-emerald-50 text-emerald-700', DELIVERED: 'bg-sky-50 text-sky-700', FAILED: 'bg-rose-50 text-rose-700',
+  PROVIDER_ERROR: 'bg-rose-50 text-rose-700', SKIPPED: 'bg-amber-50 text-amber-700',
+};
 
 export default function ResultsSmsPage() {
   const queryClient = useQueryClient();
-  const [selectedClass, setSelectedClass] = useState('');
-  const [selectedTerm, setSelectedTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'preview' | 'history' | 'failed'>('preview');
-  const [expandedBatch, setExpandedBatch] = useState<string | null>(null);
-  const [expandedPreview, setExpandedPreview] = useState<string | null>(null);
-  const [sendScope, setSendScope] = useState<'all' | 'selected'>('all');
+  const [classId, setClassId] = useState('');
+  const [termId, setTermId] = useState('');
+  const [scope, setScope] = useState<'all' | 'selected'>('all');
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [tab, setTab] = useState<'compose' | 'history' | 'failed'>('compose');
+  const [openStudent, setOpenStudent] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState(false);
+  const [allowResend, setAllowResend] = useState(false);
 
-  const { data: classes } = useQuery({
-    queryKey: ['classes'],
-    queryFn: () => classApi.getAll().then(res => res.data),
+  const { data: classes } = useQuery({ queryKey: ['classes'], queryFn: () => classApi.getAll().then((r) => r.data) });
+  const { data: terms } = useQuery({ queryKey: ['terms'], queryFn: () => termApi.getAll().then((r) => r.data) });
+  const { data: dashboard } = useQuery({ queryKey: ['results-sms-dashboard'], queryFn: () => resultsSmsApi.getDashboard().then((r) => r.data) });
+  const { data: settings } = useQuery({ queryKey: ['results-sms-settings'], queryFn: () => resultsSmsApi.getSettings().then((r) => r.data) });
+  const { data: preview, isLoading } = useQuery({
+    queryKey: ['results-sms-preview', classId, termId],
+    queryFn: () => resultsSmsApi.preview(classId, termId).then((r) => r.data), enabled: Boolean(classId && termId),
   });
-
-  const { data: terms } = useQuery({
-    queryKey: ['terms'],
-    queryFn: () => termApi.getAll().then(res => res.data),
+  const { data: history } = useQuery({ queryKey: ['results-sms-history', classId, termId], queryFn: () => resultsSmsApi.getHistory(classId || undefined, termId || undefined).then((r) => r.data), enabled: tab === 'history' });
+  const { data: failed } = useQuery({ queryKey: ['results-sms-failed'], queryFn: () => resultsSmsApi.getFailedLogs().then((r) => r.data), enabled: tab === 'failed' });
+  const send = useMutation({
+    mutationFn: () => resultsSmsApi.send({ classId, termId, studentIds: scope === 'selected' ? selectedStudents : undefined, allowResend }),
+    onSuccess: () => { setConfirm(false); setAllowResend(false); queryClient.invalidateQueries({ queryKey: ['results-sms'] }); setTab('history'); },
   });
+  const retry = useMutation({ mutationFn: (id: string) => resultsSmsApi.retry(id), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['results-sms'] }) });
 
-  const { data: smsSettings } = useQuery({
-    queryKey: ['results-sms-settings'],
-    queryFn: () => resultsSmsApi.getSettings().then(res => res.data),
-  });
+  const students = useMemo(() => {
+    const grouped = new Map<string, any>();
+    (preview?.recipients || []).forEach((r: any) => { if (!grouped.has(r.studentId)) grouped.set(r.studentId, r); });
+    return Array.from(grouped.values());
+  }, [preview]);
+  const target = (preview?.recipients || []).filter((r: any) => r.phoneStatus === 'VALID' && (scope === 'all' || selectedStudents.includes(r.studentId)));
+  const alreadySent = target.filter((r: any) => r.alreadySent).length;
+  const segments = target.reduce((sum: number, r: any) => sum + r.segments, 0);
 
-  const {
-    data: previewData,
-    isLoading: previewLoading,
-    refetch: refetchPreview,
-  } = useQuery({
-    queryKey: ['results-sms-preview', selectedClass, selectedTerm],
-    queryFn: () => resultsSmsApi.preview(selectedClass, selectedTerm).then(res => res.data),
-    enabled: !!selectedClass && !!selectedTerm,
-  });
+  return <PermissionGuard permission="communications.view" fallback={<div className="p-8 text-slate-600">You do not have permission to view Results SMS.</div>}>
+    <div className="min-h-full space-y-6 pb-10">
+      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">Communication / SMS</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Results SMS Hub</h1><p className="mt-1 text-sm text-slate-500">Preview verified results, confirm recipients, and monitor delivery.</p></div>
+        <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">{[['compose', 'Create send'], ['history', 'Send history'], ['failed', 'Failed queue']].map(([key, label]) => <button key={key} onClick={() => setTab(key as any)} className={`rounded-lg px-3 py-2 text-sm font-medium ${tab === key ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>{label}</button>)}</div>
+      </header>
 
-  const { data: historyData, refetch: refetchHistory } = useQuery({
-    queryKey: ['results-sms-history', selectedClass, selectedTerm],
-    queryFn: () => resultsSmsApi.getHistory(selectedClass || undefined, selectedTerm || undefined).then(res => res.data),
-    enabled: activeTab === 'history',
-  });
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+        {[[dashboard?.balance?.balance ?? '—', 'Units available'], [dashboard?.usedUnits ?? 0, 'Used units'], [preview?.totalStudents ?? 0, 'Students with results'], [preview?.validRecipients ?? 0, 'Valid recipients'], [preview?.missingPhone ?? 0, 'Missing phone'], [dashboard?.sent ?? 0, 'Sent'], [dashboard?.failed ?? 0, 'Failed'], [`${dashboard?.deliveryRate ?? 0}%`, 'Delivery rate']].map(([value, label]) => <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="text-xl font-bold text-slate-950">{value}</div><div className="mt-1 text-xs text-slate-500">{label}</div></div>)}
+      </section>
 
-  const { data: failedData, refetch: refetchFailed } = useQuery({
-    queryKey: ['results-sms-failed'],
-    queryFn: () => resultsSmsApi.getFailedLogs().then(res => res.data),
-    enabled: activeTab === 'failed',
-  });
+      {tab === 'compose' && <>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold text-slate-950">Create Results SMS</h2><p className="text-sm text-slate-500">Only published, verified academic results are used.</p></div><div className={`rounded-full px-3 py-1 text-xs font-semibold ${settings?.smsEnabled ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{settings?.smsEnabled ? `Provider online · ${settings.smsProvider || 'configured'}` : 'SMS disabled'}</div></div>
+          <div className="grid gap-4 md:grid-cols-3"><Select label="Academic class" value={classId} onChange={(v: string) => { setClassId(v); setSelectedStudents([]); }} options={classes || []} placeholder="Select class" /><Select label="Term / assessment" value={termId} onChange={setTermId} options={terms || []} placeholder="Select assessment" /><div><label className="mb-2 block text-sm font-medium text-slate-700">Recipients</label><div className="flex rounded-xl border border-slate-200 p-1">{[['all', 'Entire class'], ['selected', 'Selected']].map(([key, label]) => <button key={key} onClick={() => setScope(key as any)} className={`flex-1 rounded-lg px-2 py-2 text-sm ${scope === key ? 'bg-indigo-600 text-white' : 'text-slate-600'}`}>{label}</button>)}</div></div></div>
+        </section>
 
-  const { data: batchLogs, refetch: refetchBatch } = useQuery({
-    queryKey: ['results-sms-batch', expandedBatch],
-    queryFn: () => resultsSmsApi.getBatchLogs(expandedBatch!).then(res => res.data),
-    enabled: !!expandedBatch,
-  });
+        {isLoading && <div className="rounded-2xl bg-white p-12 text-center text-sm text-slate-500">Loading published results and validating parent contacts...</div>}
+        {preview && !isLoading && <>
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"><div><h2 className="font-semibold text-slate-950">Recipient validation</h2><p className="text-sm text-slate-500">{preview.class || 'Class'} · {preview.term || 'Assessment'} · {preview.totalStudents} students</p></div><div className="flex flex-wrap gap-2 text-sm"><span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">{target.length} valid</span><span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">{preview.missingPhone} missing</span><span className="rounded-full bg-rose-50 px-3 py-1 text-rose-700">{preview.invalidPhone} invalid</span></div></div>
+            <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm"><thead className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400"><tr><th className="w-10 py-3">{scope === 'selected' && <input type="checkbox" checked={selectedStudents.length === students.length && students.length > 0} onChange={(e) => setSelectedStudents(e.target.checked ? students.map((s) => s.studentId) : [])} />}</th><th>Student</th><th>Parent / phone</th><th>Status</th><th>Message</th></tr></thead><tbody className="divide-y divide-slate-100">{students.map((r: any) => <tr key={r.studentId} className="hover:bg-slate-50"><td className="py-3">{scope === 'selected' && <input type="checkbox" checked={selectedStudents.includes(r.studentId)} onChange={() => setSelectedStudents((x) => x.includes(r.studentId) ? x.filter((id) => id !== r.studentId) : [...x, r.studentId])} />}</td><td className="py-3"><div className="font-medium text-slate-900">{r.studentName}</div><div className="text-xs text-slate-500">{r.admissionNumber || 'No admission number'}</div></td><td><div className="text-slate-700">{r.parentName}</div><div className="font-mono text-xs text-slate-500">{r.phoneNumber || 'No number'}</div></td><td><span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusStyles[r.phoneStatus]}`}>{r.phoneStatus === 'VALID' ? 'Ready' : r.errorCode === 'NO_PHONE_NUMBER' ? 'No phone' : 'Invalid'}</span>{r.alreadySent && <div className="mt-1 text-xs font-semibold text-amber-700">Already sent</div>}</td><td><button onClick={() => setOpenStudent(openStudent === r.studentId ? null : r.studentId)} className="text-indigo-600 hover:underline">{openStudent === r.studentId ? 'Hide preview' : 'Preview SMS'}</button></td></tr>)}{openStudent && <tr><td colSpan={5} className="bg-slate-50 p-4"><MessagePreview recipient={students.find((s: any) => s.studentId === openStudent)} /></td></tr>}</tbody></table></div>
+          </section>
+          <section className="flex flex-col gap-4 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5 md:flex-row md:items-center md:justify-between"><div><div className="text-sm font-semibold text-indigo-950">Send summary</div><div className="mt-1 text-sm text-indigo-800">{scope === 'selected' ? selectedStudents.length : preview.totalStudents} students · {target.length} valid recipients · {segments} estimated units</div>{preview.multiSegment && <div className="mt-2 text-xs font-medium text-amber-800">Some messages exceed 160 characters and will use multiple billable segments.</div>}{alreadySent > 0 && <div className="mt-2 text-xs font-medium text-amber-800">{alreadySent} result notification(s) match a previously sent result version.</div>}</div><PermissionGuard permission="communications.send"><button disabled={!target.length || (scope === 'selected' && !selectedStudents.length) || !settings?.smsEnabled} onClick={() => setConfirm(true)} className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300">Review and confirm</button></PermissionGuard></section>
+        </>}
+      </>}
 
-  const sendMutation = useMutation({
-    mutationFn: () =>
-      resultsSmsApi.send({
-        classId: selectedClass,
-        termId: selectedTerm,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['results-sms-history'] });
-      queryClient.invalidateQueries({ queryKey: ['results-sms-preview'] });
-    },
-  });
+      {tab === 'history' && <LogTable title="Send history" rows={history || []} batch />}
+      {tab === 'failed' && <LogTable title="Failed SMS diagnostics" rows={failed || []} onRetry={(id: string) => retry.mutate(id)} />}
 
-  const [batchResult, setBatchResult] = useState<any>(null);
-  const [showConfirm, setShowConfirm] = useState(false);
-
-  const handleSend = useCallback(async () => {
-    setShowConfirm(false);
-    sendMutation.mutate(undefined, {
-      onSuccess: (res: any) => {
-        setBatchResult(res);
-      },
-    });
-  }, [sendMutation]);
-
-  const handlePreviewRecipient = (parentId: string) => {
-    setExpandedPreview(expandedPreview === parentId ? null : parentId);
-  };
-
-  const totalRecipients = previewData?.totalRecipients ?? 0;
-  const validRecipients = previewData?.validRecipients ?? 0;
-  const missingPhone = previewData?.missingPhone ?? 0;
-  const invalidPhone = previewData?.invalidPhone ?? 0;
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Results SMS</h1>
-          <p className="text-gray-600 mt-1">Send exam results to parents via SMS</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setActiveTab('preview')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${activeTab === 'preview' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-          >
-            Send SMS
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-          >
-            History
-          </button>
-          <button
-            onClick={() => setActiveTab('failed')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${activeTab === 'failed' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-          >
-            Failed Logs
-          </button>
-        </div>
-      </div>
-
-      {activeTab === 'preview' && (
-        <>
-          <div className="bg-white rounded-lg shadow p-6">
-            {smsSettings && (
-              <div className="mb-4 p-4 rounded-lg border" style={{ background: smsSettings.smsEnabled ? '#f0fdf4' : '#fef2f2' }}>
-                <div className="flex items-center gap-2">
-                  <span className={`inline-block w-2 h-2 rounded-full ${smsSettings.smsEnabled ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                  <span className="font-medium">{smsSettings.smsEnabled ? 'SMS is enabled' : 'SMS is disabled'}</span>
-                  <span className="text-gray-500 text-sm ml-2">
-                    Provider: {smsSettings.smsProvider || 'Not set'} | Sender: {smsSettings.smsSenderId || 'Default'}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Class</label>
-                <select
-                  value={selectedClass}
-                  onChange={(e) => setSelectedClass(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg"
-                >
-                  <option value="">Select class...</option>
-                  {(Array.isArray(classes) ? classes : []).map((cls: any) => (
-                    <option key={cls.id} value={cls.id}>{cls.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Term</label>
-                <select
-                  value={selectedTerm}
-                  onChange={(e) => setSelectedTerm(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg"
-                >
-                  <option value="">Select term...</option>
-                  {(Array.isArray(terms) ? terms : []).map((term: any) => (
-                    <option key={term.id} value={term.id}>{term.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {previewLoading && (
-              <div className="text-center py-8">
-                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
-                <div className="text-gray-600">Loading recipients...</div>
-              </div>
-            )}
-
-            {previewData && !previewLoading && (
-              <div>
-                <div className="grid grid-cols-4 gap-4 mb-6">
-                  <div className="p-4 bg-blue-50 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-blue-700">{totalRecipients}</div>
-                    <div className="text-sm text-blue-600">Total Recipients</div>
-                  </div>
-                  <div className="p-4 bg-green-50 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-green-700">{validRecipients}</div>
-                    <div className="text-sm text-green-600">Ready to Send</div>
-                  </div>
-                  <div className="p-4 bg-yellow-50 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-yellow-700">{missingPhone}</div>
-                    <div className="text-sm text-yellow-600">Missing Phone</div>
-                  </div>
-                  <div className="p-4 bg-red-50 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-red-700">{invalidPhone}</div>
-                    <div className="text-sm text-red-600">Invalid Number</div>
-                  </div>
-                </div>
-
-                {validRecipients > 0 && (
-                  <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p className="text-amber-800 font-medium">Preview: This is what parents will receive</p>
-                    <p className="text-amber-700 text-sm mt-1">
-                      SMS will be sent to {validRecipients} parent(s) with phone numbers on record.
-                      {missingPhone > 0 && ` ${missingPhone} parent(s) missing phone numbers will be skipped.`}
-                      {invalidPhone > 0 && ` ${invalidPhone} parent(s) with invalid numbers will be skipped.`}
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-3 mb-6 max-h-96 overflow-y-auto">
-                  {previewData.recipients?.map((r: any) => (
-                    <div key={r.parentId} className="border rounded-lg overflow-hidden">
-                      <button
-                        onClick={() => handlePreviewRecipient(r.parentId)}
-                        className="w-full flex items-center justify-between p-3 hover:bg-gray-50 text-left"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`w-2 h-2 rounded-full ${
-                            r.phoneStatus === 'VALID' ? 'bg-green-500' :
-                            r.phoneStatus === 'MISSING' ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}></div>
-                          <div>
-                            <div className="font-medium">{r.parentName}</div>
-                            <div className="text-sm text-gray-500">
-                              {r.studentName} ({r.admissionNumber || 'N/A'})
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-mono">{r.phoneNumber || '-'}</div>
-                          <div className={`text-xs ${
-                            r.phoneStatus === 'VALID' ? 'text-green-600' :
-                            r.phoneStatus === 'MISSING' ? 'text-yellow-600' : 'text-red-600'
-                          }`}>
-                            {r.phoneStatus === 'VALID' ? 'Ready' : r.phoneStatus === 'MISSING' ? 'No Phone' : 'Invalid'}
-                          </div>
-                        </div>
-                      </button>
-                      {expandedPreview === r.parentId && (
-                        <div className="p-4 bg-gray-50 border-t">
-                          <div className="mb-2">
-                            <div className="text-xs font-medium text-gray-500 mb-1">SMS Preview</div>
-                            <pre className="bg-white p-3 rounded border text-sm whitespace-pre-wrap font-mono">{r.message}</pre>
-                          </div>
-                          {r.phoneStatus !== 'VALID' && r.errorSuggestion && (
-                            <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
-                              <strong>Fix:</strong> {r.errorSuggestion}
-                            </div>
-                          )}
-                          <div className="mt-2 text-xs text-gray-500">
-                            Average: {r.average}% | Total Points: {r.totalPoints} | GPA: {r.gpa ?? 'N/A'} | Rank: {r.classRank ? `#${r.classRank}` : 'N/A'}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {validRecipients > 0 && (
-                  <div className="flex gap-3 justify-end">
-                    <button
-                      onClick={() => setShowConfirm(true)}
-                      disabled={sendMutation.isPending}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium"
-                    >
-                      {sendMutation.isPending ? (
-                        <span className="flex items-center gap-2">
-                          <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
-                          Sending...
-                        </span>
-                      ) : (
-                        `Send SMS to ${validRecipients} Parent(s)`
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {!selectedClass || !selectedTerm ? (
-              <div className="text-center py-12 text-gray-500">
-                Select a class and term to see recipients
-              </div>
-            ) : null}
-          </div>
-
-          {sendMutation.isPending && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-xl p-8 max-w-md w-full mx-4 text-center">
-                <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Sending Results SMS...</h3>
-                <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${validRecipients > 0 ? Math.min(100, (sendMutation.data?.sent || 0) / validRecipients * 100) : 0}%` }}
-                  ></div>
-                </div>
-                <div className="text-sm text-gray-600">
-                  Sent: {sendMutation.data?.sent ?? 0} / {validRecipients}
-                  {sendMutation.data && (
-                    <>
-                      <span className="ml-2">Failed: {sendMutation.data.failed}</span>
-                      <span className="ml-2">Skipped: {sendMutation.data.skipped}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {batchResult && !sendMutation.isPending && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-xl p-8 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-                <div className="text-center mb-6">
-                  <div className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl ${
-                    batchResult.failed === 0 ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'
-                  }`}>
-                    {batchResult.failed === 0 ? '✓' : '!'}
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900">{batchResult.message}</h3>
-                  <div className="flex justify-center gap-6 mt-4 text-sm">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{batchResult.sent}</div>
-                      <div className="text-gray-500">Sent</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-red-600">{batchResult.failed}</div>
-                      <div className="text-gray-500">Failed</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-yellow-600">{batchResult.skipped}</div>
-                      <div className="text-gray-500">Skipped</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-gray-600">{batchResult.total}</div>
-                      <div className="text-gray-500">Total</div>
-                    </div>
-                  </div>
-                </div>
-
-                {batchResult.logs?.filter((l: any) => l.status !== 'SENT').length > 0 && (
-                  <div className="mt-4">
-                    <h4 className="font-bold text-gray-900 mb-3">Failed / Skipped Details</h4>
-                    <div className="space-y-2">
-                      {batchResult.logs.filter((l: any) => l.status !== 'SENT').map((log: any) => (
-                        <div key={log.id} className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <div className="font-medium">{log.parentName}</div>
-                              <div className="text-sm text-gray-600">{log.studentName} - {log.phoneNumber || 'No phone'}</div>
-                              <div className="text-sm text-red-700 mt-1">{log.errorMessage}</div>
-                              {log.errorSuggestion && (
-                                <div className="text-sm text-amber-700 mt-1">
-                                  <strong>Suggested fix:</strong> {log.errorSuggestion}
-                                </div>
-                              )}
-                            </div>
-                            <span className={`text-xs px-2 py-1 rounded ${
-                              log.status === 'FAILED' ? 'bg-red-200 text-red-800' : 'bg-yellow-200 text-yellow-800'
-                            }`}>
-                              {log.status}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex justify-end mt-6">
-                  <button
-                    onClick={() => { setBatchResult(null); setSelectedClass(''); setSelectedTerm(''); }}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {showConfirm && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-xl p-8 max-w-md w-full mx-4">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Confirm Send</h3>
-                <p className="text-gray-600 mb-4">
-                  Send results SMS to <strong>{validRecipients} parent(s)</strong>?
-                  {missingPhone > 0 && (
-                    <span className="block text-yellow-600 mt-2">
-                      {missingPhone} parent(s) with missing phone numbers will be skipped.
-                    </span>
-                  )}
-                </p>
-                <p className="text-sm text-gray-500 mb-6">
-                  Each SMS will contain the full exam results breakdown for their child.
-                </p>
-                <div className="flex gap-3 justify-end">
-                  <button
-                    onClick={() => setShowConfirm(false)}
-                    className="px-4 py-2 border rounded-lg hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSend}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    Send Now
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {activeTab === 'history' && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Sending History</h2>
-
-          {!historyData || historyData.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">No SMS batches found</div>
-          ) : (
-            <div className="space-y-3">
-              {historyData.map((batch: any) => (
-                <div key={batch.batchId} className="border rounded-lg overflow-hidden">
-                  <button
-                    onClick={() => setExpandedBatch(expandedBatch === batch.batchId ? null : batch.batchId)}
-                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50"
-                  >
-                    <div>
-                      <div className="font-medium text-sm text-gray-500 font-mono">{batch.batchId}</div>
-                      <div className="text-xs text-gray-400">{new Date(batch.createdAt).toLocaleString()}</div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-center">
-                        <div className="text-sm font-bold">{batch.sent}</div>
-                        <div className="text-xs text-green-600">Sent</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-sm font-bold">{batch.failed}</div>
-                        <div className="text-xs text-red-600">Failed</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-sm font-bold">{batch.skipped}</div>
-                        <div className="text-xs text-yellow-600">Skip</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-sm font-bold">{batch.total}</div>
-                        <div className="text-xs text-gray-600">Total</div>
-                      </div>
-                      <span className="text-gray-400">{expandedBatch === batch.batchId ? '▲' : '▼'}</span>
-                    </div>
-                  </button>
-                  {expandedBatch === batch.batchId && batchLogs && (
-                    <div className="border-t bg-gray-50 p-4 max-h-80 overflow-y-auto">
-                      {batchLogs.length === 0 ? (
-                        <div className="text-gray-500 text-sm">Loading...</div>
-                      ) : (
-                        <div className="space-y-2">
-                          {batchLogs.map((log: any) => (
-                            <div key={log.id} className="flex items-start justify-between p-2 bg-white rounded border text-sm">
-                              <div className="flex-1">
-                                <div className="font-medium">{log.parentName}</div>
-                                <div className="text-gray-500">{log.studentName} - {log.phoneNumber || 'No phone'}</div>
-                                {log.errorMessage && (
-                                  <div className="text-red-600 text-xs mt-0.5">{log.errorMessage}</div>
-                                )}
-                                {log.errorSuggestion && (
-                                  <div className="text-amber-600 text-xs">{log.errorSuggestion}</div>
-                                )}
-                              </div>
-                              <span className={`text-xs px-2 py-0.5 rounded ml-2 ${
-                                log.status === 'SENT' ? 'bg-green-100 text-green-700' :
-                                log.status === 'FAILED' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                              }`}>
-                                {log.status}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'failed' && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Failed / Skipped Logs</h2>
-
-          {!failedData || failedData.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">No failed or skipped SMS records</div>
-          ) : (
-            <div className="space-y-3">
-              {failedData.map((log: any) => (
-                <div key={log.id} className="p-4 border rounded-lg bg-red-50/30">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-medium">{log.parentName}</div>
-                      <div className="text-sm text-gray-600">{log.studentName} ({log.admissionNumber || 'N/A'})</div>
-                      <div className="text-sm text-gray-500 font-mono">{log.phoneNumber || 'No phone number'}</div>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded ${
-                      log.status === 'FAILED' ? 'bg-red-200 text-red-800' : 'bg-yellow-200 text-yellow-800'
-                    }`}>
-                      {log.status}
-                    </span>
-                  </div>
-                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded text-sm">
-                    <strong>Error:</strong> {log.errorMessage || 'Unknown'}
-                  </div>
-                  {log.errorSuggestion && (
-                    <div className="mt-1 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
-                      <strong>Recommended action:</strong> {log.errorSuggestion}
-                    </div>
-                  )}
-                  <div className="mt-1 text-xs text-gray-400">
-                    Batch: {log.batchId} | {new Date(log.createdAt).toLocaleString()}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {confirm && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"><div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"><h2 className="text-xl font-bold text-slate-950">Confirm Results SMS</h2><p className="mt-2 text-sm text-slate-600">Send the exact previews to <strong>{target.length} valid parent number(s)</strong> using approximately <strong>{segments} SMS unit(s)</strong>.</p>{alreadySent > 0 && <label className="mt-4 flex gap-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900"><input type="checkbox" checked={allowResend} onChange={(e) => setAllowResend(e.target.checked)} />Allow explicit resend of {alreadySent} already-sent result version(s).</label>}<div className="mt-6 flex justify-end gap-3"><button onClick={() => setConfirm(false)} className="rounded-xl border px-4 py-2 text-sm">Cancel</button><button onClick={() => send.mutate()} disabled={send.isPending || (alreadySent > 0 && !allowResend)} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300">{send.isPending ? 'Queuing...' : 'Send results SMS'}</button></div>{send.isError && <p className="mt-3 text-sm text-rose-600">{String((send.error as any)?.response?.data?.message || 'Unable to send. Review provider and balance settings.')}</p>}</div></div>}
     </div>
-  );
+  </PermissionGuard>;
 }
+
+function Select({ label, value, onChange, options, placeholder }: any) { return <div><label className="mb-2 block text-sm font-medium text-slate-700">{label}</label><select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-indigo-500"><option value="">{placeholder}</option>{(Array.isArray(options) ? options : []).map((o: any) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></div>; }
+function MessagePreview({ recipient }: { recipient: any }) { if (!recipient) return null; return <div><div className="mb-2 flex justify-between text-xs text-slate-500"><span>Exact SMS preview</span><span>{recipient.characters} characters · {recipient.segments} segment(s) · {recipient.estimatedUnits} unit(s)</span></div><div className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-4 font-mono text-sm leading-6 text-slate-700">{recipient.message}</div><div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">{recipient.result.subjects.map((s: any) => <span key={s.name} className="rounded bg-slate-100 px-2 py-1">{s.name}: {s.absent ? 'Absent' : s.mark ?? '-'} {s.grade || ''}</span>)}</div></div>; }
+function LogTable({ title, rows, onRetry, batch }: any) { return <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="mb-4 font-semibold text-slate-950">{title}</h2>{!rows.length ? <div className="py-12 text-center text-sm text-slate-500">No records found.</div> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="border-b text-xs uppercase tracking-wide text-slate-400"><tr><th className="py-3">{batch ? 'Batch' : 'Student'}</th><th>{batch ? 'Created' : 'Phone / reason'}</th><th>Status</th><th>{batch ? 'Volume' : 'Action'}</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map((r: any) => <tr key={r.batchId || r.id}><td className="py-3 font-medium text-slate-800">{batch ? r.batchId : `${r.studentName} (${r.admissionNumber || 'N/A'})`}</td><td className="text-slate-500">{batch ? new Date(r.createdAt).toLocaleString() : <>{r.phoneNumber || 'No phone'}<div className="text-xs text-rose-600">{r.errorMessage || r.errorSuggestion || ''}</div></>}</td><td>{batch ? <span className="text-xs text-slate-600">{r.sent} sent · {r.failed} failed · {r.delivered} delivered</span> : <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusStyles[r.status] || 'bg-slate-100 text-slate-600'}`}>{r.status}</span>}</td><td>{batch ? `${r.total} messages · ${r.units} units` : onRetry && <button onClick={() => onRetry(r.id)} className="text-sm font-semibold text-indigo-600 hover:underline">Retry</button>}</td></tr>)}</tbody></table></div>}</section>; }

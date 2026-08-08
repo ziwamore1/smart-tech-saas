@@ -5844,6 +5844,14 @@ model ResultSmsLog {
   errorSuggestion   String? // Recommended action for the error
   batchId           String? // Groups messages sent together
   sentAt            DateTime?
+  deliveredAt       DateTime?
+  failedAt          DateTime?
+  resultVersion     String?
+  retryCount        Int       @default(0)
+  providerResponse  String?
+  failureCode       String?
+  initiatedById     String?
+  messageHash       String?
   createdAt         DateTime  @default(now())
 
   @@index([schoolId])
@@ -5851,6 +5859,7 @@ model ResultSmsLog {
   @@index([termId])
   @@index([batchId])
   @@index([status])
+  @@index([studentId, termId, resultVersion])
   @@index([createdAt])
 }
 

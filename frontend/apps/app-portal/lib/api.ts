@@ -685,7 +685,7 @@ export const resultsSmsApi = {
   preview: (classId: string, termId: string) =>
     api.get('/results-sms/preview', { params: { classId, termId } }),
 
-  send: (data: { classId: string; termId: string; parentIds?: string[] }) =>
+  send: (data: { classId: string; termId: string; parentIds?: string[]; studentIds?: string[]; allowResend?: boolean }) =>
     api.post('/results-sms/send', data),
 
   autoSend: (data: { classId: string; termId: string }) =>
@@ -705,6 +705,15 @@ export const resultsSmsApi = {
 
   getSettings: () =>
     api.get('/results-sms/settings'),
+
+  getDashboard: () =>
+    api.get('/results-sms/dashboard'),
+
+  retry: (id: string) =>
+    api.post(`/results-sms/logs/${id}/retry`),
+
+  updateDeliveryStatus: (id: string, data: { status: string; providerResponse?: string }) =>
+    api.post(`/results-sms/logs/${id}/delivery-status`, data),
 };
 
 export const enrollmentApi = {
