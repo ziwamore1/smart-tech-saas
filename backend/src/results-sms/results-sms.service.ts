@@ -40,6 +40,15 @@ export class ResultsSmsService {
       this.prisma.class.findUnique({ where: { id: classId }, select: { name: true } }),
     ]);
 
+    const priorSent = new Map<string, { id: string; status: string; sentAt: Date | null }>();
+    for (const prior of await this.prisma.resultSmsLog.findMany({
+      where: { schoolId, termId, status: { in: ['SENT', 'DELIVERED'] } },
+      select: { studentId: true, resultVersion: true, id: true, status: true, sentAt: true },
+    })) {
+      const key = `${prior.studentId}:${prior.resultVersion}`;
+      if (!priorSent.has(key)) priorSent.set(key, { id: prior.id, status: prior.status, sentAt: prior.sentAt });
+    }
+
     const averages = new Map<string, number>();
     for (const student of students) {
       const rows = computed.filter((r) => r.studentId === student.id && r.finalPercentage != null);
@@ -81,7 +90,7 @@ export class ResultsSmsService {
         points: subject.points,
         absent: subject.isAbsent ?? false,
       }));
-      const version = createHash('sha256').update(JSON.stringify({ rows, summary, report })).digest('hex');
+      const version = createHash('sha256').update(JSON.stringify({ rows, summary })).digest('hex');
       const result = {
         subjects: officialSubjects,
         total: isPrimary ? Number(officialSubjects.reduce((sum: number, subject: any) => sum + (subject.mark || 0), 0).toFixed(1)) : null,
@@ -97,10 +106,7 @@ export class ResultsSmsService {
       };
       const message = this.formatMessage(school?.name || 'SCHOOL', student, klass?.name, term?.name, result);
       const length = message.length;
-      const existing = await this.prisma.resultSmsLog.findFirst({
-        where: { schoolId, studentId: student.id, termId, resultVersion: version, status: { in: ['SENT', 'DELIVERED'] } },
-        orderBy: { createdAt: 'desc' }, select: { id: true, status: true, sentAt: true },
-      });
+      const existing = priorSent.get(`${student.id}:${version}`);
       for (const link of student.parents) {
         const parent = link.parent;
         const phoneStatus = !parent.phone ? 'MISSING' : this.isValidPhone(parent.phone) ? 'VALID' : 'INVALID';

@@ -683,7 +683,7 @@ export const communicationApi = {
 
 export const resultsSmsApi = {
   preview: (classId: string, termId: string) =>
-    api.get('/results-sms/preview', { params: { classId, termId } }),
+    api.get('/results-sms/preview', { params: { classId, termId }, timeout: 60000 }),
 
   send: (data: { classId: string; termId: string; parentIds?: string[]; studentIds?: string[]; allowResend?: boolean }) =>
     api.post('/results-sms/send', data),
