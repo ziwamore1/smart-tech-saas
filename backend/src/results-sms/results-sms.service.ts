@@ -90,11 +90,15 @@ export class ResultsSmsService {
         points: subject.points,
         absent: subject.isAbsent ?? false,
       }));
+      const subjectPoints = officialSubjects.map((s: any) => s.points).filter((p: any) => p != null);
+      const bestSix = isPrimary || subjectPoints.length === 0
+        ? null
+        : subjectPoints.slice().sort((a: number, b: number) => a - b).slice(0, 6).reduce((sum: number, p: number) => sum + p, 0);
       const version = createHash('sha256').update(JSON.stringify({ rows, summary })).digest('hex');
       const result = {
         subjects: officialSubjects,
         total: isPrimary ? Number(officialSubjects.reduce((sum: number, subject: any) => sum + (subject.mark || 0), 0).toFixed(1)) : null,
-        points: isPrimary ? null : summary?.totalPoints ?? null,
+        bestSix,
         overall: summary?.overallPercentage != null
           ? Number(summary.overallPercentage.toFixed(1))
           : averages.get(student.id) == null ? null : Number(averages.get(student.id)!.toFixed(1)),
@@ -104,7 +108,7 @@ export class ResultsSmsService {
         classSize: ranking.length || summary?.classSize || undefined,
         attendance: summary?.attendanceRate ?? null,
       };
-      const message = this.formatMessage(school?.name || 'SCHOOL', student, klass?.name, term?.name, result);
+      const message = this.formatMessage(student, klass?.name, term?.name, result);
       const length = message.length;
       const existing = priorSent.get(`${student.id}:${version}`);
       for (const link of student.parents) {
@@ -216,22 +220,25 @@ export class ResultsSmsService {
   private async resolveProvider(schoolId: string): Promise<SmsProvider> { try { const provider = await this.smsProviderFactory.getSchoolSmsProvider(schoolId); if (!provider) throw new Error('SMS provider is not configured.'); return provider; } catch (e: any) { throw new BadRequestException({ code: 'PROVIDER_NOT_CONFIGURED', message: e.message || 'Configure an SMS provider in Communications Settings.' }); } }
   private async getBalance(schoolId: string) { try { const p = await this.smsProviderFactory.getSchoolSmsProvider(schoolId); return await p.getBalance(); } catch { return null; } }
   private emptyPreview() { return { totalStudents: 0, totalRecipients: 0, validRecipients: 0, missingPhone: 0, invalidPhone: 0, estimatedUnits: 0, multiSegment: false, recipients: [] }; }
-  private formatMessage(school: string, student: any, className: string | undefined, term: string | undefined, result: any) {
+  private formatMessage(student: any, className: string | undefined, term: string | undefined, result: any) {
     const subjects = result.subjects.map((s: any) => {
       const label = this.subjectShortcut(s.name);
-      if (result.points != null) return `${label} ${s.points ?? '-'}`;
+      if (result.bestSix != null) return `${label} ${s.points ?? '-'}`;
       return `${label} ${s.absent ? 'ABS' : s.mark == null ? '-' : Number(s.mark.toFixed(1))}`;
     }).join(', ');
     const overall = [
       result.total != null ? `Total ${result.total}` : '',
-      result.points != null ? `Points ${result.points}` : '',
+      result.bestSix != null ? `Pts ${result.bestSix}` : '',
       result.overall != null ? `Avg ${result.overall}%` : '',
       result.grade ? `Grade ${result.grade}` : '',
       result.division ? `Div ${result.division}` : '',
       result.position ? `Pos ${result.position}${result.classSize ? `/${result.classSize}` : ''}` : '',
       result.attendance != null ? `Att ${Number(result.attendance.toFixed(1))}%` : '',
-    ].filter(Boolean).join('. ');
-    return `${school}: ${student.firstName} ${student.lastName} (${student.admissionNumber || 'N/A'}), ${className || 'Class'}, ${term || 'Results'}: ${subjects}. ${overall}. Report: app.smarttechsaas.com`;
+    ].filter(Boolean).join(', ');
+    let message = `${student.firstName} ${student.lastName} (${student.admissionNumber || 'N/A'}), ${className || 'Class'}, ${term || 'Results'}: ${subjects}. ${overall}. app.smarttechsaas.com`;
+    if (message.length > SINGLE_SMS_LIMIT && result.classSize) message = message.replace(`/${result.classSize}`, '');
+    if (message.length > SINGLE_SMS_LIMIT) message = message.replace(/,\s*Att [\d.]+%/, '');
+    return message;
   }
   private subjectShortcut(name: string) {
     const normalized = name.trim().toLowerCase();
@@ -240,6 +247,8 @@ export class ResultsSmsService {
       'social studies': 'SS', 'religious education': 'RE', 'computer studies': 'Comp', 'computer science': 'Comp',
       biology: 'Bio', chemistry: 'Chem', physics: 'Phys', geography: 'Geo', history: 'Hist',
       'civic education': 'Civ', 'business studies': 'Bus', accounting: 'Acct', economics: 'Econ',
+      'mathematics i': 'MI', 'mathematics ii': 'MII', 'maths i': 'MI', 'maths ii': 'MII',
+      'information and communication technology': 'ICT', 'information and communications technology': 'ICT', 'ict': 'ICT',
     };
     if (known[normalized]) return known[normalized];
     const words = name.split(/\s+/).filter(Boolean);
