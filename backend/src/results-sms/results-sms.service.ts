@@ -43,32 +43,53 @@ export class ResultsSmsService {
     ]);
 
     const recipients: any[] = [];
+    const previewWarnings: string[] = [];
     for (const student of students) {
       const rows = computed.filter((r) => r.studentId === student.id);
       if (!rows.length) continue;
       const summary = summaries.find((s) => s.studentId === student.id);
-      const report = await this.reportCardEngine.generateReportCardData(student.id, termId, schoolId);
+      let report: any = null;
+      try {
+        report = await this.reportCardEngine.generateReportCardData(student.id, termId, schoolId);
+      } catch (error: any) {
+        // A malformed optional report-card configuration must not hide all valid
+        // published recipients. Keep the published snapshot and expose a warning.
+        const detail = error?.message || 'Report card data could not be generated';
+        this.logger.warn(`Results SMS report fallback for student ${student.id}: ${detail}`);
+        previewWarnings.push(`${student.firstName} ${student.lastName}: ${detail}`);
+      }
       const isPrimary = school?.institutionType?.code === 'PRIMARY_SCHOOL';
-      const officialSubjects = report.subjectBreakdown.map((subject: any) => ({
+      const officialSubjects = (report?.subjectBreakdown || rows.map((row) => ({
+        subjectName: row.subject.name,
+        subjectCode: row.subject.code,
+        totalRawScore: row.totalRawScore,
+        finalPercentage: row.finalPercentage,
+        finalGrade: row.finalGrade,
+        finalRemark: row.finalRemark,
+        points: row.points,
+        isAbsent: row.isAbsent,
+      }))).map((subject: any) => ({
         name: subject.subjectName,
         code: subject.subjectCode,
         mark: isPrimary ? subject.totalRawScore : null,
         grade: subject.finalGrade,
         remark: subject.finalRemark,
         points: subject.points,
-        absent: false,
+        absent: subject.isAbsent ?? false,
       }));
       const version = createHash('sha256').update(JSON.stringify({ rows, summary, report })).digest('hex');
       const result = {
         subjects: officialSubjects,
         total: isPrimary ? Number(officialSubjects.reduce((sum: number, subject: any) => sum + (subject.mark || 0), 0).toFixed(1)) : null,
-        points: isPrimary ? null : report.termSummary.totalPoints ?? report.totalPoints ?? null,
-        overall: report.termSummary.overallPercentage == null ? null : Number(report.termSummary.overallPercentage.toFixed(1)),
-        grade: report.termSummary.overallGrade ?? null,
-        division: report.division?.division ?? null,
-        position: report.termSummary.classRank ?? null,
-        classSize: report.termSummary.classSize || undefined,
-        attendance: report.attendance.attendanceRate ?? null,
+        points: isPrimary ? null : report?.termSummary?.totalPoints ?? report?.totalPoints ?? summary?.totalPoints ?? null,
+        overall: report?.termSummary?.overallPercentage != null
+          ? Number(report.termSummary.overallPercentage.toFixed(1))
+          : summary?.overallPercentage == null ? null : Number(summary.overallPercentage.toFixed(1)),
+        grade: report?.termSummary?.overallGrade ?? summary?.overallGrade ?? null,
+        division: report?.division?.division ?? (summary?.competencyScores as any)?.division ?? null,
+        position: report?.termSummary?.classRank ?? summary?.classRank ?? null,
+        classSize: report?.termSummary?.classSize || summary?.classSize || undefined,
+        attendance: report?.attendance?.attendanceRate ?? summary?.attendanceRate ?? null,
       };
       const message = this.formatMessage(school?.name || 'SCHOOL', student, klass?.name, term?.name, result);
       const length = message.length;
@@ -98,7 +119,7 @@ export class ResultsSmsService {
       missingPhone: recipients.filter((r) => r.phoneStatus === 'MISSING').length,
       invalidPhone: recipients.filter((r) => r.phoneStatus === 'INVALID').length,
       estimatedUnits: valid.reduce((sum, r) => sum + r.estimatedUnits, 0),
-      multiSegment: valid.some((r) => r.segments > 1), recipients,
+      multiSegment: valid.some((r) => r.segments > 1), previewWarnings, recipients,
     };
   }
 
