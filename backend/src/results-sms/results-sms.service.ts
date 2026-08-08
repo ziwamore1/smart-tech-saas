@@ -3,7 +3,6 @@ import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsProviderFactory } from '../communications-cloud/providers/sms/sms-provider.factory';
 import { SmsProvider } from '../communications-cloud/interfaces/provider.interface';
-import { ReportCardEngineService } from '../report-card-engine/report-card-engine.service';
 
 const SINGLE_SMS_LIMIT = 160;
 
@@ -14,7 +13,6 @@ export class ResultsSmsService {
   constructor(
     private prisma: PrismaService,
     private smsProviderFactory: SmsProviderFactory,
-    private reportCardEngine: ReportCardEngineService,
   ) {}
 
   /** The formatter consumes published computed results; it never grades or recalculates them. */
@@ -42,24 +40,30 @@ export class ResultsSmsService {
       this.prisma.class.findUnique({ where: { id: classId }, select: { name: true } }),
     ]);
 
+    const averages = new Map<string, number>();
+    for (const student of students) {
+      const rows = computed.filter((r) => r.studentId === student.id && r.finalPercentage != null);
+      if (rows.length) averages.set(student.id, rows.reduce((sum, row) => sum + (row.finalPercentage || 0), 0) / rows.length);
+    }
+    const ranking = Array.from(averages.entries()).sort((a, b) => b[1] - a[1]);
+    const positions = new Map<string, number>();
+    let lastAverage: number | null = null;
+    let lastPosition = 0;
+    ranking.forEach(([studentId, average], index) => {
+      if (lastAverage === null || Math.abs(average - lastAverage) > 0.001) {
+        lastPosition = index + 1;
+        lastAverage = average;
+      }
+      positions.set(studentId, lastPosition);
+    });
+
     const recipients: any[] = [];
-    const previewWarnings: string[] = [];
     for (const student of students) {
       const rows = computed.filter((r) => r.studentId === student.id);
       if (!rows.length) continue;
       const summary = summaries.find((s) => s.studentId === student.id);
-      let report: any = null;
-      try {
-        report = await this.reportCardEngine.generateReportCardData(student.id, termId, schoolId);
-      } catch (error: any) {
-        // A malformed optional report-card configuration must not hide all valid
-        // published recipients. Keep the published snapshot and expose a warning.
-        const detail = error?.message || 'Report card data could not be generated';
-        this.logger.warn(`Results SMS report fallback for student ${student.id}: ${detail}`);
-        previewWarnings.push(`${student.firstName} ${student.lastName}: ${detail}`);
-      }
       const isPrimary = school?.institutionType?.code === 'PRIMARY_SCHOOL';
-      const officialSubjects = (report?.subjectBreakdown || rows.map((row) => ({
+      const officialSubjects = rows.map((row) => ({
         subjectName: row.subject.name,
         subjectCode: row.subject.code,
         totalRawScore: row.totalRawScore,
@@ -68,7 +72,7 @@ export class ResultsSmsService {
         finalRemark: row.finalRemark,
         points: row.points,
         isAbsent: row.isAbsent,
-      }))).map((subject: any) => ({
+      })).map((subject: any) => ({
         name: subject.subjectName,
         code: subject.subjectCode,
         mark: isPrimary ? subject.totalRawScore : null,
@@ -81,15 +85,15 @@ export class ResultsSmsService {
       const result = {
         subjects: officialSubjects,
         total: isPrimary ? Number(officialSubjects.reduce((sum: number, subject: any) => sum + (subject.mark || 0), 0).toFixed(1)) : null,
-        points: isPrimary ? null : report?.termSummary?.totalPoints ?? report?.totalPoints ?? summary?.totalPoints ?? null,
-        overall: report?.termSummary?.overallPercentage != null
-          ? Number(report.termSummary.overallPercentage.toFixed(1))
-          : summary?.overallPercentage == null ? null : Number(summary.overallPercentage.toFixed(1)),
-        grade: report?.termSummary?.overallGrade ?? summary?.overallGrade ?? null,
-        division: report?.division?.division ?? (summary?.competencyScores as any)?.division ?? null,
-        position: report?.termSummary?.classRank ?? summary?.classRank ?? null,
-        classSize: report?.termSummary?.classSize || summary?.classSize || undefined,
-        attendance: report?.attendance?.attendanceRate ?? summary?.attendanceRate ?? null,
+        points: isPrimary ? null : summary?.totalPoints ?? null,
+        overall: summary?.overallPercentage != null
+          ? Number(summary.overallPercentage.toFixed(1))
+          : averages.get(student.id) == null ? null : Number(averages.get(student.id)!.toFixed(1)),
+        grade: summary?.overallGrade ?? null,
+        division: (summary?.competencyScores as any)?.division ?? null,
+        position: positions.get(student.id) ?? null,
+        classSize: ranking.length || summary?.classSize || undefined,
+        attendance: summary?.attendanceRate ?? null,
       };
       const message = this.formatMessage(school?.name || 'SCHOOL', student, klass?.name, term?.name, result);
       const length = message.length;
@@ -119,7 +123,7 @@ export class ResultsSmsService {
       missingPhone: recipients.filter((r) => r.phoneStatus === 'MISSING').length,
       invalidPhone: recipients.filter((r) => r.phoneStatus === 'INVALID').length,
       estimatedUnits: valid.reduce((sum, r) => sum + r.estimatedUnits, 0),
-      multiSegment: valid.some((r) => r.segments > 1), previewWarnings, recipients,
+      multiSegment: valid.some((r) => r.segments > 1), recipients,
     };
   }
 
