@@ -42,7 +42,7 @@ export default function StaffPositionsPage() {
       } else {
         setSuccess(
           `Sync complete: ${data.teachersScanned ?? 0} staff scanned, ` +
-          `${data.departmentGroupsLinked ?? 0} departments linked, ` +
+          `${data.teachersLinked ?? 0} staff linked to departments, ` +
           `${data.positionsCreated ?? 0} positions created`
         );
       }

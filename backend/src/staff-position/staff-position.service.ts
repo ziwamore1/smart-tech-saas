@@ -29,9 +29,18 @@ export class StaffPositionService {
   private readonly logger = new Logger(StaffPositionService.name);
   private readonly lastSyncAt = new Map<string, number>();
   private readonly syncStartedAt = new Map<string, number>();
+  private readonly lastDeptImportAt = new Map<string, number>();
   private static readonly SYNC_LEASE_MS = 120_000;
+  private static readonly DEPT_IMPORT_TTL_MS = 5 * 60_000;
+  private static readonly SYNC_BATCH_SIZE = 500;
 
   constructor(private readonly prisma: PrismaService) {}
+
+  private async ensureDepartmentsImported(schoolId: string) {
+    if (Date.now() - (this.lastDeptImportAt.get(schoolId) || 0) < StaffPositionService.DEPT_IMPORT_TTL_MS) return;
+    await this.syncRegisteredDepartments(schoolId);
+    this.lastDeptImportAt.set(schoolId, Date.now());
+  }
 
   private shouldRunSync(schoolId: string): boolean {
     const startedAt = this.syncStartedAt.get(schoolId);
@@ -55,7 +64,7 @@ export class StaffPositionService {
   }
 
   async getDepartments(schoolId: string) {
-    await this.syncRegisteredDepartments(schoolId);
+    await this.ensureDepartmentsImported(schoolId);
     this.ensureBackgroundSync(schoolId);
     const departments = await this.prisma.department.findMany({
       where: { schoolId },
@@ -507,7 +516,7 @@ export class StaffPositionService {
   }
 
   private async syncRegisteredPositions(schoolId: string) {
-    await this.syncRegisteredDepartments(schoolId);
+    await this.ensureDepartmentsImported(schoolId);
     if (!this.shouldRunSync(schoolId)) return;
     try {
       await this.runPositionSync(schoolId);
@@ -528,23 +537,7 @@ export class StaffPositionService {
   }
 
   private async runPositionSync(schoolId: string) {
-    const registeredStaff = await this.prisma.teacher.findMany({
-      where: { schoolId },
-      select: {
-        id: true,
-        departmentId: true,
-        department: true,
-        user: {
-          select: {
-            userRoles: { select: { role: { select: { name: true } } } },
-            schoolUsers: {
-              where: { schoolId },
-              select: { SchoolRoleAssignment: { where: { isActive: true }, select: { role: true } } },
-            },
-          },
-        },
-      },
-    });
+    const BATCH = StaffPositionService.SYNC_BATCH_SIZE;
 
     const existingPositions = await this.prisma.actingPosition.findMany({
       where: { schoolId },
@@ -572,59 +565,91 @@ export class StaffPositionService {
     const positionUpdateByGroup = new Map<string, { ids: string[]; departmentId: string | null; isPrimary: boolean }>();
     const positionsToCreate: { teacherId: string; schoolId: string; positionType: string; departmentId: string | null; isPrimary: boolean }[] = [];
 
-    for (const teacher of registeredStaff) {
-      let departmentId = teacher.departmentId;
-      if (!departmentId && teacher.department?.trim()) {
-        const name = teacher.department.trim().toLowerCase();
-        departmentId = departmentByName.get(name) || departmentByCode.get(name) || null;
-        if (departmentId) {
-          const group = teacherDeptByGroup.get(departmentId) || [];
-          group.push(teacher.id);
-          teacherDeptByGroup.set(departmentId, group);
-          teacher.departmentId = departmentId;
-        }
-      }
+    const teacherSelect = {
+      id: true,
+      departmentId: true,
+      department: true,
+      user: {
+        select: {
+          userRoles: { select: { role: { select: { name: true } } } },
+          schoolUsers: {
+            where: { schoolId },
+            select: { SchoolRoleAssignment: { where: { isActive: true }, select: { role: true } } },
+          },
+        },
+      },
+    };
 
-      const roles = new Set<string>(teacher.user.userRoles.map((a) => a.role.name));
-      for (const membership of teacher.user.schoolUsers) {
-        for (const assignment of membership.SchoolRoleAssignment) roles.add(assignment.role);
-      }
+    let teachersScanned = 0;
+    let lastId = '';
+    for (;;) {
+      const batch = await this.prisma.teacher.findMany({
+        where: { schoolId, id: { gt: lastId } },
+        orderBy: { id: 'asc' },
+        take: BATCH,
+        select: teacherSelect,
+      });
+      if (batch.length === 0) break;
+      lastId = batch[batch.length - 1].id;
+      teachersScanned += batch.length;
 
-      for (const role of roles) {
-        const positionType = this.getPositionTypeForRole(role);
-        if (!positionType) continue;
-        const key = `${teacher.id}:${positionType}`;
-        const existing = positionByTeacherType.get(key);
-        if (existing) {
-          const isDeptPos = departmentPositionTypes.includes(positionType);
-          if (isDeptPos && existing.departmentId !== departmentId && existing.isActive) {
-            const isPrimary = positionType === 'HOD' ? true : existing.isPrimary;
-            const groupKey = `${departmentId || 'null'}:${isPrimary}`;
-            const group = positionUpdateByGroup.get(groupKey) || { ids: [], departmentId, isPrimary };
-            group.ids.push(existing.id);
-            positionUpdateByGroup.set(groupKey, group);
-            existing.departmentId = departmentId;
+      for (const teacher of batch) {
+        let departmentId = teacher.departmentId;
+        if (!departmentId && teacher.department?.trim()) {
+          const name = teacher.department.trim().toLowerCase();
+          departmentId = departmentByName.get(name) || departmentByCode.get(name) || null;
+          if (departmentId) {
+            const group = teacherDeptByGroup.get(departmentId) || [];
+            group.push(teacher.id);
+            teacherDeptByGroup.set(departmentId, group);
+            teacher.departmentId = departmentId;
           }
-          continue;
         }
-        if (positionType === 'HOD' && !departmentId) continue;
-        positionsToCreate.push({
-          teacherId: teacher.id,
-          schoolId,
-          positionType,
-          departmentId: departmentPositionTypes.includes(positionType) ? departmentId : null,
-          isPrimary: true,
-        });
-        positionByTeacherType.set(key, { id: 'pending', departmentId, isPrimary: true });
+
+        const roles = new Set<string>(teacher.user.userRoles.map((a) => a.role.name));
+        for (const membership of teacher.user.schoolUsers) {
+          for (const assignment of membership.SchoolRoleAssignment) roles.add(assignment.role);
+        }
+
+        for (const role of roles) {
+          const positionType = this.getPositionTypeForRole(role);
+          if (!positionType) continue;
+          if (positionType === 'SUBJECT_TEACHER') continue;
+          const key = `${teacher.id}:${positionType}`;
+          const existing = positionByTeacherType.get(key);
+          if (existing) {
+            const isDeptPos = departmentPositionTypes.includes(positionType);
+            if (isDeptPos && existing.departmentId !== departmentId && existing.isActive) {
+              const isPrimary = positionType === 'HOD' ? true : existing.isPrimary;
+              const groupKey = `${departmentId || 'null'}:${isPrimary}`;
+              const group = positionUpdateByGroup.get(groupKey) || { ids: [], departmentId, isPrimary };
+              group.ids.push(existing.id);
+              positionUpdateByGroup.set(groupKey, group);
+              existing.departmentId = departmentId;
+            }
+            continue;
+          }
+          if (positionType === 'HOD' && !departmentId) continue;
+          positionsToCreate.push({
+            teacherId: teacher.id,
+            schoolId,
+            positionType,
+            departmentId: departmentPositionTypes.includes(positionType) ? departmentId : null,
+            isPrimary: true,
+          });
+          positionByTeacherType.set(key, { id: 'pending', departmentId, isPrimary: true });
+        }
       }
     }
 
+    let linked = 0;
     for (const [departmentId, teacherIds] of teacherDeptByGroup) {
       try {
-        await this.prisma.teacher.updateMany({
+        const result = await this.prisma.teacher.updateMany({
           where: { id: { in: teacherIds }, schoolId },
           data: { departmentId },
         });
+        linked += result.count;
       } catch (err: any) {
         this.logger.warn(`Failed to link ${teacherIds.length} teachers to department ${departmentId}: ${err.message}`);
       }
@@ -658,13 +683,14 @@ export class StaffPositionService {
     }
 
     this.logger.log(
-      `Staff-position sync school ${schoolId}: ${registeredStaff.length} teachers scanned, ` +
-      `${teacherDeptByGroup.size} department groups linked, ${positionUpdateByGroup.size} position groups updated`,
+      `Staff-position sync school ${schoolId}: ${teachersScanned} teachers scanned, ` +
+      `${linked} teachers linked to departments, ${positionUpdateByGroup.size} position groups updated`,
     );
 
     return {
-      teachersScanned: registeredStaff.length,
-      departmentGroupsLinked: teacherDeptByGroup.size,
+      teachersScanned,
+      teachersLinked: linked,
+      departmentsLinked: teacherDeptByGroup.size,
       positionsCreated: created,
     };
   }
