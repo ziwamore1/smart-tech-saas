@@ -1,2 +1,5 @@
 [deploy]
 region = "us-west2"
+
+[services.smart-tech-saas-production]
+memoryLimit = 2048
