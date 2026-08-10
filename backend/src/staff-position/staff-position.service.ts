@@ -18,6 +18,7 @@ const POSITION_TO_ROLE: Record<string, string> = {
   HEAD_TEACHER: 'Head Teacher',
   DEPUTY: 'Deputy',
   HOD: 'HOD',
+  SUBJECT_TEACHER: 'Teacher',
   CLASS_TEACHER: 'Class Teacher',
   LOWER_PRIMARY_SENIOR_TEACHER: 'Lower Primary Senior Teacher',
   UPPER_PRIMARY_SENIOR_TEACHER: 'Upper Primary Senior Teacher',
@@ -43,6 +44,7 @@ export class StaffPositionService {
   }
 
   async getDepartments(schoolId: string) {
+    await this.syncRegisteredPositions(schoolId);
     const departments = await this.prisma.department.findMany({
       where: { schoolId },
       orderBy: { name: 'asc' },
@@ -176,6 +178,7 @@ export class StaffPositionService {
   }
 
   async getSchoolPositions(schoolId: string, positionType?: string) {
+    await this.syncRegisteredPositions(schoolId);
     const where: any = { schoolId };
     if (positionType) where.positionType = positionType;
 
@@ -252,16 +255,7 @@ export class StaffPositionService {
   // ==================== HIERARCHY / MONITORING ====================
 
   async getHierarchy(schoolId: string) {
-    // Backfill positions for staff registered with supervisory school roles, including legacy records.
-    const registeredStaff = await this.prisma.teacher.findMany({
-      where: { schoolId },
-      include: { user: { include: { userRoles: { include: { role: true } } } } },
-    });
-    for (const teacher of registeredStaff) {
-      for (const userRole of teacher.user.userRoles) {
-        await this.reconcileTeacherRole(teacher.id, schoolId, userRole.role.name, true);
-      }
-    }
+    await this.syncRegisteredPositions(schoolId);
 
     const positions = await this.prisma.actingPosition.findMany({
       where: { schoolId, isActive: true },
@@ -451,7 +445,7 @@ export class StaffPositionService {
 
   /** Reconciles a registered teacher's role with the live hierarchy. */
   async reconcileTeacherRole(teacherId: string, schoolId: string, role: string, active: boolean) {
-    const positionType = Object.entries(POSITION_TO_ROLE).find(([, value]) => value.toLowerCase() === role.toLowerCase())?.[0];
+    const positionType = this.getPositionTypeForRole(role);
     if (!positionType) return;
 
     const teacher = await this.prisma.teacher.findFirst({ where: { id: teacherId, schoolId } });
@@ -467,8 +461,9 @@ export class StaffPositionService {
     }
 
     if (existing) {
-      if (positionType === 'HOD' && existing.departmentId !== teacher.departmentId) {
-        await this.prisma.actingPosition.update({ where: { id: existing.id }, data: { departmentId: teacher.departmentId, isPrimary: true } });
+      const departmentPosition = ['HOD', 'SUBJECT_TEACHER', 'CLASS_TEACHER', 'SENIOR_TEACHER', 'LOWER_PRIMARY_SENIOR_TEACHER', 'UPPER_PRIMARY_SENIOR_TEACHER'].includes(positionType);
+      if (departmentPosition && existing.departmentId !== teacher.departmentId) {
+        await this.prisma.actingPosition.update({ where: { id: existing.id }, data: { departmentId: teacher.departmentId, isPrimary: positionType === 'HOD' ? true : undefined } });
       }
       return;
     }
@@ -480,10 +475,44 @@ export class StaffPositionService {
         teacherId,
         schoolId,
         positionType,
-        departmentId: ['HOD', 'LOWER_PRIMARY_SENIOR_TEACHER', 'UPPER_PRIMARY_SENIOR_TEACHER'].includes(positionType) ? teacher.departmentId : null,
+        departmentId: ['HOD', 'SUBJECT_TEACHER', 'CLASS_TEACHER', 'SENIOR_TEACHER', 'LOWER_PRIMARY_SENIOR_TEACHER', 'UPPER_PRIMARY_SENIOR_TEACHER'].includes(positionType) ? teacher.departmentId : null,
         isPrimary: true,
       },
     });
+  }
+
+  private getPositionTypeForRole(role: string) {
+    const normalized = role.trim().toUpperCase().replace(/\s+/g, '_');
+    if (normalized === 'TEACHER' || normalized === 'SUBJECT_TEACHER') return 'SUBJECT_TEACHER';
+    if (normalized === 'HOD' || normalized === 'HEAD_OF_DEPARTMENT') return 'HOD';
+    return Object.entries(POSITION_TO_ROLE).find(([, value]) => value.toLowerCase() === role.toLowerCase())?.[0];
+  }
+
+  private async syncRegisteredPositions(schoolId: string) {
+    const registeredStaff = await this.prisma.teacher.findMany({
+      where: { schoolId },
+      include: {
+        user: {
+          include: {
+            userRoles: { include: { role: true } },
+            schoolUsers: {
+              where: { schoolId },
+              include: { schoolRoleAssignments: { where: { isActive: true } } },
+            },
+          },
+        },
+      },
+    });
+
+    for (const teacher of registeredStaff) {
+      const roles = new Set<string>(teacher.user.userRoles.map((assignment) => assignment.role.name));
+      for (const membership of teacher.user.schoolUsers) {
+        for (const assignment of membership.schoolRoleAssignments) roles.add(assignment.role);
+      }
+      for (const role of roles) {
+        await this.reconcileTeacherRole(teacher.id, schoolId, role, true);
+      }
+    }
   }
 
   // ==================== HELPERS ====================
