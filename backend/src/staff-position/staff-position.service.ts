@@ -152,38 +152,21 @@ export class StaffPositionService {
     const roleName = POSITION_TO_ROLE[dto.positionType];
     if (roleName) {
       try {
-        let role = await this.prisma.role.findFirst({ where: { name: roleName } });
-        if (!role) {
-          role = await this.prisma.role.create({ data: { name: roleName } });
-        }
-        const existingUr = await this.prisma.userRole.findFirst({
-          where: { userId: dto.teacherId, roleId: role.id },
-        });
-        if (!existingUr) {
-          await this.prisma.userRole.create({
-            data: { userId: dto.teacherId, roleId: role.id },
-          });
-        }
-        const membership = await this.prisma.schoolUser.findFirst({
-          where: { userId: dto.teacherId, schoolId },
-        });
-        if (membership) {
-          const existingSr = await this.prisma.schoolRoleAssignment.findFirst({
-            where: { schoolMembershipId: membership.id, role: roleName },
-          });
-          if (!existingSr) {
-            await this.prisma.schoolRoleAssignment.create({
-              data: { schoolMembershipId: membership.id, role: roleName, isActive: true },
-            });
-          } else if (!existingSr.isActive) {
-            await this.prisma.schoolRoleAssignment.update({
-              where: { id: existingSr.id },
-              data: { isActive: true },
-            });
-          }
-        }
+        await this.ensureRoleForTeacher(dto.teacherId, schoolId, roleName);
       } catch (err: any) {
         this.logger.warn(`Failed to auto-assign role "${roleName}" for position ${dto.positionType}: ${err.message}`);
+      }
+    }
+
+    // Align the teacher's department so a re-sync keeps the assigned department
+    if (this.isDepartmentPositionType(dto.positionType) && dto.departmentId) {
+      try {
+        await this.prisma.teacher.update({
+          where: { id: dto.teacherId },
+          data: { departmentId: dto.departmentId },
+        });
+      } catch (err: any) {
+        this.logger.warn(`Failed to align teacher department for position ${dto.positionType}: ${err.message}`);
       }
     }
 
@@ -217,26 +200,51 @@ export class StaffPositionService {
   async updateActingPosition(id: string, dto: UpdateActingPositionDto) {
     if (dto.positionType) this.validatePositionType(dto.positionType);
 
+    const existing = await this.prisma.actingPosition.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Acting position not found');
+
+    const position = await this.prisma.actingPosition.update({
+      where: { id },
+      data: {
+        ...dto,
+        startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+      },
+      include: {
+        teacher: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        department: true,
+        class: { select: { id: true, name: true } },
+      },
+    });
+
+    // Keep roles and the teacher's department aligned so a re-sync doesn't revert the edit.
     try {
-      return await this.prisma.actingPosition.update({
-        where: { id },
-        data: {
-          ...dto,
-          startDate: dto.startDate ? new Date(dto.startDate) : undefined,
-          endDate: dto.endDate ? new Date(dto.endDate) : undefined,
-        },
-        include: {
-          teacher: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } } },
-          department: true,
-          class: { select: { id: true, name: true } },
-        },
-      });
-    } catch (err: any) {
-      if (err?.code === 'P2025') {
-        throw new NotFoundException('Acting position not found');
+      if (dto.positionType && dto.positionType !== existing.positionType) {
+        const oldRoleName = POSITION_TO_ROLE[existing.positionType];
+        const newRoleName = POSITION_TO_ROLE[dto.positionType];
+        if (oldRoleName && oldRoleName !== newRoleName) {
+          await this.removeRoleForTeacher(existing.teacherId, existing.schoolId, existing.positionType, id);
+        }
+        if (newRoleName) {
+          await this.ensureRoleForTeacher(existing.teacherId, existing.schoolId, newRoleName);
+        }
       }
-      throw err;
+
+      if (
+        dto.departmentId !== undefined &&
+        dto.departmentId !== existing.departmentId &&
+        this.isDepartmentPositionType(dto.positionType ?? existing.positionType)
+      ) {
+        await this.prisma.teacher.update({
+          where: { id: existing.teacherId },
+          data: { departmentId: dto.departmentId || null },
+        });
+      }
+    } catch (err: any) {
+      this.logger.warn(`Failed to sync role/department for position ${id}: ${err.message}`);
     }
+
+    return position;
   }
 
   async deleteActingPosition(id: string) {
@@ -246,32 +254,10 @@ export class StaffPositionService {
     const result = await this.prisma.actingPosition.delete({ where: { id } });
 
     // Remove the corresponding role if no other positions of the same type exist for this teacher
-    const roleName = POSITION_TO_ROLE[pos.positionType];
-    if (roleName) {
-      try {
-        const remaining = await this.prisma.actingPosition.findFirst({
-          where: { teacherId: pos.teacherId, positionType: pos.positionType, id: { not: id } },
-        });
-        if (!remaining) {
-          const role = await this.prisma.role.findFirst({ where: { name: roleName } });
-          if (role) {
-            await this.prisma.userRole.deleteMany({
-              where: { userId: pos.teacherId, roleId: role.id },
-            });
-            const membership = await this.prisma.schoolUser.findFirst({
-              where: { userId: pos.teacherId, schoolId: pos.schoolId },
-            });
-            if (membership) {
-              await this.prisma.schoolRoleAssignment.updateMany({
-                where: { schoolMembershipId: membership.id, role: roleName },
-                data: { isActive: false },
-              });
-            }
-          }
-        }
-      } catch (err: any) {
-        this.logger.warn(`Failed to remove role "${roleName}" on position delete: ${err.message}`);
-      }
+    try {
+      await this.removeRoleForTeacher(pos.teacherId, pos.schoolId, pos.positionType, id);
+    } catch (err: any) {
+      this.logger.warn(`Failed to remove role for position ${pos.positionType} on delete: ${err.message}`);
     }
 
     return result;
@@ -551,7 +537,7 @@ export class StaffPositionService {
       where: { schoolId },
       select: { id: true, teacherId: true, positionType: true, departmentId: true, isPrimary: true, isActive: true },
     });
-    const positionByTeacherType = new Map<string, { id: string; departmentId: string | null; isPrimary: boolean }>();
+    const positionByTeacherType = new Map<string, { id: string; departmentId: string | null; isPrimary: boolean; isActive: boolean }>();
     for (const p of existingPositions) {
       positionByTeacherType.set(`${p.teacherId}:${p.positionType}`, p);
     }
@@ -645,7 +631,7 @@ export class StaffPositionService {
             departmentId: departmentPositionTypes.includes(positionType) ? departmentId : null,
             isPrimary: true,
           });
-          positionByTeacherType.set(key, { id: 'pending', departmentId, isPrimary: true });
+          positionByTeacherType.set(key, { id: 'pending', departmentId, isPrimary: true, isActive: true });
         }
       }
     }
@@ -736,6 +722,69 @@ export class StaffPositionService {
   }
 
   // ==================== HELPERS ====================
+
+  private isDepartmentPositionType(type: string) {
+    return ['HOD', 'LOWER_PRIMARY_SENIOR_TEACHER', 'UPPER_PRIMARY_SENIOR_TEACHER'].includes(type);
+  }
+
+  private async ensureRoleForTeacher(teacherId: string, schoolId: string, roleName: string) {
+    let role = await this.prisma.role.findFirst({ where: { name: roleName } });
+    if (!role) {
+      role = await this.prisma.role.create({ data: { name: roleName } });
+    }
+    const existingUr = await this.prisma.userRole.findFirst({
+      where: { userId: teacherId, roleId: role.id },
+    });
+    if (!existingUr) {
+      await this.prisma.userRole.create({
+        data: { userId: teacherId, roleId: role.id },
+      });
+    }
+    const membership = await this.prisma.schoolUser.findFirst({
+      where: { userId: teacherId, schoolId },
+    });
+    if (membership) {
+      const existingSr = await this.prisma.schoolRoleAssignment.findFirst({
+        where: { schoolMembershipId: membership.id, role: roleName },
+      });
+      if (!existingSr) {
+        await this.prisma.schoolRoleAssignment.create({
+          data: { schoolMembershipId: membership.id, role: roleName, isActive: true },
+        });
+      } else if (!existingSr.isActive) {
+        await this.prisma.schoolRoleAssignment.update({
+          where: { id: existingSr.id },
+          data: { isActive: true },
+        });
+      }
+    }
+  }
+
+  private async removeRoleForTeacher(teacherId: string, schoolId: string, positionType: string, excludePositionId?: string) {
+    const roleName = POSITION_TO_ROLE[positionType];
+    if (!roleName) return;
+
+    const remaining = await this.prisma.actingPosition.findFirst({
+      where: { teacherId, positionType, ...(excludePositionId ? { id: { not: excludePositionId } } : {}) },
+    });
+    if (remaining) return;
+
+    const role = await this.prisma.role.findFirst({ where: { name: roleName } });
+    if (!role) return;
+
+    await this.prisma.userRole.deleteMany({
+      where: { userId: teacherId, roleId: role.id },
+    });
+    const membership = await this.prisma.schoolUser.findFirst({
+      where: { userId: teacherId, schoolId },
+    });
+    if (membership) {
+      await this.prisma.schoolRoleAssignment.updateMany({
+        where: { schoolMembershipId: membership.id, role: roleName },
+        data: { isActive: false },
+      });
+    }
+  }
 
   private validatePositionType(type: string) {
     if (!POSITION_TYPES.includes(type as any)) {

@@ -1,13 +1,19 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Req, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { StaffPositionService } from '../staff-position/staff-position.service';
 
 @Controller('roles')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class RoleController {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(RoleController.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private staffPositionService: StaffPositionService,
+  ) {}
 
   @Get()
   findAll() {
@@ -87,6 +93,18 @@ export class RoleController {
       }
     }
 
+    // Keep the teacher's staff position in sync so a re-sync shows the updated role
+    if (schoolId) {
+      const teacher = await this.prisma.teacher.findFirst({ where: { userId: body.userId, schoolId } });
+      if (teacher) {
+        try {
+          await this.staffPositionService.reconcileTeacherRole(teacher.id, schoolId, body.roleName, true);
+        } catch (err: any) {
+          this.logger.warn(`Failed to reconcile staff position for role ${body.roleName}: ${err.message}`);
+        }
+      }
+    }
+
     return { message: 'Role assigned successfully' };
   }
 
@@ -118,6 +136,18 @@ export class RoleController {
           where: { schoolMembershipId: membership.id, role: body.roleName },
           data: { isActive: false },
         });
+      }
+    }
+
+    // Deactivate the teacher's staff position so a re-sync doesn't show a stale role
+    if (schoolId) {
+      const teacher = await this.prisma.teacher.findFirst({ where: { userId: body.userId, schoolId } });
+      if (teacher) {
+        try {
+          await this.staffPositionService.reconcileTeacherRole(teacher.id, schoolId, body.roleName, false);
+        } catch (err: any) {
+          this.logger.warn(`Failed to reconcile staff position for removed role ${body.roleName}: ${err.message}`);
+        }
       }
     }
 
