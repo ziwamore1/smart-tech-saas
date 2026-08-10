@@ -46,15 +46,27 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    // Collect all roles from multiple sources
-    const allRoleNames = new Set<string>();
-
-    // 0. JWT merged roles (contains all roles merged at login time)
+    // Fast path: if the JWT-merged roles already satisfy the requirement, skip
+    // the database lookups entirely. This keeps requests on a single (or two)
+    // DB round-trip, which matters a lot when the app and database are in
+    // different regions.
+    const jwtRoleNames = new Set<string>();
     if (user.roles && Array.isArray(user.roles)) {
-      for (const r of user.roles) {
-        allRoleNames.add(normalize(r));
-      }
+      for (const r of user.roles) jwtRoleNames.add(normalize(r));
     }
+    if (user.platformRoles && Array.isArray(user.platformRoles)) {
+      for (const pr of user.platformRoles) jwtRoleNames.add(normalize(pr));
+    }
+    if (user.schoolRoles && Array.isArray(user.schoolRoles)) {
+      for (const sr of user.schoolRoles) jwtRoleNames.add(normalize(sr));
+    }
+    if (requiredRoles.some((role) => jwtRoleNames.has(normalize(role)))) {
+      return true;
+    }
+
+    // Slow path (JWT roles are stale/incomplete): consult the database before
+    // denying access.
+    const allRoleNames = new Set(jwtRoleNames);
 
     // 1. Legacy UserRole table (backward compatibility)
     const userRoles = await this.prisma.userRole.findMany({
@@ -63,20 +75,6 @@ export class RolesGuard implements CanActivate {
     });
     for (const ur of userRoles) {
       allRoleNames.add(normalize(ur.role.name));
-    }
-
-    // 2. Platform roles
-    if (user.platformRoles && Array.isArray(user.platformRoles)) {
-      for (const pr of user.platformRoles) {
-        allRoleNames.add(normalize(pr));
-      }
-    }
-
-    // 3. School roles (from JWT)
-    if (user.schoolRoles && Array.isArray(user.schoolRoles)) {
-      for (const sr of user.schoolRoles) {
-        allRoleNames.add(normalize(sr));
-      }
     }
 
     // 4. School roles (from database, for cases where JWT is stale)

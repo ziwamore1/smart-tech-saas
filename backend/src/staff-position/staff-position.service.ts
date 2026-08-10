@@ -215,24 +215,28 @@ export class StaffPositionService {
   }
 
   async updateActingPosition(id: string, dto: UpdateActingPositionDto) {
-    const pos = await this.prisma.actingPosition.findUnique({ where: { id } });
-    if (!pos) throw new NotFoundException('Acting position not found');
-
     if (dto.positionType) this.validatePositionType(dto.positionType);
 
-    return this.prisma.actingPosition.update({
-      where: { id },
-      data: {
-        ...dto,
-        startDate: dto.startDate ? new Date(dto.startDate) : undefined,
-        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
-      },
-      include: {
-        teacher: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } } },
-        department: true,
-        class: { select: { id: true, name: true } },
-      },
-    });
+    try {
+      return await this.prisma.actingPosition.update({
+        where: { id },
+        data: {
+          ...dto,
+          startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+          endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+        },
+        include: {
+          teacher: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+          department: true,
+          class: { select: { id: true, name: true } },
+        },
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2025') {
+        throw new NotFoundException('Acting position not found');
+      }
+      throw err;
+    }
   }
 
   async deleteActingPosition(id: string) {
