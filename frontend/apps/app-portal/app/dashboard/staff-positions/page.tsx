@@ -221,7 +221,7 @@ function DepartmentsTab({ departments, isDirector, onRefresh, setSuccess, setErr
 
       {departments.length === 0 ? (
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e8ddd0', padding: 40, textAlign: 'center', color: '#6b7280' }}>
-          No departments created yet. {isDirector && 'Click "Add Department" to create one.'}
+          No departments are currently linked from the Staff Register. {isDirector && 'Create a department first, then assign staff during registration.'}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
@@ -243,8 +243,12 @@ function DepartmentsTab({ departments, isDirector, onRefresh, setSuccess, setErr
                 )}
               </div>
               {dept.description && <p style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>{dept.description}</p>}
+              <div style={{ marginTop: 10, padding: '8px 10px', background: '#f0fdf4', borderRadius: 6, fontSize: 12, color: '#059669' }}>
+                <i className="fas fa-user-tie" style={{ marginRight: 5 }}></i>
+                {dept.hod?.teacher?.user ? <>HOD: {dept.hod.teacher.user.firstName} {dept.hod.teacher.user.lastName}</> : 'HOD is recognized automatically from Staff Register roles'}
+              </div>
               <div style={{ display: 'flex', gap: 12, marginTop: 10, fontSize: 12, color: '#6b7280' }}>
-                <span><strong style={{ color: '#374151' }}>{dept._count?.teachers || 0}</strong> teachers</span>
+                <span><strong style={{ color: '#374151' }}>{dept._count?.teachers || 0}</strong> registered staff</span>
                 <span><strong style={{ color: '#374151' }}>{dept._count?.positions || 0}</strong> positions</span>
               </div>
             </div>
