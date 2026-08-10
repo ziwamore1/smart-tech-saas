@@ -32,18 +32,20 @@ export default function StaffPositionsPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError(null);
-    try {
-      const [deptsRes, posRes, typesRes] = await Promise.allSettled([
-        staffPositionApi.getDepartments(),
-        staffPositionApi.getPositions(),
-        staffPositionApi.getPositionTypes(),
-      ]);
-      if (deptsRes.status === 'fulfilled') setDepartments(deptsRes.value.data?.data || deptsRes.value.data || []);
-      if (posRes.status === 'fulfilled') setPositions(posRes.value.data?.data || posRes.value.data || []);
-      if (typesRes.status === 'fulfilled') setPositionTypes(typesRes.value.data?.data || typesRes.value.data || []);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load data');
-    } finally { setLoading(false); }
+    const [deptsRes, posRes, typesRes] = await Promise.allSettled([
+      staffPositionApi.getDepartments(),
+      staffPositionApi.getPositions(),
+      staffPositionApi.getPositionTypes(),
+    ]);
+    const failures: string[] = [];
+    if (deptsRes.status === 'fulfilled') setDepartments(deptsRes.value.data?.data || deptsRes.value.data || []);
+    else failures.push(`departments: ${(deptsRes.reason as any)?.response?.data?.message || (deptsRes.reason as any)?.message || deptsRes.reason}`);
+    if (posRes.status === 'fulfilled') setPositions(posRes.value.data?.data || posRes.value.data || []);
+    else failures.push(`positions: ${(posRes.reason as any)?.response?.data?.message || (posRes.reason as any)?.message || posRes.reason}`);
+    if (typesRes.status === 'fulfilled') setPositionTypes(typesRes.value.data?.data || typesRes.value.data || []);
+    else failures.push(`position types: ${(typesRes.reason as any)?.response?.data?.message || (typesRes.reason as any)?.message || typesRes.reason}`);
+    if (failures.length) setError(`Failed to load: ${failures.join('; ')}`);
+    setLoading(false);
   }, []);
 
   const fetchHierarchy = useCallback(async () => {

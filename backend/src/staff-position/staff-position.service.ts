@@ -508,19 +508,23 @@ export class StaffPositionService {
 
     for (const teacher of registeredStaff) {
       if (!teacher.departmentId && teacher.department?.trim()) {
-        const department = await this.prisma.department.findFirst({
-          where: {
-            schoolId,
-            OR: [
-              { name: { equals: teacher.department.trim(), mode: 'insensitive' } },
-              { code: { equals: teacher.department.trim(), mode: 'insensitive' } },
-            ],
-          },
-          select: { id: true },
-        });
-        if (department) {
-          await this.prisma.teacher.update({ where: { id: teacher.id }, data: { departmentId: department.id } });
-          teacher.departmentId = department.id;
+        try {
+          const department = await this.prisma.department.findFirst({
+            where: {
+              schoolId,
+              OR: [
+                { name: { equals: teacher.department.trim(), mode: 'insensitive' } },
+                { code: { equals: teacher.department.trim(), mode: 'insensitive' } },
+              ],
+            },
+            select: { id: true },
+          });
+          if (department) {
+            await this.prisma.teacher.update({ where: { id: teacher.id }, data: { departmentId: department.id } });
+            teacher.departmentId = department.id;
+          }
+        } catch (err: any) {
+          this.logger.warn(`Failed to link teacher ${teacher.id} to department "${teacher.department}": ${err.message}`);
         }
       }
 
@@ -529,7 +533,11 @@ export class StaffPositionService {
         for (const assignment of membership.schoolRoleAssignments) roles.add(assignment.role);
       }
       for (const role of roles) {
-        await this.reconcileTeacherRole(teacher.id, schoolId, role, true);
+        try {
+          await this.reconcileTeacherRole(teacher.id, schoolId, role, true);
+        } catch (err: any) {
+          this.logger.warn(`Failed to reconcile role "${role}" for teacher ${teacher.id} in school ${schoolId}: ${err.message}`);
+        }
       }
     }
   }
@@ -545,14 +553,18 @@ export class StaffPositionService {
       const name = record.department?.trim();
       if (!name) continue;
 
-      const existing = await this.prisma.department.findFirst({
-        where: { schoolId, name: { equals: name, mode: 'insensitive' } },
-        select: { id: true },
-      });
-      if (!existing) {
-        await this.prisma.department.create({
-          data: { schoolId, name, category: 'STAFF_REGISTER', description: 'Imported from Staff Register' },
+      try {
+        const existing = await this.prisma.department.findFirst({
+          where: { schoolId, name: { equals: name, mode: 'insensitive' } },
+          select: { id: true },
         });
+        if (!existing) {
+          await this.prisma.department.create({
+            data: { schoolId, name, category: 'STAFF_REGISTER', description: 'Imported from Staff Register' },
+          });
+        }
+      } catch (err: any) {
+        this.logger.warn(`Failed to import registered department "${name}" for school ${schoolId}: ${err.message}`);
       }
     }
   }
