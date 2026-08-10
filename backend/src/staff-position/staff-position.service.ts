@@ -28,14 +28,14 @@ const POSITION_TO_ROLE: Record<string, string> = {
 export class StaffPositionService {
   private readonly logger = new Logger(StaffPositionService.name);
   private readonly lastSyncAt = new Map<string, number>();
+  private readonly syncRunning = new Set<string>();
 
   constructor(private readonly prisma: PrismaService) {}
 
   private shouldRunSync(schoolId: string): boolean {
-    const now = Date.now();
-    const last = this.lastSyncAt.get(schoolId) || 0;
-    if (now - last < 60_000) return false;
-    this.lastSyncAt.set(schoolId, now);
+    if (this.syncRunning.has(schoolId)) return false;
+    if (Date.now() - (this.lastSyncAt.get(schoolId) || 0) < 30_000) return false;
+    this.syncRunning.add(schoolId);
     return true;
   }
 
@@ -501,7 +501,15 @@ export class StaffPositionService {
   private async syncRegisteredPositions(schoolId: string) {
     await this.syncRegisteredDepartments(schoolId);
     if (!this.shouldRunSync(schoolId)) return;
+    try {
+      await this.runPositionSync(schoolId);
+      this.lastSyncAt.set(schoolId, Date.now());
+    } finally {
+      this.syncRunning.delete(schoolId);
+    }
+  }
 
+  private async runPositionSync(schoolId: string) {
     const registeredStaff = await this.prisma.teacher.findMany({
       where: { schoolId },
       select: {
@@ -542,8 +550,8 @@ export class StaffPositionService {
 
     const departmentPositionTypes = ['HOD', 'SUBJECT_TEACHER', 'CLASS_TEACHER', 'SENIOR_TEACHER', 'LOWER_PRIMARY_SENIOR_TEACHER', 'UPPER_PRIMARY_SENIOR_TEACHER'];
 
-    const teacherDeptUpdates: { id: string; departmentId: string }[] = [];
-    const positionUpdates: { id: string; departmentId: string | null; isPrimary: boolean }[] = [];
+    const teacherDeptByGroup = new Map<string, string[]>();
+    const positionUpdateByGroup = new Map<string, { ids: string[]; departmentId: string | null; isPrimary: boolean }>();
     const positionsToCreate: { teacherId: string; schoolId: string; positionType: string; departmentId: string | null; isPrimary: boolean }[] = [];
 
     for (const teacher of registeredStaff) {
@@ -552,7 +560,9 @@ export class StaffPositionService {
         const name = teacher.department.trim().toLowerCase();
         departmentId = departmentByName.get(name) || departmentByCode.get(name) || null;
         if (departmentId) {
-          teacherDeptUpdates.push({ id: teacher.id, departmentId });
+          const group = teacherDeptByGroup.get(departmentId) || [];
+          group.push(teacher.id);
+          teacherDeptByGroup.set(departmentId, group);
           teacher.departmentId = departmentId;
         }
       }
@@ -570,7 +580,11 @@ export class StaffPositionService {
         if (existing) {
           const isDeptPos = departmentPositionTypes.includes(positionType);
           if (isDeptPos && existing.departmentId !== departmentId && existing.isActive) {
-            positionUpdates.push({ id: existing.id, departmentId, isPrimary: positionType === 'HOD' ? true : existing.isPrimary });
+            const isPrimary = positionType === 'HOD' ? true : existing.isPrimary;
+            const groupKey = `${departmentId || 'null'}:${isPrimary}`;
+            const group = positionUpdateByGroup.get(groupKey) || { ids: [], departmentId, isPrimary };
+            group.ids.push(existing.id);
+            positionUpdateByGroup.set(groupKey, group);
             existing.departmentId = departmentId;
           }
           continue;
@@ -587,29 +601,39 @@ export class StaffPositionService {
       }
     }
 
-    if (teacherDeptUpdates.length) {
-      await Promise.all(
-        teacherDeptUpdates.map((u) =>
-          this.prisma.teacher.update({ where: { id: u.id }, data: { departmentId: u.departmentId } }),
-        ),
-      ).catch((err) => this.logger.warn(`Failed to link teacher departments: ${err.message}`));
+    for (const [departmentId, teacherIds] of teacherDeptByGroup) {
+      try {
+        await this.prisma.teacher.updateMany({
+          where: { id: { in: teacherIds }, schoolId },
+          data: { departmentId },
+        });
+      } catch (err: any) {
+        this.logger.warn(`Failed to link ${teacherIds.length} teachers to department ${departmentId}: ${err.message}`);
+      }
     }
 
-    if (positionUpdates.length) {
-      await Promise.all(
-        positionUpdates.map((u) =>
-          this.prisma.actingPosition.update({
-            where: { id: u.id },
-            data: { departmentId: u.departmentId, isPrimary: u.isPrimary },
-          }),
-        ),
-      ).catch((err) => this.logger.warn(`Failed to update acting positions: ${err.message}`));
+    for (const [, group] of positionUpdateByGroup) {
+      try {
+        await this.prisma.actingPosition.updateMany({
+          where: { id: { in: group.ids } },
+          data: { departmentId: group.departmentId, isPrimary: group.isPrimary },
+        });
+      } catch (err: any) {
+        this.logger.warn(`Failed to update ${group.ids.length} acting positions: ${err.message}`);
+      }
     }
 
     if (positionsToCreate.length) {
-      await this.prisma.actingPosition
-        .createMany({ data: positionsToCreate, skipDuplicates: true })
-        .catch((err) => this.logger.warn(`Failed to create acting positions: ${err.message}`));
+      try {
+        for (let i = 0; i < positionsToCreate.length; i += 1000) {
+          await this.prisma.actingPosition.createMany({
+            data: positionsToCreate.slice(i, i + 1000),
+            skipDuplicates: true,
+          });
+        }
+      } catch (err: any) {
+        this.logger.warn(`Failed to create ${positionsToCreate.length} acting positions: ${err.message}`);
+      }
     }
   }
 
