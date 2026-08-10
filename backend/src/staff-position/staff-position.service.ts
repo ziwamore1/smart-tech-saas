@@ -54,7 +54,7 @@ export class StaffPositionService {
 
   async getDepartments(schoolId: string) {
     await this.syncRegisteredDepartments(schoolId);
-    await this.syncRegisteredPositions(schoolId);
+    this.ensureBackgroundSync(schoolId);
     const departments = await this.prisma.department.findMany({
       where: { schoolId },
       orderBy: { name: 'asc' },
@@ -188,7 +188,7 @@ export class StaffPositionService {
   }
 
   async getSchoolPositions(schoolId: string, positionType?: string) {
-    await this.syncRegisteredPositions(schoolId);
+    this.ensureBackgroundSync(schoolId);
     const where: any = { schoolId };
     if (positionType) where.positionType = positionType;
 
@@ -265,7 +265,7 @@ export class StaffPositionService {
   // ==================== HIERARCHY / MONITORING ====================
 
   async getHierarchy(schoolId: string) {
-    await this.syncRegisteredPositions(schoolId);
+    this.ensureBackgroundSync(schoolId);
 
     const positions = await this.prisma.actingPosition.findMany({
       where: { schoolId, isActive: true },
@@ -496,6 +496,12 @@ export class StaffPositionService {
     if (normalized === 'TEACHER' || normalized === 'SUBJECT_TEACHER') return 'SUBJECT_TEACHER';
     if (normalized === 'HOD' || normalized === 'HEAD_OF_DEPARTMENT') return 'HOD';
     return Object.entries(POSITION_TO_ROLE).find(([, value]) => value.toLowerCase() === role.toLowerCase())?.[0];
+  }
+
+  private ensureBackgroundSync(schoolId: string) {
+    this.syncRegisteredPositions(schoolId).catch((err: any) => {
+      this.logger.error(`Background staff-position sync failed for school ${schoolId}: ${err.message}`);
+    });
   }
 
   private async syncRegisteredPositions(schoolId: string) {
