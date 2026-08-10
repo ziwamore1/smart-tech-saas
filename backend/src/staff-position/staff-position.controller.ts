@@ -103,4 +103,12 @@ export class StaffPositionController {
   async getPositionTypes() {
     return this.service.getPositionTypes();
   }
+
+  // ==================== SYNC ====================
+
+  @Post('sync')
+  @Roles(...ADMIN_ROLES)
+  async forceSync(@Req() req: any) {
+    return this.service.forceSync(req.user.schoolId);
+  }
 }

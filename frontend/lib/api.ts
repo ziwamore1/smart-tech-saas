@@ -2016,6 +2016,9 @@ export const staffPositionApi = {
   getMonitoringChain: (teacherId: string) =>
     api.get(`/staff-positions/monitoring-chain/${teacherId}`),
   getPositionTypes: () => api.get('/staff-positions/position-types'),
+
+  // Sync
+  forceSync: () => api.post('/staff-positions/sync'),
 };
 
 export const schoolMembershipApi = {

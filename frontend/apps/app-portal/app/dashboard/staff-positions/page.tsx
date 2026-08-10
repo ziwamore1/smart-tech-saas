@@ -26,10 +26,33 @@ export default function StaffPositionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const userRoles = user?.roles || [];
   const isAdmin = userRoles.some((r: string) => ADMIN_ROLES.includes(r as AdminRole));
   const isDirector = userRoles.includes('Director') || userRoles.includes('SuperAdmin');
+
+  const handleSync = async () => {
+    setSyncing(true); setError(null); setSuccess(null);
+    try {
+      const res = await staffPositionApi.forceSync();
+      const data = res.data?.data || res.data || {};
+      if (data.running) {
+        setSuccess(data.message || 'Sync already in progress');
+      } else {
+        setSuccess(
+          `Sync complete: ${data.teachersScanned ?? 0} staff scanned, ` +
+          `${data.departmentGroupsLinked ?? 0} departments linked, ` +
+          `${data.positionsCreated ?? 0} positions created`
+        );
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Sync failed');
+    } finally {
+      setSyncing(false);
+      fetchData();
+    }
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError(null);
@@ -81,6 +104,15 @@ export default function StaffPositionsPage() {
           <h1 style={{ fontSize: 24, fontWeight: 700, color: '#1a1a2e' }}>Staff Positions & Departments</h1>
           <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4 }}>Manage departments, acting positions, and organizational hierarchy</p>
         </div>
+        {isAdmin && (
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            style={{ padding: '8px 16px', background: syncing ? '#f3c3b8' : '#ea6645', color: '#fff', border: 'none', borderRadius: 6, cursor: syncing ? 'not-allowed' : 'pointer', fontSize: 13 }}
+          >
+            <i className="fas fa-sync" style={{ marginRight: 6 }}></i>{syncing ? 'Syncing...' : 'Sync Now'}
+          </button>
+        )}
       </div>
 
       {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: 12, marginBottom: 16, color: '#dc2626', fontSize: 14 }}>{error}</div>}

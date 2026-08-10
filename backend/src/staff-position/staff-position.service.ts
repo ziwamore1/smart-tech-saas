@@ -517,6 +517,16 @@ export class StaffPositionService {
     }
   }
 
+  async forceSync(schoolId: string) {
+    if (this.syncStartedAt.has(schoolId)) {
+      return { running: true, message: 'A sync is already in progress for this school. Refresh in a moment.' };
+    }
+    this.lastSyncAt.delete(schoolId);
+    const summary = await this.runPositionSync(schoolId);
+    this.lastSyncAt.set(schoolId, Date.now());
+    return { running: false, message: 'Sync complete', ...summary };
+  }
+
   private async runPositionSync(schoolId: string) {
     const registeredStaff = await this.prisma.teacher.findMany({
       where: { schoolId },
@@ -631,8 +641,8 @@ export class StaffPositionService {
       }
     }
 
+    let created = 0;
     if (positionsToCreate.length) {
-      let created = 0;
       try {
         for (let i = 0; i < positionsToCreate.length; i += 1000) {
           const result = await this.prisma.actingPosition.createMany({
@@ -651,6 +661,12 @@ export class StaffPositionService {
       `Staff-position sync school ${schoolId}: ${registeredStaff.length} teachers scanned, ` +
       `${teacherDeptByGroup.size} department groups linked, ${positionUpdateByGroup.size} position groups updated`,
     );
+
+    return {
+      teachersScanned: registeredStaff.length,
+      departmentGroupsLinked: teacherDeptByGroup.size,
+      positionsCreated: created,
+    };
   }
 
   private async syncRegisteredDepartments(schoolId: string) {
