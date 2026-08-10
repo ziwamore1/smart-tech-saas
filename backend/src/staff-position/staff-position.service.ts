@@ -44,6 +44,7 @@ export class StaffPositionService {
   }
 
   async getDepartments(schoolId: string) {
+    await this.syncRegisteredDepartments(schoolId);
     await this.syncRegisteredPositions(schoolId);
     const departments = await this.prisma.department.findMany({
       where: { schoolId },
@@ -489,6 +490,7 @@ export class StaffPositionService {
   }
 
   private async syncRegisteredPositions(schoolId: string) {
+    await this.syncRegisteredDepartments(schoolId);
     const registeredStaff = await this.prisma.teacher.findMany({
       where: { schoolId },
       include: {
@@ -528,6 +530,29 @@ export class StaffPositionService {
       }
       for (const role of roles) {
         await this.reconcileTeacherRole(teacher.id, schoolId, role, true);
+      }
+    }
+  }
+
+  private async syncRegisteredDepartments(schoolId: string) {
+    const registeredDepartments = await this.prisma.teacher.findMany({
+      where: { schoolId, department: { not: null } },
+      select: { department: true },
+      distinct: ['department'],
+    });
+
+    for (const record of registeredDepartments) {
+      const name = record.department?.trim();
+      if (!name) continue;
+
+      const existing = await this.prisma.department.findFirst({
+        where: { schoolId, name: { equals: name, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      if (!existing) {
+        await this.prisma.department.create({
+          data: { schoolId, name, category: 'STAFF_REGISTER', description: 'Imported from Staff Register' },
+        });
       }
     }
   }
