@@ -5,6 +5,7 @@ import { SocketGateway } from '../messaging/socket.gateway';
 import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { StaffSyncEngineService } from '../shared/staff-sync-engine/staff-sync-engine.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
+import { StaffPositionService } from '../staff-position/staff-position.service';
 import { Teacher } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
@@ -18,6 +19,7 @@ export class TeacherService {
     private socketGateway: SocketGateway,
     private gradingEngine: GradingEngineService,
     private syncEngine: StaffSyncEngineService,
+    private staffPositionService: StaffPositionService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
   ) {}
 
@@ -145,6 +147,12 @@ export class TeacherService {
       .then(result => this.logger.log(`Auto-sync to HR profile for teacher ${teacher.id}: created=${result.created}, updated=${result.updated}`))
       .catch(err => this.logger.error(`Auto-sync to HR profile failed for teacher ${teacher.id}:`, err.message));
 
+    // Registration is the source of truth for department membership and roles.
+    const registrationRoles = Array.isArray(data.roles) ? data.roles : [];
+    for (const role of registrationRoles) {
+      await this.staffPositionService.reconcileTeacherRole(teacher.id, schoolId, role, true);
+    }
+
     const plainPassword = password || 'Teacher123!';
     const teacherWithUser = teacher as any;
     this.unifiedMessaging
@@ -216,6 +224,19 @@ export class TeacherService {
       data: updateData,
       include: { user: true },
     });
+
+    if (allowedTeacherFields.departmentId !== undefined) {
+      const activeSupervisoryPositions = await this.prisma.actingPosition.findMany({
+        where: { teacherId: id, isActive: true, positionType: { in: ['HOD', 'LOWER_PRIMARY_SENIOR_TEACHER', 'UPPER_PRIMARY_SENIOR_TEACHER'] } },
+      });
+      for (const position of activeSupervisoryPositions) {
+        await this.prisma.actingPosition.update({ where: { id: position.id }, data: { departmentId: updated.departmentId } });
+      }
+      const roleAssignments = await this.prisma.userRole.findMany({ where: { userId: updated.userId }, include: { role: true } });
+      for (const assignment of roleAssignments) {
+        await this.staffPositionService.reconcileTeacherRole(id, updated.schoolId, assignment.role.name, true);
+      }
+    }
 
     // Auto-sync updated data to StaffHrProfile for Staff Return Hub
     this.syncEngine.syncStaffProfile(id, updated.schoolId)

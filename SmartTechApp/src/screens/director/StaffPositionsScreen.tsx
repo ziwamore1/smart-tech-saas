@@ -20,6 +20,7 @@ export const StaffPositionsScreen: React.FC<StaffPositionsProps> = ({ onToggleDr
   const [activeTab, setActiveTab] = useState<Tab>('departments');
   const [departments, setDepartments] = useState<any[]>([]);
   const [positions, setPositions] = useState<any[]>([]);
+  const [staff, setStaff] = useState<any[]>([]);
   const [hierarchy, setHierarchy] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -29,18 +30,20 @@ export const StaffPositionsScreen: React.FC<StaffPositionsProps> = ({ onToggleDr
   const [editingDept, setEditingDept] = useState<any>(null);
   const [editingPos, setEditingPos] = useState<any>(null);
   const [newDept, setNewDept] = useState({ name: '', description: '', category: '' });
-  const [newPos, setNewPos] = useState({ title: '', positionType: 'TEACHING', departmentId: '', description: '' });
+  const [newPos, setNewPos] = useState({ teacherId: '', positionType: 'HOD', departmentId: '' });
 
   const loadData = async () => {
     try {
-      const [deptData, posData, hierData] = await Promise.allSettled([
+      const [deptData, posData, hierData, staffData] = await Promise.allSettled([
         apiService.getDepartments(),
         apiService.getStaffPositions(),
         apiService.getStaffHierarchy(),
+        apiService.getStaff(),
       ]);
       if (deptData.status === 'fulfilled') setDepartments(deptData.value || []);
       if (posData.status === 'fulfilled') setPositions(posData.value || []);
       if (hierData.status === 'fulfilled') setHierarchy(hierData.value);
+      if (staffData.status === 'fulfilled') setStaff(staffData.value || []);
     } catch (err) {
       console.error('Failed to load staff positions data:', err);
     } finally {
@@ -83,7 +86,7 @@ export const StaffPositionsScreen: React.FC<StaffPositionsProps> = ({ onToggleDr
   };
 
   const handleSavePos = async () => {
-    if (!newPos.title) { Alert.alert('Error', 'Position title is required'); return; }
+    if (!newPos.teacherId) { Alert.alert('Error', 'Staff member is required'); return; }
     try {
       if (editingPos) {
         await apiService.updateStaffPosition(editingPos.id, newPos);
@@ -94,7 +97,7 @@ export const StaffPositionsScreen: React.FC<StaffPositionsProps> = ({ onToggleDr
       }
       setShowPosModal(false);
       setEditingPos(null);
-      setNewPos({ title: '', positionType: 'TEACHING', departmentId: '', description: '' });
+       setNewPos({ teacherId: '', positionType: 'HOD', departmentId: '' });
       loadData();
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.message || 'Failed to save position');
@@ -117,7 +120,7 @@ export const StaffPositionsScreen: React.FC<StaffPositionsProps> = ({ onToggleDr
   );
 
   const filteredPositions = positions.filter(p =>
-    p.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    `${p.teacher?.user?.firstName || ''} ${p.teacher?.user?.lastName || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.positionType?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -158,6 +161,7 @@ export const StaffPositionsScreen: React.FC<StaffPositionsProps> = ({ onToggleDr
             <View style={styles.itemInfo}>
               <Text style={styles.itemTitle}>{dept.name}</Text>
               {dept.description && <Text style={styles.itemSubtitle}>{dept.description}</Text>}
+              {dept.hod?.teacher?.user && <Text style={styles.hodText}>HOD: {dept.hod.teacher.user.firstName} {dept.hod.teacher.user.lastName}</Text>}
               {dept.category && (
                 <View style={[styles.badge, { backgroundColor: colors.infoLight }]}>
                   <Text style={[styles.badgeText, { color: colors.primary }]}>{dept.category}</Text>
@@ -168,8 +172,8 @@ export const StaffPositionsScreen: React.FC<StaffPositionsProps> = ({ onToggleDr
               <Text style={styles.editBtnText}>Edit</Text>
             </TouchableOpacity>
           </View>
-          {dept.teacherCount !== undefined && (
-            <Text style={styles.countText}>{dept.teacherCount} staff assigned</Text>
+          {dept._count?.teachers !== undefined && (
+            <Text style={styles.countText}>{dept._count.teachers} staff registered</Text>
           )}
         </TouchableOpacity>
       ))}
@@ -184,7 +188,7 @@ export const StaffPositionsScreen: React.FC<StaffPositionsProps> = ({ onToggleDr
 
   const renderPositions = () => (
     <WidgetCard title={`Staff Positions (${filteredPositions.length})`}>
-      <TouchableOpacity style={styles.addBtn} onPress={() => { setEditingPos(null); setNewPos({ title: '', positionType: 'TEACHING', departmentId: '', description: '' }); setShowPosModal(true); }}>
+       <TouchableOpacity style={styles.addBtn} onPress={() => { setEditingPos(null); setNewPos({ teacherId: '', positionType: 'HOD', departmentId: '' }); setShowPosModal(true); }}>
         <Text style={styles.addBtnText}>+ Add Position</Text>
       </TouchableOpacity>
       {filteredPositions.map(pos => {
@@ -196,13 +200,14 @@ export const StaffPositionsScreen: React.FC<StaffPositionsProps> = ({ onToggleDr
                 <Text style={[styles.itemIconText, { color: tc.text }]}>👤</Text>
               </View>
               <View style={styles.itemInfo}>
-                <Text style={styles.itemTitle}>{pos.title}</Text>
+                 <Text style={styles.itemTitle}>{pos.teacher?.user?.firstName} {pos.teacher?.user?.lastName}</Text>
+                 <Text style={styles.itemSubtitle}>{pos.positionType?.replace(/_/g, ' ')}{pos.isPrimary ? ' • Primary' : ''}</Text>
                 {pos.department && <Text style={styles.itemSubtitle}>{pos.department.name}</Text>}
                 <View style={[styles.badge, { backgroundColor: tc.bg }]}>
                   <Text style={[styles.badgeText, { color: tc.text }]}>{pos.positionType}</Text>
                 </View>
               </View>
-              <TouchableOpacity style={styles.editBtn} onPress={() => { setEditingPos(pos); setNewPos({ title: pos.title, positionType: pos.positionType || 'TEACHING', departmentId: pos.departmentId || '', description: pos.description || '' }); setShowPosModal(true); }}>
+               <TouchableOpacity style={styles.editBtn} onPress={() => { setEditingPos(pos); setNewPos({ teacherId: pos.teacherId, positionType: pos.positionType || 'HOD', departmentId: pos.departmentId || '' }); setShowPosModal(true); }}>
                 <Text style={styles.editBtnText}>Edit</Text>
               </TouchableOpacity>
             </View>
@@ -306,11 +311,27 @@ export const StaffPositionsScreen: React.FC<StaffPositionsProps> = ({ onToggleDr
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{editingPos ? 'Edit Position' : 'New Position'}</Text>
-            <TextInput style={styles.modalInput} placeholder="Position title" value={newPos.title} onChangeText={v => setNewPos(p => ({ ...p, title: v }))} />
-            <TextInput style={styles.modalInput} placeholder="Description (optional)" value={newPos.description} onChangeText={v => setNewPos(p => ({ ...p, description: v }))} />
+            <Text style={styles.pickerLabel}>Staff member</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.staffPicker}>
+              {staff.map(member => (
+                <TouchableOpacity key={member.id} style={[styles.pickerOption, newPos.teacherId === member.id && styles.pickerOptionActive]} onPress={() => setNewPos(p => ({ ...p, teacherId: member.id, departmentId: member.departmentId || p.departmentId }))}>
+                  <Text style={[styles.pickerOptionText, newPos.teacherId === member.id && styles.pickerOptionTextActive]}>{member.firstName} {member.lastName}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {newPos.positionType === 'HOD' && <>
+              <Text style={styles.pickerLabel}>Department</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.staffPicker}>
+                {departments.map(department => (
+                  <TouchableOpacity key={department.id} style={[styles.pickerOption, newPos.departmentId === department.id && styles.pickerOptionActive]} onPress={() => setNewPos(p => ({ ...p, departmentId: department.id }))}>
+                    <Text style={[styles.pickerOptionText, newPos.departmentId === department.id && styles.pickerOptionTextActive]}>{department.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </>}
             <View style={styles.pickerRow}>
               <Text style={styles.pickerLabel}>Type:</Text>
-              {['TEACHING', 'ADMINISTRATIVE', 'LEADERSHIP', 'SUPPORT'].map(t => (
+              {['DIRECTOR', 'DEPUTY_DIRECTOR', 'HEAD_TEACHER', 'HOD', 'SUBJECT_TEACHER', 'CLASS_TEACHER', 'SENIOR_TEACHER', 'ADMINISTRATOR'].map(t => (
                 <TouchableOpacity key={t} style={[styles.pickerOption, newPos.positionType === t && styles.pickerOptionActive]} onPress={() => setNewPos(p => ({ ...p, positionType: t }))}>
                   <Text style={[styles.pickerOptionText, newPos.positionType === t && styles.pickerOptionTextActive]}>{t}</Text>
                 </TouchableOpacity>
@@ -351,6 +372,7 @@ const styles = StyleSheet.create({
   itemInfo: { flex: 1 },
   itemTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
   itemSubtitle: { fontSize: 13, color: colors.textLight, marginTop: 2 },
+  hodText: { fontSize: 12, color: colors.success, fontWeight: '600', marginTop: 4 },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: borderRadius.sm, alignSelf: 'flex-start', marginTop: 4 },
   badgeText: { fontSize: 11, fontWeight: '600' },
   editBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
@@ -370,6 +392,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: spacing.lg, textAlign: 'center' },
   modalInput: { borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md, padding: spacing.md, fontSize: 15, marginBottom: spacing.md, color: colors.text },
   pickerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md, flexWrap: 'wrap' },
+  staffPicker: { marginVertical: spacing.sm, maxHeight: 48 },
   pickerLabel: { fontSize: 14, fontWeight: '600', color: colors.text },
   pickerOption: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.md, backgroundColor: colors.background },
   pickerOptionActive: { backgroundColor: colors.primary },

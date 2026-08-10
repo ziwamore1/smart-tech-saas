@@ -43,11 +43,22 @@ export class StaffPositionService {
   }
 
   async getDepartments(schoolId: string) {
-    return this.prisma.department.findMany({
+    const departments = await this.prisma.department.findMany({
       where: { schoolId },
       orderBy: { name: 'asc' },
       include: { _count: { select: { teachers: true, positions: true } } },
     });
+
+    const hods = await this.prisma.actingPosition.findMany({
+      where: { schoolId, positionType: 'HOD', isActive: true, departmentId: { not: null } },
+      include: { teacher: { include: { user: { select: { firstName: true, lastName: true } } } } },
+    });
+
+    return departments.map((department) => ({
+      ...department,
+      hod: hods.find((position) => position.departmentId === department.id) || null,
+      source: 'STAFF_REGISTER',
+    }));
   }
 
   async getDepartmentById(id: string) {
@@ -85,7 +96,7 @@ export class StaffPositionService {
   async createActingPosition(schoolId: string, dto: CreateActingPositionDto) {
     this.validatePositionType(dto.positionType);
 
-    const teacher = await this.prisma.teacher.findUnique({ where: { id: dto.teacherId } });
+    const teacher = await this.prisma.teacher.findFirst({ where: { id: dto.teacherId, schoolId } });
     if (!teacher) throw new NotFoundException('Teacher not found');
 
     if (dto.positionType === 'HOD' && !dto.departmentId) {
@@ -241,6 +252,17 @@ export class StaffPositionService {
   // ==================== HIERARCHY / MONITORING ====================
 
   async getHierarchy(schoolId: string) {
+    // Backfill positions for staff registered with supervisory school roles, including legacy records.
+    const registeredStaff = await this.prisma.teacher.findMany({
+      where: { schoolId },
+      include: { user: { include: { userRoles: { include: { role: true } } } } },
+    });
+    for (const teacher of registeredStaff) {
+      for (const userRole of teacher.user.userRoles) {
+        await this.reconcileTeacherRole(teacher.id, schoolId, userRole.role.name, true);
+      }
+    }
+
     const positions = await this.prisma.actingPosition.findMany({
       where: { schoolId, isActive: true },
       include: {
@@ -302,7 +324,7 @@ export class StaffPositionService {
   }
 
   async getDepartmentTeachers(schoolId: string, departmentId: string) {
-    const dept = await this.prisma.department.findUnique({ where: { id: departmentId } });
+    const dept = await this.prisma.department.findFirst({ where: { id: departmentId, schoolId } });
     if (!dept) throw new NotFoundException('Department not found');
 
     const teacherIds = (
@@ -314,7 +336,11 @@ export class StaffPositionService {
 
     const positions = await this.prisma.actingPosition.findMany({
       where: { teacherId: { in: teacherIds }, isActive: true },
-      include: { department: true, class: { select: { id: true, name: true } } },
+      include: {
+        teacher: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } } } },
+        department: true,
+        class: { select: { id: true, name: true } },
+      },
     });
 
     const hod = positions.find(p =>
@@ -332,7 +358,7 @@ export class StaffPositionService {
 
     return {
       department: dept,
-      hod: hod ? { id: hod.id, teacher: (hod as any).teacher } : null,
+      hod: hod ? { id: hod.id, teacher: hod.teacher, positionType: hod.positionType } : null,
       teachers: teachers.map(t => ({
         ...t,
         positions: positions.filter(p => p.teacherId === t.id),
@@ -421,6 +447,43 @@ export class StaffPositionService {
       value: t,
       label: t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
     }));
+  }
+
+  /** Reconciles a registered teacher's role with the live hierarchy. */
+  async reconcileTeacherRole(teacherId: string, schoolId: string, role: string, active: boolean) {
+    const positionType = Object.entries(POSITION_TO_ROLE).find(([, value]) => value.toLowerCase() === role.toLowerCase())?.[0];
+    if (!positionType) return;
+
+    const teacher = await this.prisma.teacher.findFirst({ where: { id: teacherId, schoolId } });
+    if (!teacher) return;
+
+    const existing = await this.prisma.actingPosition.findFirst({
+      where: { teacherId, schoolId, positionType, isActive: true },
+    });
+
+    if (!active) {
+      if (existing) await this.prisma.actingPosition.update({ where: { id: existing.id }, data: { isActive: false, endDate: new Date(), isPrimary: false } });
+      return;
+    }
+
+    if (existing) {
+      if (positionType === 'HOD' && existing.departmentId !== teacher.departmentId) {
+        await this.prisma.actingPosition.update({ where: { id: existing.id }, data: { departmentId: teacher.departmentId, isPrimary: true } });
+      }
+      return;
+    }
+
+    if (positionType === 'HOD' && !teacher.departmentId) return;
+
+    await this.prisma.actingPosition.create({
+      data: {
+        teacherId,
+        schoolId,
+        positionType,
+        departmentId: ['HOD', 'LOWER_PRIMARY_SENIOR_TEACHER', 'UPPER_PRIMARY_SENIOR_TEACHER'].includes(positionType) ? teacher.departmentId : null,
+        isPrimary: true,
+      },
+    });
   }
 
   // ==================== HELPERS ====================

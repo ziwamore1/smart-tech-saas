@@ -1,11 +1,12 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { StaffPositionService } from '../staff-position/staff-position.service';
 
 @Injectable()
 export class SchoolMembershipService {
   private readonly logger = new Logger(SchoolMembershipService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private staffPositionService: StaffPositionService) {}
 
   async addMember(schoolId: string, userId: string, isPrimary = false) {
     const existing = await this.prisma.schoolUser.findFirst({
@@ -102,6 +103,11 @@ export class SchoolMembershipService {
         },
       },
     });
+
+    const roleRecord = await this.prisma.role.findFirst({ where: { name: role } });
+    if (roleRecord) {
+      await this.prisma.userRole.deleteMany({ where: { userId, roleId: roleRecord.id } });
+    }
   }
 
   async getTeachingStaff(schoolId: string) {
@@ -174,6 +180,8 @@ export class SchoolMembershipService {
     });
 
     if (existing) {
+      const teacher = await this.prisma.teacher.findFirst({ where: { userId, schoolId } });
+      if (teacher) await this.staffPositionService.reconcileTeacherRole(teacher.id, schoolId, role, true);
       return existing;
     }
 
@@ -185,6 +193,9 @@ export class SchoolMembershipService {
         isActive: true,
       },
     });
+
+    const teacher = await this.prisma.teacher.findFirst({ where: { userId, schoolId } });
+    if (teacher) await this.staffPositionService.reconcileTeacherRole(teacher.id, schoolId, role, true);
 
     // Also create legacy UserRole to ensure backward compatibility in JWT
     try {
@@ -220,6 +231,9 @@ export class SchoolMembershipService {
         role,
       },
     });
+
+    const teacher = await this.prisma.teacher.findFirst({ where: { userId, schoolId } });
+    if (teacher) await this.staffPositionService.reconcileTeacherRole(teacher.id, schoolId, role, false);
 
     return { message: `Role ${role} removed` };
   }
