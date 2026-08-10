@@ -2056,9 +2056,9 @@ export const staffPositionApi = {
   getDepartments: () => api.get('/staff-positions/departments'),
   getDepartmentById: (id: string) => api.get(`/staff-positions/departments/${id}`),
   createDepartment: (data: { name: string; code?: string; category: string; description?: string }) =>
-    api.post('/staff-positions/departments', data),
-  updateDepartment: (id: string, data: any) => api.put(`/staff-positions/departments/${id}`, data),
-  deleteDepartment: (id: string) => api.delete(`/staff-positions/departments/${id}`),
+    api.post('/staff-positions/departments', data, { timeout: 60000 }),
+  updateDepartment: (id: string, data: any) => api.put(`/staff-positions/departments/${id}`, data, { timeout: 60000 }),
+  deleteDepartment: (id: string) => api.delete(`/staff-positions/departments/${id}`, { timeout: 60000 }),
   getDepartmentTeachers: (departmentId: string) =>
     api.get(`/staff-positions/departments/${departmentId}/teachers`),
 
@@ -2068,9 +2068,9 @@ export const staffPositionApi = {
   getTeacherPositions: (teacherId: string) =>
     api.get(`/staff-positions/positions/teacher/${teacherId}`),
   createPosition: (data: { teacherId: string; positionType: string; departmentId?: string; classId?: string; isPrimary?: boolean; startDate?: string }) =>
-    api.post('/staff-positions/positions', data),
-  updatePosition: (id: string, data: any) => api.put(`/staff-positions/positions/${id}`, data),
-  deletePosition: (id: string) => api.delete(`/staff-positions/positions/${id}`),
+    api.post('/staff-positions/positions', data, { timeout: 60000 }),
+  updatePosition: (id: string, data: any) => api.put(`/staff-positions/positions/${id}`, data, { timeout: 60000 }),
+  deletePosition: (id: string) => api.delete(`/staff-positions/positions/${id}`, { timeout: 60000 }),
 
   // Hierarchy & Monitoring
   getHierarchy: () => api.get('/staff-positions/hierarchy'),

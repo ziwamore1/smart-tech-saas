@@ -167,6 +167,7 @@ function DepartmentsTab({ departments, isDirector, onRefresh, setSuccess, setErr
   const [code, setCode] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const CATEGORIES = [
     'MATHEMATICS', 'SCIENCE', 'LANGUAGES', 'SOCIAL_SCIENCE', 'COMPUTER_SCIENCE',
@@ -185,7 +186,8 @@ function DepartmentsTab({ departments, isDirector, onRefresh, setSuccess, setErr
   };
 
   const handleSubmit = async () => {
-    if (!name || !category) return;
+    if (saving || !name || !category) return;
+    setSaving(true);
     try {
       if (editDept) {
         await staffPositionApi.updateDepartment(editDept.id, { name, code, category, description });
@@ -197,17 +199,22 @@ function DepartmentsTab({ departments, isDirector, onRefresh, setSuccess, setErr
       resetForm(); onRefresh();
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Failed to save department');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this department? This cannot be undone if teachers are assigned.')) return;
+    setSaving(true);
     try {
       await staffPositionApi.deleteDepartment(id);
       setSuccess('Department deleted');
       onRefresh();
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Failed to delete');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -247,8 +254,8 @@ function DepartmentsTab({ departments, isDirector, onRefresh, setSuccess, setErr
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button onClick={handleSubmit} style={{ padding: '8px 16px', background: '#059669', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>{editDept ? 'Update' : 'Create'}</button>
-            <button onClick={resetForm} style={{ padding: '8px 16px', background: '#6b7280', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+            <button onClick={handleSubmit} disabled={saving || !name || !category} style={{ padding: '8px 16px', background: saving ? '#86a7e0' : '#059669', color: '#fff', border: 'none', borderRadius: 6, cursor: saving || !name || !category ? 'not-allowed' : 'pointer', fontSize: 13 }}>{saving ? (editDept ? 'Updating...' : 'Creating...') : (editDept ? 'Update' : 'Create')}</button>
+            <button onClick={resetForm} disabled={saving} style={{ padding: '8px 16px', background: '#6b7280', color: '#fff', border: 'none', borderRadius: 6, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13 }}>Cancel</button>
           </div>
         </div>
       )}
@@ -271,8 +278,8 @@ function DepartmentsTab({ departments, isDirector, onRefresh, setSuccess, setErr
                 </div>
                 {isDirector && (
                   <div style={{ display: 'flex', gap: 4 }}>
-                    <button onClick={() => handleEdit(dept)} style={{ padding: '4px 8px', background: '#dbeafe', color: '#1d4ed8', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Edit</button>
-                    <button onClick={() => handleDelete(dept.id)} style={{ padding: '4px 8px', background: '#fecaca', color: '#dc2626', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Del</button>
+                    <button onClick={() => handleEdit(dept)} disabled={saving} style={{ padding: '4px 8px', background: '#dbeafe', color: '#1d4ed8', border: 'none', borderRadius: 4, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 11, opacity: saving ? 0.5 : 1 }}>Edit</button>
+                    <button onClick={() => handleDelete(dept.id)} disabled={saving} style={{ padding: '4px 8px', background: '#fecaca', color: '#dc2626', border: 'none', borderRadius: 4, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 11, opacity: saving ? 0.5 : 1 }}>Del</button>
                   </div>
                 )}
               </div>
@@ -302,6 +309,7 @@ function PositionsTab({ positions, departments, positionTypes, isDirector, onRef
   const [classId, setClassId] = useState('');
   const [isPrimary, setIsPrimary] = useState(true);
   const [teachers, setTeachers] = useState<any[]>([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const loadTeachers = async () => {
@@ -326,33 +334,41 @@ function PositionsTab({ positions, departments, positionTypes, isDirector, onRef
   };
 
   const handleSubmit = async () => {
-    if (!teacherId || !positionType) return;
+    if (saving || !teacherId || !positionType) return;
+    setSaving(true);
     try {
-      const payload: any = { teacherId, positionType, isPrimary };
-      if (departmentId) payload.departmentId = departmentId;
-      if (classId) payload.classId = classId;
-
       if (editPos) {
+        const payload: any = { positionType, isPrimary };
+        if (departmentId) payload.departmentId = departmentId;
+        if (classId) payload.classId = classId;
         await staffPositionApi.updatePosition(editPos.id, payload);
         setSuccess('Position updated');
       } else {
+        const payload: any = { teacherId, positionType, isPrimary };
+        if (departmentId) payload.departmentId = departmentId;
+        if (classId) payload.classId = classId;
         await staffPositionApi.createPosition(payload);
         setSuccess('Position created');
       }
       resetForm(); onRefresh();
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Failed to save position');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this position assignment?')) return;
+    setSaving(true);
     try {
       await staffPositionApi.deletePosition(id);
       setSuccess('Position deleted');
       onRefresh();
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Failed to delete');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -418,8 +434,8 @@ function PositionsTab({ positions, departments, positionTypes, isDirector, onRef
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button onClick={handleSubmit} disabled={!teacherId || !positionType} style={{ padding: '8px 16px', background: teacherId && positionType ? '#059669' : '#d1d5db', color: '#fff', border: 'none', borderRadius: 6, cursor: teacherId && positionType ? 'pointer' : 'not-allowed', fontSize: 13 }}>{editPos ? 'Update' : 'Assign'}</button>
-            <button onClick={resetForm} style={{ padding: '8px 16px', background: '#6b7280', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+            <button onClick={handleSubmit} disabled={saving || !teacherId || !positionType} style={{ padding: '8px 16px', background: saving ? '#86a7e0' : teacherId && positionType ? '#059669' : '#d1d5db', color: '#fff', border: 'none', borderRadius: 6, cursor: saving || !teacherId || !positionType ? 'not-allowed' : 'pointer', fontSize: 13 }}>{saving ? (editPos ? 'Updating...' : 'Assigning...') : (editPos ? 'Update' : 'Assign')}</button>
+            <button onClick={resetForm} disabled={saving} style={{ padding: '8px 16px', background: '#6b7280', color: '#fff', border: 'none', borderRadius: 6, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13 }}>Cancel</button>
           </div>
         </div>
       )}
@@ -458,8 +474,8 @@ function PositionsTab({ positions, departments, positionTypes, isDirector, onRef
                       <td style={{ padding: '10px 14px' }}>
                         {isDirector && (
                           <div style={{ display: 'flex', gap: 4 }}>
-                            <button onClick={() => handleEdit(pos)} style={{ padding: '3px 8px', background: '#dbeafe', color: '#1d4ed8', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Edit</button>
-                            <button onClick={() => handleDelete(pos.id)} style={{ padding: '3px 8px', background: '#fecaca', color: '#dc2626', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Del</button>
+                            <button onClick={() => handleEdit(pos)} disabled={saving} style={{ padding: '3px 8px', background: '#dbeafe', color: '#1d4ed8', border: 'none', borderRadius: 4, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 11, opacity: saving ? 0.5 : 1 }}>Edit</button>
+                            <button onClick={() => handleDelete(pos.id)} disabled={saving} style={{ padding: '3px 8px', background: '#fecaca', color: '#dc2626', border: 'none', borderRadius: 4, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 11, opacity: saving ? 0.5 : 1 }}>Del</button>
                           </div>
                         )}
                       </td>
