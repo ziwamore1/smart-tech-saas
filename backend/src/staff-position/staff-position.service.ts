@@ -527,13 +527,17 @@ export class StaffPositionService {
   }
 
   async forceSync(schoolId: string) {
-    if (this.syncStartedAt.has(schoolId)) {
+    this.lastSyncAt.delete(schoolId);
+    if (!this.shouldRunSync(schoolId)) {
       return { running: true, message: 'A sync is already in progress for this school. Refresh in a moment.' };
     }
-    this.lastSyncAt.delete(schoolId);
-    const summary = await this.runPositionSync(schoolId);
-    this.lastSyncAt.set(schoolId, Date.now());
-    return { running: false, message: 'Sync complete', ...summary };
+    try {
+      const summary = await this.runPositionSync(schoolId);
+      this.lastSyncAt.set(schoolId, Date.now());
+      return { running: false, message: 'Sync complete', ...summary };
+    } finally {
+      this.syncStartedAt.delete(schoolId);
+    }
   }
 
   private async runPositionSync(schoolId: string) {
