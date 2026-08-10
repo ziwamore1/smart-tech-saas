@@ -28,14 +28,16 @@ const POSITION_TO_ROLE: Record<string, string> = {
 export class StaffPositionService {
   private readonly logger = new Logger(StaffPositionService.name);
   private readonly lastSyncAt = new Map<string, number>();
-  private readonly syncRunning = new Set<string>();
+  private readonly syncStartedAt = new Map<string, number>();
+  private static readonly SYNC_LEASE_MS = 120_000;
 
   constructor(private readonly prisma: PrismaService) {}
 
   private shouldRunSync(schoolId: string): boolean {
-    if (this.syncRunning.has(schoolId)) return false;
+    const startedAt = this.syncStartedAt.get(schoolId);
+    if (startedAt !== undefined && Date.now() - startedAt < StaffPositionService.SYNC_LEASE_MS) return false;
     if (Date.now() - (this.lastSyncAt.get(schoolId) || 0) < 30_000) return false;
-    this.syncRunning.add(schoolId);
+    this.syncStartedAt.set(schoolId, Date.now());
     return true;
   }
 
@@ -511,7 +513,7 @@ export class StaffPositionService {
       await this.runPositionSync(schoolId);
       this.lastSyncAt.set(schoolId, Date.now());
     } finally {
-      this.syncRunning.delete(schoolId);
+      this.syncStartedAt.delete(schoolId);
     }
   }
 
@@ -630,17 +632,25 @@ export class StaffPositionService {
     }
 
     if (positionsToCreate.length) {
+      let created = 0;
       try {
         for (let i = 0; i < positionsToCreate.length; i += 1000) {
-          await this.prisma.actingPosition.createMany({
+          const result = await this.prisma.actingPosition.createMany({
             data: positionsToCreate.slice(i, i + 1000),
             skipDuplicates: true,
           });
+          created += result.count;
         }
       } catch (err: any) {
         this.logger.warn(`Failed to create ${positionsToCreate.length} acting positions: ${err.message}`);
       }
+      this.logger.log(`Staff-position sync school ${schoolId}: created ${created} acting positions`);
     }
+
+    this.logger.log(
+      `Staff-position sync school ${schoolId}: ${registeredStaff.length} teachers scanned, ` +
+      `${teacherDeptByGroup.size} department groups linked, ${positionUpdateByGroup.size} position groups updated`,
+    );
   }
 
   private async syncRegisteredDepartments(schoolId: string) {
