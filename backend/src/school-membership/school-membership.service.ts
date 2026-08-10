@@ -71,7 +71,7 @@ export class SchoolMembershipService {
             accountStatus: true,
           },
         },
-        schoolRoleAssignments: {
+        SchoolRoleAssignment: {
           where: { isActive: true },
           select: { role: true, startDate: true },
         },
@@ -84,7 +84,7 @@ export class SchoolMembershipService {
     return this.prisma.schoolUser.findMany({
       where: {
         schoolId,
-        schoolRoleAssignments: {
+        SchoolRoleAssignment: {
           some: { role, isActive: true },
         },
       },
@@ -97,7 +97,7 @@ export class SchoolMembershipService {
             email: true,
           },
         },
-        schoolRoleAssignments: {
+        SchoolRoleAssignment: {
           where: { isActive: true },
           select: { role: true },
         },
@@ -125,7 +125,7 @@ export class SchoolMembershipService {
           },
           // Users with teaching-related school roles
           {
-            schoolRoleAssignments: {
+            SchoolRoleAssignment: {
               some: {
                 role: { in: ['Teacher', 'Class Teacher', 'Director', 'Deputy Director', 'Head Teacher'] },
                 isActive: true,
@@ -153,7 +153,7 @@ export class SchoolMembershipService {
             },
           },
         },
-        schoolRoleAssignments: {
+        SchoolRoleAssignment: {
           where: { isActive: true },
           select: { role: true },
         },
@@ -282,7 +282,7 @@ export class SchoolMembershipService {
       where: { userId },
       include: {
         school: { select: { id: true, name: true } },
-        schoolRoleAssignments: {
+        SchoolRoleAssignment: {
           where: { isActive: true },
           select: { role: true, startDate: true },
         },

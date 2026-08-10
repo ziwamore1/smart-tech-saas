@@ -539,7 +539,7 @@ export class StaffPositionService {
             userRoles: { select: { role: { select: { name: true } } } },
             schoolUsers: {
               where: { schoolId },
-              select: { schoolRoleAssignments: { where: { isActive: true }, select: { role: true } } },
+              select: { SchoolRoleAssignment: { where: { isActive: true }, select: { role: true } } },
             },
           },
         },
@@ -587,7 +587,7 @@ export class StaffPositionService {
 
       const roles = new Set<string>(teacher.user.userRoles.map((a) => a.role.name));
       for (const membership of teacher.user.schoolUsers) {
-        for (const assignment of membership.schoolRoleAssignments) roles.add(assignment.role);
+        for (const assignment of membership.SchoolRoleAssignment) roles.add(assignment.role);
       }
 
       for (const role of roles) {
