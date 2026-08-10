@@ -505,6 +505,23 @@ export class StaffPositionService {
     });
 
     for (const teacher of registeredStaff) {
+      if (!teacher.departmentId && teacher.department?.trim()) {
+        const department = await this.prisma.department.findFirst({
+          where: {
+            schoolId,
+            OR: [
+              { name: { equals: teacher.department.trim(), mode: 'insensitive' } },
+              { code: { equals: teacher.department.trim(), mode: 'insensitive' } },
+            ],
+          },
+          select: { id: true },
+        });
+        if (department) {
+          await this.prisma.teacher.update({ where: { id: teacher.id }, data: { departmentId: department.id } });
+          teacher.departmentId = department.id;
+        }
+      }
+
       const roles = new Set<string>(teacher.user.userRoles.map((assignment) => assignment.role.name));
       for (const membership of teacher.user.schoolUsers) {
         for (const assignment of membership.schoolRoleAssignments) roles.add(assignment.role);
