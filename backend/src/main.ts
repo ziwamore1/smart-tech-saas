@@ -127,7 +127,7 @@ async function bootstrap() {
     }),
   );
 
-  app.useGlobalFilters(new GlobalExceptionFilter(), new SentryFilter());
+  app.useGlobalFilters(new GlobalExceptionFilter(), new SentryFilter(app.getHttpAdapter()));
   app.useGlobalInterceptors(new TransformInterceptor(), new SentryInterceptor());
 
   const port = process.env.PORT || 3001;
