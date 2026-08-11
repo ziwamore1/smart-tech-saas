@@ -105,6 +105,11 @@ async function bootstrap() {
     }
   });
 
+  app.use((req: any, _res: any, next: any) => {
+    console.error(`[reqProbe:afterAuth] ${req.method} ${req.originalUrl}`);
+    next();
+  });
+
   app.use(json({ limit: '10mb' }));
   app.use(compression());
 

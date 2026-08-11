@@ -3,6 +3,11 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 
 export function setupSecurity(app: INestApplication) {
+  app.use((req: any, _res: any, next: any) => {
+    console.error(`[reqProbe:enter] ${req.method} ${req.originalUrl}`);
+    next();
+  });
+
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
