@@ -79,20 +79,50 @@ export class AuthService {
   async superAdminLogin(email: string, password: string) {
     this.logger.log(`SuperAdmin login attempt: ${email}`);
 
-    const user = await this.prisma.systemUser.findUnique({
+    const systemUser = await this.prisma.systemUser.findUnique({
       where: { email: email.toLowerCase() },
     });
 
-    this.logger.log(`SuperAdmin user found:`, user);
+    if (systemUser) {
+      const isPasswordValid = await bcrypt.compare(password, systemUser.password);
+      this.logger.log(`SuperAdmin system user found; password valid:`, isPasswordValid);
 
-    if (!user) {
+      if (!isPasswordValid) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      return {
+        message: 'Login successful',
+        access_token: await this.jwtService.signAsync({
+          sub: systemUser.id,
+          type: 'super_admin',
+          roles: ['SUPER_ADMIN'],
+        }),
+        user: {
+          id: systemUser.id,
+          email: systemUser.email,
+          fullName: systemUser.fullName,
+          role: 'SUPER_ADMIN',
+        },
+      };
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { email: { equals: email.toLowerCase(), mode: 'insensitive' } },
+      include: { userRoles: { include: { role: true } } },
+    });
+
+    const isSuperAdmin = user?.userRoles.some(
+      (userRole) => userRole.role.name.toLowerCase() === 'superadmin',
+    );
+
+    if (!user || !isSuperAdmin) {
       this.logger.warn(`SuperAdmin user not found: ${email}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    
-    this.logger.log(`Password valid:`, isPasswordValid);
+    this.logger.log(`SuperAdmin user found; password valid:`, isPasswordValid);
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
@@ -110,7 +140,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        fullName: user.fullName,
+        fullName: `${user.firstName} ${user.lastName}`.trim(),
         role: 'SUPER_ADMIN',
       },
     };

@@ -974,7 +974,7 @@ Email: ${director.email}
 
     const user = await this.prisma.user.create({
       data: {
-        email,
+        email: email.toLowerCase(),
         password: hashedPassword,
         firstName,
         lastName,
