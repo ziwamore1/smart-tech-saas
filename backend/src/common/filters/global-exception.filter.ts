@@ -16,6 +16,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
+    console.error(`[probe:filter-enter] ${(exception as Error)?.name || typeof exception} ${(exception as Error)?.message || ''}`);
 
     this.logger.error(`Exception caught: ${JSON.stringify(exception)}`);
 

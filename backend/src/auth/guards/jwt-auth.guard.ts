@@ -7,9 +7,13 @@ export class JwtAuthGuard {
 
   canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest();
+    console.error(`[probe:guard-enter] ${request.method} ${request.url}`);
     const token = this.extractToken(request);
 
-    if (!token) throw new UnauthorizedException('Missing authentication token');
+    if (!token) {
+      console.error(`[probe:guard-throw] no token ${request.url}`);
+      throw new UnauthorizedException('Missing authentication token');
+    }
 
     try {
       const payload = this.jwtService.verify(token);
