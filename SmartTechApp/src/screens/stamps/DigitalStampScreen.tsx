@@ -12,11 +12,12 @@ import {
   TextInput,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as ImagePicker from 'expo-image-picker';
 import { captureRef } from 'react-native-view-shot';
 import QRCode from 'react-native-qrcode-svg';
 import { HeaderBar } from '../../components';
@@ -56,6 +57,7 @@ interface ApprovalRequest {
 
 export const DigitalStampScreen: React.FC = () => {
   const { user } = useAuthStore();
+  const insets = useSafeAreaInsets();
   const isDirector = user?.roles?.includes('Director') || user?.roles?.includes('Head Teacher');
   const isClassTeacher = user?.roles?.includes('Class Teacher');
   const isAdmin = user?.roles?.includes('Deputy Head') || user?.roles?.includes('Deputy Director') || user?.roles?.includes('HOD');
@@ -74,6 +76,11 @@ export const DigitalStampScreen: React.FC = () => {
   const [selectedStampId, setSelectedStampId] = useState<string>('');
   const [approvalNote, setApprovalNote] = useState('');
   const [applying, setApplying] = useState(false);
+  const [showUploadStampModal, setShowUploadStampModal] = useState(false);
+  const [stampName, setStampName] = useState('');
+  const [stampType, setStampType] = useState('official');
+  const [stampImage, setStampImage] = useState('');
+  const [uploadingStamp, setUploadingStamp] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -174,6 +181,32 @@ export const DigitalStampScreen: React.FC = () => {
     }
   };
 
+  const pickStampImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 1 });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+    setStampImage(`data:${asset.mimeType || 'image/png'};base64,${base64}`);
+  };
+
+  const handleUploadStamp = async () => {
+    if (!stampName.trim() || !stampImage) {
+      Alert.alert('Incomplete stamp', 'Add a name and choose a clear stamp image.');
+      return;
+    }
+    setUploadingStamp(true);
+    try {
+      await apiService.uploadStamp({ name: stampName.trim(), type: stampType, imageUrl: stampImage });
+      setShowUploadStampModal(false);
+      setStampName('');
+      setStampImage('');
+      Alert.alert('Stamp uploaded', 'The stamp is now available in the school platform.');
+      loadData();
+    } catch (err: any) {
+      Alert.alert('Upload failed', err?.response?.data?.message || 'Unable to upload this stamp.');
+    } finally { setUploadingStamp(false); }
+  };
+
   const handleExportStampedDoc = async (doc: DocumentStamp) => {
     try {
       const dir = FileSystem.documentDirectory + 'stamped_docs/';
@@ -209,7 +242,7 @@ export const DigitalStampScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading stamps...</Text>
@@ -219,7 +252,7 @@ export const DigitalStampScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <HeaderBar title="Digital Stamps" subtitle="Manage & verify documents" />
 
       <View style={styles.tabBar}>
@@ -243,7 +276,10 @@ export const DigitalStampScreen: React.FC = () => {
           <>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Available Stamps</Text>
-              <Text style={styles.sectionCount}>{stamps.length} stamps</Text>
+              <View style={styles.sectionActions}>
+                <Text style={styles.sectionCount}>{stamps.length} stamps</Text>
+                {isDirector && <TouchableOpacity style={styles.uploadStampBtn} onPress={() => setShowUploadStampModal(true)}><Text style={styles.verifyBtnText}>＋ Upload</Text></TouchableOpacity>}
+              </View>
             </View>
 
             {stamps.length === 0 ? (
@@ -410,6 +446,20 @@ export const DigitalStampScreen: React.FC = () => {
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
 
+      <Modal visible={showUploadStampModal} transparent animationType="slide" onRequestClose={() => setShowUploadStampModal(false)}>
+        <View style={styles.modalOverlay}><View style={styles.modal}>
+          <Text style={styles.modalTitle}>Upload Institutional Stamp</Text>
+          <Text style={styles.modalSubtext}>Use a clean, high-resolution PNG with a transparent background when possible.</Text>
+          <Text style={styles.fieldLabel}>Stamp name</Text>
+          <TextInput style={styles.input} value={stampName} onChangeText={setStampName} placeholder="e.g. School Official Seal" placeholderTextColor={colors.textLight} />
+          <Text style={styles.fieldLabel}>Stamp type</Text>
+          <View style={styles.typeRow}>{['official', 'approval', 'verified'].map((type) => <TouchableOpacity key={type} style={[styles.typeButton, stampType === type && styles.typeButtonActive]} onPress={() => setStampType(type)}><Text style={stampType === type ? styles.typeTextActive : styles.typeText}>{type.toUpperCase()}</Text></TouchableOpacity>)}</View>
+          <TouchableOpacity style={styles.pickStampBtn} onPress={pickStampImage}><Text style={styles.pickStampText}>{stampImage ? 'Change image' : 'Choose stamp image'}</Text></TouchableOpacity>
+          {stampImage && <Image source={{ uri: stampImage }} style={styles.uploadedStampPreview} contentFit="contain" />}
+          <View style={[styles.modalActions, { paddingBottom: Math.max(spacing.md, insets.bottom) }]}><TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowUploadStampModal(false)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity><TouchableOpacity style={[styles.modalVerifyBtn, uploadingStamp && styles.modalVerifyBtnDisabled]} onPress={handleUploadStamp} disabled={uploadingStamp}>{uploadingStamp ? <ActivityIndicator color={colors.white} /> : <Text style={styles.modalVerifyText}>Upload Stamp</Text>}</TouchableOpacity></View>
+        </View></View>
+      </Modal>
+
       {/* Verification Modal */}
       <Modal visible={showVerifyModal} transparent animationType="slide" onRequestClose={() => { setShowVerifyModal(false); setVerificationResult(null); }}>
         <View style={styles.modalOverlay}>
@@ -450,7 +500,7 @@ export const DigitalStampScreen: React.FC = () => {
               </View>
             )}
 
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, { paddingBottom: Math.max(spacing.md, insets.bottom) }]}>
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => { setShowVerifyModal(false); setVerificationResult(null); }}>
                 <Text style={styles.modalCancelText}>Close</Text>
               </TouchableOpacity>
@@ -499,7 +549,7 @@ export const DigitalStampScreen: React.FC = () => {
               numberOfLines={3}
             />
 
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, { paddingBottom: Math.max(spacing.md, insets.bottom) }]}>
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowApplyModal(false)}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
@@ -536,6 +586,8 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
   sectionCount: { fontSize: 13, color: colors.textLight, fontWeight: '500' },
+  sectionActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  uploadStampBtn: { backgroundColor: colors.primary, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: borderRadius.md },
   verifyBtn: { backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.md },
   verifyBtnText: { color: colors.white, fontSize: 13, fontWeight: '600' },
   emptyState: { alignItems: 'center', paddingVertical: spacing.xxl * 2 },
@@ -586,6 +638,14 @@ const styles = StyleSheet.create({
   stampOptionSelected: { borderColor: colors.primary, backgroundColor: colors.infoLight },
   stampOptionIcon: { fontSize: 24, marginBottom: spacing.xs },
   stampOptionName: { fontSize: 11, fontWeight: '600', color: colors.text, textAlign: 'center' },
+  typeRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  typeButton: { flex: 1, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
+  typeButtonActive: { backgroundColor: colors.infoLight, borderColor: colors.primary },
+  typeText: { color: colors.textLight, fontSize: 10, fontWeight: '600' },
+  typeTextActive: { color: colors.primary, fontSize: 10, fontWeight: '700' },
+  pickStampBtn: { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md, padding: spacing.md, alignItems: 'center' },
+  pickStampText: { color: colors.primary, fontWeight: '700' },
+  uploadedStampPreview: { width: 120, height: 90, alignSelf: 'center', marginTop: spacing.md },
   verificationResult: { flexDirection: 'row', borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, gap: spacing.md },
   verificationIcon: { fontSize: 28, fontWeight: '700' },
   verificationInfo: { flex: 1 },

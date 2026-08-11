@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, RefreshControl, Image, Dimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeaderBar } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { apiService } from '../../services/api';
@@ -52,6 +52,7 @@ function getFileTypeIcon(mimeType?: string, format?: string): string {
 
 export const SuperAdminMediaScreen: React.FC<SuperAdminMediaProps> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const insets = useSafeAreaInsets();
   const [media, setMedia] = useState<any[]>([]);
   const [mediaStats, setMediaStats] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<MediaTab>('All');
@@ -203,7 +204,7 @@ export const SuperAdminMediaScreen: React.FC<SuperAdminMediaProps> = ({ onToggle
         renderItem={renderItem}
         keyExtractor={(item, index) => item.id || item.publicId || item._id || String(index)}
         numColumns={GRID_COLS}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: 80 + insets.bottom }]}
         columnWrapperStyle={styles.columnWrapper}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
@@ -218,7 +219,7 @@ export const SuperAdminMediaScreen: React.FC<SuperAdminMediaProps> = ({ onToggle
         }
       />
 
-      <TouchableOpacity style={styles.fab} onPress={handleUpload} activeOpacity={0.8}>
+      <TouchableOpacity style={[styles.fab, { bottom: 24 + insets.bottom }]} onPress={handleUpload} activeOpacity={0.8}>
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
     </SafeAreaView>

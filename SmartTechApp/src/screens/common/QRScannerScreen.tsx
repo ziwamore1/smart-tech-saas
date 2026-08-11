@@ -12,12 +12,14 @@ import { Camera, CameraView } from 'expo-camera';
 import { useNavigation } from '@react-navigation/native';
 import { verificationService } from '../../services/verification';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 const SCAN_AREA_SIZE = width * 0.7;
 
 export function QRScannerScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanning, setScanning] = useState(true);
   const [torchOn, setTorchOn] = useState(false);
@@ -133,7 +135,7 @@ export function QRScannerScreen() {
         </View>
 
         {/* Instructions */}
-        <View style={styles.instructionsContainer}>
+        <View style={[styles.instructionsContainer, { bottom: 120 + insets.bottom }]}>
           <Text style={styles.instructionsText}>
             Position the QR code within the frame
           </Text>
@@ -144,7 +146,7 @@ export function QRScannerScreen() {
 
         {/* Manual Input Button */}
         <TouchableOpacity
-          style={styles.manualInputButton}
+          style={[styles.manualInputButton, { bottom: 20 + insets.bottom }]}
           onPress={() => navigation.navigate('ManualVerification')}
         >
           <Ionicons name="keypad" size={20} color="white" style={{ marginRight: 8 }} />

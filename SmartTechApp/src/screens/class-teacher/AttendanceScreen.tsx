@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { HeaderBar } from '../../components';
@@ -42,6 +42,7 @@ interface Props {
 
 export const AttendanceScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -304,7 +305,7 @@ export const AttendanceScreen: React.FC<Props> = ({ onToggleDrawer, onNavigate, 
       )}
 
       {hasChanges && !isSelectionMode && (
-        <TouchableOpacity style={styles.saveFab} onPress={saveAttendance} disabled={saving}>
+        <TouchableOpacity style={[styles.saveFab, { bottom: spacing.lg + insets.bottom }]} onPress={saveAttendance} disabled={saving}>
           <Text style={styles.saveFabText}>{saving ? 'Saving...' : `Save (${students.filter(s => s.status !== 'PRESENT').length} changes)`}</Text>
         </TouchableOpacity>
       )}

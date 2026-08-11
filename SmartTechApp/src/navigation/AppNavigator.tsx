@@ -61,6 +61,8 @@ import HODMonitoringWrapper from '../screens/monitoring/HODMonitoringWrapper';
 import { AssessmentEntryScreen } from '../screens/assessment/AssessmentEntryScreen';
 import { AssessmentConfigScreen } from '../screens/assessment/AssessmentConfigScreen';
 import { PendingAssessmentsScreen } from '../screens/assessment/PendingAssessmentsScreen';
+import { SuperAdminSwitchSchoolScreen } from '../screens/super-admin/SwitchSchoolScreen';
+import { SuperAdminEnrollStaffScreen } from '../screens/super-admin/EnrollStaffScreen';
 
 import { DeviceSecurityScreen } from '../screens/security/DeviceSecurityScreen';
 import { PasswordManagementScreen } from '../screens/security/PasswordManagementScreen';
@@ -91,7 +93,7 @@ function useRoleCheck(user: any) {
   const isParent = isPrimaryParent || isSecParent;
 
   // SuperAdmin is checked first via separate login endpoint
-  const isSuperAdmin = hasRole('SuperAdmin') || hasRole('SUPER_ADMIN');
+  const isSuperAdmin = (hasRole('SuperAdmin') || hasRole('SUPER_ADMIN')) && !user?.schoolId;
 
   // Director/Deputy Director have their own dashboard - do NOT include in isTeacher
   const isPrimaryDirector = institutionType === 'PRIMARY_SCHOOL' && (hasRole('Head Teacher') || hasRole('Deputy Head') || hasRole('Director'));
@@ -217,6 +219,8 @@ export function AppNavigator() {
 
             {/* SuperAdmin Screens */}
             {isSuperAdmin && <Stack.Screen name="SuperAdminSchoolDetail" component={require('../screens/super-admin/SchoolDetailScreen').SuperAdminSchoolDetailScreen} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminSwitchSchool" component={SuperAdminSwitchSchoolScreen} />}
+            {isSuperAdmin && <Stack.Screen name="SuperAdminEnrollStaff" component={SuperAdminEnrollStaffScreen} />}
             {isSuperAdmin && <Stack.Screen name="SuperAdminCreateSchool" component={require('../screens/super-admin/CreateSchoolScreen').SuperAdminCreateSchoolScreen} />}
             {isSuperAdmin && <Stack.Screen name="SuperAdminSubscriptionPlans" component={require('../screens/super-admin/SubscriptionPlansScreen').SuperAdminSubscriptionPlansScreen} />}
             {isSuperAdmin && <Stack.Screen name="SuperAdminInstitutionTypes" component={require('../screens/super-admin/InstitutionTypesScreen').SuperAdminInstitutionTypesScreen} />}

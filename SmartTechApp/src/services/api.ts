@@ -15,6 +15,8 @@ import {
   ExamStats,
   UploadedExam,
   SuperAdminLoginResponse,
+  LinkedIdentity,
+  SwitchIdentityResponse,
 } from '../types';
 
 const extra = Constants.expoConfig?.extra || {};
@@ -121,6 +123,10 @@ class ApiService {
     this.token = token;
   }
 
+  getToken() {
+    return this.token;
+  }
+
   async superAdminLogin(data: { email: string; password: string }): Promise<SuperAdminLoginResponse> {
     const response = await this.client.post<SuperAdminLoginResponse>('/auth/super-admin/login', data);
     this.token = response.data.access_token;
@@ -151,6 +157,24 @@ class ApiService {
     return response.data;
   }
 
+  async getLinkedIdentities(): Promise<{ identities: LinkedIdentity[] }> {
+    const response = await this.client.get('/auth/linked-identities');
+    return response.data;
+  }
+
+  async switchIdentity(schoolId: string): Promise<SwitchIdentityResponse> {
+    const response = await this.client.post<SwitchIdentityResponse>('/auth/switch-identity', { schoolId });
+    this.token = response.data.access_token;
+    await AsyncStorage.setItem('access_token', response.data.access_token);
+    await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
+    return response.data;
+  }
+
+  async enrollSelfAsStaff(schoolId: string, role: string) {
+    const response = await this.client.post('/super-admin/enroll-self-as-staff', { schoolId, role });
+    return response.data;
+  }
+
   async forgotPassword(identifier: string) {
     const response = await this.client.post('/auth/forgot-password', { identifier });
     return response.data;
@@ -165,6 +189,8 @@ class ApiService {
     this.token = null;
     AsyncStorage.removeItem('access_token').catch(() => {});
     AsyncStorage.removeItem('user').catch(() => {});
+    AsyncStorage.removeItem('sa_token').catch(() => {});
+    AsyncStorage.removeItem('sa_user').catch(() => {});
   }
 
   async getAppVersion() {
@@ -1443,10 +1469,8 @@ class ApiService {
     return response.data;
   }
 
-  async uploadStamp(formData: FormData) {
-    const response = await this.client.post('/stamps/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+  async uploadStamp(data: { name: string; type: string; imageUrl?: string; svgContent?: string }) {
+    const response = await this.client.post('/stamps/upload', data);
     return response.data;
   }
 
@@ -1746,7 +1770,7 @@ class ApiService {
     return response.data;
   }
 
-  async sendResultsSms(data: { classId: string; termId: string; parentIds?: string[] }) {
+  async sendResultsSms(data: { classId: string; termId: string; parentIds?: string[]; studentIds?: string[]; allowResend?: boolean }) {
     const response = await this.client.post('/results-sms/send', data);
     return response.data;
   }
@@ -1910,6 +1934,26 @@ class ApiService {
     const response = await this.client.get('/mobile/staff-positions/positions', {
       params: { positionType },
     });
+    return response.data;
+  }
+
+  async getResultsSmsSettings() {
+    const response = await this.client.get('/results-sms/settings');
+    return response.data;
+  }
+
+  async getResultsSmsDashboard() {
+    const response = await this.client.get('/results-sms/dashboard');
+    return response.data;
+  }
+
+  async retryResultsSmsLog(id: string) {
+    const response = await this.client.post(`/results-sms/logs/${id}/retry`);
+    return response.data;
+  }
+
+  async syncStaffPositions() {
+    const response = await this.client.post('/staff-positions/sync');
     return response.data;
   }
 

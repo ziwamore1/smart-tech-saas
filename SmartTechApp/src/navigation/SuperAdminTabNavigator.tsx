@@ -32,6 +32,7 @@ interface DrawerScreen {
 const allDrawerScreens: (DrawerScreen & { section?: string })[] = [
   { name: 'SuperAdminHome', label: 'Dashboard', icon: '📊', component: SuperAdminDashboardScreen, institutionTypes: null as any, section: 'MAIN' },
   { name: 'SuperAdminSchools', label: 'Schools', icon: '🏫', component: SuperAdminSchoolsScreen, institutionTypes: null as any, section: 'MAIN' },
+  { name: 'SuperAdminSwitchSchool', label: 'Linked Schools', icon: '🔁', stackScreen: 'SuperAdminSwitchSchool', institutionTypes: null as any, section: 'MAIN' },
   { name: 'SuperAdminSchoolMembers', label: 'School Members', icon: '🔑', stackScreen: 'PendingAssessments', institutionTypes: null as any, section: 'MAIN' },
   { name: 'SuperAdminSubscriptionPlans', label: 'Subscription Plans', icon: '💳', stackScreen: 'SuperAdminSubscriptionPlans', institutionTypes: null as any, section: 'ACADEMIC' },
   { name: 'SuperAdminInstitutionTypes', label: 'Institution Types', icon: '🏛️', stackScreen: 'SuperAdminInstitutionTypes', institutionTypes: null as any, section: 'ACADEMIC' },
@@ -62,7 +63,7 @@ const allDrawerScreens: (DrawerScreen & { section?: string })[] = [
   { name: 'SuperAdminDigitalStamps', label: 'Stamps', icon: '🔏', stackScreen: 'SuperAdminDigitalStamps', institutionTypes: null as any, section: 'TOOLS' },
   { name: 'SuperAdminStampVerify', label: 'Verifications', icon: '✅', stackScreen: 'SuperAdminQRVerification', institutionTypes: null as any, section: 'TOOLS' },
   { name: 'SuperAdminMedia', label: 'Media Library', icon: '🖼️', component: SuperAdminMediaScreen, institutionTypes: null as any, section: 'TOOLS' },
-  { name: 'SuperAdminEnrollStaff', label: 'Enroll as Staff', icon: '👨‍🏫', stackScreen: 'PendingAssessments', institutionTypes: null as any, section: 'TOOLS' },
+  { name: 'SuperAdminEnrollStaff', label: 'Enroll as Staff', icon: '👨‍🏫', stackScreen: 'SuperAdminEnrollStaff', institutionTypes: null as any, section: 'TOOLS' },
   { name: 'SuperAdminProfile', label: 'Profile', icon: '👤', component: ProfileScreen, institutionTypes: null as any, section: 'ACCOUNT' },
 ];
 

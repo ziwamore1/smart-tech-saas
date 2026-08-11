@@ -3,14 +3,19 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { mmkvStorage } from '../storage/mmkv';
 import { User, DashboardData, Notification, INSTITUTION_TYPE_ROLES, InstitutionTypeCode, SuperAdminLoginResponse } from '../types';
 import { apiService } from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  saUser: User | null;
+  saToken: string | null;
   login: (email: string, password: string, deviceToken?: string, username?: string) => Promise<void>;
   superAdminLogin: (email: string, password: string) => Promise<void>;
+  switchToSchool: (schoolId: string) => Promise<void>;
+  switchToSuperAdmin: () => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
   clearError: () => void;
@@ -34,6 +39,8 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
       error: null,
+      saUser: null,
+      saToken: null,
 
       login: async (email: string, password: string, deviceToken?: string, username?: string) => {
         set({ isLoading: true, error: null });
@@ -51,6 +58,8 @@ export const useAuthStore = create<AuthState>()(
           set({
             user,
             isAuthenticated: true,
+            saUser: null,
+            saToken: null,
             isLoading: false,
           });
         } catch (error: any) {
@@ -75,9 +84,13 @@ export const useAuthStore = create<AuthState>()(
             schoolId: null,
             institutionType: null,
           };
+          await AsyncStorage.setItem('sa_token', response.access_token);
+          await AsyncStorage.setItem('sa_user', JSON.stringify(saUser));
           set({
             user: saUser,
             isAuthenticated: true,
+            saUser,
+            saToken: response.access_token,
             isLoading: false,
           });
         } catch (error: any) {
@@ -89,11 +102,33 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      switchToSchool: async (schoolId: string) => {
+        const currentUser = get().saUser || get().user;
+        const currentToken = get().saToken || apiService.getToken() || await AsyncStorage.getItem('access_token');
+        if (!currentUser || !currentToken) throw new Error('SuperAdmin session not available');
+        await AsyncStorage.setItem('sa_token', currentToken);
+        await AsyncStorage.setItem('sa_user', JSON.stringify(currentUser));
+        const response = await apiService.switchIdentity(schoolId);
+        const user = response.user;
+        if (!user.institutionType) user.institutionType = extractInstitutionType(user);
+        set({ user, isAuthenticated: true, saUser: currentUser, saToken: currentToken, error: null });
+      },
+
+      switchToSuperAdmin: async () => {
+        const saToken = get().saToken || await AsyncStorage.getItem('sa_token');
+        const stored = get().saUser || JSON.parse((await AsyncStorage.getItem('sa_user')) || 'null');
+        if (!saToken || !stored) throw new Error('SuperAdmin session not available');
+        apiService.setToken(saToken);
+        await AsyncStorage.setItem('access_token', saToken);
+        await AsyncStorage.setItem('user', JSON.stringify(stored));
+        set({ user: stored, isAuthenticated: true, saUser: stored, saToken, error: null });
+      },
+
       logout: async () => {
         try {
           await apiService.logout();
         } finally {
-          set({ user: null, isAuthenticated: false });
+          set({ user: null, isAuthenticated: false, saUser: null, saToken: null });
         }
       },
 
@@ -109,6 +144,8 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        saUser: state.saUser,
+        saToken: state.saToken,
       }),
     }
   )

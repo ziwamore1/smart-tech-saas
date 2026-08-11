@@ -27,7 +27,7 @@ type ProfileScreenProps = {
 };
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation, onToggleDrawer }) => {
-  const { user, logout, setUser } = useAuthStore();
+  const { user, logout, setUser, saUser, switchToSuperAdmin } = useAuthStore();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -418,6 +418,21 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation, onTogg
             </View>
           </Card>
 
+          {saUser && user?.schoolId && (
+            <Card style={styles.switchCard}>
+              <Text style={styles.sectionTitle}>SuperAdmin Session</Text>
+              <Text style={styles.switchDescription}>You are viewing this school as a linked staff member.</Text>
+              <Button
+                title="Back to Super Admin"
+                onPress={async () => {
+                  try { await switchToSuperAdmin(); } catch (error: any) { Alert.alert('Unable to switch', error?.message || 'Please sign in again.'); }
+                }}
+                variant="outline"
+                size="small"
+              />
+            </Card>
+          )}
+
           <Button
             title="Logout"
             onPress={handleLogout}
@@ -575,5 +590,17 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     marginBottom: spacing.xl,
+  },
+  switchCard: {
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: '#93c5fd',
+    backgroundColor: '#eff6ff',
+  },
+  switchDescription: {
+    color: '#1e40af',
+    fontSize: 13,
+    marginBottom: spacing.md,
   },
 });

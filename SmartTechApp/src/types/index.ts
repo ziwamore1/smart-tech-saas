@@ -11,6 +11,11 @@ export interface User {
   school?: School | null;
   institutionType?: string | null;
   studentId?: string | null;
+  platformRoles?: string[];
+  schoolRoles?: string[];
+  schoolName?: string | null;
+  teacherId?: string;
+  classTeacherOf?: string;
 }
 
 export const INSTITUTION_TYPES = {
@@ -81,6 +86,20 @@ export interface SuperAdminLoginResponse {
     fullName: string;
     role: string;
   };
+}
+
+export interface LinkedIdentity {
+  schoolId: string;
+  schoolName: string;
+  isPrimary: boolean;
+  roles: string[];
+  institutionType: string | null;
+}
+
+export interface SwitchIdentityResponse {
+  message: string;
+  access_token: string;
+  user: User;
 }
 
 export interface DashboardData {

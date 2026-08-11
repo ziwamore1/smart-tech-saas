@@ -11,7 +11,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { io, Socket } from 'socket.io-client';
 import Constants from 'expo-constants';
 import { colors, spacing, borderRadius, typography, shadows } from '../../theme';
@@ -49,6 +49,7 @@ interface ChatMessage {
 }
 
 export function CollaborationScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const socketRef = useRef<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -282,7 +283,7 @@ export function CollaborationScreen({ navigation }: any) {
         )}
 
         {!chatVisible && (
-          <TouchableOpacity style={styles.chatFab} onPress={() => setChatVisible(true)}>
+          <TouchableOpacity style={[styles.chatFab, { bottom: 24 + insets.bottom }]} onPress={() => setChatVisible(true)}>
             <Text style={styles.chatFabIcon}>💬</Text>
           </TouchableOpacity>
         )}

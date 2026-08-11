@@ -14,10 +14,12 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { Image } from 'expo-image';
+import { captureRef } from 'react-native-view-shot';
 import Svg, { Path, G } from 'react-native-svg';
 import { apiService } from '../../services/api';
 import { DigitalSignature } from '../../types';
@@ -36,6 +38,7 @@ function SignaturePad({ onCapture }: { onCapture: (data: string) => void }) {
   const [paths, setPaths] = useState<{ x: number; y: number }[][]>([]);
   const [currentPath, setCurrentPath] = useState<{ x: number; y: number }[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
+  const padRef = useRef<View>(null);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -66,16 +69,18 @@ function SignaturePad({ onCapture }: { onCapture: (data: string) => void }) {
     setCurrentPath([]);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (paths.length === 0 && currentPath.length === 0) {
       Alert.alert('Empty', 'Please draw a signature first');
       return;
     }
-    const allPoints = paths.flat();
-    if (allPoints.length === 0) return;
-    const data = JSON.stringify({ points: allPoints, width: PAD_WIDTH, height: PAD_HEIGHT });
-    onCapture(data);
-    handleClear();
+    try {
+      const data = await captureRef(padRef, { format: 'png', quality: 1, result: 'base64' });
+      onCapture(`data:image/png;base64,${data}`);
+      handleClear();
+    } catch {
+      Alert.alert('Capture failed', 'Unable to create a signature image. Please try again.');
+    }
   };
 
   const pathToSvgPath = (points: { x: number; y: number }[]): string => {
@@ -89,7 +94,7 @@ function SignaturePad({ onCapture }: { onCapture: (data: string) => void }) {
 
   return (
     <View style={styles.padContainer}>
-      <View style={styles.pad} {...panResponder.panHandlers}>
+      <View ref={padRef} collapsable={false} style={styles.pad} {...panResponder.panHandlers}>
         <Svg width={PAD_WIDTH} height={PAD_HEIGHT}>
           <G stroke="#000" strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round">
             {paths.map((path, i) => (
@@ -117,6 +122,7 @@ function SignaturePad({ onCapture }: { onCapture: (data: string) => void }) {
 }
 
 export function DigitalSignatureScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const [signatures, setSignatures] = useState<DigitalSignature[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -176,7 +182,9 @@ export function DigitalSignatureScreen({ navigation }: any) {
       if (result.canceled || !result.assets || result.assets.length === 0) return;
 
       const file = result.assets[0];
-      setSignatureImageUrl(file.uri);
+       const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: FileSystem.EncodingType.Base64 });
+       const mimeType = file.mimeType || 'image/png';
+       setSignatureImageUrl(`data:${mimeType};base64,${base64}`);
       setSignatureMethod('upload');
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to pick image');
@@ -250,7 +258,17 @@ export function DigitalSignatureScreen({ navigation }: any) {
         await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
       }
 
-      const fileUri = dir + `${sig.name.replace(/\s+/g, '_')}.json`;
+      const safeName = sig.name.replace(/[^a-z0-9_-]+/gi, '_');
+      const imageData = sig.imageUrl || sig.signatureData || '';
+      if (imageData.startsWith('data:image/')) {
+        const base64 = imageData.substring(imageData.indexOf(',') + 1);
+        const fileUri = dir + `${safeName}.png`;
+        await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+        await Sharing.shareAsync(fileUri, { mimeType: 'image/png', dialogTitle: `Share ${sig.name} Signature` });
+        return;
+      }
+
+      const fileUri = dir + `${safeName}.json`;
       const content = JSON.stringify({
         name: sig.name,
         title: sig.title,
@@ -288,7 +306,7 @@ export function DigitalSignatureScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -297,7 +315,7 @@ export function DigitalSignatureScreen({ navigation }: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.title}>Digital Signatures</Text>
         <TouchableOpacity style={styles.createHeaderBtn} onPress={() => { resetForm(); setModalVisible(true); }}>
@@ -326,13 +344,9 @@ export function DigitalSignatureScreen({ navigation }: any) {
               <View style={styles.sigBody}>
                 <View style={styles.sigPreview}>
                   {sig.imageUrl ? (
-                    <View style={styles.sigImagePlaceholder}>
-                      <Text style={styles.sigImageIcon}>🖋️</Text>
-                    </View>
+                    <Image source={{ uri: sig.imageUrl }} style={styles.signatureImage} contentFit="contain" />
                   ) : sig.signatureData ? (
-                    <View style={styles.sigDrawnPreview}>
-                      <Text style={styles.sigDrawnIcon}>✍️</Text>
-                    </View>
+                    <Image source={{ uri: sig.signatureData }} style={styles.signatureImage} contentFit="contain" />
                   ) : (
                     <View style={styles.sigNoImage}>
                       <Text style={styles.sigNoImageText}>No signature</Text>
@@ -409,7 +423,7 @@ export function DigitalSignatureScreen({ navigation }: any) {
               </View>
             )}
 
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, { paddingBottom: Math.max(spacing.md, insets.bottom) }]}>
               <TouchableOpacity style={styles.cancelModalBtn} onPress={() => setModalVisible(false)}>
                 <Text style={styles.cancelModalBtnText}>Cancel</Text>
               </TouchableOpacity>
@@ -438,7 +452,7 @@ export function DigitalSignatureScreen({ navigation }: any) {
               placeholderTextColor={colors.textLight}
               autoCapitalize="none"
             />
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, { paddingBottom: Math.max(spacing.md, insets.bottom) }]}>
               <TouchableOpacity style={styles.cancelModalBtn} onPress={() => setSignDocModalVisible(false)}>
                 <Text style={styles.cancelModalBtnText}>Cancel</Text>
               </TouchableOpacity>
@@ -482,6 +496,7 @@ const styles = StyleSheet.create({
   defaultBadgeText: { color: colors.white, fontSize: 11, fontWeight: '600' },
   sigBody: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.sm },
   sigPreview: { width: 70, height: 50, borderRadius: borderRadius.md, overflow: 'hidden' },
+  signatureImage: { width: '100%', height: '100%', backgroundColor: '#f8fafc' },
   sigImagePlaceholder: { flex: 1, backgroundColor: '#f0fdf4', justifyContent: 'center', alignItems: 'center' },
   sigImageIcon: { fontSize: 24 },
   sigDrawnPreview: { flex: 1, backgroundColor: '#fef3c7', justifyContent: 'center', alignItems: 'center' },

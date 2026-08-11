@@ -9,7 +9,7 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Pdf from 'react-native-pdf';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -36,6 +36,7 @@ interface PDFPreviewScreenProps {
 }
 
 export const PDFPreviewScreen: React.FC<PDFPreviewScreenProps> = ({ route, navigation }) => {
+  const insets = useSafeAreaInsets();
   const params = route?.params || {};
   const pdfRef = useRef<any>(null);
   const qrRef = useRef<any>(null);
@@ -130,7 +131,7 @@ export const PDFPreviewScreen: React.FC<PDFPreviewScreenProps> = ({ route, navig
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <HeaderBar title="Document Preview" subtitle="Loading..." />
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -164,7 +165,7 @@ export const PDFPreviewScreen: React.FC<PDFPreviewScreenProps> = ({ route, navig
     : { uri: '', cache: true };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <HeaderBar
         title="Document Preview"
         subtitle={`${documentType} • ${documentName}`}
@@ -232,7 +233,7 @@ export const PDFPreviewScreen: React.FC<PDFPreviewScreenProps> = ({ route, navig
       </View>
 
       {showQR && verificationHash && (
-        <View style={styles.qrModal} ref={qrRef} collapsable={false}>
+        <View style={[styles.qrModal, { paddingBottom: Math.max(spacing.lg, insets.bottom) }]} ref={qrRef} collapsable={false}>
           <View style={styles.qrCard}>
             <Text style={styles.qrTitle}>Document Verification</Text>
             <View style={styles.qrWrapper}>

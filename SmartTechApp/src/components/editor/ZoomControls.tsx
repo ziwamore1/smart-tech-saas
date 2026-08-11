@@ -6,6 +6,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface ZoomControlsProps {
   zoom: number;
@@ -20,8 +21,9 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
   onZoomOut,
   onZoomToFit,
 }) => {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { bottom: 24 + insets.bottom }]}>
       <TouchableOpacity style={styles.button} onPress={onZoomOut} activeOpacity={0.6}>
         <Text style={styles.buttonText}>−</Text>
       </TouchableOpacity>

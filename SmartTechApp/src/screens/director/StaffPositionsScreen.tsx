@@ -25,6 +25,7 @@ export const StaffPositionsScreen: React.FC<StaffPositionsProps> = ({ onToggleDr
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [showPosModal, setShowPosModal] = useState(false);
   const [editingDept, setEditingDept] = useState<any>(null);
@@ -55,6 +56,19 @@ export const StaffPositionsScreen: React.FC<StaffPositionsProps> = ({ onToggleDr
   useEffect(() => { loadData(); }, []);
 
   const handleRefresh = () => { setRefreshing(true); loadData(); };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const result = await apiService.syncStaffPositions();
+      Alert.alert('Sync complete', result?.message || 'Staff positions were synchronized from the staff register.');
+      await loadData();
+    } catch (err: any) {
+      Alert.alert('Sync failed', err.response?.data?.message || 'Failed to synchronize staff positions.');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleSaveDept = async () => {
     if (!newDept.name) { Alert.alert('Error', 'Department name is required'); return; }
@@ -264,6 +278,10 @@ export const StaffPositionsScreen: React.FC<StaffPositionsProps> = ({ onToggleDr
 
       {renderTabs()}
 
+      <TouchableOpacity style={styles.syncBtn} onPress={handleSync} disabled={syncing}>
+        <Text style={styles.syncBtnText}>{syncing ? 'Syncing staff register...' : '↻ Sync from Staff Register'}</Text>
+      </TouchableOpacity>
+
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
@@ -360,6 +378,8 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: colors.primary },
   tabText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   tabTextActive: { color: colors.white },
+  syncBtn: { marginHorizontal: spacing.md, padding: spacing.sm, borderRadius: borderRadius.sm, backgroundColor: colors.infoLight, alignItems: 'center' },
+  syncBtnText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
   searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: borderRadius.lg, paddingHorizontal: spacing.md, marginBottom: spacing.md, ...shadows.sm },
   searchIcon: { fontSize: 18, marginRight: spacing.sm },
   searchInput: { flex: 1, paddingVertical: spacing.md, fontSize: 15, color: colors.text },
