@@ -15,6 +15,9 @@ const getSupervisorLabel = (posType: string) => {
   return 'HOD';
 };
 
+const isLeadershipType = (type: string) =>
+  ['DIRECTOR', 'DEPUTY_DIRECTOR', 'HEAD_TEACHER', 'DEPUTY'].includes(type);
+
 export default function StaffPositionsPage() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const router = useRouter();
@@ -305,6 +308,7 @@ function PositionsTab({ positions, departments, positionTypes, isDirector, onRef
   const [editPos, setEditPos] = useState<any>(null);
   const [teacherId, setTeacherId] = useState('');
   const [positionType, setPositionType] = useState('');
+  const [section, setSection] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [classId, setClassId] = useState('');
   const [isPrimary, setIsPrimary] = useState(true);
@@ -323,13 +327,13 @@ function PositionsTab({ positions, departments, positionTypes, isDirector, onRef
   }, []);
 
   const resetForm = () => {
-    setTeacherId(''); setPositionType(''); setDepartmentId(''); setClassId('');
+    setTeacherId(''); setPositionType(''); setSection(''); setDepartmentId(''); setClassId('');
     setIsPrimary(true); setEditPos(null); setShowForm(false);
   };
 
   const handleEdit = (pos: any) => {
     setEditPos(pos); setTeacherId(pos.teacherId); setPositionType(pos.positionType);
-    setDepartmentId(pos.departmentId || ''); setClassId(pos.classId || '');
+    setSection(pos.section || ''); setDepartmentId(pos.departmentId || ''); setClassId(pos.classId || '');
     setIsPrimary(pos.isPrimary ?? true); setShowForm(true);
   };
 
@@ -339,12 +343,14 @@ function PositionsTab({ positions, departments, positionTypes, isDirector, onRef
     try {
       if (editPos) {
         const payload: any = { positionType, isPrimary };
+        if (section) payload.section = section;
         if (departmentId) payload.departmentId = departmentId;
         if (classId) payload.classId = classId;
         await staffPositionApi.updatePosition(editPos.id, payload);
         setSuccess('Position updated');
       } else {
         const payload: any = { teacherId, positionType, isPrimary };
+        if (section) payload.section = section;
         if (departmentId) payload.departmentId = departmentId;
         if (classId) payload.classId = classId;
         await staffPositionApi.createPosition(payload);
@@ -432,6 +438,16 @@ function PositionsTab({ positions, departments, positionTypes, isDirector, onRef
                 <label style={{ fontSize: 13 }}><input type="radio" checked={!isPrimary} onChange={() => setIsPrimary(false)} /> Additional</label>
               </div>
             </div>
+            {isLeadershipType(positionType) && (
+              <div>
+                <label style={{ fontSize: 12, color: '#374151', display: 'block', marginBottom: 4 }}>Section</label>
+                <select value={section} onChange={e => setSection(e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }}>
+                  <option value="">Auto (from department)</option>
+                  <option value="PRIMARY">Primary</option>
+                  <option value="SECONDARY">Secondary</option>
+                </select>
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button onClick={handleSubmit} disabled={saving || !teacherId || !positionType} style={{ padding: '8px 16px', background: saving ? '#86a7e0' : teacherId && positionType ? '#059669' : '#d1d5db', color: '#fff', border: 'none', borderRadius: 6, cursor: saving || !teacherId || !positionType ? 'not-allowed' : 'pointer', fontSize: 13 }}>{saving ? (editPos ? 'Updating...' : 'Assigning...') : (editPos ? 'Update' : 'Assign')}</button>
@@ -467,7 +483,7 @@ function PositionsTab({ positions, departments, positionTypes, isDirector, onRef
                   .map((pos: any) => (
                     <tr key={pos.id} style={{ borderTop: '1px solid #f3eee8' }}>
                       <td style={{ padding: '10px 14px', fontWeight: 500 }}>{getTeacherName(pos)}</td>
-                      <td style={{ padding: '10px 14px' }}><PositionBadge type={pos.positionType} label={positionTypeLabels[pos.positionType] || pos.positionType} /></td>
+                      <td style={{ padding: '10px 14px' }}><PositionBadge type={pos.positionType} label={positionTypeLabels[pos.positionType] || pos.positionType} />{pos.section ? <SectionBadge section={pos.section} /> : null}</td>
                       <td style={{ padding: '10px 14px', color: '#6b7280', fontSize: 12 }}>{pos.department?.name || '-'}</td>
                       <td style={{ padding: '10px 14px', fontSize: 12 }}>{pos.isPrimary ? <span style={{ color: '#059669' }}>Primary</span> : <span style={{ color: '#6b7280' }}>Additional</span>}</td>
                       <td style={{ padding: '10px 14px' }}><StatusBadge status={pos.isActive ? 'ACTIVE' : 'INACTIVE'} /></td>
@@ -510,7 +526,7 @@ function HierarchyTab({ hierarchy, departments, onRefresh }: any) {
 
           {hierarchy.director ? (
             <div style={{ padding: '8px 12px', background: '#fef3c7', borderRadius: 8, marginBottom: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>Director</div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Director{hierarchy.director.section ? <SectionBadge section={hierarchy.director.section} /> : null}</div>
               <div style={{ fontSize: 13, color: '#374151' }}>{hierarchy.director.teacher?.user?.firstName} {hierarchy.director.teacher?.user?.lastName}</div>
             </div>
           ) : null}
@@ -518,7 +534,7 @@ function HierarchyTab({ hierarchy, departments, onRefresh }: any) {
           {hierarchy.deputyDirector?.length > 0 ? (
             hierarchy.deputyDirector.map((d: any) => (
               <div key={d.id} style={{ padding: '6px 12px', background: '#dbeafe', borderRadius: 8, marginBottom: 4 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#1d4ed8' }}>Deputy Director</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#1d4ed8' }}>Deputy Director{d.section ? <SectionBadge section={d.section} /> : null}</div>
                 <div style={{ fontSize: 13 }}>{d.teacher?.user?.firstName} {d.teacher?.user?.lastName}</div>
               </div>
             ))
@@ -526,21 +542,28 @@ function HierarchyTab({ hierarchy, departments, onRefresh }: any) {
 
           {hierarchy.headTeacher ? (
             <div style={{ padding: '8px 12px', background: '#fef3c7', borderRadius: 8, marginBottom: 8, marginTop: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>Head Teacher</div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Head Teacher{hierarchy.headTeacher.section ? <SectionBadge section={hierarchy.headTeacher.section} /> : null}</div>
               <div style={{ fontSize: 13, color: '#374151' }}>{hierarchy.headTeacher.teacher?.user?.firstName} {hierarchy.headTeacher.teacher?.user?.lastName}</div>
+            </div>
+          ) : null}
+
+          {hierarchy.headTeacherSecondary ? (
+            <div style={{ padding: '8px 12px', background: '#fef3c7', borderRadius: 8, marginBottom: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Head Teacher{hierarchy.headTeacherSecondary.section ? <SectionBadge section={hierarchy.headTeacherSecondary.section} /> : null}</div>
+              <div style={{ fontSize: 13, color: '#374151' }}>{hierarchy.headTeacherSecondary.teacher?.user?.firstName} {hierarchy.headTeacherSecondary.teacher?.user?.lastName}</div>
             </div>
           ) : null}
 
           {hierarchy.deputies?.length > 0 ? (
             hierarchy.deputies.map((d: any) => (
               <div key={d.id} style={{ padding: '6px 12px', background: '#f3f4f6', borderRadius: 8, marginBottom: 4 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Deputy</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Deputy{d.section ? <SectionBadge section={d.section} /> : null}</div>
                 <div style={{ fontSize: 13 }}>{d.teacher?.user?.firstName} {d.teacher?.user?.lastName}</div>
               </div>
             ))
           ) : null}
 
-          {!hierarchy.director && !hierarchy.headTeacher && !hierarchy.deputyDirector?.length && !hierarchy.deputies?.length && (
+          {!hierarchy.director && !hierarchy.headTeacher && !hierarchy.headTeacherSecondary && !hierarchy.deputyDirector?.length && !hierarchy.deputies?.length && (
             <div style={{ color: '#9ca3af', fontSize: 13 }}>No leadership assigned</div>
           )}
         </div>
@@ -577,14 +600,15 @@ function HierarchyTab({ hierarchy, departments, onRefresh }: any) {
           </h3>
           <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.7 }}>
             <p><strong>Director</strong> → Supervises all staff (secondary/advanced secondary)</p>
-            <p><strong>Deputy Director</strong> → Supervises HODs, Senior Teachers, and Subject Teachers</p>
-            <p><strong>Head Teacher</strong> → Supervises all staff (primary)</p>
-            <p><strong>Deputy</strong> → Supervises HODs, Senior Teachers, Subject Teachers (primary)</p>
+            <p><strong>Deputy Director</strong> → Supervises HODs and Subject Teachers (secondary)</p>
+            <p><strong>Head Teacher</strong> → Supervises all staff in their section (Primary or Secondary)</p>
+            <p><strong>Deputy</strong> → Supervises Senior Teachers and Class Teachers (primary)</p>
             <p><strong>HOD</strong> → Supervises teachers in their department (secondary)</p>
             <p><strong>Lower Primary Senior Teacher</strong> → Supervises Lower Primary Class Teachers</p>
             <p><strong>Upper Primary Senior Teacher</strong> → Supervises Upper Primary Class Teachers</p>
             <p><strong>Subject Teacher</strong> → Reports to HOD / Deputy Director</p>
             <p><strong>Class Teacher</strong> → Additional responsibility for a class</p>
+            <p style={{ marginTop: 8 }}><strong>Section</strong> (Primary/Secondary) is set per leadership position, or derived automatically from the staff member's department category.</p>
           </div>
         </div>
       </div>
@@ -644,6 +668,13 @@ function PositionBadge({ type, label }: { type: string; label: string }) {
   };
   const c = colors[type] || { bg: '#f3f4f6', text: '#374151' };
   return <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 500, background: c.bg, color: c.text }}>{label}</span>;
+}
+
+function SectionBadge({ section }: { section: string }) {
+  const c = section === 'PRIMARY'
+    ? { bg: '#dbeafe', text: '#1d4ed8' }
+    : { bg: '#dcfce7', text: '#16a34a' };
+  return <span style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: c.bg, color: c.text }}>{section === 'PRIMARY' ? 'Primary' : 'Secondary'}</span>;
 }
 
 function StatusBadge({ status }: { status: string }) {

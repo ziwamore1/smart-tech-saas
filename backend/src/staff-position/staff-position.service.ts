@@ -24,6 +24,12 @@ const POSITION_TO_ROLE: Record<string, string> = {
   UPPER_PRIMARY_SENIOR_TEACHER: 'Upper Primary Senior Teacher',
 };
 
+const SECTION_REQUIRED_POSITION_TYPES = ['DIRECTOR', 'DEPUTY_DIRECTOR', 'HEAD_TEACHER', 'DEPUTY'];
+
+const PRIMARY_SECTION_CATEGORIES = [
+  'EARLY_CHILDHOOD', 'LOWER_PRIMARY', 'UPPER_PRIMARY', 'SPECIAL_EDUCATION', 'LITERACY_NUMERACY',
+];
+
 @Injectable()
 export class StaffPositionService {
   private readonly logger = new Logger(StaffPositionService.name);
@@ -135,6 +141,7 @@ export class StaffPositionService {
         teacherId: dto.teacherId,
         schoolId,
         positionType: dto.positionType,
+        section: dto.section,
         departmentId: dto.departmentId,
         classId: dto.classId,
         isPrimary: dto.isPrimary ?? true,
@@ -278,7 +285,9 @@ export class StaffPositionService {
 
     const director = positions.find(p => p.positionType === 'DIRECTOR');
     const deputyDirector = positions.filter(p => p.positionType === 'DEPUTY_DIRECTOR');
-    const headTeacher = positions.find(p => p.positionType === 'HEAD_TEACHER');
+    const headTeachers = positions.filter(p => p.positionType === 'HEAD_TEACHER');
+    const primaryHeadTeacher = headTeachers.find(p => this.positionSection(p) === 'PRIMARY') || headTeachers[0];
+    const secondaryHeadTeacher = headTeachers.find(p => this.positionSection(p) === 'SECONDARY' && (!primaryHeadTeacher || p.id !== primaryHeadTeacher.id));
     const deputies = positions.filter(p => p.positionType === 'DEPUTY');
     const hods = positions.filter(p => p.positionType === 'HOD');
     const lowerPrimarySeniorTeachers = positions.filter(p => p.positionType === 'LOWER_PRIMARY_SENIOR_TEACHER');
@@ -319,10 +328,11 @@ export class StaffPositionService {
     });
 
     return {
-      director: director ? { id: director.id, teacher: director.teacher } : null,
-      deputyDirector: deputyDirector.map(d => ({ id: d.id, teacher: d.teacher })),
-      headTeacher: headTeacher ? { id: headTeacher.id, teacher: headTeacher.teacher } : null,
-      deputies: deputies.map(d => ({ id: d.id, teacher: d.teacher })),
+      director: director ? { id: director.id, teacher: director.teacher, section: this.positionSection(director) } : null,
+      deputyDirector: deputyDirector.map(d => ({ id: d.id, teacher: d.teacher, section: this.positionSection(d) })),
+      headTeacher: primaryHeadTeacher ? { id: primaryHeadTeacher.id, teacher: primaryHeadTeacher.teacher, section: this.positionSection(primaryHeadTeacher) } : null,
+      headTeacherSecondary: secondaryHeadTeacher ? { id: secondaryHeadTeacher.id, teacher: secondaryHeadTeacher.teacher, section: this.positionSection(secondaryHeadTeacher) } : null,
+      deputies: deputies.map(d => ({ id: d.id, teacher: d.teacher, section: this.positionSection(d) })),
       departments: departmentHierarchy,
       unassignedTeachers: subjectTeachers.filter(t => !departments.some(d => d.teachers.some(t2 => t2.id === t.teacherId))),
     };
@@ -380,6 +390,7 @@ export class StaffPositionService {
 
     const positions = await this.prisma.actingPosition.findMany({
       where: { teacherId, isActive: true },
+      include: { department: true },
     });
 
     const allPositions = await this.prisma.actingPosition.findMany({
@@ -392,13 +403,14 @@ export class StaffPositionService {
 
     const director = allPositions.find(p => p.positionType === 'DIRECTOR');
     const deputyDirector = allPositions.filter(p => p.positionType === 'DEPUTY_DIRECTOR');
-    const headTeacher = allPositions.find(p => p.positionType === 'HEAD_TEACHER');
+    const headTeachers = allPositions.filter(p => p.positionType === 'HEAD_TEACHER');
     const deputies = allPositions.filter(p => p.positionType === 'DEPUTY');
     const hods = allPositions.filter(p => p.positionType === 'HOD');
     const lowerPrimarySeniorTeachers = allPositions.filter(p => p.positionType === 'LOWER_PRIMARY_SENIOR_TEACHER');
     const upperPrimarySeniorTeachers = allPositions.filter(p => p.positionType === 'UPPER_PRIMARY_SENIOR_TEACHER');
     const allDeptSupervisors = [...hods, ...lowerPrimarySeniorTeachers, ...upperPrimarySeniorTeachers];
-    const seniorLeaders = [...deputyDirector, ...deputies];
+    const subjectTeachers = allPositions.filter(p => p.positionType === 'SUBJECT_TEACHER');
+    const classTeachers = allPositions.filter(p => p.positionType === 'CLASS_TEACHER');
 
     const isDirector = positions.some(p => p.positionType === 'DIRECTOR');
     const isDeputyDirector = positions.some(p => p.positionType === 'DEPUTY_DIRECTOR');
@@ -410,30 +422,49 @@ export class StaffPositionService {
     const isDeptSupervisor = isHod || isLowerPrimarySenior || isUpperPrimarySenior;
     const position = positions[0];
 
+    const mySection = position ? this.positionSection(position) : 'SECONDARY';
+    const primaryHeadTeachers = headTeachers.filter(h => this.positionSection(h) === 'PRIMARY');
+    const secondaryHeadTeachers = headTeachers.filter(h => this.positionSection(h) === 'SECONDARY');
+    const myHeadTeachers = mySection === 'PRIMARY' ? primaryHeadTeachers : secondaryHeadTeachers;
+    const primaryDeputies = deputies.filter(d => this.positionSection(d) === 'PRIMARY');
+
     let supervises: any[] = [];
     let supervisedBy: any[] = [];
 
     if (isDirector) {
       supervises = allPositions.filter(p => p.teacherId !== teacherId);
-    } else if (isDeputyDirector || isDeputy) {
-      supervises = [...allDeptSupervisors, ...allPositions.filter(p => p.positionType === 'SUBJECT_TEACHER')];
-      supervisedBy = director ? [director] : headTeacher ? [headTeacher] : [];
     } else if (isHeadTeacher) {
-      supervises = allPositions.filter(p => p.teacherId !== teacherId);
+      supervises = allPositions.filter(p => p.teacherId !== teacherId && this.positionSection(p) === mySection);
+      supervisedBy = director ? [director] : [];
+    } else if (isDeputyDirector || isDeputy) {
+      const sectionDeptSupervisors = mySection === 'PRIMARY'
+        ? [...lowerPrimarySeniorTeachers, ...upperPrimarySeniorTeachers]
+        : hods;
+      supervises = [
+        ...sectionDeptSupervisors,
+        ...classTeachers.filter(c => this.positionSection(c) === mySection),
+        ...subjectTeachers.filter(s => this.positionSection(s) === mySection),
+      ];
+      supervisedBy = [...(director ? [director] : []), ...(myHeadTeachers.length ? myHeadTeachers : headTeachers)];
     } else if (isDeptSupervisor && position?.departmentId) {
-      const deptTeachers = await this.prisma.teacher.findMany({
+      const deptTeacherIds = (await this.prisma.teacher.findMany({
         where: { departmentId: position.departmentId },
         select: { id: true },
-      });
-      const deptTeacherIds = deptTeachers.map(t => t.id);
+      })).map(t => t.id);
       supervises = allPositions.filter(p => deptTeacherIds.includes(p.teacherId) && p.teacherId !== teacherId);
-      supervisedBy = [...seniorLeaders, ...(director ? [director] : []), ...(headTeacher ? [headTeacher] : [])];
+      supervisedBy = isHod
+        ? [...deputyDirector, ...(director ? [director] : []), ...(secondaryHeadTeachers.length ? secondaryHeadTeachers : headTeachers)]
+        : [...primaryDeputies, ...(director ? [director] : []), ...(primaryHeadTeachers.length ? primaryHeadTeachers : headTeachers)];
     } else {
       if (position?.departmentId) {
         const deptBoss = allDeptSupervisors.find(s => s.departmentId === position.departmentId);
         if (deptBoss) supervisedBy.push(deptBoss);
       }
-      supervisedBy = [...supervisedBy, ...seniorLeaders, ...(director ? [director] : []), ...(headTeacher ? [headTeacher] : [])];
+      if (mySection === 'PRIMARY') {
+        supervisedBy = [...supervisedBy, ...primaryDeputies, ...(director ? [director] : []), ...(primaryHeadTeachers.length ? primaryHeadTeachers : headTeachers)];
+      } else {
+        supervisedBy = [...supervisedBy, ...deputyDirector, ...(director ? [director] : []), ...(secondaryHeadTeachers.length ? secondaryHeadTeachers : headTeachers)];
+      }
     }
 
     const uniqueSupervises = supervises.filter((v, i, a) => a.findIndex(t => t.teacherId === v.teacherId) === i);
@@ -441,9 +472,9 @@ export class StaffPositionService {
 
     return {
       teacher: { id: teacher.id, user: teacher.user, departmentId: teacher.departmentId },
-      positions: positions.map(p => ({ positionType: p.positionType, isPrimary: p.isPrimary })),
-      supervises: uniqueSupervises.map(p => ({ id: p.id, positionType: p.positionType, teacher: p.teacher, department: p.department })),
-      supervisedBy: uniqueSupervisedBy.map(p => ({ id: p.id, positionType: p.positionType, teacher: p.teacher, department: p.department })),
+      positions: positions.map(p => ({ positionType: p.positionType, isPrimary: p.isPrimary, section: this.positionSection(p) })),
+      supervises: uniqueSupervises.map(p => ({ id: p.id, positionType: p.positionType, section: this.positionSection(p), teacher: p.teacher, department: p.department })),
+      supervisedBy: uniqueSupervisedBy.map(p => ({ id: p.id, positionType: p.positionType, section: this.positionSection(p), teacher: p.teacher, department: p.department })),
     };
   }
 
@@ -459,7 +490,10 @@ export class StaffPositionService {
     const positionType = this.getPositionTypeForRole(role);
     if (!positionType) return;
 
-    const teacher = await this.prisma.teacher.findFirst({ where: { id: teacherId, schoolId } });
+    const teacher = await this.prisma.teacher.findFirst({
+      where: { id: teacherId, schoolId },
+      include: { departmentRel: { select: { category: true } } },
+    });
     if (!teacher) return;
 
     const existing = await this.prisma.actingPosition.findFirst({
@@ -486,6 +520,9 @@ export class StaffPositionService {
         teacherId,
         schoolId,
         positionType,
+        section: SECTION_REQUIRED_POSITION_TYPES.includes(positionType)
+          ? this.sectionFromCategory((teacher as any).departmentRel?.category)
+          : null,
         departmentId: ['HOD', 'SUBJECT_TEACHER', 'CLASS_TEACHER', 'SENIOR_TEACHER', 'LOWER_PRIMARY_SENIOR_TEACHER', 'UPPER_PRIMARY_SENIOR_TEACHER'].includes(positionType) ? teacher.departmentId : null,
         isPrimary: true,
       },
@@ -557,12 +594,13 @@ export class StaffPositionService {
 
     const teacherDeptByGroup = new Map<string, string[]>();
     const positionUpdateByGroup = new Map<string, { ids: string[]; departmentId: string | null; isPrimary: boolean }>();
-    const positionsToCreate: { teacherId: string; schoolId: string; positionType: string; departmentId: string | null; isPrimary: boolean }[] = [];
+    const positionsToCreate: { teacherId: string; schoolId: string; positionType: string; section: 'PRIMARY' | 'SECONDARY' | null; departmentId: string | null; isPrimary: boolean }[] = [];
 
     const teacherSelect = {
       id: true,
       departmentId: true,
       department: true,
+      departmentRel: { select: { category: true } },
       user: {
         select: {
           userRoles: { select: { role: { select: { name: true } } } },
@@ -628,6 +666,9 @@ export class StaffPositionService {
             teacherId: teacher.id,
             schoolId,
             positionType,
+            section: SECTION_REQUIRED_POSITION_TYPES.includes(positionType)
+              ? this.sectionFromCategory((teacher as any).departmentRel?.category)
+              : null,
             departmentId: departmentPositionTypes.includes(positionType) ? departmentId : null,
             isPrimary: true,
           });
@@ -722,6 +763,16 @@ export class StaffPositionService {
   }
 
   // ==================== HELPERS ====================
+
+  private sectionFromCategory(category?: string | null): 'PRIMARY' | 'SECONDARY' | null {
+    if (!category) return null;
+    return PRIMARY_SECTION_CATEGORIES.includes(category) ? 'PRIMARY' : 'SECONDARY';
+  }
+
+  private positionSection(p: { section?: string | null; department?: { category?: string | null } | null }): 'PRIMARY' | 'SECONDARY' {
+    if (p.section) return p.section as 'PRIMARY' | 'SECONDARY';
+    return this.sectionFromCategory(p.department?.category) ?? 'SECONDARY';
+  }
 
   private isDepartmentPositionType(type: string) {
     return ['HOD', 'LOWER_PRIMARY_SENIOR_TEACHER', 'UPPER_PRIMARY_SENIOR_TEACHER'].includes(type);

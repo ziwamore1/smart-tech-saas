@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsDateString, IsIn } from 'class-validator';
 
 export class CreateActingPositionDto {
   @IsString()
@@ -6,6 +6,8 @@ export class CreateActingPositionDto {
 
   @IsString()
   positionType: string;
+
+  @IsOptional() @IsIn(['PRIMARY', 'SECONDARY']) section?: 'PRIMARY' | 'SECONDARY';
 
   @IsOptional() @IsString() departmentId?: string;
 
