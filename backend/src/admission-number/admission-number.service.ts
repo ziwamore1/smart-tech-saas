@@ -20,17 +20,30 @@ export class AdmissionNumberService {
     const year = academicYear.startDate.getFullYear();
     const effectiveClassId = classId || '__SCHOOL__';
 
-    const sequence = await this.prisma.admissionSequence.upsert({
-      where: { schoolId_academicYearId_classId: { schoolId, academicYearId, classId: effectiveClassId } },
-      update: { currentSequence: { increment: 1 } },
-      create: {
-        schoolId,
-        academicYearId,
-        classId: effectiveClassId,
-        year,
-        currentSequence: 1,
-      },
-    });
+    let sequence;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        sequence = await this.prisma.admissionSequence.upsert({
+          where: { schoolId_academicYearId_classId: { schoolId, academicYearId, classId: effectiveClassId } },
+          update: { currentSequence: { increment: 1 } },
+          create: {
+            schoolId,
+            academicYearId,
+            classId: effectiveClassId,
+            year,
+            currentSequence: 1,
+          },
+        });
+        break;
+      } catch (error: any) {
+        const message = String(error?.message || '').toLowerCase();
+        const retryable = error?.code === 'P2034' || message.includes('write conflict') || message.includes('deadlock');
+        if (!retryable || attempt === 3) throw error;
+        await new Promise((resolve) => setTimeout(resolve, attempt * 250));
+      }
+    }
+
+    if (!sequence) throw new Error('Admission sequence could not be generated');
 
     const admissionNumber = `ST-${sequence.year}-${String(sequence.currentSequence).padStart(3, '0')}`;
 

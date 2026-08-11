@@ -850,25 +850,37 @@ export class StudentService {
     if (!student) throw new NotFoundException('Student not found');
     if (student.schoolId !== schoolId) throw new ForbiddenException('Invalid student');
 
-    return this.prisma.$transaction(async (tx) => {
-      const existing = await tx.enrollment.findFirst({ where: { studentId, academicYearId } });
-      if (existing) throw new ForbiddenException('Student already enrolled in this academic year');
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const existing = await tx.enrollment.findFirst({ where: { studentId, academicYearId } });
+          if (existing) throw new ForbiddenException('Student already enrolled in this academic year');
 
-      const enrollment = await tx.enrollment.create({
-        data: { studentId, academicYearId, classId, schoolId, status: EnrollmentStatus.ACTIVE },
-      });
+          const enrollment = await tx.enrollment.create({
+            data: { studentId, academicYearId, classId, schoolId, status: EnrollmentStatus.ACTIVE },
+          });
 
-      await tx.student.update({
-        where: { id: studentId },
-        data: {
-          classId,
-          ...(student.status !== StudentStatus.ACTIVE ? { status: StudentStatus.ACTIVE } : {}),
-        },
-      });
+          await tx.student.update({
+            where: { id: studentId },
+            data: {
+              classId,
+              ...(student.status !== StudentStatus.ACTIVE ? { status: StudentStatus.ACTIVE } : {}),
+            },
+          });
 
-      await this.admissionNumberService.resequenceClassInTransaction(tx, schoolId, academicYearId, classId);
-      return enrollment;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
+          await this.admissionNumberService.resequenceClassInTransaction(tx, schoolId, academicYearId, classId);
+          return enrollment;
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
+      } catch (error: any) {
+        const message = String(error?.message || '').toLowerCase();
+        const retryable = error?.code === 'P2034' || message.includes('write conflict') || message.includes('deadlock');
+        if (!retryable || attempt === 3) throw error;
+        this.logger.warn(`Retrying enrollment for student ${studentId} after transaction conflict (attempt ${attempt + 1}/3)`);
+        await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+      }
+    }
+
+    throw new Error('Student enrollment could not be completed');
   }
 
   async promoteStudent(fromAcademicYearId: string, toAcademicYearId: string, schoolId: string) {
