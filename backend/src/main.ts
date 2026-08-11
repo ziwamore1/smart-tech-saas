@@ -136,9 +136,10 @@ async function bootstrap() {
   // Express Router instance) may not call next() for unmatched routes in all
   // configurations.  By adding a catch-all middleware on the Router itself we
   // guarantee it runs when no NestJS controller matches.
-  const expressApp = app.getHttpAdapter().getInstance();
-  if (expressApp._router?.stack) {
-    for (const layer of expressApp._router.stack) {
+  const expressApp = app.getHttpAdapter().getInstance() as any;
+  const expressRouter = expressApp._router ?? expressApp.router;
+  if (expressRouter?.stack) {
+    for (const layer of expressRouter.stack) {
       if (layer.name === 'router' && typeof layer.handle?.use === 'function') {
         layer.handle.use(
           (err: any, _req: Request, res: Response, _next: NextFunction) => {
