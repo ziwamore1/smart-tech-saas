@@ -1,7 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import type { Request, Response, NextFunction } from 'express';
 
 export function setupSecurity(app: INestApplication) {
   app.use(
@@ -19,13 +18,7 @@ export function setupSecurity(app: INestApplication) {
     legacyHeaders: false,
   });
 
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    try {
-      globalLimiter(req, res, next);
-    } catch (err) {
-      next(err);
-    }
-  });
+  app.use(globalLimiter);
 
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -33,26 +26,14 @@ export function setupSecurity(app: INestApplication) {
     message: 'Too many authentication attempts, please try again later.',
   });
 
-  app.use('/api/v1/auth', (req: Request, res: Response, next: NextFunction) => {
-    try {
-      authLimiter(req, res, next);
-    } catch (err) {
-      next(err);
-    }
-  });
+  app.use('/api/v1/auth', authLimiter);
 
   const verificationLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 200,
   });
 
-  app.use('/api/v1/verification', (req: Request, res: Response, next: NextFunction) => {
-    try {
-      verificationLimiter(req, res, next);
-    } catch (err) {
-      next(err);
-    }
-  });
+  app.use('/api/v1/verification', verificationLimiter);
 
   app.getHttpAdapter().getInstance().disable('x-powered-by');
 }
