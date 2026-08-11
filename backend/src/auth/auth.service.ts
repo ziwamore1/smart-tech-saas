@@ -95,13 +95,17 @@ export class AuthService {
         throw new UnauthorizedException('Invalid credentials');
       }
 
+      console.error('[probe:login-service] signing system user token');
+      const accessToken = await this.jwtService.signAsync({
+        sub: systemUser.id,
+        type: 'super_admin',
+        roles: ['SUPER_ADMIN'],
+      });
+      console.error('[probe:login-service] system user token complete');
+
       return {
         message: 'Login successful',
-        access_token: await this.jwtService.signAsync({
-          sub: systemUser.id,
-          type: 'super_admin',
-          roles: ['SUPER_ADMIN'],
-        }),
+        access_token: accessToken,
         user: {
           id: systemUser.id,
           email: systemUser.email,

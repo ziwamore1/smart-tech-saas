@@ -32,7 +32,9 @@ export class AuthController {
   async superAdminLogin(@Body() body: { email: string; password: string }) {
     console.error(`[probe:login-handler] ${body?.email}`);
     this.logger.log(`Super admin login request: ${body.email}`);
-    return this.authService.superAdminLogin(body.email, body.password);
+    const result = await this.authService.superAdminLogin(body.email, body.password);
+    console.error('[probe:login-handler] service complete');
+    return result;
   }
 
   @Post('school')
