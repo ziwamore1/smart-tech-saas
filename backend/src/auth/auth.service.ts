@@ -78,13 +78,17 @@ export class AuthService {
 
   async superAdminLogin(email: string, password: string) {
     this.logger.log(`SuperAdmin login attempt: ${email}`);
+    console.error('[probe:login-service] lookup system user');
 
     const systemUser = await this.prisma.systemUser.findUnique({
       where: { email: email.toLowerCase() },
     });
+    console.error(`[probe:login-service] system user lookup complete: ${!!systemUser}`);
 
     if (systemUser) {
+      console.error('[probe:login-service] checking system user password');
       const isPasswordValid = await bcrypt.compare(password, systemUser.password);
+      console.error(`[probe:login-service] system user password complete: ${isPasswordValid}`);
       this.logger.log(`SuperAdmin system user found; password valid:`, isPasswordValid);
 
       if (!isPasswordValid) {
@@ -111,6 +115,7 @@ export class AuthService {
       where: { email: { equals: email.toLowerCase(), mode: 'insensitive' } },
       include: { userRoles: { include: { role: true } } },
     });
+    console.error(`[probe:login-service] user lookup complete: ${!!user}`);
 
     const isSuperAdmin = user?.userRoles.some(
       (userRole) => userRole.role.name.toLowerCase() === 'superadmin',
@@ -122,6 +127,7 @@ export class AuthService {
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    console.error(`[probe:login-service] user password complete: ${isPasswordValid}`);
     this.logger.log(`SuperAdmin user found; password valid:`, isPasswordValid);
 
     if (!isPasswordValid) {
