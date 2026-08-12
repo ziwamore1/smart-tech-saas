@@ -249,7 +249,7 @@ export class ClassService {
         select: { classId: true },
       }),
       this.prisma.classTeacherAssignment.findMany({
-        where: { teacherId: user.id, isActive: true },
+        where: { teacherId: user.id, schoolId: user.schoolId, isActive: true },
         select: { classId: true },
       }),
       this.prisma.class.findMany({

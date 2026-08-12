@@ -74,7 +74,9 @@ export const useAuthStore = create<AuthState>()(
       superAdminLogin: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
         try {
+          console.log('[mobile-auth] store request start');
           const response: SuperAdminLoginResponse = await apiService.superAdminLogin({ email, password });
+          console.log('[mobile-auth] store response received');
           const saUser: User = {
             id: response.user.id,
             email: response.user.email,
@@ -84,8 +86,12 @@ export const useAuthStore = create<AuthState>()(
             schoolId: null,
             institutionType: null,
           };
-          await AsyncStorage.setItem('sa_token', response.access_token);
-          await AsyncStorage.setItem('sa_user', JSON.stringify(saUser));
+          void AsyncStorage.setItem('sa_token', response.access_token).catch((error) =>
+            console.warn('Failed to persist SuperAdmin token:', error),
+          );
+          void AsyncStorage.setItem('sa_user', JSON.stringify(saUser)).catch((error) =>
+            console.warn('Failed to persist SuperAdmin user:', error),
+          );
           set({
             user: saUser,
             isAuthenticated: true,

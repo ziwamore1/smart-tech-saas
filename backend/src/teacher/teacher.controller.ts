@@ -75,7 +75,7 @@ export class TeacherController {
 
   @Get('subjects')
   getAssignedSubjects(@Req() req: any) {
-    return this.teacherService.getAssignedSubjects(req.user.id);
+    return this.teacherService.getAssignedSubjects(req.user.id, req.user.schoolId);
   }
 
   @Get('classes')
@@ -85,14 +85,19 @@ export class TeacherController {
   }
 
   @Get('class-students')
-  getClassStudents(@Query('classId') classId: string) {
-    return this.teacherService.getClassStudents(classId);
+  @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
+  getClassStudents(@Query('classId') classId: string, @Req() req: any) {
+    return this.teacherService.getClassStudents(classId, req.user.schoolId);
   }
 
   @Post('enter-marks')
+  @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
   enterMarks(@Req() req: any, @Body() body) {
-    return this.teacherService.enterMarks({
-      ...body,
+    return this.teacherService.enterBulkScores({
+      classId: body.classId,
+      subjectId: body.subjectId,
+      termId: body.termId,
+      scores: body.scores,
       teacherId: req.user.id,
       schoolId: req.user.schoolId,
     });

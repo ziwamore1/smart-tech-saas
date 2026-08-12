@@ -128,7 +128,9 @@ class ApiService {
   }
 
   async superAdminLogin(data: { email: string; password: string }): Promise<SuperAdminLoginResponse> {
+    console.log('[mobile-auth] request start', data.email);
     const response = await this.client.post<SuperAdminLoginResponse>('/auth/super-admin/login', data);
+    console.log('[mobile-auth] response received', response.status, !!response.data?.access_token);
     this.token = response.data.access_token;
     AsyncStorage.setItem('access_token', response.data.access_token).catch((e) =>
       console.warn('Failed to persist access token:', e),
@@ -307,7 +309,7 @@ class ApiService {
   }
 
   async getTeacherClasses() {
-    const response = await this.client.get('/teacher/classes');
+    const response = await this.client.get('/classes/teaching');
     return response.data;
   }
 
@@ -316,8 +318,10 @@ class ApiService {
     return response.data;
   }
 
-  async getTeacherSubjects() {
-    const response = await this.client.get('/teacher/subjects');
+  async getTeacherSubjects(classId?: string, academicYearId?: string) {
+    const response = classId
+      ? await this.client.get(`/classes/teaching/${classId}/subjects`, { params: { academicYearId } })
+      : await this.client.get('/teacher/subjects');
     return response.data;
   }
 

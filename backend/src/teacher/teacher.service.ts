@@ -378,7 +378,7 @@ export class TeacherService {
   }
   async getTeacherClasses(teacherId: string, schoolId: string) {
     const assignments = await this.prisma.teachingAssignment.findMany({
-      where: { teacherId },
+      where: { teacherId, schoolId },
       include: {
         class: {
           include: {
@@ -402,7 +402,7 @@ export class TeacherService {
     });
 
     const ctaRecords = await this.prisma.classTeacherAssignment.findMany({
-      where: { teacherId, isActive: true },
+      where: { teacherId, schoolId, isActive: true },
       include: {
         class: {
           include: {
@@ -489,19 +489,20 @@ export class TeacherService {
         };
       });
   }
-  async getAssignedSubjects(teacherId: string) {
+  async getAssignedSubjects(teacherId: string, schoolId: string) {
     return this.prisma.teachingAssignment.findMany({
-      where: { teacherId },
+      where: { teacherId, schoolId },
       include: {
         class: true,
         subject: true,
       },
     });
   }
-  async getClassStudents(classId: string) {
+  async getClassStudents(classId: string, schoolId: string) {
     return this.prisma.enrollment.findMany({
       where: {
         classId,
+        schoolId,
         status: 'ACTIVE',
         student: { status: 'ACTIVE' },
       },
@@ -617,6 +618,8 @@ export class TeacherService {
         teacherId,
         subjectId,
         classId,
+        schoolId,
+        academicYear: { terms: { some: { id: termId } } },
       },
     });
 

@@ -9,12 +9,16 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as XLSX from 'xlsx';
 import * as ExcelJS from 'exceljs';
 import { getSubjectShortcut } from '../common/subject-shortcuts';
+import { ClassAccessService } from '../common/access/class-access.service';
 
 @Injectable()
 export class ResultService {
   private readonly logger = new Logger(ResultService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private classAccess: ClassAccessService,
+  ) {}
 
   async findAll(
     schoolId: string,
@@ -171,6 +175,8 @@ export class ResultService {
     subjectId: string,
     termId: string,
     score: number,
+    roles: string[] = [],
+    isSuperAdmin = false,
   ) {
     const term = await this.prisma.term.findUnique({
       where: { id: termId },
@@ -190,6 +196,7 @@ export class ResultService {
       where: {
         studentId,
         academicYearId: term.academicYearId,
+        schoolId,
         status: 'ACTIVE',
         student: { status: 'ACTIVE' },
       },
@@ -199,40 +206,28 @@ export class ResultService {
       throw new ForbiddenException('Student not enrolled in this academic year');
     }
 
-    // Find teaching assignment for this subject and class
-    let assignment = await this.prisma.teachingAssignment.findFirst({
+    await this.classAccess.assertCanEnterResults(
+      { id: userId, schoolId, roles, isSuperAdmin },
+      enrollment.classId,
+      subjectId,
+      term.academicYearId,
+    );
+
+    const assignment = await this.prisma.teachingAssignment.findFirst({
       where: {
+        teacherId: userId,
         subjectId,
         classId: enrollment.classId,
         academicYearId: term.academicYearId,
         schoolId,
       },
     });
-
-    // If no assignment found, try to find by userId
-    if (!assignment) {
-      const teacher = await this.prisma.teacher.findFirst({
-        where: { userId },
-      });
-      if (teacher) {
-        assignment = await this.prisma.teachingAssignment.findFirst({
-          where: {
-            teacherId: teacher.id,
-            subjectId,
-            academicYearId: term.academicYearId,
-            schoolId,
-          },
-        });
-      }
-    }
-
-    // For directors, teaching assignment is not required — use userId as fallback
     const teacherId = assignment?.teacherId || userId;
 
     const gradeData = await this.calculateGrade(score, schoolId, enrollment.classId);
 
     const existing = await this.prisma.result.findFirst({
-      where: { studentId, subjectId, termId, student: { status: 'ACTIVE' } },
+      where: { studentId, subjectId, termId, schoolId, student: { status: 'ACTIVE' } },
     });
 
     if (existing) {
@@ -355,13 +350,15 @@ export class ResultService {
       termId: string;
       score: number;
     }>,
+    roles: string[] = [],
+    isSuperAdmin = false,
   ) {
     const term = await this.prisma.term.findUnique({
       where: { id: results[0].termId },
       include: { academicYear: true },
     });
 
-    if (!term || term.resultsLocked) {
+    if (!term || term.academicYear.schoolId !== schoolId || term.resultsLocked) {
       throw new ForbiddenException('Results are locked or term not found');
     }
 
@@ -386,6 +383,13 @@ export class ResultService {
     for (const item of results) {
       try {
         const classId = enrollmentMap.get(item.studentId);
+        if (!classId) throw new ForbiddenException('Student is not enrolled in this academic year');
+        await this.classAccess.assertCanEnterResults(
+          { id: teacherId, schoolId, roles, isSuperAdmin },
+          classId,
+          item.subjectId,
+          term.academicYearId,
+        );
         const gradeData = await this.calculateGrade(item.score, schoolId, classId);
         const result = await this.prisma.result.upsert({
           where: {
@@ -481,13 +485,15 @@ export class ResultService {
 
   async update(
     id: string,
-    teacherId: string,
+    userId: string,
     schoolId: string,
     score: number,
+    roles: string[] = [],
+    isSuperAdmin = false,
   ) {
     const result = await this.prisma.result.findUnique({
       where: { id },
-      include: { term: true },
+      include: { term: { include: { academicYear: true } } },
     });
 
     if (!result || result.schoolId !== schoolId) {
@@ -499,9 +505,24 @@ export class ResultService {
     }
 
     const enrollment = await this.prisma.enrollment.findFirst({
-      where: { studentId: result.studentId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+      where: {
+        studentId: result.studentId,
+        schoolId,
+        academicYearId: result.term.academicYearId,
+        status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
+      },
       select: { classId: true },
     });
+
+    if (!enrollment) throw new ForbiddenException('Student is not enrolled in this academic year');
+
+    await this.classAccess.assertCanEnterResults(
+      { id: userId, schoolId, roles, isSuperAdmin },
+      enrollment.classId,
+      result.subjectId,
+      result.term.academicYearId,
+    );
 
     const gradeData = await this.calculateGrade(score, schoolId, enrollment?.classId);
 
@@ -511,7 +532,7 @@ export class ResultService {
         score,
         grade: gradeData.grade,
         remark: gradeData.remark,
-        teacherId,
+        teacherId: userId,
       },
       include: {
         student: true,

@@ -395,6 +395,9 @@ export const teacherApi = {
     api.get('/teacher', { params }),
   getById: (id: string) => api.get(`/teacher/${id}`),
   getClasses: () => api.get('/teacher/classes'),
+  getTeachingClasses: (academicYearId?: string) => api.get('/classes/teaching', { params: { academicYearId } }),
+  getTeachingSubjects: (classId: string, academicYearId?: string) =>
+    api.get(`/classes/teaching/${classId}/subjects`, { params: { academicYearId } }),
   create: (data: any) => api.post('/teacher', data),
   update: (id: string, data: any) => api.put(`/teacher/${id}`, data),
   delete: (id: string) => api.delete(`/teacher/${id}`),
@@ -405,6 +408,8 @@ export const teachingAssignmentApi = {
   getByTeacher: (teacherId: string) => api.get(`/teaching-assignment/teacher/${teacherId}`),
   create: (data: { teacherId: string; subjectId: string; classId: string; academicYearId: string }) =>
     api.post('/teaching-assignment', data),
+  update: (id: string, data: { teacherId: string; subjectId: string; classId: string; academicYearId: string }) =>
+    api.patch(`/teaching-assignment/${id}`, data),
   delete: (id: string) => api.delete(`/teaching-assignment/${id}`),
 };
 

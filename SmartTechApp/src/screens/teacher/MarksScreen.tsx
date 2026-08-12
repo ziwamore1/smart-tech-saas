@@ -28,21 +28,22 @@ export const TeacherMarksScreen: React.FC<TeacherMarksProps> = ({ onToggleDrawer
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    if (!selectedClass?.id) return;
+    apiService.getTeacherSubjects(selectedClass.id)
+      .then((response) => {
+        const data = response?.data || response;
+        setSubjects(Array.isArray(data) ? data : data?.subjects || []);
+      })
+      .catch(() => setSubjects([]));
+  }, [selectedClass?.id]);
 
   const loadData = async () => {
     try {
-      const [clsRes, subjRes] = await Promise.allSettled([
-        apiService.getTeacherClasses(),
-        apiService.getTeacherSubjects(),
-      ]);
-      if (clsRes.status === 'fulfilled') {
-        const d = clsRes.value?.data || clsRes.value;
-        setClasses(Array.isArray(d) ? d : d?.classes || []);
-      }
-      if (subjRes.status === 'fulfilled') {
-        const d = subjRes.value?.data || subjRes.value;
-        setSubjects(Array.isArray(d) ? d : d?.subjects || []);
-      }
+      const clsRes = await apiService.getTeacherClasses();
+      const classData = clsRes?.data || clsRes;
+      const availableClasses = Array.isArray(classData) ? classData : classData?.classes || [];
+      setClasses(availableClasses);
     } catch (err) { console.error('Failed to load'); }
     finally { setLoading(false); }
   };

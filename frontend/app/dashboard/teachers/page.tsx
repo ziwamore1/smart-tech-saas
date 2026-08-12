@@ -329,15 +329,16 @@ export default function TeachersPage() {
         await classApi.setClassTeacher(data.classId, teacherRecordId);
         return { success: true };
       }
-      // If editing, delete old assignment first
       if (editingAssignment?.id) {
-        await teachingAssignmentApi.delete(editingAssignment.id);
+        return teachingAssignmentApi.update(editingAssignment.id, data);
       }
       return teachingAssignmentApi.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teaching-assignments'] });
       queryClient.invalidateQueries({ queryKey: ['classes'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-teaching-classes'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-teaching-subjects'] });
       setShowAssignmentModal(false);
       setSelectedTeacherForAssignment(null);
       setAssignmentForm({ classId: '', subjectId: '', academicYearId: '' });

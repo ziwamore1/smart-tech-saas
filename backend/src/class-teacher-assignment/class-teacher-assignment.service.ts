@@ -21,11 +21,11 @@ export class ClassTeacherAssignmentService {
 
     // Validate class exists
     const cls = await this.prisma.class.findUnique({ where: { id: data.classId } });
-    if (!cls) throw new BadRequestException('Class not found');
+    if (!cls || cls.schoolId !== data.schoolId) throw new BadRequestException('Class not found');
 
     // Validate academic year exists
     const year = await this.prisma.academicYear.findUnique({ where: { id: data.academicYearId } });
-    if (!year) throw new BadRequestException('Academic year not found');
+    if (!year || year.schoolId !== data.schoolId) throw new BadRequestException('Academic year not found');
 
     // Check for existing assignment
     const existing = await this.prisma.classTeacherAssignment.findFirst({

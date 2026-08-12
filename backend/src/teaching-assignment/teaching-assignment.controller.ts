@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Patch, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { TeachingAssignmentService } from './teaching-assignment.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -37,13 +37,23 @@ export class TeachingAssignmentController {
   }
 
   @Get('teacher/:teacherId')
-  findByTeacher(@Param('teacherId') teacherId: string) {
-    return this.service.findByTeacher(teacherId);
+  findByTeacher(@Param('teacherId') teacherId: string, @Req() req: any) {
+    return this.service.findByTeacher(teacherId, req.user.schoolId);
   }
 
   @Delete(':id')
   @Roles('Director')
-  delete(@Param('id') id: string) {
-    return this.service.delete(id);
+  delete(@Param('id') id: string, @Req() req: any) {
+    return this.service.delete(id, req.user.schoolId);
+  }
+
+  @Patch(':id')
+  @Roles('Director')
+  update(
+    @Param('id') id: string,
+    @Body() body: { teacherId: string; subjectId: string; classId: string; academicYearId: string },
+    @Req() req: any,
+  ) {
+    return this.service.update(id, body, req.user.schoolId);
   }
 }

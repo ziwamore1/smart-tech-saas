@@ -99,9 +99,9 @@ export class TeachingAssignmentService {
     return { data: assignments, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async findByTeacher(teacherId: string) {
+  async findByTeacher(teacherId: string, schoolId: string) {
     return this.prisma.teachingAssignment.findMany({
-      where: { teacherId },
+      where: { teacherId, schoolId },
       select: {
         id: true,
         teacherId: true,
@@ -117,8 +117,32 @@ export class TeachingAssignmentService {
     });
   }
 
-  async delete(id: string) {
+  async delete(id: string, schoolId: string) {
+    const assignment = await this.prisma.teachingAssignment.findUnique({ where: { id } });
+    if (!assignment || assignment.schoolId !== schoolId) throw new NotFoundException('Assignment not found');
     await this.prisma.teachingAssignment.delete({ where: { id } });
     return { message: 'Assignment deleted successfully' };
+  }
+
+  async update(
+    id: string,
+    data: { teacherId: string; subjectId: string; classId: string; academicYearId: string },
+    schoolId: string,
+  ) {
+    const current = await this.prisma.teachingAssignment.findUnique({ where: { id } });
+    if (!current || current.schoolId !== schoolId) throw new NotFoundException('Assignment not found');
+
+    const teacher = await this.prisma.user.findUnique({ where: { id: data.teacherId }, include: { teacher: true } });
+    const [subject, classEntity, academicYear] = await Promise.all([
+      this.prisma.subject.findUnique({ where: { id: data.subjectId } }),
+      this.prisma.class.findUnique({ where: { id: data.classId } }),
+      this.prisma.academicYear.findUnique({ where: { id: data.academicYearId } }),
+    ]);
+    if (!teacher?.teacher || teacher.teacher.schoolId !== schoolId) throw new ForbiddenException('Teacher does not belong to this school');
+    if (!subject || subject.schoolId !== schoolId) throw new ForbiddenException('Invalid subject');
+    if (!classEntity || classEntity.schoolId !== schoolId) throw new ForbiddenException('Invalid class');
+    if (!academicYear || academicYear.schoolId !== schoolId) throw new ForbiddenException('Invalid academic year');
+
+    return this.prisma.teachingAssignment.update({ where: { id }, data });
   }
 }

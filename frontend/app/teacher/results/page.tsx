@@ -24,9 +24,9 @@ export default function TeacherResultsPage() {
   });
 
   const { data: classesResponse } = useQuery({
-    queryKey: ['teacher-classes'],
+    queryKey: ['teacher-teaching-classes'],
     queryFn: async () => {
-      const res = await teacherApi.getClasses();
+      const res = await teacherApi.getTeachingClasses();
       let data = res.data;
       if (data?.data) data = data.data;
       if (data?.classes) data = data.classes;
@@ -62,6 +62,17 @@ export default function TeacherResultsPage() {
   const terms = Array.isArray(termsResponse) ? termsResponse : [];
   const subjects = Array.isArray(subjectsResponse) ? subjectsResponse : [];
 
+  const { data: teachingSubjectsResponse } = useQuery({
+    queryKey: ['teacher-teaching-subjects', selectedClass],
+    queryFn: () => teacherApi.getTeachingSubjects(selectedClass).then((res) => {
+      let data = res.data;
+      if (data?.data) data = data.data;
+      return Array.isArray(data) ? data : [];
+    }),
+    enabled: !!selectedClass,
+  });
+  const authorizedSubjects = Array.isArray(teachingSubjectsResponse) ? teachingSubjectsResponse : [];
+
   const { data: assessmentTypes } = useQuery({
     queryKey: ['assessment-types', selectedSubject, selectedTerm],
     queryFn: () => selectedSubject && selectedTerm 
@@ -74,14 +85,12 @@ export default function TeacherResultsPage() {
   const assignedClass = teacher?.classTeacherOf;
   const teachingSubjects = teacher?.subjects || [];
 
-  const { data: studentsData } = useQuery({
+  const { data: studentsData, isError: studentsError } = useQuery({
     queryKey: ['class-students', selectedClass],
     queryFn: () => selectedClass 
-      ? studentApi.getAll({ limit: 100 }).then(res => {
+      ? studentApi.getAll({ limit: 1000, classId: selectedClass }).then(res => {
           const students = res.data?.data || res.data?.students || [];
-          return students.filter((s: any) => 
-            s.enrollments?.some((e: any) => e.classId === selectedClass && e.isActive)
-          );
+          return students;
         })
       : Promise.resolve([]),
     enabled: !!selectedClass,
@@ -244,6 +253,11 @@ export default function TeacherResultsPage() {
                 </option>
               ))}
             </select>
+            {!classes.length && (
+              <p className="mt-2 text-sm text-amber-700">
+                You currently have no teaching classes assigned. Please contact the Director.
+              </p>
+            )}
           </div>
 
           <div>
@@ -269,10 +283,7 @@ export default function TeacherResultsPage() {
               className="w-full px-3 py-2 border rounded-lg"
             >
               <option value="">Select Subject</option>
-              {teachingSubjects.map((subject: any) => (
-                <option key={subject.id} value={subject.id}>{subject.name}</option>
-              ))}
-              {subjects?.map((subject: any) => (
+              {(selectedClass ? authorizedSubjects : teachingSubjects).map((subject: any) => (
                 <option key={subject.id} value={subject.id}>{subject.name}</option>
               ))}
             </select>
@@ -339,7 +350,11 @@ export default function TeacherResultsPage() {
           {students.length === 0 ? (
             <div className="text-center py-12">
               <span className="text-4xl">👥</span>
-              <p className="text-gray-500 mt-2">No students found in this class.</p>
+              <p className="text-gray-500 mt-2">
+                {studentsError
+                  ? 'Unable to load students for this class. Please try again.'
+                  : 'No active students are enrolled in this class.'}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">

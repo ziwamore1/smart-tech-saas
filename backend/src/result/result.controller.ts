@@ -37,7 +37,7 @@ export class ResultController {
   ) {}
 
   @Get()
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
   findAll(
     @Query('classId') classId: string,
     @Query('termId') termId: string,
@@ -53,7 +53,7 @@ export class ResultController {
   }
 
   @Get('computed')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
   async findComputed(
     @Query('classId') classId: string,
     @Query('termId') termId: string,
@@ -81,7 +81,7 @@ export class ResultController {
   }
 
   @Get('template/:termId')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
   async downloadTemplate(
     @Param('termId') termId: string,
     @Query('classId') classId: string,
@@ -114,7 +114,7 @@ export class ResultController {
   }
 
   @Get(':id')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
   findOne(@Param('id') id: string, @Req() req: any) {
     return this.resultService.findOne(id, req.user.schoolId);
   }
@@ -194,7 +194,7 @@ export class ResultController {
   }
 
   @Post()
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
   async create(
     @Body()
     body: {
@@ -229,11 +229,13 @@ export class ResultController {
       body.subjectId,
       body.termId,
       body.score,
+      req.user.roles || [],
+      req.user.isSuperAdmin === true,
     );
   }
 
   @Post('bulk')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles('Director', 'Deputy Director', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
   async createBulk(
     @Body()
     body: {
@@ -270,6 +272,8 @@ export class ResultController {
       userId,
       req.user.schoolId,
       body.results,
+      req.user.roles || [],
+      req.user.isSuperAdmin === true,
     );
   }
 
@@ -315,30 +319,13 @@ export class ResultController {
     @Req() req: any,
   ) {
     const userId = req.user.id;
-    let teacherId = userId;
-
-    let teacher = await this.prisma.teacher.findFirst({
-      where: { userId },
-    });
-
-    if (!teacher && req.user.roles?.includes('DIRECTOR')) {
-      teacher = await this.prisma.teacher.create({
-        data: {
-          userId,
-          schoolId: req.user.schoolId,
-        },
-      });
-    }
-
-    if (teacher) {
-      teacherId = teacher.id;
-    }
-
     return this.resultService.update(
       id,
-      teacherId,
+      userId,
       req.user.schoolId,
       body.score,
+      req.user.roles || [],
+      req.user.isSuperAdmin === true,
     );
   }
 
