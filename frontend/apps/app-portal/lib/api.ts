@@ -2400,6 +2400,12 @@ export const schoolMembershipApi = {
   getUserRoles: (userId: string) => api.get(`/school-membership/user/${userId}/roles`),
 };
 
+export const accessApi = {
+  getUserPermissions: (userId: string) => api.get(`/users/${userId}/permissions`),
+  saveUserPermissions: (userId: string, permissions: string[]) =>
+    api.patch(`/users/${userId}/permissions`, { permissions }),
+};
+
 export const platformRoleApi = {
   getAll: () => api.get('/platform-roles'),
   assign: (userId: string, role: string) => api.post('/platform-roles/assign', { userId, role }),

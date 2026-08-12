@@ -17,8 +17,20 @@ export class ClassAccessService {
     return (user.roles || []).map(normalizeRole);
   }
 
-  getPermissions(user: AccessUser): Permission[] {
-    return getDefaultPermissions(this.roles(user));
+  async getPermissions(user: AccessUser): Promise<Permission[]> {
+    const defaults = new Set(getDefaultPermissions(this.roles(user)));
+    if (!user.schoolId) return Array.from(defaults);
+    const membership = await this.prisma.schoolUser.findFirst({ where: { userId: user.id, schoolId: user.schoolId } });
+    if (!membership) return Array.from(defaults);
+    const overrides = await this.prisma.userPermissionOverride.findMany({
+      where: { schoolMembershipId: membership.id },
+      select: { permission: true, granted: true },
+    });
+    for (const override of overrides) {
+      if (override.granted) defaults.add(override.permission as Permission);
+      else defaults.delete(override.permission as Permission);
+    }
+    return Array.from(defaults);
   }
 
   private isSchoolAdministrator(user: AccessUser): boolean {
@@ -103,7 +115,7 @@ export class ClassAccessService {
 
   async assertCanEnterResults(user: AccessUser, classId: string, subjectId: string, academicYearId: string) {
     if (!user.schoolId) throw new ForbiddenException('No school context is active');
-    const permissions = this.getPermissions(user);
+    const permissions = await this.getPermissions(user);
     if (!permissions.includes(PERMISSIONS.RESULTS_ENTER)) {
       throw new ForbiddenException('You do not have permission to enter results');
     }
@@ -158,10 +170,42 @@ export class ClassAccessService {
     return {
       schoolId: user.schoolId,
       roles: user.roles || [],
-      permissions: this.getPermissions(user),
+      permissions: await this.getPermissions(user),
       schoolClasses,
       assignedClasses,
       academicYearId: academicYearId || null,
     };
+  }
+
+  async getUserAccess(actor: AccessUser, userId: string) {
+    if (!actor.schoolId) throw new ForbiddenException('No school context is active');
+    const membership = await this.prisma.schoolUser.findFirst({
+      where: { userId, schoolId: actor.schoolId },
+      include: { SchoolRoleAssignment: { where: { isActive: true }, select: { role: true } } },
+    });
+    if (!membership) throw new NotFoundException('User is not a member of this school');
+    const [user, permissions, classes, assignments] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, firstName: true, lastName: true, email: true } }),
+      this.getPermissions({ id: userId, schoolId: actor.schoolId, roles: membership.SchoolRoleAssignment.map(({ role }) => role) }),
+      this.schoolClasses(actor),
+      this.prisma.teachingAssignment.findMany({ where: { teacherId: userId, schoolId: actor.schoolId }, select: { classId: true, subjectId: true, academicYearId: true } }),
+    ]);
+    const overrides = await this.prisma.userPermissionOverride.findMany({ where: { schoolMembershipId: membership.id }, select: { permission: true, granted: true } });
+    return { user, roles: membership.SchoolRoleAssignment.map(({ role }) => role), permissions, overrides, classes, assignments };
+  }
+
+  async saveUserPermissions(actor: AccessUser, userId: string, permissions: string[]) {
+    if (!actor.schoolId) throw new ForbiddenException('No school context is active');
+    const membership = await this.prisma.schoolUser.findFirst({ where: { userId, schoolId: actor.schoolId } });
+    if (!membership) throw new NotFoundException('User is not a member of this school');
+    const valid = new Set(Object.values(PERMISSIONS));
+    const selected = new Set(permissions.filter((permission) => valid.has(permission as Permission)));
+    const all = Object.values(PERMISSIONS);
+    await this.prisma.$transaction(all.map((permission) => this.prisma.userPermissionOverride.upsert({
+      where: { schoolMembershipId_permission: { schoolMembershipId: membership.id, permission } },
+      create: { schoolMembershipId: membership.id, permission, granted: selected.has(permission), assignedBy: actor.id },
+      update: { granted: selected.has(permission), assignedBy: actor.id },
+    })));
+    return this.getUserAccess(actor, userId);
   }
 }

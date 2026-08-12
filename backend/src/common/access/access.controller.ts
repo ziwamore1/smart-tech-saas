@@ -1,5 +1,7 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import { ClassAccessService } from './class-access.service';
 
 @Controller()
@@ -29,5 +31,19 @@ export class AccessController {
   @Get('me/access/classes')
   diagnose(@Req() req: any, @Query('academicYearId') academicYearId?: string) {
     return this.access.diagnose(req.user, academicYearId);
+  }
+
+  @Get('users/:userId/permissions')
+  @UseGuards(RolesGuard)
+  @Roles('Director', 'Deputy Director', 'Head Teacher')
+  getUserPermissions(@Req() req: any, @Param('userId') userId: string) {
+    return this.access.getUserAccess(req.user, userId);
+  }
+
+  @Patch('users/:userId/permissions')
+  @UseGuards(RolesGuard)
+  @Roles('Director', 'Deputy Director', 'Head Teacher')
+  saveUserPermissions(@Req() req: any, @Param('userId') userId: string, @Body() body: { permissions: string[] }) {
+    return this.access.saveUserPermissions(req.user, userId, body.permissions || []);
   }
 }

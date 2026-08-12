@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { teacherApi, api, teachingAssignmentApi, classApi, subjectApi, academicYearApi, roleApi, enrollmentApi, schoolMembershipApi, classTeacherAssignmentApi, classSubjectApi } from '@/lib/api';
+import { teacherApi, api, teachingAssignmentApi, classApi, subjectApi, academicYearApi, roleApi, enrollmentApi, schoolMembershipApi, classTeacherAssignmentApi, classSubjectApi, accessApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permission-context';
 
@@ -27,7 +27,38 @@ export default function TeachersPage() {
   const [assignmentForm, setAssignmentForm] = useState({ classId: '', subjectId: '', academicYearId: '' });
   const [editingAssignment, setEditingAssignment] = useState<any>(null);
   const [showClassTeacherModal, setShowClassTeacherModal] = useState(false);
+  const [showAccessModal, setShowAccessModal] = useState(false);
+  const [accessTeacher, setAccessTeacher] = useState<any>(null);
+  const [accessPermissions, setAccessPermissions] = useState<string[]>([]);
   const [classTeacherForm, setClassTeacherForm] = useState({ teacherId: '', classId: '', academicYearId: '', isPrimary: true });
+
+  const accessUserId = accessTeacher?.userId || accessTeacher?.user?.id;
+  const { isLoading: accessLoading } = useQuery({
+    queryKey: ['user-access', accessUserId],
+    enabled: showAccessModal && !!accessUserId,
+    queryFn: async () => {
+      const res = await accessApi.getUserPermissions(accessUserId);
+      const data = res.data?.data || res.data || {};
+      setAccessPermissions(Array.isArray(data.permissions) ? data.permissions : []);
+      return data;
+    },
+  });
+  const saveAccessMutation = useMutation({
+    mutationFn: () => accessApi.saveUserPermissions(accessUserId, accessPermissions),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-access', accessUserId] });
+      setMessage({ type: 'success', text: 'Permissions saved.' });
+      setShowAccessModal(false);
+    },
+    onError: (error: any) => setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to save permissions.' }),
+  });
+
+  const permissionGroups = [
+    { label: 'Classes', values: ['CLASS_VIEW', 'CLASS_MANAGE', 'CLASS_STUDENT_VIEW'] },
+    { label: 'Results', values: ['RESULTS_VIEW', 'RESULTS_ENTER', 'RESULTS_EDIT', 'RESULTS_APPROVE', 'RESULTS_PUBLISH'] },
+    { label: 'Attendance and Reports', values: ['ATTENDANCE_VIEW', 'ATTENDANCE_MARK', 'REPORT_VIEW', 'REPORT_GENERATE'] },
+    { label: 'Analytics and Assignments', values: ['ANALYTICS_VIEW', 'ASSIGNMENT_VIEW', 'ASSIGNMENT_MANAGE'] },
+  ];
 
   const { data: teachersData, isLoading: teachersLoading, error: teachersError } = useQuery({
     queryKey: ['teachers'],
@@ -653,6 +684,9 @@ export default function TeachersPage() {
                         </button>
                         {canManageStaff && (
                         <>
+                        <button onClick={() => { setAccessTeacher(teacher); setAccessPermissions([]); setShowAccessModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors">
+                          Access
+                        </button>
                         <button onClick={async () => {
                           setSelectedTeacher(teacher);
                           setEditForm({
@@ -1054,6 +1088,46 @@ export default function TeachersPage() {
                   <div><span className="text-gray-600">Hire Date:</span> {selectedTeacher.hireDate ? new Date(selectedTeacher.hireDate).toLocaleDateString() : '-'}</div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAccessModal && (
+        <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Manage Access</h2>
+                <p className="text-sm text-gray-500 mt-1">{accessTeacher?.user?.firstName} {accessTeacher?.user?.lastName}</p>
+              </div>
+              <button onClick={() => setShowAccessModal(false)} className="text-gray-400 hover:text-gray-700 text-xl" aria-label="Close">×</button>
+            </div>
+            {accessLoading ? (
+              <div className="py-12 text-center text-gray-500">Loading permissions...</div>
+            ) : (
+              <div className="space-y-6">
+                <p className="text-sm text-gray-600 bg-violet-50 border border-violet-100 rounded-lg p-3">Role defaults are applied automatically. Selecting or clearing a permission creates a school-specific override.</p>
+                {permissionGroups.map((group) => (
+                  <section key={group.label}>
+                    <h3 className="font-semibold text-gray-900 mb-3">{group.label}</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {group.values.map((permission) => (
+                        <label key={permission} className="flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                          <input type="checkbox" checked={accessPermissions.includes(permission)} onChange={(event) => setAccessPermissions((current) => event.target.checked ? [...current, permission] : current.filter((item) => item !== permission))} className="rounded border-gray-300 text-violet-600 focus:ring-violet-500" />
+                          <span className="text-sm text-gray-700">{permission.replaceAll('_', ' ').toLowerCase().replace(/(^| )\w/g, (letter) => letter.toUpperCase())}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end gap-3 pt-6 mt-6 border-t">
+              <button onClick={() => setShowAccessModal(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
+              <button onClick={() => saveAccessMutation.mutate()} disabled={accessLoading || saveAccessMutation.isPending || !accessUserId} className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:bg-gray-400">
+                {saveAccessMutation.isPending ? 'Saving...' : 'Save Permissions'}
+              </button>
             </div>
           </div>
         </div>
