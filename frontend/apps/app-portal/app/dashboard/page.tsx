@@ -810,16 +810,16 @@ export default function DashboardPage() {
 
       {/* Quick Actions */}
       {isDirector && (
-        <div style={{ background: '#101827', borderRadius: '16px', padding: '24px', marginBottom: '24px', color: '#fff', boxShadow: '0 12px 30px rgba(15,23,42,0.18)' }}>
+        <div style={{ background: '#ffffff', borderRadius: '16px', padding: '24px', marginBottom: '24px', color: '#0f172a', boxShadow: '0 12px 30px rgba(15,23,42,0.10)', border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#34d399', boxShadow: '0 0 0 5px rgba(52,211,153,0.16)' }} />
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#059669', boxShadow: '0 0 0 5px rgba(5,150,105,0.16)' }} />
                 <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700 }}>Live Results Monitoring</h2>
               </div>
-              <p style={{ margin: '8px 0 0', color: '#a7b4c8', fontSize: '13px' }}>See who is entering results, for which class and subject, as work happens.</p>
+              <p style={{ margin: '8px 0 0', color: '#475569', fontSize: '13px' }}>See who is entering results, for which class and subject, as work happens.</p>
             </div>
-            <span style={{ color: '#86efac', fontSize: '12px', fontWeight: 700, padding: '7px 10px', border: '1px solid rgba(134,239,172,0.25)', borderRadius: '999px' }}>LIVE · AUTO-SYNC</span>
+            <span style={{ color: '#047857', background: '#ecfdf5', fontSize: '12px', fontWeight: 700, padding: '7px 10px', border: '1px solid #a7f3d0', borderRadius: '999px' }}>LIVE · AUTO-SYNC</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '16px' }}>
             {[
@@ -827,16 +827,16 @@ export default function DashboardPage() {
               ['Teachers active', new Set(liveActivities.map((item: any) => item.teacher?.id || item.teacherId || item.teacherName)).size, '#bbf7d0'],
               ['Classes covered', new Set(liveActivities.map((item: any) => item.class?.id || item.classId || item.className)).size, '#fde68a'],
               ['Subjects covered', new Set(liveActivities.map((item: any) => item.subject?.id || item.subjectId || item.subjectName)).size, '#fbcfe8'],
-            ].map(([label, value, color]) => <div key={label as string} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px 14px' }}><div style={{ color, fontSize: '22px', fontWeight: 800 }}>{value}</div><div style={{ color: '#91a0b5', fontSize: '11px', marginTop: '3px' }}>{label}</div></div>)}
+            ].map(([label, value, color]) => <div key={label as string} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px' }}><div style={{ color: color === '#bfdbfe' ? '#1d4ed8' : color === '#bbf7d0' ? '#047857' : color === '#fde68a' ? '#b45309' : '#be185d', fontSize: '22px', fontWeight: 800 }}>{value}</div><div style={{ color: '#475569', fontSize: '11px', fontWeight: 600, marginTop: '3px' }}>{label}</div></div>)}
           </div>
-          {liveResultsLoading && liveActivities.length === 0 ? <div style={{ padding: '28px 0', color: '#a7b4c8' }}>Loading recent activity...</div> : liveActivities.length === 0 ? <div style={{ padding: '28px 0', color: '#a7b4c8' }}>No result entries have been recorded for the current term yet.</div> : (
+          {liveResultsLoading && liveActivities.length === 0 ? <div style={{ padding: '28px 0', color: '#475569' }}>Loading recent activity...</div> : liveActivities.length === 0 ? <div style={{ padding: '28px 0', color: '#475569' }}>No result entries have been recorded for the current term yet.</div> : (
             <div style={{ display: 'grid', gap: '10px' }}>
               {liveActivities.slice(0, 6).map((activity: any) => (
-                <div key={`${activity.id}-${activity.timestamp}`} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', alignItems: 'center', gap: '14px', padding: '14px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px' }}>
-                  <div><div style={{ fontWeight: 700, fontSize: '14px' }}>{activity.teacherName || `${activity.teacher?.firstName || ''} ${activity.teacher?.lastName || ''}`.trim() || 'Teacher'}</div><div style={{ color: '#91a0b5', fontSize: '11px', marginTop: '3px' }}>entered a result</div></div>
-                  <div><div style={{ color: '#dbeafe', fontSize: '13px', fontWeight: 600 }}>{activity.className || activity.class?.name || 'Class'}</div><div style={{ color: '#91a0b5', fontSize: '11px' }}>Class</div></div>
-                  <div><div style={{ color: '#fde68a', fontSize: '13px', fontWeight: 600 }}>{activity.subjectName || activity.subject?.name || 'Subject'}</div><div style={{ color: '#91a0b5', fontSize: '11px' }}>Subject</div></div>
-                  <div style={{ textAlign: 'right' }}><div style={{ color: '#86efac', fontWeight: 700, fontSize: '15px' }}>{activity.score ?? '--'}%</div><div style={{ color: '#91a0b5', fontSize: '11px' }}>{activity.timestamp ? new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'now'}</div></div>
+                <div key={`${activity.id}-${activity.timestamp}`} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', alignItems: 'center', gap: '14px', padding: '14px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+                  <div><div style={{ color: '#0f172a', fontWeight: 700, fontSize: '14px' }}>{activity.teacherName || `${activity.teacher?.firstName || ''} ${activity.teacher?.lastName || ''}`.trim() || 'Teacher'}</div><div style={{ color: '#475569', fontSize: '11px', marginTop: '3px' }}>entered a result</div></div>
+                  <div><div style={{ color: '#1d4ed8', fontSize: '13px', fontWeight: 600 }}>{activity.className || activity.class?.name || 'Class'}</div><div style={{ color: '#475569', fontSize: '11px' }}>Class</div></div>
+                  <div><div style={{ color: '#b45309', fontSize: '13px', fontWeight: 600 }}>{activity.subjectName || activity.subject?.name || 'Subject'}</div><div style={{ color: '#475569', fontSize: '11px' }}>Subject</div></div>
+                  <div style={{ textAlign: 'right' }}><div style={{ color: '#047857', fontWeight: 700, fontSize: '15px' }}>{activity.score ?? '--'}%</div><div style={{ color: '#475569', fontSize: '11px' }}>{activity.timestamp ? new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'now'}</div></div>
                 </div>
               ))}
             </div>
