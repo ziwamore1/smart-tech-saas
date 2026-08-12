@@ -128,7 +128,6 @@ export class SchoolMembershipService {
             SchoolRoleAssignment: {
               some: {
                 role: { in: ['Teacher', 'Class Teacher', 'Director', 'Deputy Director', 'Head Teacher'] },
-                isActive: true,
               },
             },
           },
@@ -154,7 +153,6 @@ export class SchoolMembershipService {
           },
         },
         SchoolRoleAssignment: {
-          where: { isActive: true },
           select: { role: true },
         },
       },
