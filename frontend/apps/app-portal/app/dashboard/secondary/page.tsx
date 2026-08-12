@@ -46,12 +46,6 @@ export default function SecondaryDashboardPage() {
   const { user, isDirector } = useAuth();
   const { hasAccess } = useFeatureLock();
   const [liveActivities, setLiveActivities] = useState<any[]>([]);
-  const { data: completionData } = useQuery<any[]>({
-    queryKey: ['secondary-results-completion', user?.schoolId, currentTerm?.id],
-    queryFn: async () => { const res = await accessApi.getResultsCompletion(currentTerm?.id); return res.data?.data || res.data || []; },
-    enabled: !!isDirector && !!user?.schoolId && !!currentTerm?.id,
-    refetchInterval: 30000,
-  });
 
   const { data: schoolProfile } = useQuery({
     queryKey: ['school-profile'],
@@ -61,6 +55,13 @@ export default function SecondaryDashboardPage() {
   const { data: currentTerm } = useQuery({
     queryKey: ['current-term'],
     queryFn: () => termApi.getCurrent().then(res => res.data?.data || res.data),
+  });
+
+  const { data: completionData } = useQuery<any[]>({
+    queryKey: ['secondary-results-completion', user?.schoolId, currentTerm?.id],
+    queryFn: async () => { const res = await accessApi.getResultsCompletion(currentTerm?.id); return res.data?.data || res.data || []; },
+    enabled: !!isDirector && !!user?.schoolId && !!currentTerm?.id,
+    refetchInterval: 30000,
   });
 
   const { isLoading: liveResultsLoading } = useQuery({

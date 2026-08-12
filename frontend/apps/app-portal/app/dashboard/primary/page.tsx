@@ -16,12 +16,6 @@ const GRADE_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#0
 export default function PrimaryDashboardPage() {
   const { user, isDirector } = useAuth();
   const [liveActivities, setLiveActivities] = useState<any[]>([]);
-  const { data: completionData } = useQuery<any[]>({
-    queryKey: ['primary-results-completion', user?.schoolId, currentTerm?.id],
-    queryFn: async () => { const res = await accessApi.getResultsCompletion(currentTerm?.id); return res.data?.data || res.data || []; },
-    enabled: !!isDirector && !!user?.schoolId && !!currentTerm?.id,
-    refetchInterval: 30000,
-  });
   const { hasAccess } = useFeatureLock();
 
   const { data: schoolProfile } = useQuery({
@@ -39,6 +33,13 @@ export default function PrimaryDashboardPage() {
   const { data: currentTerm } = useQuery({
     queryKey: ['current-term'],
     queryFn: () => termApi.getCurrent().then(res => res.data?.data || res.data),
+  });
+
+  const { data: completionData } = useQuery<any[]>({
+    queryKey: ['primary-results-completion', user?.schoolId, currentTerm?.id],
+    queryFn: async () => { const res = await accessApi.getResultsCompletion(currentTerm?.id); return res.data?.data || res.data || []; },
+    enabled: !!isDirector && !!user?.schoolId && !!currentTerm?.id,
+    refetchInterval: 30000,
   });
 
   const { isLoading: liveResultsLoading } = useQuery({
