@@ -40,6 +40,13 @@ export class AccessController {
     return this.access.liveResults(req.user, termId);
   }
 
+  @Get('results/completion')
+  @UseGuards(RolesGuard)
+  @Roles('Director', 'Deputy Director', 'Head Teacher')
+  completion(@Req() req: any, @Query('termId') termId?: string) {
+    return this.access.resultsCompletion(req.user, termId);
+  }
+
   @Get('users/:userId/permissions')
   @UseGuards(RolesGuard)
   @Roles('Director', 'Deputy Director', 'Head Teacher')

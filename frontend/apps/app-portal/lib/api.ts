@@ -2405,6 +2405,7 @@ export const accessApi = {
   saveUserPermissions: (userId: string, permissions: string[]) =>
     api.patch(`/users/${userId}/permissions`, { permissions }),
   getLiveResults: (termId?: string) => api.get('/results/live', { params: termId ? { termId } : undefined }),
+  getResultsCompletion: (termId?: string) => api.get('/results/completion', { params: termId ? { termId } : undefined }),
 };
 
 export const platformRoleApi = {

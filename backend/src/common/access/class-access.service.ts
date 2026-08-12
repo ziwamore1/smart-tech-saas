@@ -208,6 +208,29 @@ export class ClassAccessService {
     }));
   }
 
+  async resultsCompletion(user: AccessUser, termId?: string) {
+    if (!user.schoolId) throw new ForbiddenException('No school context is active');
+    const term = termId
+      ? await this.prisma.term.findFirst({ where: { id: termId, academicYear: { schoolId: user.schoolId } }, select: { id: true, academicYearId: true } })
+      : await this.prisma.term.findFirst({ where: { isCurrent: true, academicYear: { schoolId: user.schoolId } }, select: { id: true, academicYearId: true } });
+    if (!term) return [];
+    const classes = await this.prisma.class.findMany({
+      where: { schoolId: user.schoolId },
+      select: { id: true, name: true, classSubjects: { select: { subjectId: true, subject: { select: { id: true, name: true, code: true } } } } },
+      orderBy: { name: 'asc' },
+    });
+    return Promise.all(classes.map(async (classEntity) => {
+      const enrolled = await this.prisma.enrollment.count({ where: { schoolId: user.schoolId, classId: classEntity.id, academicYearId: term.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } } });
+      const subjects = await Promise.all(classEntity.classSubjects.map(async ({ subjectId, subject }) => {
+        const entered = await this.prisma.result.findMany({ where: { schoolId: user.schoolId, termId: term.id, subjectId, student: { status: 'ACTIVE', enrollments: { some: { classId: classEntity.id, academicYearId: term.academicYearId, status: 'ACTIVE' } } } }, select: { studentId: true }, distinct: ['studentId'] });
+        const enteredCount = entered.length;
+        return { ...subject, enteredCount, totalStudents: enrolled, completionRate: enrolled ? Math.round((enteredCount / enrolled) * 100) : 0, complete: enrolled > 0 && enteredCount >= enrolled };
+      }));
+      const completeSubjects = subjects.filter((subject) => subject.complete).length;
+      return { classId: classEntity.id, className: classEntity.name, totalStudents: enrolled, totalSubjects: subjects.length, completeSubjects, completionRate: subjects.length ? Math.round((subjects.reduce((sum, subject) => sum + subject.completionRate, 0) / subjects.length)) : 0, complete: subjects.length > 0 && completeSubjects === subjects.length, subjects };
+    }));
+  }
+
   async getUserAccess(actor: AccessUser, userId: string) {
     if (!actor.schoolId) throw new ForbiddenException('No school context is active');
     const membership = await this.prisma.schoolUser.findFirst({
