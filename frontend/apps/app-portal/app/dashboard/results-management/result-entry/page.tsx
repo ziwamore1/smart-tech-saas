@@ -995,7 +995,7 @@ export default function ResultEntryPage() {
                 <span><span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#f9fafb', borderRadius: '2px', marginRight: '4px', border: '1px solid #d1d5db' }}></span>Pending</span>
               </div>
             </div>
-            <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 440px)' }}>
+            <div style={{ overflow: 'auto', minHeight: '560px', maxHeight: 'calc(100vh - 280px)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ background: '#374151', position: 'sticky', top: 0, zIndex: 10 }}>
@@ -1104,7 +1104,7 @@ export default function ResultEntryPage() {
         </div>
       ) : (
         <div style={{ background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div ref={tableRef} style={{ overflow: 'auto', maxHeight: 'calc(100vh - 440px)' }}>
+          <div ref={tableRef} style={{ overflow: 'auto', minHeight: '560px', maxHeight: 'calc(100vh - 280px)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ background: '#374151', position: 'sticky', top: 0, zIndex: 10 }}>
