@@ -32,6 +32,7 @@ export const SuperAdminSwitchSchoolScreen: React.FC<any> = ({ onToggleDrawer }) 
       await switchToSchool(schoolId);
     } catch (error: any) {
       Alert.alert('Switch failed', error?.response?.data?.message || error?.message || 'You are not linked to this school.');
+    } finally {
       setSwitching(null);
     }
   };

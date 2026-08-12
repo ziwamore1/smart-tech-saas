@@ -37,7 +37,7 @@ function truncateHash(hash?: string): string {
 function SignaturePad({ onCapture }: { onCapture: (data: string) => void }) {
   const [paths, setPaths] = useState<{ x: number; y: number }[][]>([]);
   const [currentPath, setCurrentPath] = useState<{ x: number; y: number }[]>([]);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const isDrawingRef = useRef(false);
   const padRef = useRef<View>(null);
 
   const panResponder = useRef(
@@ -46,20 +46,26 @@ function SignaturePad({ onCapture }: { onCapture: (data: string) => void }) {
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
         const { locationX, locationY } = evt.nativeEvent;
-        setIsDrawing(true);
+        isDrawingRef.current = true;
         setCurrentPath([{ x: locationX, y: locationY }]);
       },
       onPanResponderMove: (evt) => {
-        if (!isDrawing) return;
+        if (!isDrawingRef.current) return;
         const { locationX, locationY } = evt.nativeEvent;
         setCurrentPath((prev) => [...prev, { x: locationX, y: locationY }]);
       },
-      onPanResponderRelease: () => {
-        setIsDrawing(false);
-        if (currentPath.length > 0) {
-          setPaths((prev) => [...prev, currentPath]);
-        }
-        setCurrentPath([]);
+       onPanResponderRelease: (evt) => {
+        isDrawingRef.current = false;
+        const { locationX, locationY } = evt.nativeEvent;
+        setCurrentPath((path) => {
+          const completedPath = path.length > 0
+            ? [...path, { x: locationX, y: locationY }]
+            : path;
+          if (completedPath.length > 0) {
+            setPaths((prev) => [...prev, completedPath]);
+          }
+          return [];
+        });
       },
     })
   ).current;

@@ -112,7 +112,7 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
     { icon: '📝', label: 'Reports', screen: 'DirectorReports', gradient: ['#EA580C', '#F97316'] as const },
     { icon: '👥', label: 'Staff', screen: 'DirectorStaff', gradient: ['#0D9488', '#5EEAD4'] as const },
     { icon: '🔑', label: 'Settings', screen: 'DirectorSettings', gradient: ['#8B5CF6', '#A78BFA'] as const },
-    { icon: '✍️', label: 'My Signature', screen: 'DigitalStamps', gradient: ['#059669', '#34D399'] as const },
+    { icon: '✍️', label: 'My Signature', screen: 'DigitalSignature', gradient: ['#059669', '#34D399'] as const },
   ];
 
   return (
@@ -172,7 +172,7 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
         </WidgetCard>
 
         {signature && (
-          <WidgetCard title="My Digital Signature" action={{ label: 'Manage', onPress: () => handleNavigate('DigitalStamps', { sourceScreen: 'director_dashboard' }) }}>
+          <WidgetCard title="My Digital Signature" action={{ label: 'Manage', onPress: () => handleNavigate('DigitalSignature', { sourceScreen: 'director_dashboard' }) }}>
             <View style={styles.signatureCard}>
               {signature.imageUrl ? (
                 <Image source={{ uri: signature.imageUrl }} style={styles.signatureImage} resizeMode="contain" />
@@ -192,8 +192,8 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
         )}
 
         {!signature && (
-          <WidgetCard title="Digital Signature" action={{ label: 'Setup', onPress: () => handleNavigate('DigitalStamps', { sourceScreen: 'director_dashboard' }) }}>
-            <TouchableOpacity style={styles.setupSignatureBtn} onPress={() => handleNavigate('DigitalStamps', { sourceScreen: 'director_dashboard' })}>
+          <WidgetCard title="Digital Signature" action={{ label: 'Setup', onPress: () => handleNavigate('DigitalSignature', { sourceScreen: 'director_dashboard' }) }}>
+            <TouchableOpacity style={styles.setupSignatureBtn} onPress={() => handleNavigate('DigitalSignature', { sourceScreen: 'director_dashboard' })}>
               <Text style={{ fontSize: 28, marginBottom: spacing.sm }}>✍️</Text>
               <Text style={styles.setupSignatureText}>Set Up Your Digital Signature</Text>
               <Text style={styles.setupSignatureSub}>Sign documents and certificates digitally</Text>

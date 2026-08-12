@@ -167,8 +167,12 @@ class ApiService {
   async switchIdentity(schoolId: string): Promise<SwitchIdentityResponse> {
     const response = await this.client.post<SwitchIdentityResponse>('/auth/switch-identity', { schoolId });
     this.token = response.data.access_token;
-    await AsyncStorage.setItem('access_token', response.data.access_token);
-    await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
+    void AsyncStorage.setItem('access_token', response.data.access_token).catch((error) =>
+      console.warn('Failed to persist school token:', error),
+    );
+    void AsyncStorage.setItem('user', JSON.stringify(response.data.user)).catch((error) =>
+      console.warn('Failed to persist school user:', error),
+    );
     return response.data;
   }
 

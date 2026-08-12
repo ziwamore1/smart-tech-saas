@@ -17,7 +17,12 @@ export const AnalyticsScreen: React.FC = () => {
 
   const isStudent = !!user?.roles?.some((r) => String(r).toLowerCase() === 'student');
   const studentId = dashboard?.student?.id || user?.studentId || user?.id;
-
+  const numeric = (value: any): number | undefined => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) return Number(value);
+    if (value && typeof value === 'object') return numeric(value.value ?? value.average ?? value.score ?? value.total);
+    return undefined;
+  };
   useEffect(() => {
     loadData();
   }, []);
@@ -97,19 +102,19 @@ export const AnalyticsScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>Statistics</Text>
             <View style={styles.statRow}>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{stats.mean?.toFixed(1) || '-'}</Text>
+               <Text style={styles.statValue}>{numeric(stats.mean)?.toFixed(1) || '-'}</Text>
                 <Text style={styles.statLabel}>Mean</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{stats.median?.toFixed(1) || '-'}</Text>
+               <Text style={styles.statValue}>{numeric(stats.median)?.toFixed(1) || '-'}</Text>
                 <Text style={styles.statLabel}>Median</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{stats.stdDev?.toFixed(2) || '-'}</Text>
+               <Text style={styles.statValue}>{numeric(stats.stdDev)?.toFixed(2) || '-'}</Text>
                 <Text style={styles.statLabel}>Std Dev</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{stats.percentile?.toFixed(0) || '-'}</Text>
+               <Text style={styles.statValue}>{numeric(stats.percentile)?.toFixed(0) || '-'}</Text>
                 <Text style={styles.statLabel}>Percentile</Text>
               </View>
             </View>
@@ -121,7 +126,7 @@ export const AnalyticsScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>Growth Trajectory</Text>
             <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 160, paddingVertical: spacing.sm }}>
               {trajectory.history.map((h: any, i: number) => {
-                const val = h.average || h.score || 0;
+                const val = numeric(h.average ?? h.score) ?? 0;
                 const dotColor = h.trend === 'up' ? '#10b981' : h.trend === 'down' ? '#ef4444' : '#f59e0b';
                 return (
                   <View key={i} style={{ alignItems: 'center', flex: 1 }}>
@@ -137,7 +142,7 @@ export const AnalyticsScreen: React.FC = () => {
               <View style={[styles.trajectoryRow, { opacity: 0.6, marginTop: spacing.sm }]}>
                 <View style={[styles.trajectoryDot, { backgroundColor: '#8b5cf6' }]} />
                 <Text style={styles.trajectoryLabel}>Predicted Next</Text>
-                <Text style={styles.trajectoryValue}>{trajectory.prediction}%</Text>
+                <Text style={styles.trajectoryValue}>{numeric(trajectory.prediction) ?? '—'}%</Text>
               </View>
             )}
           </Card>
@@ -153,7 +158,7 @@ export const AnalyticsScreen: React.FC = () => {
                   <View style={styles.weaknessBar}>
                     <View style={[styles.weaknessFill, { width: `${Math.min(w.score || w.proficiency || 0, 100)}%`, backgroundColor: (w.score || 0) >= 75 ? '#10b981' : (w.score || 0) >= 50 ? '#f59e0b' : '#ef4444' }]} />
                   </View>
-                  <Text style={styles.weaknessScore}>{w.score || w.proficiency || 0}%</Text>
+                  <Text style={styles.weaknessScore}>{numeric(w.score ?? w.proficiency) ?? 0}%</Text>
                 </View>
               </View>
             ))}

@@ -82,7 +82,7 @@ export default function App() {
   const notificationListener = useRef<any>();
   const responseListener = useRef<any>();
   const unreadTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
 
   const refreshUnreadCount = useCallback(async () => {
     try {
@@ -121,13 +121,12 @@ export default function App() {
   useEffect(() => {
     (async () => {
       await setupNotificationChannels();
-      await registerForPushNotificationsAsync();
     })();
     setAppIsReady(true);
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !user?.schoolId) return;
 
     registerForPushNotificationsAsync().catch(console.warn);
 
@@ -147,7 +146,7 @@ export default function App() {
         responseListener.current.remove();
       }
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.schoolId]);
 
   const checkForUpdates = useCallback(async () => {
     if (__DEV__) return;

@@ -586,6 +586,16 @@ export class NotificationsService {
     platform?: string,
     role?: string,
   ): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    // System-level accounts do not have a User row until they switch into a school.
+    if (!user) {
+      this.logger.warn(`Skipping device registration for non-school user ${userId}`);
+      return;
+    }
+
     await this.prisma.notificationDevice.upsert({
       where: {
         userId_deviceToken: { userId, deviceToken },

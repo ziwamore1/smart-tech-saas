@@ -172,7 +172,7 @@ export function AppNavigator() {
             {can('template-personalization.manage') && <Stack.Screen name="AITemplateGenerator" component={AITemplateGeneratorScreen} />}
             {can('template-personalization.manage') && <Stack.Screen name="BrandingPresets" component={BrandingPresetsScreen} />}
             {can('template-personalization.manage') && <Stack.Screen name="CloudAssetLibrary" component={CloudAssetLibraryScreen} />}
-            {can('stamps.manage') && <Stack.Screen name="DigitalSignature" component={DigitalSignatureScreen} />}
+            {(can('stamps.manage') || isDirector) && <Stack.Screen name="DigitalSignature" component={DigitalSignatureScreen} />}
             {can('communications.manage') && <Stack.Screen name="Collaboration" component={CollaborationScreen} />}
 
             {/* SuperAdmin-only unrestricted screens */}
