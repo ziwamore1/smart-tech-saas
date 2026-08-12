@@ -830,8 +830,8 @@ export default function DashboardPage() {
             ].map(([label, value, color]) => <div key={label as string} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px' }}><div style={{ color: color === '#bfdbfe' ? '#1d4ed8' : color === '#bbf7d0' ? '#047857' : color === '#fde68a' ? '#b45309' : '#be185d', fontSize: '22px', fontWeight: 800 }}>{value}</div><div style={{ color: '#475569', fontSize: '11px', fontWeight: 600, marginTop: '3px' }}>{label}</div></div>)}
           </div>
           {liveResultsLoading && liveActivities.length === 0 ? <div style={{ padding: '28px 0', color: '#475569' }}>Loading recent activity...</div> : liveActivities.length === 0 ? <div style={{ padding: '28px 0', color: '#475569' }}>No result entries have been recorded for the current term yet.</div> : (
-            <div style={{ display: 'grid', gap: '10px' }}>
-              {liveActivities.slice(0, 6).map((activity: any) => (
+            <div style={{ display: 'grid', gap: '10px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+              {liveActivities.map((activity: any) => (
                 <div key={`${activity.id}-${activity.timestamp}`} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', alignItems: 'center', gap: '14px', padding: '14px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
                   <div><div style={{ color: '#0f172a', fontWeight: 700, fontSize: '14px' }}>{activity.teacherName || `${activity.teacher?.firstName || ''} ${activity.teacher?.lastName || ''}`.trim() || 'Teacher'}</div><div style={{ color: '#475569', fontSize: '11px', marginTop: '3px' }}>entered a result</div></div>
                   <div><div style={{ color: '#1d4ed8', fontSize: '13px', fontWeight: 600 }}>{activity.className || activity.class?.name || 'Class'}</div><div style={{ color: '#475569', fontSize: '11px' }}>Class</div></div>
