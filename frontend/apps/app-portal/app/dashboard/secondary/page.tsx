@@ -1,12 +1,14 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import Link from 'next/link';
-import { schoolApi, termApi } from '@/lib/api';
+import { schoolApi, termApi, accessApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useFeatureLock } from '@/lib/feature-lock-context';
 import { TIER_ORDER, SubscriptionTier } from '@/types/subscription';
 import Icon3D from '@/components/Icon3D';
+import { useSchoolSocket } from '@/lib/use-school-socket';
 
 const basicActions = [
   { name: 'Form Classes', href: '/dashboard/classes', icon3d: 'classes', desc: 'Manage Form 1–6 classes' },
@@ -41,8 +43,9 @@ const PLAN_LIMITS: Record<SubscriptionTier, { label: string; students: number; t
 };
 
 export default function SecondaryDashboardPage() {
-  const { user } = useAuth();
+  const { user, isDirector } = useAuth();
   const { hasAccess } = useFeatureLock();
+  const [liveActivities, setLiveActivities] = useState<any[]>([]);
 
   const { data: schoolProfile } = useQuery({
     queryKey: ['school-profile'],
@@ -52,6 +55,23 @@ export default function SecondaryDashboardPage() {
   const { data: currentTerm } = useQuery({
     queryKey: ['current-term'],
     queryFn: () => termApi.getCurrent().then(res => res.data?.data || res.data),
+  });
+
+  const { isLoading: liveResultsLoading } = useQuery({
+    queryKey: ['secondary-live-results', user?.schoolId, currentTerm?.id],
+    queryFn: async () => {
+      const res = await accessApi.getLiveResults(currentTerm?.id);
+      const data = res.data?.data || res.data || [];
+      const results = Array.isArray(data) ? data : [];
+      setLiveActivities(results);
+      return results;
+    },
+    enabled: !!isDirector && !!user?.schoolId && !!currentTerm?.id,
+    refetchInterval: 30000,
+  });
+
+  useSchoolSocket({
+    'results:live': (activity) => setLiveActivities((current) => [activity, ...current.filter((item) => item.id !== activity.id)].slice(0, 30)),
   });
 
   const { data: statsData } = useQuery({
@@ -161,6 +181,16 @@ export default function SecondaryDashboardPage() {
       )}
 
       <div>
+        {isDirector && (
+          <div className="bg-slate-900 rounded-2xl p-5 mb-6 text-white shadow-lg">
+            <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
+              <div><div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_0_5px_rgba(52,211,153,0.15)]" /><h2 className="text-xl font-bold">Live Results Monitoring</h2></div><p className="text-slate-400 text-sm mt-2">Monitor teachers entering scores across forms and subjects.</p></div>
+              <span className="text-xs font-bold text-emerald-300 border border-emerald-300/30 rounded-full px-3 py-1.5">LIVE · AUTO-SYNC</span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">{[['Entries tracked', liveActivities.length], ['Teachers active', new Set(liveActivities.map((item: any) => item.teacher?.id || item.teacherId || item.teacherName)).size], ['Classes covered', new Set(liveActivities.map((item: any) => item.class?.id || item.classId || item.className)).size], ['Subjects covered', new Set(liveActivities.map((item: any) => item.subject?.id || item.subjectId || item.subjectName)).size]].map(([label, value]) => <div key={label as string} className="bg-white/5 rounded-lg p-3"><div className="text-xl font-extrabold text-emerald-300">{value}</div><div className="text-[11px] text-slate-400 mt-1">{label}</div></div>)}</div>
+            {liveResultsLoading && liveActivities.length === 0 ? <div className="py-5 text-slate-400 text-sm">Loading recent activity...</div> : liveActivities.length === 0 ? <div className="py-5 text-slate-400 text-sm">No result entries have been recorded for the current term yet.</div> : <div className="grid gap-2">{liveActivities.slice(0, 6).map((activity: any) => <div key={`${activity.id}-${activity.timestamp}`} className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-center bg-white/5 border border-white/10 rounded-xl p-3"><div><div className="font-bold text-sm">{activity.teacherName || `${activity.teacher?.firstName || ''} ${activity.teacher?.lastName || ''}`.trim() || 'Teacher'}</div><div className="text-[11px] text-slate-400">entered a result</div></div><div><div className="text-sm font-semibold text-blue-200">{activity.className || activity.class?.name || 'Class'}</div><div className="text-[11px] text-slate-400">Class</div></div><div><div className="text-sm font-semibold text-amber-200">{activity.subjectName || activity.subject?.name || 'Subject'}</div><div className="text-[11px] text-slate-400">Subject</div></div><div className="sm:text-right"><div className="text-sm font-bold text-emerald-300">{activity.score ?? '--'}%</div><div className="text-[11px] text-slate-400">{activity.timestamp ? new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'now'}</div></div></div>)}</div>}
+          </div>
+        )}
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {basicActions.map((action) => (
