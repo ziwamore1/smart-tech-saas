@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { SocketGateway } from '../messaging/socket.gateway';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
+import { SchoolEventsGateway } from '../common/school-events.gateway';
 
 export interface CreateAssessmentDefinitionDto {
   name: string;
@@ -76,7 +77,27 @@ export class AssessmentEngineService {
     private gradingEngine: GradingEngineService,
     private socketGateway: SocketGateway,
     private compositeSubjectService: CompositeSubjectService,
+    @Optional() private schoolEvents?: SchoolEventsGateway,
   ) {}
+
+  private async emitLiveResult(schoolId: string, data: { classId: string; subjectId: string; termId: string; studentId?: string; score?: number | null; enteredBy?: string }) {
+    const [teacher, subject, classEntity] = await Promise.all([
+      data.enteredBy ? this.prisma.user.findUnique({ where: { id: data.enteredBy }, select: { id: true, firstName: true, lastName: true } }) : null,
+      this.prisma.subject.findUnique({ where: { id: data.subjectId }, select: { id: true, name: true, code: true } }),
+      this.prisma.class.findUnique({ where: { id: data.classId }, select: { id: true, name: true } }),
+    ]);
+    this.schoolEvents?.emitResultsLive(schoolId, {
+      id: `${data.studentId || data.classId}-${data.subjectId}-${Date.now()}`,
+      ...data,
+      timestamp: new Date(),
+      teacher,
+      teacherName: teacher ? `${teacher.firstName} ${teacher.lastName}`.trim() : 'Teacher',
+      subject,
+      subjectName: subject?.name || 'Subject',
+      class: classEntity,
+      className: classEntity?.name || 'Class',
+    });
+  }
 
   async createAssessmentDefinition(schoolId: string, data: CreateAssessmentDefinitionDto) {
     const existing = await this.prisma.assessmentDefinition.findUnique({
@@ -688,9 +709,10 @@ export class AssessmentEngineService {
       sheetId: sheet?.id,
       enteredCount: results.filter(r => r.rawScore !== null).length,
       timestamp: new Date(),
-    });
+      });
+      await this.emitLiveResult(schoolId, { classId, subjectId, termId, enteredBy, score: results[0]?.rawScore ?? null });
 
-    return {
+      return {
       batch,
       results,
       summary: {
@@ -787,6 +809,7 @@ export class AssessmentEngineService {
         studentId: data.studentId,
         timestamp: new Date(),
       });
+      await this.emitLiveResult(schoolId, { classId: data.classId, subjectId: data.subjectId, termId: data.termId, studentId: data.studentId, enteredBy: data.enteredBy, score: null });
 
       return result;
     }
@@ -878,6 +901,7 @@ export class AssessmentEngineService {
       studentId: data.studentId,
       timestamp: new Date(),
     });
+    await this.emitLiveResult(schoolId, { classId: data.classId, subjectId: data.subjectId, termId: data.termId, studentId: data.studentId, enteredBy: data.enteredBy, score: data.rawScore });
 
     return result;
   }

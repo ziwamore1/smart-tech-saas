@@ -538,12 +538,14 @@ export class TeacherService {
         schoolId: data.schoolId,
         score: data.score,
       },
+      include: { teacher: { select: { firstName: true, lastName: true } }, subject: { select: { name: true } } },
     });
 
     // Resolve classId from active enrollment
     const enrollment = await this.prisma.enrollment.findFirst({
       where: { studentId: data.studentId, status: 'ACTIVE' },
       orderBy: { createdAt: 'desc' },
+      include: { class: { select: { id: true, name: true } } },
     });
     const classId = enrollment?.classId || null;
 
@@ -588,14 +590,21 @@ export class TeacherService {
       },
     }).catch(() => {});
 
-    // Emit real-time WebSocket event
-    this.socketGateway.server?.emit(`result:updated:${data.schoolId}`, {
+    const liveActivity = {
+      id: result.id,
       studentId: data.studentId,
       subjectId: data.subjectId,
       termId: data.termId,
       score: data.score,
       timestamp: new Date(),
-    });
+      teacherId: data.teacherId,
+      teacherName: result.teacher ? `${result.teacher.firstName} ${result.teacher.lastName}`.trim() : 'Teacher',
+      subjectName: result.subject?.name || 'Subject',
+      classId,
+      className: enrollment?.class?.name || 'Class',
+    };
+    this.socketGateway.server?.emit(`result:updated:${data.schoolId}`, liveActivity);
+    this.schoolEvents?.emitResultsLive(data.schoolId, liveActivity);
 
     return result;
   }

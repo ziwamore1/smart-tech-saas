@@ -33,6 +33,13 @@ export class AccessController {
     return this.access.diagnose(req.user, academicYearId);
   }
 
+  @Get('results/live')
+  @UseGuards(RolesGuard)
+  @Roles('Director', 'Deputy Director', 'Head Teacher')
+  liveResults(@Req() req: any, @Query('termId') termId?: string) {
+    return this.access.liveResults(req.user, termId);
+  }
+
   @Get('users/:userId/permissions')
   @UseGuards(RolesGuard)
   @Roles('Director', 'Deputy Director', 'Head Teacher')

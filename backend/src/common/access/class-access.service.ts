@@ -177,6 +177,37 @@ export class ClassAccessService {
     };
   }
 
+  async liveResults(user: AccessUser, termId?: string) {
+    if (!user.schoolId) throw new ForbiddenException('No school context is active');
+    const results = await this.prisma.result.findMany({
+      where: { schoolId: user.schoolId, ...(termId ? { termId } : {}) },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+      include: {
+        teacher: { select: { id: true, firstName: true, lastName: true } },
+        subject: { select: { id: true, name: true, code: true } },
+        student: { select: { id: true, firstName: true, lastName: true } },
+        term: { select: { id: true, name: true, academicYearId: true } },
+      },
+    });
+    const classIds = [...new Set(results.map((result) => result.studentId))];
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { schoolId: user.schoolId, studentId: { in: classIds }, ...(termId ? { academicYearId: results[0]?.term?.academicYearId } : {}) },
+      select: { studentId: true, class: { select: { id: true, name: true } } },
+    });
+    const classes = new Map(enrollments.map((enrollment) => [enrollment.studentId, enrollment.class]));
+    return results.map((result) => ({
+      id: result.id,
+      score: result.score,
+      timestamp: result.createdAt,
+      teacher: result.teacher,
+      subject: result.subject,
+      student: result.student,
+      term: result.term,
+      class: classes.get(result.studentId) || null,
+    }));
+  }
+
   async getUserAccess(actor: AccessUser, userId: string) {
     if (!actor.schoolId) throw new ForbiddenException('No school context is active');
     const membership = await this.prisma.schoolUser.findFirst({

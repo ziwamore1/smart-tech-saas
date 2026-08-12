@@ -77,6 +77,10 @@ export class SchoolEventsGateway implements OnGatewayInit, OnGatewayConnection, 
     this.emitToSchool(schoolId, 'results:published', data);
   }
 
+  emitResultsLive(schoolId: string, data: any) {
+    this.emitToSchool(schoolId, 'results:live', data);
+  }
+
   emitAttendanceUpdated(schoolId: string, data: { classId: string; date: string; markedBy: string }) {
     this.emitToSchool(schoolId, 'attendance:updated', data);
   }

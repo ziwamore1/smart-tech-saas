@@ -7,11 +7,14 @@ import { schoolApi, subscriptionApi, termApi, academicYearApi } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context';
 import Icon3D from '@/components/Icon3D';
 import { INSTITUTION_TYPE_LABELS, INSTITUTION_TYPE_FEATURES, InstitutionTypeCode } from '@/lib/institution-types';
+import { accessApi } from '@/lib/api';
+import { useSchoolSocket } from '@/lib/use-school-socket';
 
 export default function DashboardPage() {
   const { user, allRoles, isSuperAdmin, isPureSuperAdmin, isDirector } = useAuth();
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
+  const [liveActivities, setLiveActivities] = useState<any[]>([]);
 
   const { data: schoolData, isLoading: schoolLoading, error: schoolError } = useQuery({
     queryKey: ['school', user?.schoolId],
@@ -77,6 +80,25 @@ export default function DashboardPage() {
       return data;
     },
     retry: false,
+  });
+
+  const { isLoading: liveResultsLoading } = useQuery({
+    queryKey: ['live-results', user?.schoolId, selectedTermId || currentTerm?.id],
+    queryFn: async () => {
+      const res = await accessApi.getLiveResults(selectedTermId || currentTerm?.id);
+      const data = res.data?.data || res.data || [];
+      const results = Array.isArray(data) ? data : [];
+      setLiveActivities(results);
+      return results;
+    },
+    enabled: !!isDirector && !!user?.schoolId && !!currentTerm?.id,
+    refetchInterval: 30000,
+  });
+
+  useSchoolSocket({
+    'results:live': (activity) => {
+      setLiveActivities((current) => [activity, ...current.filter((item) => item.id !== activity.id)].slice(0, 30));
+    },
   });
 
   const { data: allTerms } = useQuery({
@@ -787,6 +809,41 @@ export default function DashboardPage() {
       )}
 
       {/* Quick Actions */}
+      {isDirector && (
+        <div style={{ background: '#101827', borderRadius: '16px', padding: '24px', marginBottom: '24px', color: '#fff', boxShadow: '0 12px 30px rgba(15,23,42,0.18)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#34d399', boxShadow: '0 0 0 5px rgba(52,211,153,0.16)' }} />
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700 }}>Live Results Monitoring</h2>
+              </div>
+              <p style={{ margin: '8px 0 0', color: '#a7b4c8', fontSize: '13px' }}>See who is entering results, for which class and subject, as work happens.</p>
+            </div>
+            <span style={{ color: '#86efac', fontSize: '12px', fontWeight: 700, padding: '7px 10px', border: '1px solid rgba(134,239,172,0.25)', borderRadius: '999px' }}>LIVE · AUTO-SYNC</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+            {[
+              ['Entries tracked', liveActivities.length, '#bfdbfe'],
+              ['Teachers active', new Set(liveActivities.map((item: any) => item.teacher?.id || item.teacherId || item.teacherName)).size, '#bbf7d0'],
+              ['Classes covered', new Set(liveActivities.map((item: any) => item.class?.id || item.classId || item.className)).size, '#fde68a'],
+              ['Subjects covered', new Set(liveActivities.map((item: any) => item.subject?.id || item.subjectId || item.subjectName)).size, '#fbcfe8'],
+            ].map(([label, value, color]) => <div key={label as string} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px 14px' }}><div style={{ color, fontSize: '22px', fontWeight: 800 }}>{value}</div><div style={{ color: '#91a0b5', fontSize: '11px', marginTop: '3px' }}>{label}</div></div>)}
+          </div>
+          {liveResultsLoading && liveActivities.length === 0 ? <div style={{ padding: '28px 0', color: '#a7b4c8' }}>Loading recent activity...</div> : liveActivities.length === 0 ? <div style={{ padding: '28px 0', color: '#a7b4c8' }}>No result entries have been recorded for the current term yet.</div> : (
+            <div style={{ display: 'grid', gap: '10px' }}>
+              {liveActivities.slice(0, 6).map((activity: any) => (
+                <div key={`${activity.id}-${activity.timestamp}`} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', alignItems: 'center', gap: '14px', padding: '14px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px' }}>
+                  <div><div style={{ fontWeight: 700, fontSize: '14px' }}>{activity.teacherName || `${activity.teacher?.firstName || ''} ${activity.teacher?.lastName || ''}`.trim() || 'Teacher'}</div><div style={{ color: '#91a0b5', fontSize: '11px', marginTop: '3px' }}>entered a result</div></div>
+                  <div><div style={{ color: '#dbeafe', fontSize: '13px', fontWeight: 600 }}>{activity.className || activity.class?.name || 'Class'}</div><div style={{ color: '#91a0b5', fontSize: '11px' }}>Class</div></div>
+                  <div><div style={{ color: '#fde68a', fontSize: '13px', fontWeight: 600 }}>{activity.subjectName || activity.subject?.name || 'Subject'}</div><div style={{ color: '#91a0b5', fontSize: '11px' }}>Subject</div></div>
+                  <div style={{ textAlign: 'right' }}><div style={{ color: '#86efac', fontWeight: 700, fontSize: '15px' }}>{activity.score ?? '--'}%</div><div style={{ color: '#91a0b5', fontSize: '11px' }}>{activity.timestamp ? new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'now'}</div></div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{
         background: '#fefcf9',
         borderRadius: '12px',
