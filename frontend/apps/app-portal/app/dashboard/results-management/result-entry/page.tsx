@@ -147,9 +147,22 @@ export default function ResultEntryPage() {
   const { data: classesData } = useQuery({
     queryKey: isTeacher ? ['teacher-classes'] : ['classes'],
     queryFn: async () => {
-      const r = isTeacher ? await teacherApi.getClasses() : await classApi.getAll();
-      const d = r.data?.data || r.data;
-      return Array.isArray(d) ? d : [];
+      const fetchAll = async () => {
+        const r = await classApi.getAll();
+        const d = r.data?.data || r.data;
+        return Array.isArray(d) ? d : [];
+      };
+      if (!isTeacher) return fetchAll();
+      try {
+        const r = await teacherApi.getClasses();
+        const d = r.data?.data || r.data;
+        return Array.isArray(d) ? d : [];
+      } catch (error) {
+        // Fall back to the unrestricted class list (same source used by the
+        // Results sheet) so the class dropdown is never empty when the
+        // teacher endpoint fails.
+        return fetchAll();
+      }
     },
   });
   const classes = useMemo(() => Array.isArray(classesData) ? classesData : [], [classesData]);

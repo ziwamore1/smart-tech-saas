@@ -17,15 +17,42 @@ export class ClassAccessService {
     return (user.roles || []).map(normalizeRole);
   }
 
+  /**
+   * Merge roles from the JWT with active school role assignments from the
+   * database. This makes access checks resilient to stale or empty JWT roles
+   * (provisioned accounts, identity switches, tokens issued before a role was
+   * assigned) by always consulting the source of truth for the school context.
+   */
+  private async effectiveRoles(user: AccessUser): Promise<string[]> {
+    const roleNames = new Set(this.roles(user));
+    if (user.schoolId) {
+      const membership = await this.prisma.schoolUser.findFirst({
+        where: { userId: user.id, schoolId: user.schoolId },
+        include: { SchoolRoleAssignment: { where: { isActive: true }, select: { role: true } } },
+      });
+      for (const assignment of membership?.SchoolRoleAssignment || []) {
+        roleNames.add(normalizeRole(assignment.role));
+      }
+    }
+    return Array.from(roleNames);
+  }
+
   async getPermissions(user: AccessUser): Promise<Permission[]> {
-    const defaults = new Set(getDefaultPermissions(this.roles(user)));
+    const defaults = new Set(getDefaultPermissions(await this.effectiveRoles(user)));
     if (!user.schoolId) return Array.from(defaults);
     const membership = await this.prisma.schoolUser.findFirst({ where: { userId: user.id, schoolId: user.schoolId } });
     if (!membership) return Array.from(defaults);
-    const overrides = await this.prisma.userPermissionOverride.findMany({
-      where: { schoolMembershipId: membership.id },
-      select: { permission: true, granted: true },
-    });
+    let overrides: Array<{ permission: string; granted: boolean }> = [];
+    try {
+      overrides = await this.prisma.userPermissionOverride.findMany({
+        where: { schoolMembershipId: membership.id },
+        select: { permission: true, granted: true },
+      });
+    } catch (error) {
+      // The permission-overrides table may not exist on databases where the
+      // migration has not been applied yet. Fall back to role defaults so
+      // access checks keep working instead of failing the whole request.
+    }
     for (const override of overrides) {
       if (override.granted) defaults.add(override.permission as Permission);
       else defaults.delete(override.permission as Permission);
@@ -33,10 +60,10 @@ export class ClassAccessService {
     return Array.from(defaults);
   }
 
-  private isSchoolAdministrator(user: AccessUser): boolean {
-    return user.isSuperAdmin === true || this.roles(user).some((role) =>
-      ['DIRECTOR', 'SUPERADMIN'].includes(role),
-    );
+  private async isSchoolAdministrator(user: AccessUser): Promise<boolean> {
+    if (user.isSuperAdmin === true) return true;
+    const roles = await this.effectiveRoles(user);
+    return roles.some((role) => ['DIRECTOR', 'SUPERADMIN'].includes(role));
   }
 
   /**
@@ -65,7 +92,7 @@ export class ClassAccessService {
 
   async teachingClasses(user: AccessUser, academicYearId?: string) {
     if (!user.schoolId) return [];
-    if (this.isSchoolAdministrator(user)) return this.schoolClasses(user, academicYearId);
+    if (await this.isSchoolAdministrator(user)) return this.schoolClasses(user, academicYearId);
 
     const yearFilter = academicYearId ? { academicYearId } : {};
     const [subjectAssignments, classAssignments, directClasses] = await Promise.all([
@@ -122,7 +149,7 @@ export class ClassAccessService {
       select: { subject: { select: { id: true, name: true, code: true } } },
       orderBy: { subject: { name: 'asc' } },
     });
-    if (this.isSchoolAdministrator(user)) return classSubjects.map(({ subject }) => subject);
+    if (await this.isSchoolAdministrator(user)) return classSubjects.map(({ subject }) => subject);
 
     const assignments = await this.prisma.teachingAssignment.findMany({
       where: { teacherId: user.id, schoolId: user.schoolId, classId, academicYearId: yearId },
