@@ -87,7 +87,14 @@ export class ClassAccessService {
       ...classAssignments.map(({ classId }) => classId),
       ...directClasses.map(({ id }) => id),
     ]));
-    if (!ids.length) return [];
+    if (!ids.length) {
+      // No assignment rows. Fall back to all school classes when the user is
+      // permitted to view classes / class students or enter results, so
+      // teachers, class teachers and HODs granted access are not blocked by
+      // missing or stale assignments.
+      if (await this.canAccessClasses(user)) return this.schoolClasses(user, academicYearId);
+      return [];
+    }
     return this.prisma.class.findMany({
       where: { schoolId: user.schoolId, id: { in: ids } },
       select: { id: true, name: true, schoolId: true, levelTypeId: true, levelType: { select: { id: true, name: true } } },
@@ -122,6 +129,9 @@ export class ClassAccessService {
       select: { subjectId: true },
     });
     const assignedIds = new Set(assignments.map(({ subjectId }) => subjectId));
+    if (assignedIds.size === 0 && (await this.canAccessClasses(user))) {
+      return classSubjects.map(({ subject }) => subject);
+    }
     return classSubjects
       .filter(({ subject }) => assignedIds.has(subject.id))
       .map(({ subject }) => subject);
