@@ -6,11 +6,15 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ClassAccessService } from '../common/access/class-access.service';
 
 @Injectable()
 export class ClassService {
   private readonly logger = new Logger(ClassService.name);
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private classAccess: ClassAccessService,
+  ) {}
 
   async create(
     name: string,
@@ -235,7 +239,7 @@ export class ClassService {
   }
 
   private async getTeacherClassIds(user: { id: string; schoolId: string; roles?: string[] }): Promise<string[] | null> {
-    const roles = (user.roles ?? []).map((r) => r.toUpperCase());
+    const roles = (user.roles ?? []).map((r) => r.toUpperCase().replace(/\s+/g, ''));
     if (roles.includes('DIRECTOR') || roles.includes('SUPERADMIN')) {
       return null;
     }
@@ -263,6 +267,14 @@ export class ClassService {
     for (const cta of classTeacherAssignments) ids.add(cta.classId);
     for (const dc of directClasses) ids.add(dc.id);
 
-    return ids.size > 0 ? Array.from(ids) : [];
+    if (ids.size > 0) return Array.from(ids);
+
+    // No assignment-based classes. If this user is permitted to view classes /
+    // class students or enter results (role default or explicit grant), fall
+    // back to all school classes so the feature works instead of showing an
+    // empty list when assignments are missing or stale.
+    if (await this.classAccess.canAccessClasses(user)) return null;
+
+    return [];
   }
 }

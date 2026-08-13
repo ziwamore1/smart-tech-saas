@@ -39,6 +39,20 @@ export class ClassAccessService {
     );
   }
 
+  /**
+   * True when the user is permitted to view classes / class students or enter
+   * results (either by role defaults or an explicit permission grant).
+   */
+  async canAccessClasses(user: AccessUser): Promise<boolean> {
+    const permissions = await this.getPermissions(user);
+    return [
+      PERMISSIONS.CLASS_VIEW,
+      PERMISSIONS.CLASS_STUDENT_VIEW,
+      PERMISSIONS.RESULTS_VIEW,
+      PERMISSIONS.RESULTS_ENTER,
+    ].some((permission) => permissions.includes(permission));
+  }
+
   async schoolClasses(user: AccessUser, academicYearId?: string) {
     if (!user.schoolId) return [];
     const where: any = { schoolId: user.schoolId };
@@ -130,10 +144,20 @@ export class ClassAccessService {
     const subjectAssignment = await this.prisma.teachingAssignment.findFirst({
       where: { teacherId: user.id, schoolId: user.schoolId, classId, subjectId, academicYearId },
     });
-    if (!subjectAssignment) {
-      throw new ForbiddenException('You are not assigned to enter results for this class and subject');
-    }
-    return true;
+    if (subjectAssignment) return true;
+
+    // No assignment for this exact class+subject. Fall back to the permission
+    // grant when the user has no teaching assignments at all in this academic
+    // year (i.e. the school has not set up assignments, so RESULTS_ENTER is the
+    // gate). This keeps the results-entry flow usable for teachers, class
+    // teachers and HODs that were granted access but have no assignment rows.
+    const anyAssignment = await this.prisma.teachingAssignment.findFirst({
+      where: { teacherId: user.id, schoolId: user.schoolId, academicYearId },
+      select: { id: true },
+    });
+    if (!anyAssignment) return true;
+
+    throw new ForbiddenException('You are not assigned to enter results for this class and subject');
   }
 
   async assertCanEnterAssessmentScore(

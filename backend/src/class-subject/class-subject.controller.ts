@@ -40,7 +40,7 @@ export class ClassSubjectController {
   }
 
   @Get('class/:classId')
-  @Roles('Director', 'Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   async getSubjectsByClass(
     @Param('classId') classId: string,
     @Query('termId') termId: string | undefined,

@@ -9,12 +9,16 @@ describe('ClassAccessService', () => {
     teachingAssignment: { findFirst: jest.fn(), findMany: jest.fn() },
     classTeacherAssignment: { findFirst: jest.fn(), findMany: jest.fn() },
     classSubject: { findMany: jest.fn() },
+    schoolUser: { findFirst: jest.fn() },
+    userPermissionOverride: { findMany: jest.fn() },
   };
   let service: ClassAccessService;
 
   beforeEach(() => {
     jest.clearAllMocks();
     service = new ClassAccessService(prisma);
+    prisma.schoolUser.findFirst.mockResolvedValue(null);
+    prisma.userPermissionOverride.findMany.mockResolvedValue([]);
   });
 
   it('allows a teacher with a matching class, subject, and year assignment', async () => {
@@ -34,13 +38,28 @@ describe('ClassAccessService', () => {
     prisma.class.findUnique.mockResolvedValue({ id: 'class-a', schoolId: 'school-a' });
     prisma.subject.findUnique.mockResolvedValue({ id: 'subject-a', schoolId: 'school-a' });
     prisma.academicYear.findUnique.mockResolvedValue({ id: 'year-a', schoolId: 'school-a' });
-    prisma.teachingAssignment.findFirst.mockResolvedValue(null);
+    prisma.teachingAssignment.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'assignment-b' });
     prisma.classTeacherAssignment.findFirst.mockResolvedValue(null);
 
     await expect(service.assertCanEnterResults(
       { id: 'teacher-a', schoolId: 'school-a', roles: ['Teacher'] },
       'class-a', 'subject-a', 'year-a',
     )).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('allows a teacher with RESULTS_ENTER permission but no assignments at all', async () => {
+    prisma.class.findUnique.mockResolvedValue({ id: 'class-a', schoolId: 'school-a' });
+    prisma.subject.findUnique.mockResolvedValue({ id: 'subject-a', schoolId: 'school-a' });
+    prisma.academicYear.findUnique.mockResolvedValue({ id: 'year-a', schoolId: 'school-a' });
+    prisma.teachingAssignment.findFirst.mockResolvedValue(null);
+    prisma.classTeacherAssignment.findFirst.mockResolvedValue(null);
+
+    await expect(service.assertCanEnterResults(
+      { id: 'teacher-a', schoolId: 'school-a', roles: ['Teacher'] },
+      'class-a', 'subject-a', 'year-a',
+    )).resolves.toBe(true);
   });
 
   it('rejects cross-school class access before checking assignments', async () => {

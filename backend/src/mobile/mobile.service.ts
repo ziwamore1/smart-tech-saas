@@ -652,15 +652,11 @@ export class MobileService {
   }
 
   async getTeacherClasses(userId: string, schoolId: string) {
-    const teacher = await this.prisma.teacher.findFirst({
-      where: { userId },
-    });
-
-    if (!teacher) return [];
-
+    // TeachingAssignment.teacherId references the User id (see schema.prisma),
+    // not the Teacher record id, so query directly with the authenticated user id.
     const assignments = await this.prisma.teachingAssignment.findMany({
       where: {
-        teacherId: teacher.id,
+        teacherId: userId,
         academicYear: { schoolId, isCurrent: true },
       },
       include: {

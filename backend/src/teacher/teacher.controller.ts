@@ -79,9 +79,9 @@ export class TeacherController {
   }
 
   @Get('classes')
-  @Roles('Teacher', 'Class Teacher')
+  @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
   getClasses(@Req() req: any) {
-    return this.teacherService.getTeacherClasses(req.user.id, req.user.schoolId);
+    return this.teacherService.getTeacherClasses(req.user);
   }
 
   @Get('class-students')

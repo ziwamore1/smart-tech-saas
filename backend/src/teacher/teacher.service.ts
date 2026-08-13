@@ -6,6 +6,7 @@ import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { StaffSyncEngineService } from '../shared/staff-sync-engine/staff-sync-engine.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { StaffPositionService } from '../staff-position/staff-position.service';
+import { ClassAccessService } from '../common/access/class-access.service';
 import { Teacher } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
@@ -20,6 +21,7 @@ export class TeacherService {
     private gradingEngine: GradingEngineService,
     private syncEngine: StaffSyncEngineService,
     private staffPositionService: StaffPositionService,
+    private classAccess: ClassAccessService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
   ) {}
 
@@ -376,7 +378,9 @@ export class TeacherService {
       assignedSubjects: formattedAssignments,
     };
   }
-  async getTeacherClasses(teacherId: string, schoolId: string) {
+  async getTeacherClasses(user: { id: string; schoolId: string; roles?: string[] }) {
+    const teacherId = user.id;
+    const schoolId = user.schoolId;
     const assignments = await this.prisma.teachingAssignment.findMany({
       where: { teacherId, schoolId },
       include: {
@@ -456,7 +460,35 @@ export class TeacherService {
       classMap.set(dc.id, dc);
     }
 
-    return Array.from(classMap.values())
+    let classes = Array.from(classMap.values());
+
+    // Fall back to all school classes when the user is permitted to view
+    // classes / class students or enter results but has no assignment rows
+    // (e.g. assignments are missing or stale). Without this, teachers, class
+    // teachers and HODs see an empty class list when entering results.
+    if (classes.length === 0 && (await this.classAccess.canAccessClasses(user))) {
+      classes = await this.prisma.class.findMany({
+        where: { schoolId },
+        include: {
+          levelType: true,
+          gradingSystem: { select: { id: true, name: true } },
+          classTeacher: { select: { id: true, firstName: true, lastName: true, email: true } },
+          enrollments: {
+            where: { status: 'ACTIVE', student: { status: 'ACTIVE' } },
+            include: {
+              student: {
+                select: {
+                  id: true, firstName: true, lastName: true, gender: true,
+                  admissionNumber: true, photoUrl: true,
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    return classes
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((c) => {
         const males = c.enrollments.filter((e: any) => e.student.gender === 'MALE' || e.student.gender === 'Male' || e.student.gender === 'M').length;
