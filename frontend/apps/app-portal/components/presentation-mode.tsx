@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useIsDirector } from '@/lib/auth-context';
 
 type PresentationTheme = {
   name: string;
@@ -20,7 +21,9 @@ const THEMES: PresentationTheme[] = [
 const ZOOM_LEVELS = [1, 1.15, 1.2, 1.3, 1.5];
 
 export function PresentationMode() {
+  const isDirector = useIsDirector();
   const [mounted, setMounted] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
   const [active, setActive] = useState(false);
   const [zoomIndex, setZoomIndex] = useState(1);
   const [themeIndex, setThemeIndex] = useState(0);
@@ -37,9 +40,25 @@ export function PresentationMode() {
   }, []);
 
   useEffect(() => {
+    const mq = window.matchMedia('(min-width: 769px) and (hover: hover) and (pointer: fine)');
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    if (mq.addEventListener) mq.addEventListener('change', update);
+    else mq.addListener?.(update);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', update);
+      else mq.removeListener?.(update);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!mounted) return;
-    const theme = THEMES[themeIndex];
     const root = document.documentElement;
+    if (!isDirector || !isDesktop) {
+      root.dataset.presentationMode = 'false';
+      return;
+    }
+    const theme = THEMES[themeIndex];
     root.dataset.presentationMode = active ? 'true' : 'false';
     root.dataset.presentationTheme = theme.name.toLowerCase();
     root.style.setProperty('--presentation-accent', theme.accent);
@@ -49,10 +68,10 @@ export function PresentationMode() {
     window.localStorage.setItem('smarttech.presentation.active', String(active));
     window.localStorage.setItem('smarttech.presentation.zoom', String(zoomIndex));
     window.localStorage.setItem('smarttech.presentation.theme', String(themeIndex));
-  }, [active, mounted, themeIndex, zoomIndex]);
+  }, [active, mounted, themeIndex, zoomIndex, isDirector, isDesktop]);
 
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || !isDirector || !isDesktop) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
       if (event.key.toLowerCase() === 'p') {
@@ -78,7 +97,7 @@ export function PresentationMode() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [active, mounted]);
+  }, [active, mounted, isDirector, isDesktop]);
 
   const toggleFullscreen = async () => {
     if (!document.fullscreenElement) {
@@ -88,7 +107,7 @@ export function PresentationMode() {
     }
   };
 
-  if (!mounted) return null;
+  if (!mounted || !isDirector || !isDesktop) return null;
 
   return (
     <div className={`presentation-control ${active ? 'presentation-control-active' : ''}`}>
