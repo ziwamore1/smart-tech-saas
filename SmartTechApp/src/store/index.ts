@@ -112,11 +112,15 @@ export const useAuthStore = create<AuthState>()(
         const currentUser = get().saUser || get().user;
         const currentToken = get().saToken || apiService.getToken() || await AsyncStorage.getItem('access_token');
         if (!currentUser || !currentToken) throw new Error('SuperAdmin session not available');
-        await AsyncStorage.setItem('sa_token', currentToken);
-        await AsyncStorage.setItem('sa_user', JSON.stringify(currentUser));
         const response = await apiService.switchIdentity(schoolId);
         const user = response.user;
         if (!user.institutionType) user.institutionType = extractInstitutionType(user);
+        void AsyncStorage.setItem('sa_token', currentToken).catch((error) =>
+          console.warn('Failed to persist SuperAdmin token:', error),
+        );
+        void AsyncStorage.setItem('sa_user', JSON.stringify(currentUser)).catch((error) =>
+          console.warn('Failed to persist SuperAdmin user:', error),
+        );
         set({ user, isAuthenticated: true, saUser: currentUser, saToken: currentToken, error: null });
       },
 
@@ -125,8 +129,12 @@ export const useAuthStore = create<AuthState>()(
         const stored = get().saUser || JSON.parse((await AsyncStorage.getItem('sa_user')) || 'null');
         if (!saToken || !stored) throw new Error('SuperAdmin session not available');
         apiService.setToken(saToken);
-        await AsyncStorage.setItem('access_token', saToken);
-        await AsyncStorage.setItem('user', JSON.stringify(stored));
+        void AsyncStorage.setItem('access_token', saToken).catch((error) =>
+          console.warn('Failed to persist access token:', error),
+        );
+        void AsyncStorage.setItem('user', JSON.stringify(stored)).catch((error) =>
+          console.warn('Failed to persist user:', error),
+        );
         set({ user: stored, isAuthenticated: true, saUser: stored, saToken, error: null });
       },
 
