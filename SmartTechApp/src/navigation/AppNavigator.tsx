@@ -121,9 +121,30 @@ export function AppNavigator() {
   const hasRoleDashboard = isStudent || isParent || isClassTeacher || isTeacher || isDirector || isSuperAdmin || isHodSupervisor;
   const { can } = usePermissions();
 
+  // Force a fresh root navigator whenever the active dashboard identity changes
+  // (e.g. SuperAdmin switching into a linked school). React Navigation does not
+  // reliably transition when the currently focused route is conditionally
+  // removed from the screen config, so keying the navigator by role guarantees
+  // the correct dashboard screen is shown after an identity switch.
+  const navigatorKey = isSuperAdmin
+    ? 'super-admin'
+    : isDirector
+      ? 'director'
+      : isHodSupervisor
+        ? 'supervisor'
+        : isTeacher
+          ? 'teacher'
+          : isClassTeacher
+            ? 'class-teacher'
+            : isParent
+              ? 'parent'
+              : isStudent
+                ? 'student'
+                : 'none';
+
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator key={navigatorKey} screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : (
