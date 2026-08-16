@@ -7,6 +7,8 @@ const subjectAbbreviationMap: Record<string, string> = {
   "english language": "ENG",
   english: "ENG",
   eng: "ENG",
+  "information and computer technology": "ICT",
+  "information & computer technology": "ICT",
   "information and communications technology": "ICT",
   "information & communications technology": "ICT",
   ict: "ICT",
@@ -44,7 +46,6 @@ const subjectAbbreviationMap: Record<string, string> = {
 };
 
 export function abbreviateSubject(name: string | undefined, code?: string): string {
-  if (code) return code;
   if (!name) return "";
   const lower = name.trim().toLowerCase();
   if (subjectAbbreviationMap[lower]) return subjectAbbreviationMap[lower];
@@ -86,29 +87,25 @@ export function abbreviateClassName(name: string | undefined): string {
 }
 
 export function abbreviateTeacher(
-  teacher: { title?: string; firstName?: string; lastName?: string; abbreviation?: string; user?: { firstName?: string; lastName?: string } } | undefined | null
+  teacher: { title?: string; firstName?: string; lastName?: string; abbreviation?: string; name?: string; user?: { firstName?: string; lastName?: string } } | undefined | null
 ): string {
   if (!teacher) return "";
-  if (teacher.abbreviation) return teacher.abbreviation;
-  const title = teacher.title || "";
   const lastName = teacher.lastName || teacher.user?.lastName || "";
   const firstName = teacher.firstName || teacher.user?.firstName || "";
-  if (title && lastName) return `${title} ${lastName}`;
+  if (firstName && lastName) return `${firstName.trim()[0]}. ${lastName}`;
   if (lastName) return lastName;
   if (firstName) return firstName;
+  if (teacher.name) return teacher.name;
   return "";
 }
 
 export function getTeacherShortName(teacher: any): string {
   if (!teacher) return "";
-  if (teacher.abbreviation) return teacher.abbreviation;
-  const title = teacher.title || "";
   const lastName = teacher.lastName || teacher.user?.lastName || "";
   const firstName = teacher.firstName || teacher.user?.firstName || "";
-  if (title && lastName) return `${title} ${lastName}`;
-  if (title && firstName && !lastName) return `${title} ${firstName}`;
   if (firstName && lastName) return `${firstName[0]}. ${lastName}`;
   if (lastName) return lastName;
   if (firstName) return firstName;
+  if (teacher.name) return teacher.name;
   return "";
 }

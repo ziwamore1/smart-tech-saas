@@ -43,6 +43,7 @@ export const subjectShortcuts: Record<string, string> = {
   'Computer Studies': 'ICT',
   'Information and Communication Technology': 'ICT',
   'Information and Communications Technology': 'ICT',
+  'Information and Computer Technology': 'ICT',
   'Design and Technology': 'DT',
   'Physical Education and Sports': 'PES',
   'Physical Education': 'PE',
