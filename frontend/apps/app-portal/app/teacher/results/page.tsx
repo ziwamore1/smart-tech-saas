@@ -493,7 +493,7 @@ export default function TeacherResultsPage() {
                             )}
                             <input
                               type="text"
-                              inputMode="decimal"
+                              inputMode="text"
                               value={absentCells.has(scoreKey) ? '' : (scores[scoreKey] ?? (existing?.score ?? ''))}
                               onChange={(e) => {
                                 const val = e.target.value.trim().toUpperCase();

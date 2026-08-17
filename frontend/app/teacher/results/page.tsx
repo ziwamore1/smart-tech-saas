@@ -414,7 +414,7 @@ export default function TeacherResultsPage() {
                           {isBulkEntry ? (
                             <input
                               type="text"
-                              inputMode="decimal"
+                              inputMode="text"
                               value={absentCells.has(student.id) ? '' : (scores[student.id] ?? '')}
                               onChange={(e) => {
                                 const val = e.target.value.trim().toUpperCase();
@@ -438,7 +438,7 @@ export default function TeacherResultsPage() {
                             <div className="flex items-center justify-center gap-2">
                               <input
                                 type="text"
-                                inputMode="decimal"
+                                inputMode="text"
                                 id={`score-${student.id}`}
                                 className="w-20 px-2 py-1 border rounded text-center"
                                 placeholder="0-100 or X/A"

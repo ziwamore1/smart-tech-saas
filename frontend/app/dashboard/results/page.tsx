@@ -1369,7 +1369,7 @@ export default function ResultsPage() {
                                 <div className="flex justify-center gap-1">
                                   <input
                                     type="text"
-                                    inputMode="decimal"
+                                    inputMode="text"
                                     autoFocus
                                     value={editingCell?.isAbsent ? '' : (editingCell?.score ?? result.score ?? '')}
                                     onChange={(e) => {

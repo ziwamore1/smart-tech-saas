@@ -1049,7 +1049,7 @@ export default function ResultEntryPage() {
                           return (
                             <td key={c.assessmentDefId} style={{ textAlign: 'center', padding: '4px 6px', borderBottom: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', background: isAbsent ? '#fef3c7' : value !== '' ? '#ecfdf5' : '#fef9c3' }}>
                               <input
-                                type="text" inputMode="decimal"
+                                type="text" inputMode="text"
                                 value={value}
                                 placeholder={entry?.isAbsent ? 'X' : `0-${c.maxScore || 100}`}
                                 onChange={e => handleComponentCell(student.id, selectedSubject, c.assessmentDefId, c.maxScore || 100, e.target.value)}
@@ -1215,9 +1215,9 @@ export default function ResultEntryPage() {
                             }}
                           >
                             {isEditing ? (
-                                <input
-                                  ref={inputRef}
-                                  type="text" inputMode="decimal"
+                                    <input
+                                      ref={inputRef}
+                                      type="text" inputMode="text"
                                   value={editingCell?.value ?? ''}
                                   onChange={e => setEditingCell({ studentId: student.id, subjectId: subjId, value: e.target.value })}
                                   onBlur={() => {
