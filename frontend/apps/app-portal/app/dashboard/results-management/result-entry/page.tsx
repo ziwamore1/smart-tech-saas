@@ -1009,21 +1009,21 @@ export default function ResultEntryPage() {
               </div>
             </div>
             <div style={{ overflow: 'auto', minHeight: '560px', maxHeight: 'calc(100vh - 280px)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', border: '1px solid #d1d5db' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', border: '2px solid #9ca3af' }}>
                 <thead>
-                  <tr style={{ background: '#374151', position: 'sticky', top: 0, zIndex: 10 }}>
-                    <th style={{ textAlign: 'center', padding: '12px 10px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.3px', minWidth: '40px', borderRight: '1px solid #4b5563', borderBottom: '2px solid #1f2937' }}>#</th>
-                    <th style={{ textAlign: 'left', padding: '12px 14px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.3px', position: 'sticky', left: 0, background: '#374151', zIndex: 11, minWidth: '180px', borderRight: '1px solid #4b5563', borderBottom: '2px solid #1f2937' }}>Student Name</th>
-                    <th style={{ textAlign: 'left', padding: '12px 14px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.3px', minWidth: '110px', borderRight: '1px solid #4b5563', borderBottom: '2px solid #1f2937' }}>Admission No.</th>
+                  <tr style={{ background: '#1e293b', position: 'sticky', top: 0, zIndex: 10 }}>
+                    <th style={{ textAlign: 'center', padding: '12px 10px', color: '#ffffff', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', minWidth: '40px', background: '#1e293b', borderRight: '2px solid #334155', borderBottom: '2px solid #0f172a' }}>#</th>
+                    <th style={{ textAlign: 'left', padding: '12px 14px', color: '#ffffff', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', position: 'sticky', left: 0, background: '#1e293b', zIndex: 11, minWidth: '180px', borderRight: '2px solid #334155', borderBottom: '2px solid #0f172a' }}>Student Name</th>
+                    <th style={{ textAlign: 'left', padding: '12px 14px', color: '#ffffff', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', minWidth: '110px', background: '#1e293b', borderRight: '2px solid #334155', borderBottom: '2px solid #0f172a' }}>Admission No.</th>
                     {subjectConfigs.map((c: any, idx: number) => (
-                      <th key={c.assessmentDefId} style={{ textAlign: 'center', padding: '12px 10px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.3px', minWidth: '110px', borderRight: '1px solid #4b5563', borderBottom: '2px solid #1f2937' }}>
-                        <div>{c.assessmentDef?.name || 'Component'}</div>
-                        <div style={{ fontSize: '9px', opacity: 0.7, fontWeight: 400 }}>Max {c.maxScore || 100} · {c.weightPercentage}%</div>
+                      <th key={c.assessmentDefId} style={{ textAlign: 'center', padding: '12px 10px', color: '#ffffff', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', minWidth: '120px', background: '#1e293b', borderRight: '2px solid #334155', borderBottom: '2px solid #0f172a' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700 }}>{c.assessmentDef?.name || 'Component'}</div>
+                        <div style={{ fontSize: '11px', fontWeight: 500, marginTop: '2px', color: '#94a3b8' }}>Max {c.maxScore || 100} · {c.weightPercentage}%</div>
                       </th>
                     ))}
-                    <th style={{ textAlign: 'center', padding: '12px 10px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.3px', minWidth: '80px', background: '#1e3a5f', borderRight: '1px solid #4b5563', borderBottom: '2px solid #1f2937' }}>Total %</th>
-                    <th style={{ textAlign: 'center', padding: '12px 10px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.3px', minWidth: '70px', background: '#1e3a5f', borderRight: '1px solid #4b5563', borderBottom: '2px solid #1f2937' }}>Grade</th>
-                    <th style={{ textAlign: 'center', padding: '12px 10px', color: 'white', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.3px', minWidth: '90px', background: '#1e3a5f', borderBottom: '2px solid #1f2937' }}>Status</th>
+                    <th style={{ textAlign: 'center', padding: '12px 10px', color: '#ffffff', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', minWidth: '80px', background: '#0f172a', borderRight: '2px solid #334155', borderBottom: '2px solid #0f172a' }}>Total %</th>
+                    <th style={{ textAlign: 'center', padding: '12px 10px', color: '#ffffff', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', minWidth: '70px', background: '#0f172a', borderRight: '2px solid #334155', borderBottom: '2px solid #0f172a' }}>Grade</th>
+                    <th style={{ textAlign: 'center', padding: '12px 10px', color: '#ffffff', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', minWidth: '90px', background: '#0f172a', borderBottom: '2px solid #0f172a' }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1032,14 +1032,14 @@ export default function ResultEntryPage() {
                     const total = computeComponentTotal(cell, subjectConfigs);
                     const status = componentCellStatus(cell, subjectConfigs);
                     const gradeColors = getGradeColor(total);
-                    const rowClass = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+                    const rowClass = idx % 2 === 0 ? '#ffffff' : '#f1f5f9';
                     return (
                       <tr key={student.id} style={{ background: rowClass }}>
-                        <td style={{ textAlign: 'center', padding: '10px 8px', color: '#6b7280', borderBottom: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', fontWeight: 500 }}>{idx + 1}</td>
-                        <td style={{ position: 'sticky', left: 0, background: rowClass, zIndex: 2, padding: '10px 14px', fontWeight: 600, color: '#1f2937', borderBottom: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', fontSize: '13px' }}>
+                        <td style={{ textAlign: 'center', padding: '10px 8px', color: '#475569', borderBottom: '1px solid #cbd5e1', borderRight: '1px solid #cbd5e1', fontWeight: 600, fontSize: '13px' }}>{idx + 1}</td>
+                        <td style={{ position: 'sticky', left: 0, background: rowClass, zIndex: 2, padding: '10px 14px', fontWeight: 600, color: '#0f172a', borderBottom: '1px solid #cbd5e1', borderRight: '1px solid #cbd5e1', fontSize: '13px' }}>
                           {student.firstName} {student.lastName}
                         </td>
-                        <td style={{ padding: '10px 14px', color: '#374151', fontSize: '13px', fontWeight: 500, borderBottom: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb' }}>
+                        <td style={{ padding: '10px 14px', color: '#1e293b', fontSize: '13px', fontWeight: 600, borderBottom: '1px solid #cbd5e1', borderRight: '1px solid #cbd5e1' }}>
                           {student.admissionNumber || '-'}
                         </td>
                         {subjectConfigs.map((c: any, cIdx: number) => {
@@ -1047,7 +1047,7 @@ export default function ResultEntryPage() {
                           const isAbsent = !!entry?.isAbsent;
                           const value = isAbsent ? 'X' : entry?.rawScore != null ? String(entry.rawScore) : '';
                           return (
-                            <td key={c.assessmentDefId} style={{ textAlign: 'center', padding: '6px 8px', borderBottom: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', background: isAbsent ? '#fef3c7' : value !== '' ? '#ecfdf5' : '#fef9c3' }}>
+                            <td key={c.assessmentDefId} style={{ textAlign: 'center', padding: '6px 8px', borderBottom: '1px solid #cbd5e1', borderRight: '1px solid #cbd5e1', background: isAbsent ? '#fef3c7' : value !== '' ? '#dcfce7' : '#fef9c3' }}>
                               <input
                                 type="text" inputMode="text"
                                 value={value}
@@ -1055,32 +1055,32 @@ export default function ResultEntryPage() {
                                 onChange={e => handleComponentCell(student.id, selectedSubject, c.assessmentDefId, c.maxScore || 100, e.target.value)}
                                 style={{
                                   width: '80px', padding: '8px 6px', textAlign: 'center',
-                                  border: isAbsent ? '2px solid #d97706' : '1px solid #d1d5db',
+                                  border: isAbsent ? '2px solid #d97706' : '2px solid #94a3b8',
                                   borderRadius: '6px', fontSize: '14px', fontWeight: isAbsent ? 700 : 600,
                                   outline: 'none', background: '#ffffff',
-                                  color: isAbsent ? '#92400e' : '#1f2937', fontStyle: isAbsent ? 'italic' : 'normal'
+                                  color: isAbsent ? '#92400e' : '#0f172a', fontStyle: isAbsent ? 'italic' : 'normal'
                                 }}
                               />
                             </td>
                           );
                         })}
-                        <td style={{ textAlign: 'center', padding: '10px 8px', borderBottom: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', fontWeight: 700, fontSize: '14px', color: total != null ? gradeColors.text : '#9ca3af', background: total != null ? '#f0f9ff' : 'transparent' }}>
+                        <td style={{ textAlign: 'center', padding: '10px 8px', borderBottom: '1px solid #cbd5e1', borderRight: '1px solid #cbd5e1', fontWeight: 700, fontSize: '14px', color: total != null ? gradeColors.text : '#94a3b8', background: total != null ? '#eff6ff' : 'transparent' }}>
                           {total != null ? `${total.toFixed(1)}%` : '-'}
                         </td>
-                        <td style={{ textAlign: 'center', padding: '10px 8px', borderBottom: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb' }}>
+                        <td style={{ textAlign: 'center', padding: '10px 8px', borderBottom: '1px solid #cbd5e1', borderRight: '1px solid #cbd5e1' }}>
                           {total != null ? (
-                            <span style={{ fontSize: '12px', fontWeight: 700, padding: '4px 12px', borderRadius: '10px', background: gradeColors.bg, color: gradeColors.text }}>
+                            <span style={{ fontSize: '13px', fontWeight: 700, padding: '4px 12px', borderRadius: '10px', background: gradeColors.bg, color: gradeColors.text }}>
                               {getGrade(null, total, gradeScales)}
                             </span>
-                          ) : <span style={{ color: '#d1d5db', fontSize: '14px' }}>-</span>}
+                          ) : <span style={{ color: '#94a3b8', fontSize: '14px' }}>-</span>}
                         </td>
-                        <td style={{ textAlign: 'center', padding: '10px 8px', borderBottom: '1px solid #e5e7eb' }}>
+                        <td style={{ textAlign: 'center', padding: '10px 8px', borderBottom: '1px solid #cbd5e1' }}>
                           {status === 'complete' ? (
-                            <span style={{ fontSize: '11px', fontWeight: 600, padding: '4px 12px', borderRadius: '10px', background: '#d1fae5', color: '#059669' }}>Complete</span>
+                            <span style={{ fontSize: '12px', fontWeight: 700, padding: '4px 12px', borderRadius: '10px', background: '#dcfce7', color: '#15803d' }}>Complete</span>
                           ) : status === 'partial' ? (
-                            <span style={{ fontSize: '11px', fontWeight: 600, padding: '4px 12px', borderRadius: '10px', background: '#fef3c7', color: '#d97706' }}>Partial</span>
+                            <span style={{ fontSize: '12px', fontWeight: 700, padding: '4px 12px', borderRadius: '10px', background: '#fef3c7', color: '#b45309' }}>Partial</span>
                           ) : (
-                            <span style={{ fontSize: '11px', fontWeight: 600, padding: '4px 12px', borderRadius: '10px', background: '#f3f4f6', color: '#6b7280' }}>Pending</span>
+                            <span style={{ fontSize: '12px', fontWeight: 600, padding: '4px 12px', borderRadius: '10px', background: '#f1f5f9', color: '#475569' }}>Pending</span>
                           )}
                         </td>
                       </tr>
