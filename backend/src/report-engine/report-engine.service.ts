@@ -12,6 +12,7 @@ import { CertificateTemplateService } from '../report-template-builder/certifica
 import { CertificateCommentService } from '../report-template-builder/certificate-comment.service';
 import { ReportTemplateBuilderService } from '../report-template-builder/report-template-builder.service';
 import { ResultsManagementService } from '../results-management/results-management.service';
+import { normalizeExamType } from '../common/utils/exam-type.util';
 import * as crypto from 'crypto';
 
 export enum ReportType {
@@ -1804,7 +1805,7 @@ export class ReportEngineService {
     ]);
     if (!term) throw new BadRequestException('Term not found');
 
-    const requestedExamType = request.examType || 'END_TERM';
+    const requestedExamType = normalizeExamType(request.examType);
     let sheet = sheets.find((candidate) => candidate.examType === requestedExamType) || sheets[0];
     if (!sheet) {
       if (!classInfo) throw new BadRequestException('Class not found');

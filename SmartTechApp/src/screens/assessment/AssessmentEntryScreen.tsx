@@ -30,6 +30,7 @@ interface StudentScoreEntry {
   rawScore: string;
   remarks: string;
   existing: boolean;
+  isAbsent?: boolean;
 }
 
 export const AssessmentEntryScreen: React.FC = () => {
@@ -117,10 +118,18 @@ export const AssessmentEntryScreen: React.FC = () => {
 
       if (value === '') {
         entry.rawScore = '';
+        entry.isAbsent = false;
       } else {
-        const num = parseFloat(value);
-        if (!isNaN(num) && num >= 0 && num <= maxScore) {
-          entry.rawScore = value;
+        const upper = value.trim().toUpperCase();
+        if (upper === 'X' || upper === 'A') {
+          entry.rawScore = upper;
+          entry.isAbsent = true;
+        } else {
+          const num = parseFloat(value);
+          if (!isNaN(num) && num >= 0 && num <= maxScore) {
+            entry.rawScore = value;
+            entry.isAbsent = false;
+          }
         }
       }
 
@@ -148,7 +157,8 @@ export const AssessmentEntryScreen: React.FC = () => {
       .filter(e => e.rawScore !== '')
       .map(e => ({
         studentId: e.studentId,
-        rawScore: parseFloat(e.rawScore),
+        rawScore: e.isAbsent ? 0 : parseFloat(e.rawScore),
+        isAbsent: e.isAbsent || false,
         remarks: e.remarks || undefined,
       }));
 
@@ -294,7 +304,8 @@ export const AssessmentEntryScreen: React.FC = () => {
           extraHeight={100}
         >
           {entries.map((entry, index) => {
-            const scoreNum = entry.rawScore ? parseFloat(entry.rawScore) : null;
+            const isAbsent = entry.isAbsent || entry.rawScore?.toUpperCase() === 'X' || entry.rawScore?.toUpperCase() === 'A';
+            const scoreNum = entry.rawScore && !isAbsent ? parseFloat(entry.rawScore) : null;
             const percentage = scoreNum !== null ? (scoreNum / maxScore) * 100 : null;
             const grade = percentage !== null ? computeGrade(percentage) : null;
             const remark = percentage !== null ? computeRemark(percentage) : null;
@@ -323,8 +334,8 @@ export const AssessmentEntryScreen: React.FC = () => {
                       style={styles.scoreInput}
                       value={entry.rawScore}
                       onChangeText={value => updateScore(index, value)}
-                      keyboardType="numeric"
-                      placeholder="0"
+                      keyboardType="default"
+                      placeholder="0 or X/A"
                       placeholderTextColor={colors.textMuted}
                       onSubmitEditing={() => handleNextStudent(index)}
                       returnKeyType="next"
@@ -332,6 +343,13 @@ export const AssessmentEntryScreen: React.FC = () => {
                     />
                   </View>
 
+                  {isAbsent && (
+                    <View style={styles.resultContainer}>
+                      <View style={styles.resultItem}>
+                        <Text style={[styles.resultValue, { color: '#92400e', fontSize: 16 }]}>Absent</Text>
+                      </View>
+                    </View>
+                  )}
                   {percentage !== null && (
                     <View style={styles.resultContainer}>
                       <View style={styles.resultItem}>

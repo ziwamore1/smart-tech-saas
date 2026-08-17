@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { reportEngineApi, reportTemplateApi, classApi, termApi, studentApi } from '@/lib/api';
 import { toast } from 'sonner';
+import { EXAM_TYPE_OPTIONS, examTypeLabel } from '@/lib/exam-types';
 
 const REPORT_TYPES = [
   { type: 'REPORT_CARD', label: 'Report Card', icon: 'fa-file-text', color: '#3b82f6', desc: 'Individual student report card with charts and analysis', bulk: false },
@@ -103,15 +104,7 @@ export default function ReportHubPage() {
   const needsClass = selectedType && ['CLASS_REPORT', 'MARK_SCHEDULE', 'ATTENDANCE_REPORT', 'ANALYTICS_SUMMARY', 'RANKING_REPORT', 'RESULTS_ANALYSIS'].includes(selectedType);
   const needsTerm = selectedType && !['TRANSCRIPT'].includes(selectedType);
   const needsTemplate = selectedType === 'CERTIFICATE';
-  const examTypes = [
-    { value: 'END_TERM', label: 'End of Term' },
-    { value: 'MID_TERM', label: 'Mid-Term' },
-    { value: 'CAT', label: 'CAT' },
-    { value: 'ASSIGNMENT', label: 'Assignment' },
-    { value: 'PROJECT', label: 'Project' },
-    { value: 'PRACTICAL', label: 'Practical' },
-    { value: 'MOCK', label: 'Mock Examination' },
-  ];
+  const examTypes = EXAM_TYPE_OPTIONS;
 
   const canGenerate = selectedType && (!needsStudent || selectedStudent) && (!needsClass || selectedClass) && (!needsTerm || selectedTerm) && (!needsTemplate || selectedTemplate || ((templates || []).length === 0));
 

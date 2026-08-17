@@ -67,7 +67,14 @@ export const TeacherMarksScreen: React.FC<TeacherMarksProps> = ({ onToggleDrawer
     }
     const scoresArray = Object.entries(scores)
       .filter(([, score]) => score.trim() !== '')
-      .map(([studentId, score]) => ({ studentId, score: parseFloat(score) }));
+      .map(([studentId, score]) => {
+        const upper = score.trim().toUpperCase();
+        if (upper === 'X' || upper === 'A') {
+          return { studentId, score: 0, isAbsent: true };
+        }
+        return { studentId, score: parseFloat(score), isAbsent: false };
+      })
+      .filter((s) => !isNaN(s.score));
 
     if (scoresArray.length === 0) {
       Alert.alert('Error', 'Enter at least one score');
@@ -100,7 +107,12 @@ export const TeacherMarksScreen: React.FC<TeacherMarksProps> = ({ onToggleDrawer
 
     const validScores = Object.entries(scores)
       .filter(([, v]) => v.trim() !== '')
-      .map(([, v]) => parseFloat(v));
+      .map(([, v]) => {
+        const upper = v.trim().toUpperCase();
+        if (upper === 'X' || upper === 'A') return null;
+        return parseFloat(v);
+      })
+      .filter((v): v is number => v !== null && !isNaN(v));
     const avg = validScores.length > 0
       ? (validScores.reduce((a, b) => a + b, 0) / validScores.length).toFixed(1)
       : '—';
@@ -117,17 +129,25 @@ export const TeacherMarksScreen: React.FC<TeacherMarksProps> = ({ onToggleDrawer
 
     const validScores = Object.entries(scores)
       .filter(([, v]) => v.trim() !== '')
-      .map(([, v]) => parseFloat(v));
+      .map(([, v]) => {
+        const upper = v.trim().toUpperCase();
+        if (upper === 'X' || upper === 'A') return null;
+        return parseFloat(v);
+      })
+      .filter((v): v is number => v !== null && !isNaN(v));
     const avg = validScores.length > 0
       ? (validScores.reduce((a, b) => a + b, 0) / validScores.length).toFixed(1)
       : '—';
 
     let rows = students.map((s: any) => {
       const raw = scores[s.id];
-      const score = raw ? parseFloat(raw) : null;
-      const bgColor = score !== null ? getScoreBgColor(score) : '#f3f4f6';
-      const textColor = score !== null ? getScoreTextColor(score) : '#9ca3af';
-      return `<tr><td style="padding:12px;border-bottom:1px solid #e5e7eb">${s.firstName} ${s.lastName}</td><td style="padding:12px;border-bottom:1px solid #e5e7eb">${s.admissionNumber || '—'}</td><td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center"><span style="background:${bgColor};color:${textColor};padding:4px 12px;border-radius:8px;font-weight:700">${score !== null ? score + '%' : '—'}</span></td></tr>`;
+      const upper = raw ? raw.trim().toUpperCase() : '';
+      const isAbsent = upper === 'X' || upper === 'A';
+      const score = !isAbsent && raw ? parseFloat(raw) : null;
+      const displayScore = isAbsent ? 'Absent' : score !== null ? score + '%' : '—';
+      const bgColor = isAbsent ? '#fef3c7' : score !== null ? getScoreBgColor(score) : '#f3f4f6';
+      const textColor = isAbsent ? '#92400e' : score !== null ? getScoreTextColor(score) : '#9ca3af';
+      return `<tr><td style="padding:12px;border-bottom:1px solid #e5e7eb">${s.firstName} ${s.lastName}</td><td style="padding:12px;border-bottom:1px solid #e5e7eb">${s.admissionNumber || '—'}</td><td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center"><span style="background:${bgColor};color:${textColor};padding:4px 12px;border-radius:8px;font-weight:700">${displayScore}</span></td></tr>`;
     }).join('');
 
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:24px;color:#333}h1{color:#1e40af;margin:0 0 4px}.sub{color:#6b7280;font-size:14px;margin-bottom:20px}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#1e40af;color:#fff;padding:12px;text-align:left;font-size:13px}tr:nth-child(even){background:#f9fafb}.footer{margin-top:24px;padding-top:16px;border-top:2px solid #e5e7eb;text-align:center;font-size:12px;color:#6b7280}.avg{text-align:center;font-size:18px;font-weight:700;color:#1e40af;margin-top:16px}.header{display:flex;align-items:center;gap:12px;margin-bottom:16px}.logo{width:48px;height:48px}</style></head><body><div class="header"><img class="logo" src="https://api.smarttechsaas.com/uploads/logo.png" alt="Logo" onerror="this.style.display='none'"/><div><h1>${school}</h1><p class="sub">Marks Report — ${className}</p></div></div><p style="margin:0"><strong>Subject:</strong> ${subjectName}</p><p style="margin:4px 0"><strong>Term:</strong> ${term}</p><p style="margin:4px 0"><strong>Date:</strong> ${date}</p><table><thead><tr><th>Student</th><th>Admission</th><th>Score</th></tr></thead><tbody>${rows}</tbody></table><p class="avg">Class Average: ${avg}%</p><div class="footer"><p>This is a computer-generated report.</p><p>SmartTech School Management System</p></div></body></html>`;
@@ -238,9 +258,9 @@ export const TeacherMarksScreen: React.FC<TeacherMarksProps> = ({ onToggleDrawer
                       </View>
                       <TextInput
                         style={styles.scoreInput}
-                        placeholder="Score"
+                        placeholder="Score or X/A"
                         placeholderTextColor={colors.textLight}
-                        keyboardType="numeric"
+                        keyboardType="default"
                         value={scores[student.id] || ''}
                         onChangeText={(v) => setScores(prev => ({ ...prev, [student.id]: v }))}
                       />
@@ -257,9 +277,12 @@ export const TeacherMarksScreen: React.FC<TeacherMarksProps> = ({ onToggleDrawer
           <>
             {students.map((student: any) => {
               const raw = scores[student.id];
-              const score = raw ? parseFloat(raw) : null;
-              const bgColor = score !== null ? getScoreBgColor(score) : '#f3f4f6';
-              const textColor = score !== null ? getScoreTextColor(score) : '#9ca3af';
+              const upper = raw ? raw.trim().toUpperCase() : '';
+              const isAbsent = upper === 'X' || upper === 'A';
+              const score = !isAbsent && raw ? parseFloat(raw) : null;
+              const displayScore = isAbsent ? 'Absent (X/A)' : score !== null ? `${score}%` : '—';
+              const bgColor = isAbsent ? '#fef3c7' : score !== null ? getScoreBgColor(score) : '#f3f4f6';
+              const textColor = isAbsent ? '#92400e' : score !== null ? getScoreTextColor(score) : '#9ca3af';
               return (
                 <Card key={student.id} variant="outlined" style={{ padding: spacing.md, marginBottom: spacing.xs }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -268,7 +291,7 @@ export const TeacherMarksScreen: React.FC<TeacherMarksProps> = ({ onToggleDrawer
                       <Text style={{ fontSize: 12, color: colors.textLight }}>{student.admissionNumber || ''}</Text>
                     </View>
                     <View style={[styles.scoreBadge, { backgroundColor: bgColor }]}>
-                      <Text style={[styles.scoreBadgeText, { color: textColor }]}>{score !== null ? `${score}%` : '—'}</Text>
+                      <Text style={[styles.scoreBadgeText, { color: textColor }]}>{displayScore}</Text>
                     </View>
                   </View>
                 </Card>

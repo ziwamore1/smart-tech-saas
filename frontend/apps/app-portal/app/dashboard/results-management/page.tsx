@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, classApi, termApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
+import { EXAM_TYPE_OPTIONS, examTypeLabel } from '@/lib/exam-types';
 
 const STATUS_STYLES: Record<string, { bg: string; color: string }> = {
   DRAFT: { bg: '#f3f4f6', color: '#6b7280' },
@@ -23,7 +24,7 @@ export default function ResultsManagementPage() {
   const [filterStatus, setFilterStatus] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createForm, setCreateForm] = useState({ classId: '', termId: '', examType: 'Exam', academicYearId: '', title: '' });
+  const [createForm, setCreateForm] = useState({ classId: '', termId: '', examType: 'END_TERM', academicYearId: '', title: '' });
   const [actionMenu, setActionMenu] = useState<string | null>(null);
 
   const { data: classesData } = useQuery({
@@ -117,7 +118,7 @@ export default function ResultsManagementPage() {
     return terms.filter((t: any) => t.academicYearId === currentAcYear.id);
   }, [currentAcYear, terms]);
 
-  const examTypes = ['Exam', 'Mid-Term', 'CAT', 'Assignment', 'Project', 'Practical', 'Mock'];
+  const examTypes = EXAM_TYPE_OPTIONS;
 
   return (
     <div>
@@ -211,7 +212,7 @@ export default function ResultsManagementPage() {
           >
             <option value="">All Types</option>
             {examTypes.map(et => (
-              <option key={et} value={et}>{et}</option>
+              <option key={et.value} value={et.value}>{et.label}</option>
             ))}
           </select>
         </div>
@@ -309,10 +310,10 @@ export default function ResultsManagementPage() {
                       onMouseEnter={e => e.currentTarget.style.background = '#faf7f4'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
-                      <td style={{ padding: '14px 20px', fontWeight: 600, color: '#1f2937' }}>{sheet.title || `${sheet.class?.name || ''} ${sheet.examType || ''}`}</td>
+                      <td style={{ padding: '14px 20px', fontWeight: 600, color: '#1f2937' }}>{sheet.title || `${sheet.class?.name || ''} ${examTypeLabel(sheet.examType) || ''}`}</td>
                       <td style={{ padding: '14px 20px', color: '#374151' }}>{sheet.class?.name || '-'}</td>
                       <td style={{ padding: '14px 20px', color: '#374151' }}>{sheet.term?.name || '-'}</td>
-                      <td style={{ padding: '14px 20px', color: '#374151' }}>{sheet.examType || '-'}</td>
+                      <td style={{ padding: '14px 20px', color: '#374151' }}>{examTypeLabel(sheet.examType) || '-'}</td>
                       <td style={{ padding: '14px 20px' }}>
                         <span style={{
                           display: 'inline-block', padding: '4px 12px',
@@ -528,7 +529,7 @@ export default function ResultsManagementPage() {
                   }}
                 >
                   {examTypes.map(et => (
-                    <option key={et} value={et}>{et}</option>
+                    <option key={et.value} value={et.value}>{et.label}</option>
                   ))}
                 </select>
               </div>

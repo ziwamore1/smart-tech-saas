@@ -1253,6 +1253,169 @@ export class HealthController {
     };
   }
 
+  @Get('backfill-exam-types')
+  async backfillExamTypes() {
+    const start = Date.now();
+    const results: Record<string, any> = {
+      sheetsScanned: 0,
+      sheetsFixed: 0,
+      sheetsSkipped: 0,
+      errors: [],
+      before: {},
+      after: {},
+    };
+
+    const VALID_EXAM_TYPES = [
+      'EXAM', 'QUIZ', 'TEST', 'MID_TERM', 'END_TERM',
+      'PRACTICAL', 'OBJECTIVE', 'STRUCTURED', 'MOCK', 'SP1', 'SP2',
+    ];
+
+    const EXAM_TYPE_MAP: Record<string, string> = {
+      'exam': 'EXAM',
+      'Exam': 'EXAM',
+      'EXAM': 'EXAM',
+      'quiz': 'QUIZ',
+      'Quiz': 'QUIZ',
+      'QUIZ': 'QUIZ',
+      'test': 'TEST',
+      'Test': 'TEST',
+      'TEST': 'TEST',
+      'cat': 'TEST',
+      'Cat': 'TEST',
+      'CAT': 'TEST',
+      'mid-term': 'MID_TERM',
+      'Mid-Term': 'MID_TERM',
+      'MID_TERM': 'MID_TERM',
+      'Mid Term': 'MID_TERM',
+      'mid_term': 'MID_TERM',
+      'midterm': 'MID_TERM',
+      'Midterm': 'MID_TERM',
+      'MIDTERM': 'MID_TERM',
+      'end-term': 'END_TERM',
+      'End-Term': 'END_TERM',
+      'END_TERM': 'END_TERM',
+      'End Term': 'END_TERM',
+      'end_term': 'END_TERM',
+      'endterm': 'END_TERM',
+      'Endterm': 'END_TERM',
+      'ENDTERM': 'END_TERM',
+      'end of term': 'END_TERM',
+      'End of Term': 'END_TERM',
+      'practical': 'PRACTICAL',
+      'Practical': 'PRACTICAL',
+      'PRACTICAL': 'PRACTICAL',
+      'objective': 'OBJECTIVE',
+      'Objective': 'OBJECTIVE',
+      'OBJECTIVE': 'OBJECTIVE',
+      'structured': 'STRUCTURED',
+      'Structured': 'STRUCTURED',
+      'STRUCTURED': 'STRUCTURED',
+      'mock': 'MOCK',
+      'Mock': 'MOCK',
+      'MOCK': 'MOCK',
+      'sp1': 'SP1',
+      'Sp1': 'SP1',
+      'SP1': 'SP1',
+      'sp2': 'SP2',
+      'Sp2': 'SP2',
+      'SP2': 'SP2',
+      'assignment': 'EXAM',
+      'Assignment': 'EXAM',
+      'ASSIGNMENT': 'EXAM',
+      'project': 'PRACTICAL',
+      'Project': 'PRACTICAL',
+      'PROJECT': 'PRACTICAL',
+    };
+
+    try {
+      const allSheets = await this.prisma.resultSheet.findMany({
+        select: { id: true, classId: true, termId: true, examType: true, schoolId: true },
+      });
+
+      results.sheetsScanned = allSheets.length;
+
+      // Count current examType distribution
+      for (const sheet of allSheets) {
+        const et = sheet.examType || 'END_TERM';
+        results.before[et] = (results.before[et] || 0) + 1;
+      }
+
+      for (const sheet of allSheets) {
+        const currentExamType = sheet.examType || 'END_TERM';
+
+        // Already valid — skip
+        if (VALID_EXAM_TYPES.includes(currentExamType)) {
+          results.sheetsSkipped++;
+          continue;
+        }
+
+        // Try to map to a valid value
+        const mappedExamType = EXAM_TYPE_MAP[currentExamType];
+        if (!mappedExamType) {
+          results.errors.push({
+            sheetId: sheet.id,
+            examType: currentExamType,
+            error: 'No mapping found — leaving as-is',
+          });
+          results.sheetsSkipped++;
+          continue;
+        }
+
+        try {
+          // Check if a sheet with the correct examType already exists for this class+term
+          const existing = await this.prisma.resultSheet.findFirst({
+            where: {
+              classId: sheet.classId,
+              termId: sheet.termId,
+              examType: mappedExamType,
+              id: { not: sheet.id },
+            },
+          });
+
+          if (existing) {
+            // A sheet with the correct examType already exists — delete the duplicate
+            await this.prisma.resultSheet.delete({ where: { id: sheet.id } });
+
+            results.sheetsFixed++;
+            results.errors.push({
+              sheetId: sheet.id,
+              examType: currentExamType,
+              mappedTo: mappedExamType,
+              mergedInto: existing.id,
+            });
+          } else {
+            // No conflict — just update the examType
+            await this.prisma.resultSheet.update({
+              where: { id: sheet.id },
+              data: { examType: mappedExamType },
+            });
+            results.sheetsFixed++;
+          }
+        } catch (e: any) {
+          results.errors.push({ sheetId: sheet.id, examType: currentExamType, error: e.message });
+        }
+      }
+
+      // Count after distribution
+      const afterSheets = await this.prisma.resultSheet.findMany({
+        select: { examType: true },
+      });
+      for (const sheet of afterSheets) {
+        const et = sheet.examType || 'END_TERM';
+        results.after[et] = (results.after[et] || 0) + 1;
+      }
+    } catch (e: any) {
+      results.fatalError = e.message;
+    }
+
+    results.summary = `scanned: ${results.sheetsScanned}, fixed: ${results.sheetsFixed}, skipped: ${results.sheetsSkipped}, errors: ${results.errors.length}`;
+    return {
+      status: results.fatalError ? 'error' : 'ok',
+      latencyMs: Date.now() - start,
+      ...results,
+    };
+  }
+
   @Head()
   async head() {
     const health = await this.healthService.check();

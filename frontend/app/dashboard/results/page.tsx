@@ -800,7 +800,8 @@ export default function ResultsPage() {
     studentId: string;
     subjectId: string;
     resultId?: string | null;
-    score?: number | null;
+    score?: number | string | null;
+    isAbsent?: boolean;
   } | null>(null);
 
   const { data: classesData = [], isLoading: classesLoading, error: classesError } = useQuery({
@@ -1367,29 +1368,50 @@ export default function ResultsPage() {
                               <td key={subject.id} className="text-center py-2 px-2">
                                 <div className="flex justify-center gap-1">
                                   <input
-                                    type="number"
-                                    min="0"
-                                    max="100"
+                                    type="text"
+                                    inputMode="decimal"
                                     autoFocus
-                                    value={editingCell?.score ?? result.score ?? ''}
-                                    onChange={(e) =>
-                                      editingCell && setEditingCell({ ...editingCell, score: Number(e.target.value) })
-                                    }
-                                    className="w-16 px-1 py-0.5 border rounded text-center"
+                                    value={editingCell?.isAbsent ? '' : (editingCell?.score ?? result.score ?? '')}
+                                    onChange={(e) => {
+                                      if (!editingCell) return;
+                                      const val = e.target.value.trim().toUpperCase();
+                                      if (val === 'X' || val === 'A') {
+                                        setEditingCell({ ...editingCell, isAbsent: true, score: 0 });
+                                      } else {
+                                        setEditingCell({ ...editingCell, isAbsent: false, score: val ? Number(val) : null });
+                                      }
+                                    }}
+                                    className={`w-16 px-1 py-0.5 border rounded text-center ${
+                                      editingCell?.isAbsent ? 'border-amber-300 bg-amber-50 text-amber-800' : ''
+                                    }`}
+                                    placeholder={editingCell?.isAbsent ? 'X/A' : '0-100 or X/A'}
                                   />
                                   <button
                                     onClick={() => {
-                                      const score = editingCell?.score;
-                                      if (score === null || score === undefined || isNaN(score)) return;
-                                      if (result.id) {
-                                        updateResultMutation.mutate({ id: result.id, score });
+                                      if (editingCell?.isAbsent) {
+                                        if (result.id) {
+                                          updateResultMutation.mutate({ id: result.id, score: 0 });
+                                        } else {
+                                          createResultMutation.mutate({
+                                            studentId: row.student?.id,
+                                            subjectId: subject.id,
+                                            termId: selectedTerm,
+                                            score: 0,
+                                          });
+                                        }
                                       } else {
-                                        createResultMutation.mutate({
-                                          studentId: row.student?.id,
-                                          subjectId: subject.id,
-                                          termId: selectedTerm,
-                                          score,
-                                        });
+                                        const score = typeof editingCell?.score === 'number' ? editingCell.score : Number(editingCell?.score);
+                                        if (score === null || score === undefined || isNaN(score)) return;
+                                        if (result.id) {
+                                          updateResultMutation.mutate({ id: result.id, score });
+                                        } else {
+                                          createResultMutation.mutate({
+                                            studentId: row.student?.id,
+                                            subjectId: subject.id,
+                                            termId: selectedTerm,
+                                            score,
+                                          });
+                                        }
                                       }
                                       setEditingCell(null);
                                     }}

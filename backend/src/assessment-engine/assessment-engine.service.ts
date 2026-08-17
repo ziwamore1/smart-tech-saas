@@ -4,6 +4,7 @@ import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { SocketGateway } from '../messaging/socket.gateway';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
+import { normalizeExamType } from '../common/utils/exam-type.util';
 
 export interface CreateAssessmentDefinitionDto {
   name: string;
@@ -428,7 +429,7 @@ export class AssessmentEngineService {
     });
     if (!term) return;
 
-    const resolvedExamType = examType || 'END_TERM';
+    const resolvedExamType = normalizeExamType(examType);
 
     const sheet = await this.prisma.resultSheet.upsert({
       where: {

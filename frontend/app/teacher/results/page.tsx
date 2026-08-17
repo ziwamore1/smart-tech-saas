@@ -14,6 +14,7 @@ export default function TeacherResultsPage() {
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedAssessmentType, setSelectedAssessmentType] = useState('');
   const [scores, setScores] = useState<Record<string, number>>({});
+  const [absentCells, setAbsentCells] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isBulkEntry, setIsBulkEntry] = useState(false);
 
@@ -182,10 +183,20 @@ export default function TeacherResultsPage() {
   );
 
   const handleSaveAll = () => {
-    const scoreList = Object.entries(scores)
-      .filter(([, score]) => score > 0)
-      .map(([studentId, score]) => ({ studentId, score }));
-    
+    const scoreList: Array<{ studentId: string; score: number }> = [];
+
+    absentCells.forEach(key => {
+      scoreList.push({ studentId: key, score: 0 });
+    });
+
+    Object.entries(scores)
+      .filter(([, score]) => score >= 0)
+      .forEach(([studentId, score]) => {
+        if (!absentCells.has(studentId)) {
+          scoreList.push({ studentId, score });
+        }
+      });
+
     if (scoreList.length === 0) {
       setMessage({ type: 'error', text: 'Please enter at least one score' });
       setTimeout(() => setMessage(null), 3000);
@@ -335,13 +346,13 @@ export default function TeacherResultsPage() {
                   Compute Final Results
                 </button>
               )}
-              {isBulkEntry && Object.keys(scores).length > 0 && (
+              {isBulkEntry && (Object.keys(scores).length > 0 || absentCells.size > 0) && (
                 <button
                   onClick={handleSaveAll}
                   disabled={bulkEnterScoresMutation.isPending}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
                 >
-                  Save All Scores
+                  Save All ({Object.keys(scores).length + absentCells.size})
                 </button>
               )}
             </div>
@@ -402,34 +413,49 @@ export default function TeacherResultsPage() {
                         <td className="py-3 px-4 text-center">
                           {isBulkEntry ? (
                             <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={scores[student.id] ?? ''}
-                              onChange={(e) => setScores({
-                                ...scores,
-                                [student.id]: Number(e.target.value),
-                              })}
-                              className="w-20 px-2 py-1 border rounded text-center"
-                              placeholder="0-100"
+                              type="text"
+                              inputMode="decimal"
+                              value={absentCells.has(student.id) ? '' : (scores[student.id] ?? '')}
+                              onChange={(e) => {
+                                const val = e.target.value.trim().toUpperCase();
+                                if (val === 'X' || val === 'A') {
+                                  setAbsentCells(prev => new Set(prev).add(student.id));
+                                  setScores(prev => { const next = { ...prev }; delete next[student.id]; return next; });
+                                } else {
+                                  setAbsentCells(prev => { const next = new Set(prev); next.delete(student.id); return next; });
+                                  setScores({
+                                    ...scores,
+                                    [student.id]: val ? Number(val) : 0,
+                                  });
+                                }
+                              }}
+                              className={`w-20 px-2 py-1 border rounded text-center ${
+                                absentCells.has(student.id) ? 'border-amber-300 bg-amber-50 text-amber-800' : ''
+                              }`}
+                              placeholder={absentCells.has(student.id) ? 'X/A' : '0-100 or X/A'}
                             />
                           ) : (
                             <div className="flex items-center justify-center gap-2">
                               <input
-                                type="number"
-                                min="0"
-                                max="100"
+                                type="text"
+                                inputMode="decimal"
                                 id={`score-${student.id}`}
                                 className="w-20 px-2 py-1 border rounded text-center"
-                                placeholder="0-100"
+                                placeholder="0-100 or X/A"
                               />
                               <button
                                 onClick={() => {
                                   const input = document.getElementById(`score-${student.id}`) as HTMLInputElement;
-                                  const score = Number(input.value);
-                                  if (score >= 0 && score <= 100) {
-                                    enterScoreMutation.mutate({ studentId: student.id, score });
+                                  const val = input.value.trim().toUpperCase();
+                                  if (val === 'X' || val === 'A') {
+                                    setAbsentCells(prev => new Set(prev).add(student.id));
                                     input.value = '';
+                                  } else {
+                                    const score = Number(input.value);
+                                    if (score >= 0 && score <= 100) {
+                                      enterScoreMutation.mutate({ studentId: student.id, score });
+                                      input.value = '';
+                                    }
                                   }
                                 }}
                                 className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"

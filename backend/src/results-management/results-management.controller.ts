@@ -203,7 +203,7 @@ export class ResultsManagementController {
       req.user.schoolId,
       termId,
       classId,
-      examType || 'Exam',
+      examType || 'END_TERM',
       file,
     );
     return { data, message: 'Results imported successfully' };

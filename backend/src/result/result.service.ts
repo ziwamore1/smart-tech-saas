@@ -470,7 +470,7 @@ export class ResultService {
         });
         const entered = created.filter(r => enrollmentMap.get(r.studentId) === classId).length;
         await this.prisma.resultSheet.updateMany({
-          where: { classId, termId: firstTermId, examType: 'END_TERM' },
+          where: { classId, termId: firstTermId, schoolId },
           data: { totalStudents: enrolled, enteredCount: { increment: entered } },
         });
       }

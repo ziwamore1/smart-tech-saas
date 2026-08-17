@@ -46,6 +46,7 @@ export default function TeacherResultsPage() {
   const [selectedAssessmentType, setSelectedAssessmentType] = useState('');
   const [entryMode, setEntryMode] = useState<EntryMode>('single');
   const [scores, setScores] = useState<Record<string, number>>({});
+  const [absentCells, setAbsentCells] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isBulkEntry, setIsBulkEntry] = useState(false);
 
@@ -226,12 +227,23 @@ export default function TeacherResultsPage() {
       : teachingSubjects.filter((s: any) => s.id === selectedSubject || s.subjectId === selectedSubject);
 
   const handleSaveAll = () => {
-    const scoreList = Object.entries(scores)
-      .filter(([, score]) => score > 0)
-      .map(([key, score]) => {
+    const scoreList: Array<{ studentId: string; subjectId: string; score: number }> = [];
+
+    absentCells.forEach(key => {
+      const [studentId, subjectId] = key.split('|');
+      scoreList.push({ studentId, subjectId, score: 0 });
+    });
+
+    Object.entries(scores)
+      .filter(([, score]) => score >= 0)
+      .forEach(([key, score]) => {
         const [studentId, subjectId] = key.split('|');
-        return { studentId, subjectId, score };
+        const absentKey = `${studentId}|${subjectId}`;
+        if (!absentCells.has(absentKey)) {
+          scoreList.push({ studentId, subjectId, score });
+        }
       });
+
     if (scoreList.length === 0) {
       setMessage({ type: 'error', text: 'Please enter at least one score' });
       setTimeout(() => setMessage(null), 3000);
@@ -298,6 +310,9 @@ export default function TeacherResultsPage() {
         {entryMode === 'single' && 'Mode A: Single Subject — You can enter marks for one subject at a time. Select a subject below.'}
         {entryMode === 'multi' && `Mode B: Multi Subject — You teach ${teachingSubjects.length} subjects. All your subjects are shown.`}
         {entryMode === 'class' && `Mode C: Class Teacher Bulk — ${classSubjects.length} subjects loaded for your class. Enter all at once.`}
+        <span className="ml-2 text-amber-700 font-semibold">
+          <i className="fa fa-user-slash mr-1"></i>Type <strong>X</strong> or <strong>A</strong> to mark a learner absent.
+        </span>
       </div>
 
       <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
@@ -413,13 +428,13 @@ export default function TeacherResultsPage() {
                   Compute Final Results
                 </button>
               )}
-              {isBulkEntry && Object.keys(scores).length > 0 && (
+              {isBulkEntry && (Object.keys(scores).length > 0 || absentCells.size > 0) && (
                 <button
                   onClick={handleSaveAll}
                   disabled={bulkEnterScoresMutation.isPending}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
                 >
-                  Save All Scores ({Object.keys(scores).length})
+                  Save All ({Object.keys(scores).length + absentCells.size})
                 </button>
               )}
             </div>
@@ -462,7 +477,14 @@ export default function TeacherResultsPage() {
 
                         return (
                           <td key={scoreKey} className={`py-2 px-3 text-center ${isMissing ? 'bg-yellow-50' : ''}`}>
-                            {currentScore > 0 && !isMissing && (
+                            {absentCells.has(scoreKey) && (
+                              <div className="mb-1">
+                                <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                                  Absent
+                                </span>
+                              </div>
+                            )}
+                            {currentScore > 0 && !isMissing && !absentCells.has(scoreKey) && (
                               <div className="mb-1">
                                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${getGradeColor(currentScore)}`}>
                                   {getGrade(existing, currentScore)}
@@ -470,24 +492,34 @@ export default function TeacherResultsPage() {
                               </div>
                             )}
                             <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.5"
-                              value={scores[scoreKey] ?? (existing?.score ?? '')}
+                              type="text"
+                              inputMode="decimal"
+                              value={absentCells.has(scoreKey) ? '' : (scores[scoreKey] ?? (existing?.score ?? ''))}
                               onChange={(e) => {
-                                const val = e.target.value;
-                                setScores(prev => ({
-                                  ...prev,
-                                  [scoreKey]: val ? Number(val) : 0,
-                                }));
+                                const val = e.target.value.trim().toUpperCase();
+                                if (val === 'X' || val === 'A') {
+                                  setAbsentCells(prev => new Set(prev).add(scoreKey));
+                                  setScores(prev => {
+                                    const next = { ...prev };
+                                    delete next[scoreKey];
+                                    return next;
+                                  });
+                                } else {
+                                  setAbsentCells(prev => { const next = new Set(prev); next.delete(scoreKey); return next; });
+                                  setScores(prev => ({
+                                    ...prev,
+                                    [scoreKey]: val ? Number(val) : 0,
+                                  }));
+                                }
                               }}
                               className={`w-16 px-1.5 py-1 border rounded text-center text-sm ${
-                                !isMissing && existing?.score < PASS_THRESHOLD
-                                  ? 'border-red-300 bg-red-50'
-                                  : isMissing ? 'border-yellow-300 bg-yellow-50' : ''
+                                absentCells.has(scoreKey)
+                                  ? 'border-amber-300 bg-amber-50 text-amber-800'
+                                  : !isMissing && existing?.score < PASS_THRESHOLD
+                                    ? 'border-red-300 bg-red-50'
+                                    : isMissing ? 'border-yellow-300 bg-yellow-50' : ''
                               }`}
-                              placeholder="0-100"
+                              placeholder={absentCells.has(scoreKey) ? 'X/A' : '0-100 or X/A'}
                             />
                           </td>
                         );

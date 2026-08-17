@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, classApi, termApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
+import { EXAM_TYPE_OPTIONS, examTypeLabel } from '@/lib/exam-types';
 
 export default function BulkUploadPage() {
   const { user } = useAuth();
@@ -39,7 +40,7 @@ export default function BulkUploadPage() {
   });
   const terms = useMemo(() => Array.isArray(termsData) ? termsData : [], [termsData]);
 
-  const examTypes = ['Exam', 'Mid-Term', 'CAT', 'Assignment', 'Project', 'Practical', 'Mock'];
+  const examTypes = EXAM_TYPE_OPTIONS;
 
   const downloadTemplate = useCallback(async () => {
     if (!selectedTerm) {
@@ -191,7 +192,7 @@ export default function BulkUploadPage() {
               }}
             >
               {examTypes.map(et => (
-                <option key={et} value={et}>{et}</option>
+                <option key={et.value} value={et.value}>{et.label}</option>
               ))}
             </select>
           </div>

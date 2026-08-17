@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { assessmentEngineApi } from '@/lib/api';
 import { toast } from 'sonner';
+import { EXAM_TYPE_OPTIONS, examTypeLabel } from '@/lib/exam-types';
 
 interface Definition {
   id: string;
@@ -21,7 +22,7 @@ interface Definition {
 }
 
 const CATEGORIES = ['continuous', 'midterm', 'end_of_term', 'project', 'practical', 'other'];
-const EXAM_TYPES = ['EXAM', 'QUIZ', 'TEST', 'MID_TERM', 'END_TERM', 'PRACTICAL', 'OBJECTIVE', 'STRUCTURED', 'MOCK', 'SP1', 'SP2'];
+const EXAM_TYPES = EXAM_TYPE_OPTIONS;
 
 const defaultForm = {
   name: '',
@@ -165,7 +166,7 @@ export default function AssessmentDefinitionsPage() {
                   <select value={form.examType} onChange={e => setForm({ ...form, examType: e.target.value })}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     <option value="">-- None --</option>
-                    {EXAM_TYPES.map(et => <option key={et} value={et}>{et.replace(/_/g, ' ')}</option>)}
+                    {EXAM_TYPES.map(et => <option key={et.value} value={et.value}>{et.label}</option>)}
                   </select>
                 </div>
               </div>
@@ -261,7 +262,7 @@ export default function AssessmentDefinitionsPage() {
                     <td className="py-3 px-4 text-gray-600 capitalize">{d.category.replace(/_/g, ' ')}</td>
                     <td className="py-3 px-4">
                       {d.examType ? (
-                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-mono">{d.examType.replace(/_/g, ' ')}</span>
+                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-mono">{examTypeLabel(d.examType || '')}</span>
                       ) : (
                         <span className="text-gray-400 text-xs">—</span>
                       )}

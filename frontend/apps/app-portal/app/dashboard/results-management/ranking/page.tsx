@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api, classApi, termApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
+import { EXAM_TYPE_OPTIONS, examTypeLabel } from '@/lib/exam-types';
 import { openRankingReport, RankingStudent, ReportMeta } from '@/lib/report-utils';
 
 type RankingType = 'class' | 'subject' | 'gender';
@@ -52,7 +53,7 @@ export default function RankingPage() {
   });
   const subjects = useMemo(() => Array.isArray(subjectsData) ? subjectsData : [], [subjectsData]);
 
-  const examTypes = ['Exam', 'Mid-Term', 'CAT', 'Assignment', 'Project', 'Practical', 'Mock'];
+  const examTypes = EXAM_TYPE_OPTIONS;
 
   const computeRankings = useCallback(async () => {
     if (!selectedClass || !selectedTerm) {
@@ -235,7 +236,7 @@ export default function RankingPage() {
               onChange={e => setSelectedExamType(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', fontSize: '14px', border: '1px solid #e8ddd0', borderRadius: '8px', background: '#fefcf9' }}
             >
-              {examTypes.map(et => <option key={et} value={et}>{et}</option>)}
+              {examTypes.map(et => <option key={et.value} value={et.value}>{et.label}</option>)}
             </select>
           </div>
           <div>

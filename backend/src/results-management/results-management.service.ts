@@ -10,6 +10,7 @@ import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { PushNotificationService } from '../push-notification/push-notification.service';
 import { Prisma } from '@prisma/client';
 import * as XLSX from 'xlsx';
+import { normalizeExamType } from '../common/utils/exam-type.util';
 
 type AnalysisBand = {
   labels: string[];
@@ -128,7 +129,7 @@ export class ResultsManagementService {
     filters: { status?: string; classId?: string; termId?: string; examType?: string },
   ) {
     const targetTermId = filters.termId;
-    const examType = filters.examType || 'END_TERM';
+    const examType = normalizeExamType(filters.examType);
 
     if (!filters.classId) {
       const currentYear = await this.prisma.academicYear.findFirst({
@@ -182,7 +183,7 @@ export class ResultsManagementService {
     if (filters.status) where.status = filters.status;
     if (filters.classId) where.classId = filters.classId;
     if (filters.termId) where.termId = filters.termId;
-    if (filters.examType) where.examType = filters.examType;
+    if (filters.examType) where.examType = normalizeExamType(filters.examType);
 
     let sheets = await this.prisma.resultSheet.findMany({
       where,
@@ -1684,6 +1685,7 @@ export class ResultsManagementService {
     examType: string,
     file: Express.Multer.File,
   ) {
+    const normalisedExamType = normalizeExamType(examType);
     const term = await this.prisma.term.findUnique({
       where: { id: termId },
       include: { academicYear: true },
@@ -1721,7 +1723,7 @@ export class ResultsManagementService {
     // Get or create the result sheet
     const currentAcYear = term.academicYearId;
     let resultSheet = await this.prisma.resultSheet.findFirst({
-      where: { classId, termId, examType },
+      where: { classId, termId, examType: normalisedExamType },
     });
 
     if (!resultSheet) {
@@ -1734,7 +1736,7 @@ export class ResultsManagementService {
           classId,
           termId,
           academicYearId: currentAcYear,
-          examType,
+          examType: normalisedExamType,
           createdBy: userId,
           totalStudents: enrollmentCount,
         },
@@ -1855,12 +1857,13 @@ export class ResultsManagementService {
     description?: string;
     createdBy: string;
   }) {
+    const examType = normalizeExamType(data.examType);
     const existing = await this.prisma.resultSheet.findUnique({
       where: {
         classId_termId_examType: {
           classId: data.classId,
           termId: data.termId,
-          examType: data.examType || 'END_TERM',
+          examType,
         },
       },
     });
@@ -1890,7 +1893,7 @@ export class ResultsManagementService {
         classId: data.classId,
         termId: data.termId,
         academicYearId,
-        examType: data.examType || 'END_TERM',
+        examType,
         title: data.title,
         description: data.description,
         createdBy: data.createdBy,

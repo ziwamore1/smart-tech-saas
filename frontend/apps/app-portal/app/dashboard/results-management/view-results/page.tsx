@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api, classApi, termApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
+import { EXAM_TYPE_OPTIONS, examTypeLabel } from '@/lib/exam-types';
 import {
   openMarkScheduleReport, openAnalysisReport, openRankingReport,
   ReportStudent, ReportMeta, AnalysisData, RankingStudent,
@@ -247,7 +248,7 @@ export default function ViewResultsPage() {
     };
   }, [selectedClass, selectedTerm, selectedExamType, classes, terms, user, sheetData]);
 
-  const examTypes = ['Exam', 'Mid-Term', 'CAT', 'Assignment', 'Project', 'Practical', 'Mock'];
+  const examTypes = EXAM_TYPE_OPTIONS;
 
   return (
     <div>
@@ -341,7 +342,7 @@ export default function ViewResultsPage() {
           <select value={selectedExamType} onChange={e => setSelectedExamType(e.target.value)}
             style={{ width: '100%', padding: '10px 14px', fontSize: '14px', border: '1px solid #e8ddd0', borderRadius: '8px', background: '#fefcf9' }}>
             <option value="">All Types</option>
-            {examTypes.map(et => <option key={et} value={et}>{et}</option>)}
+            {examTypes.map(et => <option key={et.value} value={et.value}>{et.label}</option>)}
           </select>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -365,7 +366,7 @@ export default function ViewResultsPage() {
             {STATUS_STYLES[sheetData.status]?.label || sheetData.status}
           </span>
           <span style={{ fontSize: '13px', color: '#6b7280' }}>
-            {sheetData.title || `${sheetData.class?.name || ''} ${sheetData.examType || ''}`}
+            {sheetData.title || `${sheetData.class?.name || ''} ${examTypeLabel(sheetData.examType) || ''}`}
           </span>
         </div>
       )}
