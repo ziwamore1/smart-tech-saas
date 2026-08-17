@@ -751,6 +751,23 @@ export class ResultService {
       });
     }
 
+    // Directors may not have teaching assignments at all. When a class is
+    // selected and the user has full access, fall back to ClassSubject records
+    // so they can still download and fill the template.
+    if (classId && isFullAccess && assignments.length === 0) {
+      const classSubjects = await this.prisma.classSubject.findMany({
+        where: { classId, schoolId },
+        include: { subject: true, class: true },
+      });
+      if (classSubjects.length > 0) {
+        assignments = classSubjects.map((cs) => ({
+          ...cs,
+          teacherId: userId,
+          academicYearId: term.academicYearId,
+        })) as any;
+      }
+    }
+
     if (assignments.length === 0) {
       throw new ForbiddenException('No teaching assignments found');
     }
