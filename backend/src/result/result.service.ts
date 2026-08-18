@@ -380,14 +380,24 @@ export class ResultService {
   ): Promise<void> {
     try {
       const sheet = await this.prisma.resultSheet.findFirst({
-        where: { schoolId, classId, termId, status: 'DRAFT' },
+        where: { schoolId, classId, termId, status: { not: 'LOCKED' } },
       });
       if (!sheet) return;
+
+      if (sheet.status === 'SUBMITTED') return;
+
+      const previousStatus = sheet.status;
 
       await this.prisma.$transaction(async (tx) => {
         await tx.resultSheet.update({
           where: { id: sheet.id },
-          data: { status: 'SUBMITTED', submittedAt: new Date(), submittedBy: userId },
+          data: {
+            status: 'SUBMITTED',
+            submittedAt: new Date(),
+            submittedBy: userId,
+            verifiedBy: null,
+            verifiedAt: null,
+          },
         });
         await tx.resultAuditLog.create({
           data: {
@@ -398,12 +408,16 @@ export class ResultService {
             classId,
             termId,
             performedBy: userId,
-            metadata: { autoSubmitted: true, reason: 'Auto-submitted on result save' },
+            metadata: {
+              autoSubmitted: true,
+              previousStatus,
+              reason: `Auto-submitted: new results added while sheet was ${previousStatus}`,
+            },
           },
         });
       });
 
-      this.logger.log(`Auto-submitted result sheet ${sheet.id} for class ${classId}, term ${termId}`);
+      this.logger.log(`Auto-submitted result sheet ${sheet.id} for class ${classId}, term ${termId} (was ${previousStatus})`);
 
       if (this.schoolEvents) {
         this.schoolEvents.emitResultsLive(schoolId, {
@@ -412,6 +426,7 @@ export class ResultService {
           sheetId: sheet.id,
           status: 'SUBMITTED',
           action: 'auto-submitted',
+          previousStatus,
           by: userId,
         });
       }
