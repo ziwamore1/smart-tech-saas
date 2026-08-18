@@ -28,6 +28,16 @@ export default function TeacherResultsPage() {
   const { user, isClassTeacher } = useAuth();
   const queryClient = useQueryClient();
 
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedTerm, setSelectedTerm] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('all');
+  const [selectedAssessmentType, setSelectedAssessmentType] = useState('');
+  const [entryMode, setEntryMode] = useState<EntryMode>('single');
+  const [scores, setScores] = useState<Record<string, number>>({});
+  const [absentCells, setAbsentCells] = useState<Set<string>>(new Set());
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isBulkEntry, setIsBulkEntry] = useState(false);
+
   useEffect(() => {
     const schoolId = user?.schoolId;
     if (!schoolId) return;
@@ -49,16 +59,6 @@ export default function TeacherResultsPage() {
 
     return () => { socket.off(eventName, handler); socket.off('results:saved', savedHandler); };
   }, [user?.schoolId, selectedClass, selectedTerm, queryClient]);
-
-  const [selectedClass, setSelectedClass] = useState('');
-  const [selectedTerm, setSelectedTerm] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState('all');
-  const [selectedAssessmentType, setSelectedAssessmentType] = useState('');
-  const [entryMode, setEntryMode] = useState<EntryMode>('single');
-  const [scores, setScores] = useState<Record<string, number>>({});
-  const [absentCells, setAbsentCells] = useState<Set<string>>(new Set());
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [isBulkEntry, setIsBulkEntry] = useState(false);
 
   const { data: teacherData } = useQuery({
     queryKey: ['my-teacher-profile'],
