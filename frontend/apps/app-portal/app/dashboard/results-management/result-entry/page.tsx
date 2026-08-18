@@ -112,6 +112,27 @@ export default function ResultEntryPage() {
   const { user, isClassTeacher, isTeacher } = useAuth();
   const queryClient = useQueryClient();
 
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedTerm, setSelectedTerm] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('all');
+  const [entryMode, setEntryMode] = useState<'single' | 'bulk'>('bulk');
+  const [searchFilter, setSearchFilter] = useState('');
+  const [editingCell, setEditingCell] = useState<{ studentId: string; subjectId: string; value: string } | null>(null);
+  const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
+  const [scores, setScores] = useState<Record<string, Record<string, number | null>>>({});
+  const [dirtyCells, setDirtyCells] = useState<Set<string>>(new Set());
+  const [absentCells, setAbsentCells] = useState<Set<string>>(new Set());
+  const [pasteMode, setPasteMode] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [showSavedBanner, setShowSavedBanner] = useState(false);
+  const [lastSavedCount, setLastSavedCount] = useState(0);
+  const [componentScores, setComponentScores] = useState<Record<string, Record<string, { rawScore: number | null; isAbsent: boolean }>>>({});
+  const [savingComponents, setSavingComponents] = useState(false);
+  const [showWorkflow, setShowWorkflow] = useState(true);
+  const [sheetId, setSheetId] = useState<string | null>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const schoolId = user?.schoolId;
     if (!schoolId) return;
@@ -136,27 +157,6 @@ export default function ResultEntryPage() {
     socket.on('results:saved', handler);
     return () => { socket.off('results:saved', handler); };
   }, [user?.schoolId, selectedClass, selectedTerm, queryClient]);
-
-  const [selectedClass, setSelectedClass] = useState('');
-  const [selectedTerm, setSelectedTerm] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState('all');
-  const [entryMode, setEntryMode] = useState<'single' | 'bulk'>('bulk');
-  const [searchFilter, setSearchFilter] = useState('');
-  const [editingCell, setEditingCell] = useState<{ studentId: string; subjectId: string; value: string } | null>(null);
-  const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
-  const [scores, setScores] = useState<Record<string, Record<string, number | null>>>({});
-  const [dirtyCells, setDirtyCells] = useState<Set<string>>(new Set());
-  const [absentCells, setAbsentCells] = useState<Set<string>>(new Set());
-  const [pasteMode, setPasteMode] = useState(false);
-  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
-  const [showSavedBanner, setShowSavedBanner] = useState(false);
-  const [lastSavedCount, setLastSavedCount] = useState(0);
-  const [componentScores, setComponentScores] = useState<Record<string, Record<string, { rawScore: number | null; isAbsent: boolean }>>>({});
-  const [savingComponents, setSavingComponents] = useState(false);
-  const [showWorkflow, setShowWorkflow] = useState(true);
-  const [sheetId, setSheetId] = useState<string | null>(null);
-  const tableRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: classesData } = useQuery({
     queryKey: isTeacher ? ['teacher-classes'] : ['classes'],
