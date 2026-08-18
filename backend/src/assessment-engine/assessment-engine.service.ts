@@ -145,11 +145,11 @@ export class AssessmentEngineService {
     return this.prisma.assessmentDefinition.update({
       where: { id },
       data: {
-        ...(data.name && { name: data.name }),
-        ...(data.code && { code: data.code }),
-        ...(data.category && { category: data.category }),
-        ...(data.examType && { examType: data.examType as any }),
-        ...(data.description !== undefined && { description: data.description }),
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.code !== undefined && { code: data.code }),
+        ...(data.category !== undefined && { category: data.category }),
+        ...(data.examType !== undefined && { examType: data.examType as any || null }),
+        ...(data.description !== undefined && { description: data.description || null }),
         ...(data.defaultMaxScore !== undefined && { defaultMaxScore: data.defaultMaxScore }),
         ...(data.defaultWeight !== undefined && { defaultWeight: data.defaultWeight }),
         ...(data.contributesToFinal !== undefined && { contributesToFinal: data.contributesToFinal }),
