@@ -1,4 +1,4 @@
-import { Controller, Get, Head, Query } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Head, Query, ForbiddenException } from '@nestjs/common';
 import { HealthService } from './health.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { getCurriculumData } from './curriculum-data';
@@ -43,6 +43,24 @@ export class HealthController {
   @Get('backfill:class-sequences')
   async backfillClassSequences() {
     return this.healthService.startClassSequenceBackfill();
+  }
+
+  @Get('backfill:computed-results')
+  async backfillComputedResults(
+    @Query('apply') apply?: string,
+    @Query('token') token?: string,
+  ) {
+    const shouldApply = String(apply).toLowerCase() === 'true';
+    if (shouldApply) {
+      const secret = process.env.BACKFILL_SECRET;
+      if (!secret) {
+        throw new BadRequestException('BACKFILL_SECRET is not configured');
+      }
+      if (token !== secret) {
+        throw new ForbiddenException('Invalid backfill token');
+      }
+    }
+    return this.healthService.backfillComputedResults(shouldApply);
   }
 
   @Get('backfill:class-sequences/status')

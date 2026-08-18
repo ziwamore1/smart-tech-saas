@@ -295,13 +295,36 @@ export default function ResultEntryPage() {
     queryFn: async () => {
       if (!selectedClass || !selectedTerm) return [];
       const activeSheetId = requestedSheetId || sheetData?.id;
-      if (!activeSheetId) return [];
-      const sr = await api.get(`/results-management/sheets/${activeSheetId}/students`);
-      const sd = sr.data?.data || sr.data;
-      if (sd && !Array.isArray(sd) && sd.students) return sd.students;
-      return Array.isArray(sd) ? sd : [];
+      if (activeSheetId) {
+        try {
+          const sr = await api.get(`/results-management/sheets/${activeSheetId}/students`);
+          const sd = sr.data?.data || sr.data;
+          const sheetStudents = sd && !Array.isArray(sd) && sd.students
+            ? sd.students
+            : Array.isArray(sd) ? sd : [];
+          if (sheetStudents.length > 0) return sheetStudents;
+        } catch {
+          // Fall through to enrollment data so entry remains usable if the
+          // sheet is still being created or temporarily unavailable.
+        }
+      }
+
+      const er = await api.get(`/enrollments/class/${selectedClass}`);
+      const ed = er.data?.data || er.data || [];
+      const enrollments = Array.isArray(ed) ? ed : ed.enrollments || ed.data || [];
+      return (Array.isArray(enrollments) ? enrollments : []).map((enr: any) => {
+        const student = enr.student || enr;
+        return {
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          admissionNumber: student.admissionNumber,
+          gender: student.gender,
+          results: [],
+        };
+      });
     },
-    enabled: !!selectedClass && !!selectedTerm && !!(requestedSheetId || sheetData?.id),
+    enabled: !!selectedClass && !!selectedTerm,
   });
   const students = useMemo(() => Array.isArray(studentsData) ? studentsData : [], [studentsData]);
 

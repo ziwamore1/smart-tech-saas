@@ -69,6 +69,141 @@ export class HealthService {
     };
   }
 
+  async backfillComputedResults(apply = false) {
+    const summary = {
+      mode: apply ? 'APPLY' : 'DRY_RUN',
+      legacyCreated: 0,
+      legacyRepaired: 0,
+      componentCreated: 0,
+      componentRepaired: 0,
+      skippedNoEnrollment: 0,
+    };
+    const classCache = new Map<string, string | null>();
+
+    const resolveClass = async (studentId: string, academicYearId: string) => {
+      const key = `${studentId}:${academicYearId}`;
+      if (classCache.has(key)) return classCache.get(key) ?? null;
+      const enrollment = await this.prisma.enrollment.findFirst({
+        where: { studentId, academicYearId, status: 'ACTIVE' },
+        select: { classId: true },
+      });
+      classCache.set(key, enrollment?.classId ?? null);
+      return enrollment?.classId ?? null;
+    };
+
+    const legacyRows = await this.prisma.result.findMany({
+      select: {
+        studentId: true,
+        subjectId: true,
+        termId: true,
+        schoolId: true,
+        score: true,
+        grade: true,
+        remark: true,
+        term: { select: { academicYearId: true } },
+      },
+    });
+
+    for (const row of legacyRows) {
+      const classId = await resolveClass(row.studentId, row.term.academicYearId);
+      if (!classId) {
+        summary.skippedNoEnrollment++;
+        continue;
+      }
+      const existing = await this.prisma.computedResult.findUnique({
+        where: { studentId_subjectId_termId: { studentId: row.studentId, subjectId: row.subjectId, termId: row.termId } },
+        select: { id: true, finalPercentage: true, classId: true, schoolId: true },
+      });
+      const needsRepair = !existing || existing.finalPercentage == null || existing.classId !== classId || existing.schoolId !== row.schoolId;
+      if (!needsRepair) continue;
+      if (apply) {
+        await this.prisma.computedResult.upsert({
+          where: { studentId_subjectId_termId: { studentId: row.studentId, subjectId: row.subjectId, termId: row.termId } },
+          update: {
+            classId,
+            schoolId: row.schoolId,
+            totalRawScore: row.score,
+            finalPercentage: row.score,
+            finalGrade: row.grade,
+            finalRemark: row.remark,
+            status: 'COMPUTED',
+            computedAt: new Date(),
+          },
+          create: {
+            studentId: row.studentId,
+            subjectId: row.subjectId,
+            termId: row.termId,
+            classId,
+            schoolId: row.schoolId,
+            totalRawScore: row.score,
+            finalPercentage: row.score,
+            finalGrade: row.grade,
+            finalRemark: row.remark,
+            status: 'COMPUTED',
+            computedAt: new Date(),
+          },
+        });
+      }
+      existing ? summary.legacyRepaired++ : summary.legacyCreated++;
+    }
+
+    const componentRows = await this.prisma.studentAssessmentResult.findMany({
+      where: { OR: [{ rawScore: { not: null } }, { isAbsent: true }] },
+      select: {
+        studentId: true,
+        subjectId: true,
+        termId: true,
+        classId: true,
+        rawScore: true,
+        percentage: true,
+        grade: true,
+        remarks: true,
+        isAbsent: true,
+        class: { select: { schoolId: true } },
+      },
+    });
+
+    for (const row of componentRows) {
+      const score = row.isAbsent ? null : row.percentage ?? row.rawScore;
+      const existing = await this.prisma.computedResult.findUnique({
+        where: { studentId_subjectId_termId: { studentId: row.studentId, subjectId: row.subjectId, termId: row.termId } },
+        select: { id: true, finalPercentage: true, classId: true, schoolId: true },
+      });
+      const schoolId = row.class.schoolId;
+      const needsRepair = !existing || existing.finalPercentage == null || existing.classId !== row.classId || existing.schoolId !== schoolId;
+      if (!needsRepair) continue;
+      if (apply) {
+        await this.prisma.computedResult.upsert({
+          where: { studentId_subjectId_termId: { studentId: row.studentId, subjectId: row.subjectId, termId: row.termId } },
+          update: {
+            classId: row.classId,
+            schoolId,
+            ...(score != null ? { totalRawScore: score, finalPercentage: score } : {}),
+            ...(row.grade ? { finalGrade: row.grade } : {}),
+            ...(row.remarks ? { finalRemark: row.remarks } : {}),
+          },
+          create: {
+            studentId: row.studentId,
+            subjectId: row.subjectId,
+            termId: row.termId,
+            classId: row.classId,
+            schoolId,
+            totalRawScore: score,
+            finalPercentage: score,
+            finalGrade: row.grade,
+            finalRemark: row.remarks,
+            status: score != null ? 'COMPUTED' : 'PENDING',
+            isAbsent: row.isAbsent,
+            computedAt: score != null ? new Date() : null,
+          },
+        });
+      }
+      existing ? summary.componentRepaired++ : summary.componentCreated++;
+    }
+
+    return summary;
+  }
+
   async checkDetailed(): Promise<HealthCheckResult> {
     const checks: Record<string, HealthCheck> = {};
 
