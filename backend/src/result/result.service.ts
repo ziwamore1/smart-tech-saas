@@ -336,11 +336,14 @@ export class ResultService {
         },
       });
 
-      // Update ResultSheet enteredCount
-      await this.prisma.resultSheet.updateMany({
-        where: { classId: enrollment.classId, termId, schoolId },
-        data: { enteredCount: { increment: 1 } },
-      }).catch(() => {});
+      // Ensure ResultSheet exists, then update counts and auto-submit
+      const sheetInfo = await this.ensureSheet(schoolId, enrollment.classId, termId, term.academicYearId, userId);
+      if (!sheetInfo.justCreated) {
+        await this.prisma.resultSheet.updateMany({
+          where: { classId: enrollment.classId, termId, schoolId },
+          data: { enteredCount: { increment: 1 } },
+        }).catch(() => {});
+      }
 
       // Auto-submit DRAFT sheet so results become visible immediately
       await this.autoSubmitSheet(schoolId, enrollment.classId, termId, userId);
@@ -414,6 +417,62 @@ export class ResultService {
       }
     } catch (error: any) {
       this.logger.warn(`Auto-submit failed for class ${classId}, term ${termId}: ${error.message}`);
+    }
+  }
+
+  private async ensureSheet(
+    schoolId: string,
+    classId: string,
+    termId: string,
+    academicYearId: string,
+    userId: string,
+  ): Promise<{ sheetId: string | null; justCreated: boolean }> {
+    try {
+      const existing = await this.prisma.resultSheet.findFirst({
+        where: { schoolId, classId, termId },
+        select: { id: true },
+      });
+      if (existing) return { sheetId: existing.id, justCreated: false };
+
+      const totalStudents = await this.prisma.enrollment.count({
+        where: { classId, academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+      });
+      const enteredCount = await this.prisma.result.count({
+        where: { schoolId, termId, student: { enrollments: { some: { classId, academicYearId, status: 'ACTIVE' } }, status: 'ACTIVE' } },
+      });
+
+      const sheet = await this.prisma.resultSheet.create({
+        data: {
+          schoolId,
+          classId,
+          termId,
+          academicYearId,
+          examType: 'END_TERM',
+          status: 'SUBMITTED',
+          totalStudents,
+          enteredCount,
+          createdBy: userId,
+          submittedAt: new Date(),
+          submittedBy: userId,
+        },
+      });
+      await this.prisma.resultAuditLog.create({
+        data: {
+          schoolId,
+          action: 'SUBMITTED',
+          entityType: 'RESULT_SHEET',
+          entityId: sheet.id,
+          classId,
+          termId,
+          performedBy: userId,
+          metadata: { autoCreated: true, reason: 'Auto-created and submitted on result save' },
+        },
+      });
+      this.logger.log(`Auto-created and submitted ResultSheet ${sheet.id} for class ${classId}, term ${termId}`);
+      return { sheetId: sheet.id, justCreated: true };
+    } catch (error: any) {
+      this.logger.warn(`ensureSheet failed for class ${classId}, term ${termId}: ${error.message}`);
+      return { sheetId: null, justCreated: false };
     }
   }
 
@@ -547,10 +606,19 @@ export class ResultService {
           where: { classId, academicYearId: term.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
         });
         const entered = created.filter(r => enrollmentMap.get(r.studentId) === classId).length;
-        await this.prisma.resultSheet.updateMany({
-          where: { classId, termId: firstTermId, schoolId },
-          data: { totalStudents: enrolled, enteredCount: { increment: entered } },
-        });
+        const sheetInfo = await this.ensureSheet(schoolId, classId, firstTermId, term.academicYearId, teacherId);
+        if (sheetInfo.justCreated) {
+          // ensureSheet already counted existing results in enteredCount
+          await this.prisma.resultSheet.updateMany({
+            where: { classId, termId: firstTermId, schoolId },
+            data: { totalStudents: enrolled },
+          });
+        } else {
+          await this.prisma.resultSheet.updateMany({
+            where: { classId, termId: firstTermId, schoolId },
+            data: { totalStudents: enrolled, enteredCount: { increment: entered } },
+          });
+        }
 
         // Auto-submit DRAFT sheets so results become visible immediately
         await this.autoSubmitSheet(schoolId, classId, firstTermId, teacherId);

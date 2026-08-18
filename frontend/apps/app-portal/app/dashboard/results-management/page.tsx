@@ -100,6 +100,9 @@ export default function ResultsManagementPage() {
       api.post(`/results-management/sheets/${id}/${action}`),
     onSuccess: (r: any) => {
       queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
+      queryClient.invalidateQueries({ queryKey: ['view-results-sheet'] });
+      queryClient.invalidateQueries({ queryKey: ['view-results-students'] });
+      queryClient.invalidateQueries({ queryKey: ['result-sheet-entry'] });
       queryClient.refetchQueries({ queryKey: ['result-sheets'] });
       setActionMenu(null);
       toast.success(r.data?.message || 'Status updated');
@@ -324,8 +327,8 @@ export default function ResultsManagementPage() {
                           {sheet.status || 'DRAFT'}
                         </span>
                       </td>
-                      <td style={{ padding: '14px 20px', textAlign: 'center', color: '#374151' }}>{sheet.studentCount || 0}</td>
-                      <td style={{ padding: '14px 20px', textAlign: 'center', color: '#374151' }}>{sheet.entriesCount || 0}</td>
+                      <td style={{ padding: '14px 20px', textAlign: 'center', color: '#374151' }}>{sheet.totalStudents || sheet.studentCount || 0}</td>
+                      <td style={{ padding: '14px 20px', textAlign: 'center', color: '#374151' }}>{sheet.enteredCount || sheet.entriesCount || 0}</td>
                       <td style={{ padding: '14px 20px', textAlign: 'right', position: 'relative' }}>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                           <a

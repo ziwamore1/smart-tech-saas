@@ -356,6 +356,7 @@ export default function ResultEntryPage() {
       queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
       queryClient.invalidateQueries({ queryKey: ['view-results-sheet'] });
       queryClient.invalidateQueries({ queryKey: ['view-results-students'] });
+      queryClient.invalidateQueries({ queryKey: ['result-sheet-entry'] });
 
       // Auto-submit the sheet from the frontend as well (backup for backend auto-submit)
       if (sheetId) {
