@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { teacherApi, resultApi, termApi, subjectApi, assessmentApi, assessmentEngineApi, studentApi } from '@/lib/api';
+import { api, teacherApi, resultApi, termApi, subjectApi, assessmentApi, assessmentEngineApi, studentApi } from '@/lib/api';
 import { socket } from '@/lib/socket';
 
 const PASS_THRESHOLD = 50;
@@ -35,10 +35,20 @@ export default function TeacherResultsPage() {
     const handler = () => {
       queryClient.invalidateQueries({ queryKey: ['results'] });
       queryClient.invalidateQueries({ queryKey: ['class-students'] });
+      queryClient.invalidateQueries({ queryKey: ['sheet-students-teacher'] });
     };
     socket.on(eventName, handler);
-    return () => { socket.off(eventName, handler); };
-  }, [user?.schoolId, queryClient]);
+
+    const savedHandler = (data: any) => {
+      if (selectedClass && data.classId === selectedClass && selectedTerm && data.termId === selectedTerm) {
+        queryClient.invalidateQueries({ queryKey: ['results'] });
+        queryClient.invalidateQueries({ queryKey: ['sheet-students-teacher'] });
+      }
+    };
+    socket.on('results:saved', savedHandler);
+
+    return () => { socket.off(eventName, handler); socket.off('results:saved', savedHandler); };
+  }, [user?.schoolId, selectedClass, selectedTerm, queryClient]);
 
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
@@ -137,6 +147,27 @@ export default function TeacherResultsPage() {
     enabled: !!selectedClass,
   });
 
+  const { data: sheetStudentsData } = useQuery({
+    queryKey: ['sheet-students-teacher', selectedClass, selectedTerm],
+    queryFn: async () => {
+      if (!selectedClass || !selectedTerm) return [];
+      try {
+        const r = await api.get('/results-management/sheets', { params: { classId: selectedClass, termId: selectedTerm } });
+        const sheets = r.data?.data || r.data;
+        const sheetArr = Array.isArray(sheets) ? sheets : [];
+        const sheetId = sheetArr.length > 0 ? sheetArr[0].id : null;
+        if (sheetId) {
+          const sr = await api.get(`/results-management/sheets/${sheetId}/students`);
+          let sd = sr.data?.data || sr.data;
+          if (sd && !Array.isArray(sd) && sd.students) sd = sd.students;
+          return Array.isArray(sd) ? sd : [];
+        }
+      } catch { /* ignore */ }
+      return [];
+    },
+    enabled: !!selectedClass && !!selectedTerm,
+  });
+
   const { data: existingResults } = useQuery({
     queryKey: ['results', selectedClass, selectedTerm, selectedSubject],
     queryFn: () => selectedClass && selectedTerm && selectedSubject
@@ -169,7 +200,8 @@ export default function TeacherResultsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['results'] });
-      setMessage({ type: 'success', text: 'Score saved successfully!' });
+      queryClient.invalidateQueries({ queryKey: ['sheet-students-teacher'] });
+      setMessage({ type: 'success', text: 'Score saved and auto-submitted for review!' });
       setTimeout(() => setMessage(null), 3000);
     },
     onError: (error: any) => {
@@ -190,8 +222,9 @@ export default function TeacherResultsPage() {
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['results'] });
+      queryClient.invalidateQueries({ queryKey: ['sheet-students-teacher'] });
       setScores({});
-      setMessage({ type: 'success', text: 'All scores saved successfully!' });
+      setMessage({ type: 'success', text: 'All scores saved and auto-submitted for review!' });
       setTimeout(() => setMessage(null), 3000);
     },
     onError: (error: any) => {
@@ -204,6 +237,7 @@ export default function TeacherResultsPage() {
     mutationFn: (classId: string) => assessmentApi.computeAllClass(classId, selectedSubject, selectedTerm),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['results'] });
+      queryClient.invalidateQueries({ queryKey: ['sheet-students-teacher'] });
       setMessage({ type: 'success', text: 'Results computed successfully!' });
       setTimeout(() => setMessage(null), 3000);
     },
@@ -214,10 +248,32 @@ export default function TeacherResultsPage() {
   });
 
   const students = studentsData || [];
+
+  // Merge results from sheets endpoint (shows all statuses: DRAFT, SUBMITTED, COMPUTED, etc.)
+  const sheetStudents: any[] = sheetStudentsData || [];
+  const sheetResultsMap = new Map<string, any>();
+  for (const s of sheetStudents) {
+    for (const r of (s.results || [])) {
+      const key = `${s.id}-${r.subjectId || r.subject?.id}`;
+      sheetResultsMap.set(key, {
+        studentId: s.id,
+        subjectId: r.subjectId || r.subject?.id,
+        score: r.score ?? r.finalPercentage ?? r.totalRawScore ?? null,
+        grade: r.grade || r.finalGrade || null,
+        remark: r.remark || r.finalRemark || null,
+        points: r.points ?? null,
+      });
+    }
+  }
+
   const existingResultsArray: any[] = existingResults || [];
   const existingResultsMap: Map<string, any> = new Map(
-    existingResultsArray.map((r: any) => [r.studentId, r])
+    existingResultsArray.map((r: any) => [`${r.studentId}-${r.subjectId}`, r])
   );
+  // Merge: sheet results fill in gaps where legacy results are missing
+  for (const [key, val] of sheetResultsMap) {
+    if (!existingResultsMap.has(key)) existingResultsMap.set(key, val);
+  }
 
   // Determine which subjects to show based on entry mode
   const displaySubjects = entryMode === 'class'

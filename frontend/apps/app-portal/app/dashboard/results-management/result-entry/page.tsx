@@ -73,11 +73,11 @@ const WORKFLOW_STEPS = [
   {
     step: 2,
     icon: 'fa-paper-plane',
-    title: 'Submit for Review',
-    who: 'Teacher / Class Teacher',
-    where: 'Result Sheets',
+    title: 'Auto-Submit for Review',
+    who: 'Automatic on Save',
+    where: 'Happens automatically',
     href: '/dashboard/results-management',
-    what: 'Open Result Sheets, find your sheet and use the \u2026 menu \u2192 Submit. This moves the sheet from DRAFT to SUBMITTED.',
+    what: 'When you click Save All, results are automatically submitted for review. The sheet moves from DRAFT to SUBMITTED instantly — no extra step needed.',
   },
   {
     step: 3,
@@ -124,6 +124,19 @@ export default function ResultEntryPage() {
     return () => { socket.off(eventName, handler); };
   }, [user?.schoolId, queryClient]);
 
+  useEffect(() => {
+    const schoolId = user?.schoolId;
+    if (!schoolId) return;
+    const handler = (data: any) => {
+      if (selectedClass && data.classId === selectedClass && selectedTerm && data.termId === selectedTerm) {
+        queryClient.invalidateQueries({ queryKey: ['sheet-students', selectedClass, selectedTerm] });
+        queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
+      }
+    };
+    socket.on('results:saved', handler);
+    return () => { socket.off('results:saved', handler); };
+  }, [user?.schoolId, selectedClass, selectedTerm, queryClient]);
+
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('all');
@@ -141,6 +154,7 @@ export default function ResultEntryPage() {
   const [componentScores, setComponentScores] = useState<Record<string, Record<string, { rawScore: number | null; isAbsent: boolean }>>>({});
   const [savingComponents, setSavingComponents] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(true);
+  const [sheetId, setSheetId] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -296,6 +310,23 @@ export default function ResultEntryPage() {
   });
   const students = useMemo(() => Array.isArray(studentsData) ? studentsData : [], [studentsData]);
 
+  // Track sheetId from the studentsData query for auto-submit
+  const { data: sheetData } = useQuery({
+    queryKey: ['result-sheets-entry', selectedClass, selectedTerm],
+    queryFn: async () => {
+      if (!selectedClass || !selectedTerm) return null;
+      const r = await api.get('/results-management/sheets', { params: { classId: selectedClass, termId: selectedTerm } });
+      const sheets = r.data?.data || r.data;
+      const sheetArr = Array.isArray(sheets) ? sheets : [];
+      return sheetArr.length > 0 ? sheetArr[0] : null;
+    },
+    enabled: !!selectedClass && !!selectedTerm,
+    staleTime: 30000,
+  });
+  useEffect(() => {
+    setSheetId(sheetData?.id || null);
+  }, [sheetData?.id]);
+
   // Filter subjects based on entry mode
   const displaySubjects = useMemo(() => {
     if (selectedSubject === 'all') return classSubjects;
@@ -319,9 +350,20 @@ export default function ResultEntryPage() {
   const bulkSaveMutation = useMutation({
     mutationFn: (scoreList: Array<{ studentId: string; subjectId: string; termId: string; score: number }>) =>
       api.post('/results/bulk', { results: scoreList }, { timeout: 120000 }),
-    onSuccess: (_data: any, variables: any) => {
+    onSuccess: async (_data: any, variables: any) => {
       queryClient.invalidateQueries({ queryKey: ['sheet-students'] });
       queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
+      queryClient.invalidateQueries({ queryKey: ['view-results-sheet'] });
+      queryClient.invalidateQueries({ queryKey: ['view-results-students'] });
+
+      // Auto-submit the sheet from the frontend as well (backup for backend auto-submit)
+      if (sheetId) {
+        try {
+          await api.post(`/results-management/sheets/${sheetId}/submit`);
+          queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
+        } catch { /* Backend auto-submitted, ignore duplicate submit errors */ }
+      }
+
       setDirtyCells(new Set());
       setAbsentCells(new Set());
       setBulkSaving(false);
@@ -330,8 +372,8 @@ export default function ResultEntryPage() {
       setLastSavedAt(new Date().toLocaleTimeString());
       setShowSavedBanner(true);
       setTimeout(() => setShowSavedBanner(false), 8000);
-      toast.success(`${count} score${count !== 1 ? 's' : ''} saved successfully`, {
-        description: `${count} result${count !== 1 ? 's' : ''} have been recorded. You can now view the full results.`,
+      toast.success(`${count} score${count !== 1 ? 's' : ''} saved and auto-submitted for review`, {
+        description: `${count} result${count !== 1 ? 's' : ''} have been recorded and submitted. They are now visible in the results sheet.`,
         action: {
           label: 'View Results',
           onClick: () => window.location.href = '/dashboard/results-management/view-results',
@@ -473,14 +515,25 @@ export default function ResultEntryPage() {
       queryClient.invalidateQueries({ queryKey: ['sheet-students'] });
       queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
       queryClient.invalidateQueries({ queryKey: ['assessment-results-single'] });
+      queryClient.invalidateQueries({ queryKey: ['view-results-sheet'] });
+      queryClient.invalidateQueries({ queryKey: ['view-results-students'] });
+
+      // Auto-submit the sheet from the frontend as well
+      if (sheetId) {
+        try {
+          await api.post(`/results-management/sheets/${sheetId}/submit`);
+          queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
+        } catch { /* Backend auto-submitted, ignore */ }
+      }
+
       setLastSavedCount(defIds.length);
       setLastSavedAt(new Date().toLocaleTimeString());
       setShowSavedBanner(true);
       setTimeout(() => setShowSavedBanner(false), 8000);
-      toast.success(`${defIds.length} assessment component${defIds.length !== 1 ? 's' : ''} saved`, {
+      toast.success(`${defIds.length} assessment component${defIds.length !== 1 ? 's' : ''} saved and auto-submitted`, {
         description: finalResults.length > 0
-          ? `${finalResults.length} final result${finalResults.length !== 1 ? 's' : ''} computed and synced to the results sheet.`
-          : 'Final results will sync once every component is entered.',
+          ? `${finalResults.length} final result${finalResults.length !== 1 ? 's' : ''} computed, synced to the results sheet, and submitted for review.`
+          : 'Final results will sync once every component is entered. Sheet has been submitted.',
         duration: 8000,
       });
     } catch (err: any) {
@@ -661,7 +714,7 @@ export default function ResultEntryPage() {
             <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span>
-            <strong>{lastSavedCount}</strong> score{lastSavedCount !== 1 ? 's' : ''} saved at <strong>{lastSavedAt}</strong>. Entries are synced to results sheet — green cells show confirmed saves.
+            <strong>{lastSavedCount}</strong> score{lastSavedCount !== 1 ? 's' : ''} saved at <strong>{lastSavedAt}</strong>. Results auto-submitted for review — green cells show confirmed saves.
           </span>
           <button onClick={() => setShowSavedBanner(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#16a34a', cursor: 'pointer' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

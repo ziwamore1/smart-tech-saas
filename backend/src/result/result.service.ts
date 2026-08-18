@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx';
 import * as ExcelJS from 'exceljs';
 import { getSubjectShortcut } from '../common/subject-shortcuts';
 import { ClassAccessService } from '../common/access/class-access.service';
+import { SchoolEventsGateway } from '../common/school-events.gateway';
 
 @Injectable()
 export class ResultService {
@@ -18,6 +19,7 @@ export class ResultService {
   constructor(
     private prisma: PrismaService,
     private classAccess: ClassAccessService,
+    private schoolEvents?: SchoolEventsGateway,
   ) {}
 
   async findAll(
@@ -338,8 +340,70 @@ export class ResultService {
         data: { enteredCount: { increment: 1 } },
       }).catch(() => {});
 
+      // Auto-submit DRAFT sheet so results become visible immediately
+      await this.autoSubmitSheet(schoolId, enrollment.classId, termId, userId);
+
+      // Emit real-time event so Director and other teachers see the update instantly
+      if (this.schoolEvents) {
+        this.schoolEvents.emitResultsSaved(schoolId, {
+          classId: enrollment.classId,
+          termId: term,
+          subjectId,
+          savedBy: userId,
+          count: 1,
+        });
+      }
+
       return created;
     }
+
+  private async autoSubmitSheet(
+    schoolId: string,
+    classId: string,
+    termId: string,
+    userId: string,
+  ): Promise<void> {
+    try {
+      const sheet = await this.prisma.resultSheet.findFirst({
+        where: { schoolId, classId, termId, status: 'DRAFT' },
+      });
+      if (!sheet) return;
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.resultSheet.update({
+          where: { id: sheet.id },
+          data: { status: 'SUBMITTED', submittedAt: new Date(), submittedBy: userId },
+        });
+        await tx.resultAuditLog.create({
+          data: {
+            schoolId,
+            action: 'SUBMITTED',
+            entityType: 'RESULT_SHEET',
+            entityId: sheet.id,
+            classId,
+            termId,
+            performedBy: userId,
+            metadata: { autoSubmitted: true, reason: 'Auto-submitted on result save' },
+          },
+        });
+      });
+
+      this.logger.log(`Auto-submitted result sheet ${sheet.id} for class ${classId}, term ${termId}`);
+
+      if (this.schoolEvents) {
+        this.schoolEvents.emitResultsLive(schoolId, {
+          classId,
+          termId,
+          sheetId: sheet.id,
+          status: 'SUBMITTED',
+          action: 'auto-submitted',
+          by: userId,
+        });
+      }
+    } catch (error: any) {
+      this.logger.warn(`Auto-submit failed for class ${classId}, term ${termId}: ${error.message}`);
+    }
+  }
 
   async createBulk(
     teacherId: string,
@@ -473,6 +537,25 @@ export class ResultService {
           where: { classId, termId: firstTermId, schoolId },
           data: { totalStudents: enrolled, enteredCount: { increment: entered } },
         });
+
+        // Auto-submit DRAFT sheets so results become visible immediately
+        await this.autoSubmitSheet(schoolId, classId, firstTermId, teacherId);
+      }
+
+      // Emit real-time event so Director and other teachers see the update instantly
+      if (this.schoolEvents) {
+        const classIds = [...new Set(created.map(r => enrollmentMap.get(r.studentId)).filter(Boolean))] as string[];
+        const subjectIds = [...new Set(created.map(r => r.subjectId))];
+        for (const classId of classIds) {
+          const termId = results[0].termId;
+          this.schoolEvents.emitResultsSaved(schoolId, {
+            classId,
+            termId,
+            subjectId: subjectIds.length === 1 ? subjectIds[0] : undefined,
+            savedBy: teacherId,
+            count: created.filter(r => enrollmentMap.get(r.studentId) === classId).length,
+          });
+        }
       }
     }
 

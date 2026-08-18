@@ -324,7 +324,6 @@ export class ResultsManagementService {
       orderBy: [{ studentId: 'asc' }, { subject: { name: 'asc' } }],
     });
 
-    // Fallback: if no computed results for this class, try without classId filter
     if (computedResults.length === 0 && students.length > 0) {
       computedResults = await this.prisma.computedResult.findMany({
         where: {
@@ -346,24 +345,24 @@ export class ResultsManagementService {
         schoolId: sheet.schoolId,
         student: { status: 'ACTIVE' },
       },
-      select: {
-        studentId: true,
-        subjectId: true,
-        score: true,
-        grade: true,
-        remark: true,
+      include: {
+        subject: { select: { id: true, name: true, code: true } },
       },
     });
 
-    const rawResultMap = new Map<string, { score: number; grade: string | null; remark: string | null }>();
+    const rawResultMap = new Map<string, { score: number; grade: string | null; remark: string | null; subjectId: string; subject?: any }>();
     for (const r of rawResults) {
-      rawResultMap.set(`${r.studentId}::${r.subjectId}`, { score: r.score, grade: r.grade, remark: r.remark });
+      rawResultMap.set(`${r.studentId}::${r.subjectId}`, {
+        score: r.score, grade: r.grade, remark: r.remark, subjectId: r.subjectId, subject: r.subject,
+      });
     }
 
     return {
-      students: students.map((student) => ({
-        ...student,
-        results: computedResults.filter((r) => r.studentId === student.id).map((cr) => {
+      students: students.map((student) => {
+        const crSubjects = new Set(
+          computedResults.filter((r) => r.studentId === student.id).map((r) => r.subjectId)
+        );
+        const crResults = computedResults.filter((r) => r.studentId === student.id).map((cr) => {
           const raw = rawResultMap.get(`${cr.studentId}::${cr.subjectId}`);
           return {
             ...cr,
@@ -371,8 +370,27 @@ export class ResultsManagementService {
             grade: raw?.grade ?? cr.finalGrade ?? null,
             remark: raw?.remark ?? cr.finalRemark ?? null,
           };
-        }),
-      })),
+        });
+        const extraRawResults: any[] = [];
+        for (const [key, raw] of rawResultMap) {
+          if (key.startsWith(`${student.id}::`) && !crSubjects.has(raw.subjectId)) {
+            extraRawResults.push({
+              studentId: student.id,
+              subjectId: raw.subjectId,
+              subject: raw.subject,
+              totalRawScore: raw.score,
+              totalMaxScore: 100,
+              finalPercentage: raw.score,
+              finalGrade: raw.grade,
+              finalRemark: raw.remark,
+              score: raw.score,
+              grade: raw.grade,
+              remark: raw.remark,
+            });
+          }
+        }
+        return { ...student, results: [...crResults, ...extraRawResults] };
+      }),
     };
   }
 
