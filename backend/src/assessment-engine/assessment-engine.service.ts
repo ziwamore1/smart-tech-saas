@@ -350,7 +350,7 @@ export class AssessmentEngineService {
                 termId,
               },
             },
-            update: { totalRawScore: totalRaw, finalPercentage: pct, finalGrade: grade, status: 'COMPUTED', computedAt: new Date() },
+            update: { classId, schoolId, totalRawScore: totalRaw, finalPercentage: pct, finalGrade: grade, status: 'COMPUTED', computedAt: new Date() },
             create: {
               studentId: enrollment.studentId,
               subjectId, termId, classId, schoolId,
@@ -395,6 +395,8 @@ export class AssessmentEngineService {
           },
         },
         update: {
+          classId,
+          schoolId,
           totalRawScore: results.reduce((s, r) => s + (r.rawScore ?? 0), 0),
           totalWeightedScore: totalWeighted,
           finalPercentage: finalPct,

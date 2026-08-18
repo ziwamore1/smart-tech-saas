@@ -7,9 +7,10 @@
  * scores when no termAssessmentConfiguration/studentAssessmentResult exist.
  *
  * This script makes the existing data consistent by, per (student, term, subject):
- *  - UPDATE existing ComputedResult rows that have NULL finalPercentage (score fields only,
- *    status and any existing non-null scores are preserved)
+ *  - UPDATE existing ComputedResult rows that have NULL finalPercentage or stale class/school
+ *    ownership (score fields only, status and any existing non-null scores are preserved)
  *  - CREATE missing ComputedResult rows from Result data (status COMPUTED)
+ *  - CREATE/repair ComputedResult rows from saved StudentAssessmentResult component data
  *
  * Usage:
  *   Dry run (read-only):      npx tsx src/scripts/backfill-computed-results.ts
@@ -118,6 +119,7 @@ async function main() {
         take: 5000,
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         select: {
+          id: true,
           studentId: true,
           subjectId: true,
           schoolId: true,
@@ -171,6 +173,8 @@ async function main() {
           points: true,
           totalRawScore: true,
           totalWeightedScore: true,
+          classId: true,
+          schoolId: true,
         },
       });
       const existingMap = new Map(existing.map((e) => [e.subjectId, e]));
@@ -193,13 +197,15 @@ async function main() {
       const toCreate = prepared.filter((p) => !existingMap.has(p.subjectId));
       const toUpdate = prepared
         .map((p) => ({ p, ex: existingMap.get(p.subjectId)! }))
-        .filter(({ ex }) => ex.finalPercentage == null);
+        .filter(({ ex }) => ex.finalPercentage == null || ex.classId !== classId || ex.schoolId !== schoolId);
 
       for (const { p, ex } of toUpdate) {
         if (APPLY) {
           await prisma.computedResult.update({
             where: { id: ex.id },
             data: {
+              classId,
+              schoolId: p.schoolId,
               totalRawScore: ex.totalRawScore ?? p.score,
               totalWeightedScore: ex.totalWeightedScore ?? p.score,
               finalPercentage: p.score,
@@ -247,11 +253,83 @@ async function main() {
     console.log(`  term ${term.id}: ${total} Result rows, ${groupMap.size} student groups`);
   }
 
+  const componentRows = await prisma.studentAssessmentResult.findMany({
+    where: {
+      OR: [{ rawScore: { not: null } }, { isAbsent: true }],
+    },
+    select: {
+      studentId: true,
+      subjectId: true,
+      termId: true,
+      classId: true,
+      rawScore: true,
+      percentage: true,
+      grade: true,
+      remarks: true,
+      isAbsent: true,
+      class: { select: { schoolId: true } },
+    },
+  });
+  let componentCreated = 0;
+  let componentUpdated = 0;
+  for (const row of componentRows) {
+    const score = row.isAbsent ? null : row.percentage ?? row.rawScore;
+    const existing = await prisma.computedResult.findUnique({
+      where: {
+        studentId_subjectId_termId: {
+          studentId: row.studentId,
+          subjectId: row.subjectId,
+          termId: row.termId,
+        },
+      },
+      select: { id: true, finalPercentage: true, classId: true, schoolId: true },
+    });
+    const needsRepair = !existing || existing.finalPercentage == null || existing.classId !== row.classId || existing.schoolId !== row.class.schoolId;
+    if (!needsRepair) continue;
+
+    if (APPLY) {
+      await prisma.computedResult.upsert({
+        where: {
+          studentId_subjectId_termId: {
+            studentId: row.studentId,
+            subjectId: row.subjectId,
+            termId: row.termId,
+          },
+        },
+        update: {
+          classId: row.classId,
+          schoolId: row.class.schoolId,
+          ...(score != null ? { totalRawScore: score, finalPercentage: score } : {}),
+          ...(row.grade ? { finalGrade: row.grade } : {}),
+          ...(row.remarks ? { finalRemark: row.remarks } : {}),
+        },
+        create: {
+          studentId: row.studentId,
+          subjectId: row.subjectId,
+          termId: row.termId,
+          classId: row.classId,
+          schoolId: row.class.schoolId,
+          totalRawScore: score,
+          finalPercentage: score,
+          finalGrade: row.grade,
+          finalRemark: row.remarks,
+          status: score != null ? 'COMPUTED' : 'PENDING',
+          isAbsent: row.isAbsent,
+          computedAt: score != null ? new Date() : null,
+        },
+      });
+    }
+    if (existing) componentUpdated++;
+    else componentCreated++;
+  }
+
   console.log('\nSUMMARY');
   console.log(`  Would create:     ${created}`);
   console.log(`  Would update:     ${updated}`);
   console.log(`  Skipped (no enrollment/class): ${skippedNoEnrollment}`);
   console.log(`  Already correct:  ${unaffected}`);
+  console.log(`  Component rows to create: ${componentCreated}`);
+  console.log(`  Component rows to repair: ${componentUpdated}`);
   console.log(`  Applied: ${APPLY ? 'YES' : 'NO (rerun with --apply to write)'}`);
 }
 

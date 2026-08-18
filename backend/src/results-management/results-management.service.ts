@@ -357,6 +357,23 @@ export class ResultsManagementService {
       });
     }
 
+    const componentResults = await this.prisma.studentAssessmentResult.findMany({
+      where: {
+        studentId: { in: students.map((s) => s.id) },
+        classId: sheet.classId,
+        termId: sheet.termId,
+        OR: [{ rawScore: { not: null } }, { isAbsent: true }],
+        student: { status: 'ACTIVE' },
+      },
+      include: { subject: { select: { id: true, name: true, code: true } } },
+      orderBy: { updatedAt: 'desc' },
+    });
+    const componentResultMap = new Map<string, any>();
+    for (const result of componentResults) {
+      const key = `${result.studentId}::${result.subjectId}`;
+      if (!componentResultMap.has(key)) componentResultMap.set(key, result);
+    }
+
     return {
       students: students.map((student) => {
         const crSubjects = new Set(
@@ -388,6 +405,19 @@ export class ResultsManagementService {
               remark: raw.remark,
             });
           }
+        }
+        for (const [key, component] of componentResultMap) {
+          if (!key.startsWith(`${student.id}::`) || crSubjects.has(component.subjectId) || rawResultMap.has(key)) continue;
+          extraRawResults.push({
+            studentId: student.id,
+            subjectId: component.subjectId,
+            subject: component.subject,
+            score: component.isAbsent ? null : component.percentage ?? component.rawScore,
+            grade: component.grade,
+            remark: component.remarks,
+            assessmentDefId: component.assessmentDefId,
+            isAbsent: component.isAbsent,
+          });
         }
         return { ...student, results: [...crResults, ...extraRawResults] };
       }),
@@ -519,15 +549,20 @@ export class ResultsManagementService {
       where: { classId: sheet.classId },
     });
 
-    const computationResults = [];
+    const computationResults: { subjectId: string; computed: number; failed: number; error?: string }[] = [];
     for (const cs of classSubjects) {
-      const result = await this.gradingEngine.computeAllClassResults(
-        sheet.classId,
-        cs.subjectId,
-        sheet.termId,
-        sheet.schoolId,
-      );
-      computationResults.push({ subjectId: cs.subjectId, ...result });
+      try {
+        const result = await this.gradingEngine.computeAllClassResults(
+          sheet.classId,
+          cs.subjectId,
+          sheet.termId,
+          sheet.schoolId,
+        );
+        computationResults.push({ subjectId: cs.subjectId, ...result });
+      } catch (error: any) {
+        this.logger.error(`Verification compute failed for subject ${cs.subjectId}: ${error.message}`);
+        computationResults.push({ subjectId: cs.subjectId, computed: 0, failed: 0, error: error.message });
+      }
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -562,7 +597,10 @@ export class ResultsManagementService {
         },
       });
 
-      return updated;
+      return {
+        ...updated,
+        computationResults,
+      };
     });
   }
 

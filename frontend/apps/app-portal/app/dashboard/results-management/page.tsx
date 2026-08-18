@@ -100,6 +100,7 @@ export default function ResultsManagementPage() {
       api.post(`/results-management/sheets/${id}/${action}`),
     onSuccess: (r: any) => {
       queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
+      queryClient.refetchQueries({ queryKey: ['result-sheets'] });
       setActionMenu(null);
       toast.success(r.data?.message || 'Status updated');
     },

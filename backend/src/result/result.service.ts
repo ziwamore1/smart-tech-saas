@@ -253,6 +253,8 @@ export class ResultService {
           },
         },
         update: {
+          classId: enrollment.classId,
+          schoolId,
           totalRawScore: score,
           finalPercentage: score,
           finalGrade: gradeData.grade,
@@ -347,10 +349,20 @@ export class ResultService {
       if (this.schoolEvents) {
         this.schoolEvents.emitResultsSaved(schoolId, {
           classId: enrollment.classId,
-          termId: term,
+          termId,
           subjectId,
           savedBy: userId,
           count: 1,
+        });
+        this.schoolEvents.emitResultsLive(schoolId, {
+          id: created.id,
+          classId: enrollment.classId,
+          termId,
+          subjectId,
+          score,
+          savedBy: userId,
+          timestamp: new Date(),
+          action: 'result-saved',
         });
       }
 
@@ -491,6 +503,8 @@ export class ResultService {
             },
           },
           update: {
+            classId,
+            schoolId,
             totalRawScore: item.score,
             finalPercentage: item.score,
             finalGrade: gradeData.grade,
@@ -545,15 +559,27 @@ export class ResultService {
       // Emit real-time event so Director and other teachers see the update instantly
       if (this.schoolEvents) {
         const classIds = [...new Set(created.map(r => enrollmentMap.get(r.studentId)).filter(Boolean))] as string[];
-        const subjectIds = [...new Set(created.map(r => r.subjectId))];
         for (const classId of classIds) {
           const termId = results[0].termId;
+          const classResults = created.filter(r => enrollmentMap.get(r.studentId) === classId);
+          const subjectIds = [...new Set(classResults.map(r => r.subjectId))];
           this.schoolEvents.emitResultsSaved(schoolId, {
             classId,
             termId,
             subjectId: subjectIds.length === 1 ? subjectIds[0] : undefined,
             savedBy: teacherId,
-            count: created.filter(r => enrollmentMap.get(r.studentId) === classId).length,
+            count: classResults.length,
+          });
+          this.schoolEvents.emitResultsLive(schoolId, {
+            id: `${classId}-${termId}-${Date.now()}`,
+            classId,
+            termId,
+            subjectId: subjectIds.length === 1 ? subjectIds[0] : undefined,
+            score: classResults[0]?.score ?? null,
+            count: classResults.length,
+            savedBy: teacherId,
+            timestamp: new Date(),
+            action: 'result-saved',
           });
         }
       }

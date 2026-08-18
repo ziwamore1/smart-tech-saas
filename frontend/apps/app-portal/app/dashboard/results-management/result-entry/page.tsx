@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, classApi, termApi, gradingSystemApi, teacherApi, assessmentEngineApi } from '@/lib/api';
 import { toast } from 'sonner';
@@ -111,6 +112,8 @@ const WORKFLOW_STEPS = [
 export default function ResultEntryPage() {
   const { user, isClassTeacher, isTeacher } = useAuth();
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const requestedSheetId = searchParams.get('sheetId');
 
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
@@ -264,68 +267,43 @@ export default function ResultEntryPage() {
     setComponentScores(map);
   }, [existingComponentsData]);
 
-  const { data: studentsData, isLoading: studentsLoading } = useQuery({
-    queryKey: ['sheet-students', selectedClass, selectedTerm],
-    queryFn: async () => {
-      if (!selectedClass || !selectedTerm) return [];
-      const r = await api.get('/results-management/sheets', { params: { classId: selectedClass, termId: selectedTerm } });
-      const sheets = r.data?.data || r.data;
-      const sheetArr = Array.isArray(sheets) ? sheets : [];
-      const sheetId = sheetArr.length > 0 ? sheetArr[0].id : null;
-      if (sheetId) {
-        const sr = await api.get(`/results-management/sheets/${sheetId}/students`);
-        let sd = sr.data?.data || sr.data;
-        if (sd && !Array.isArray(sd) && sd.students) sd = sd.students;
-        const students = Array.isArray(sd) ? sd : [];
-        // If there are no results in the response, try getting students from enrollment endpoint
-        const hasResults = students.some((s: any) => s.results?.length > 0);
-        if (!hasResults) {
-          // Fetch enrollment-based student list
-          const er = await api.get(`/enrollments/class/${selectedClass}`);
-          const ed = er.data?.data || er.data || [];
-          const enrollments = Array.isArray(ed) ? ed : [];
-          return enrollments.map((enr: any) => {
-            const s = enr.student || enr;
-            return {
-              id: s.id, firstName: s.firstName, lastName: s.lastName,
-              admissionNumber: s.admissionNumber, gender: s.gender, results: [],
-            };
-          });
-        }
-        return students;
-      }
-      // No sheet yet, try direct student enrollment
-      const er = await api.get(`/enrollments/class/${selectedClass}`);
-      const ed = er.data?.data || er.data || [];
-      const enrollments = Array.isArray(ed) ? ed : [];
-      return enrollments.map((enr: any) => {
-        const s = enr.student || enr;
-        return {
-          id: s.id, firstName: s.firstName, lastName: s.lastName,
-          admissionNumber: s.admissionNumber, gender: s.gender, results: [],
-        };
-      });
-    },
-    enabled: !!selectedClass && !!selectedTerm,
-  });
-  const students = useMemo(() => Array.isArray(studentsData) ? studentsData : [], [studentsData]);
-
-  // Track sheetId from the studentsData query for auto-submit
   const { data: sheetData } = useQuery({
-    queryKey: ['result-sheets-entry', selectedClass, selectedTerm],
+    queryKey: ['result-sheet-entry', requestedSheetId, selectedClass, selectedTerm],
     queryFn: async () => {
+      if (requestedSheetId) {
+        const r = await api.get(`/results-management/sheets/${requestedSheetId}`);
+        return r.data?.data || r.data || null;
+      }
       if (!selectedClass || !selectedTerm) return null;
       const r = await api.get('/results-management/sheets', { params: { classId: selectedClass, termId: selectedTerm } });
       const sheets = r.data?.data || r.data;
-      const sheetArr = Array.isArray(sheets) ? sheets : [];
-      return sheetArr.length > 0 ? sheetArr[0] : null;
+      return Array.isArray(sheets) && sheets.length > 0 ? sheets[0] : null;
     },
-    enabled: !!selectedClass && !!selectedTerm,
+    enabled: !!requestedSheetId || (!!selectedClass && !!selectedTerm),
     staleTime: 30000,
   });
+
   useEffect(() => {
-    setSheetId(sheetData?.id || null);
-  }, [sheetData?.id]);
+    if (!sheetData) return;
+    if (sheetData.classId && !selectedClass) setSelectedClass(sheetData.classId);
+    if (sheetData.termId && !selectedTerm) setSelectedTerm(sheetData.termId);
+    setSheetId(sheetData.id || requestedSheetId || null);
+  }, [sheetData, requestedSheetId, selectedClass, selectedTerm]);
+
+  const { data: studentsData, isLoading: studentsLoading } = useQuery({
+    queryKey: ['sheet-students', selectedClass, selectedTerm, requestedSheetId || sheetData?.id],
+    queryFn: async () => {
+      if (!selectedClass || !selectedTerm) return [];
+      const activeSheetId = requestedSheetId || sheetData?.id;
+      if (!activeSheetId) return [];
+      const sr = await api.get(`/results-management/sheets/${activeSheetId}/students`);
+      const sd = sr.data?.data || sr.data;
+      if (sd && !Array.isArray(sd) && sd.students) return sd.students;
+      return Array.isArray(sd) ? sd : [];
+    },
+    enabled: !!selectedClass && !!selectedTerm && !!(requestedSheetId || sheetData?.id),
+  });
+  const students = useMemo(() => Array.isArray(studentsData) ? studentsData : [], [studentsData]);
 
   // Filter subjects based on entry mode
   const displaySubjects = useMemo(() => {
@@ -541,7 +519,7 @@ export default function ResultEntryPage() {
     } finally {
       setSavingComponents(false);
     }
-  }, [selectedClass, selectedSubject, selectedTerm, componentScores, students, subjectConfigs, savingComponents, queryClient]);
+  }, [selectedClass, selectedSubject, selectedTerm, componentScores, students, subjectConfigs, savingComponents, sheetId, queryClient]);
 
   const handleBulkSaveAll = useCallback(() => {
     if (dirtyCells.size === 0) {

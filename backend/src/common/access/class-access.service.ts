@@ -251,13 +251,13 @@ export class ClassAccessService {
         term: { select: { id: true, name: true, academicYearId: true } },
       },
     });
-    const classIds = [...new Set(results.map((result) => result.studentId))];
+    const studentIds = [...new Set(results.map((result) => result.studentId))];
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { schoolId: user.schoolId, studentId: { in: classIds }, ...(termId ? { academicYearId: results[0]?.term?.academicYearId } : {}) },
+      where: { schoolId: user.schoolId, studentId: { in: studentIds }, ...(termId ? { academicYearId: results[0]?.term?.academicYearId } : {}) },
       select: { studentId: true, class: { select: { id: true, name: true } } },
     });
     const classes = new Map(enrollments.map((enrollment) => [enrollment.studentId, enrollment.class]));
-    return results.map((result) => ({
+    const legacyActivities = results.map((result) => ({
       id: result.id,
       score: result.score,
       timestamp: result.createdAt,
@@ -267,6 +267,50 @@ export class ClassAccessService {
       term: result.term,
       class: classes.get(result.studentId) || null,
     }));
+
+    // Component-based entry is stored in StudentAssessmentResult until a final
+    // result is computed, so include it in live tracking as well.
+    const componentResults = await this.prisma.studentAssessmentResult.findMany({
+      where: {
+        ...(termId ? { termId } : {}),
+        OR: [{ rawScore: { not: null } }, { isAbsent: true }],
+        class: { schoolId: user.schoolId },
+        student: { status: 'ACTIVE' },
+      },
+      orderBy: { enteredAt: 'desc' },
+      take: 30,
+      include: {
+        subject: { select: { id: true, name: true, code: true } },
+        student: { select: { id: true, firstName: true, lastName: true } },
+        term: { select: { id: true, name: true, academicYearId: true } },
+        class: { select: { id: true, name: true } },
+        assessmentDef: { select: { name: true, code: true } },
+      },
+    });
+    const enteredByIds = [...new Set(componentResults.map((result) => result.enteredBy))];
+    const enteredByUsers = await this.prisma.user.findMany({
+      where: { id: { in: enteredByIds } },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    const teachers = new Map(enteredByUsers.map((teacher) => [teacher.id, teacher]));
+    const componentActivities = componentResults.map((result) => {
+      const teacher = teachers.get(result.enteredBy);
+      return {
+        id: result.id,
+        score: result.isAbsent ? null : result.rawScore,
+        timestamp: result.enteredAt,
+        teacher,
+        subject: result.subject,
+        student: result.student,
+        term: result.term,
+        class: result.class,
+        assessmentDef: result.assessmentDef,
+      };
+    });
+
+    return [...legacyActivities, ...componentActivities]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 30);
   }
 
   async resultsCompletion(user: AccessUser, termId?: string) {
@@ -283,8 +327,12 @@ export class ClassAccessService {
     return Promise.all(classes.map(async (classEntity) => {
       const enrolled = await this.prisma.enrollment.count({ where: { schoolId: user.schoolId, classId: classEntity.id, academicYearId: term.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } } });
       const subjects = await Promise.all(classEntity.classSubjects.map(async ({ subjectId, subject }) => {
-        const entered = await this.prisma.result.findMany({ where: { schoolId: user.schoolId, termId: term.id, subjectId, student: { status: 'ACTIVE', enrollments: { some: { classId: classEntity.id, academicYearId: term.academicYearId, status: 'ACTIVE' } } } }, select: { studentId: true }, distinct: ['studentId'] });
-        const enteredCount = entered.length;
+        const [entered, componentEntered] = await Promise.all([
+          this.prisma.result.findMany({ where: { schoolId: user.schoolId, termId: term.id, subjectId, student: { status: 'ACTIVE', enrollments: { some: { classId: classEntity.id, academicYearId: term.academicYearId, status: 'ACTIVE' } } } }, select: { studentId: true }, distinct: ['studentId'] }),
+          this.prisma.studentAssessmentResult.findMany({ where: { classId: classEntity.id, termId: term.id, subjectId, student: { status: 'ACTIVE' }, OR: [{ rawScore: { not: null } }, { isAbsent: true }] }, select: { studentId: true }, distinct: ['studentId'] }),
+        ]);
+        const enteredStudentIds = new Set([...entered, ...componentEntered].map((row) => row.studentId));
+        const enteredCount = enteredStudentIds.size;
         return { ...subject, enteredCount, totalStudents: enrolled, completionRate: enrolled ? Math.round((enteredCount / enrolled) * 100) : 0, complete: enrolled > 0 && enteredCount >= enrolled };
       }));
       const completeSubjects = subjects.filter((subject) => subject.complete).length;
