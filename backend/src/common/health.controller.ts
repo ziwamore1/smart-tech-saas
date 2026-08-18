@@ -166,14 +166,13 @@ export class HealthController {
           select: {
             id: true, admissionNumber: true, studentUuid: true, status: true,
             dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
-            gender: true, photoUrl: true, photoPublicId: true, createdAt: true, updatedAt: true,
+            gender: true, photoUrl: true, photoPublicId: true,
             enrollments: {
               include: { class: true, academicYear: true },
               orderBy: { academicYear: { startDate: 'desc' } as any },
             },
             parents: { include: { parent: true } },
           },
-          orderBy: { createdAt: 'desc' },
         }),
         new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), 10000)),
       ]);
