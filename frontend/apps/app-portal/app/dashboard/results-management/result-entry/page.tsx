@@ -20,7 +20,7 @@ function getGradeColor(score: number | null) {
 
 function computeGradeFromScales(score: number, scales: any[]): string | null {
   if (!scales || scales.length === 0) return null;
-  const match = scales.find((s: any) => score >= s.minScore && score <= s.maxScore);
+  const match = scales.find((s: any) => score >= s.minScore && score < s.maxScore + 1);
   return match?.grade || null;
 }
 
