@@ -32,13 +32,6 @@ export default function TeachersPage() {
   const [accessPermissions, setAccessPermissions] = useState<string[]>([]);
   const [classTeacherForm, setClassTeacherForm] = useState({ teacherId: '', classId: '', academicYearId: '', isPrimary: true });
 
-  useEffect(() => {
-    if (currentAcademicYear?.id) {
-      setAssignmentForm(prev => ({ ...prev, academicYearId: prev.academicYearId || currentAcademicYear.id }));
-      setClassTeacherForm(prev => ({ ...prev, academicYearId: prev.academicYearId || currentAcademicYear.id }));
-    }
-  }, [currentAcademicYear?.id]);
-
   const accessUserId = accessTeacher?.userId || accessTeacher?.user?.id;
   const { isLoading: accessLoading } = useQuery({
     queryKey: ['user-access', accessUserId],
@@ -151,6 +144,13 @@ export default function TeachersPage() {
     }),
   });
   const currentAcademicYear = academicYearsData?.find((y: any) => y.isCurrent);
+
+  useEffect(() => {
+    if (currentAcademicYear?.id) {
+      setAssignmentForm(prev => ({ ...prev, academicYearId: prev.academicYearId || currentAcademicYear.id }));
+      setClassTeacherForm(prev => ({ ...prev, academicYearId: prev.academicYearId || currentAcademicYear.id }));
+    }
+  }, [currentAcademicYear?.id]);
 
   const { data: classTeacherAssignments, isLoading: ctaLoading } = useQuery({
     queryKey: ['class-teacher-assignments'],

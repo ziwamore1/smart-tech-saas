@@ -175,6 +175,12 @@ export default function StudentsPage() {
   const [admissionPreview, setAdmissionPreview] = useState('');
 
   useEffect(() => {
+    if (currentAcademicYear?.id && !studentForm.academicYearId) {
+      setStudentForm(prev => ({ ...prev, academicYearId: currentAcademicYear.id }));
+    }
+  }, [currentAcademicYear?.id]);
+
+  useEffect(() => {
     if (showAddModal && currentAcademicYear) {
       const fetchPreview = async () => {
         try {
@@ -824,6 +830,7 @@ export default function StudentsPage() {
                       onChange={(e) => setStudentForm({ ...studentForm, academicYearId: e.target.value })}
                       className="w-full px-3 py-2 border rounded-lg"
                     >
+                      <option value="">Select Academic Year</option>
                       {academicYears.map((year: any) => (
                         <option key={year.id} value={year.id}>
                           {year.name} {year.isCurrent ? '(Current)' : ''}
