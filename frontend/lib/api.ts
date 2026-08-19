@@ -2075,3 +2075,125 @@ export const reportEngineApi = {
   deleteReport: (id: string) => api.delete(`/report-engine/reports/${id}`),
   downloadReport: (id: string) => api.get(`/report-engine/download/${id}`, { responseType: 'blob' }),
 };
+
+/**
+ * Chunked bulk save with retry — prevents timeouts on large payloads.
+ */
+export async function bulkSaveResults(
+  results: Array<{ studentId: string; subjectId: string; termId: string; score: number }>,
+  options?: {
+    chunkSize?: number;
+    maxRetries?: number;
+    timeout?: number;
+    onProgress?: (sent: number, total: number) => void;
+  },
+): Promise<{ created: number; errors: number; details: any[] }> {
+  const chunkSize = options?.chunkSize ?? 50;
+  const maxRetries = options?.maxRetries ?? 3;
+  const timeout = options?.timeout ?? 120000;
+  const totalCreated = { created: 0, errors: 0, details: [] as any[] };
+
+  for (let i = 0; i < results.length; i += chunkSize) {
+    const chunk = results.slice(i, i + chunkSize);
+    let lastError: any = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const res = await api.post('/results/bulk', { results: chunk }, { timeout });
+        const data = res.data;
+        totalCreated.created += data?.created ?? chunk.length;
+        totalCreated.errors += data?.errors ?? 0;
+        if (data?.details?.length) totalCreated.details.push(...data.details);
+        lastError = null;
+        break;
+      } catch (err: any) {
+        lastError = err;
+        const status = err?.response?.status;
+        if (status && status >= 400 && status < 500) {
+          totalCreated.errors += chunk.length;
+          totalCreated.details.push({ error: err?.response?.data?.message || `HTTP ${status}`, count: chunk.length });
+          break;
+        }
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 8000);
+          await new Promise(r => setTimeout(r, delay));
+        }
+      }
+    }
+
+    if (lastError) {
+      totalCreated.errors += chunk.length;
+      totalCreated.details.push({ error: lastError?.response?.data?.message || lastError?.message || 'Network error after retries', count: chunk.length });
+    }
+
+    options?.onProgress?.(Math.min(i + chunkSize, results.length), results.length);
+  }
+
+  return totalCreated;
+}
+
+/**
+ * Chunked bulk assessment scores save with retry.
+ */
+export async function bulkSaveAssessmentScores(
+  data: {
+    classId: string;
+    subjectId: string;
+    termId: string;
+    assessmentDefId: string;
+    maxScore: number;
+    scores: any[];
+  },
+  options?: {
+    chunkSize?: number;
+    maxRetries?: number;
+    timeout?: number;
+    onProgress?: (sent: number, total: number) => void;
+  },
+): Promise<any> {
+  const chunkSize = options?.chunkSize ?? 50;
+  const maxRetries = options?.maxRetries ?? 3;
+  const timeout = options?.timeout ?? 120000;
+  const allResults: any[] = [];
+  let allValidationErrors: any[] = [];
+
+  for (let i = 0; i < data.scores.length; i += chunkSize) {
+    const chunk = data.scores.slice(i, i + chunkSize);
+    let lastError: any = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const res = await api.post('/assessment-engine/scores/bulk', { ...data, scores: chunk }, { timeout });
+        const result = res.data;
+        if (result?.results) allResults.push(...result.results);
+        if (result?.validationErrors) allValidationErrors.push(...result.validationErrors);
+        lastError = null;
+        break;
+      } catch (err: any) {
+        lastError = err;
+        const status = err?.response?.status;
+        if (status && status >= 400 && status < 500) break;
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 8000);
+          await new Promise(r => setTimeout(r, delay));
+        }
+      }
+    }
+
+    if (lastError) {
+      allValidationErrors.push({ error: lastError?.response?.data?.message || lastError?.message || 'Network error after retries', count: chunk.length });
+    }
+
+    options?.onProgress?.(Math.min(i + chunkSize, data.scores.length), data.scores.length);
+  }
+
+  return {
+    results: allResults,
+    validationErrors: allValidationErrors,
+    summary: {
+      total: data.scores.length,
+      entered: allResults.filter((r: any) => r.rawScore !== null).length,
+      absent: allResults.filter((r: any) => r.isAbsent).length,
+    },
+  };
+}

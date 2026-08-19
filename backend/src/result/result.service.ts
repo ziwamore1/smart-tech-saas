@@ -514,6 +514,8 @@ export class ResultService {
     roles: string[] = [],
     isSuperAdmin = false,
   ) {
+    if (results.length === 0) return { created: 0, errors: 0, details: [] };
+
     const term = await this.prisma.term.findUnique({
       where: { id: results[0].termId },
       include: { academicYear: true },
@@ -523,118 +525,250 @@ export class ResultService {
       throw new ForbiddenException('Results are locked or term not found');
     }
 
-    const created: any[] = [];
-    const errors: any[] = [];
+    const academicYearId = term.academicYearId;
+    const firstTermId = results[0].termId;
 
-    const enrollmentMap = new Map<string, string>();
+    // ── Batch 1: Fetch all enrollments in one query ──
     const uniqueStudentIds = [...new Set(results.map(r => r.studentId))];
     const allEnrollments = await this.prisma.enrollment.findMany({
       where: {
         studentId: { in: uniqueStudentIds },
-        academicYearId: term.academicYearId,
+        academicYearId,
         status: 'ACTIVE',
         student: { status: 'ACTIVE' },
       },
       select: { studentId: true, classId: true },
     });
-    for (const e of allEnrollments) {
-      enrollmentMap.set(e.studentId, e.classId);
+    const enrollmentMap = new Map(allEnrollments.map(e => [e.studentId, e.classId]));
+
+    // ── Batch 2: Pre-check permissions once per unique (classId, subjectId) ──
+    const uniqueClassSubjectPairs = new Set<string>();
+    const missingEnrollment: any[] = [];
+    for (const item of results) {
+      const cid = enrollmentMap.get(item.studentId);
+      if (!cid) {
+        missingEnrollment.push({ studentId: item.studentId, subjectId: item.subjectId, error: 'Student not enrolled in this academic year' });
+        continue;
+      }
+      uniqueClassSubjectPairs.add(`${cid}::${item.subjectId}`);
     }
 
-    for (const item of results) {
+    const permissionErrors: any[] = [];
+    for (const pair of uniqueClassSubjectPairs) {
+      const [classId, subjectId] = pair.split('::');
       try {
-        const classId = enrollmentMap.get(item.studentId);
-        if (!classId) throw new ForbiddenException('Student is not enrolled in this academic year');
         await this.classAccess.assertCanEnterResults(
           { id: teacherId, schoolId, roles, isSuperAdmin },
           classId,
-          item.subjectId,
-          term.academicYearId,
+          subjectId,
+          academicYearId,
         );
-        const gradeData = await this.calculateGrade(item.score, schoolId, classId);
-        const result = await this.prisma.result.upsert({
-          where: {
-            studentId_subjectId_termId: {
-              studentId: item.studentId,
-              subjectId: item.subjectId,
-              termId: item.termId,
-            },
-          },
-          update: {
-            score: item.score,
-            grade: gradeData.grade,
-            remark: gradeData.remark,
-            teacherId,
-          },
-          create: {
-            studentId: item.studentId,
-            subjectId: item.subjectId,
-            termId: item.termId,
-            teacherId,
-            schoolId,
-            score: item.score,
-            grade: gradeData.grade,
-            remark: gradeData.remark,
-          },
-        });
-        created.push(result);
-
-        await this.prisma.computedResult.upsert({
-          where: {
-            studentId_subjectId_termId: {
-              studentId: item.studentId,
-              subjectId: item.subjectId,
-              termId: item.termId,
-            },
-          },
-          update: {
-            classId,
-            schoolId,
-            totalRawScore: item.score,
-            finalPercentage: item.score,
-            finalGrade: gradeData.grade,
-            finalRemark: gradeData.remark,
-            points: gradeData.points,
-            gpa: gradeData.gpa,
-            status: 'COMPUTED',
-            computedAt: new Date(),
-          },
-          create: {
-            studentId: item.studentId,
-            subjectId: item.subjectId,
-            termId: item.termId,
-            classId: classId || '',
-            schoolId,
-            totalRawScore: item.score,
-            finalPercentage: item.score,
-            finalGrade: gradeData.grade,
-            finalRemark: gradeData.remark,
-            points: gradeData.points,
-            gpa: gradeData.gpa,
-            status: 'COMPUTED',
-            computedAt: new Date(),
-          },
-        });
-      } catch (error: any) {
-        errors.push({
-          studentId: item.studentId,
-          subjectId: item.subjectId,
-          error: error.message,
-        });
+      } catch (e: any) {
+        permissionErrors.push({ classId, subjectId, error: e.message });
       }
     }
 
+    if (permissionErrors.length > 0 || missingEnrollment.length > 0) {
+      const allErrors = [...missingEnrollment, ...permissionErrors];
+      if (permissionErrors.length > 0 && missingEnrollment.length === 0) {
+        throw new ForbiddenException(`Permission denied: ${permissionErrors[0].error}`);
+      }
+      // If some students are missing enrollments but permissions are fine, filter them out
+      const unauthorizedPairs = new Set(permissionErrors.map(e => `${e.classId}::${e.subjectId}`));
+      const blockedStudentIds = new Set(results
+        .filter(r => {
+          const cid = enrollmentMap.get(r.studentId);
+          return !cid || unauthorizedPairs.has(`${cid}::${r.subjectId}`);
+        })
+        .map(r => r.studentId));
+      if (blockedStudentIds.size > 0 && blockedStudentIds.size === uniqueStudentIds.length) {
+        throw new ForbiddenException(allErrors[0].error);
+      }
+    }
+
+    // ── Batch 3: Pre-fetch grading systems (one per unique classId) ──
+    const uniqueClassIds = [...new Set(results.map(r => enrollmentMap.get(r.studentId)).filter(Boolean))] as string[];
+    const gradingCache = new Map<string, any>();
+
+    const classGradingSystems = await this.prisma.class.findMany({
+      where: { id: { in: uniqueClassIds } },
+      select: { id: true, gradingSystemId: true },
+    });
+    const classSystemIds = classGradingSystems
+      .filter(c => c.gradingSystemId)
+      .map(c => c.gradingSystemId);
+    const uniqueSystemIds = [...new Set(classSystemIds)];
+
+    if (uniqueSystemIds.length > 0) {
+      const systems = await this.prisma.gradingSystem.findMany({
+        where: { id: { in: uniqueSystemIds } },
+        include: { gradeScales: true },
+      });
+      const systemMap = new Map(systems.map(s => [s.id, s]));
+      for (const c of classGradingSystems) {
+        if (c.gradingSystemId) gradingCache.set(c.id, systemMap.get(c.gradingSystemId));
+      }
+    }
+
+    // Fallback: school-level grading systems (batch once)
+    const schoolDefault = await this.prisma.gradingSystem.findFirst({
+      where: { schoolId, isDefault: true },
+      include: { gradeScales: true },
+    });
+    const anySchoolSystem = !schoolDefault
+      ? await this.prisma.gradingSystem.findFirst({ where: { schoolId }, include: { gradeScales: true } })
+      : null;
+    const fallbackSystem = schoolDefault || anySchoolSystem;
+
+    // Grade computation helper (pure in-memory, no DB calls)
+    const computeGradeInMemory = (score: number, classId?: string): { grade: string; remark: string; points: number | null; gpa: number | null } => {
+      let system: any = classId ? gradingCache.get(classId) : undefined;
+      if (!system && fallbackSystem) system = fallbackSystem;
+      if (!system) return { grade: 'N/A', remark: 'No grading system configured', points: null, gpa: null };
+
+      const scale = system.gradeScales.find(
+        (s: any) => score >= s.minScore && score < s.maxScore + 1,
+      );
+      if (!scale) return { grade: 'N/A', remark: 'Score out of range', points: null, gpa: null };
+      return {
+        grade: scale.grade,
+        remark: scale.remark,
+        points: (scale as any).points ?? null,
+        gpa: (scale as any).gpa ?? null,
+      };
+    };
+
+    // ── Batch 4: Execute upserts inside a transaction ──
+    const created: any[] = [];
+    const errors: any[] = [...missingEnrollment];
+    const permBlockedPairs = new Set(permissionErrors.map(e => `${e.classId}::${e.subjectId}`));
+
+    // Process in chunks of 50 to avoid transaction timeout
+    const CHUNK_SIZE = 50;
+    for (let i = 0; i < results.length; i += CHUNK_SIZE) {
+      const chunk = results.slice(i, i + CHUNK_SIZE);
+      const chunkResult = await this.prisma.$transaction(async (tx) => {
+        const chunkCreated: any[] = [];
+        const chunkErrors: any[] = [];
+
+        for (const item of chunk) {
+          try {
+            const classId = enrollmentMap.get(item.studentId);
+            if (!classId) continue; // already recorded in errors
+
+            const pairKey = `${classId}::${item.subjectId}`;
+            if (permBlockedPairs.has(pairKey)) continue;
+
+            const gradeData = computeGradeInMemory(item.score, classId);
+
+            const result = await tx.result.upsert({
+              where: {
+                studentId_subjectId_termId: {
+                  studentId: item.studentId,
+                  subjectId: item.subjectId,
+                  termId: item.termId,
+                },
+              },
+              update: {
+                score: item.score,
+                grade: gradeData.grade,
+                remark: gradeData.remark,
+                teacherId,
+              },
+              create: {
+                studentId: item.studentId,
+                subjectId: item.subjectId,
+                termId: item.termId,
+                teacherId,
+                schoolId,
+                score: item.score,
+                grade: gradeData.grade,
+                remark: gradeData.remark,
+              },
+            });
+
+            await tx.computedResult.upsert({
+              where: {
+                studentId_subjectId_termId: {
+                  studentId: item.studentId,
+                  subjectId: item.subjectId,
+                  termId: item.termId,
+                },
+              },
+              update: {
+                classId,
+                schoolId,
+                totalRawScore: item.score,
+                finalPercentage: item.score,
+                finalGrade: gradeData.grade,
+                finalRemark: gradeData.remark,
+                points: gradeData.points,
+                gpa: gradeData.gpa,
+                status: 'COMPUTED',
+                computedAt: new Date(),
+              },
+              create: {
+                studentId: item.studentId,
+                subjectId: item.subjectId,
+                termId: item.termId,
+                classId: classId || '',
+                schoolId,
+                totalRawScore: item.score,
+                finalPercentage: item.score,
+                finalGrade: gradeData.grade,
+                finalRemark: gradeData.remark,
+                points: gradeData.points,
+                gpa: gradeData.gpa,
+                status: 'COMPUTED',
+                computedAt: new Date(),
+              },
+            });
+
+            chunkCreated.push(result);
+          } catch (error: any) {
+            chunkErrors.push({
+              studentId: item.studentId,
+              subjectId: item.subjectId,
+              error: error.message,
+            });
+          }
+        }
+        return { created: chunkCreated, errors: chunkErrors };
+      }, { maxWait: 30000, timeout: 60000 });
+
+      created.push(...chunkResult.created);
+      errors.push(...chunkResult.errors);
+    }
+
+    // ── Post-batch: Update result sheets ──
     if (created.length > 0) {
-      const firstTermId = results[0].termId;
       const classIds = [...new Set(created.map(r => enrollmentMap.get(r.studentId)).filter(Boolean))] as string[];
+
+      // Batch-fetch enrollment counts
+      const enrollmentCounts = await this.prisma.enrollment.groupBy({
+        by: ['classId'],
+        where: {
+          classId: { in: classIds },
+          academicYearId,
+          status: 'ACTIVE',
+          student: { status: 'ACTIVE' },
+        },
+        _count: { id: true },
+      });
+      const enrollmentCountMap = new Map(enrollmentCounts.map(e => [e.classId, e._count.id]));
+
+      // Batch-fetch existing sheets
+      const existingSheets = await this.prisma.resultSheet.findMany({
+        where: { classId: { in: classIds }, termId: firstTermId, schoolId },
+        select: { classId: true, id: true },
+      });
+      const sheetMap = new Map(existingSheets.map(s => [s.classId, s]));
+
       for (const classId of classIds) {
-        const enrolled = await this.prisma.enrollment.count({
-          where: { classId, academicYearId: term.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
-        });
+        const enrolled = enrollmentCountMap.get(classId) || 0;
         const entered = created.filter(r => enrollmentMap.get(r.studentId) === classId).length;
-        const sheetInfo = await this.ensureSheet(schoolId, classId, firstTermId, term.academicYearId, teacherId);
+        const sheetInfo = await this.ensureSheet(schoolId, classId, firstTermId, academicYearId, teacherId);
         if (sheetInfo.justCreated) {
-          // ensureSheet already counted existing results in enteredCount
           await this.prisma.resultSheet.updateMany({
             where: { classId, termId: firstTermId, schoolId },
             data: { totalStudents: enrolled },
@@ -645,38 +779,32 @@ export class ResultService {
             data: { totalStudents: enrolled, enteredCount: { increment: entered } },
           });
         }
-
-        // Auto-submit DRAFT sheets so results become visible immediately
         await this.autoSubmitSheet(schoolId, classId, firstTermId, teacherId);
       }
 
-      // Emit real-time event so Director and other teachers see the update instantly
+      // ── Emit real-time events (fire-and-forget) ──
       if (this.schoolEvents) {
         const [teacher, ...classNames] = await Promise.all([
           this.prisma.user.findUnique({ where: { id: teacherId }, select: { firstName: true, lastName: true } }),
-          ...[...new Set(created.map(r => enrollmentMap.get(r.studentId)).filter(Boolean))].map(classId =>
-            this.prisma.class.findUnique({ where: { id: classId! }, select: { id: true, name: true } })
-          ),
+          ...classIds.map(cid => this.prisma.class.findUnique({ where: { id: cid }, select: { id: true, name: true } })),
         ]);
         const classNamesMap = new Map(classNames.filter(Boolean).map((c: any) => [c.id, c.name]));
         const teacherName = teacher ? `${teacher.firstName} ${teacher.lastName}`.trim() : undefined;
 
-        const classIds = [...new Set(created.map(r => enrollmentMap.get(r.studentId)).filter(Boolean))] as string[];
         for (const classId of classIds) {
-          const termId = results[0].termId;
           const classResults = created.filter(r => enrollmentMap.get(r.studentId) === classId);
           const subjectIds = [...new Set(classResults.map(r => r.subjectId))];
           this.schoolEvents.emitResultsSaved(schoolId, {
             classId,
-            termId,
+            termId: firstTermId,
             subjectId: subjectIds.length === 1 ? subjectIds[0] : undefined,
             savedBy: teacherId,
             count: classResults.length,
           });
           this.schoolEvents.emitResultsLive(schoolId, {
-            id: `${classId}-${termId}-${Date.now()}`,
+            id: `${classId}-${firstTermId}-${Date.now()}`,
             classId,
-            termId,
+            termId: firstTermId,
             subjectId: subjectIds.length === 1 ? subjectIds[0] : undefined,
             score: classResults[0]?.score ?? null,
             count: classResults.length,

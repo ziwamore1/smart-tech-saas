@@ -562,129 +562,132 @@ export class AssessmentEngineService {
       },
     });
 
-    const results = [];
+    // ── Pre-fetch grading system once (avoid N+1 DB calls per student) ──
+    let gradingSystem: any = null;
+    const cls = await this.prisma.class.findUnique({
+      where: { id: classId },
+      select: { gradingSystemId: true },
+    });
+    if (cls?.gradingSystemId) {
+      gradingSystem = await this.prisma.gradingSystem.findUnique({
+        where: { id: cls.gradingSystemId },
+        include: { gradeScales: true },
+      });
+    }
+    if (!gradingSystem) {
+      gradingSystem = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId, isDefault: true },
+        include: { gradeScales: true },
+      });
+    }
+    if (!gradingSystem) {
+      gradingSystem = await this.prisma.gradingSystem.findFirst({
+        where: { schoolId },
+        include: { gradeScales: true },
+      });
+    }
+
+    // ── Pre-validate and compute grades in-memory ──
+    const validScores: Array<{ entry: typeof scores[0]; roundedScore: number; weightedScore: number; grade: string | null }> = [];
+    const validationErrors: Array<{ studentId: string; error: string }> = [];
 
     for (const scoreEntry of scores) {
-      const { rawScore, remarks } = scoreEntry;
-
       const isAbsent = scoreEntry.isAbsent || scoreEntry.absentCode === 'X' || scoreEntry.absentCode === 'A';
-
       if (isAbsent) {
-        const absentRemarks = scoreEntry.absentCode
-          ? `[Absent-${scoreEntry.absentCode}] ${remarks || ''}`.trim()
-          : `[Absent] ${remarks || ''}`.trim();
-
-        const result = await this.prisma.studentAssessmentResult.upsert({
-          where: {
-            studentId_subjectId_termId_assessmentDefId: {
-              studentId: scoreEntry.studentId,
-              subjectId,
-              termId,
-              assessmentDefId,
-            },
-          },
-          update: {
-            rawScore: null,
-            maxScore: effectiveMaxScore,
-            weightedScore: null,
-            percentage: null,
-            grade: null,
-            isAbsent: true,
-            remarks: absentRemarks || null,
-            enteredBy,
-            status: 'SUBMITTED',
-            batchId: batch.id,
-          },
-          create: {
-            studentId: scoreEntry.studentId,
-            subjectId,
-            termId,
-            classId,
-            assessmentDefId,
-            rawScore: null,
-            maxScore: effectiveMaxScore,
-            weightedScore: null,
-            percentage: null,
-            grade: null,
-            isAbsent: true,
-            remarks: absentRemarks || null,
-            enteredBy,
-            status: 'SUBMITTED',
-            batchId: batch.id,
-          },
-        });
-
-        results.push(result);
+        validScores.push({ entry: scoreEntry, roundedScore: 0, weightedScore: 0, grade: null });
         continue;
       }
 
-      if (rawScore !== null) {
-        if (!allowNegative && rawScore < 0) {
-          throw new BadRequestException(`Negative scores not allowed. Student: ${scoreEntry.studentId}`);
+      if (scoreEntry.rawScore !== null && scoreEntry.rawScore !== undefined) {
+        if (!allowNegative && scoreEntry.rawScore < 0) {
+          validationErrors.push({ studentId: scoreEntry.studentId, error: 'Negative scores not allowed' });
+          continue;
         }
-
-        if (rawScore > effectiveMaxScore) {
-          throw new BadRequestException(`Score ${rawScore} exceeds max score ${effectiveMaxScore}. Student: ${scoreEntry.studentId}`);
+        if (scoreEntry.rawScore > effectiveMaxScore) {
+          validationErrors.push({ studentId: scoreEntry.studentId, error: `Score ${scoreEntry.rawScore} exceeds max score ${effectiveMaxScore}` });
+          continue;
         }
-
-        if (!allowHalfMarks && !Number.isInteger(rawScore)) {
-          throw new BadRequestException(`Half marks not allowed. Student: ${scoreEntry.studentId}`);
+        if (!allowHalfMarks && !Number.isInteger(scoreEntry.rawScore)) {
+          validationErrors.push({ studentId: scoreEntry.studentId, error: 'Half marks not allowed' });
+          continue;
         }
       }
 
-      const roundedScore = rawScore !== null
-        ? parseFloat(rawScore.toFixed(decimalPlaces))
-        : null;
+      const rawScore = scoreEntry.rawScore ?? null;
+      const roundedScore = rawScore !== null ? parseFloat(rawScore.toFixed(decimalPlaces)) : null;
+      const weightedScore = roundedScore !== null ? (roundedScore / effectiveMaxScore) * 100 : null;
 
-      const weightedScore = roundedScore !== null
-        ? (roundedScore / effectiveMaxScore) * 100
-        : null;
+      // In-memory grade lookup
+      let grade: string | null = null;
+      if (weightedScore !== null && gradingSystem?.gradeScales?.length > 0) {
+        const scale = gradingSystem.gradeScales.find(
+          (s: any) => weightedScore >= s.minScore && weightedScore < s.maxScore + 1,
+        );
+        grade = scale?.grade ?? null;
+      }
 
-      const grade = weightedScore !== null
-        ? await this.gradingEngine.computeGrade(weightedScore, classId, subjectId, termId, schoolId)
-        : null;
+      validScores.push({ entry: scoreEntry, roundedScore: roundedScore ?? 0, weightedScore: weightedScore ?? 0, grade });
+    }
 
-      const result = await this.prisma.studentAssessmentResult.upsert({
-        where: {
-          studentId_subjectId_termId_assessmentDefId: {
-            studentId: scoreEntry.studentId,
-            subjectId,
-            termId,
-            assessmentDefId,
-          },
-        },
-        update: {
-          rawScore: roundedScore,
-          maxScore: effectiveMaxScore,
-          weightedScore,
-          percentage: weightedScore,
-          grade,
-          isAbsent: false,
-          remarks: remarks || null,
-          enteredBy,
-          status: 'SUBMITTED',
-          batchId: batch.id,
-        },
-        create: {
-          studentId: scoreEntry.studentId,
-          subjectId,
-          termId,
-          classId,
-          assessmentDefId,
-          rawScore: roundedScore,
-          maxScore: effectiveMaxScore,
-          weightedScore,
-          percentage: weightedScore,
-          grade,
-          isAbsent: false,
-          remarks: remarks || null,
-          enteredBy,
-          status: 'SUBMITTED',
-          batchId: batch.id,
-        },
-      });
+    // ── Execute upserts in transaction chunks ──
+    const results: any[] = [];
+    const CHUNK_SIZE = 50;
 
-      results.push(result);
+    for (let i = 0; i < validScores.length; i += CHUNK_SIZE) {
+      const chunk = validScores.slice(i, i + CHUNK_SIZE);
+      const chunkResults = await this.prisma.$transaction(async (tx) => {
+        const upserted: any[] = [];
+        for (const { entry, roundedScore, weightedScore, grade } of chunk) {
+          const isAbsent = entry.isAbsent || entry.absentCode === 'X' || entry.absentCode === 'A';
+          const absentRemarks = isAbsent && entry.absentCode
+            ? `[Absent-${entry.absentCode}] ${entry.remarks || ''}`.trim()
+            : isAbsent ? `[Absent] ${entry.remarks || ''}`.trim() : null;
+
+          const result = await tx.studentAssessmentResult.upsert({
+            where: {
+              studentId_subjectId_termId_assessmentDefId: {
+                studentId: entry.studentId,
+                subjectId,
+                termId,
+                assessmentDefId,
+              },
+            },
+            update: {
+              rawScore: isAbsent ? null : roundedScore,
+              maxScore: effectiveMaxScore,
+              weightedScore: isAbsent ? null : weightedScore,
+              percentage: isAbsent ? null : weightedScore,
+              grade: isAbsent ? null : grade,
+              isAbsent,
+              remarks: absentRemarks || entry.remarks || null,
+              enteredBy,
+              status: 'SUBMITTED',
+              batchId: batch.id,
+            },
+            create: {
+              studentId: entry.studentId,
+              subjectId,
+              termId,
+              classId,
+              assessmentDefId,
+              rawScore: isAbsent ? null : roundedScore,
+              maxScore: effectiveMaxScore,
+              weightedScore: isAbsent ? null : weightedScore,
+              percentage: isAbsent ? null : weightedScore,
+              grade: isAbsent ? null : grade,
+              isAbsent,
+              remarks: absentRemarks || entry.remarks || null,
+              enteredBy,
+              status: 'SUBMITTED',
+              batchId: batch.id,
+            },
+          });
+          upserted.push(result);
+        }
+        return upserted;
+      }, { maxWait: 30000, timeout: 60000 });
+
+      results.push(...chunkResults);
     }
 
     await this.prisma.assessmentBatch.update({
@@ -697,12 +700,11 @@ export class AssessmentEngineService {
 
     this.logger.log(`Bulk entered ${results.length} scores for batch ${batch.id}`);
 
-    // Sync computed results and result sheet for real-time web analytics
-    await this.syncComputedResult(classId, subjectId, termId, schoolId).catch(e =>
+    // Sync computed results and result sheet for real-time web analytics (fire-and-forget)
+    this.syncComputedResult(classId, subjectId, termId, schoolId).catch(e =>
       this.logger.error(`syncComputedResult failed: ${e.message}`),
     );
-    // Recompute any composite subjects that include this subject
-    await this.compositeSubjectService.recomputeAllComposites(subjectId, classId, termId, schoolId).catch(e =>
+    this.compositeSubjectService.recomputeAllComposites(subjectId, classId, termId, schoolId).catch(e =>
       this.logger.error(`composite recompute failed: ${e.message}`),
     );
     const def = await this.prisma.assessmentDefinition.findUnique({
@@ -726,17 +728,19 @@ export class AssessmentEngineService {
       sheetId: sheet?.id,
       enteredCount: results.filter(r => r.rawScore !== null).length,
       timestamp: new Date(),
-      });
-      await this.emitLiveResult(schoolId, { classId, subjectId, termId, enteredBy, score: results[0]?.rawScore ?? null });
+    });
+    await this.emitLiveResult(schoolId, { classId, subjectId, termId, enteredBy, score: results[0]?.rawScore ?? null });
 
-      return {
+    return {
       batch,
       results,
+      validationErrors,
       summary: {
-        total: results.length,
+        total: scores.length,
         entered: results.filter(r => r.rawScore !== null).length,
         absent: results.filter(r => r.isAbsent).length,
         missing: results.filter(r => r.rawScore === null && !r.isAbsent).length,
+        validationErrors: validationErrors.length,
       },
     };
   }

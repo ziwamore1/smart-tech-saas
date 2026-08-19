@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, classApi, termApi, gradingSystemApi, teacherApi, assessmentEngineApi } from '@/lib/api';
+import { api, classApi, termApi, gradingSystemApi, teacherApi, assessmentEngineApi, bulkSaveResults, bulkSaveAssessmentScores } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import { socket } from '@/lib/socket';
@@ -350,7 +350,14 @@ export default function ResultEntryPage() {
 
   const bulkSaveMutation = useMutation({
     mutationFn: (scoreList: Array<{ studentId: string; subjectId: string; termId: string; score: number }>) =>
-      api.post('/results/bulk', { results: scoreList }, { timeout: 120000 }),
+      bulkSaveResults(scoreList, {
+        chunkSize: 50,
+        maxRetries: 3,
+        timeout: 120000,
+        onProgress: (sent, total) => {
+          if (total > 50) toast.info(`Saving... ${sent}/${total} scores`, { id: 'bulk-progress', duration: 2000 });
+        },
+      }),
     onSuccess: async (_data: any, variables: any) => {
       queryClient.invalidateQueries({ queryKey: ['sheet-students'] });
       queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
@@ -487,7 +494,7 @@ export default function ResultEntryPage() {
     try {
       for (const defId of defIds) {
         const config = subjectConfigs.find((c: any) => c.assessmentDefId === defId);
-        await assessmentEngineApi.scores.bulk({
+        await bulkSaveAssessmentScores({
           classId: selectedClass,
           subjectId,
           termId: selectedTerm,
@@ -499,7 +506,7 @@ export default function ResultEntryPage() {
             isAbsent: e.isAbsent,
             absentCode: e.isAbsent ? 'X' : undefined,
           })),
-        }, { timeout: 120000 });
+        }, { timeout: 120000, chunkSize: 50, maxRetries: 3 });
       }
 
       // Persist complete component totals into the final results table so no downstream component misses them
@@ -511,7 +518,7 @@ export default function ResultEntryPage() {
         if (total != null) finalResults.push({ studentId: s.id, subjectId, termId: selectedTerm, score: parseFloat(total.toFixed(2)) });
       });
       if (finalResults.length > 0) {
-        await api.post('/results/bulk', { results: finalResults }, { timeout: 120000 });
+        await bulkSaveResults(finalResults, { timeout: 120000, chunkSize: 50, maxRetries: 3 });
       }
 
       queryClient.invalidateQueries({ queryKey: ['sheet-students'] });

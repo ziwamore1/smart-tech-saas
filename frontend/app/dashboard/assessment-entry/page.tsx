@@ -10,7 +10,7 @@ import {
   GridCellEditStopReasons,
   GridEditCellProps,
 } from '@mui/x-data-grid';
-import { assessmentEngineApi, classApi, subjectApi, termApi, studentApi, teacherApi } from '@/lib/api';
+import { assessmentEngineApi, classApi, subjectApi, termApi, studentApi, teacherApi, bulkSaveAssessmentScores } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 
@@ -136,7 +136,7 @@ export default function AssessmentEntryPage() {
   }, [students, selectedAssessment, configurations, existingResults]);
 
   const bulkSaveMutation = useMutation({
-    mutationFn: (data: any) => assessmentEngineApi.scores.bulk(data).then(r => r.data?.data || r.data),
+    mutationFn: (data: any) => bulkSaveAssessmentScores(data, { chunkSize: 50, maxRetries: 3, timeout: 120000 }).then(r => r),
     onSuccess: (data: any) => {
       const count = data.summary?.entered || 0;
       setSavedCount(count);
