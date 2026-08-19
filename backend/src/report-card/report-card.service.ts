@@ -153,7 +153,7 @@ export class ReportCardService {
     }
 
     const gradeScale = gradingSystem.gradeScales.find(
-      (s) => score >= s.minScore && score <= s.maxScore,
+      (s) => score >= s.minScore && score < s.maxScore + 1,
     );
 
     if (!gradeScale) {

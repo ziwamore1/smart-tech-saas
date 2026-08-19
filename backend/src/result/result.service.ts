@@ -888,7 +888,7 @@ export class ResultService {
     );
 
     const scale = gradingSystem.gradeScales.find(
-      (s) => score >= s.minScore && score <= s.maxScore,
+      (s) => score >= s.minScore && score < s.maxScore + 1,
     );
 
     if (!scale) {

@@ -46,7 +46,7 @@ export class GradingEngineService {
 
       if (cls?.gradingSystem?.gradeScales?.length > 0) {
         const scale = cls.gradingSystem.gradeScales.find(
-          s => percentage >= s.minScore && percentage <= s.maxScore,
+          s => percentage >= s.minScore && percentage < s.maxScore + 1,
         );
         if (scale) return scale.grade;
       }
@@ -59,7 +59,7 @@ export class GradingEngineService {
     });
     if (schoolDefault?.gradeScales?.length > 0) {
       const scale = schoolDefault.gradeScales.find(
-        s => percentage >= s.minScore && percentage <= s.maxScore,
+        s => percentage >= s.minScore && percentage < s.maxScore + 1,
       );
       if (scale) return scale.grade;
     }
@@ -71,7 +71,7 @@ export class GradingEngineService {
     });
     if (anySystem?.gradeScales?.length > 0) {
       const scale = anySystem.gradeScales.find(
-        s => percentage >= s.minScore && percentage <= s.maxScore,
+        s => percentage >= s.minScore && percentage < s.maxScore + 1,
       );
       if (scale) return scale.grade;
     }
@@ -116,7 +116,7 @@ export class GradingEngineService {
 
       if (cls?.gradingSystem?.gradeScales?.length > 0) {
         const scale = cls.gradingSystem.gradeScales.find(
-          s => percentage >= s.minScore && percentage <= s.maxScore,
+          s => percentage >= s.minScore && percentage < s.maxScore + 1,
         );
         if (scale) {
           return {
@@ -136,7 +136,7 @@ export class GradingEngineService {
     });
     if (schoolDefault?.gradeScales?.length > 0) {
       const scale = schoolDefault.gradeScales.find(
-        s => percentage >= s.minScore && percentage <= s.maxScore,
+        s => percentage >= s.minScore && percentage < s.maxScore + 1,
       );
       if (scale) {
         return {
@@ -155,7 +155,7 @@ export class GradingEngineService {
     });
     if (anySystem?.gradeScales?.length > 0) {
       const scale = anySystem.gradeScales.find(
-        s => percentage >= s.minScore && percentage <= s.maxScore,
+        s => percentage >= s.minScore && percentage < s.maxScore + 1,
       );
       if (scale) {
         return {

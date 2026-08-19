@@ -339,7 +339,7 @@ export class ExamMarkingService {
 
     if (system) {
       const scale = system.gradeScales.find(
-        (s) => score >= s.minScore && score <= s.maxScore,
+        (s) => score >= s.minScore && score < s.maxScore + 1,
       );
       if (scale) return scale.grade;
     }

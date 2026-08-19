@@ -69,7 +69,7 @@ async function getGradeScales(classId: string | null, schoolId: string): Promise
 }
 
 function applyScale(scales: GradeScale[], score: number): GradeScale | null {
-  return scales.find((s) => score >= s.minScore && score <= s.maxScore) ?? null;
+  return scales.find((s) => score >= s.minScore && score < s.maxScore + 1) ?? null;
 }
 
 function fallbackScale(score: number): GradeScale {

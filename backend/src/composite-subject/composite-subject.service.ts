@@ -286,7 +286,7 @@ export class CompositeSubjectService {
         });
         if (cls?.gradingSystem?.gradeScales?.length > 0) {
           const scale = cls.gradingSystem.gradeScales.find(
-            s => percentage >= s.minScore && percentage <= s.maxScore,
+            s => percentage >= s.minScore && percentage < s.maxScore + 1,
           );
           if (scale) return scale.grade;
         }
@@ -299,7 +299,7 @@ export class CompositeSubjectService {
       });
       if (defaultSystem?.gradeScales?.length > 0) {
         const scale = defaultSystem.gradeScales.find(
-          s => percentage >= s.minScore && percentage <= s.maxScore,
+          s => percentage >= s.minScore && percentage < s.maxScore + 1,
         );
         if (scale) return scale.grade;
       }
@@ -311,7 +311,7 @@ export class CompositeSubjectService {
       });
       if (anySystem?.gradeScales?.length > 0) {
         const scale = anySystem.gradeScales.find(
-          s => percentage >= s.minScore && percentage <= s.maxScore,
+          s => percentage >= s.minScore && percentage < s.maxScore + 1,
         );
         if (scale) return scale.grade;
       }

@@ -875,8 +875,8 @@ model GradingSystem {
 model GradeScale {
   id              String        @id @default(uuid())
   gradingSystemId String
-  minScore        Int
-  maxScore        Int
+  minScore        Float
+  maxScore        Float
   grade           String
   remark          String
   points          Int

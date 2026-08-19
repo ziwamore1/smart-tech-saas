@@ -548,7 +548,7 @@ export class AssessmentService {
     }
 
     const scale = gradingSystem.gradeScales.find(
-      (s) => score >= s.minScore && score <= s.maxScore,
+      (s) => score >= s.minScore && score < s.maxScore + 1,
     );
 
     return {
