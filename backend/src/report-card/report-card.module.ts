@@ -6,9 +6,10 @@ import { ReportTemplateService } from './report-template.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { ReportCardEngineModule } from '../report-card-engine/report-card-engine.module';
+import { CompositeSubjectModule } from '../composite-subject/composite-subject.module';
 
 @Module({
-  imports: [AnalyticsModule, ReportCardEngineModule],
+  imports: [AnalyticsModule, ReportCardEngineModule, CompositeSubjectModule],
   controllers: [ReportCardController, ReportTemplateController],
   providers: [ReportCardService, ReportTemplateService, PrismaService],
   exports: [ReportCardService, ReportTemplateService],

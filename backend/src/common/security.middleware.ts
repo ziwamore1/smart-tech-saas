@@ -27,7 +27,7 @@ export function setupSecurity(app: INestApplication) {
 
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 20,
+    max: 100,
     message: 'Too many authentication attempts, please try again later.',
   });
 
