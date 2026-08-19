@@ -271,15 +271,21 @@ export default function StudentsPage() {
     },
   });
 
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
+
   const deleteStudentMutation = useMutation({
     mutationFn: (id: string) => studentApi.delete(id),
+    onMutate: (id) => setPendingDeleteId(id),
     onSuccess: () => {
+      setPendingDeleteId(null);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
       setMessage({ type: 'success', text: 'Student deleted successfully!' });
       setTimeout(() => setMessage(null), 3000);
     },
     onError: (error: any) => {
+      setPendingDeleteId(null);
       setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to delete student.' });
       setTimeout(() => setMessage(null), 5000);
     },
@@ -287,7 +293,9 @@ export default function StudentsPage() {
 
   const removeFromClassMutation = useMutation({
     mutationFn: (enrollmentId: string) => enrollmentApi.removeFromClass(enrollmentId),
+    onMutate: (enrollmentId) => setPendingRemoveId(enrollmentId),
     onSuccess: () => {
+      setPendingRemoveId(null);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
       setShowViewModal(false);
@@ -296,6 +304,7 @@ export default function StudentsPage() {
       setTimeout(() => setMessage(null), 5000);
     },
     onError: (error: any) => {
+      setPendingRemoveId(null);
       setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to remove student from class.' });
       setTimeout(() => setMessage(null), 5000);
     },
@@ -443,10 +452,10 @@ export default function StudentsPage() {
                     removeFromClassMutation.mutate(enrollmentId);
                   }
                 }}
-                disabled={removeFromClassMutation.isPending}
+                disabled={pendingRemoveId === student.enrollments?.[0]?.id}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {removeFromClassMutation.isPending ? (
+                {pendingRemoveId === student.enrollments?.[0]?.id ? (
                   <span className="inline-flex items-center gap-1">
                     <span className="inline-block w-3 h-3 border-2 border-orange-300 border-t-orange-600 rounded-full animate-spin"></span>
                     Removing...
@@ -455,10 +464,10 @@ export default function StudentsPage() {
               </button>
               <button
                 onClick={() => { if (confirm(`Delete ${student.firstName} ${student.lastName}? This will permanently remove them and all their records.`)) { deleteStudentMutation.mutate(student.id); } }}
-                disabled={deleteStudentMutation.isPending}
+                disabled={pendingDeleteId === student.id}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {deleteStudentMutation.isPending ? (
+                {pendingDeleteId === student.id ? (
                   <span className="inline-flex items-center gap-1">
                     <span className="inline-block w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin"></span>
                     Deleting...
@@ -1092,10 +1101,10 @@ export default function StudentsPage() {
                                   removeFromClassMutation.mutate(enrollment.id);
                                 }
                               }}
-                              disabled={removeFromClassMutation.isPending}
+                              disabled={pendingRemoveId === enrollment.id}
                               className="px-2 py-1 rounded text-xs font-medium bg-orange-50 text-orange-600 hover:bg-orange-100 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              {removeFromClassMutation.isPending ? (
+                              {pendingRemoveId === enrollment.id ? (
                                 <span className="inline-flex items-center gap-1">
                                   <span className="inline-block w-3 h-3 border-2 border-orange-300 border-t-orange-600 rounded-full animate-spin"></span>
                                   Removing...

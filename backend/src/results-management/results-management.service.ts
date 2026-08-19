@@ -200,6 +200,31 @@ export class ResultsManagementService {
       orderBy: [{ term: { startDate: 'desc' } }, { class: { name: 'asc' } }],
     });
 
+    // Recalculate live counts for each sheet to fix stale 0s
+    for (const sheet of sheets) {
+      const termRecord = sheet.term as any;
+      const ayId = sheet.academicYearId || termRecord?.academicYear?.id;
+      if (!ayId) continue;
+
+      const liveTotal = await this.prisma.enrollment.count({
+        where: { classId: sheet.classId, academicYearId: ayId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+      });
+      const liveEntered = await this.prisma.result.groupBy({
+        by: ['studentId'],
+        where: { schoolId, termId: sheet.termId, student: { enrollments: { some: { classId: sheet.classId, academicYearId: ayId, status: 'ACTIVE' } }, status: 'ACTIVE' } },
+      });
+      const liveEnteredCount = liveEntered.length;
+
+      if ((sheet as any).totalStudents !== liveTotal || (sheet as any).enteredCount !== liveEnteredCount) {
+        await this.prisma.resultSheet.update({
+          where: { id: sheet.id },
+          data: { totalStudents: liveTotal, enteredCount: liveEnteredCount },
+        });
+        (sheet as any).totalStudents = liveTotal;
+        (sheet as any).enteredCount = liveEnteredCount;
+      }
+    }
+
     // Auto-create sheet if none exists for the requested class+term
     if (sheets.length === 0 && filters.classId && targetTermId) {
       const term = await this.prisma.term.findUnique({
