@@ -1590,7 +1590,7 @@ export const assessmentEngineApi = {
       api.get(`/assessment-engine/configurations?classId=${classId}&subjectId=${subjectId}&termId=${termId}`),
   },
   scores: {
-    bulk: (data: any) => api.post('/assessment-engine/scores/bulk', data),
+    bulk: (data: any, config?: any) => api.post('/assessment-engine/scores/bulk', data, { timeout: 120000, ...config }),
     single: (data: any) => api.post('/assessment-engine/scores', data),
   },
   results: {

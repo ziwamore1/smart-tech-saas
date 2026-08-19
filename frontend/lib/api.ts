@@ -7,7 +7,7 @@ if (!API_BASE_URL.endsWith('/api/v1') && !API_BASE_URL.endsWith('/api/v1/')) {
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -1544,7 +1544,7 @@ export const assessmentEngineApi = {
       api.get(`/assessment-engine/configurations?classId=${classId}&subjectId=${subjectId}&termId=${termId}`),
   },
   scores: {
-    bulk: (data: any) => api.post('/assessment-engine/scores/bulk', data),
+    bulk: (data: any, config?: any) => api.post('/assessment-engine/scores/bulk', data, { timeout: 120000, ...config }),
     single: (data: any) => api.post('/assessment-engine/scores', data),
   },
   results: {

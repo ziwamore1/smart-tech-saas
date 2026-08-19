@@ -499,7 +499,7 @@ export default function ResultEntryPage() {
             isAbsent: e.isAbsent,
             absentCode: e.isAbsent ? 'X' : undefined,
           })),
-        });
+        }, { timeout: 120000 });
       }
 
       // Persist complete component totals into the final results table so no downstream component misses them
