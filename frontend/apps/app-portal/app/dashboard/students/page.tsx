@@ -286,6 +286,7 @@ export default function StudentsPage() {
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
+  const [highlightedStudentId, setHighlightedStudentId] = useState<string | null>(null);
 
   const deleteStudentMutation = useMutation({
     mutationFn: (id: string) => studentApi.delete(id),
@@ -340,14 +341,19 @@ export default function StudentsPage() {
 
   const enrollStudentMutation = useMutation({
     mutationFn: (data: any) => enrollmentApi.create(data),
-    onSuccess: () => {
+    onSuccess: (_res, variables) => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
       setMessage({ type: 'success', text: 'Student enrolled successfully!' });
       setTimeout(() => setMessage(null), 3000);
       setShowEnrollmentModal(false);
+      const enrolledId = variables?.studentId;
       setSelectedStudent(null);
       setEnrollmentForm({ classId: '', termId: '', academicYearId: currentAcademicYear?.id || '' });
+      if (enrolledId) {
+        setHighlightedStudentId(enrolledId);
+        setTimeout(() => setHighlightedStudentId(null), 180000);
+      }
     },
     onError: (error: any) => {
       setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to enroll student.' });
@@ -365,9 +371,6 @@ export default function StudentsPage() {
   }, [message]);
 
   const students = Array.isArray(studentsData) ? studentsData : [];
-  const totalStudents = students.length;
-  const maleStudents = students.filter((s: any) => s.gender?.toUpperCase() === 'MALE').length;
-  const femaleStudents = students.filter((s: any) => s.gender?.toUpperCase() === 'FEMALE').length;
 
   if (studentsError) {
     console.log('Students query error:', studentsError);
@@ -382,6 +385,10 @@ export default function StudentsPage() {
     const matchesStatus = filterStatus === '' || student.status === filterStatus;
     return matchesSearch && matchesClass && matchesStatus;
   });
+
+  const totalStudents = filteredStudents.length;
+  const maleStudents = filteredStudents.filter((s: any) => s.gender?.toUpperCase() === 'MALE').length;
+  const femaleStudents = filteredStudents.filter((s: any) => s.gender?.toUpperCase() === 'FEMALE').length;
 
   const groupedByClass = filteredStudents.reduce((acc: Record<string, any[]>, s: any) => {
     const key = s.className || 'Ungrouped';
@@ -414,11 +421,12 @@ export default function StudentsPage() {
     );
     classStudents.forEach((student: any, si: number) => {
       tableRows.push(
-        <tr key={student.id || `r-${gi}-${si}`} className="hover:bg-gray-50 transition-colors">
-          <td className="py-4 px-6">
+        <tr key={student.id || `r-${gi}-${si}`} onClick={() => { if (highlightedStudentId === student.id) setHighlightedStudentId(null); }}
+          className={`transition-all duration-300 ${highlightedStudentId === student.id ? 'bg-yellow-100 border-l-4 border-l-yellow-400 animate-pulse-once' : 'hover:bg-gray-50'}`}>
+          <td className="py-4 px-6 border border-gray-200">
             <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">{student.admissionNumber || 'N/A'}</span>
           </td>
-          <td className="py-4 px-6">
+          <td className="py-4 px-6 border border-gray-200">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
                 {(student.firstName?.[0] || '?')}{(student.lastName?.[0] || '?')}
@@ -426,29 +434,29 @@ export default function StudentsPage() {
               <div className="font-medium text-gray-900">{student.firstName} {student.lastName}</div>
             </div>
           </td>
-          <td className="py-4 px-6">
+          <td className="py-4 px-6 border border-gray-200">
             <span className="text-sm text-gray-700">{student.className || '-'}</span>
           </td>
-          <td className="py-4 px-6">
+          <td className="py-4 px-6 border border-gray-200">
             <span className={`px-2 py-1 rounded text-xs font-medium ${student.gender === 'Male' ? 'bg-blue-100 text-blue-700' : student.gender === 'Female' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-700'}`}>
               {student.gender || '-'}
             </span>
           </td>
-          <td className="py-4 px-6 text-sm text-gray-600">
+          <td className="py-4 px-6 text-sm text-gray-600 border border-gray-200">
             {student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : '-'}
           </td>
-          <td className="py-4 px-6">
+          <td className="py-4 px-6 border border-gray-200">
             <div className="text-sm">
               <div className="text-gray-900">{student.email || '-'}</div>
               <div className="text-gray-500">{student.phone || '-'}</div>
             </div>
           </td>
-          <td className="py-4 px-6">
+          <td className="py-4 px-6 border border-gray-200">
             <span className={`px-3 py-1 rounded-full text-xs font-medium border ${student.status === 'ACTIVE' ? 'bg-green-100 text-green-700 border-green-200' : student.status === 'INACTIVE' ? 'bg-gray-100 text-gray-600 border-gray-200' : student.status === 'TRANSFERRED' ? 'bg-purple-100 text-purple-700 border-purple-200' : student.status === 'GRADUATED' ? 'bg-blue-100 text-blue-700 border-blue-200' : student.status === 'WITHDRAWN' ? 'bg-orange-100 text-orange-700 border-orange-200' : student.status === 'SUSPENDED' ? 'bg-red-100 text-red-700 border-red-200' : student.status === 'DECEASED' ? 'bg-gray-200 text-gray-800 border-gray-300' : 'bg-red-100 text-red-700 border-red-200'}`}>
               {student.status || 'ACTIVE'}
             </span>
           </td>
-          <td className="py-4 px-6">
+          <td className="py-4 px-6 border border-gray-200">
             <div className="flex items-center justify-end gap-2">
               <button onClick={() => { setSelectedStudent(student); setShowViewModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">👁️ View</button>
               <button onClick={() => { setSelectedStudent(student); const parent = student.parents?.[0]?.parent; setEditForm({ firstName: student.firstName || '', lastName: student.lastName || '', admissionNumber: student.admissionNumber || '', dateOfBirth: student.dateOfBirth ? student.dateOfBirth.split('T')[0] : '', gender: student.gender || '', email: student.email || '', phone: student.phone || '', address: student.address || '', parentName: parent ? `${parent.firstName || ''} ${parent.lastName || ''}`.trim() : '', parentPhone: parent?.phone || '', parentEmail: parent?.email || '', }); setShowEditModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors">✏️ Edit</button>
@@ -649,20 +657,20 @@ export default function StudentsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full border-collapse">
               <thead className="bg-gray-50 border-b-2">
                 <tr>
-                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Admission #</th>
-                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
-                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Class</th>
-                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Gender</th>
-                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Date of Birth</th>
-                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Contact</th>
-                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="text-right py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider border border-gray-200">Admission #</th>
+                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider border border-gray-200">Name</th>
+                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider border border-gray-200">Class</th>
+                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider border border-gray-200">Gender</th>
+                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider border border-gray-200">Date of Birth</th>
+                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider border border-gray-200">Contact</th>
+                  <th className="text-left py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider border border-gray-200">Status</th>
+                  <th className="text-right py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider border border-gray-200">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-200">
                 {tableRows}
               </tbody>
             </table>
