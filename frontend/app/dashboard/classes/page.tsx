@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { classApi, levelTypeApi, enrollmentApi, studentApi, subjectApi, classSubjectApi, gradingSystemApi, api, classTeacherAssignmentApi, academicYearApi } from '@/lib/api';
 import { usePermissions } from '@/lib/permission-context';
@@ -76,6 +76,13 @@ export default function ClassesPage() {
       } catch { return []; }
     },
   });
+  const currentAcademicYear = academicYearsData?.find((y: any) => y.isCurrent);
+
+  useEffect(() => {
+    if (currentAcademicYear?.id) {
+      setClassTeacherForm(prev => ({ ...prev, academicYearId: prev.academicYearId || currentAcademicYear.id }));
+    }
+  }, [currentAcademicYear?.id]);
 
   const { data: classTeacherAssignments } = useQuery({
     queryKey: ['class-teacher-assignments'],
@@ -110,7 +117,7 @@ export default function ClassesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['class-teacher-assignments'] });
       setShowClassTeacherModal(false);
-      setClassTeacherForm({ teacherId: '', academicYearId: '', isPrimary: true });
+      setClassTeacherForm({ teacherId: '', academicYearId: currentAcademicYear?.id || '', isPrimary: true });
       setMessage({ type: 'success', text: 'Class teacher assigned!' });
       setTimeout(() => setMessage(null), 3000);
     },
@@ -487,7 +494,7 @@ export default function ClassesPage() {
                   <button 
                     onClick={() => {
                       setSelectedClass(cls);
-                      setClassTeacherForm({ teacherId: '', academicYearId: academicYearsData?.[0]?.id || '', isPrimary: true });
+                       setClassTeacherForm({ teacherId: '', academicYearId: currentAcademicYear?.id || '', isPrimary: true });
                       setShowClassTeacherModal(true);
                     }}
                     className="px-3 py-2 bg-teal-50 text-teal-600 rounded-xl hover:bg-teal-100 text-xs font-medium transition-colors"

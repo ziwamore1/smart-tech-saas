@@ -148,7 +148,7 @@ export default function PrimaryStudentsPage() {
       setTimeout(() => setRegisterSuccess(''), 4000);
       setFormData({
         firstName: '', lastName: '', admissionNumber: '', dateOfBirth: '', gender: '',
-        intakeType: 'grade1', grade: '1', classId: '', academicYearId: '', termId: '',
+        intakeType: 'grade1', grade: '1', classId: '', academicYearId: currentAcademicYear?.id || '', termId: '',
         previousSchool: '', guardianName: '', guardianPhone: '', guardianEmail: '',
         manualOverride: false, status: 'ACTIVE',
       });

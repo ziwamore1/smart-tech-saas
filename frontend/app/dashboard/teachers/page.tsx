@@ -29,6 +29,13 @@ export default function TeachersPage() {
   const [showClassTeacherModal, setShowClassTeacherModal] = useState(false);
   const [classTeacherForm, setClassTeacherForm] = useState({ teacherId: '', classId: '', academicYearId: '', isPrimary: true });
 
+  useEffect(() => {
+    if (currentAcademicYear?.id) {
+      setAssignmentForm(prev => ({ ...prev, academicYearId: prev.academicYearId || currentAcademicYear.id }));
+      setClassTeacherForm(prev => ({ ...prev, academicYearId: prev.academicYearId || currentAcademicYear.id }));
+    }
+  }, [currentAcademicYear?.id]);
+
   const { data: teachersData, isLoading: teachersLoading, error: teachersError } = useQuery({
     queryKey: ['teachers'],
     keepPreviousData: true,
@@ -112,6 +119,7 @@ export default function TeachersPage() {
       return Array.isArray(data) ? data : [];
     }),
   });
+  const currentAcademicYear = academicYearsData?.find((y: any) => y.isCurrent);
 
   const { data: classTeacherAssignments, isLoading: ctaLoading } = useQuery({
     queryKey: ['class-teacher-assignments'],
@@ -341,7 +349,7 @@ export default function TeachersPage() {
       queryClient.invalidateQueries({ queryKey: ['teacher-teaching-subjects'] });
       setShowAssignmentModal(false);
       setSelectedTeacherForAssignment(null);
-      setAssignmentForm({ classId: '', subjectId: '', academicYearId: '' });
+      setAssignmentForm({ classId: '', subjectId: '', academicYearId: currentAcademicYear?.id || '' });
       setEditingAssignment(null);
       setMessage({ type: 'success', text: editingAssignment ? 'Assignment updated successfully!' : 'Assignment created successfully!' });
       setTimeout(() => setMessage(null), 3000);
@@ -372,7 +380,7 @@ export default function TeachersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['class-teacher-assignments'] });
       setShowClassTeacherModal(false);
-      setClassTeacherForm({ teacherId: '', classId: '', academicYearId: '', isPrimary: true });
+      setClassTeacherForm({ teacherId: '', classId: '', academicYearId: currentAcademicYear?.id || '', isPrimary: true });
       setMessage({ type: 'success', text: 'Class teacher assigned successfully!' });
       setTimeout(() => setMessage(null), 3000);
     },
@@ -1208,7 +1216,7 @@ export default function TeachersPage() {
               </div>
             </div>
             <div className="flex gap-3 justify-end pt-6">
-              <button onClick={() => { setShowAssignmentModal(false); setSelectedTeacherForAssignment(null); setAssignmentForm({ classId: '', subjectId: '', academicYearId: '' }); setEditingAssignment(null); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
+              <button onClick={() => { setShowAssignmentModal(false); setSelectedTeacherForAssignment(null); setAssignmentForm({ classId: '', subjectId: '', academicYearId: currentAcademicYear?.id || '' }); setEditingAssignment(null); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
               <button onClick={() => {
                 if (!selectedTeacherForAssignment?.id || !assignmentForm.classId || (!isPrimary && !assignmentForm.subjectId) || !assignmentForm.academicYearId) {
                   alert('Please fill in all required fields');
@@ -1272,7 +1280,7 @@ export default function TeachersPage() {
               </div>
             </div>
             <div className="flex gap-3 justify-end pt-6">
-              <button onClick={() => { setShowClassTeacherModal(false); setClassTeacherForm({ teacherId: '', classId: '', academicYearId: '', isPrimary: true }); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
+              <button onClick={() => { setShowClassTeacherModal(false); setClassTeacherForm({ teacherId: '', classId: '', academicYearId: currentAcademicYear?.id || '', isPrimary: true }); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
               <button onClick={() => {
                 if (!classTeacherForm.teacherId || !classTeacherForm.classId || !classTeacherForm.academicYearId) {
                   alert('Please fill in all required fields');

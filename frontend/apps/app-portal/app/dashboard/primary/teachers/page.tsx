@@ -146,6 +146,13 @@ export default function PrimaryTeachersPage() {
       return Array.isArray(data) ? data : [];
     }),
   });
+  const currentAcademicYear = academicYearsData?.find((y: any) => y.isCurrent);
+
+  useEffect(() => {
+    if (currentAcademicYear?.id) {
+      setAssignmentForm(prev => ({ ...prev, academicYearId: prev.academicYearId || currentAcademicYear.id }));
+    }
+  }, [currentAcademicYear?.id]);
 
   const teachers = Array.isArray(teachersData) ? teachersData : [];
   const totalTeachers = teachers.length;
@@ -317,7 +324,7 @@ export default function PrimaryTeachersPage() {
       queryClient.invalidateQueries({ queryKey: ['classes'] });
       setShowAssignmentModal(false);
       setSelectedTeacherForAssignment(null);
-      setAssignmentForm({ classId: '', subjectId: '', academicYearId: '' });
+      setAssignmentForm({ classId: '', subjectId: '', academicYearId: currentAcademicYear?.id || '' });
       setMessage({ type: 'success', text: 'Assignment created successfully!' });
       setTimeout(() => setMessage(null), 3000);
     },
@@ -1040,7 +1047,7 @@ export default function PrimaryTeachersPage() {
               </div>
             </div>
             <div className="flex gap-3 justify-end pt-6">
-              <button onClick={() => { setShowAssignmentModal(false); setSelectedTeacherForAssignment(null); setAssignmentForm({ classId: '', subjectId: '', academicYearId: '' }); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
+              <button onClick={() => { setShowAssignmentModal(false); setSelectedTeacherForAssignment(null); setAssignmentForm({ classId: '', subjectId: '', academicYearId: currentAcademicYear?.id || '' }); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
               <button onClick={() => {
                 if (!selectedTeacherForAssignment?.id || !assignmentForm.classId) {
                   alert('Please fill in all required fields');

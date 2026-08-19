@@ -318,9 +318,14 @@ export class TeacherService {
       });
     } else {
       academicYear = await this.prisma.academicYear.findFirst({
-        where: { schoolId },
-        orderBy: { startDate: 'desc' },
+        where: { schoolId, isCurrent: true },
       });
+      if (!academicYear) {
+        academicYear = await this.prisma.academicYear.findFirst({
+          where: { schoolId },
+          orderBy: { startDate: 'desc' },
+        });
+      }
     }
 
     // 3️⃣ Determine Term
@@ -332,9 +337,14 @@ export class TeacherService {
       });
     } else {
       term = await this.prisma.term.findFirst({
-        where: { academicYearId: academicYear.id },
-        orderBy: { startDate: 'desc' },
+        where: { academicYearId: academicYear.id, isCurrent: true },
       });
+      if (!term) {
+        term = await this.prisma.term.findFirst({
+          where: { academicYearId: academicYear.id },
+          orderBy: { startDate: 'desc' },
+        });
+      }
     }
 
     // 4️⃣ Get teaching assignments

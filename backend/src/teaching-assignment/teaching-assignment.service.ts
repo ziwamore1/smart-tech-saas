@@ -19,6 +19,13 @@ export class TeachingAssignmentService {
     let resolvedUserId = teacherId;
     let teacher;
 
+    if (!academicYearId) {
+      const currentYear = await this.prisma.academicYear.findFirst({
+        where: { schoolId, isCurrent: true },
+      });
+      if (currentYear) academicYearId = currentYear.id;
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: teacherId },
     });
@@ -131,6 +138,13 @@ export class TeachingAssignmentService {
   ) {
     const current = await this.prisma.teachingAssignment.findUnique({ where: { id } });
     if (!current || current.schoolId !== schoolId) throw new NotFoundException('Assignment not found');
+
+    if (!data.academicYearId) {
+      const currentYear = await this.prisma.academicYear.findFirst({
+        where: { schoolId, isCurrent: true },
+      });
+      if (currentYear) data.academicYearId = currentYear.id;
+    }
 
     const teacher = await this.prisma.user.findUnique({ where: { id: data.teacherId }, include: { teacher: true } });
     const [subject, classEntity, academicYear] = await Promise.all([

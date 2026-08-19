@@ -302,6 +302,7 @@ export default function SettingsPage() {
       return Array.isArray(data) ? data : [];
     },
   });
+  const currentAcademicYear = academicYearsData?.find((y: any) => y.isCurrent);
 
   const [schoolForm, setSchoolForm] = useState({
     name: '',
@@ -325,6 +326,12 @@ export default function SettingsPage() {
     endDate: '',
     academicYearId: '',
   });
+
+  useEffect(() => {
+    if (currentAcademicYear?.id) {
+      setTermForm(prev => ({ ...prev, academicYearId: prev.academicYearId || currentAcademicYear.id }));
+    }
+  }, [currentAcademicYear?.id]);
 
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [academicYearMessage, setAcademicYearMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -408,7 +415,7 @@ export default function SettingsPage() {
     mutationFn: (data: { name: string; startDate: string; endDate: string; academicYearId: string }) => termApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['terms'] });
-      setTermForm({ name: '', startDate: '', endDate: '', academicYearId: '' });
+      setTermForm({ name: '', startDate: '', endDate: '', academicYearId: currentAcademicYear?.id || '' });
       setTermMessage({ type: 'success', text: 'Term created successfully!' });
       setTimeout(() => setTermMessage(null), 3000);
     },

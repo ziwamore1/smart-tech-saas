@@ -15,6 +15,14 @@ export class ClassTeacherAssignmentService {
     isPrimary?: boolean;
     assignedBy?: string;
   }) {
+    // Auto-resolve academic year if not provided
+    if (!data.academicYearId) {
+      const currentYear = await this.prisma.academicYear.findFirst({
+        where: { schoolId: data.schoolId, isCurrent: true },
+      });
+      if (currentYear) data.academicYearId = currentYear.id;
+    }
+
     // Validate teacher exists
     const user = await this.prisma.user.findUnique({ where: { id: data.teacherId } });
     if (!user) throw new BadRequestException('Teacher not found');
