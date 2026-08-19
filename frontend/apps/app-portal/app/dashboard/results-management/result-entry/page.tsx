@@ -1246,7 +1246,7 @@ export default function ResultEntryPage() {
                           r.subjectId === subjId || r.subject?.id === subjId
                         );
                         const cellKey = `${student.id}::${subjId}`;
-                        const dbScore = result?.score;
+                        const dbScore = result?.finalPercentage ?? result?.score;
                         const pendingScore = studentScores[subjId];
                         const isAbsent = absentCells.has(cellKey);
                         const effectiveScore = isAbsent ? null : (pendingScore != null ? pendingScore : dbScore);

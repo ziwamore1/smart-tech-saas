@@ -418,9 +418,9 @@ export class ResultsManagementService {
           const raw = rawResultMap.get(`${cr.studentId}::${cr.subjectId}`);
           return {
             ...cr,
-            score: raw?.score ?? cr.totalRawScore ?? cr.finalPercentage ?? null,
-            grade: raw?.grade ?? cr.finalGrade ?? null,
-            remark: raw?.remark ?? cr.finalRemark ?? null,
+            score: cr.finalPercentage ?? cr.totalRawScore ?? raw?.score ?? null,
+            grade: cr.finalGrade ?? raw?.grade ?? null,
+            remark: cr.finalRemark ?? raw?.remark ?? null,
           };
         });
         const extraRawResults: any[] = [];
