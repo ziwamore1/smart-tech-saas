@@ -10,6 +10,7 @@ import { AnalyticsService } from '../analytics/analytics.service';
 import { ReportCardEngineService } from '../report-card-engine/report-card-engine.service';
 import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
+import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as handlebars from 'handlebars';
@@ -55,6 +56,7 @@ export class ReportCardService {
     private analyticsService: AnalyticsService,
     private reportCardEngineService: ReportCardEngineService,
     private cloudinary: CloudinaryService,
+    private compositeSubjectService: CompositeSubjectService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
   ) {}
 
@@ -301,6 +303,30 @@ export class ReportCardService {
 
     if (results.length === 0) {
       throw new NotFoundException('No results found');
+    }
+
+    // Apply composite subject transform: replace component subjects with composites
+    const composites = await this.compositeSubjectService.getCompositeResultsForStudent(
+      studentId, termId, classId, schoolId,
+    );
+    if (composites.length > 0) {
+      const componentIds = new Set<string>();
+      for (const comp of composites) {
+        for (const c of comp.components) componentIds.add(c.subjectId);
+      }
+      const filtered = results.filter((r: any) => !componentIds.has(r.subjectId));
+      for (const comp of composites) {
+        filtered.push({
+          subject: { id: comp.composite.id, name: comp.composite.name, code: comp.composite.code },
+          finalPercentage: comp.finalPercentage,
+          finalGrade: comp.finalGrade,
+          finalRemark: null,
+          points: null,
+          totalRawScore: comp.finalPercentage,
+          isComposite: true,
+        } as any);
+      }
+      results = filtered;
     }
 
     let totalMarks = 0;

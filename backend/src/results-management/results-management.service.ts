@@ -8,6 +8,7 @@ import { AssessmentEngineService } from '../assessment-engine/assessment-engine.
 import { ResultsSmsService } from '../results-sms/results-sms.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { PushNotificationService } from '../push-notification/push-notification.service';
+import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 import { Prisma } from '@prisma/client';
 import * as XLSX from 'xlsx';
 import { normalizeExamType } from '../common/utils/exam-type.util';
@@ -82,6 +83,7 @@ export class ResultsManagementService {
     private resultAnalytics: ResultAnalyticsService,
     private reportCardEngine: ReportCardEngineService,
     private assessmentEngine: AssessmentEngineService,
+    private compositeSubjectService: CompositeSubjectService,
     @Optional() @Inject(forwardRef(() => ResultsSmsService))
     private resultsSmsService?: ResultsSmsService,
     private schoolEvents?: SchoolEventsGateway,
@@ -596,9 +598,15 @@ export class ResultsManagementService {
         computationResults.push({ subjectId: cs.subjectId, ...result });
       } catch (error: any) {
         this.logger.error(`Verification compute failed for subject ${cs.subjectId}: ${error.message}`);
-        computationResults.push({ subjectId: cs.subjectId, computed: 0, failed: 0, error: error.message });
+      computationResults.push({ subjectId: cs.subjectId, computed: 0, failed: 0, error: error.message });
       }
     }
+
+    // Recompute all composite subjects for this class/term
+    const compositeResults = await this.compositeSubjectService.recomputeAllCompositesForClass(sheet.classId, sheet.termId, sheet.schoolId).catch(e => {
+      this.logger.warn(`Composite recompute failed during verify: ${e.message}`);
+      return [];
+    });
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.resultSheet.update({
@@ -635,6 +643,7 @@ export class ResultsManagementService {
       return {
         ...updated,
         computationResults,
+        compositeResults: compositeResults.length > 0 ? compositeResults : undefined,
       };
     });
   }

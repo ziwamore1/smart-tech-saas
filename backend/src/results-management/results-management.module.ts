@@ -8,6 +8,7 @@ import { ResultAnalyticsModule } from '../result-analytics/result-analytics.modu
 import { ReportCardEngineModule } from '../report-card-engine/report-card-engine.module';
 import { AssessmentEngineModule } from '../assessment-engine/assessment-engine.module';
 import { ResultsSmsModule } from '../results-sms/results-sms.module';
+import { CompositeSubjectModule } from '../composite-subject/composite-subject.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ResultsSmsModule } from '../results-sms/results-sms.module';
     ReportCardEngineModule,
     AssessmentEngineModule,
     forwardRef(() => ResultsSmsModule),
+    CompositeSubjectModule,
   ],
   controllers: [ResultsManagementController],
   providers: [ResultsManagementService],

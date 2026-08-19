@@ -1,16 +1,11 @@
-import {
-  Injectable,
-  ForbiddenException,
-  NotFoundException,
-  BadRequestException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as XLSX from 'xlsx';
 import * as ExcelJS from 'exceljs';
 import { getSubjectShortcut } from '../common/subject-shortcuts';
 import { ClassAccessService } from '../common/access/class-access.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
+import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 
 @Injectable()
 export class ResultService {
@@ -19,6 +14,7 @@ export class ResultService {
   constructor(
     private prisma: PrismaService,
     private classAccess: ClassAccessService,
+    private compositeSubjectService: CompositeSubjectService,
     private schoolEvents?: SchoolEventsGateway,
   ) {}
 
@@ -347,6 +343,11 @@ export class ResultService {
 
       // Auto-submit DRAFT sheet so results become visible immediately
       await this.autoSubmitSheet(schoolId, enrollment.classId, termId, userId);
+
+      // Recompute any composite subjects that include this subject
+      await this.compositeSubjectService.recomputeAllComposites(subjectId, enrollment.classId, termId, schoolId).catch(e =>
+        this.logger.warn(`Composite recompute failed for ${subjectId}: ${e.message}`),
+      );
 
       // Emit real-time event so Director and other teachers see the update instantly
       if (this.schoolEvents) {
@@ -817,6 +818,16 @@ export class ResultService {
             teacher: teacher ? { id: teacherId, firstName: teacher.firstName, lastName: teacher.lastName } : undefined,
             class: classId ? { id: classId, name: classNamesMap.get(classId) } : undefined,
           });
+        }
+      }
+
+      // Recompute composite subjects for all affected class+subject combinations
+      const affectedSubjects = [...new Set(created.map(r => r.subjectId))];
+      for (const subjectId of affectedSubjects) {
+        for (const classId of uniqueClassIds) {
+          await this.compositeSubjectService.recomputeAllComposites(subjectId, classId, firstTermId, schoolId).catch(e =>
+            this.logger.warn(`Composite recompute failed for subject ${subjectId}: ${e.message}`),
+          );
         }
       }
     }
@@ -1433,6 +1444,9 @@ export class ResultService {
       if (s.code) subjectMap.set(s.code.toLowerCase(), s.id);
     }
 
+    const affectedSubjectIds = new Set<string>();
+    const affectedClassIds = new Set<string>();
+
     let inserted = 0;
     let updated = 0;
     let absentCount = 0;
@@ -1614,6 +1628,17 @@ export class ResultService {
         });
 
         if (isAbsent) absentCount++;
+        affectedSubjectIds.add(subjectId);
+        if (enrollment?.classId) affectedClassIds.add(enrollment.classId);
+      }
+    }
+
+    // Recompute composite subjects for all affected subjects in this class
+    for (const subjectId of affectedSubjectIds) {
+      for (const classId of affectedClassIds) {
+        await this.compositeSubjectService.recomputeAllComposites(subjectId, classId, termId, schoolId).catch(e =>
+          this.logger.warn(`Composite recompute failed for subject ${subjectId}: ${e.message}`),
+        );
       }
     }
 

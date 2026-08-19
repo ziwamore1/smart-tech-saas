@@ -232,6 +232,41 @@ export class CompositeSubjectService {
     });
   }
 
+  async recomputeAllCompositesForClass(classId: string, termId: string, schoolId: string) {
+    const composites = await this.prisma.compositeSubject.findMany({
+      where: {
+        isActive: true,
+        components: { some: {} },
+        curriculum: {
+          schoolCurricula: { some: { schoolId, isActive: true } },
+        },
+      },
+      include: { components: true },
+    });
+
+    if (composites.length === 0) return [];
+
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { classId, academicYear: { terms: { some: { id: termId } } }, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+      select: { studentId: true },
+    });
+
+    const results: any[] = [];
+    for (const composite of composites) {
+      for (const enrollment of enrollments) {
+        const result = await this.computeCompositeForStudent(
+          composite.id,
+          enrollment.studentId,
+          termId,
+          classId,
+          schoolId,
+        );
+        if (result) results.push(result);
+      }
+    }
+    return results;
+  }
+
   async getCompositeResultsForStudent(studentId: string, termId: string, classId: string, schoolId: string) {
     const school = await this.prisma.school.findUnique({
       where: { id: schoolId },

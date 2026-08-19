@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsProviderFactory } from '../communications-cloud/providers/sms/sms-provider.factory';
 import { SmsProvider } from '../communications-cloud/interfaces/provider.interface';
+import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 
 const SINGLE_SMS_LIMIT = 160;
 
@@ -13,6 +14,7 @@ export class ResultsSmsService {
   constructor(
     private prisma: PrismaService,
     private smsProviderFactory: SmsProviderFactory,
+    private compositeSubjectService: CompositeSubjectService,
   ) {}
 
   /** The formatter consumes published computed results; it never grades or recalculates them. */
@@ -90,6 +92,35 @@ export class ResultsSmsService {
         points: subject.points,
         absent: subject.isAbsent ?? false,
       }));
+
+      // Replace component subjects with composite subjects (e.g. Physics+Chemistry → Science)
+      const composites = await this.compositeSubjectService.getCompositeResultsForStudent(
+        student.id, termId, classId, schoolId,
+      );
+      if (composites.length > 0) {
+        const componentIds = new Set<string>();
+        for (const comp of composites) {
+          for (const c of comp.components) componentIds.add(c.subjectId);
+        }
+        const filtered = officialSubjects.filter((s: any) => {
+          const matchingRow = rows.find((r) => r.subject.name === s.name || r.subject.code === s.code);
+          return !matchingRow || !componentIds.has(matchingRow.subjectId);
+        });
+        for (const comp of composites) {
+          filtered.push({
+            name: comp.composite.name,
+            code: comp.composite.code,
+            mark: isPrimary ? comp.finalPercentage : null,
+            grade: comp.finalGrade,
+            remark: null,
+            points: null,
+            absent: comp.finalPercentage == null,
+          });
+        }
+        officialSubjects.length = 0;
+        officialSubjects.push(...filtered);
+      }
+
       const subjectPoints = officialSubjects.map((s: any) => s.points).filter((p: any) => p != null);
       const bestSix = isPrimary || subjectPoints.length === 0
         ? null

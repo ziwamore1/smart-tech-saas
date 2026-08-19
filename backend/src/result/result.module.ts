@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { ResultController } from './result.controller';
 import { ResultService } from './result.service';
 import { StudentSubjectModule } from '../student-subject/student-subject.module';
+import { CompositeSubjectModule } from '../composite-subject/composite-subject.module';
 
 @Module({
-  imports: [StudentSubjectModule],
+  imports: [StudentSubjectModule, CompositeSubjectModule],
   controllers: [ResultController],
   providers: [ResultService],
 })
