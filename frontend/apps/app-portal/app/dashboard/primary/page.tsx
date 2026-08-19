@@ -14,7 +14,8 @@ const GRADE_LABELS = ['Pre', '1', '2', '3', '4', '5', '6', '7'];
 const GRADE_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#0891b2', '#ea6645', '#7c3aed'];
 
 export default function PrimaryDashboardPage() {
-  const { user, isDirector } = useAuth();
+  const { user, isDirector, allRoles } = useAuth();
+  const canViewLive = isDirector || (allRoles || []).some((r: string) => ['Deputy Director', 'Head Teacher'].includes(r));
   const [liveActivities, setLiveActivities] = useState<any[]>([]);
   const { hasAccess } = useFeatureLock();
 
@@ -38,7 +39,7 @@ export default function PrimaryDashboardPage() {
   const { data: completionData } = useQuery<any[]>({
     queryKey: ['primary-results-completion', user?.schoolId, currentTerm?.id],
     queryFn: async () => { const res = await accessApi.getResultsCompletion(currentTerm?.id); return res.data?.data || res.data || []; },
-    enabled: !!isDirector && !!user?.schoolId && !!currentTerm?.id,
+    enabled: !!canViewLive && !!user?.schoolId && !!currentTerm?.id,
     refetchInterval: 30000,
   });
 
@@ -51,7 +52,7 @@ export default function PrimaryDashboardPage() {
       setLiveActivities(results);
       return results;
     },
-    enabled: !!isDirector && !!user?.schoolId && !!currentTerm?.id,
+    enabled: !!canViewLive && !!user?.schoolId && !!currentTerm?.id,
     refetchInterval: 30000,
   });
 

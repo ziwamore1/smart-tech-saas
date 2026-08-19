@@ -350,6 +350,10 @@ export class ResultService {
 
       // Emit real-time event so Director and other teachers see the update instantly
       if (this.schoolEvents) {
+        const [teacher, classObj] = await Promise.all([
+          this.prisma.user.findUnique({ where: { id: userId }, select: { firstName: true, lastName: true } }),
+          this.prisma.class.findUnique({ where: { id: enrollment.classId }, select: { name: true } }),
+        ]);
         this.schoolEvents.emitResultsSaved(schoolId, {
           classId: enrollment.classId,
           termId,
@@ -366,6 +370,12 @@ export class ResultService {
           savedBy: userId,
           timestamp: new Date(),
           action: 'result-saved',
+          teacherName: teacher ? `${teacher.firstName} ${teacher.lastName}`.trim() : undefined,
+          className: classObj?.name,
+          subjectName: created.subject?.name,
+          teacher: teacher ? { id: userId, firstName: teacher.firstName, lastName: teacher.lastName } : undefined,
+          class: classObj ? { id: enrollment.classId, name: classObj.name } : undefined,
+          subject: created.subject ? { id: subjectId, name: created.subject.name } : undefined,
         });
       }
 
@@ -452,7 +462,8 @@ export class ResultService {
       const totalStudents = await this.prisma.enrollment.count({
         where: { classId, academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       });
-      const enteredCount = await this.prisma.result.count({
+      const enteredStudents = await this.prisma.result.groupBy({
+        by: ['studentId'],
         where: { schoolId, termId, student: { enrollments: { some: { classId, academicYearId, status: 'ACTIVE' } }, status: 'ACTIVE' } },
       });
 
@@ -465,7 +476,7 @@ export class ResultService {
           examType: 'END_TERM',
           status: 'SUBMITTED',
           totalStudents,
-          enteredCount,
+          enteredCount: enteredStudents.length,
           createdBy: userId,
           submittedAt: new Date(),
           submittedBy: userId,
@@ -641,6 +652,15 @@ export class ResultService {
 
       // Emit real-time event so Director and other teachers see the update instantly
       if (this.schoolEvents) {
+        const [teacher, ...classNames] = await Promise.all([
+          this.prisma.user.findUnique({ where: { id: teacherId }, select: { firstName: true, lastName: true } }),
+          ...[...new Set(created.map(r => enrollmentMap.get(r.studentId)).filter(Boolean))].map(classId =>
+            this.prisma.class.findUnique({ where: { id: classId! }, select: { id: true, name: true } })
+          ),
+        ]);
+        const classNamesMap = new Map(classNames.filter(Boolean).map((c: any) => [c.id, c.name]));
+        const teacherName = teacher ? `${teacher.firstName} ${teacher.lastName}`.trim() : undefined;
+
         const classIds = [...new Set(created.map(r => enrollmentMap.get(r.studentId)).filter(Boolean))] as string[];
         for (const classId of classIds) {
           const termId = results[0].termId;
@@ -663,6 +683,11 @@ export class ResultService {
             savedBy: teacherId,
             timestamp: new Date(),
             action: 'result-saved',
+            teacherName,
+            className: classNamesMap.get(classId),
+            subjectName: classResults[0]?.subject?.name,
+            teacher: teacher ? { id: teacherId, firstName: teacher.firstName, lastName: teacher.lastName } : undefined,
+            class: classId ? { id: classId, name: classNamesMap.get(classId) } : undefined,
           });
         }
       }

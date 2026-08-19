@@ -20,7 +20,7 @@ export class SyncEngineController {
   enqueueSync(@Request() req, @Body() body: any) {
     return this.syncEngine.enqueueSync({
       ...body,
-      userId: req.user.userId,
+      userId: req.user.id,
       schoolId: req.user.schoolId,
     });
   }
@@ -28,7 +28,7 @@ export class SyncEngineController {
   @Post('enqueue-batch')
   enqueueBatchSync(@Request() req, @Body() body: any) {
     return this.syncEngine.enqueueBatchSync(
-      req.user.userId,
+      req.user.id,
       req.user.schoolId,
       body.items,
     );
@@ -36,18 +36,18 @@ export class SyncEngineController {
 
   @Get('pending')
   getPendingSyncs(@Request() req, @Query('limit') limit?: string) {
-    return this.syncEngine.getPendingSyncs(req.user.userId, parseInt(limit) || 50);
+    return this.syncEngine.getPendingSyncs(req.user.id, parseInt(limit) || 50);
   }
 
   @Get('status')
   getSyncStatus(@Request() req) {
-    return this.syncEngine.getSyncStatus(req.user.userId);
+    return this.syncEngine.getSyncStatus(req.user.id);
   }
 
   @Delete('clear-completed')
   clearCompleted(@Request() req, @Query('olderThanDays') days?: string) {
     return this.syncEngine.clearCompletedSyncs(
-      req.user.userId,
+      req.user.id,
       parseInt(days) || 7,
     );
   }

@@ -162,7 +162,8 @@ export class ResultsManagementService {
               const totalStudents = await this.prisma.enrollment.count({
                 where: { classId: cls.id, academicYearId: currentYear.id, status: 'ACTIVE', student: { status: 'ACTIVE' } },
               });
-              const enteredCount = await this.prisma.result.count({
+              const enteredStudents = await this.prisma.result.groupBy({
+                by: ['studentId'],
                 where: { schoolId, termId, student: { enrollments: { some: { classId: cls.id, academicYearId: currentYear.id, status: 'ACTIVE' } }, status: 'ACTIVE' } },
               });
               await this.prisma.resultSheet.create({
@@ -174,7 +175,7 @@ export class ResultsManagementService {
                   examType,
                   createdBy: 'SYSTEM',
                   totalStudents,
-                  enteredCount,
+                  enteredCount: enteredStudents.length,
                 },
               });
             }
@@ -209,7 +210,8 @@ export class ResultsManagementService {
         const totalStudents = await this.prisma.enrollment.count({
           where: { classId: filters.classId, academicYearId: term.academicYear.id, status: 'ACTIVE', student: { status: 'ACTIVE' } },
         });
-        const enteredCount = await this.prisma.result.count({
+        const enteredStudents = await this.prisma.result.groupBy({
+          by: ['studentId'],
           where: { schoolId, termId: targetTermId, student: { enrollments: { some: { classId: filters.classId, academicYearId: term.academicYear.id, status: 'ACTIVE' } }, status: 'ACTIVE' } },
         });
         const newSheet = await this.prisma.resultSheet.create({
@@ -221,7 +223,7 @@ export class ResultsManagementService {
             examType,
             createdBy: 'SYSTEM',
             totalStudents,
-            enteredCount,
+            enteredCount: enteredStudents.length,
           },
           include: {
             class: { select: { id: true, name: true, classTeacher: { select: { firstName: true, lastName: true } } } },

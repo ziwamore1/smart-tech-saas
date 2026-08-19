@@ -43,7 +43,8 @@ const PLAN_LIMITS: Record<SubscriptionTier, { label: string; students: number; t
 };
 
 export default function SecondaryDashboardPage() {
-  const { user, isDirector } = useAuth();
+  const { user, isDirector, allRoles } = useAuth();
+  const canViewLive = isDirector || (allRoles || []).some((r: string) => ['Deputy Director', 'Head Teacher'].includes(r));
   const { hasAccess } = useFeatureLock();
   const [liveActivities, setLiveActivities] = useState<any[]>([]);
 
@@ -60,7 +61,7 @@ export default function SecondaryDashboardPage() {
   const { data: completionData } = useQuery<any[]>({
     queryKey: ['secondary-results-completion', user?.schoolId, currentTerm?.id],
     queryFn: async () => { const res = await accessApi.getResultsCompletion(currentTerm?.id); return res.data?.data || res.data || []; },
-    enabled: !!isDirector && !!user?.schoolId && !!currentTerm?.id,
+    enabled: !!canViewLive && !!user?.schoolId && !!currentTerm?.id,
     refetchInterval: 30000,
   });
 
@@ -73,7 +74,7 @@ export default function SecondaryDashboardPage() {
       setLiveActivities(results);
       return results;
     },
-    enabled: !!isDirector && !!user?.schoolId && !!currentTerm?.id,
+    enabled: !!canViewLive && !!user?.schoolId && !!currentTerm?.id,
     refetchInterval: 30000,
   });
 

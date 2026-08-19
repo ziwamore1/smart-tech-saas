@@ -12,6 +12,7 @@ import { useSchoolSocket } from '@/lib/use-school-socket';
 
 export default function DashboardPage() {
   const { user, allRoles, isSuperAdmin, isPureSuperAdmin, isDirector } = useAuth();
+  const canViewLive = isDirector || allRoles.some((r: string) => ['Deputy Director', 'Head Teacher'].includes(r));
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
   const [liveActivities, setLiveActivities] = useState<any[]>([]);
@@ -91,7 +92,7 @@ export default function DashboardPage() {
       setLiveActivities(results);
       return results;
     },
-    enabled: !!isDirector && !!user?.schoolId && !!currentTerm?.id,
+    enabled: !!canViewLive && !!user?.schoolId && !!currentTerm?.id,
     refetchInterval: 30000,
   });
 
@@ -808,8 +809,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Quick Actions */}
-      {isDirector && (
+      {/* Live Results Monitoring */}
+      {canViewLive && (
         <div style={{ background: '#ffffff', borderRadius: '16px', padding: '24px', marginBottom: '24px', color: '#0f172a', boxShadow: '0 12px 30px rgba(15,23,42,0.10)', border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
             <div>

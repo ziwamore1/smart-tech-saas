@@ -249,6 +249,20 @@ export class AssessmentEngineService {
       results.push(result);
     }
 
+    const submittedDefIds = configurations.map((c) => c.assessmentDefId);
+    const deleted = await this.prisma.termAssessmentConfiguration.deleteMany({
+      where: {
+        classId,
+        subjectId,
+        termId,
+        assessmentDefId: { notIn: submittedDefIds },
+      },
+    });
+
+    if (deleted.count > 0) {
+      this.logger.log(`Removed ${deleted.count} deleted assessment configs for class ${classId}, subject ${subjectId}, term ${termId}`);
+    }
+
     this.logger.log(`Configured ${results.length} assessment types for class ${classId}, subject ${subjectId}, term ${termId}`);
 
     return results;

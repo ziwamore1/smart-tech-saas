@@ -78,7 +78,7 @@ export class AssessmentEngineController {
   bulkEnterScores(@Request() req, @Body() body: any) {
     return this.assessmentEngine.bulkEnterScores(req.user.schoolId, {
       ...body,
-      enteredBy: req.user.userId,
+      enteredBy: req.user.id,
     });
   }
 
@@ -86,7 +86,7 @@ export class AssessmentEngineController {
   enterSingleScore(@Request() req, @Body() body: any) {
     return this.assessmentEngine.enterSingleScore(req.user.schoolId, {
       ...body,
-      enteredBy: req.user.userId,
+      enteredBy: req.user.id,
     });
   }
 
@@ -115,7 +115,7 @@ export class AssessmentEngineController {
 
   @Post('batches/:batchId/verify')
   verifyBatch(@Param('batchId') batchId: string, @Request() req) {
-    return this.assessmentEngine.verifyBatch(batchId, req.user.userId);
+    return this.assessmentEngine.verifyBatch(batchId, req.user.id);
   }
 
   @Post('batches/:batchId/lock')
@@ -125,7 +125,7 @@ export class AssessmentEngineController {
 
   @Get('teacher/pending')
   getTeacherPendingAssessments(@Request() req) {
-    return this.assessmentEngine.getTeacherPendingAssessments(req.user.userId, req.user.schoolId);
+    return this.assessmentEngine.getTeacherPendingAssessments(req.user.id, req.user.schoolId);
   }
 
   @Get('completion-stats')
