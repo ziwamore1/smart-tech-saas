@@ -276,8 +276,8 @@ tr:hover {
   background: var(--bg-gray-50);
 }
 
-/* Card containers */
-div[class*="rounded-lg shadow"] {
+/* Card containers - exclude toast notifications */
+div[class*="rounded-lg shadow"]:not(.fixed):not([style*="position: fixed"]) {
   background: var(--bg-white);
   border-radius: 12px;
   border: 1px solid var(--border-gray-200);

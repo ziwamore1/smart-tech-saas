@@ -44,38 +44,52 @@ export class EnrollmentService {
     if (!classEntity) throw new NotFoundException('Class not found');
     if (classEntity.schoolId !== data.schoolId) throw new ForbiddenException('Invalid class');
 
-    return this.prisma.$transaction(async (tx) => {
-      const existing = await tx.enrollment.findFirst({
-        where: { studentId: data.studentId, academicYearId: data.academicYearId },
-      });
+    const MAX_RETRIES = 3;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const existing = await tx.enrollment.findFirst({
+            where: { studentId: data.studentId, academicYearId: data.academicYearId },
+          });
 
-      if (existing) throw new ForbiddenException('Student already enrolled in this academic year');
+          if (existing) throw new ForbiddenException('Student already enrolled in this academic year');
 
-      const enrollment = await tx.enrollment.create({
-        data: {
-          studentId: data.studentId,
-          classId: data.classId,
-          academicYearId: data.academicYearId,
-          schoolId: data.schoolId,
-          streamId: data.streamId,
-          status: EnrollmentStatus.ACTIVE,
-        },
-      });
+          const enrollment = await tx.enrollment.create({
+            data: {
+              studentId: data.studentId,
+              classId: data.classId,
+              academicYearId: data.academicYearId,
+              schoolId: data.schoolId,
+              streamId: data.streamId,
+              status: EnrollmentStatus.ACTIVE,
+            },
+          });
 
-      await tx.student.update({
-        where: { id: data.studentId },
-        data: {
-          classId: data.classId,
-          ...(student.status !== StudentStatus.ACTIVE ? { status: StudentStatus.ACTIVE } : {}),
-        },
-      });
+          await tx.student.update({
+            where: { id: data.studentId },
+            data: {
+              classId: data.classId,
+              ...(student.status !== StudentStatus.ACTIVE ? { status: StudentStatus.ACTIVE } : {}),
+            },
+          });
 
-      await this.admissionNumberService.resequenceClassInTransaction(
-        tx, data.schoolId, data.academicYearId, data.classId,
-      );
+          await this.admissionNumberService.resequenceClassInTransaction(
+            tx, data.schoolId, data.academicYearId, data.classId,
+          );
 
-      return enrollment;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
+          return enrollment;
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
+      } catch (error: any) {
+        const isRetryable = error?.code === 'P2034' || error?.code === 'P2028' ||
+          error?.message?.includes('deadlock') || error?.message?.includes('serialization');
+        if (isRetryable && attempt < MAX_RETRIES) {
+          this.logger.warn(`Enrollment transaction conflict on attempt ${attempt}, retrying...`);
+          await new Promise(r => setTimeout(r, 200 * attempt));
+          continue;
+        }
+        throw error;
+      }
+    }
   }
 
   async getActiveEnrollmentsByClass(classId: string) {

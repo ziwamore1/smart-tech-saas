@@ -520,7 +520,7 @@ export class StudentService {
                   classId: options.classId,
                   ...(options.includeInactive ? {} : { status: EnrollmentStatus.ACTIVE }),
                 }
-              : undefined,
+              : options?.includeInactive ? undefined : { status: EnrollmentStatus.ACTIVE },
             take: 1,
             orderBy: options?.classId
               ? [{ sequenceNumber: 'asc' as const }, { academicYear: { startDate: 'desc' as const } }]
@@ -757,6 +757,43 @@ export class StudentService {
         oldStatus: student.status,
         newStatus: dto.status,
       });
+    }
+
+    if (dto.parentName || dto.parentPhone || dto.parentEmail) {
+      const parentNameParts = (dto.parentName || '').trim().split(/\s+/);
+      const parentFirstName = parentNameParts[0] || '';
+      const parentLastName = parentNameParts.slice(1).join(' ') || '';
+
+      if (parentFirstName) {
+        const existingParents = await this.prisma.parentStudent.findMany({
+          where: { studentId: id },
+          include: { parent: true },
+        });
+        const existingParent = existingParents.length > 0 ? existingParents[0].parent : null;
+
+        if (existingParent) {
+          const parentUpdateData: any = {};
+          if (parentFirstName) parentUpdateData.firstName = parentFirstName;
+          if (parentLastName) parentUpdateData.lastName = parentLastName;
+          if (dto.parentPhone) parentUpdateData.phone = dto.parentPhone;
+          if (dto.parentEmail) parentUpdateData.email = dto.parentEmail;
+          await this.prisma.parent.update({ where: { id: existingParent.id }, data: parentUpdateData });
+        } else {
+          const parentEmail = dto.parentEmail || `parent-${id}@placeholder.local`;
+          const newParent = await this.prisma.parent.create({
+            data: {
+              firstName: parentFirstName,
+              lastName: parentLastName,
+              phone: dto.parentPhone || null,
+              email: parentEmail,
+              schoolId: student.schoolId,
+            },
+          });
+          await this.prisma.parentStudent.create({
+            data: { parentId: newParent.id, studentId: id },
+          });
+        }
+      }
     }
 
     return updated;

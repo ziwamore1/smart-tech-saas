@@ -227,6 +227,13 @@ export default function EnrollmentsPage() {
       )}
 
       <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex flex-wrap gap-4 text-sm">
+            <div><span className="font-medium text-gray-600">Academic Year:</span> <span className="font-semibold text-blue-700">{currentAcademicYear?.name || currentAcademicYear?.year || 'Loading...'}</span></div>
+            <div><span className="font-medium text-gray-600">Current Term:</span> <span className="font-semibold text-blue-700">{currentTerm?.name || 'Loading...'}</span></div>
+            <div><span className="font-medium text-gray-600">Enrolling Into:</span> <span className="font-semibold text-blue-700">{selectedClassObj?.name || 'Select a class'}</span></div>
+          </div>
+        </div>
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">Select Class to Enroll Into *</label>
           <select

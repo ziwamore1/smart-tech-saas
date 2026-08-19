@@ -427,7 +427,7 @@ export default function StudentsPage() {
           <td className="py-4 px-6">
             <div className="flex items-center justify-end gap-2">
               <button onClick={() => { setSelectedStudent(student); setShowViewModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">👁️ View</button>
-              <button onClick={() => { setSelectedStudent(student); setEditForm({ firstName: student.firstName || '', lastName: student.lastName || '', admissionNumber: student.admissionNumber || '', dateOfBirth: student.dateOfBirth ? student.dateOfBirth.split('T')[0] : '', gender: student.gender || '', email: student.email || '', phone: student.phone || '', address: student.address || '', parentName: student.parentName || '', parentPhone: student.parentPhone || '', parentEmail: student.parentEmail || '', }); setShowEditModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors">✏️ Edit</button>
+              <button onClick={() => { setSelectedStudent(student); const parent = student.parents?.[0]?.parent; setEditForm({ firstName: student.firstName || '', lastName: student.lastName || '', admissionNumber: student.admissionNumber || '', dateOfBirth: student.dateOfBirth ? student.dateOfBirth.split('T')[0] : '', gender: student.gender || '', email: student.email || '', phone: student.phone || '', address: student.address || '', parentName: parent ? `${parent.firstName || ''} ${parent.lastName || ''}`.trim() : '', parentPhone: parent?.phone || '', parentEmail: parent?.email || '', }); setShowEditModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors">✏️ Edit</button>
               <button onClick={() => { setSelectedStudent(student); setShowEnrollmentModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-50 text-green-600 hover:bg-green-100 transition-colors">📚 Enroll</button>
               <button onClick={() => { setSelectedStudent(student); setShowLinkParentModal(true); setSelectedParentId(''); setLinkParentSearch(''); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-pink-50 text-pink-600 hover:bg-pink-100 transition-colors">👪 Parent</button>
               <button onClick={() => { setStatusModalStudent(student); setNewStatus(student.status || 'ACTIVE'); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors">🔁 Status</button>
@@ -1399,12 +1399,15 @@ export default function StudentsPage() {
                 </button>
                 <button
                   onClick={() => {
-                            const cleanData = {
+                             const cleanData = {
                               firstName: editForm.firstName,
                               lastName: editForm.lastName,
                               admissionNumber: editForm.admissionNumber,
                               dateOfBirth: editForm.dateOfBirth,
                               gender: editForm.gender,
+                              parentName: editForm.parentName || undefined,
+                              parentPhone: editForm.parentPhone || undefined,
+                              parentEmail: editForm.parentEmail || undefined,
                             };
                             updateStudentMutation.mutate({ id: selectedStudent.id, data: cleanData });
                           }}

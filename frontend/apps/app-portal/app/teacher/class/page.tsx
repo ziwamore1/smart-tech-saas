@@ -116,6 +116,7 @@ export default function MyClassPage() {
 
   const openEditModal = (student: any) => {
     setSelectedStudent(student);
+    const parent = student.parents?.[0]?.parent;
     setEditForm({
       firstName: student.firstName || '',
       lastName: student.lastName || '',
@@ -124,9 +125,9 @@ export default function MyClassPage() {
       email: student.email || '',
       phone: student.phone || '',
       address: student.address || '',
-      parentName: student.parentName || '',
-      parentPhone: student.parentPhone || '',
-      parentEmail: student.parentEmail || '',
+      parentName: parent ? `${parent.firstName || ''} ${parent.lastName || ''}`.trim() : '',
+      parentPhone: parent?.phone || '',
+      parentEmail: parent?.email || '',
     });
     setShowEditModal(true);
   };
