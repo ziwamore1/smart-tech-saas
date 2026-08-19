@@ -180,9 +180,6 @@ export default function TeachersPage() {
   });
 
   const teachers = Array.isArray(teachersData) ? teachersData : [];
-  const totalTeachers = teachers.length;
-  const maleTeachers = teachers.filter((t: any) => t.gender?.toUpperCase() === 'MALE').length;
-  const femaleTeachers = teachers.filter((t: any) => t.gender?.toUpperCase() === 'FEMALE').length;
 
   const filteredTeachers = teachers.filter((teacher: any) => {
     const teacherUser = teacher.user || {};
@@ -198,6 +195,10 @@ export default function TeachersPage() {
     
     return matchesSearch && matchesDepartment && matchesStaffType && matchesStatus;
   });
+
+  const totalTeachers = filteredTeachers.length;
+  const maleTeachers = filteredTeachers.filter((t: any) => t.gender?.toUpperCase() === 'MALE').length;
+  const femaleTeachers = filteredTeachers.filter((t: any) => t.gender?.toUpperCase() === 'FEMALE').length;
 
   const departments = [...new Set(teachers.map((t: any) => t.department).filter(Boolean))] as string[];
 
