@@ -674,4 +674,78 @@ export class HealthService {
       message: 'Disk check not implemented',
     };
   }
+
+  async backfillSheetCounts(apply = false, schoolId?: string) {
+    const start = Date.now();
+    const where: any = {};
+    if (schoolId) where.schoolId = schoolId;
+
+    const sheets = await this.prisma.resultSheet.findMany({
+      where,
+      select: { id: true, classId: true, termId: true, schoolId: true, academicYearId: true, totalStudents: true, enteredCount: true },
+    });
+
+    let updated = 0;
+    let alreadyCorrect = 0;
+    const results: any[] = [];
+
+    for (const sheet of sheets) {
+      let ayId = sheet.academicYearId;
+      if (!ayId) {
+        const term = await this.prisma.term.findUnique({ where: { id: sheet.termId }, select: { academicYearId: true } });
+        ayId = term?.academicYearId;
+      }
+      if (!ayId) {
+        results.push({ sheetId: sheet.id, error: 'No academic year resolved', wasCorrect: false });
+        continue;
+      }
+
+      const [totalStudents, enteredResults] = await Promise.all([
+        this.prisma.enrollment.count({
+          where: { classId: sheet.classId, academicYearId: ayId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+        }),
+        this.prisma.result.groupBy({
+          by: ['studentId'],
+          where: { schoolId: sheet.schoolId, termId: sheet.termId, student: { enrollments: { some: { classId: sheet.classId, academicYearId: ayId, status: 'ACTIVE' } }, status: 'ACTIVE' } },
+        }),
+      ]);
+      const enteredCount = enteredResults.length;
+      const wasCorrect = sheet.totalStudents === totalStudents && sheet.enteredCount === enteredCount;
+
+      if (!wasCorrect && apply) {
+        await this.prisma.resultSheet.update({
+          where: { id: sheet.id },
+          data: { totalStudents, enteredCount },
+        });
+      }
+
+      if (wasCorrect) {
+        alreadyCorrect++;
+      } else {
+        updated++;
+      }
+
+      results.push({
+        sheetId: sheet.id,
+        classId: sheet.classId,
+        termId: sheet.termId,
+        schoolId: sheet.schoolId,
+        previousTotal: sheet.totalStudents,
+        newTotal: totalStudents,
+        previousEntered: sheet.enteredCount,
+        newEntered: enteredCount,
+        wasCorrect,
+        applied: !wasCorrect && apply,
+      });
+    }
+
+    return {
+      mode: apply ? 'APPLY' : 'DRY_RUN',
+      totalSheets: sheets.length,
+      updated,
+      alreadyCorrect,
+      results,
+      latencyMs: Date.now() - start,
+    };
+  }
 }

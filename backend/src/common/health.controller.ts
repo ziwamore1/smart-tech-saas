@@ -1433,6 +1433,43 @@ export class HealthController {
     };
   }
 
+  @Get('backfill:sheet-counts')
+  async backfillSheetCounts(
+    @Query('apply') apply?: string,
+    @Query('token') token?: string,
+    @Query('schoolId') schoolId?: string,
+  ) {
+    const shouldApply = String(apply).toLowerCase() === 'true';
+    if (shouldApply) {
+      const secret = process.env.BACKFILL_SECRET;
+      if (!secret) {
+        throw new BadRequestException('BACKFILL_SECRET is not configured');
+      }
+      if (token !== secret) {
+        throw new ForbiddenException('Invalid backfill token');
+      }
+    }
+    return this.healthService.backfillSheetCounts(shouldApply, schoolId);
+  }
+
+  @Get('backfill-sheet-counts/status')
+  async backfillSheetCountsHealth() {
+    const start = Date.now();
+    try {
+      const totalSheets = await this.prisma.resultSheet.count();
+      const sheetsWithZero = await this.prisma.resultSheet.count({ where: { totalStudents: 0 } });
+      return {
+        status: sheetsWithZero === 0 ? 'healthy' : 'degraded',
+        totalSheets,
+        sheetsWithZeroStudents: sheetsWithZero,
+        needsBackfill: sheetsWithZero > 0,
+        latencyMs: Date.now() - start,
+      };
+    } catch (e: any) {
+      return { status: 'error', message: e.message, latencyMs: Date.now() - start };
+    }
+  }
+
   @Head()
   async head() {
     const health = await this.healthService.check();
