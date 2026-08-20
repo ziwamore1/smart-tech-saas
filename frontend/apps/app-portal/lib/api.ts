@@ -2313,6 +2313,10 @@ export const resultsManagementApi = {
   // Audit
   getAuditLogs: (params?: { schoolId?: string; entityType?: string; entityId?: string; action?: string; classId?: string; termId?: string }) =>
     api.get('/results-management/audit-logs', { params }),
+
+  // Backfill
+  backfillSheetCounts: () =>
+    api.post('/results-management/sheets/backfill-counts'),
 };
 
 // ===================== CURRICULUM INTELLIGENCE ENGINE (CIE) =====================
@@ -2608,9 +2612,4 @@ export const activityApi = {
     api.get('/school-activity/presence', { params: { schoolId } }),
   heartbeat: (data: { schoolId: string; userId: string; userName: string; userRole: string; page?: string }) =>
     api.post('/school-activity/presence/heartbeat', data),
-};
-
-export const resultsManagementApi = {
-  backfillSheetCounts: () =>
-    api.post('/results-management/sheets/backfill-counts'),
 };
