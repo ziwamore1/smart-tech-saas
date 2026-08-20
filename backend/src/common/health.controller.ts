@@ -1488,6 +1488,90 @@ export class HealthController {
     }
   }
 
+  @Get('diagnose-commerce')
+  async diagnoseCommerce(@Query('schoolId') schoolId?: string, @Query('className') className?: string) {
+    const start = Date.now();
+    const targetClass = className || 'Form 2A';
+    const results: Record<string, any> = {};
+
+    try {
+      const whereClass: any = { name: targetClass };
+      if (schoolId) whereClass.schoolId = schoolId;
+      const classes = await this.prisma.class.findMany({ where: whereClass, select: { id: true, name: true, schoolId: true } });
+      results.classes = classes;
+
+      for (const cls of classes) {
+        const classResult: Record<string, any> = {};
+
+        // Commerce subjects
+        const commerceSubjects = await this.prisma.subject.findMany({
+          where: { schoolId: cls.schoolId, name: { contains: 'ommerce', mode: 'insensitive' } },
+          select: { id: true, name: true },
+        });
+        classResult.commerceSubjects = commerceSubjects;
+        const subjectIds = commerceSubjects.map(s => s.id);
+
+        // ClassSubject assignments
+        const classSubjects = await this.prisma.classSubject.findMany({
+          where: { classId: cls.id, subjectId: { in: subjectIds } },
+          select: { id: true, subjectId: true },
+        });
+        classResult.classSubjectAssigned = classSubjects.length > 0;
+
+        if (!classResult.classSubjectAssigned) {
+          const allCS = await this.prisma.classSubject.findMany({
+            where: { classId: cls.id },
+            select: { subject: { select: { name: true } } },
+          });
+          classResult.allClassSubjects = allCS.map(cs => cs.subject.name);
+        }
+
+        // Enrolled students
+        const enrollments = await this.prisma.enrollment.findMany({
+          where: { classId: cls.id, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+          select: { studentId: true, academicYearId: true },
+        });
+        classResult.enrolledStudents = enrollments.length;
+
+        // Result (legacy) entries for Commerce
+        const legacyResults = await this.prisma.result.findMany({
+          where: { subjectId: { in: subjectIds }, studentId: { in: enrollments.map(e => e.studentId) } },
+          select: { id: true, score: true, studentId: true, subjectId: true, termId: true, schoolId: true },
+        });
+        classResult.legacyResults = legacyResults.length;
+
+        // StudentAssessmentResult entries for Commerce
+        const assessmentResults = await this.prisma.studentAssessmentResult.findMany({
+          where: { subjectId: { in: subjectIds }, classId: cls.id },
+          select: { id: true, rawScore: true, percentage: true, studentId: true, subjectId: true, termId: true },
+        });
+        classResult.assessmentResults = assessmentResults.length;
+
+        // ComputedResult entries for Commerce
+        const computedResults = await this.prisma.computedResult.findMany({
+          where: { subjectId: { in: subjectIds }, classId: cls.id },
+          select: { id: true, finalPercentage: true, status: true, studentId: true, subjectId: true, termId: true },
+        });
+        classResult.computedResults = computedResults.length;
+        classResult.computedResultSample = computedResults.slice(0, 3);
+
+        // ResultSheets for this class
+        const sheets = await this.prisma.resultSheet.findMany({
+          where: { classId: cls.id },
+          select: { id: true, examType: true, status: true, totalStudents: true, enteredCount: true, termId: true, academicYearId: true, schoolId: true },
+          orderBy: { createdAt: 'desc' },
+        });
+        classResult.sheets = sheets;
+
+        results[`${cls.name}_${cls.schoolId}`] = classResult;
+      }
+    } catch (e: any) {
+      results.error = e.message;
+    }
+
+    return { latencyMs: Date.now() - start, ...results };
+  }
+
   @Head()
   async head() {
     const health = await this.healthService.check();
