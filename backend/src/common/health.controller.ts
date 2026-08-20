@@ -1572,6 +1572,114 @@ export class HealthController {
     return { latencyMs: Date.now() - start, ...results };
   }
 
+  @Get('diagnose-commerce-deep')
+  async diagnoseCommerceDeep(@Query('schoolId') schoolId?: string) {
+    const start = Date.now();
+    const results: Record<string, any> = {};
+
+    try {
+      const schoolFilter = schoolId || '724804b1-b4e4-4301-952d-a818c3866a9d';
+
+      // 1. All Commerce subjects for this school
+      const commerceSubjects = await this.prisma.subject.findMany({
+        where: { schoolId: schoolFilter, name: { contains: 'ommerce', mode: 'insensitive' } },
+        select: { id: true, name: true, code: true, isCore: true },
+      });
+      results.commerceSubjects = commerceSubjects;
+
+      // 2. Which Commerce subject is linked via ClassSubject?
+      const form2a = await this.prisma.class.findFirst({
+        where: { name: 'Form 2A', schoolId: schoolFilter },
+        select: { id: true },
+      });
+      if (form2a) {
+        const classSubjects = await this.prisma.classSubject.findMany({
+          where: { classId: form2a.id },
+          select: { id: true, subjectId: true, subject: { select: { name: true } } },
+        });
+        results.form2aClassSubjects = classSubjects;
+        results.form2aCommerceLinked = classSubjects.filter(cs =>
+          commerceSubjects.some(s => s.id === cs.subjectId)
+        );
+      }
+
+      // 3. ComputedResults — which subjectId do they reference?
+      const computedResults = await this.prisma.computedResult.findMany({
+        where: { classId: form2a?.id, subjectId: { in: commerceSubjects.map(s => s.id) } },
+        select: { id: true, finalPercentage: true, status: true, studentId: true, subjectId: true, termId: true },
+      });
+      results.computedResultsBySubject = {};
+      for (const cr of computedResults) {
+        const key = cr.subjectId;
+        if (!results.computedResultsBySubject[key]) results.computedResultsBySubject[key] = { count: 0, withScore: 0, nullScore: 0, sample: [] };
+        results.computedResultsBySubject[key].count++;
+        if (cr.finalPercentage != null) results.computedResultsBySubject[key].withScore++;
+        else results.computedResultsBySubject[key].nullScore++;
+        if (results.computedResultsBySubject[key].sample.length < 3) results.computedResultsBySubject[key].sample.push(cr);
+      }
+
+      // 4. ALL StudentAssessmentResults for Form 2A (any subject) — to see if scores exist somewhere
+      const allAssessments = await this.prisma.studentAssessmentResult.findMany({
+        where: { classId: form2a?.id },
+        select: { id: true, rawScore: true, percentage: true, grade: true, studentId: true, subjectId: true, termId: true, isAbsent: true },
+      });
+      results.totalAssessmentResults = allAssessments.length;
+      results.assessmentsBySubject = {};
+      for (const ar of allAssessments) {
+        if (!results.assessmentsBySubject[ar.subjectId]) results.assessmentsBySubject[ar.subjectId] = { count: 0, withScore: 0 };
+        results.assessmentsBySubject[ar.subjectId].count++;
+        if (ar.rawScore != null) results.assessmentsBySubject[ar.subjectId].withScore++;
+      }
+
+      // 5. Resolve subject names for assessment data
+      const allSubjectIds = Object.keys(results.assessmentsBySubject);
+      if (allSubjectIds.length > 0) {
+        const subjects = await this.prisma.subject.findMany({
+          where: { id: { in: allSubjectIds } },
+          select: { id: true, name: true },
+        });
+        const subjectMap = new Map(subjects.map(s => [s.id, s.name]));
+        const named: Record<string, any> = {};
+        for (const [sid, data] of Object.entries(results.assessmentsBySubject)) {
+          named[subjectMap.get(sid) || sid] = data;
+        }
+        results.assessmentsBySubject = named;
+      }
+
+      // 6. All ComputedResults for Form 2A (any subject) — to see which have scores
+      const allComputed = await this.prisma.computedResult.findMany({
+        where: { classId: form2a?.id },
+        select: { id: true, finalPercentage: true, status: true, subjectId: true },
+      });
+      results.totalComputedResults = allComputed.length;
+      results.computedBySubject = {};
+      for (const cr of allComputed) {
+        if (!results.computedBySubject[cr.subjectId]) results.computedBySubject[cr.subjectId] = { count: 0, withScore: 0, nullScore: 0 };
+        results.computedBySubject[cr.subjectId].count++;
+        if (cr.finalPercentage != null) results.computedBySubject[cr.subjectId].withScore++;
+        else results.computedBySubject[cr.subjectId].nullScore++;
+      }
+      const computedSubjectIds = Object.keys(results.computedBySubject);
+      if (computedSubjectIds.length > 0) {
+        const subjects = await this.prisma.subject.findMany({
+          where: { id: { in: computedSubjectIds } },
+          select: { id: true, name: true },
+        });
+        const subjectMap = new Map(subjects.map(s => [s.id, s.name]));
+        const named: Record<string, any> = {};
+        for (const [sid, data] of Object.entries(results.computedBySubject)) {
+          named[subjectMap.get(sid) || sid] = data;
+        }
+        results.computedBySubject = named;
+      }
+
+    } catch (e: any) {
+      results.error = e.message;
+    }
+
+    return { latencyMs: Date.now() - start, ...results };
+  }
+
   @Head()
   async head() {
     const health = await this.healthService.check();
