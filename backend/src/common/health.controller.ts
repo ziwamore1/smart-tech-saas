@@ -1452,6 +1452,24 @@ export class HealthController {
     return this.healthService.backfillSheetCounts(shouldApply, schoolId);
   }
 
+  @Get('fix-term-ay')
+  async fixTermAcademicYear(
+    @Query('apply') apply?: string,
+    @Query('token') token?: string,
+  ) {
+    const shouldApply = String(apply).toLowerCase() === 'true';
+    if (shouldApply) {
+      const secret = process.env.BACKFILL_SECRET;
+      if (!secret) {
+        throw new BadRequestException('BACKFILL_SECRET is not configured');
+      }
+      if (token !== secret) {
+        throw new ForbiddenException('Invalid backfill token');
+      }
+    }
+    return this.healthService.fixTermAcademicYear(shouldApply);
+  }
+
   @Get('backfill-sheet-counts/status')
   async backfillSheetCountsHealth() {
     const start = Date.now();

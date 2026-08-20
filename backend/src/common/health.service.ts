@@ -748,4 +748,120 @@ export class HealthService {
       latencyMs: Date.now() - start,
     };
   }
+
+  async fixTermAcademicYear(apply = false) {
+    const start = Date.now();
+    const results: Record<string, any> = { termsFixed: 0, sheetsFixed: 0, crossSchoolDeleted: 0, recalc: { updated: 0, alreadyCorrect: 0 }, errors: [] };
+
+    try {
+      // 1. Find all schools and their current academic year
+      const schools = await this.prisma.school.findMany({
+        select: { id: true, name: true },
+      });
+
+      for (const school of schools) {
+        const currentAY = await this.prisma.academicYear.findFirst({
+          where: { schoolId: school.id, isCurrent: true },
+          select: { id: true, name: true },
+        });
+        if (!currentAY) continue;
+
+        // 2. Fix Terms pointing to wrong AY
+        const wrongTerms = await this.prisma.term.findMany({
+          where: { academicYearId: { not: currentAY.id }, academicYear: { schoolId: school.id } },
+          select: { id: true, name: true, academicYearId: true },
+        });
+        for (const term of wrongTerms) {
+          if (apply) {
+            try {
+              await this.prisma.term.update({ where: { id: term.id }, data: { academicYearId: currentAY.id } });
+              results.termsFixed++;
+            } catch (e: any) { results.errors.push({ step: 'fixTerm', termId: term.id, error: e.message }); }
+          } else {
+            results.termsFixed++;
+          }
+        }
+
+        // 3. Fix ResultSheets with wrong AY
+        const wrongSheets = await this.prisma.resultSheet.findMany({
+          where: { schoolId: school.id, academicYearId: { not: currentAY.id } },
+          select: { id: true, classId: true, academicYearId: true },
+        });
+        for (const sheet of wrongSheets) {
+          if (apply) {
+            try {
+              await this.prisma.resultSheet.update({ where: { id: sheet.id }, data: { academicYearId: currentAY.id } });
+              results.sheetsFixed++;
+            } catch (e: any) { results.errors.push({ step: 'fixSheet', sheetId: sheet.id, error: e.message }); }
+          } else {
+            results.sheetsFixed++;
+          }
+        }
+
+        // 4. Delete cross-school sheets
+        const allSchoolClasses = await this.prisma.class.findMany({
+          where: { schoolId: school.id },
+          select: { id: true },
+        });
+        const classIdSet = new Set(allSchoolClasses.map(c => c.id));
+
+        const schoolSheets = await this.prisma.resultSheet.findMany({
+          where: { schoolId: school.id },
+          select: { id: true, classId: true },
+        });
+        for (const sheet of schoolSheets) {
+          if (!classIdSet.has(sheet.classId)) {
+            if (apply) {
+              try {
+                await this.prisma.resultSheet.delete({ where: { id: sheet.id } });
+                results.crossSchoolDeleted++;
+              } catch (e: any) { results.errors.push({ step: 'deleteCrossSchool', sheetId: sheet.id, error: e.message }); }
+            } else {
+              results.crossSchoolDeleted++;
+            }
+          }
+        }
+
+        // 5. Recalculate all remaining sheets for this school
+        const remainingSheets = await this.prisma.resultSheet.findMany({
+          where: { schoolId: school.id },
+          select: { id: true, classId: true, termId: true, schoolId: true, academicYearId: true, totalStudents: true, enteredCount: true },
+        });
+        for (const sheet of remainingSheets) {
+          let ayId = sheet.academicYearId;
+          if (!ayId) {
+            const term = await this.prisma.term.findUnique({ where: { id: sheet.termId }, select: { academicYearId: true } });
+            ayId = term?.academicYearId;
+          }
+          if (!ayId) continue;
+
+          const [totalStudents, enteredResults] = await Promise.all([
+            this.prisma.enrollment.count({
+              where: { classId: sheet.classId, academicYearId: ayId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+            }),
+            this.prisma.result.groupBy({
+              by: ['studentId'],
+              where: { schoolId: sheet.schoolId, termId: sheet.termId, student: { enrollments: { some: { classId: sheet.classId, academicYearId: ayId, status: 'ACTIVE' } }, status: 'ACTIVE' } },
+            }),
+          ]);
+          const enteredCount = enteredResults.length;
+          const wasCorrect = sheet.totalStudents === totalStudents && sheet.enteredCount === enteredCount;
+
+          if (!wasCorrect && apply) {
+            await this.prisma.resultSheet.update({ where: { id: sheet.id }, data: { totalStudents, enteredCount } });
+          }
+          if (wasCorrect) results.recalc.alreadyCorrect++;
+          else results.recalc.updated++;
+        }
+      }
+    } catch (e: any) {
+      results.fatalError = e.message;
+    }
+
+    return {
+      mode: apply ? 'APPLY' : 'DRY_RUN',
+      latencyMs: Date.now() - start,
+      ...results,
+    };
+  }
 }
