@@ -326,17 +326,20 @@ export class ClassAccessService {
     });
     return Promise.all(classes.map(async (classEntity) => {
       const enrolled = await this.prisma.enrollment.count({ where: { schoolId: user.schoolId, classId: classEntity.id, academicYearId: term.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } } });
+      const enrolledFallback = await this.prisma.computedResult.findMany({ where: { schoolId: user.schoolId, classId: classEntity.id, termId: term.id, finalPercentage: { not: null }, student: { status: 'ACTIVE' } }, select: { studentId: true }, distinct: ['studentId'] }).then(r => r.length);
+      const effectiveEnrolled = enrolled || enrolledFallback;
       const subjects = await Promise.all(classEntity.classSubjects.map(async ({ subjectId, subject }) => {
-        const [entered, componentEntered] = await Promise.all([
+        const [entered, componentEntered, computedEntered] = await Promise.all([
           this.prisma.result.findMany({ where: { schoolId: user.schoolId, termId: term.id, subjectId, student: { status: 'ACTIVE', enrollments: { some: { classId: classEntity.id, academicYearId: term.academicYearId, status: 'ACTIVE' } } } }, select: { studentId: true }, distinct: ['studentId'] }),
           this.prisma.studentAssessmentResult.findMany({ where: { classId: classEntity.id, termId: term.id, subjectId, student: { status: 'ACTIVE' }, OR: [{ rawScore: { not: null } }, { isAbsent: true }] }, select: { studentId: true }, distinct: ['studentId'] }),
+          this.prisma.computedResult.findMany({ where: { classId: classEntity.id, termId, subjectId, finalPercentage: { not: null }, student: { status: 'ACTIVE' } }, select: { studentId: true }, distinct: ['studentId'] }),
         ]);
-        const enteredStudentIds = new Set([...entered, ...componentEntered].map((row) => row.studentId));
+        const enteredStudentIds = new Set([...entered, ...componentEntered, ...computedEntered].map((row) => row.studentId));
         const enteredCount = enteredStudentIds.size;
-        return { ...subject, enteredCount, totalStudents: enrolled, completionRate: enrolled ? Math.round((enteredCount / enrolled) * 100) : 0, complete: enrolled > 0 && enteredCount >= enrolled };
+        return { ...subject, enteredCount, totalStudents: effectiveEnrolled, completionRate: effectiveEnrolled ? Math.round((enteredCount / effectiveEnrolled) * 100) : 0, complete: effectiveEnrolled > 0 && enteredCount >= effectiveEnrolled };
       }));
       const completeSubjects = subjects.filter((subject) => subject.complete).length;
-      return { classId: classEntity.id, className: classEntity.name, totalStudents: enrolled, totalSubjects: subjects.length, completeSubjects, completionRate: subjects.length ? Math.round((subjects.reduce((sum, subject) => sum + subject.completionRate, 0) / subjects.length)) : 0, complete: subjects.length > 0 && completeSubjects === subjects.length, subjects };
+      return { classId: classEntity.id, className: classEntity.name, totalStudents: effectiveEnrolled, totalSubjects: subjects.length, completeSubjects, completionRate: subjects.length ? Math.round((subjects.reduce((sum, subject) => sum + subject.completionRate, 0) / subjects.length)) : 0, complete: subjects.length > 0 && completeSubjects === subjects.length, subjects };
     }));
   }
 
