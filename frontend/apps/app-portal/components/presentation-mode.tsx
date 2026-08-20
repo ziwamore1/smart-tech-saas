@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useIsDirector } from '@/lib/auth-context';
 
 type PresentationTheme = {
@@ -28,14 +28,23 @@ export function PresentationMode() {
   const [zoomIndex, setZoomIndex] = useState(1);
   const [themeIndex, setThemeIndex] = useState(0);
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ x: 24, y: 24 });
+  const dragging = useRef(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const controlRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const savedActive = window.localStorage.getItem('smarttech.presentation.active') === 'true';
     const savedZoom = Number(window.localStorage.getItem('smarttech.presentation.zoom'));
     const savedTheme = Number(window.localStorage.getItem('smarttech.presentation.theme'));
+    const savedPosX = Number(window.localStorage.getItem('smarttech.presentation.posX'));
+    const savedPosY = Number(window.localStorage.getItem('smarttech.presentation.posY'));
     setActive(savedActive);
     setZoomIndex(Number.isInteger(savedZoom) && savedZoom >= 0 && savedZoom < ZOOM_LEVELS.length ? savedZoom : 1);
     setThemeIndex(Number.isInteger(savedTheme) && savedTheme >= 0 && savedTheme < THEMES.length ? savedTheme : 0);
+    if (Number.isFinite(savedPosX) && Number.isFinite(savedPosY)) {
+      setPos({ x: savedPosX, y: savedPosY });
+    }
     setMounted(true);
   }, []);
 
@@ -99,6 +108,34 @@ export function PresentationMode() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [active, mounted, isDirector, isDesktop]);
 
+  const savePos = useCallback((x: number, y: number) => {
+    setPos({ x, y });
+    window.localStorage.setItem('smarttech.presentation.posX', String(x));
+    window.localStorage.setItem('smarttech.presentation.posY', String(y));
+  }, []);
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest('button, input, [role="dialog"]')) return;
+    e.preventDefault();
+    dragging.current = true;
+    const rect = controlRef.current?.getBoundingClientRect();
+    if (rect) {
+      dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragging.current) return;
+    const newX = Math.max(0, Math.min(window.innerWidth - 60, e.clientX - dragOffset.current.x));
+    const newY = Math.max(0, Math.min(window.innerHeight - 50, e.clientY - dragOffset.current.y));
+    savePos(newX, newY);
+  }, [savePos]);
+
+  const onPointerUp = useCallback(() => {
+    dragging.current = false;
+  }, []);
+
   const toggleFullscreen = async () => {
     if (!document.fullscreenElement) {
       await document.documentElement.requestFullscreen?.();
@@ -110,7 +147,14 @@ export function PresentationMode() {
   if (!mounted || !isDirector || !isDesktop) return null;
 
   return (
-    <div className={`presentation-control ${active ? 'presentation-control-active' : ''}`}>
+    <div
+      ref={controlRef}
+      className={`presentation-control ${active ? 'presentation-control-active' : ''}`}
+      style={{ right: 'auto', bottom: 'auto', left: pos.x, top: pos.y, touchAction: 'none', cursor: 'grab' }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+    >
       {open && (
         <div className="presentation-panel" role="dialog" aria-label="Presentation controls">
           <div className="presentation-panel-heading">
@@ -159,7 +203,7 @@ export function PresentationMode() {
         </div>
       )}
 
-      <div className="presentation-actions">
+      <div className="presentation-actions" style={{ cursor: dragging.current ? 'grabbing' : 'grab' }}>
         <button type="button" className="presentation-main-button" onClick={() => { setActive((value) => !value); setOpen(true); }}>
           <span className="presentation-spark">✦</span>
           <span>{active ? 'Exit presentation' : 'Present'}</span>

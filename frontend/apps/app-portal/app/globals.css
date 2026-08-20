@@ -68,10 +68,9 @@ html[data-presentation-mode='true'] .sidebar-link.active .nav-text {
 
 .presentation-control {
   position: fixed;
-  right: 24px;
-  bottom: 24px;
   z-index: 200;
   font-family: Arial, Helvetica, sans-serif;
+  user-select: none;
 }
 
 .presentation-actions {
