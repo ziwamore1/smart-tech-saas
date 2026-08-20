@@ -224,4 +224,11 @@ export class ResultsManagementController {
     );
     return { data, message: 'Audit logs retrieved successfully' };
   }
+
+  @Post('sheets/backfill-counts')
+  @Roles('Director', 'Deputy Director', 'Head Teacher')
+  async backfillSheetCounts(@Request() req) {
+    const result = await this.resultsManagement.backfillAllSheetCounts(req.user.schoolId);
+    return { data: result, message: `Backfilled ${result.updated} sheets, ${result.alreadyCorrect} already correct` };
+  }
 }

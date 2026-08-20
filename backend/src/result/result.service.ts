@@ -470,9 +470,17 @@ export class ResultService {
     try {
       const existing = await this.prisma.resultSheet.findFirst({
         where: { schoolId, classId, termId },
-        select: { id: true },
+        select: { id: true, totalStudents: true },
       });
-      if (existing) return { sheetId: existing.id, justCreated: false };
+      if (existing) {
+        const liveTotal = await this.prisma.enrollment.count({
+          where: { classId, academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+        });
+        if (existing.totalStudents !== liveTotal) {
+          await this.prisma.resultSheet.update({ where: { id: existing.id }, data: { totalStudents: liveTotal } });
+        }
+        return { sheetId: existing.id, justCreated: false };
+      }
 
       const totalStudents = await this.prisma.enrollment.count({
         where: { classId, academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },

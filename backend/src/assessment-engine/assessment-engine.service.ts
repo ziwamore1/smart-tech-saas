@@ -480,6 +480,10 @@ export class AssessmentEngineService {
 
     const resolvedExamType = normalizeExamType(examType);
 
+    const totalStudents = await this.prisma.enrollment.count({
+      where: { classId, academicYearId: term.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+    });
+
     const sheet = await this.prisma.resultSheet.upsert({
       where: {
         classId_termId_examType: {
@@ -488,7 +492,7 @@ export class AssessmentEngineService {
           examType: resolvedExamType,
         },
       },
-      update: {},
+      update: { totalStudents },
       create: {
         schoolId,
         classId,
@@ -497,12 +501,8 @@ export class AssessmentEngineService {
         examType: resolvedExamType,
         createdBy: userId || 'SYSTEM',
         status: 'DRAFT',
-        totalStudents: 0,
+        totalStudents,
       },
-    });
-
-    const totalStudents = await this.prisma.enrollment.count({
-      where: { classId, academicYearId: term.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
     });
 
     // Find all assessment definitions matching this exam type
@@ -538,7 +538,6 @@ export class AssessmentEngineService {
     await this.prisma.resultSheet.update({
       where: { id: sheet.id },
       data: {
-        totalStudents,
         enteredCount: scoredStudents.size,
       },
     });

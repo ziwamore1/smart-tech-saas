@@ -2609,3 +2609,8 @@ export const activityApi = {
   heartbeat: (data: { schoolId: string; userId: string; userName: string; userRole: string; page?: string }) =>
     api.post('/school-activity/presence/heartbeat', data),
 };
+
+export const resultsManagementApi = {
+  backfillSheetCounts: () =>
+    api.post('/results-management/sheets/backfill-counts'),
+};

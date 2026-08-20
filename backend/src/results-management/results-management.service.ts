@@ -90,6 +90,39 @@ export class ResultsManagementService {
     private pushNotification?: PushNotificationService,
   ) {}
 
+  async recalculateSheetCounts(sheetId: string): Promise<{ totalStudents: number; enteredCount: number }> {
+    const sheet = await this.prisma.resultSheet.findUnique({
+      where: { id: sheetId },
+      select: { classId: true, termId: true, schoolId: true, academicYearId: true, id: true },
+    });
+    if (!sheet) return { totalStudents: 0, enteredCount: 0 };
+
+    let ayId = sheet.academicYearId;
+    if (!ayId) {
+      const term = await this.prisma.term.findUnique({ where: { id: sheet.termId }, select: { academicYearId: true } });
+      ayId = term?.academicYearId;
+    }
+    if (!ayId) return { totalStudents: 0, enteredCount: 0 };
+
+    const [totalStudents, enteredResults] = await Promise.all([
+      this.prisma.enrollment.count({
+        where: { classId: sheet.classId, academicYearId: ayId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+      }),
+      this.prisma.result.groupBy({
+        by: ['studentId'],
+        where: { schoolId: sheet.schoolId, termId: sheet.termId, student: { enrollments: { some: { classId: sheet.classId, academicYearId: ayId, status: 'ACTIVE' } }, status: 'ACTIVE' } },
+      }),
+    ]);
+    const enteredCount = enteredResults.length;
+
+    await this.prisma.resultSheet.update({
+      where: { id: sheetId },
+      data: { totalStudents, enteredCount },
+    });
+
+    return { totalStudents, enteredCount };
+  }
+
   private computingKeys = new Set<string>();
 
   private ensureComputedResults(classId: string, termId: string, schoolId: string): void {
@@ -283,12 +316,14 @@ export class ResultsManagementService {
       throw new NotFoundException('Result sheet not found');
     }
 
+    const counts = await this.recalculateSheetCounts(sheet.id);
+
     const auditLogs = await this.prisma.resultAuditLog.findMany({
       where: { entityType: 'RESULT_SHEET', entityId: id },
       orderBy: { createdAt: 'asc' },
     });
 
-    return { ...sheet, statusTimeline: auditLogs };
+    return { ...sheet, totalStudents: counts.totalStudents, enteredCount: counts.enteredCount, statusTimeline: auditLogs };
   }
 
   async getSheetStudents(sheetId: string) {
@@ -2030,7 +2065,8 @@ export class ResultsManagementService {
     });
 
     if (existing) {
-      return existing;
+      const counts = await this.recalculateSheetCounts(existing.id);
+      return { ...existing, totalStudents: counts.totalStudents, enteredCount: counts.enteredCount };
     }
 
     let academicYearId = data.academicYearId;
@@ -2048,6 +2084,15 @@ export class ResultsManagementService {
       },
     });
 
+    const enteredStudents = await this.prisma.result.groupBy({
+      by: ['studentId'],
+      where: {
+        schoolId: data.schoolId,
+        termId: data.termId,
+        student: { enrollments: { some: { classId: data.classId, academicYearId, status: 'ACTIVE' } }, status: 'ACTIVE' },
+      },
+    });
+
     return this.prisma.resultSheet.create({
       data: {
         schoolId: data.schoolId,
@@ -2059,11 +2104,46 @@ export class ResultsManagementService {
         description: data.description,
         createdBy: data.createdBy,
         totalStudents,
+        enteredCount: enteredStudents.length,
       },
       include: {
         class: { select: { id: true, name: true } },
         term: { select: { id: true, name: true } },
       },
     });
+  }
+
+  async backfillAllSheetCounts(schoolId: string): Promise<{ updated: number; alreadyCorrect: number; sheets: any[] }> {
+    const sheets = await this.prisma.resultSheet.findMany({
+      where: { schoolId },
+      select: { id: true, classId: true, termId: true, academicYearId: true, totalStudents: true, enteredCount: true },
+    });
+
+    let updated = 0;
+    let alreadyCorrect = 0;
+    const results: any[] = [];
+
+    for (const sheet of sheets) {
+      const counts = await this.recalculateSheetCounts(sheet.id);
+      const wasCorrect = sheet.totalStudents === counts.totalStudents && sheet.enteredCount === counts.enteredCount;
+      if (wasCorrect) {
+        alreadyCorrect++;
+      } else {
+        updated++;
+      }
+      results.push({
+        sheetId: sheet.id,
+        classId: sheet.classId,
+        termId: sheet.termId,
+        previousTotal: sheet.totalStudents,
+        newTotal: counts.totalStudents,
+        previousEntered: sheet.enteredCount,
+        newEntered: counts.enteredCount,
+        wasCorrect,
+      });
+    }
+
+    this.logger.log(`Backfill complete: ${updated} updated, ${alreadyCorrect} already correct out of ${sheets.length} sheets for school ${schoolId}`);
+    return { updated, alreadyCorrect, sheets: results };
   }
 }

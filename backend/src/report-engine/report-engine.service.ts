@@ -1809,6 +1809,9 @@ export class ReportEngineService {
     let sheet = sheets.find((candidate) => candidate.examType === requestedExamType) || sheets[0];
     if (!sheet) {
       if (!classInfo) throw new BadRequestException('Class not found');
+      const totalStudents = await this.prisma.enrollment.count({
+        where: { classId: request.classId!, academicYearId: term.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+      });
       sheet = await this.prisma.resultSheet.create({
         data: {
           schoolId: request.schoolId,
@@ -1817,6 +1820,7 @@ export class ReportEngineService {
           academicYearId: term.academicYearId,
           examType: requestedExamType,
           createdBy: request.options?.userId || 'SYSTEM',
+          totalStudents,
         },
         select: { id: true, examType: true },
       });
