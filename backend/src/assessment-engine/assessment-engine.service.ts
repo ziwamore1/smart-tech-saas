@@ -5,6 +5,8 @@ import { SocketGateway } from '../messaging/socket.gateway';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { normalizeExamType } from '../common/utils/exam-type.util';
+import { SchoolActivityService } from '../common/services/school-activity.service';
+import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
 
 export interface CreateAssessmentDefinitionDto {
   name: string;
@@ -79,6 +81,7 @@ export class AssessmentEngineService {
     private socketGateway: SocketGateway,
     private compositeSubjectService: CompositeSubjectService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
+    @Optional() private readonly activityService?: SchoolActivityService,
   ) {}
 
   private async emitLiveResult(schoolId: string, data: { classId: string; subjectId: string; termId: string; studentId?: string; score?: number | null; enteredBy?: string }) {
@@ -764,6 +767,18 @@ export class AssessmentEngineService {
       this.logger.warn(`WebSocket emit failed: ${e.message}`);
     }
     await this.emitLiveResult(schoolId, { classId, subjectId, termId, enteredBy, score: results[0]?.rawScore ?? null }).catch(() => {});
+
+    this.activityService?.publish({
+      type: ActivityEventType.RESULT_BULK_ENTERED,
+      category: ActivityCategory.RESULTS,
+      severity: ActivitySeverity.SUCCESS,
+      schoolId,
+      userId: enteredBy,
+      userName: enteredByName || undefined,
+      title: 'Bulk results entered',
+      description: `${results?.length || 0} scores entered for ${className || 'class'} - ${subjectName || 'subject'}`,
+      metadata: { classId, subjectId, termId, count: results?.length || 0, teacherName: enteredByName, className, subjectName },
+    });
 
     return {
       batch,

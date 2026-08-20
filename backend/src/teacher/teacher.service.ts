@@ -6,6 +6,8 @@ import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { StaffSyncEngineService } from '../shared/staff-sync-engine/staff-sync-engine.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { StaffPositionService } from '../staff-position/staff-position.service';
+import { SchoolActivityService } from '../common/services/school-activity.service';
+import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
 import { ClassAccessService } from '../common/access/class-access.service';
 import { Teacher } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -23,6 +25,7 @@ export class TeacherService {
     private staffPositionService: StaffPositionService,
     private classAccess: ClassAccessService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
+    @Optional() private readonly activityService?: SchoolActivityService,
   ) {}
 
   async findAll(schoolId?: string) {
@@ -805,6 +808,17 @@ export class TeacherService {
         className,
       }).catch(() => {});
     }
+
+    this.activityService?.publish({
+      type: ActivityEventType.RESULT_BULK_ENTERED,
+      category: ActivityCategory.RESULTS,
+      severity: ActivitySeverity.SUCCESS,
+      schoolId,
+      userId: data.teacherId,
+      title: 'Bulk results entered',
+      description: `${data.scores.length} scores entered`,
+      metadata: { classId: data.classId, subjectId: data.subjectId, termId: data.termId, count: data.scores.length },
+    });
 
     return {
       message: 'Bulk scores saved successfully',

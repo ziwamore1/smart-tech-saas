@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   NotFoundException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
@@ -18,6 +19,8 @@ import { InstitutionRegistrationService } from '../institution/institution-regis
 import { InstitutionProvisioningService } from '../institution/institution-provisioning.service';
 import { RegisterInstitutionDto, InstitutionTypeCodeEnum } from '../institution/dto/institution-type.dto';
 import { StaffSyncEngineService } from '../shared/staff-sync-engine/staff-sync-engine.service';
+import { SchoolActivityService } from '../common/services/school-activity.service';
+import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
 
 @Injectable()
 export class AuthService {
@@ -32,6 +35,7 @@ export class AuthService {
     private institutionRegistrationService: InstitutionRegistrationService,
     private provisioningService: InstitutionProvisioningService,
     private syncEngine: StaffSyncEngineService,
+    @Optional() private readonly activityService?: SchoolActivityService,
   ) {}
 
   async registerSuperAdmin(data: RegisterSuperAdminDto) {
@@ -591,6 +595,19 @@ export class AuthService {
         this.logger.warn(`Failed to ensure Teacher record for Director ${user.id}: ${err.message}`),
       );
     }
+
+    this.activityService?.publish({
+      type: ActivityEventType.USER_LOGIN,
+      category: ActivityCategory.ADMINISTRATION,
+      severity: ActivitySeverity.INFO,
+      schoolId: user?.schoolUsers?.[0]?.schoolId || schoolId || '',
+      userId: user.id,
+      userName: `${user.firstName} ${user.lastName}`,
+      userRole: user.userRoles?.[0]?.role?.name || 'User',
+      title: 'User logged in',
+      description: `${user.firstName} ${user.lastName} logged in`,
+      metadata: { email: user.email },
+    });
 
     return {
       message: 'Login successful',

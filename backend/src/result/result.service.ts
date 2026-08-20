@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as XLSX from 'xlsx';
 import * as ExcelJS from 'exceljs';
@@ -6,6 +6,8 @@ import { getSubjectShortcut } from '../common/subject-shortcuts';
 import { ClassAccessService } from '../common/access/class-access.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
+import { SchoolActivityService } from '../common/services/school-activity.service';
+import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
 
 @Injectable()
 export class ResultService {
@@ -16,6 +18,7 @@ export class ResultService {
     private classAccess: ClassAccessService,
     private compositeSubjectService: CompositeSubjectService,
     private schoolEvents?: SchoolEventsGateway,
+    @Optional() private readonly activityService?: SchoolActivityService,
   ) {}
 
   async findAll(
@@ -377,6 +380,17 @@ export class ResultService {
           teacher: teacher ? { id: userId, firstName: teacher.firstName, lastName: teacher.lastName } : undefined,
           class: classObj ? { id: enrollment.classId, name: classObj.name } : undefined,
           subject: created.subject ? { id: subjectId, name: created.subject.name } : undefined,
+        });
+
+        this.activityService?.publish({
+          type: ActivityEventType.RESULT_SAVED,
+          category: ActivityCategory.RESULTS,
+          severity: ActivitySeverity.SUCCESS,
+          schoolId,
+          userId: savedBy,
+          title: 'Result saved',
+          description: `Score saved for ${className || 'class'} - ${subjectName || 'subject'}`,
+          metadata: { classId: enrollment?.classId, subjectId, termId, score, teacherName, className, subjectName },
         });
       }
 

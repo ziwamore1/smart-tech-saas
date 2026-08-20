@@ -2598,3 +2598,14 @@ export async function bulkSaveAssessmentScores(
     },
   };
 }
+
+export const activityApi = {
+  getStats: (schoolId: string) =>
+    api.get('/school-activity/stats', { params: { schoolId } }),
+  getFeed: (schoolId: string, opts?: { limit?: number; offset?: number; category?: string }) =>
+    api.get('/school-activity/feed', { params: { schoolId, ...opts } }),
+  getPresence: (schoolId: string) =>
+    api.get('/school-activity/presence', { params: { schoolId } }),
+  heartbeat: (data: { schoolId: string; userId: string; userName: string; userRole: string; page?: string }) =>
+    api.post('/school-activity/presence/heartbeat', data),
+};

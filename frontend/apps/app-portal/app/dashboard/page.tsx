@@ -133,6 +133,7 @@ export default function DashboardPage() {
   const studentsByClass = stats?.studentsByClass || [];
 
   const quickActions = [
+    { name: 'Activity Center', href: '/dashboard/activity-center', icon3d: 'analytics' },
     { name: 'Students', href: '/dashboard/students', icon3d: 'students' },
     { name: 'Teachers', href: '/dashboard/teachers', icon3d: 'teachers' },
     { name: 'Timetable', href: '/timetable', icon3d: 'timetable' },

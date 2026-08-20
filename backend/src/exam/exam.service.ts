@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException,
 import { PrismaService } from '../prisma/prisma.service';
 import { ExamMarkingService } from './exam-marking.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
+import { SchoolActivityService } from '../common/services/school-activity.service';
+import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
 
 interface ExamCreateInput {
   title: string; description?: string; type?: string;
@@ -20,6 +22,7 @@ export class ExamService {
     private prisma: PrismaService,
     private markingService: ExamMarkingService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
+    @Optional() private readonly activityService?: SchoolActivityService,
   ) {}
 
   async create(data: ExamCreateInput & { questions?: any[] }) {
@@ -159,6 +162,17 @@ export class ExamService {
       this.schoolEvents.emitExamPublished(exam.schoolId, {
         examId: id,
         publishedBy: exam.createdById || '',
+      });
+
+      this.activityService?.publish({
+        type: ActivityEventType.EXAM_PUBLISHED,
+        category: ActivityCategory.EXAMS,
+        severity: ActivitySeverity.INFO,
+        schoolId: exam.schoolId,
+        userId: exam.createdById || '',
+        title: 'Exam published',
+        description: `Exam "${exam.title}" has been published`,
+        metadata: { examId: id, examTitle: exam.title },
       });
     }
 

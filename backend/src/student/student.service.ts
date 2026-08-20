@@ -8,6 +8,8 @@ import { UsernameGenerationService } from '../identity-service/username-generati
 import { CredentialDeliveryService } from '../identity-service/credential-delivery.service';
 import { AdmissionNumberService } from '../admission-number/admission-number.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
+import { SchoolActivityService } from '../common/services/school-activity.service';
+import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
 import * as bcrypt from 'bcrypt';
 import { normalizeZambianPhone } from '../common/utils/phone.util';
 
@@ -22,6 +24,7 @@ export class StudentService {
     private credentialDeliveryService: CredentialDeliveryService,
     private admissionNumberService: AdmissionNumberService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
+    @Optional() private readonly activityService?: SchoolActivityService,
   ) {}
 
   async create(dto: CreateStudentDto, schoolId: string, userId: string, userRoles: string[]) {
@@ -174,6 +177,16 @@ export class StudentService {
         classId: dto.classId || '',
       });
     }
+
+    this.activityService?.publish({
+      type: ActivityEventType.STUDENT_ENROLLED,
+      category: ActivityCategory.ENROLLMENT,
+      severity: ActivitySeverity.SUCCESS,
+      schoolId,
+      title: 'Student enrolled',
+      description: `New student enrolled`,
+      metadata: { studentId: student.id, classId: dto.classId || '' },
+    });
 
     return {
       ...student,

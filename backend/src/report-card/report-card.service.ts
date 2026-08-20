@@ -11,6 +11,8 @@ import { ReportCardEngineService } from '../report-card-engine/report-card-engin
 import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
+import { SchoolActivityService } from '../common/services/school-activity.service';
+import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as handlebars from 'handlebars';
@@ -58,6 +60,7 @@ export class ReportCardService {
     private cloudinary: CloudinaryService,
     private compositeSubjectService: CompositeSubjectService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
+    @Optional() private readonly activityService?: SchoolActivityService,
   ) {}
 
   private async uploadToCloudinary(buffer: Buffer, publicId: string): Promise<{ url: string | null; publicId: string | null }> {
@@ -654,6 +657,16 @@ export class ReportCardService {
     if (this.schoolEvents) {
       this.schoolEvents.emitReportCardGenerated(schoolId, { classId, termId });
     }
+
+    this.activityService?.publish({
+      type: ActivityEventType.REPORT_CARD_GENERATED,
+      category: ActivityCategory.REPORTS,
+      severity: ActivitySeverity.SUCCESS,
+      schoolId,
+      title: 'Report cards generated',
+      description: `Report cards generated for class`,
+      metadata: { classId, termId },
+    });
 
     return { buffer, url, publicId };
   }

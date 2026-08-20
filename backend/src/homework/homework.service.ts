@@ -1,9 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SchoolActivityService } from '../common/services/school-activity.service';
+import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
 
 @Injectable()
 export class HomeworkService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Optional() private readonly activityService?: SchoolActivityService,
+  ) {}
 
   async getAll(schoolId: string, filters: {
     classId?: string;
@@ -136,7 +141,7 @@ export class HomeworkService {
     schoolId: string;
     createdById?: string;
   }) {
-    return this.prisma.homework.create({
+    const created = await this.prisma.homework.create({
       data: {
         title: data.title,
         description: data.description,
@@ -154,6 +159,19 @@ export class HomeworkService {
         subject: true,
       },
     });
+
+    this.activityService?.publish({
+      type: ActivityEventType.ASSIGNMENT_CREATED,
+      category: ActivityCategory.ASSIGNMENTS,
+      severity: ActivitySeverity.INFO,
+      schoolId: data.schoolId,
+      userId: data.createdById,
+      title: 'Assignment created',
+      description: `"${data.title}" assigned to class`,
+      metadata: { homeworkId: created.id, classId: data.classId, subjectId: data.subjectId, title: data.title },
+    });
+
+    return created;
   }
 
   async update(id: string, data: {
@@ -200,7 +218,12 @@ export class HomeworkService {
   }
 
   async grade(submissionId: string, data: { score: number; feedback?: string }) {
-    return this.prisma.homeworkSubmission.update({
+    const submission = await this.prisma.homeworkSubmission.findUnique({
+      where: { id: submissionId },
+      include: { homework: { select: { schoolId: true } } },
+    });
+
+    const result = await this.prisma.homeworkSubmission.update({
       where: { id: submissionId },
       data: {
         score: data.score,
@@ -208,6 +231,18 @@ export class HomeworkService {
         gradedAt: new Date(),
       },
     });
+
+    this.activityService?.publish({
+      type: ActivityEventType.ASSIGNMENT_GRADED,
+      category: ActivityCategory.ASSIGNMENTS,
+      severity: ActivitySeverity.SUCCESS,
+      schoolId: submission?.homework?.schoolId || '',
+      title: 'Assignment graded',
+      description: `Submission graded with score ${data.score}`,
+      metadata: { submissionId, score: data.score },
+    });
+
+    return result;
   }
 
   async getSubmissions(homeworkId: string) {

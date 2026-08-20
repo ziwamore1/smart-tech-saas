@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceStatus } from '@prisma/client';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { HolidayService } from '../holiday/holiday.service';
+import { SchoolActivityService } from '../common/services/school-activity.service';
+import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
 
 @Injectable()
 export class AttendanceService {
@@ -12,6 +14,7 @@ export class AttendanceService {
     private prisma: PrismaService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
     @Optional() private holidayService?: HolidayService,
+    @Optional() private readonly activityService?: SchoolActivityService,
   ) {}
 
   /**
@@ -236,6 +239,17 @@ export class AttendanceService {
         markedBy: schoolId,
       });
     }
+
+    this.activityService?.publish({
+      type: ActivityEventType.ATTENDANCE_BULK_MARKED,
+      category: ActivityCategory.ATTENDANCE,
+      severity: ActivitySeverity.SUCCESS,
+      schoolId,
+      userId: schoolId,
+      title: 'Attendance marked',
+      description: `${records.length} attendance records marked for ${records[0]?.date || 'today'}`,
+      metadata: { date: records[0]?.date, count: records.length },
+    });
 
     return results;
   }
