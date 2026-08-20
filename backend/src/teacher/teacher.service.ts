@@ -768,7 +768,7 @@ export class TeacherService {
       }).catch(() => {});
     }
 
-    // Emit real-time WebSocket event
+    // Emit real-time WebSocket events
     this.socketGateway.server?.emit(`result:updated:${schoolId}`, {
       classId,
       subjectId,
@@ -776,6 +776,35 @@ export class TeacherService {
       processedCount: results.length,
       timestamp: new Date(),
     });
+
+    // Emit results:live for Live Monitoring on dashboard
+    const [teacher, subject, classEntity] = await Promise.all([
+      this.prisma.teacher.findUnique({ where: { id: teacherId }, include: { user: true } }),
+      this.prisma.subject.findUnique({ where: { id: subjectId } }),
+      classId ? this.prisma.class.findUnique({ where: { id: classId } }) : null,
+    ]);
+
+    const teacherName = teacher?.user
+      ? `${teacher.user.firstName} ${teacher.user.lastName}`.trim()
+      : 'Teacher';
+    const subjectName = subject?.name || 'Subject';
+    const className = classEntity?.name || 'Class';
+
+    for (const s of results) {
+      this.schoolEvents?.emitResultsLive(schoolId, {
+        id: s.id,
+        studentId: s.studentId,
+        subjectId,
+        termId,
+        score: s.score,
+        timestamp: new Date(),
+        teacherId,
+        teacherName,
+        subjectName,
+        classId,
+        className,
+      }).catch(() => {});
+    }
 
     return {
       message: 'Bulk scores saved successfully',
