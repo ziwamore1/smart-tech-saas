@@ -392,6 +392,14 @@ const regularNav: NavItem[] = [
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
+    name: 'Activity Center', 
+    href: '/dashboard/activity-center', 
+    icon: 'fa-satellite-dish',
+    color: '#6366f1',
+    typeRoles: ROLE_MAP.supervision,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
+  },
+  { 
     name: 'Report Cards', 
     href: '/dashboard/report-cards', 
     icon: 'fa-file-text',
