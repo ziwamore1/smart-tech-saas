@@ -441,12 +441,26 @@ export class ResultsManagementService {
       }
     }
 
+    // Clean up phantom ComputedResult records that have null finalPercentage
+    // and no raw scores. These were created by earlier syncComputedResult runs
+    // that found no component data but still upserted a PENDING record.
+    const phantomIds = computedResults
+      .filter(cr => cr.finalPercentage == null && cr.totalRawScore === 0)
+      .map(cr => cr.id);
+    if (phantomIds.length > 0) {
+      this.prisma.computedResult.deleteMany({ where: { id: { in: phantomIds } } }).catch(() => {});
+    }
+
     return {
       students: students.map((student) => {
         const crSubjects = new Set(
-          computedResults.filter((r) => r.studentId === student.id).map((r) => r.subjectId)
+          computedResults
+            .filter((r) => r.studentId === student.id && (r.finalPercentage != null || r.totalRawScore > 0))
+            .map((r) => r.subjectId)
         );
-        const crResults = computedResults.filter((r) => r.studentId === student.id).map((cr) => {
+        const crResults = computedResults
+          .filter((r) => r.studentId === student.id && (r.finalPercentage != null || r.totalRawScore > 0))
+          .map((cr) => {
           const raw = rawResultMap.get(`${cr.studentId}::${cr.subjectId}`);
           return {
             ...cr,
