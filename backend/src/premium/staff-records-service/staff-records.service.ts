@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StaffSyncEngineService } from '../../shared/staff-sync-engine/staff-sync-engine.service';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class StaffRecordsService {
@@ -135,16 +136,22 @@ export class StaffRecordsService {
   }
 
   async createProfile(data: any, schoolId: string) {
-    const existing = await this.prisma.staffHrProfile.findUnique({
-      where: { staffId: data.staffId },
-    });
-    if (existing) return this.updateProfile(existing.id, data);
+    if (data.staffId) {
+      const existing = await this.prisma.staffHrProfile.findUnique({
+        where: { staffId: data.staffId },
+      });
+      if (existing) return this.updateProfile(existing.id, data);
+    }
 
+    const staffId = data.staffId || `manual-${uuidv4()}`;
     const profile = await this.prisma.staffHrProfile.create({
-      data: this.mapProfileData(data, schoolId),
+      data: this.mapProfileData({ ...data, staffId }, schoolId),
     });
 
-    await this.syncEngine.syncStaffProfile(data.staffId, schoolId);
+    if (data.staffId) {
+      try { await this.syncEngine.syncStaffProfile(data.staffId, schoolId); }
+      catch (err: any) { this.logger.warn(`Sync failed for ${data.staffId}: ${err.message}`); }
+    }
     return profile;
   }
 
@@ -188,13 +195,13 @@ export class StaffRecordsService {
     if (data.dateOfFirstAppointment !== undefined) fields.dateOfFirstAppointment = data.dateOfFirstAppointment ? new Date(data.dateOfFirstAppointment) : null;
     if (data.dateOfPresentAppointment !== undefined) fields.dateOfPresentAppointment = data.dateOfPresentAppointment ? new Date(data.dateOfPresentAppointment) : null;
     if (data.dateOfActingAppointment !== undefined) fields.dateOfActingAppointment = data.dateOfActingAppointment ? new Date(data.dateOfActingAppointment) : null;
-    if (data.confirmed !== undefined) fields.confirmed = data.confirmed;
+    if (data.confirmed !== undefined) fields.confirmed = typeof data.confirmed === 'boolean' ? (data.confirmed ? 'true' : '') : data.confirmed;
     if (data.expectedConfirmationDate !== undefined) fields.expectedConfirmationDate = data.expectedConfirmationDate ? new Date(data.expectedConfirmationDate) : null;
     if (data.allowancesEntitled !== undefined) fields.allowancesEntitled = data.allowancesEntitled;
     if (data.employmentStatus !== undefined) fields.employmentStatus = data.employmentStatus;
     if (data.employmentType !== undefined) fields.employmentType = data.employmentType;
     if (data.contractEffectiveDate !== undefined) fields.contractEffectiveDate = data.contractEffectiveDate ? new Date(data.contractEffectiveDate) : null;
-    if (data.contractNormalised !== undefined) fields.contractNormalised = data.contractNormalised;
+    if (data.contractNormalised !== undefined) fields.contractNormalised = typeof data.contractNormalised === 'boolean' ? (data.contractNormalised ? 'true' : '') : data.contractNormalised;
     if (data.contractEnd !== undefined) fields.contractEnd = data.contractEnd ? new Date(data.contractEnd) : null;
     if (data.retirementDate !== undefined) fields.retirementDate = data.retirementDate ? new Date(data.retirementDate) : null;
     if (data.payrollPoint !== undefined) fields.payrollPoint = data.payrollPoint;

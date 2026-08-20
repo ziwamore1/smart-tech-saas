@@ -33,6 +33,12 @@ export class StaffRecordsController {
     return this.staffRecordsService.findAllProfiles(req.user?.schoolId || req.query.schoolId);
   }
 
+  @Get('profiles/search/query')
+  @Roles(...ADMIN_ROLES)
+  searchProfiles(@Req() req: any, @Query('q') q: string) {
+    return this.staffRecordsService.searchProfiles(req.user.schoolId, q);
+  }
+
   @Get('profiles/:id')
   @Roles(...ADMIN_ROLES)
   findProfileById(@Param('id') id: string) {
@@ -62,12 +68,6 @@ export class StaffRecordsController {
   @Roles(...ADMIN_ROLES)
   deleteProfile(@Param('id') id: string) {
     return this.staffRecordsService.deleteProfile(id);
-  }
-
-  @Get('profiles/search/query')
-  @Roles(...ADMIN_ROLES)
-  searchProfiles(@Req() req: any, @Query('q') q: string) {
-    return this.staffRecordsService.searchProfiles(req.user.schoolId, q);
   }
 
   // ══════════════════════════════════════════

@@ -130,9 +130,9 @@ export const StaffReturnsScreen: React.FC<StaffReturnsProps> = ({ onToggleDrawer
       const payload: any = {};
       ALL_FIELDS.forEach(f => {
         const val = form[f.key];
-        if (val !== '' && val !== null && val !== undefined) {
-          if (f.type === 'bool') payload[f.key] = val === 'true' || val === true;
-          else payload[f.key] = val;
+        if (val !== null && val !== undefined) {
+          if (f.type === 'bool') payload[f.key] = (val === 'true' || val === true) ? 'true' : '';
+          else payload[f.key] = val === '' ? null : val;
         }
       });
 

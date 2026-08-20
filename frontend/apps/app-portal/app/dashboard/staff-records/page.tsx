@@ -388,8 +388,8 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
     try {
       const payload: any = {};
       ALL_PROFILE_FIELDS.forEach(f => {
-        if (form[f] !== '' && form[f] !== null && form[f] !== undefined) {
-          payload[f] = form[f];
+        if (form[f] !== null && form[f] !== undefined) {
+          payload[f] = form[f] === '' ? null : form[f];
         }
       });
 
