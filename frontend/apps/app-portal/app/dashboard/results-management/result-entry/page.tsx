@@ -509,23 +509,17 @@ export default function ResultEntryPage() {
         }, { timeout: 120000, chunkSize: 50, maxRetries: 3 });
       }
 
-      // Persist complete component totals into the final results table so no downstream component misses them
-      const finalResults: Array<{ studentId: string; subjectId: string; termId: string; score: number }> = [];
-      students.forEach((s: any) => {
-        const cell = componentScores[`${s.id}::${subjectId}`];
-        if (componentCellStatus(cell, subjectConfigs) !== 'complete') return;
-        const total = computeComponentTotal(cell, subjectConfigs);
-        if (total != null) finalResults.push({ studentId: s.id, subjectId, termId: selectedTerm, score: parseFloat(total.toFixed(2)) });
-      });
-      if (finalResults.length > 0) {
-        await bulkSaveResults(finalResults, { timeout: 120000, chunkSize: 50, maxRetries: 3 });
-      }
+      // The backend's syncComputedResult (called inside bulkEnterScores) already computes
+      // the weighted final percentage from all component scores and writes it to ComputedResult.
+      // No need for the frontend to also write to the legacy Result table — the backend is
+      // the authoritative source for component-based weighted totals.
 
       queryClient.invalidateQueries({ queryKey: ['sheet-students'] });
       queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
       queryClient.invalidateQueries({ queryKey: ['assessment-results-single'] });
       queryClient.invalidateQueries({ queryKey: ['view-results-sheet'] });
       queryClient.invalidateQueries({ queryKey: ['view-results-students'] });
+      queryClient.invalidateQueries({ queryKey: ['results'] });
 
       // Auto-submit the sheet from the frontend as well
       if (sheetId) {
@@ -540,9 +534,7 @@ export default function ResultEntryPage() {
       setShowSavedBanner(true);
       setTimeout(() => setShowSavedBanner(false), 8000);
       toast.success(`${defIds.length} assessment component${defIds.length !== 1 ? 's' : ''} saved and auto-submitted`, {
-        description: finalResults.length > 0
-          ? `${finalResults.length} final result${finalResults.length !== 1 ? 's' : ''} computed, synced to the results sheet, and submitted for review.`
-          : 'Final results will sync once every component is entered. Sheet has been submitted.',
+        description: 'Weighted final results computed by the system and synced to the results sheet. Sheet has been submitted for review.',
         duration: 8000,
       });
     } catch (err: any) {

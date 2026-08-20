@@ -82,22 +82,26 @@ export class AssessmentEngineService {
   ) {}
 
   private async emitLiveResult(schoolId: string, data: { classId: string; subjectId: string; termId: string; studentId?: string; score?: number | null; enteredBy?: string }) {
-    const [teacher, subject, classEntity] = await Promise.all([
-      data.enteredBy ? this.prisma.user.findUnique({ where: { id: data.enteredBy }, select: { id: true, firstName: true, lastName: true } }) : null,
-      this.prisma.subject.findUnique({ where: { id: data.subjectId }, select: { id: true, name: true, code: true } }),
-      this.prisma.class.findUnique({ where: { id: data.classId }, select: { id: true, name: true } }),
-    ]);
-    this.schoolEvents?.emitResultsLive(schoolId, {
-      id: `${data.studentId || data.classId}-${data.subjectId}-${Date.now()}`,
-      ...data,
-      timestamp: new Date(),
-      teacher,
-      teacherName: teacher ? `${teacher.firstName} ${teacher.lastName}`.trim() : 'Teacher',
-      subject,
-      subjectName: subject?.name || 'Subject',
-      class: classEntity,
-      className: classEntity?.name || 'Class',
-    });
+    try {
+      const [teacher, subject, classEntity] = await Promise.all([
+        data.enteredBy ? this.prisma.user.findUnique({ where: { id: data.enteredBy }, select: { id: true, firstName: true, lastName: true } }) : null,
+        this.prisma.subject.findUnique({ where: { id: data.subjectId }, select: { id: true, name: true, code: true } }),
+        this.prisma.class.findUnique({ where: { id: data.classId }, select: { id: true, name: true } }),
+      ]);
+      this.schoolEvents?.emitResultsLive(schoolId, {
+        id: `${data.studentId || data.classId}-${data.subjectId}-${Date.now()}`,
+        ...data,
+        timestamp: new Date(),
+        teacher,
+        teacherName: teacher ? `${teacher.firstName} ${teacher.lastName}`.trim() : 'Teacher',
+        subject,
+        subjectName: subject?.name || 'Subject',
+        class: classEntity,
+        className: classEntity?.name || 'Class',
+      });
+    } catch (e: any) {
+      this.logger.warn(`emitLiveResult failed: ${e.message}`);
+    }
   }
 
   async createAssessmentDefinition(schoolId: string, data: CreateAssessmentDefinitionDto) {
@@ -719,17 +723,21 @@ export class AssessmentEngineService {
       return null;
     });
 
-    // Emit real-time WebSocket event
-    this.socketGateway.server?.emit(`result:updated:${schoolId}`, {
-      classId,
-      subjectId,
-      termId,
-      batchId: batch.id,
-      sheetId: sheet?.id,
-      enteredCount: results.filter(r => r.rawScore !== null).length,
-      timestamp: new Date(),
-    });
-    await this.emitLiveResult(schoolId, { classId, subjectId, termId, enteredBy, score: results[0]?.rawScore ?? null });
+    // Emit real-time WebSocket event (safe — server may be null in serverless)
+    try {
+      this.socketGateway.server?.emit?.(`result:updated:${schoolId}`, {
+        classId,
+        subjectId,
+        termId,
+        batchId: batch.id,
+        sheetId: sheet?.id,
+        enteredCount: results.filter(r => r.rawScore !== null).length,
+        timestamp: new Date(),
+      });
+    } catch (e: any) {
+      this.logger.warn(`WebSocket emit failed: ${e.message}`);
+    }
+    await this.emitLiveResult(schoolId, { classId, subjectId, termId, enteredBy, score: results[0]?.rawScore ?? null }).catch(() => {});
 
     return {
       batch,
@@ -823,14 +831,19 @@ export class AssessmentEngineService {
         this.logger.error(`syncResultSheet failed: ${e.message}`);
       });
 
-      this.socketGateway.server?.emit(`result:updated:${schoolId}`, {
-        classId: data.classId,
-        subjectId: data.subjectId,
-        termId: data.termId,
-        studentId: data.studentId,
-        timestamp: new Date(),
-      });
-      await this.emitLiveResult(schoolId, { classId: data.classId, subjectId: data.subjectId, termId: data.termId, studentId: data.studentId, enteredBy: data.enteredBy, score: null });
+      // Emit real-time WebSocket event (safe — server may be null in serverless)
+      try {
+        this.socketGateway.server?.emit?.(`result:updated:${schoolId}`, {
+          classId: data.classId,
+          subjectId: data.subjectId,
+          termId: data.termId,
+          studentId: data.studentId,
+          timestamp: new Date(),
+        });
+      } catch (e: any) {
+        this.logger.warn(`WebSocket emit failed: ${e.message}`);
+      }
+      await this.emitLiveResult(schoolId, { classId: data.classId, subjectId: data.subjectId, termId: data.termId, studentId: data.studentId, enteredBy: data.enteredBy, score: null }).catch(() => {});
 
       return result;
     }
@@ -914,15 +927,19 @@ export class AssessmentEngineService {
       this.logger.error(`syncResultSheet failed: ${e.message}`);
     });
 
-    // Emit real-time WebSocket event
-    this.socketGateway.server?.emit(`result:updated:${schoolId}`, {
-      classId: data.classId,
-      subjectId: data.subjectId,
-      termId: data.termId,
-      studentId: data.studentId,
-      timestamp: new Date(),
-    });
-    await this.emitLiveResult(schoolId, { classId: data.classId, subjectId: data.subjectId, termId: data.termId, studentId: data.studentId, enteredBy: data.enteredBy, score: data.rawScore });
+    // Emit real-time WebSocket event (safe — server may be null in serverless)
+    try {
+      this.socketGateway.server?.emit?.(`result:updated:${schoolId}`, {
+        classId: data.classId,
+        subjectId: data.subjectId,
+        termId: data.termId,
+        studentId: data.studentId,
+        timestamp: new Date(),
+      });
+    } catch (e: any) {
+      this.logger.warn(`WebSocket emit failed: ${e.message}`);
+    }
+    await this.emitLiveResult(schoolId, { classId: data.classId, subjectId: data.subjectId, termId: data.termId, studentId: data.studentId, enteredBy: data.enteredBy, score: data.rawScore }).catch(() => {});
 
     return result;
   }
