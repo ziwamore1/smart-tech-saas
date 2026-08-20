@@ -335,8 +335,22 @@ export class AssessmentEngineService {
       where: { classId, subjectId, termId },
     });
 
+    // Resolve the academic year for this term so the enrollment query is
+    // reliable even when the Term ↔ AcademicYear join is missing or the
+    // nested Prisma query doesn't traverse correctly.
+    const term = await this.prisma.term.findUnique({
+      where: { id: termId },
+      select: { academicYearId: true },
+    });
+    const enrollmentWhere: any = { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } };
+    if (term?.academicYearId) {
+      enrollmentWhere.academicYearId = term.academicYearId;
+    } else {
+      // Fallback: derive academic year via the term relation
+      enrollmentWhere.academicYear = { terms: { some: { id: termId } } };
+    }
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { classId, academicYear: { terms: { some: { id: termId } } }, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+      where: enrollmentWhere,
       select: { studentId: true },
     });
 
@@ -404,35 +418,47 @@ export class AssessmentEngineService {
         return result && (result.rawScore != null || result.isAbsent);
       });
 
-      await this.prisma.computedResult.upsert({
-        where: {
-          studentId_subjectId_termId: {
+      if (totalWeight > 0) {
+        await this.prisma.computedResult.upsert({
+          where: {
+            studentId_subjectId_termId: {
+              studentId: enrollment.studentId,
+              subjectId,
+              termId,
+            },
+          },
+          update: {
+            classId,
+            schoolId,
+            totalRawScore: results.reduce((s, r) => s + (r.rawScore ?? 0), 0),
+            totalWeightedScore: totalWeighted,
+            finalPercentage: finalPct,
+            finalGrade,
+            status: allFilled ? 'COMPUTED' : 'PENDING',
+            computedAt: allFilled ? new Date() : null,
+          },
+          create: {
+            studentId: enrollment.studentId,
+            subjectId, termId, classId, schoolId,
+            totalRawScore: results.reduce((s, r) => s + (r.rawScore ?? 0), 0),
+            totalWeightedScore: totalWeighted,
+            finalPercentage: finalPct,
+            finalGrade,
+            status: allFilled ? 'COMPUTED' : 'PENDING',
+            computedAt: allFilled ? new Date() : null,
+          },
+        });
+      } else {
+        // No components entered yet — remove any stale ComputedResult so
+        // getSheetStudents falls back to StudentAssessmentResult data.
+        await this.prisma.computedResult.deleteMany({
+          where: {
             studentId: enrollment.studentId,
             subjectId,
             termId,
           },
-        },
-        update: {
-          classId,
-          schoolId,
-          totalRawScore: results.reduce((s, r) => s + (r.rawScore ?? 0), 0),
-          totalWeightedScore: totalWeighted,
-          finalPercentage: finalPct,
-          finalGrade,
-          status: allFilled ? 'COMPUTED' : 'PENDING',
-          computedAt: allFilled ? new Date() : null,
-        },
-        create: {
-          studentId: enrollment.studentId,
-          subjectId, termId, classId, schoolId,
-          totalRawScore: results.reduce((s, r) => s + (r.rawScore ?? 0), 0),
-          totalWeightedScore: totalWeighted,
-          finalPercentage: finalPct,
-          finalGrade,
-          status: allFilled ? 'COMPUTED' : 'PENDING',
-          computedAt: allFilled ? new Date() : null,
-        },
-      });
+        });
+      }
     }
   }
 

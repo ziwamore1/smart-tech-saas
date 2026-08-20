@@ -112,6 +112,17 @@ export default function ResultsManagementPage() {
     },
   });
 
+  useEffect(() => {
+    if (!actionMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement)?.closest?.('[data-action-menu]')) {
+        setActionMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [actionMenu]);
+
   const currentAcYear = useMemo(() => {
     if (createForm.academicYearId) return academicYears.find((y: any) => y.id === createForm.academicYearId);
     return academicYears.find((y: any) => y.isCurrent);
@@ -291,8 +302,8 @@ export default function ResultsManagementPage() {
           </button>
         </div>
       ) : (
-        <div style={{ background: '#fdfaf7', border: '1px solid #e8ddd0', borderRadius: '12px', overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
+        <div style={{ background: '#fdfaf7', border: '1px solid #e8ddd0', borderRadius: '12px' }}>
+          <div style={{ overflow: 'visible' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f5efe8', borderBottom: '2px solid #e8ddd0' }}>
@@ -352,7 +363,8 @@ export default function ResultsManagementPage() {
                             <i className="fa fa-edit" style={{ marginRight: '4px' }}></i>Enter
                           </a>
                           <button
-                            onClick={() => setActionMenu(actionMenu === sheet.id ? null : sheet.id)}
+                            data-action-menu
+                            onClick={(e) => { e.stopPropagation(); setActionMenu(actionMenu === sheet.id ? null : sheet.id); }}
                             style={{
                               padding: '6px 12px', fontSize: '12px', color: '#374151',
                               background: '#f5efe8', border: 'none', borderRadius: '6px',
@@ -362,7 +374,7 @@ export default function ResultsManagementPage() {
                             <i className="fa fa-ellipsis-v"></i>
                           </button>
                           {actionMenu === sheet.id && (
-                            <div style={{
+                            <div data-action-menu style={{
                               position: 'absolute', top: '100%', right: '0', zIndex: 50,
                               background: '#fdfaf7', border: '1px solid #e8ddd0',
                               borderRadius: '8px', boxShadow: '0 10px 40px rgba(0,0,0,0.1)',

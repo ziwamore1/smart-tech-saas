@@ -405,10 +405,40 @@ export class ResultsManagementService {
       include: { subject: { select: { id: true, name: true, code: true } } },
       orderBy: { updatedAt: 'desc' },
     });
-    const componentResultMap = new Map<string, any>();
+
+    // Collect all assessment configurations needed to aggregate component scores
+    const configSubjectIds = [...new Set(componentResults.map(c => c.subjectId))];
+    const configs = configSubjectIds.length > 0
+      ? await this.prisma.termAssessmentConfiguration.findMany({
+          where: {
+            classId: sheet.classId,
+            termId: sheet.termId,
+            subjectId: { in: configSubjectIds },
+          },
+        })
+      : [];
+    const configMap = new Map<string, { assessmentDefId: string; maxScore: number; weightPercentage: number }[]>();
+    for (const cfg of configs) {
+      const arr = configMap.get(cfg.subjectId) || [];
+      arr.push({ assessmentDefId: cfg.assessmentDefId, maxScore: cfg.maxScore, weightPercentage: cfg.weightPercentage });
+      configMap.set(cfg.subjectId, arr);
+    }
+
+    // Aggregate all component results per student+subject into a weighted percentage
+    const componentAggMap = new Map<string, any>();
     for (const result of componentResults) {
       const key = `${result.studentId}::${result.subjectId}`;
-      if (!componentResultMap.has(key)) componentResultMap.set(key, result);
+      const existing = componentAggMap.get(key);
+      if (!existing) {
+        componentAggMap.set(key, {
+          studentId: result.studentId,
+          subjectId: result.subjectId,
+          subject: result.subject,
+          entries: [result],
+        });
+      } else {
+        existing.entries.push(result);
+      }
     }
 
     return {
@@ -443,17 +473,34 @@ export class ResultsManagementService {
             });
           }
         }
-        for (const [key, component] of componentResultMap) {
-          if (!key.startsWith(`${student.id}::`) || crSubjects.has(component.subjectId) || rawResultMap.has(key)) continue;
+        for (const [key, agg] of componentAggMap) {
+          if (!key.startsWith(`${student.id}::`) || crSubjects.has(agg.subjectId) || rawResultMap.has(key)) continue;
+          const subjectConfigs = configMap.get(agg.subjectId) || [];
+          let totalWeighted = 0;
+          let totalWeight = 0;
+          for (const entry of agg.entries) {
+            if (entry.isAbsent) continue;
+            const cfg = subjectConfigs.find(c => c.assessmentDefId === entry.assessmentDefId);
+            const maxScore = cfg?.maxScore || entry.maxScore || 100;
+            const weight = cfg?.weightPercentage || 0;
+            if (entry.rawScore != null && weight > 0) {
+              const pct = (entry.rawScore / maxScore) * 100;
+              totalWeighted += pct * (weight / 100);
+              totalWeight += weight;
+            }
+          }
+          const aggregatedPct = totalWeight > 0
+            ? parseFloat(((totalWeighted / totalWeight) * 100).toFixed(2))
+            : null;
           extraRawResults.push({
             studentId: student.id,
-            subjectId: component.subjectId,
-            subject: component.subject,
-            score: component.isAbsent ? null : component.percentage ?? component.rawScore,
-            grade: component.grade,
-            remark: component.remarks,
-            assessmentDefId: component.assessmentDefId,
-            isAbsent: component.isAbsent,
+            subjectId: agg.subjectId,
+            subject: agg.subject,
+            finalPercentage: aggregatedPct,
+            score: aggregatedPct,
+            totalRawScore: agg.entries.reduce((s: number, e: any) => s + (e.rawScore ?? 0), 0),
+            grade: agg.entries[0]?.grade ?? null,
+            remark: agg.entries[0]?.remarks ?? null,
           });
         }
         return { ...student, results: [...crResults, ...extraRawResults] };
