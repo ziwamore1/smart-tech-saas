@@ -1433,7 +1433,7 @@ export class HealthController {
     };
   }
 
-  @Get('backfill:sheet-counts')
+  @Get('backfill-sheet-counts')
   async backfillSheetCounts(
     @Query('apply') apply?: string,
     @Query('token') token?: string,
