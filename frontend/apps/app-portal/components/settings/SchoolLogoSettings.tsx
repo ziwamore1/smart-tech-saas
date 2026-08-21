@@ -91,7 +91,21 @@ export function SchoolLogoSettings() {
 
   const { data: branding, isLoading } = useQuery({
     queryKey: ['school-branding'],
-    queryFn: () => schoolApi.getBranding().then((res) => res.data?.data || res.data),
+    queryFn: async () => {
+      try {
+        const res = await schoolApi.getBranding();
+        return res.data?.data || res.data;
+      } catch {
+        // Older backend without /school/branding — fall back to the profile
+        // endpoint, which also exposes logoUrl.
+        try {
+          const res = await schoolApi.getProfile();
+          return res.data?.data || res.data;
+        } catch {
+          return null;
+        }
+      }
+    },
     staleTime: 30_000,
   });
 
@@ -103,8 +117,18 @@ export function SchoolLogoSettings() {
       formData.append('logo', blob, 'school-logo.png');
       return schoolApi.uploadLogo(formData);
     },
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       closeCropper();
+      // Optimistically seed the cache from the upload response so the logo
+      // shows immediately, even if a branding refetch fails.
+      const logoUrl = res?.data?.logoUrl || res?.data?.data?.logoUrl;
+      if (logoUrl) {
+        queryClient.setQueryData(['school-branding'], (old: any) => ({
+          ...(old || {}),
+          name: old?.name || '',
+          logoUrl,
+        }));
+      }
       queryClient.invalidateQueries({ queryKey: ['school-branding'] });
       queryClient.invalidateQueries({ queryKey: ['school-profile'] });
       queryClient.invalidateQueries({ queryKey: ['school', user?.schoolId] });
@@ -119,6 +143,10 @@ export function SchoolLogoSettings() {
     mutationFn: () => schoolApi.deleteLogo(),
     onSuccess: () => {
       setConfirmRemove(false);
+      queryClient.setQueryData(['school-branding'], (old: any) => ({
+        ...(old || {}),
+        logoUrl: null,
+      }));
       queryClient.invalidateQueries({ queryKey: ['school-branding'] });
       queryClient.invalidateQueries({ queryKey: ['school-profile'] });
       queryClient.invalidateQueries({ queryKey: ['school', user?.schoolId] });

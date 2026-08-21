@@ -48,8 +48,19 @@ export default function DashboardPage() {
   // School branding (logo) — always fetched for THIS user's school from the JWT
   const { data: brandingData } = useQuery({
     queryKey: ['school-branding'],
-    queryFn: () =>
-      schoolApi.getBranding().then((res) => res.data?.data || res.data),
+    queryFn: async () => {
+      try {
+        const res = await schoolApi.getBranding();
+        return res.data?.data || res.data;
+      } catch {
+        try {
+          const res = await schoolApi.getProfile();
+          return res.data?.data || res.data;
+        } catch {
+          return null;
+        }
+      }
+    },
     staleTime: 60_000,
   });
   const schoolLogoUrl = brandingData?.logoUrl || null;
