@@ -6,7 +6,6 @@ import ReactCrop, { centerCrop, makeAspectCrop, type Crop, type PixelCrop } from
 import 'react-image-crop/dist/ReactCrop.css';
 import { schoolApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { usePermissions } from '@/lib/permission-context';
 
 const OUTPUT_SIZE = 512;
 const TO_RADIANS = Math.PI / 180;
@@ -74,8 +73,12 @@ function drawCropped(image: HTMLImageElement, crop: PixelCrop, rotationDeg: numb
 export function SchoolLogoSettings() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const permissions = usePermissions();
-  const readOnly = permissions.isReadOnly('settings.edit');
+
+  const userRoles: string[] = (user as any)?.allRoles || (user as any)?.roles || (user as any)?.schoolRoles || [];
+  const canManage = userRoles.some((r) =>
+    ['Director', 'SuperAdmin', 'Admin', 'Deputy Director', 'Head Teacher'].includes(r),
+  );
+  const readOnly = !canManage;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);

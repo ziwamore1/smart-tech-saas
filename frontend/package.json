@@ -15,6 +15,7 @@
     "lint:portal": "npm run lint -w @smarttech/app-portal"
   },
   "dependencies": {
-    "next-cloudinary": "^6.17.5"
+    "next-cloudinary": "^6.17.5",
+    "react-image-crop": "^11.0.10"
   }
 }
