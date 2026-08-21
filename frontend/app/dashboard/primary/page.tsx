@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useFeatureLock } from '@/lib/feature-lock-context';
 import { TIER_ORDER, SubscriptionTier } from '@/types/subscription';
 import Icon3D from '@/components/Icon3D';
+import { SchoolLogo } from '@/components/SchoolLogo';
 
 function UpgradePrompt({ feature, requiredTier, currentTier }: { feature: string; requiredTier: string; currentTier: string }) {
   return (
@@ -112,7 +113,8 @@ export default function PrimaryDashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-4">
-        <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <SchoolLogo />
           <h1 className="text-3xl font-bold text-gray-900">Primary School Dashboard</h1>
           <p className="text-gray-500 mt-1">
             {currentTerm ? `Current Term: ${currentTerm.name} — ${currentTerm.academicYear?.name || ''}` : ''}

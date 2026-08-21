@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useFeatureLock } from '@/lib/feature-lock-context';
 import { TIER_ORDER, SubscriptionTier } from '@/types/subscription';
 import Icon3D from '@/components/Icon3D';
+import { SchoolLogo } from '@/components/SchoolLogo';
 import { useSchoolSocket } from '@/lib/use-school-socket';
 
 const basicActions = [
@@ -109,6 +110,7 @@ export default function SecondaryDashboardPage() {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+              <SchoolLogo />
               <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>{schoolProfile?.name || 'Secondary School'}</h1>
               <span style={{
                 fontSize: '12px', fontWeight: 600, background: 'rgba(255,255,255,0.2)',

@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useFeatureLock } from '@/lib/feature-lock-context';
 import { TIER_ORDER, SubscriptionTier } from '@/types/subscription';
 import Icon3D from '@/components/Icon3D';
+import { SchoolLogo } from '@/components/SchoolLogo';
 import { useSchoolSocket } from '@/lib/use-school-socket';
 
 const GRADE_LABELS = ['Pre', '1', '2', '3', '4', '5', '6', '7'];
@@ -138,6 +139,7 @@ export default function PrimaryDashboardPage() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <SchoolLogo />
             <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>
               {schoolProfile?.name || 'Primary School'}
             </h1>

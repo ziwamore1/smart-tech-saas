@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { schoolApi, termApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import Icon3D from '@/components/Icon3D';
+import { SchoolLogo } from '@/components/SchoolLogo';
 
 const quickActions = [
   { name: 'Programs', href: '/dashboard/classes', icon3d: 'classes', desc: 'Degree & diploma programs' },
@@ -38,6 +39,7 @@ export default function CollegeDashboardPage() {
         color: 'white'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+          <SchoolLogo />
           <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>
             {schoolProfile?.name || 'College'}
           </h1>
