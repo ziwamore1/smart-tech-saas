@@ -84,7 +84,7 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
     setRefreshing(false);
   };
 
-  const drawerScreens = ['DirectorReports', 'DirectorStaff', 'DirectorSettings', 'DirectorProfile', 'DirectorHome', 'DirectorClasses', 'DirectorStudents', 'DirectorLibrary', 'DirectorTimetable', 'DirectorCommunication', 'DirectorECE', 'DirectorPrimaryGrading', 'DirectorGrade7'];
+  const drawerScreens = ['DirectorReports', 'DirectorStaff', 'DirectorSettings', 'DirectorProfile', 'DirectorHome', 'DirectorClasses', 'DirectorStudents', 'DirectorLibrary', 'DirectorTimetable', 'DirectorCommunication', 'DirectorECE', 'DirectorPrimaryGrading', 'DirectorGrade7', 'DirectorActivityCenter'];
 
   const handleNavigate = (screen: string, params?: any) => {
     if (drawerScreens.includes(screen)) {
@@ -105,6 +105,7 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
 
   const quickActions = [
     ...(isPrimarySchool ? primaryActions : []),
+    { icon: '⚡', label: 'Live Activity', screen: 'DirectorActivityCenter', gradient: ['#2563EB', '#60A5FA'] as const },
     { icon: '📋', label: 'Exams', screen: 'ExamList', gradient: ['#1E3A8A', '#3B82F6'] as const },
     { icon: '📄', label: 'Templates', screen: 'TemplateMarketplace', gradient: ['#0D9488', '#14B8A6'] as const },
     { icon: '📊', label: 'Analytics', screen: 'Analytics', gradient: ['#7C3AED', '#A78BFA'] as const },

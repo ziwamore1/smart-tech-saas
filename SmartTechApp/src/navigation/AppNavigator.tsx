@@ -57,6 +57,7 @@ import { QRVerificationScreen } from '../screens/stamps/QRVerificationScreen';
 import { ApprovalWorkflowScreen } from '../screens/stamps/ApprovalWorkflowScreen';
 import { DepartmentTeachersScreen } from '../screens/monitoring/DepartmentTeachersScreen';
 import { TeacherAssessmentDetailScreen } from '../screens/monitoring/TeacherAssessmentDetailScreen';
+import ActivityCenterScreen from '../screens/monitoring/ActivityCenterScreen';
 import HODMonitoringWrapper from '../screens/monitoring/HODMonitoringWrapper';
 import { AssessmentEntryScreen } from '../screens/assessment/AssessmentEntryScreen';
 import { AssessmentConfigScreen } from '../screens/assessment/AssessmentConfigScreen';
@@ -181,6 +182,9 @@ export function AppNavigator() {
             {(isTeacher || isClassTeacher) && <Stack.Screen name="TeacherClasses" component={TeacherClassesScreen} />}
             {(isTeacher || isClassTeacher) && <Stack.Screen name="TeacherMarks" component={TeacherMarksScreen} />}
             <Stack.Screen name="HODMonitoring" component={HODMonitoringWrapper} />
+            {(isDirector || isHodSupervisor || isTeacher || isClassTeacher) && (
+              <Stack.Screen name="ActivityCenter" component={ActivityCenterScreen} />
+            )}
 
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />

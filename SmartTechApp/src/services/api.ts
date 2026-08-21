@@ -3044,6 +3044,27 @@ class ApiService {
     const response = await this.client.delete(`/report-engine/reports/${id}`);
     return response.data;
   }
+
+  // ===== School Activity Center (live monitoring) =====
+  async getActivityStats(schoolId: string) {
+    const response = await this.client.get('/school-activity/stats', { params: { schoolId } });
+    return response.data;
+  }
+
+  async getActivityFeed(schoolId: string, opts?: { limit?: number; offset?: number; category?: string }) {
+    const response = await this.client.get('/school-activity/feed', { params: { schoolId, ...opts } });
+    return response.data;
+  }
+
+  async getActivityPresence(schoolId: string) {
+    const response = await this.client.get('/school-activity/presence', { params: { schoolId } });
+    return response.data;
+  }
+
+  async sendPresenceHeartbeat(data: { schoolId: string; userId: string; userName: string; userRole: string; page?: string }) {
+    const response = await this.client.post('/school-activity/presence/heartbeat', data);
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

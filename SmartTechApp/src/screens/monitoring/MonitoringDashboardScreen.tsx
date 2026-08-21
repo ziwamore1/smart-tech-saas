@@ -250,6 +250,18 @@ export const MonitoringDashboardScreen: React.FC<MonitoringProps> = ({ onToggleD
         </View>
       </View>
 
+      <TouchableOpacity style={styles.activityCenterCard} onPress={() => {
+        if (stackNavigation) stackNavigation.navigate('ActivityCenter');
+        else navigation.navigate('ActivityCenter' as never);
+      }}>
+        <Text style={styles.activityCenterIcon}>⚡</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.activityCenterTitle}>Live Activity Center</Text>
+          <Text style={styles.activityCenterSubtitle}>Users online · results entry · live school events</Text>
+        </View>
+        <Text style={styles.arrow}>›</Text>
+      </TouchableOpacity>
+
       {(isDirector || isDeputyDirector) && hierarchy && (
         <WidgetCard title="🗺️ Organisation Structure">
           <View style={styles.orgContainer}>
@@ -423,6 +435,20 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, padding: spacing.md, borderRadius: borderRadius.md, alignItems: 'center' },
   statValue: { fontSize: 24, fontWeight: '700' },
   statLabel: { fontSize: 12, color: colors.textLight, marginTop: spacing.xs },
+  activityCenterCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  activityCenterIcon: { fontSize: 24 },
+  activityCenterTitle: { fontSize: 14, fontWeight: '700', color: '#1D4ED8' },
+  activityCenterSubtitle: { fontSize: 11, color: colors.textLight, marginTop: 1 },
   orgContainer: { alignItems: 'center', paddingVertical: spacing.sm },
   orgNode: { alignItems: 'center', marginVertical: spacing.xs },
   orgBadge: { backgroundColor: colors.primaryLight, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.sm },

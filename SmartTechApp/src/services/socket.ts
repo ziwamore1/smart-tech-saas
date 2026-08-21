@@ -1,15 +1,18 @@
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL } from './api';
+import { BASE_URL } from './api';
 
 class SocketService {
   private socket: Socket | null = null;
   private listeners: Map<string, Set<(data: any) => void>> = new Map();
   private joinedSchools: Set<string> = new Set();
 
+  // Namespace must match the backend gateway ("/school"), so use the bare
+  // server origin — NOT API_BASE_URL which includes "/api/v1" (the full path
+  // becomes the socket.io namespace and would never receive events).
   connect() {
     if (this.socket?.connected) return;
 
-    this.socket = io(`${API_BASE_URL}/school`, {
+    this.socket = io(`${BASE_URL}/school`, {
       transports: ['websocket'],
       autoConnect: true,
       reconnection: true,
