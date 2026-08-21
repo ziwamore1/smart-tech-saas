@@ -45,6 +45,21 @@ export default function DashboardPage() {
     enabled: !!user?.schoolId,
   });
 
+  // School branding (logo) — always fetched for THIS user's school from the JWT
+  const { data: brandingData } = useQuery({
+    queryKey: ['school-branding'],
+    queryFn: () =>
+      schoolApi.getBranding().then((res) => res.data?.data || res.data),
+    staleTime: 60_000,
+  });
+  const schoolLogoUrl = brandingData?.logoUrl || null;
+  const schoolInitials = (brandingData?.name || '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w: string) => w[0].toUpperCase())
+    .join('') || '?';
+
   const { data: statsData } = useQuery({
     queryKey: ['school-stats'],
     queryFn: () => schoolApi.getStats().then(res => {
@@ -167,6 +182,44 @@ export default function DashboardPage() {
           color: 'white'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px', flexWrap: 'wrap' }}>
+            {schoolLogoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={schoolLogoUrl}
+                alt={`${school.name} logo`}
+                style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '14px',
+                  objectFit: 'cover',
+                  background: 'white',
+                  border: '2px solid rgba(255,255,255,0.7)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                  flexShrink: 0,
+                }}
+              />
+            ) : (
+              <div
+                aria-label={`${school.name} logo placeholder`}
+                style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '14px',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '20px',
+                  fontWeight: 700,
+                  letterSpacing: '1px',
+                  color: 'white',
+                  background: 'rgba(255,255,255,0.18)',
+                  border: '2px dashed rgba(255,255,255,0.45)',
+                }}
+              >
+                {schoolInitials}
+              </div>
+            )}
             <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>{school.name}</h1>
             {school.institutionType && (
               <span style={{

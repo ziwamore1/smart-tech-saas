@@ -5,9 +5,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MessagingModule } from '../messaging/messaging.module';
 import { GradingSystemModule } from '../grading-system/grading-system.module';
 import { InstitutionModule } from '../institution/institution.module';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
-  imports: [MessagingModule, GradingSystemModule, InstitutionModule],
+  imports: [MessagingModule, GradingSystemModule, InstitutionModule, CloudinaryModule],
   providers: [SchoolService, PrismaService],
   controllers: [SchoolController],
 })

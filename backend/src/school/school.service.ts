@@ -310,6 +310,7 @@ export class SchoolService {
         phone: true,
         address: true,
         logo: true,
+        logoUrl: true,
         motto: true,
         primaryColor: true,
         subscriptionStatus: true,
@@ -323,6 +324,59 @@ export class SchoolService {
     
     console.log(`[SchoolService] getProfile result:`, JSON.stringify(school));
     return school;
+  }
+
+  /**
+   * School-specific branding (logo, name). ALWAYS resolved from the JWT-derived
+   * schoolId — a school can only ever read its own branding, never another's.
+   */
+  async getBranding(schoolId?: string) {
+    if (!schoolId) return null;
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: {
+        id: true,
+        name: true,
+        motto: true,
+        logoUrl: true,
+        updatedAt: true,
+      },
+    });
+    return school;
+  }
+
+  /**
+   * Persist a new school logo. Returns the previous publicId so the caller can
+   * clean up the replaced Cloudinary asset. Scoped strictly to schoolId.
+   */
+  async updateLogo(
+    schoolId: string,
+    logoUrl: string,
+    logoPublicId: string,
+  ): Promise<{ previousPublicId: string | null }> {
+    if (!schoolId) throw new BadRequestException('School ID is required');
+    const current = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { logoPublicId: true },
+    });
+    await this.prisma.school.update({
+      where: { id: schoolId },
+      data: { logoUrl, logoPublicId },
+    });
+    return { previousPublicId: current?.logoPublicId || null };
+  }
+
+  async removeLogo(schoolId: string): Promise<{ previousPublicId: string | null }> {
+    if (!schoolId) throw new BadRequestException('School ID is required');
+    const current = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { logoPublicId: true },
+    });
+    await this.prisma.school.update({
+      where: { id: schoolId },
+      data: { logoUrl: null, logoPublicId: null },
+    });
+    return { previousPublicId: current?.logoPublicId || null };
   }
 
   async updateProfile(

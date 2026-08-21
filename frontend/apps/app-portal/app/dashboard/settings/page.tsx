@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { schoolApi, termApi, academicYearApi, gradingSystemApi, holidayApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { ReadOnlyBanner } from '@/components/permissions/ReadOnlyBanner';
+import { SchoolLogoSettings } from '@/components/settings/SchoolLogoSettings';
 
 type SettingsTab = 'school' | 'academic' | 'terms' | 'grading' | 'holidays' | 'appearance' | 'notifications';
 
@@ -619,7 +620,9 @@ export default function SettingsPage() {
       </div>
 
       {activeTab === 'school' && (
-        <div className="bg-white rounded-lg shadow p-6">
+        <>
+          <SchoolLogoSettings />
+          <div className="bg-white rounded-lg shadow p-6">
           {saveMessage && (
             <div className={`mb-4 px-4 py-3 rounded-lg ${
               saveMessage.type === 'success' 
@@ -776,7 +779,8 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
-        </div>
+          </div>
+        </>
       )}
 
       {activeTab === 'terms' && (

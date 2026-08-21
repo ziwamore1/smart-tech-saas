@@ -170,6 +170,12 @@ export const schoolApi = {
   getById: (id: string) => api.get(`/school/${id}`),
   updateProfile: (data: any) => api.patch('/school/profile', data),
   updateBranding: (data: any) => api.patch('/school/branding', data),
+  getBranding: () => api.get('/school/branding'),
+  uploadLogo: (formData: FormData) =>
+    api.post('/school/branding/logo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  deleteLogo: () => api.delete('/school/branding/logo'),
   getStats: () => api.get('/school/stats'),
   getTimeSettings: () => api.get('/school/time-settings'),
   updateTimeSettings: (data: {
