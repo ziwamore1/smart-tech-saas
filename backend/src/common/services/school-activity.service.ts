@@ -140,7 +140,7 @@ export class SchoolActivityService {
       aiTutorSessions: counters.get('AI_TUTOR_SESSION_STARTED') || 0,
       attendanceMarkedToday: (counters.get('ATTENDANCE_MARKED') || 0) + (counters.get('ATTENDANCE_BULK_MARKED') || 0),
       attendancePendingToday: Math.max(0, (counters.get('ATTENDANCE_MARKED') || 0) - (counters.get('ATTENDANCE_MARKED') || 0)),
-      resultsEnteredToday: (counters.get('RESULT_ENTERED') || 0) + (counters.get('RESULT_BULK_ENTERED') || 0),
+      resultsEnteredToday: (counters.get('RESULT_ENTERED') || 0) + (counters.get('RESULT_BULK_ENTERED') || 0) + (counters.get('RESULT_SAVED') || 0),
       assignmentsGradedToday: counters.get('ASSIGNMENT_GRADED') || 0,
       classesWithActivity: this.getUniqueClassesWithActivity(schoolId),
       averageAttendanceRate: 0,

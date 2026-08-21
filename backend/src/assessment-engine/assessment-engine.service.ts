@@ -885,6 +885,17 @@ export class AssessmentEngineService {
       }
       await this.emitLiveResult(schoolId, { classId: data.classId, subjectId: data.subjectId, termId: data.termId, studentId: data.studentId, enteredBy: data.enteredBy, score: null }).catch(() => {});
 
+      this.activityService?.publish({
+        type: ActivityEventType.RESULT_ENTERED,
+        category: ActivityCategory.RESULTS,
+        severity: ActivitySeverity.SUCCESS,
+        schoolId,
+        userId: data.enteredBy,
+        title: 'Score entered',
+        description: `Absent marked for a student`,
+        metadata: { classId: data.classId, subjectId: data.subjectId, termId: data.termId, studentId: data.studentId, isAbsent: true },
+      });
+
       return result;
     }
 
@@ -980,6 +991,22 @@ export class AssessmentEngineService {
       this.logger.warn(`WebSocket emit failed: ${e.message}`);
     }
     await this.emitLiveResult(schoolId, { classId: data.classId, subjectId: data.subjectId, termId: data.termId, studentId: data.studentId, enteredBy: data.enteredBy, score: data.rawScore }).catch(() => {});
+
+    const [enteredClass, enteredSubject] = await Promise.all([
+      this.prisma.class.findUnique({ where: { id: data.classId }, select: { name: true } }),
+      this.prisma.subject.findUnique({ where: { id: data.subjectId }, select: { name: true } }),
+    ]).catch(() => [null, null] as any);
+
+    this.activityService?.publish({
+      type: ActivityEventType.RESULT_ENTERED,
+      category: ActivityCategory.RESULTS,
+      severity: ActivitySeverity.SUCCESS,
+      schoolId,
+      userId: data.enteredBy,
+      title: 'Score entered',
+      description: `${data.rawScore ?? 'No'} score for ${enteredClass?.name || 'class'} - ${enteredSubject?.name || 'subject'}`,
+      metadata: { classId: data.classId, subjectId: data.subjectId, termId: data.termId, studentId: data.studentId, score: data.rawScore },
+    });
 
     return result;
   }

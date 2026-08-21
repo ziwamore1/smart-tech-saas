@@ -353,11 +353,15 @@ export class ResultService {
       );
 
       // Emit real-time event so Director and other teachers see the update instantly
+      const [teacher, classObj] = await Promise.all([
+        this.prisma.user.findUnique({ where: { id: userId }, select: { firstName: true, lastName: true } }),
+        this.prisma.class.findUnique({ where: { id: enrollment.classId }, select: { name: true } }),
+      ]);
+      const teacherName = teacher ? `${teacher.firstName} ${teacher.lastName}`.trim() : undefined;
+      const className = classObj?.name;
+      const subjectName = created.subject?.name;
+
       if (this.schoolEvents) {
-        const [teacher, classObj] = await Promise.all([
-          this.prisma.user.findUnique({ where: { id: userId }, select: { firstName: true, lastName: true } }),
-          this.prisma.class.findUnique({ where: { id: enrollment.classId }, select: { name: true } }),
-        ]);
         this.schoolEvents.emitResultsSaved(schoolId, {
           classId: enrollment.classId,
           termId,
@@ -374,25 +378,26 @@ export class ResultService {
           savedBy: userId,
           timestamp: new Date(),
           action: 'result-saved',
-          teacherName: teacher ? `${teacher.firstName} ${teacher.lastName}`.trim() : undefined,
-          className: classObj?.name,
-          subjectName: created.subject?.name,
+          teacherName,
+          className,
+          subjectName,
           teacher: teacher ? { id: userId, firstName: teacher.firstName, lastName: teacher.lastName } : undefined,
           class: classObj ? { id: enrollment.classId, name: classObj.name } : undefined,
           subject: created.subject ? { id: subjectId, name: created.subject.name } : undefined,
         });
-
-        this.activityService?.publish({
-          type: ActivityEventType.RESULT_SAVED,
-          category: ActivityCategory.RESULTS,
-          severity: ActivitySeverity.SUCCESS,
-          schoolId,
-          userId: savedBy,
-          title: 'Result saved',
-          description: `Score saved for ${className || 'class'} - ${subjectName || 'subject'}`,
-          metadata: { classId: enrollment?.classId, subjectId, termId, score, teacherName, className, subjectName },
-        });
       }
+
+      this.activityService?.publish({
+        type: ActivityEventType.RESULT_SAVED,
+        category: ActivityCategory.RESULTS,
+        severity: ActivitySeverity.SUCCESS,
+        schoolId,
+        userId,
+        userName: teacherName,
+        title: 'Result saved',
+        description: `Score saved for ${className || 'class'} - ${subjectName || 'subject'}`,
+        metadata: { classId: enrollment?.classId, subjectId, termId, score, teacherName, className, subjectName },
+      });
 
       return created;
     }
@@ -806,14 +811,14 @@ export class ResultService {
       }
 
       // ── Emit real-time events (fire-and-forget) ──
-      if (this.schoolEvents) {
-        const [teacher, ...classNames] = await Promise.all([
-          this.prisma.user.findUnique({ where: { id: teacherId }, select: { firstName: true, lastName: true } }),
-          ...classIds.map(cid => this.prisma.class.findUnique({ where: { id: cid }, select: { id: true, name: true } })),
-        ]);
-        const classNamesMap = new Map(classNames.filter(Boolean).map((c: any) => [c.id, c.name]));
-        const teacherName = teacher ? `${teacher.firstName} ${teacher.lastName}`.trim() : undefined;
+      const [teacher, ...classNames] = await Promise.all([
+        this.prisma.user.findUnique({ where: { id: teacherId }, select: { firstName: true, lastName: true } }),
+        ...classIds.map(cid => this.prisma.class.findUnique({ where: { id: cid }, select: { id: true, name: true } })),
+      ]);
+      const classNamesMap = new Map(classNames.filter(Boolean).map((c: any) => [c.id, c.name]));
+      const teacherName = teacher ? `${teacher.firstName} ${teacher.lastName}`.trim() : undefined;
 
+      if (this.schoolEvents) {
         for (const classId of classIds) {
           const classResults = created.filter(r => enrollmentMap.get(r.studentId) === classId);
           const subjectIds = [...new Set(classResults.map(r => r.subjectId))];
@@ -842,6 +847,18 @@ export class ResultService {
           });
         }
       }
+
+      this.activityService?.publish({
+        type: ActivityEventType.RESULT_BULK_ENTERED,
+        category: ActivityCategory.RESULTS,
+        severity: ActivitySeverity.SUCCESS,
+        schoolId,
+        userId: teacherId,
+        userName: teacherName,
+        title: 'Results entered',
+        description: `${created.length} scores entered`,
+        metadata: { count: created.length, classes: classIds, termIds: [...new Set(created.map(r => r.termId))], teacherName },
+      });
 
       // Recompute composite subjects for all affected class+subject combinations
       const affectedSubjects = [...new Set(created.map(r => r.subjectId))];
