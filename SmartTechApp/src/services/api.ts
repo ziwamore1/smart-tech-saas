@@ -2751,6 +2751,44 @@ class ApiService {
     return response.data;
   }
 
+  // ===== School Branding =====
+  async getSchoolBranding(): Promise<{ id?: string; name?: string; logoUrl?: string | null }> {
+    const response = await this.client.get('/school/branding');
+    return response.data;
+  }
+
+  async getSchoolProfile(): Promise<{ id?: string; name?: string; logoUrl?: string | null }> {
+    const response = await this.client.get('/school/profile');
+    return response.data;
+  }
+
+  async uploadSchoolLogo(imageUri: string): Promise<{ message: string; logoUrl?: string }> {
+    const fileName = imageUri.split('/').pop() || 'school-logo.jpg';
+    const ext = (fileName.split('.').pop() || '').toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      png: 'image/png',
+      webp: 'image/webp',
+      gif: 'image/gif',
+    };
+    const formData = new FormData();
+    formData.append('logo', {
+      uri: imageUri,
+      name: fileName,
+      type: mimeTypes[ext] || 'image/jpeg',
+    } as any);
+    const response = await this.client.post('/school/branding/logo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async deleteSchoolLogo(): Promise<{ message: string }> {
+    const response = await this.client.delete('/school/branding/logo');
+    return response.data;
+  }
+
   // ===== School Subscription =====
   async getMySubscription() {
     const response = await this.client.get('/subscription/my-subscription');

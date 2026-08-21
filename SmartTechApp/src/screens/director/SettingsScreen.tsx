@@ -1,11 +1,14 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { useAuthStore } from '../../store';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { apiService } from '../../services/api';
+import { refreshSchoolBranding, setStoredSchoolLogo, canManageSchoolBranding } from '../../services/branding';
 
 interface DirectorSettingsProps {
   onToggleDrawer?: () => void;
@@ -16,6 +19,76 @@ interface DirectorSettingsProps {
 export const DirectorSettingsScreen: React.FC<DirectorSettingsProps> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
   const { user, logout } = useAuthStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const [logoUri, setLogoUri] = useState<string | null>(user?.school?.logo ?? null);
+  const [brandingBusy, setBrandingBusy] = useState(false);
+
+  useEffect(() => {
+    refreshSchoolBranding()
+      .then((url) => { if (url) setLogoUri(url); })
+      .catch(() => {});
+  }, []);
+
+  const schoolName = user?.school?.name || user?.schoolName || '';
+  const schoolInitials =
+    schoolName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => (w[0] || '').toUpperCase()).join('') || '?';
+
+  const handleChangeLogo = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission needed', 'Allow photo library access to upload a school logo.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+      });
+      if (result.canceled || !result.assets?.length) return;
+
+      setBrandingBusy(true);
+      const res = await apiService.uploadSchoolLogo(result.assets[0].uri);
+      const url = res?.logoUrl || null;
+      if (!url) throw new Error('Upload succeeded but no logo URL was returned');
+      await setStoredSchoolLogo(url);
+      setLogoUri(url);
+      Alert.alert('Success', 'School logo updated. It will now appear on your dashboards.');
+    } catch (err: any) {
+      console.error('Logo upload failed:', err);
+      Alert.alert('Upload failed', err?.response?.data?.message || err?.message || 'Could not upload the logo. Please try again.');
+    } finally {
+      setBrandingBusy(false);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    Alert.alert(
+      'Remove Logo',
+      'Remove the school logo? Your dashboards will fall back to initials.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setBrandingBusy(true);
+              await apiService.deleteSchoolLogo();
+              await setStoredSchoolLogo(null);
+              setLogoUri(null);
+              Alert.alert('Success', 'School logo removed.');
+            } catch (err: any) {
+              console.error('Logo removal failed:', err);
+              Alert.alert('Failed', err?.response?.data?.message || 'Could not remove the logo. Please try again.');
+            } finally {
+              setBrandingBusy(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -104,6 +177,51 @@ export const DirectorSettingsScreen: React.FC<DirectorSettingsProps> = ({ onTogg
           </View>
         </View>
 
+        {canManageSchoolBranding(user) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>School Branding</Text>
+            <View style={[styles.sectionCard, styles.brandingCard]}>
+              <View style={styles.brandingRow}>
+                {logoUri ? (
+                  <Image source={{ uri: logoUri }} style={styles.brandingLogo} />
+                ) : (
+                  <View style={[styles.brandingLogo, styles.brandingLogoFallback]}>
+                    <Text style={styles.brandingLogoInitials}>{schoolInitials}</Text>
+                  </View>
+                )}
+                <View style={styles.brandingInfo}>
+                  <Text style={styles.brandingName} numberOfLines={1}>{schoolName || 'Your school'}</Text>
+                  <Text style={styles.brandingHint}>
+                    {logoUri
+                      ? 'Shown on dashboards and reports on every device.'
+                      : 'Upload your school logo to personalise your dashboards.'}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.brandingActions}>
+                <TouchableOpacity
+                  style={[styles.brandingPrimaryButton, brandingBusy && styles.brandingButtonDisabled]}
+                  onPress={handleChangeLogo}
+                  disabled={brandingBusy}
+                >
+                  <Text style={styles.brandingPrimaryText}>
+                    {brandingBusy ? 'Working…' : logoUri ? 'Change Logo' : 'Upload Logo'}
+                  </Text>
+                </TouchableOpacity>
+                {!!logoUri && (
+                  <TouchableOpacity
+                    style={[styles.brandingDangerButton, brandingBusy && styles.brandingButtonDisabled]}
+                    onPress={handleRemoveLogo}
+                    disabled={brandingBusy}
+                  >
+                    <Text style={styles.brandingDangerText}>Remove</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
+        )}
+
         {settingsSections.map((section, idx) => (
           <View key={idx} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -147,6 +265,20 @@ const styles = StyleSheet.create({
   profileEmail: { fontSize: 14, color: colors.textLight, marginTop: 2 },
   profileRole: { fontSize: 12, fontWeight: '600', color: colors.primary, marginTop: 4, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: colors.infoLight, borderRadius: borderRadius.sm, alignSelf: 'flex-start' },
   section: { marginBottom: spacing.lg },
+  brandingCard: { paddingVertical: spacing.sm },
+  brandingRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  brandingLogo: { width: 72, height: 72, borderRadius: 18, backgroundColor: colors.background },
+  brandingLogoFallback: { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.primary },
+  brandingLogoInitials: { fontSize: 24, fontWeight: '700', color: colors.white },
+  brandingInfo: { flex: 1, marginLeft: spacing.md },
+  brandingName: { fontSize: 16, fontWeight: '700', color: colors.text },
+  brandingHint: { fontSize: 12, color: colors.textLight, marginTop: 4 },
+  brandingActions: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  brandingPrimaryButton: { flex: 1, backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.sm + 2, alignItems: 'center', marginRight: spacing.sm },
+  brandingButtonDisabled: { opacity: 0.6 },
+  brandingPrimaryText: { color: colors.white, fontSize: 14, fontWeight: '600' },
+  brandingDangerButton: { backgroundColor: colors.errorLight, borderRadius: borderRadius.lg, paddingVertical: spacing.sm + 2, paddingHorizontal: spacing.lg, alignItems: 'center' },
+  brandingDangerText: { color: colors.error, fontSize: 14, fontWeight: '600' },
   sectionTitle: { fontSize: 14, fontWeight: '600', color: colors.textLight, marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
   sectionCard: { backgroundColor: colors.white, borderRadius: borderRadius.xl, ...shadows.card },
   settingItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.lg },

@@ -7,6 +7,7 @@ import { useAuthStore } from '../../store';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { apiService } from '../../services/api';
+import { refreshSchoolBranding } from '../../services/branding';
 
 interface DirectorDashboardProps {
   onToggleDrawer?: () => void;
@@ -35,6 +36,8 @@ export const DirectorDashboardScreen: React.FC<DirectorDashboardProps> = ({ onTo
   }, []);
 
   useEffect(() => { loadDirectorData(); }, [loadDirectorData]);
+
+  useEffect(() => { refreshSchoolBranding().catch(() => {}); }, []);
 
   useEffect(() => {
     const loadSignature = async () => {

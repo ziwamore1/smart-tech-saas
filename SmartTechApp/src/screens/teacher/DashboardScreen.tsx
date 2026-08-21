@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, StatCard, QuickActionItem, WidgetCard } from '../../components';
 import { colors, spacing } from '../../theme';
 import { useAuthStore, useAppStore } from '../../store';
+import { refreshSchoolBranding } from '../../services/branding';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -19,6 +20,7 @@ export const TeacherDashboardScreen: React.FC<Props> = ({ onToggleDrawer, onNavi
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
   useEffect(() => { fetchDashboard(); }, []);
+  useEffect(() => { refreshSchoolBranding().catch(() => {}); }, []);
 
   const stats = dashboard?.stats;
   const isHod = user?.roles?.some((r) => r === 'HOD' || r === 'HEAD_OF_DEPARTMENT');
