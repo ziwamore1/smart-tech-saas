@@ -479,8 +479,9 @@ export class ResultsManagementService {
     // Clean up phantom ComputedResult records that have null finalPercentage
     // and no raw scores. These were created by earlier syncComputedResult runs
     // that found no component data but still upserted a PENDING record.
+    // Absent records are legitimate — they carry the ABSENT flag instead of a score.
     const phantomIds = computedResults
-      .filter(cr => cr.finalPercentage == null && cr.totalRawScore === 0)
+      .filter(cr => cr.finalPercentage == null && cr.totalRawScore === 0 && !cr.isAbsent)
       .map(cr => cr.id);
     if (phantomIds.length > 0) {
       this.prisma.computedResult.deleteMany({ where: { id: { in: phantomIds } } }).catch(() => {});
@@ -490,16 +491,16 @@ export class ResultsManagementService {
       students: students.map((student) => {
         const crSubjects = new Set(
           computedResults
-            .filter((r) => r.studentId === student.id && (r.finalPercentage != null || r.totalRawScore > 0))
+            .filter((r) => r.studentId === student.id && (r.finalPercentage != null || r.totalRawScore > 0 || r.isAbsent))
             .map((r) => r.subjectId)
         );
         const crResults = computedResults
-          .filter((r) => r.studentId === student.id && (r.finalPercentage != null || r.totalRawScore > 0))
+          .filter((r) => r.studentId === student.id && (r.finalPercentage != null || r.totalRawScore > 0 || r.isAbsent))
           .map((cr) => {
           const raw = rawResultMap.get(`${cr.studentId}::${cr.subjectId}`);
           return {
             ...cr,
-            score: cr.finalPercentage ?? cr.totalRawScore ?? raw?.score ?? null,
+            score: cr.isAbsent ? null : (cr.finalPercentage ?? cr.totalRawScore ?? raw?.score ?? null),
             grade: cr.finalGrade ?? raw?.grade ?? null,
             remark: cr.finalRemark ?? raw?.remark ?? null,
           };
@@ -525,6 +526,7 @@ export class ResultsManagementService {
         for (const [key, agg] of componentAggMap) {
           if (!key.startsWith(`${student.id}::`) || crSubjects.has(agg.subjectId) || rawResultMap.has(key)) continue;
           const subjectConfigs = configMap.get(agg.subjectId) || [];
+          const allEntriesAbsent = agg.entries.length > 0 && agg.entries.every((e: any) => e.isAbsent);
           let totalWeighted = 0;
           let totalWeight = 0;
           for (const entry of agg.entries) {
@@ -547,6 +549,7 @@ export class ResultsManagementService {
             subject: agg.subject,
             finalPercentage: aggregatedPct,
             score: aggregatedPct,
+            isAbsent: allEntriesAbsent,
             totalRawScore: agg.entries.reduce((s: number, e: any) => s + (e.rawScore ?? 0), 0),
             grade: agg.entries[0]?.grade ?? null,
             remark: agg.entries[0]?.remarks ?? null,

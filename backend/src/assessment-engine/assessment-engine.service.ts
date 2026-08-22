@@ -358,20 +358,24 @@ export class AssessmentEngineService {
     });
 
     for (const enrollment of enrollments) {
+      // Include absent entries (rawScore is null when isAbsent) so that
+      // students who were absent for every component are recognised instead
+      // of being treated as having no data at all.
       const results = await this.prisma.studentAssessmentResult.findMany({
         where: {
           studentId: enrollment.studentId,
           subjectId,
           termId,
           classId,
-          rawScore: { not: null },
+          OR: [{ rawScore: { not: null } }, { isAbsent: true }],
         },
       });
 
       if (configs.length === 0) {
-        if (results.length > 0) {
-          const totalRaw = results.reduce((s, r) => s + (r.rawScore ?? 0), 0);
-          const totalMax = results.reduce((s, r) => s + (r.maxScore ?? 100), 0);
+        const scoredResults = results.filter(r => r.rawScore != null);
+        if (scoredResults.length > 0) {
+          const totalRaw = scoredResults.reduce((s, r) => s + (r.rawScore ?? 0), 0);
+          const totalMax = scoredResults.reduce((s, r) => s + (r.maxScore ?? 100), 0);
           const pct = totalMax > 0 ? parseFloat(((totalRaw / totalMax) * 100).toFixed(2)) : null;
           const grade = pct != null
             ? await this.gradingEngine.computeGrade(pct, classId, subjectId, termId, schoolId)
@@ -385,11 +389,29 @@ export class AssessmentEngineService {
                 termId,
               },
             },
-            update: { classId, schoolId, totalRawScore: totalRaw, finalPercentage: pct, finalGrade: grade, status: 'COMPUTED', computedAt: new Date() },
+            update: { classId, schoolId, totalRawScore: totalRaw, finalPercentage: pct, finalGrade: grade, isAbsent: false, status: 'COMPUTED', computedAt: new Date() },
             create: {
               studentId: enrollment.studentId,
               subjectId, termId, classId, schoolId,
-              totalRawScore: totalRaw, finalPercentage: pct, finalGrade: grade, status: 'COMPUTED', computedAt: new Date(),
+              totalRawScore: totalRaw, finalPercentage: pct, finalGrade: grade, isAbsent: false, status: 'COMPUTED', computedAt: new Date(),
+            },
+          });
+        } else if (results.length > 0) {
+          // Absence-only data without configured assessments — keep the
+          // subject flagged as ABSENT rather than silently scoring zero.
+          await this.prisma.computedResult.upsert({
+            where: {
+              studentId_subjectId_termId: {
+                studentId: enrollment.studentId,
+                subjectId,
+                termId,
+              },
+            },
+            update: { classId, schoolId, totalRawScore: 0, finalPercentage: null, finalGrade: null, finalRemark: 'ABSENT (X)', points: null, isAbsent: true, status: 'COMPUTED', metadata: { absentCode: 'X' }, computedAt: new Date() },
+            create: {
+              studentId: enrollment.studentId,
+              subjectId, termId, classId, schoolId,
+              totalRawScore: 0, finalPercentage: null, finalGrade: null, finalRemark: 'ABSENT (X)', points: null, isAbsent: true, status: 'COMPUTED', metadata: { absentCode: 'X' }, computedAt: new Date(),
             },
           });
         }
@@ -421,6 +443,17 @@ export class AssessmentEngineService {
         return result && (result.rawScore != null || result.isAbsent);
       });
 
+      // The student has an entry for every configured component and all of
+      // them are absences (entered as X/A) — the subject is ABSENT, not
+      // missing. Persist an authoritative absent ComputedResult so entry
+      // tables, view results and reports show Absent instead of a dash.
+      const allComponentsAbsent =
+        results.length > 0 &&
+        configs.every(c => {
+          const result = results.find(r => r.assessmentDefId === c.assessmentDefId);
+          return result && result.isAbsent && result.rawScore == null;
+        });
+
       if (totalWeight > 0) {
         await this.prisma.computedResult.upsert({
           where: {
@@ -437,6 +470,7 @@ export class AssessmentEngineService {
             totalWeightedScore: totalWeighted,
             finalPercentage: finalPct,
             finalGrade,
+            isAbsent: false,
             status: allFilled ? 'COMPUTED' : 'PENDING',
             computedAt: allFilled ? new Date() : null,
           },
@@ -447,8 +481,49 @@ export class AssessmentEngineService {
             totalWeightedScore: totalWeighted,
             finalPercentage: finalPct,
             finalGrade,
+            isAbsent: false,
             status: allFilled ? 'COMPUTED' : 'PENDING',
             computedAt: allFilled ? new Date() : null,
+          },
+        });
+      } else if (results.some(r => r.isAbsent)) {
+        // Entries exist but none carry a usable score (absence-only data).
+        const metadata = allComponentsAbsent ? { absentCode: 'X' } : {};
+        await this.prisma.computedResult.upsert({
+          where: {
+            studentId_subjectId_termId: {
+              studentId: enrollment.studentId,
+              subjectId,
+              termId,
+            },
+          },
+          update: {
+            classId,
+            schoolId,
+            totalRawScore: 0,
+            totalWeightedScore: null,
+            finalPercentage: null,
+            finalGrade: null,
+            finalRemark: allComponentsAbsent ? 'ABSENT (X)' : null,
+            points: null,
+            isAbsent: true,
+            status: allComponentsAbsent && allFilled ? 'COMPUTED' : 'PENDING',
+            metadata,
+            computedAt: allComponentsAbsent && allFilled ? new Date() : null,
+          },
+          create: {
+            studentId: enrollment.studentId,
+            subjectId, termId, classId, schoolId,
+            totalRawScore: 0,
+            totalWeightedScore: null,
+            finalPercentage: null,
+            finalGrade: null,
+            finalRemark: allComponentsAbsent ? 'ABSENT (X)' : null,
+            points: null,
+            isAbsent: true,
+            status: allComponentsAbsent && allFilled ? 'COMPUTED' : 'PENDING',
+            metadata,
+            computedAt: allComponentsAbsent && allFilled ? new Date() : null,
           },
         });
       } else {
@@ -766,6 +841,15 @@ export class AssessmentEngineService {
       this.logger.warn(`WebSocket emit failed: ${e.message}`);
     }
     await this.emitLiveResult(schoolId, { classId, subjectId, termId, enteredBy, score: results[0]?.rawScore ?? null }).catch(() => {});
+
+    const [enteredUser, enteredClass, enteredSubject] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: enteredBy }, select: { firstName: true, lastName: true } }),
+      this.prisma.class.findUnique({ where: { id: classId }, select: { name: true } }),
+      this.prisma.subject.findUnique({ where: { id: subjectId }, select: { name: true } }),
+    ]).catch(() => [null, null, null] as any);
+    const enteredByName = enteredUser ? `${enteredUser.firstName ?? ''} ${enteredUser.lastName ?? ''}`.trim() : undefined;
+    const className = enteredClass?.name;
+    const subjectName = enteredSubject?.name;
 
     this.activityService?.publish({
       type: ActivityEventType.RESULT_BULK_ENTERED,

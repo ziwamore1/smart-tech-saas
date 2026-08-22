@@ -244,6 +244,8 @@ export class ResultController {
         subjectId: string;
         termId: string;
         score: number;
+        isAbsent?: boolean;
+        absentCode?: string | null;
       }>;
     },
     @Req() req: any,

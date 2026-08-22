@@ -538,6 +538,8 @@ export class ResultService {
       subjectId: string;
       termId: string;
       score: number;
+      isAbsent?: boolean;
+      absentCode?: string | null;
     }>,
     roles: string[] = [],
     isSuperAdmin = false,
@@ -687,7 +689,15 @@ export class ResultService {
             const pairKey = `${classId}::${item.subjectId}`;
             if (permBlockedPairs.has(pairKey)) continue;
 
-            const gradeData = computeGradeInMemory(item.score, classId);
+            // X/A absences are stored with score 0 in the legacy Result table
+            // (same convention as the Excel import) but the ComputedResult
+            // keeps them flagged as absent so they never count as a zero mark.
+            const isAbsent = !!item.isAbsent;
+            const absentCode = item.absentCode ?? 'X';
+            const effectiveScore = isAbsent ? 0 : item.score;
+            const gradeData = isAbsent
+              ? { grade: null, remark: `ABSENT (${absentCode})`, points: null, gpa: null }
+              : computeGradeInMemory(item.score, classId);
 
             const result = await tx.result.upsert({
               where: {
@@ -698,7 +708,7 @@ export class ResultService {
                 },
               },
               update: {
-                score: item.score,
+                score: effectiveScore,
                 grade: gradeData.grade,
                 remark: gradeData.remark,
                 teacherId,
@@ -709,7 +719,7 @@ export class ResultService {
                 termId: item.termId,
                 teacherId,
                 schoolId,
-                score: item.score,
+                score: effectiveScore,
                 grade: gradeData.grade,
                 remark: gradeData.remark,
               },
@@ -726,12 +736,15 @@ export class ResultService {
               update: {
                 classId,
                 schoolId,
-                totalRawScore: item.score,
-                finalPercentage: item.score,
+                totalRawScore: effectiveScore,
+                totalWeightedScore: isAbsent ? null : item.score,
+                finalPercentage: isAbsent ? null : item.score,
                 finalGrade: gradeData.grade,
                 finalRemark: gradeData.remark,
                 points: gradeData.points,
                 gpa: gradeData.gpa,
+                isAbsent,
+                metadata: isAbsent ? { absentCode } : {},
                 status: 'COMPUTED',
                 computedAt: new Date(),
               },
@@ -741,12 +754,15 @@ export class ResultService {
                 termId: item.termId,
                 classId: classId || '',
                 schoolId,
-                totalRawScore: item.score,
-                finalPercentage: item.score,
+                totalRawScore: effectiveScore,
+                totalWeightedScore: isAbsent ? null : item.score,
+                finalPercentage: isAbsent ? null : item.score,
                 finalGrade: gradeData.grade,
                 finalRemark: gradeData.remark,
                 points: gradeData.points,
                 gpa: gradeData.gpa,
+                isAbsent,
+                metadata: isAbsent ? { absentCode } : {},
                 status: 'COMPUTED',
                 computedAt: new Date(),
               },

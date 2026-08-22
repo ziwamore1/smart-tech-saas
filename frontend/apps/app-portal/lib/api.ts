@@ -2478,7 +2478,7 @@ export const reportEngineApi = {
  * sequentially with exponential backoff retry on transient failures.
  */
 export async function bulkSaveResults(
-  results: Array<{ studentId: string; subjectId: string; termId: string; score: number }>,
+  results: Array<{ studentId: string; subjectId: string; termId: string; score: number; isAbsent?: boolean; absentCode?: 'X' | 'A' }>,
   options?: {
     chunkSize?: number;
     maxRetries?: number;

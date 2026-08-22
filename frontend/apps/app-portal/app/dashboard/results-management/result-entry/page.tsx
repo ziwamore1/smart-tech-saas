@@ -349,7 +349,7 @@ export default function ResultEntryPage() {
   const [bulkSaving, setBulkSaving] = useState(false);
 
   const bulkSaveMutation = useMutation({
-    mutationFn: (scoreList: Array<{ studentId: string; subjectId: string; termId: string; score: number }>) =>
+    mutationFn: (scoreList: Array<{ studentId: string; subjectId: string; termId: string; score: number; isAbsent?: boolean; absentCode?: 'X' | 'A' }>) =>
       bulkSaveResults(scoreList, {
         chunkSize: 50,
         maxRetries: 3,
@@ -550,14 +550,20 @@ export default function ResultEntryPage() {
       return;
     }
     if (bulkSaving || bulkSaveMutation.isPending) return;
-    const scoreList: Array<{ studentId: string; subjectId: string; termId: string; score: number }> = [];
+    const scoreList: Array<{ studentId: string; subjectId: string; termId: string; score: number; isAbsent?: boolean; absentCode?: 'X' | 'A' }> = [];
     dirtyCells.forEach(key => {
       const [studentId, subjectId] = key.split('::');
       const isAbsent = absentCells.has(key);
       const score = scores[studentId]?.[subjectId];
       if (isAbsent || (score != null && score >= 0)) {
         const scoreToSave = isAbsent ? 0 : score;
-        scoreList.push({ studentId, subjectId, termId: selectedTerm, score: scoreToSave });
+        scoreList.push({
+          studentId,
+          subjectId,
+          termId: selectedTerm,
+          score: scoreToSave as number,
+          ...(isAbsent ? { isAbsent: true, absentCode: 'X' as const } : {}),
+        });
       }
     });
     if (scoreList.length > 0) {
@@ -675,7 +681,7 @@ export default function ResultEntryPage() {
         const r = s.results?.find((res: any) => res.subjectId === subjId || res.subject?.id === subjId);
         const pending = scores[s.id]?.[subjId];
         const isAbsent = absentCells.has(cellKey);
-        if (isAbsent || r?.score != null || pending != null) entered++;
+        if (isAbsent || r?.score != null || r?.isAbsent || pending != null) entered++;
       });
     });
     return { entered, total, missing: total - entered };
@@ -1085,7 +1091,11 @@ export default function ResultEntryPage() {
                     const cell = componentScores[`${student.id}::${selectedSubject}`];
                     const total = computeComponentTotal(cell, subjectConfigs);
                     const status = componentCellStatus(cell, subjectConfigs);
-                    const gradeColors = getGradeColor(total);
+                    // Every configured component was entered as X/A — the learner is
+                    // absent, not missing scores.
+                    const rowAbsent = !!cell && Object.keys(cell).length > 0 && subjectConfigs.length > 0 &&
+                      subjectConfigs.every((c: any) => cell[c.assessmentDefId]?.isAbsent && cell[c.assessmentDefId]?.rawScore == null);
+                    const gradeColors = getGradeColor(rowAbsent ? -1 : total);
                     const rowClass = idx % 2 === 0 ? '#ffffff' : '#f1f5f9';
                     return (
                       <tr key={student.id} style={{ background: rowClass }}>
@@ -1118,11 +1128,13 @@ export default function ResultEntryPage() {
                             </td>
                           );
                         })}
-                        <td style={{ textAlign: 'center', padding: '10px 8px', borderBottom: '1px solid #cbd5e1', borderRight: '1px solid #cbd5e1', fontWeight: 700, fontSize: '14px', color: total != null ? gradeColors.text : '#94a3b8', background: total != null ? '#eff6ff' : 'transparent' }}>
-                          {total != null ? `${total.toFixed(1)}%` : '-'}
+                        <td style={{ textAlign: 'center', padding: '10px 8px', borderBottom: '1px solid #cbd5e1', borderRight: '1px solid #cbd5e1', fontWeight: 700, fontSize: '14px', color: rowAbsent ? '#92400e' : total != null ? gradeColors.text : '#94a3b8', background: rowAbsent || total != null ? '#fef3c7' : 'transparent' }}>
+                          {rowAbsent ? <span style={{ fontStyle: 'italic', color: '#92400e', fontWeight: 700 }}>ABSENT</span> : total != null ? `${total.toFixed(1)}%` : '-'}
                         </td>
                         <td style={{ textAlign: 'center', padding: '10px 8px', borderBottom: '1px solid #cbd5e1', borderRight: '1px solid #cbd5e1' }}>
-                          {total != null ? (
+                          {rowAbsent ? (
+                            <span style={{ fontSize: '13px', fontWeight: 700, padding: '4px 12px', borderRadius: '10px', background: gradeColors.bg, color: gradeColors.text }}>X</span>
+                          ) : total != null ? (
                             <span style={{ fontSize: '13px', fontWeight: 700, padding: '4px 12px', borderRadius: '10px', background: gradeColors.bg, color: gradeColors.text }}>
                               {getGrade(null, total, gradeScales)}
                             </span>
@@ -1240,7 +1252,9 @@ export default function ResultEntryPage() {
                         const cellKey = `${student.id}::${subjId}`;
                         const dbScore = result?.finalPercentage ?? result?.score;
                         const pendingScore = studentScores[subjId];
-                        const isAbsent = absentCells.has(cellKey);
+                        // Absent when typed locally (not yet saved) OR when the saved
+                        // data marks the student absent (component scores entered as X/A).
+                        const isAbsent = absentCells.has(cellKey) || !!result?.isAbsent;
                         const effectiveScore = isAbsent ? null : (pendingScore != null ? pendingScore : dbScore);
                         const isEmpty = effectiveScore == null && !isAbsent && (!editingCell || editingCell.studentId !== student.id || editingCell.subjectId !== subjId);
                         const isEditing = editingCell?.studentId === student.id && editingCell?.subjectId === subjId;
