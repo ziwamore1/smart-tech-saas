@@ -61,6 +61,39 @@ export class StudentService {
       );
     }
 
+    // Guard against accidental double-registration (teacher unsure whether the
+    // first submission went through): block the same name in the same class
+    // unless a date of birth clearly distinguishes the two students.
+    if (dto.classId && dto.firstName?.trim() && dto.lastName?.trim()) {
+      const sameClassDuplicate = await this.prisma.student.findFirst({
+        where: {
+          schoolId,
+          firstName: { equals: dto.firstName.trim(), mode: 'insensitive' },
+          lastName: { equals: dto.lastName.trim(), mode: 'insensitive' },
+          NOT: { status: 'WITHDRAWN' as StudentStatus },
+          enrollments: { some: { classId: dto.classId, status: 'ACTIVE' as any } },
+        },
+        select: { id: true, firstName: true, lastName: true, admissionNumber: true, dateOfBirth: true },
+      });
+
+      if (sameClassDuplicate) {
+        const dobProvided = !!dto.dateOfBirth;
+        const dobMatches =
+          dobProvided &&
+          !!sameClassDuplicate.dateOfBirth &&
+          new Date(dto.dateOfBirth).getTime() === new Date(sameClassDuplicate.dateOfBirth).getTime();
+
+        if (!dobProvided || dobMatches || !sameClassDuplicate.dateOfBirth) {
+          throw new ConflictException(
+            `"${sameClassDuplicate.firstName} ${sameClassDuplicate.lastName}" is already registered in this class (Admission ${sameClassDuplicate.admissionNumber}). ` +
+              (dobProvided
+                ? 'A student with this name and date of birth already exists — no duplicate was created.'
+                : 'If this is genuinely a DIFFERENT student with the same name, enter their date of birth to register them.')
+          );
+        }
+      }
+    }
+
     const createData: any = {
       firstName: dto.firstName,
       lastName: dto.lastName,
@@ -188,8 +221,13 @@ export class StudentService {
       metadata: { studentId: student.id, classId: dto.classId || '' },
     });
 
+    const enrolledClass = dto.classId
+      ? await this.prisma.class.findUnique({ where: { id: dto.classId }, select: { id: true, name: true } })
+      : null;
+
     return {
       ...student,
+      enrolledClass: enrolledClass ? { id: enrolledClass.id, name: enrolledClass.name } : null,
       credentials: {
         student: {
           username: studentUsername,
