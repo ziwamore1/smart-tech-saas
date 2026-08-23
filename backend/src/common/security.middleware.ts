@@ -33,12 +33,22 @@ export function setupSecurity(app: INestApplication) {
 
   app.use('/api/v1/auth', authLimiter);
 
+  // Public document verification — anti-enumeration/scraping secondary layer.
+  // (Edge/API-gateway limiting remains the primary control in production.)
+  // Generous enough for ordinary users scanning school documents;
+  // tight enough to blunt code brute-forcing. Clean 429, no internal detail.
   const verificationLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      statusCode: 429,
+      message: 'Too many verification attempts. Please try again later.',
+    },
   });
 
-  app.use('/api/v1/verification', verificationLimiter);
+  app.use('/api/v1/public/verification', verificationLimiter);
 
   app.getHttpAdapter().getInstance().disable('x-powered-by');
 }

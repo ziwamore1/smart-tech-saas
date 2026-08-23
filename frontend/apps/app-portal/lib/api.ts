@@ -1583,6 +1583,72 @@ export const digitalStampApi = {
     api.get(`/stamps/verify/document/${documentId}`),
 };
 
+// ── Digital Stamp Engine (Document Authenticity Platform) ──
+export const stampEngineApi = {
+  myPermissions: () => api.get('/stamp-engine/permissions'),
+
+  listTemplates: () => api.get('/stamp-engine/templates'),
+  getTemplate: (id: string) => api.get(`/stamp-engine/templates/${id}`),
+  createTemplate: (data: { name: string; description?: string; type?: string; configJson: any; isDefault?: boolean }) =>
+    api.post('/stamp-engine/templates', data),
+  updateTemplate: (id: string, data: any) => api.patch(`/stamp-engine/templates/${id}`, data),
+  publishTemplate: (id: string, changeNote?: string) =>
+    api.post(`/stamp-engine/templates/${id}/publish`, { changeNote }),
+  rollbackTemplate: (id: string, version: number) =>
+    api.post(`/stamp-engine/templates/${id}/rollback/${version}`),
+  setDefaultTemplate: (id: string) => api.post(`/stamp-engine/templates/${id}/default`),
+  archiveTemplate: (id: string) => api.delete(`/stamp-engine/templates/${id}`),
+  templateVersions: (id: string) => api.get(`/stamp-engine/templates/${id}/versions`),
+  renderPreview: (configJson: any, assetIds: string[] = []) =>
+    api.post('/stamp-engine/render-preview', { configJson, assetIds }, { timeout: 15000 }),
+
+  listAssets: () => api.get('/stamp-engine/assets'),
+  uploadAsset: (file: File, name: string, kind: string = 'LOGO') => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('name', name);
+    form.append('kind', kind);
+    return api.post('/stamp-engine/assets/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  deleteAsset: (id: string) => api.delete(`/stamp-engine/assets/${id}`),
+
+  finalizeDocument: (data: any) => api.post('/stamp-engine/documents/finalize', data, { timeout: 60000 }),
+  listDocuments: (params?: { status?: string; documentType?: string }) =>
+    api.get('/stamp-engine/documents', { params }),
+  getDocument: (id: string) => api.get(`/stamp-engine/documents/${id}`),
+  revokeDocument: (id: string, reason: string) =>
+    api.post(`/stamp-engine/documents/${id}/revoke`, { reason }),
+  supersedeDocument: (id: string, data: any) =>
+    api.post(`/stamp-engine/documents/${id}/supersede`, data),
+  auditTrail: (id: string) => api.get(`/stamp-engine/documents/${id}/audit-trail`),
+
+  approvalConfigs: {
+    list: () => api.get('/stamp-engine/approval-configs'),
+    create: (data: { documentType: string; name: string; steps: any[] }) =>
+      api.post('/stamp-engine/approval-configs', data),
+    update: (id: string, data: any) => api.patch(`/stamp-engine/approval-configs/${id}`, data),
+  },
+
+  // ── Unified Document Authentication Pipeline ──
+  authentication: {
+    capabilities: (templateId?: string) =>
+      api.get(`/stamp-engine/document-authentication/capabilities${templateId ? `?templateId=${templateId}` : ''}`),
+    prepare: (data: any) => api.post('/stamp-engine/document-authentication/prepare', data),
+    issue: (data: any) => api.post('/stamp-engine/document-authentication/issue', data, { timeout: 90000 }),
+    records: (status?: string) =>
+      api.get(`/stamp-engine/document-authentication/records${status ? `?status=${status}` : ''}`),
+    get: (idOrSerial: string) => api.get(`/stamp-engine/document-authentication/${encodeURIComponent(idOrSerial)}`),
+    revoke: (idOrSerial: string, reason: string) =>
+      api.post(`/stamp-engine/document-authentication/${encodeURIComponent(idOrSerial)}/revoke`, { reason }),
+    supersede: (idOrSerial: string, newAuthenticationId: string) =>
+      api.post(`/stamp-engine/document-authentication/${encodeURIComponent(idOrSerial)}/supersede`, { newAuthenticationId }),
+    trace: (idOrSerial: string) =>
+      api.get(`/stamp-engine/document-authentication/${encodeURIComponent(idOrSerial)}/pipeline-trace`),
+  },
+};
+
 export const assessmentEngineApi = {
   definitions: {
     create: (data: any) => api.post('/assessment-engine/definitions', data),

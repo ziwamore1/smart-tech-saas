@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CertificateRendererService } from './certificate-renderer.service';
 import { DigitalStampService } from './digital-stamp.service';
 import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
+import { VerificationService } from '../stamp-engine/verification.service';
 import * as puppeteer from 'puppeteer';
 import * as handlebars from 'handlebars';
 import * as fs from 'fs';
@@ -12,11 +13,14 @@ import * as crypto from 'crypto';
 
 @Injectable()
 export class TemplateRendererService {
+  private readonly logger = new Logger(TemplateRendererService.name);
+
   constructor(
     private prisma: PrismaService,
     private digitalStampService: DigitalStampService,
     private cloudinary: CloudinaryService,
     private certificateRenderer: CertificateRendererService,
+    private verification: VerificationService,
   ) {}
 
   async getSchool(schoolId: string) {
@@ -30,7 +34,11 @@ export class TemplateRendererService {
     const browser = await this.getBrowser();
     const page = await browser.newPage();
     page.setDefaultTimeout(60000);
-    await page.setContent(this.enforceMinimumFontSize(html), { waitUntil: 'networkidle0' as any });
+    try {
+      await page.setContent(this.enforceMinimumFontSize(html), { waitUntil: 'networkidle0' as any, timeout: 30000 });
+    } catch {
+      await page.setContent(this.enforceMinimumFontSize(html), { waitUntil: 'domcontentloaded' as any, timeout: 60000 });
+    }
     const pdf = await page.pdf({
       format: (template?.pageSize || 'A4') as any,
       landscape: (template?.orientation || 'portrait') === 'landscape',
@@ -887,6 +895,16 @@ export class TemplateRendererService {
       'percentile': data?.percentile ?? '',
       'z_score': data?.zScore ?? '',
       'attendance_rate': data?.attendancePercentage ?? '',
+      // ── Digital Document Authenticity (Stamp Engine) tokens ──
+      // Callers inject data.authenticity = VerificationService.buildAuthenticityPlaceholders()
+      // when a document is finalized; unresolved tokens render empty (never broken markup).
+      'digital_stamp': data?.authenticity?.digital_stamp || '',
+      'digital_signature': data?.authenticity?.digital_signature || '',
+      'document_serial': data?.authenticity?.document_serial || '',
+      'verification_qr': data?.authenticity?.verification_qr || '',
+      'document_hash': data?.authenticity?.document_hash || '',
+      'issued_date': data?.authenticity?.issued_date ?? new Date().toLocaleDateString(),
+      'issued_timestamp': data?.authenticity?.issued_timestamp ?? '',
     };
 
     return text.replace(/\{\{(\w+)\}\}/g, (_match: string, key: string) => {
@@ -1222,7 +1240,13 @@ export class TemplateRendererService {
   }
 
   async renderPdf(schoolId: string, templateId: string, data?: any): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {
-    const html = await this.renderPreview(schoolId, templateId, data);
+    // ── Authenticity pipeline (Phase 6 wiring) ──
+    // When the template declares includeStamp/includeSignature, finalize a
+    // DocumentVerification and inject authenticity placeholders BEFORE HTML
+    // rendering. Fail-safe: any stamp-engine error renders the document
+    // WITHOUT authenticity tokens (never a fake-authenticated document).
+    const renderData = await this.maybeAttachAuthenticity(schoolId, templateId, data);
+    const html = await this.renderPreview(schoolId, templateId, renderData);
 
     const template = await this.prisma.reportTemplate.findFirst({
       where: { id: templateId, schoolId },
@@ -1232,7 +1256,15 @@ export class TemplateRendererService {
     const page = await browser.newPage();
     page.setDefaultTimeout(60000);
 
-    await page.setContent(html, { waitUntil: 'networkidle0' as any });
+    // Hardened load: networkidle0 first (best fidelity); if unreachable remote
+    // assets keep the network busy, fall back to domcontentloaded so rendering
+    // degrades to embedded content instead of failing the whole document.
+    try {
+      await page.setContent(html, { waitUntil: 'networkidle0' as any, timeout: 30000 });
+    } catch {
+      this.logger?.warn?.('setContent networkidle0 timed out — falling back to domcontentloaded');
+      await page.setContent(html, { waitUntil: 'domcontentloaded' as any, timeout: 60000 });
+    }
 
     const pdf = await page.pdf({
       format: (template?.pageSize || 'A4') as any,
@@ -1257,6 +1289,52 @@ export class TemplateRendererService {
       return { buffer, url: result.secureUrl, publicId: result.publicId };
     } catch {
       return { buffer, url: null, publicId: null };
+    }
+  }
+
+  /**
+   * Automatic authenticity workflow (marketplace-driven): if the ReportTemplate
+   * opts in via includeStamp/includeSignature, run stamp-engine finalize
+   * (serial → hash → QR → verification record) and expose the result to the
+   * placeholder engine as data.authenticity. Teachers never touch crypto config.
+   */
+  private async maybeAttachAuthenticity(schoolId: string, templateId: string, data?: any): Promise<any> {
+    try {
+      const template = await this.prisma.reportTemplate.findFirst({
+        where: { id: templateId, schoolId },
+        select: { id: true, name: true, templateType: true, includeStamp: true, includeSignature: true },
+      });
+      if (!template?.includeStamp) return data;
+
+      // Entitlement gate — missing PREMIUM feature ⇒ unauthenticated render.
+      await this.verification.assertEntitlement(schoolId);
+
+      const finalized = await this.verification.finalize({
+        actor: { userId: 'report-pipeline', schoolId, roles: [], isSuperAdmin: true },
+        schoolId,
+        documentId: crypto.randomUUID(),
+        documentType: template.templateType || 'REPORT',
+        documentTitle: template.name,
+        issuedToLabel: null,
+        documentData: {
+          templateId,
+          payloadKeys: Object.keys(data || {}).sort(),
+          renderedAt: new Date().toISOString(),
+        },
+        ipAddress: undefined,
+        userAgent: 'report-pipeline',
+      });
+
+      return {
+        ...(data || {}),
+        authenticity: this.verification.buildAuthenticityPlaceholders(finalized),
+      };
+    } catch (e: any) {
+      // Fail-safe per spec §Failure Handling: no serial/QR/stamp on the output.
+      this.logger.warn(
+        `Authenticity skipped for template ${templateId}: ${e?.message ?? e}`,
+      );
+      return data;
     }
   }
 }

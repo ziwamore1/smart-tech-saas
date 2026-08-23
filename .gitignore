@@ -1,1 +1,10 @@
 node_modules
+dist/
+.env
+.env.local
+.env.*.local
+*.log
+boot-*.log
+*.db
+.next
+.tsbuildinfo

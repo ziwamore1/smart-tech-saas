@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Organisation {
+  id               String   @id @default(uuid())
+  name             String
+  slug             String   @unique
+  email            String   @unique
+  passwordHash     String
+  publicKey        String?
+  privateKeyEnc    String?
+  keyFingerprint   String?
+  keyAlgorithm     String   @default("Ed25519")
+  brandingJson     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  signatures       Signature[]
+  auditLogs        AuditLog[]
+  signingKeys      SigningKey[]
+  visualAssets     VisualSignatureAsset[]
+}
+
+// ── Signing-key lifecycle: ACTIVE → ROTATED → REVOKED ──
+// Historical signatures stay verifiable because every Signature row pins the
+// publicKey that produced it; keyId identifies the lifecycle record.
+model SigningKey {
+  id             String    @id @default(uuid())
+  organisationId String
+  publicKey      String
+  privateKeyEnc  String
+  fingerprint    String    @unique
+  algorithm      String    @default("Ed25519")
+  status         String    @default("ACTIVE")
+  activatedAt    DateTime  @default(now())
+  rotatedAt      DateTime?
+  revokedAt      DateTime?
+  revokedReason  String?
+  createdAt      DateTime  @default(now())
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  signatures     Signature[]
+
+  @@index([organisationId, status])
+}
+
+model Signature {
+  id             String   @id @default(uuid())
+  organisationId String
+  documentName   String
+  documentType   String?
+  documentId     String?
+  signerRole     String?
+  metadata       String?
+  canonicalHash  String
+  signature      String
+  publicKey      String
+  keyId          String?
+  algorithm      String   @default("Ed25519")
+  signedBy       String
+  status         String   @default("ACTIVE")
+  revokedAt      DateTime?
+  revokedReason  String?
+  supersededById String?
+  createdAt      DateTime @default(now())
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  signingKey     SigningKey?  @relation(fields: [keyId], references: [id])
+  auditLogs      AuditLog[]
+  verificationEvents VerificationEvent[]
+
+  @@index([organisationId, status])
+  @@index([canonicalHash])
+  @@index([organisationId, documentId])
+}
+
+// Visual representation of a handwritten/typed signature — NOT cryptographic.
+// Purely presentational; authenticity comes exclusively from Signature rows.
+model VisualSignatureAsset {
+  id             String   @id @default(uuid())
+  organisationId String
+  name           String
+  storageUrl     String
+  mimeType       String
+  width          Int?
+  height         Int?
+  style          String?
+  uploadedBy     String?
+  createdAt      DateTime @default(now())
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  organisationId String?
+  signatureId    String?
+  action         String
+  detail         String?
+  actor          String?
+  correlationId  String?
+  ip             String?
+  userAgent      String?
+  result         String   @default("SUCCESS")
+  createdAt      DateTime @default(now())
+  organisation   Organisation? @relation(fields: [organisationId], references: [id])
+  signature      Signature?    @relation(fields: [signatureId], references: [id])
+
+  @@index([organisationId, createdAt])
+  @@index([correlationId])
+}
+
+// Append-only record of every verification attempt (public + internal).
+// Never exposed through public APIs.
+model VerificationEvent {
+  id             String   @id @default(uuid())
+  signatureId    String?
+  identifier     String
+  outcome        String
+  ip             String?
+  userAgent      String?
+  channel        String   @default("PUBLIC")
+  createdAt      DateTime @default(now())
+  signature      Signature? @relation(fields: [signatureId], references: [id])
+
+  @@index([identifier, createdAt])
+  @@index([signatureId, createdAt])
+}

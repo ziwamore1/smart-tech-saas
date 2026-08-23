@@ -97,6 +97,12 @@ export default function DigitalStampsPage() {
           <p className="text-sm text-gray-500 mt-1">Manage stamps, verify documents, and approve workflows</p>
         </div>
         <div className="flex gap-2">
+          <Link href="/dashboard/digital-stamps/issue" className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">
+            📜 Issue Document
+          </Link>
+          <Link href="/dashboard/digital-stamps/designer" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
+            🎨 Stamp Designer
+          </Link>
           <Link href="/dashboard/digital-stamps/apply" className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700">
             🔏 Apply Stamp
           </Link>

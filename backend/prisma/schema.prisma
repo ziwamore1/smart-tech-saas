@@ -310,6 +310,14 @@ model School {
   compositeSubjects            CompositeSubject[]
   holidays                     Holiday[]
   studentSubjects              StudentSubject[]
+  stampTemplates               StampTemplate[]
+  stampDesignAssets            StampAsset[]
+  serialSequences              SerialSequence[]
+  documentSerials              DocumentSerial[]
+  documentVerifications        DocumentVerification[]
+  documentAuditLogs            DocumentAuditLog[]
+  approvalWorkflowConfigs      ApprovalWorkflowConfig[]
+  stampInstances               StampInstance[]
 
   @@index([institutionTypeId])
   @@index([isActive])
@@ -5917,4 +5925,288 @@ model GeneratedReport {
   @@index([termId])
   @@index([generatedById])
   @@index([createdAt])
+}
+
+// ==========================================
+// DIGITAL STAMP ENGINE — DOCUMENT AUTHENTICITY
+// Visual stamps are presentation only. Authenticity is backed by:
+// identity + authorization + SHA-256 canonical hash + unique serial +
+// audit trail + public verification endpoint.
+// ==========================================
+
+enum StampTemplateStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum DocumentVerificationStatus {
+  VALID
+  REVOKED
+  EXPIRED
+  INVALID
+  SUPERSEDED
+}
+
+enum StampAssetKind {
+  LOGO
+  EMBLEM
+  COAT_OF_ARMS
+  CENTER_GRAPHIC
+  SIGNATURE
+  OTHER
+}
+
+model StampTemplate {
+  id          String              @id @default(uuid())
+  schoolId    String
+  name        String
+  description String?
+  type        StampType           @default(CUSTOM)
+  status      StampTemplateStatus @default(DRAFT)
+  version     Int                 @default(1)
+  isActive    Boolean             @default(true)
+  isDefault   Boolean             @default(false)
+  configJson  Json
+  thumbnailUrl String?
+  publishedAt DateTime?
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  school      School              @relation(fields: [schoolId], references: [id])
+  versions    StampTemplateVersion[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+  @@index([status])
+}
+
+model StampTemplateVersion {
+  id          String       @id @default(uuid())
+  templateId  String
+  version     Int
+  configJson  Json
+  changeNote  String?
+  createdById String?
+  createdAt   DateTime     @default(now())
+  template    StampTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, version])
+  @@index([templateId])
+}
+
+model StampAsset {
+  id           String         @id @default(uuid())
+  schoolId     String
+  name         String
+  kind         StampAssetKind @default(LOGO)
+  url          String
+  publicId     String?
+  format       String? // png | svg | webp
+  width        Int?
+  height       Int?
+  sizeBytes    Int?
+  metadata     Json?          @default("{}")
+  uploadedById String?
+  createdAt    DateTime       @default(now())
+  school       School         @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
+  @@index([kind])
+}
+
+/// Atomic per-school counters. Allocation uses INSERT .. ON CONFLICT DO UPDATE
+/// RETURNING so two concurrent transactions can never receive the same value.
+model SerialSequence {
+  id        String   @id @default(uuid())
+  schoolId  String
+  scopeKey  String // e.g. "TRANSCRIPT:2026"
+  prefix    String
+  nextValue Int      @default(1)
+  updatedAt DateTime @updatedAt
+  school    School   @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, scopeKey])
+  @@index([schoolId])
+}
+
+model DocumentSerial {
+  id            String   @id @default(uuid())
+  schoolId      String
+  serialNumber  String   @unique
+  documentType  String
+  documentRef   String? // external document identifier (GeneratedReport/DocumentStamp/etc.)
+  sequence      Int
+  year          Int?
+  formatPattern String?
+  issuedAt      DateTime @default(now())
+  issuedById    String?
+  school        School   @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
+  @@index([documentType])
+  @@index([issuedAt])
+}
+
+model DocumentVerification {
+  id                  String                     @id @default(uuid())
+  schoolId            String
+  documentId          String
+  documentType        String
+  documentTitle       String?
+  serialNumber        String?                    @unique
+  documentHash        String                     @unique
+  algorithm           String                     @default("SHA-256")
+  hashBasis           Json? // summary of canonical payload fields used for the hash
+  status              DocumentVerificationStatus @default(VALID)
+  stampedAt           DateTime                   @default(now()) // authoritative server time
+  timezone            String                     @default("Africa/Lusaka")
+  stampDate           String? // visual date e.g. "23 AUG 2026" (derived server-side)
+  stampTime           String? // visual time e.g. "13:42:17 CAT"
+  templateId          String? // StampTemplate used at finalize time (snapshot kept below)
+  templateVersion     Int?
+  templateSnapshot    Json? // immutable copy of the layer config used for this document
+  verificationCode    String                     @unique // short opaque QR token, e.g. 7H4K9X2P
+  verificationUrl     String?
+  qrCodeDataUrl       String?
+  issuedToLabel       String? // safe public label (e.g. student name or class), never internal ids
+  disclaimerText      String?
+  expiresAt           DateTime?
+  revokedAt           DateTime?
+  revokedById         String?
+  revocationReason    String?
+  supersededBySerial  String?
+  finalizedById       String
+  signatureRecordId   String? // DocumentSignature id when signed through signing-service
+  metadata            Json?                      @default("{}")
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+  school              School                     @relation(fields: [schoolId], references: [id])
+
+  @@index([documentId])
+  @@index([schoolId])
+  @@index([status])
+  @@index([verificationCode])
+}
+
+model ApprovalWorkflowConfig {
+  id             String   @id @default(uuid())
+  schoolId       String
+  documentType   String // REPORT_CARD | TRANSCRIPT | CERTIFICATE | CUSTOM:* 
+  name           String
+  stepsJson      Json // [{ order, role|userId, requireSignature, autoApprove }]
+  isActive       Boolean  @default(true)
+  requiresSigner Boolean  @default(true)
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  school         School   @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, documentType, name])
+  @@index([schoolId])
+  @@index([isActive])
+}
+
+model DocumentAuditLog {
+  id                      String   @id @default(uuid())
+  schoolId                String?
+  actorId                 String?
+  action                  String // SIGNATURE_CREATED | STAMP_TEMPLATE_PUBLISHED | DOCUMENT_FINALIZED | DOCUMENT_REVOKED | ...
+  entityType              String // StampTemplate | DocumentVerification | DigitalSignature ...
+  entityId                String?
+  documentVerificationId  String?
+  beforeStatus            String?
+  afterStatus             String?
+  ipAddress               String?
+  userAgent               String?
+  detail                  Json?    @default("{}")
+  result                  String? // SUCCESS | DENIED
+  createdAt               DateTime @default(now())
+  school                  School?  @relation(fields: [schoolId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([schoolId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Document Authentication Platform — unified pipeline models
+// ─────────────────────────────────────────────────────────────
+
+// A StampInstance is the actual stamp applied to ONE document.
+// The template can evolve; instances are immutable history.
+model StampInstance {
+  id                     String   @id @default(uuid())
+  schoolId               String
+  documentVerificationId String?  @unique
+  templateId             String?
+  templateVersion        Int?
+  configSnapshot         Json? // immutable copy of layer config used
+  serialNumber           String?
+  verificationCode       String?
+  renderedSvgHash        String?
+  hash                   String?
+  status                 String   @default("ACTIVE") // ACTIVE | SUPERSEDED
+  appliedAt              DateTime @default(now())
+  appliedById            String?
+  createdAt              DateTime @default(now())
+  school                 School   @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId, status])
+  @@index([templateId])
+}
+
+// Unified authentication record spanning stamp + cryptographic signature.
+// The signature itself lives in the independent Signature Service; this row
+// references it (signatureServiceId + signingKeyId) for the verification portal.
+model DocumentAuthentication {
+  id                     String    @id @default(uuid())
+  schoolId               String?
+  organizationRef        String? // external organisation id in Signature Service
+  documentId             String
+  documentType           String
+  documentVersion        Int       @default(1)
+  documentSerial         String?
+  verificationCode       String?
+  originalHash           String? // content-only hash before stamping/signing
+  finalHash              String? // canonical signed payload hash
+  finalPdfHash           String?
+  stampInstanceId        String?
+  documentVerificationId String?   @unique
+  signatureServiceId     String? // primary Signature.id in Signature Service
+  signaturesJson         Json? // [{signatureId, keyId, signer, signerRole, signedAt}]
+  signingKeyId           String?
+  signerId               String? // primary authorised signatory (platform user)
+  issuedBy               String?
+  issuedAt               DateTime?
+  expiresAt              DateTime?
+  status                 String    @default("PENDING") // PENDING | VALID | EXPIRED | REVOKED | SUPERSEDED | FAILED
+  supersededById         String?
+  revokedAt              DateTime?
+  revocationReason       String?
+  verificationCount      Int       @default(0)
+  lastVerifiedAt         DateTime?
+  pipelineTrace          Json? // correlationId + step log for observability
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@unique([schoolId, documentId, documentVersion])
+  @@index([status])
+  @@index([documentSerial])
+}
+
+// Append-only public-verification attempt log (never exposed publicly).
+model AuthVerificationEvent {
+  id               String   @id @default(uuid())
+  authenticationId String?
+  code             String
+  outcome          String // VALID | REVOKED | EXPIRED | SUPERSEDED | NOT_FOUND
+  ip               String?
+  userAgent        String?
+  createdAt        DateTime @default(now())
+
+  @@index([code, createdAt])
+  @@index([authenticationId])
 }

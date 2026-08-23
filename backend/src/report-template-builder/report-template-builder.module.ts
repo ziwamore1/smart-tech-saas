@@ -13,9 +13,10 @@ import { DigitalStampService } from './digital-stamp.service';
 import { CertificateCommentService } from './certificate-comment.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { FeatureLockModule } from '../feature-lock/feature-lock.module';
+import { StampEngineModule } from '../stamp-engine/stamp-engine.module';
 
 @Module({
-  imports: [FeatureLockModule],
+  imports: [FeatureLockModule, StampEngineModule],
   controllers: [ReportTemplateBuilderController],
   providers: [
     ReportTemplateBuilderService,

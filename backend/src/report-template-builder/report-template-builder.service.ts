@@ -210,8 +210,14 @@ export class ReportTemplateBuilderService {
         data: { isDefault: false },
       });
     }
+    // Components may arrive inline (nested create); never spread raw arrays into the relation.
+    const { components, ...templateFields } = data as any;
     return this.prisma.reportTemplate.create({
-      data: { ...data, schoolId },
+      data: {
+        ...templateFields,
+        schoolId,
+        ...(Array.isArray(components) ? { components: { create: components } } : {}),
+      } as any,
     });
   }
 
@@ -226,9 +232,13 @@ export class ReportTemplateBuilderService {
       });
     }
 
+    const { components, ...templateFields } = data as any;
     return this.prisma.reportTemplate.update({
       where: { id },
-      data,
+      data: {
+        ...templateFields,
+        ...(Array.isArray(components) ? { components: { create: components } } : {}),
+      } as any,
     });
   }
 

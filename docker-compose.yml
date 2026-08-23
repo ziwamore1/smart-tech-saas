@@ -62,6 +62,10 @@ services:
       MINISTRY_ZAMBIA_API_URL: ${MINISTRY_ZAMBIA_API_URL}
       MINISTRY_ZAMBIA_CLIENT_ID: ${MINISTRY_ZAMBIA_CLIENT_ID}
       MINISTRY_ZAMBIA_CLIENT_SECRET: ${MINISTRY_ZAMBIA_CLIENT_SECRET}
+      # Digital Signature Service bridge (Part B) — empty URL = stamp-only mode
+      SIGNATURE_SERVICE_URL: ${SIGNATURE_SERVICE_URL:-http://signature-service:4001}
+      SIGNATURE_SERVICE_KEY: ${SIGNATURE_SERVICE_KEY:-stamp-engine:dev-internal-service-secret}
+      SIGNATURE_SERVICE_TIMEOUT_MS: ${SIGNATURE_SERVICE_TIMEOUT_MS:-15000}
     ports:
       - "3001:3001"
     volumes:
@@ -94,6 +98,30 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+    networks:
+      - smarttech-network
+    restart: unless-stopped
+
+  # Digital Signature Service (Part B) — opt-in via profile so the default
+  # `docker compose up -d` behaviour is unchanged:
+  #   docker compose --profile authenticity up -d
+  signature-service:
+    build:
+      context: ./digital-signature/backend
+      dockerfile: Dockerfile
+    container_name: smarttech-signature-service
+    environment:
+      DATABASE_URL: ${SIG_DATABASE_URL:-file:/app/data/prod.db}
+      JWT_SECRET: ${SIG_JWT_SECRET:-change-this-to-a-secure-random-string-min-32-characters}
+      ENCRYPTION_KEY: ${SIG_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+      INTERNAL_SERVICE_KEYS: ${INTERNAL_SERVICE_KEYS:-stamp-engine:dev-internal-service-secret}
+      CORS_ORIGIN: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+      PORT: 4001
+      NODE_ENV: production
+    ports:
+      - "4001:4001"
+    volumes:
+      - sig_data:/app/data
     networks:
       - smarttech-network
     restart: unless-stopped
@@ -131,6 +159,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  sig_data:
 
 networks:
   smarttech-network:

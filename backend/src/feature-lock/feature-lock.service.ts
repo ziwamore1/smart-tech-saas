@@ -121,6 +121,10 @@ const DEFAULT_FEATURES: Omit<FeatureLockDto, 'isEnabled' | 'isLocked'>[] = [
   { key: 'stamps.signatures', name: 'Digital Signatures', description: 'Create and manage digital signatures', category: 'stamps', minTier: 'STANDARD' },
   { key: 'stamps.blockchain', name: 'Blockchain Certificates', description: 'Issue blockchain-verified certificates', category: 'stamps', minTier: 'PREMIUM' },
   { key: 'stamps.approvals', name: 'Approval Workflows', description: 'Multi-step approval workflows', category: 'stamps', minTier: 'STANDARD' },
+  { key: 'stamps.designer', name: 'Stamp Designer', description: 'Layer-based institutional stamp designer with live preview and template versioning', category: 'stamps', minTier: 'PREMIUM' },
+  { key: 'stamps.serials', name: 'Document Serial Numbers', description: 'Unique verifiable document serial numbers (e.g. STS-2026-000001)', category: 'stamps', minTier: 'PREMIUM' },
+  { key: 'stamps.qrVerification', name: 'QR Document Verification', description: 'QR codes linked to the public verification page and document integrity hashes', category: 'stamps', minTier: 'PREMIUM' },
+  { key: 'stamps.revocation', name: 'Document Revocation', description: 'Revoke or supersede issued documents with a full audit trail', category: 'stamps', minTier: 'PREMIUM' },
 
   // ── Gallery ──
   { key: 'gallery.view', name: 'View Gallery', description: 'View photo gallery', category: 'gallery', minTier: 'BASIC' },

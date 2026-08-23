@@ -98,6 +98,7 @@ import { ResultsSmsModule } from './results-sms/results-sms.module';
 import { HolidayModule } from './holiday/holiday.module';
 import { ReportEngineModule } from './report-engine/report-engine.module';
 import { StudentSubjectModule } from './student-subject/student-subject.module';
+import { StampEngineModule } from './stamp-engine/stamp-engine.module';
 
 @Module({
   imports: [
@@ -221,6 +222,7 @@ import { StudentSubjectModule } from './student-subject/student-subject.module';
     HolidayModule,
     ReportEngineModule,
     StudentSubjectModule,
+    StampEngineModule,
   ],
   providers: [ProductionLogger],
 })
