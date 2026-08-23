@@ -69,7 +69,7 @@ Migrations (all additive, applied & verified locally):
 | `JWT_SECRET` | ✔ | existing |
 | `CLOUDINARY_*` | ✔ | asset uploads (falls back to local disk otherwise — NOT viable on Railway ephemeral FS) |
 | `STAMP_DEFAULT_TIMEZONE` | recommended | defaults `Africa/Lusaka` (CAT) |
-| `VERIFICATION_PUBLIC_BASE` / `VERIFICATION_URL_BASE` | recommended | absolute base for `/v/:code` links inside QR payloads |
+| `VERIFICATION_URL` | **required in prod** | absolute base for `/v/:code` links inside QR payloads (e.g. `https://app.smarttechsaas.com`) |
 | `SIGNATURE_SERVICE_URL` | optional | enables cryptographic mode; absent ⇒ stamp-only |
 | `SIGNATURE_SERVICE_KEY` | w/ URL | internal service key |
 | `SIGNATURE_SERVICE_TIMEOUT_MS` | optional | default sane timeout |
