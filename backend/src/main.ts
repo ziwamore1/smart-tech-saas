@@ -23,6 +23,7 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3002',
   'https://app.smarttechsaas.com',
   'https://www.smarttechsaas.com',
+  'https://verify.smarttechsaas.com',
   'https://smart-tech-saas-production.up.railway.app',
 ];
 
