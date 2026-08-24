@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, classApi, termApi, gradingSystemApi, teacherApi, assessmentEngineApi, bulkSaveResults, bulkSaveAssessmentScores } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
+import { EXAM_TYPE_OPTIONS, examTypeLabel } from '@/lib/exam-types';
 import { socket } from '@/lib/socket';
 
 const PASS_THRESHOLD = 50;
@@ -69,7 +70,7 @@ const WORKFLOW_STEPS = [
     who: 'Teacher / Class Teacher',
     where: 'This page',
     href: '',
-    what: 'Select a Class, Term and Subject (or use Bulk Mode), then type each learner\u2019s score. Use X or A to mark a learner absent. Click Save.',
+    what: 'Select a Class, Term and Exam Type (Mid-Term, End of Term, Mock...) — the result sheet is created for you automatically. Then type each learner\u2019s score. Use X or A to mark a learner absent. Click Save.',
   },
   {
     step: 2,
@@ -117,6 +118,11 @@ export default function ResultEntryPage() {
 
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
+  // Which exam the marks belong to (Mid-Term, End of Term, Mock...). Selecting
+  // this is what pins entry to the right result sheet — the sheet itself is
+  // found-or-created automatically on the server, so teachers never have to
+  // visit the Results Management page to set one up first.
+  const [selectedExamType, setSelectedExamType] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('all');
   const [entryMode, setEntryMode] = useState<'single' | 'bulk'>('bulk');
   const [searchFilter, setSearchFilter] = useState('');
@@ -252,8 +258,15 @@ export default function ResultEntryPage() {
   });
 
   useEffect(() => {
+    // Changing class / subject / term / exam / mode moves entry to a different
+    // result sheet — drop any unsaved cells and the cached sheet reference so
+    // they can never leak into the wrong exam's save batch.
     setComponentScores({});
-  }, [selectedClass, selectedSubject, selectedTerm, entryMode]);
+    setScores({});
+    setDirtyCells(new Set());
+    setAbsentCells(new Set());
+    setSheetId(null);
+  }, [selectedClass, selectedSubject, selectedTerm, selectedExamType, entryMode]);
 
   useEffect(() => {
     const data = existingComponentsData;
@@ -267,19 +280,26 @@ export default function ResultEntryPage() {
     setComponentScores(map);
   }, [existingComponentsData]);
 
+  // Find-or-create the result sheet for the selected class + term + exam.
+  // The backend auto-provisions a DRAFT sheet when none matches yet, so this
+  // page never needs a manual "create sheet" step (its standalone superpower).
   const { data: sheetData } = useQuery({
-    queryKey: ['result-sheet-entry', requestedSheetId, selectedClass, selectedTerm],
+    queryKey: ['result-sheet-entry', requestedSheetId, selectedClass, selectedTerm, selectedExamType],
     queryFn: async () => {
+      // Explicit class/term/exam selections always win — so changing the exam
+      // after arriving via ?sheetId= re-targets entry to the right sheet.
+      if (selectedClass && selectedTerm && selectedExamType) {
+        const r = await api.get('/results-management/sheets', { params: { classId: selectedClass, termId: selectedTerm, examType: selectedExamType } });
+        const sheets = r.data?.data || r.data;
+        return Array.isArray(sheets) && sheets.length > 0 ? sheets[0] : null;
+      }
       if (requestedSheetId) {
         const r = await api.get(`/results-management/sheets/${requestedSheetId}`);
         return r.data?.data || r.data || null;
       }
-      if (!selectedClass || !selectedTerm) return null;
-      const r = await api.get('/results-management/sheets', { params: { classId: selectedClass, termId: selectedTerm } });
-      const sheets = r.data?.data || r.data;
-      return Array.isArray(sheets) && sheets.length > 0 ? sheets[0] : null;
+      return null;
     },
-    enabled: !!requestedSheetId || (!!selectedClass && !!selectedTerm),
+    enabled: !!requestedSheetId || (!!selectedClass && !!selectedTerm && !!selectedExamType),
     staleTime: 30000,
   });
 
@@ -287,8 +307,11 @@ export default function ResultEntryPage() {
     if (!sheetData) return;
     if (sheetData.classId && !selectedClass) setSelectedClass(sheetData.classId);
     if (sheetData.termId && !selectedTerm) setSelectedTerm(sheetData.termId);
+    // Deep-linked from Results Management (?sheetId=...): adopt the sheet's
+    // exam type so the header, chip and saves all reference the right exam.
+    if (sheetData.examType && !selectedExamType) setSelectedExamType(sheetData.examType);
     setSheetId(sheetData.id || requestedSheetId || null);
-  }, [sheetData, requestedSheetId, selectedClass, selectedTerm]);
+  }, [sheetData, requestedSheetId, selectedClass, selectedTerm, selectedExamType]);
 
   const { data: studentsData, isLoading: studentsLoading } = useQuery({
     queryKey: ['sheet-students', selectedClass, selectedTerm, requestedSheetId || sheetData?.id],
@@ -324,7 +347,7 @@ export default function ResultEntryPage() {
         };
       });
     },
-    enabled: !!selectedClass && !!selectedTerm,
+    enabled: !!selectedClass && !!selectedTerm && !!selectedExamType,
   });
   const students = useMemo(() => Array.isArray(studentsData) ? studentsData : [], [studentsData]);
 
@@ -470,6 +493,10 @@ export default function ResultEntryPage() {
       toast.error('Please select class, subject, term and subject');
       return;
     }
+    if (!selectedExamType) {
+      toast.error('Choose the Exam Type first so results are filed under the right exam');
+      return;
+    }
     if (savingComponents) return;
     const subjectId = selectedSubject;
 
@@ -542,11 +569,15 @@ export default function ResultEntryPage() {
     } finally {
       setSavingComponents(false);
     }
-  }, [selectedClass, selectedSubject, selectedTerm, componentScores, students, subjectConfigs, savingComponents, sheetId, queryClient]);
+  }, [selectedClass, selectedSubject, selectedTerm, selectedExamType, componentScores, students, subjectConfigs, savingComponents, sheetId, queryClient]);
 
   const handleBulkSaveAll = useCallback(() => {
     if (dirtyCells.size === 0) {
       toast.error('No changes to save');
+      return;
+    }
+    if (!selectedExamType) {
+      toast.error('Choose the Exam Type first so results are filed under the right exam');
       return;
     }
     if (bulkSaving || bulkSaveMutation.isPending) return;
@@ -571,7 +602,7 @@ export default function ResultEntryPage() {
       toast.info(`Saving ${scoreList.length} score${scoreList.length !== 1 ? 's' : ''}...`);
       bulkSaveMutation.mutate(scoreList);
     }
-  }, [dirtyCells, scores, selectedTerm, bulkSaveMutation, bulkSaving, absentCells]);
+  }, [dirtyCells, scores, selectedTerm, selectedExamType, bulkSaveMutation, bulkSaving, absentCells]);
 
   const handlePasteFromExcel = useCallback(async () => {
     try {
@@ -735,11 +766,13 @@ export default function ResultEntryPage() {
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#1f2937', margin: 0 }}>Result Entry</h1>
           <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0 0' }}>
+            {selectedExamType ? <strong style={{ color: '#4f46e5' }}>{examTypeLabel(selectedExamType)}</strong> : 'Pick class, term & exam —'}
             {componentMode
-              ? `Enter assessment component scores for ${selectedSubjectName} — total % and grade are computed automatically.`
+              ? ` enter assessment component scores for ${selectedSubjectName} — total % and grade are computed automatically.`
               : entryMode === 'bulk'
-                ? 'Enter scores for all subjects at once (Class Teacher Mode)'
-                : 'Enter scores for one subject at a time'}
+                ? ' enter marks for all subjects at once (Class Teacher Mode).'
+                : ' enter marks for one subject at a time.'}
+            {' '}The result sheet is set up for you automatically.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -933,6 +966,22 @@ export default function ResultEntryPage() {
             {terms.map((t: any) => (<option key={t.id} value={t.id}>{t.name}</option>))}
           </select>
         </div>
+        <div style={{ flex: '1', minWidth: '160px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
+            Exam Type <span style={{ color: '#dc2626' }}>*</span>
+          </label>
+          <select value={selectedExamType} onChange={e => setSelectedExamType(e.target.value)}
+            style={{
+              width: '100%', padding: '10px 14px', fontSize: '14px',
+              border: selectedExamType ? '1px solid #d1d5db' : '2px solid #f59e0b',
+              borderRadius: '8px', background: '#ffffff', fontWeight: selectedExamType ? 600 : 400
+            }}>
+            <option value="">Select Exam</option>
+            {EXAM_TYPE_OPTIONS.map(et => (
+              <option key={et.value} value={et.value}>{et.label}</option>
+            ))}
+          </select>
+        </div>
         {entryMode === 'single' && (
           <div style={{ flex: '1', minWidth: '160px' }}>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>Subject</label>
@@ -953,6 +1002,35 @@ export default function ResultEntryPage() {
               <i className="fa fa-layer-group" style={{ marginRight: '6px' }}></i>
               {subjectConfigs.length} assessment component{subjectConfigs.length !== 1 ? 's' : ''} configured — entering components will auto-compute the final total & grade.
             </p>
+          </div>
+        )}
+        {selectedClass && selectedTerm && selectedExamType && (
+          <div style={{ flex: '1', minWidth: '240px', background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: '8px', padding: '10px 14px' }}>
+            {!sheetData && !requestedSheetId ? (
+              <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: '#3730a3' }}>
+                <i className="fa fa-spinner fa-spin" style={{ marginRight: '6px' }}></i>
+                Preparing your {examTypeLabel(selectedExamType)} result sheet...
+              </p>
+            ) : sheetData ? (
+              <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: '#3730a3' }}>
+                <i className="fa fa-file-signature" style={{ marginRight: '6px' }}></i>
+                Filing into: {examTypeLabel(sheetData.examType || selectedExamType)} sheet ·{' '}
+                <span style={{
+                  padding: '1px 8px', borderRadius: '10px', background:
+                    sheetData.status === 'LOCKED' ? '#fee2e2' : sheetData.status === 'DRAFT' ? '#f3f4f6' : '#dbeafe',
+                  color: sheetData.status === 'LOCKED' ? '#dc2626' : sheetData.status === 'DRAFT' ? '#4b5563' : '#2563eb'
+                }}>{sheetData.status}</span>
+                {' '}— {sheetData.status === 'DRAFT'
+                  ? 'saving auto-submits it for review'
+                  : sheetData.status === 'SUBMITTED'
+                    ? 'awaiting HOD verification'
+                    : sheetData.status === 'VERIFIED'
+                      ? 'verified — awaiting publish by the Director'
+                      : sheetData.status === 'PUBLISHED'
+                        ? 'already published to parents/students'
+                        : 'locked by your Director'}
+              </p>
+            ) : null}
           </div>
         )}
       </div>
@@ -1166,10 +1244,12 @@ export default function ResultEntryPage() {
             </div>
           </div>
         )
-      ) : !selectedClass || !selectedTerm ? (
+      ) : !selectedClass || !selectedTerm || !selectedExamType ? (
         <div style={{ background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '12px', padding: '60px', textAlign: 'center' }}>
           <i className="fa fa-hand-pointer" style={{ fontSize: '40px', color: '#d1d5db' }}></i>
-          <p style={{ color: '#9ca3af', marginTop: '12px' }}>Select a class and term to start entering results</p>
+          <p style={{ color: '#9ca3af', marginTop: '12px' }}>
+            Select a class, term and <strong>Exam Type</strong> to start entering results — your result sheet is created automatically
+          </p>
         </div>
       ) : studentsLoading ? (
         <div style={{ background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '12px', padding: '60px', textAlign: 'center' }}>
