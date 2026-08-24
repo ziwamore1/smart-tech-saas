@@ -17,7 +17,12 @@ import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('assessment-engine')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('Director', 'Teacher', 'Class Teacher')
+// Keep in sync with result.controller.ts — HODs enter/verify component
+// scores (Mid-Term / End-of-Term) and Deputy Directors review them, so both
+// need the same access Teachers have here. 'Deputy Head' covers accounts
+// provisioned with either 'Deputy Head' or 'Deputy' (the guard normalizes
+// both to DEPUTY).
+@Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
 export class AssessmentEngineController {
   constructor(private assessmentEngine: AssessmentEngineService) {}
 
