@@ -97,6 +97,7 @@ export default function StampDesignerPage() {
   const previewRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0, layerX: 0, layerY: 0 });
+  const [dragging, setDragging] = useState(false);
 
   const debounceRef = useRef<any>(null);
   const mountedRef = useRef(true);
@@ -243,6 +244,7 @@ export default function StampDesignerPage() {
     const layer = layers.find(l => l.id === selectedId);
     if (!layer) return;
     isDragging.current = true;
+    setDragging(true);
     dragStart.current = { x: coords.cx, y: coords.cy, layerX: layer.x, layerY: layer.y };
   }, [selectedId, layers, busy, getCanvasCoords]);
 
@@ -258,6 +260,7 @@ export default function StampDesignerPage() {
 
   const handlePreviewMouseUp = useCallback(() => {
     isDragging.current = false;
+    setDragging(false);
   }, []);
 
   // ── Keyboard nudge ──
@@ -639,7 +642,7 @@ export default function StampDesignerPage() {
             </div>
             <div
               ref={previewRef}
-              className="mx-auto rounded-lg overflow-hidden cursor-crosshair select-none"
+              className={`mx-auto rounded-lg overflow-hidden select-none ${dragging ? 'cursor-grabbing' : selectedId ? 'cursor-grab' : 'cursor-crosshair'}`}
               style={{
                 aspectRatio: '1 / 1',
                 maxWidth: '100%',
