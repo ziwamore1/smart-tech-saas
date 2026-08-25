@@ -94,6 +94,7 @@ export default function StampDesignerPage() {
   const [shapeWidth, setShapeWidth] = useState(560);
   const [shapeHeight, setShapeHeight] = useState(560);
   const [innerRingRadius, setInnerRingRadius] = useState(238);
+  const [innerInset, setInnerInset] = useState(22);
 
   // ── Drag state ──
   const previewRef = useRef<HTMLDivElement>(null);
@@ -131,7 +132,7 @@ export default function StampDesignerPage() {
       height: shapeType !== 'circle' ? shapeHeight : undefined,
       borderWidth, borderColor, borderCount,
       innerRings: innerRing
-        ? [{ radius: shapeType === 'circle' ? innerRingRadius : undefined, inset: shapeType !== 'circle' ? 22 : undefined, width: 2, color: borderColor, dashed: innerRingDashed }]
+        ? [{ radius: shapeType === 'circle' ? innerRingRadius : undefined, inset: shapeType !== 'circle' ? innerInset : undefined, width: 2, color: borderColor, dashed: innerRingDashed }]
         : [],
     },
     layers: layers
@@ -152,7 +153,7 @@ export default function StampDesignerPage() {
         return { id: l.id, type: l.type, name: l.name, content: l.content || '', x: l.x, y: l.y, rotation: l.rotation, opacity: l.opacity, zIndex: l.zIndex, fontFamily: l.fontFamily, fontSize: l.fontSize, fontWeight: l.fontWeight, letterSpacing: l.letterSpacing, color: l.color, label: l.label || undefined, showTime: l.showTime, direction: l.direction || undefined };
       }),
     effects: { inkOpacity, texture: noiseAmount > 0 ? 'ink' : 'none', watermarkText: watermarkText || undefined, noiseAmount },
-  }), [shapeType, outerRadius, shapeWidth, shapeHeight, innerRingRadius, borderWidth, borderColor, borderCount, innerRing, innerRingDashed, inkOpacity, noiseAmount, watermarkText, layers]);
+  }), [shapeType, outerRadius, shapeWidth, shapeHeight, innerRingRadius, innerInset, borderWidth, borderColor, borderCount, innerRing, innerRingDashed, inkOpacity, noiseAmount, watermarkText, layers]);
 
   const assetIds = useMemo(() => layers.filter(l => l.enabled && l.type === 'image' && l.assetId).map(l => l.assetId as string), [layers]);
 
@@ -348,6 +349,7 @@ export default function StampDesignerPage() {
     setShapeWidth(shape.width ?? 560);
     setShapeHeight(shape.height ?? 560);
     setInnerRingRadius(ring?.radius ?? 238);
+    setInnerInset(ring?.inset ?? 22);
     setInkOpacity(effects.inkOpacity ?? 0.92);
     setNoiseAmount(effects.noiseAmount ?? 0.18);
     setWatermarkText(effects.watermarkText || '');
@@ -512,6 +514,14 @@ export default function StampDesignerPage() {
                       onChange={e => setShapeHeight(parseInt(e.target.value))}
                       className="flex-1" />
                     <span className="text-xs text-gray-500 w-10 text-right">{shapeHeight}</span>
+                  </div>
+                </label>
+                <label className="block text-xs font-medium text-gray-600">Inner inset
+                  <div className="flex items-center gap-2 mt-1">
+                    <input type="range" min={5} max={Math.floor(Math.min(shapeWidth, shapeHeight) / 2) - 10} step={1} value={innerInset}
+                      onChange={e => setInnerInset(parseInt(e.target.value))}
+                      className="flex-1" />
+                    <span className="text-xs text-gray-500 w-10 text-right">{innerInset}</span>
                   </div>
                 </label>
               </>

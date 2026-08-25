@@ -60,7 +60,7 @@ export class StampRendererService {
     if (effects.texture === 'ink' || effects.texture === 'grain') {
       const freq = effects.texture === 'grain' ? 0.9 : 0.35;
       const octaves = effects.texture === 'grain' ? 4 : 2;
-      const amount = Math.min(0.6, Math.max(0, effects.noiseAmount ?? 0.18));
+      const amount = Math.min(1.0, Math.max(0, effects.noiseAmount ?? 0.18));
       defs.push(
         `<filter id="${bodyGroupId}_noise" x="-10%" y="-10%" width="120%" height="120%">` +
           `<feTurbulence type="fractalNoise" baseFrequency="${freq}" numOctaves="${octaves}" result="noise" seed="7"/>` +
