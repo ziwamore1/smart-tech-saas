@@ -132,6 +132,11 @@ export default function StampDesignerPage() {
   const dragStart = useRef({ x: 0, y: 0, layerX: 0, layerY: 0 });
   const [dragging, setDragging] = useState(false);
 
+  // ── Shape resize state ──
+  const isResizing = useRef(false);
+  const resizeHandle = useRef<string>('');
+  const resizeStart = useRef({ mouseX: 0, mouseY: 0, w: 0, h: 0 });
+
   const debounceRef = useRef<any>(null);
   const mountedRef = useRef(true);
   const renderFailures = useRef(0);
@@ -293,8 +298,50 @@ export default function StampDesignerPage() {
 
   const handlePreviewMouseUp = useCallback(() => {
     isDragging.current = false;
+    isResizing.current = false;
+    resizeHandle.current = '';
     setDragging(false);
   }, []);
+
+  // ── Shape resize handlers ──
+  const handleResizeStart = useCallback((handle: string, e: React.MouseEvent) => {
+    if (shapeType === 'circle') return;
+    e.preventDefault();
+    e.stopPropagation();
+    isResizing.current = true;
+    resizeHandle.current = handle;
+    resizeStart.current = { mouseX: e.clientX, mouseY: e.clientY, w: shapeWidth, h: shapeHeight };
+  }, [shapeType, shapeWidth, shapeHeight]);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!isResizing.current || !previewRef.current) return;
+      const rect = previewRef.current.getBoundingClientRect();
+      const scaleX = shapeWidth / rect.width;
+      const scaleY = shapeHeight / rect.height;
+      const dx = (e.clientX - resizeStart.current.mouseX) * scaleX;
+      const dy = (e.clientY - resizeStart.current.mouseY) * scaleY;
+      const h = resizeHandle.current;
+      let newW = shapeWidth;
+      let newH = shapeHeight;
+      if (h.includes('r') || h === 'right') newW = Math.max(100, Math.min(580, resizeStart.current.w + dx * 2));
+      if (h.includes('l') || h === 'left') newW = Math.max(100, Math.min(580, resizeStart.current.w - dx * 2));
+      if (h.includes('b') || h === 'bottom') newH = Math.max(100, Math.min(580, resizeStart.current.h + dy * 2));
+      if (h.includes('t') || h === 'top') newH = Math.max(100, Math.min(580, resizeStart.current.h - dy * 2));
+      if (h.length === 2) {
+        if (h.includes('r')) newW = Math.max(100, Math.min(580, resizeStart.current.w + dx * 2));
+        if (h.includes('l')) newW = Math.max(100, Math.min(580, resizeStart.current.w - dx * 2));
+        if (h.includes('b')) newH = Math.max(100, Math.min(580, resizeStart.current.h + dy * 2));
+        if (h.includes('t')) newH = Math.max(100, Math.min(580, resizeStart.current.h - dy * 2));
+      }
+      setShapeWidth(Math.round(newW / 2) * 2);
+      setShapeHeight(Math.round(newH / 2) * 2);
+    };
+    const onUp = () => { isResizing.current = false; resizeHandle.current = ''; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [shapeWidth, shapeHeight, shapeType]);
 
   // ── Keyboard nudge ──
   useEffect(() => {
@@ -593,7 +640,7 @@ export default function StampDesignerPage() {
               <>
                 <label className="block text-xs font-medium text-gray-600">Width
                   <div className="flex items-center gap-2 mt-1">
-                    <input type="range" min={200} max={580} step={2} value={shapeWidth}
+                    <input type="range" min={100} max={580} step={2} value={shapeWidth}
                       onChange={e => setShapeWidth(parseInt(e.target.value))}
                       className="flex-1" />
                     <span className="text-xs text-gray-500 w-10 text-right">{shapeWidth}</span>
@@ -601,7 +648,7 @@ export default function StampDesignerPage() {
                 </label>
                 <label className="block text-xs font-medium text-gray-600">Height
                   <div className="flex items-center gap-2 mt-1">
-                    <input type="range" min={200} max={580} step={2} value={shapeHeight}
+                    <input type="range" min={100} max={580} step={2} value={shapeHeight}
                       onChange={e => setShapeHeight(parseInt(e.target.value))}
                       className="flex-1" />
                     <span className="text-xs text-gray-500 w-10 text-right">{shapeHeight}</span>
@@ -788,7 +835,7 @@ export default function StampDesignerPage() {
             </div>
             <div
               ref={previewRef}
-              className={`mx-auto rounded-lg overflow-hidden select-none ${dragging ? 'cursor-grabbing' : selectedId ? 'cursor-grab' : 'cursor-crosshair'}`}
+              className={`mx-auto rounded-lg select-none relative ${dragging ? 'cursor-grabbing' : selectedId ? 'cursor-grab' : 'cursor-crosshair'}`}
               style={{
                 aspectRatio: '1 / 1',
                 maxWidth: '100%',
@@ -805,6 +852,20 @@ export default function StampDesignerPage() {
                 className="w-full h-full flex items-center justify-center"
                 dangerouslySetInnerHTML={{ __html: svg || '<span style="color:#9ca3af;font-size:13px">Rendering…</span>' }}
               />
+              {shapeType !== 'circle' && !selectedId && (
+                <>
+                  {/* Edge handles */}
+                  <div onMouseDown={e => handleResizeStart('left', e)} className="absolute left-0 top-1/2 -translate-y-1/2 w-2 h-12 cursor-ew-resize hover:bg-blue-400/40 rounded-sm z-10" />
+                  <div onMouseDown={e => handleResizeStart('right', e)} className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-12 cursor-ew-resize hover:bg-blue-400/40 rounded-sm z-10" />
+                  <div onMouseDown={e => handleResizeStart('top', e)} className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-2 cursor-ns-resize hover:bg-blue-400/40 rounded-sm z-10" />
+                  <div onMouseDown={e => handleResizeStart('bottom', e)} className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-2 cursor-ns-resize hover:bg-blue-400/40 rounded-sm z-10" />
+                  {/* Corner handles */}
+                  <div onMouseDown={e => handleResizeStart('tl', e)} className="absolute top-0 left-0 w-3 h-3 cursor-nwse-resize hover:bg-blue-500/50 rounded-sm z-10" />
+                  <div onMouseDown={e => handleResizeStart('tr', e)} className="absolute top-0 right-0 w-3 h-3 cursor-nesw-resize hover:bg-blue-500/50 rounded-sm z-10" />
+                  <div onMouseDown={e => handleResizeStart('bl', e)} className="absolute bottom-0 left-0 w-3 h-3 cursor-nesw-resize hover:bg-blue-500/50 rounded-sm z-10" />
+                  <div onMouseDown={e => handleResizeStart('br', e)} className="absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize hover:bg-blue-500/50 rounded-sm z-10" />
+                </>
+              )}
             </div>
             <p className="text-[11px] text-gray-400 mt-3 text-center">
               Finalised documents receive the authoritative date/time and serial number from the server.
