@@ -55,6 +55,7 @@ export interface StampTextLayer extends StampLayerBase {
   letterSpacing?: number;
   color?: string;
   align?: 'start' | 'middle' | 'end';
+  direction?: 'horizontal' | 'vertical';
 }
 
 export interface StampCurvedTextLayer extends StampLayerBase {

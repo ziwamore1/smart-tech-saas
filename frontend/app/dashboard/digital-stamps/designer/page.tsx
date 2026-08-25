@@ -16,6 +16,7 @@ interface LayerDraft {
   curveRadius?: number; startAngle?: number; endAngle?: number;
   autoFit?: boolean;
   separator?: string;
+  direction?: 'horizontal' | 'vertical';
   assetId?: string; width?: number; height?: number;
   showTime?: boolean; label?: string;
 }
@@ -76,7 +77,7 @@ export default function StampDesignerPage() {
   const [innerRing, setInnerRing] = useState(true);
   const [innerRingDashed, setInnerRingDashed] = useState(true);
   const [inkOpacity, setInkOpacity] = useState(0.92);
-  const [texture, setTexture] = useState<'none' | 'ink' | 'grain'>('ink');
+  const [noiseAmount, setNoiseAmount] = useState(0.18);
   const [watermarkText, setWatermarkText] = useState('');
   const [layers, setLayers] = useState<LayerDraft[]>(defaultLayers());
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
@@ -148,10 +149,10 @@ export default function StampDesignerPage() {
         if (l.type === 'verification-marker') {
           return { id: l.id, type: l.type, name: l.name, x: l.x, y: l.y, rotation: l.rotation, opacity: l.opacity, zIndex: l.zIndex, text: l.label || undefined, size: 36, fontSize: l.fontSize };
         }
-        return { id: l.id, type: l.type, name: l.name, content: l.content || '', x: l.x, y: l.y, rotation: l.rotation, opacity: l.opacity, zIndex: l.zIndex, fontFamily: l.fontFamily, fontSize: l.fontSize, fontWeight: l.fontWeight, letterSpacing: l.letterSpacing, color: l.color, label: l.label || undefined, showTime: l.showTime };
+        return { id: l.id, type: l.type, name: l.name, content: l.content || '', x: l.x, y: l.y, rotation: l.rotation, opacity: l.opacity, zIndex: l.zIndex, fontFamily: l.fontFamily, fontSize: l.fontSize, fontWeight: l.fontWeight, letterSpacing: l.letterSpacing, color: l.color, label: l.label || undefined, showTime: l.showTime, direction: l.direction || undefined };
       }),
-    effects: { inkOpacity, texture, watermarkText: watermarkText || undefined, noiseAmount: 0.18 },
-  }), [shapeType, outerRadius, shapeWidth, shapeHeight, innerRingRadius, borderWidth, borderColor, borderCount, innerRing, innerRingDashed, inkOpacity, texture, watermarkText, layers]);
+    effects: { inkOpacity, texture: noiseAmount > 0 ? 'ink' : 'none', watermarkText: watermarkText || undefined, noiseAmount },
+  }), [shapeType, outerRadius, shapeWidth, shapeHeight, innerRingRadius, borderWidth, borderColor, borderCount, innerRing, innerRingDashed, inkOpacity, noiseAmount, watermarkText, layers]);
 
   const assetIds = useMemo(() => layers.filter(l => l.enabled && l.type === 'image' && l.assetId).map(l => l.assetId as string), [layers]);
 
@@ -348,7 +349,7 @@ export default function StampDesignerPage() {
     setShapeHeight(shape.height ?? 560);
     setInnerRingRadius(ring?.radius ?? 238);
     setInkOpacity(effects.inkOpacity ?? 0.92);
-    setTexture((effects.texture || 'ink') as any);
+    setNoiseAmount(effects.noiseAmount ?? 0.18);
     setWatermarkText(effects.watermarkText || '');
     setLayers(cfg.layers.map((l: any): LayerDraft => ({
       id: l.id || uid(), type: l.type, name: l.name || l.type, enabled: true,
@@ -359,6 +360,7 @@ export default function StampDesignerPage() {
       color: l.color || '#123456',
       curveRadius: l.curve?.radius, startAngle: l.curve?.startAngle, endAngle: l.curve?.endAngle,
       separator: l.separator || undefined,
+      direction: l.direction || undefined,
       assetId: l.assetId || '', width: l.width ?? 130, height: l.height ?? 130,
       showTime: l.showTime, label: l.label ?? l.text,
     })));
@@ -444,9 +446,12 @@ export default function StampDesignerPage() {
                 <input type="range" min={0.3} max={1} step={0.02} value={inkOpacity} onChange={e => setInkOpacity(parseFloat(e.target.value))} className="mt-2 w-full" />
               </label>
               <label className="block text-xs font-medium text-gray-600">Ink texture
-                <select value={texture} onChange={e => setTexture(e.target.value as any)} className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm">
-                  <option value="none">Flat ink</option><option value="ink">Realistic ink</option><option value="grain">Grainy</option>
-                </select>
+                <div className="flex items-center gap-2 mt-1">
+                  <input type="range" min={0} max={1} step={0.05} value={noiseAmount}
+                    onChange={e => setNoiseAmount(parseFloat(e.target.value))}
+                    className="flex-1" />
+                  <span className="text-xs text-gray-500 w-10 text-right">{noiseAmount > 0 ? `${Math.round(noiseAmount * 100)}%` : 'Off'}</span>
+                </div>
               </label>
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -534,7 +539,32 @@ export default function StampDesignerPage() {
           </section>
 
           <section className="bg-white rounded-xl border p-4">
-            <h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-2">Layers</h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Layers</h2>
+              <div className="relative group">
+                <button className="px-2 py-1 text-[10px] font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ Add Text</button>
+                <div className="hidden group-hover:block absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg z-10 whitespace-nowrap">
+                  <button onClick={() => {
+                    const id = uid();
+                    const newLayer: LayerDraft = { id, type: 'text', name: 'Custom text', enabled: true, content: 'CUSTOM TEXT', x: 300, y: 300, rotation: 0, opacity: 1, zIndex: 40 + layers.length, fontFamily: 'serif', fontSize: 20, fontWeight: 'bold', letterSpacing: 2, color: '#123456', direction: 'horizontal' };
+                    setLayers(prev => [...prev, newLayer]);
+                    setSelectedId(id);
+                  }} className="block w-full text-left px-3 py-2 text-xs hover:bg-gray-50 rounded-t-lg">Horizontal</button>
+                  <button onClick={() => {
+                    const id = uid();
+                    const newLayer: LayerDraft = { id, type: 'text', name: 'Vertical text', enabled: true, content: 'VERTICAL', x: 300, y: 300, rotation: 0, opacity: 1, zIndex: 40 + layers.length, fontFamily: 'serif', fontSize: 20, fontWeight: 'bold', letterSpacing: 2, color: '#123456', direction: 'vertical' };
+                    setLayers(prev => [...prev, newLayer]);
+                    setSelectedId(id);
+                  }} className="block w-full text-left px-3 py-2 text-xs hover:bg-gray-50">Vertical</button>
+                  <button onClick={() => {
+                    const id = uid();
+                    const newLayer: LayerDraft = { id, type: 'curved-text', name: 'Curved text', enabled: true, content: 'CURVED TEXT', x: 300, y: 120, rotation: 0, opacity: 1, zIndex: 40 + layers.length, fontFamily: 'serif', fontSize: 28, fontWeight: 'bold', letterSpacing: 2, color: '#123456', curveRadius: 200, startAngle: -150, endAngle: -30 };
+                    setLayers(prev => [...prev, newLayer]);
+                    setSelectedId(id);
+                  }} className="block w-full text-left px-3 py-2 text-xs hover:bg-gray-50 rounded-b-lg">Curved</button>
+                </div>
+              </div>
+            </div>
             <div className="space-y-1">
               {[...layers].sort((a, b) => a.zIndex - b.zIndex).map(l => (
                 <div key={l.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer ${selectedId === l.id ? 'bg-blue-50 ring-1 ring-blue-300' : 'hover:bg-gray-50'}`} onClick={() => setSelectedId(l.id)}>
@@ -554,6 +584,13 @@ export default function StampDesignerPage() {
                   <label className="block text-xs font-medium text-gray-600">Content
                     <input value={selected.content || ''} onChange={e => updateLayer(selected.id, { content: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
                   </label>
+                  {selected.type === 'text' && (
+                    <label className="block text-xs font-medium text-gray-600">Direction
+                      <select value={selected.direction || 'horizontal'} onChange={e => updateLayer(selected.id, { direction: e.target.value as 'horizontal' | 'vertical' })} className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm">
+                        <option value="horizontal">Horizontal</option><option value="vertical">Vertical</option>
+                      </select>
+                    </label>
+                  )}
                   {selected.type === 'curved-text' && (
                     <>
                       <div className="grid grid-cols-3 gap-2">

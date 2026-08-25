@@ -72,7 +72,7 @@ export class StampRendererService {
       textureFilter = `filter="url(#${bodyGroupId}_noise)"`;
     }
 
-    parts.push(`<g id="${bodyGroupId}" opacity="${(effects.inkOpacity ?? 1).toFixed(2)}">`);
+    parts.push(`<g id="${bodyGroupId}" opacity="${(effects.inkOpacity ?? 1).toFixed(2)}" ${textureFilter}>`);
 
     // ── Shape: borders + rings ──
     parts.push(this.renderShape(config, width, height));
@@ -246,6 +246,20 @@ export class StampRendererService {
     const color = layer.color || '#111827';
     const align = layer.align || 'middle';
     const content = this.resolveDynamicContent(layer.content, _ctx);
+    const isVertical = layer.direction === 'vertical';
+
+    if (isVertical) {
+      const chars = [...content];
+      const tspans = chars.map((ch, i) =>
+        `<tspan x="${layer.x}" dy="${i === 0 ? 0 : fontSize * 1.3}">${escXml(ch)}</tspan>`,
+      ).join('');
+      return (
+        `<text x="${layer.x}" y="${layer.y}" font-family="${escXml(fontFamily)}" font-size="${fontSize}" ` +
+        `font-weight="${weight}" letter-spacing="${spacing}" fill="${color}" text-anchor="${align}"${this.layerTransform(layer)}>` +
+        `${tspans}</text>`
+      );
+    }
+
     return (
       `<text x="${layer.x}" y="${layer.y}" font-family="${escXml(fontFamily)}" font-size="${fontSize}" ` +
       `font-weight="${weight}" letter-spacing="${spacing}" fill="${color}" text-anchor="${align}"${this.layerTransform(layer)}>` +
