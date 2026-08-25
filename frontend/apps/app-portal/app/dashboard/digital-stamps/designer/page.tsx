@@ -443,6 +443,11 @@ export default function StampDesignerPage() {
               <label className="block text-xs font-medium text-gray-600">Ink opacity
                 <input type="range" min={0.3} max={1} step={0.02} value={inkOpacity} onChange={e => setInkOpacity(parseFloat(e.target.value))} className="mt-2 w-full" />
               </label>
+              <label className="block text-xs font-medium text-gray-600">Ink texture
+                <select value={texture} onChange={e => setTexture(e.target.value as any)} className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm">
+                  <option value="none">Flat ink</option><option value="ink">Realistic ink</option><option value="grain">Grainy</option>
+                </select>
+              </label>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <label className="block text-xs font-medium text-gray-600">Border
@@ -458,9 +463,6 @@ export default function StampDesignerPage() {
             <div className="flex items-center gap-4 text-xs text-gray-600">
               <label className="flex items-center gap-1"><input type="checkbox" checked={innerRing} onChange={e => setInnerRing(e.target.checked)} /> Inner ring</label>
               <label className="flex items-center gap-1"><input type="checkbox" checked={innerRingDashed} disabled={!innerRing} onChange={e => setInnerRingDashed(e.target.checked)} /> Dashed</label>
-              <select value={texture} onChange={e => setTexture(e.target.value as any)} className="border rounded px-2 py-1">
-                <option value="none">Flat ink</option><option value="ink">Realistic ink</option><option value="grain">Grainy</option>
-              </select>
             </div>
             <label className="block text-xs font-medium text-gray-600">Watermark (optional)
               <input value={watermarkText} onChange={e => setWatermarkText(e.target.value)} placeholder="e.g. SPECIMEN" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
