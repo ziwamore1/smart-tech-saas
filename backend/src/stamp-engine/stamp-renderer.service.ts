@@ -308,7 +308,7 @@ export class StampRendererService {
         `<tspan x="${layer.x}" dy="${fontSize * 1.25}" font-size="${Math.round(fontSize * 0.72)}" font-weight="normal">${escXml(timeText)}</tspan>`,
       );
     }
-    return `<text font-family="${escXml(family)}" font-size="${fontSize}" fill="${color}" text-anchor="middle"${this.layerTransform(layer)}>${lines.join('')}</text>`;
+    return `<text x="${layer.x}" y="${layer.y}" font-family="${escXml(family)}" font-size="${fontSize}" fill="${color}" text-anchor="middle"${this.layerTransform(layer)}>${lines.join('')}</text>`;
   }
 
   private renderSerialLayer(layer: Extract<StampLayer, { type: 'serial' }>, ctx: StampRenderContext): string {
@@ -319,7 +319,7 @@ export class StampRendererService {
     if (layer.label) tspans.push(`<tspan x="${layer.x}" dy="0">${escXml(layer.label)} </tspan>`);
     tspans.push(`<tspan x="${layer.x}" dy="${layer.label ? fontSize * 1.15 : 0}" font-weight="bold" letter-spacing="1">${escXml(serial)}</tspan>`);
     return (
-      `<text font-family="${escXml(layer.fontFamily || 'monospace')}" font-size="${fontSize}" fill="${color}" text-anchor="middle"${this.layerTransform(layer)}>${tspans.join('')}</text>`
+      `<text x="${layer.x}" y="${layer.y}" font-family="${escXml(layer.fontFamily || 'monospace')}" font-size="${fontSize}" fill="${color}" text-anchor="middle"${this.layerTransform(layer)}>${tspans.join('')}</text>`
     );
   }
 
