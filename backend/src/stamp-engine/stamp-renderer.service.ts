@@ -272,12 +272,26 @@ export class StampRendererService {
     const color = layer.color || '#111827';
     const content = this.resolveDynamicContent(layer.content, ctx);
 
-    return (
-      `<path id="${id}" d="M ${p1.x.toFixed(2)},${p1.y.toFixed(2)} A ${radius},${radius} 0 ${largeArc} ${sweep} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}" fill="none"/>` +
+    const parts = [
+      `<path id="${id}" d="M ${p1.x.toFixed(2)},${p1.y.toFixed(2)} A ${radius},${radius} 0 ${largeArc} ${sweep} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}" fill="none"/>`,
       `<text font-family="${escXml(layer.fontFamily || 'serif')}" font-size="${fontSize}" font-weight="${layer.fontWeight || 'bold'}" ` +
       `letter-spacing="${spacing}" fill="${color}" text-anchor="middle"${this.layerTransform(layer, centerX, centerY)}>` +
-      `<textPath href="#${id}" xlink:href="#${id}" startOffset="50%">${escXml(content)}</textPath></text>`
-    );
+      `<textPath href="#${id}" xlink:href="#${id}" startOffset="50%">${escXml(content)}</textPath></text>`,
+    ];
+
+    if (layer.separator) {
+      const gapMidAngle = (startAngle + endAngle + 360) / 2;
+      const sp = polarPoint(centerX, centerY, radius, gapMidAngle);
+      const sepSize = Math.max(10, Math.round(fontSize * 0.6));
+      parts.push(
+        `<text x="${sp.x.toFixed(2)}" y="${sp.y.toFixed(2)}" font-family="${escXml(layer.fontFamily || 'serif')}" ` +
+        `font-size="${sepSize}" font-weight="${layer.fontWeight || 'bold'}" fill="${color}" ` +
+        `text-anchor="middle" dominant-baseline="central"${this.layerTransform(layer, centerX, centerY)}>` +
+        `${escXml(layer.separator)}</text>`,
+      );
+    }
+
+    return parts.join('');
   }
 
   private renderImageLayer(layer: Extract<StampLayer, { type: 'image' }>, ctx: StampRenderContext): string {
@@ -286,7 +300,7 @@ export class StampRendererService {
     return (
       `<image href="${escXml(url)}" xlink:href="${escXml(url)}" x="${layer.x - layer.width / 2}" ` +
       `y="${layer.y - layer.height / 2}" width="${layer.width}" height="${layer.height}" ` +
-      `preserveAspectRatio="xMidYMid meet"${this.layerTransform(layer, layer.x, layer.y)}>`
+      `preserveAspectRatio="xMidYMid meet"${this.layerTransform(layer, layer.x, layer.y)} />`
     );
   }
 

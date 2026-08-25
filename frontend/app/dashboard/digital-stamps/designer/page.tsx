@@ -15,6 +15,7 @@ interface LayerDraft {
   fontFamily: string; fontSize: number; fontWeight: string; letterSpacing: number; color: string;
   curveRadius?: number; startAngle?: number; endAngle?: number;
   autoFit?: boolean;
+  separator?: string;
   assetId?: string; width?: number; height?: number;
   showTime?: boolean; label?: string;
 }
@@ -138,7 +139,7 @@ export default function StampDesignerPage() {
         const cx = CANVAS / 2;
         const cy = CANVAS / 2;
         if (l.type === 'curved-text') {
-          return { id: l.id, type: l.type, name: l.name, content: l.content || '', x: l.x, y: l.y, rotation: l.rotation, opacity: l.opacity, zIndex: l.zIndex, fontFamily: l.fontFamily, fontSize: l.fontSize, fontWeight: l.fontWeight, letterSpacing: l.letterSpacing, color: l.color,
+          return { id: l.id, type: l.type, name: l.name, content: l.content || '', x: l.x, y: l.y, rotation: l.rotation, opacity: l.opacity, zIndex: l.zIndex, fontFamily: l.fontFamily, fontSize: l.fontSize, fontWeight: l.fontWeight, letterSpacing: l.letterSpacing, color: l.color, separator: l.separator || undefined,
             curve: { centerX: cx, centerY: cy, radius: l.curveRadius ?? 225, startAngle: l.startAngle ?? -150, endAngle: l.endAngle ?? -30, orientation: (l.startAngle ?? 0) > 90 ? 'inward' : 'outward' } };
         }
         if (l.type === 'image') {
@@ -357,6 +358,7 @@ export default function StampDesignerPage() {
       fontWeight: l.fontWeight || 'normal', letterSpacing: l.letterSpacing ?? 0,
       color: l.color || '#123456',
       curveRadius: l.curve?.radius, startAngle: l.curve?.startAngle, endAngle: l.curve?.endAngle,
+      separator: l.separator || undefined,
       assetId: l.assetId || '', width: l.width ?? 130, height: l.height ?? 130,
       showTime: l.showTime, label: l.label ?? l.text,
     })));
@@ -579,6 +581,10 @@ export default function StampDesignerPage() {
                         </button>
                       </div>
                       <p className="text-[10px] text-gray-400 -mt-1">Shrinks font to fit full text on the arc while preserving letter-spacing.</p>
+                      <label className="block text-xs font-medium text-gray-600 mt-1">Gap separator (e.g. ★)
+                        <input value={selected.separator || ''} onChange={e => updateLayer(selected.id, { separator: e.target.value || undefined })} placeholder="★" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                      </label>
+                      <p className="text-[10px] text-gray-400 -mt-1">Places a character at the midpoint of the arc gap (where text doesn&apos;t cover).</p>
                     </>
                   )}
                 </>
