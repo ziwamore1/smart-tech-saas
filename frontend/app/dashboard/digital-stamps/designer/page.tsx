@@ -3,12 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { stampEngineApi } from '@/lib/api';
 
-/**
- * Digital Stamp Designer — reproduces an institution's real physical stamp
- * as a configurable layer stack. Live preview is rendered by the SAME
- * server-side engine used on finalized documents (single source of truth).
- */
-
 type ShapeType = 'circle' | 'rectangle' | 'square' | 'oval';
 
 interface LayerDraft {
@@ -29,6 +23,7 @@ interface TemplateRow {
 }
 
 const uid = () => Math.random().toString(36).slice(2, 10);
+const CANVAS = 600;
 
 const defaultLayers = (): LayerDraft[] => ([
   { id: uid(), type: 'curved-text', name: 'Top arc — institution name', enabled: true, content: 'INSTITUTION NAME', x: 300, y: 120, rotation: 0, opacity: 1, zIndex: 10, fontFamily: 'serif', fontSize: 40, fontWeight: 'bold', letterSpacing: 4, color: '#123456', curveRadius: 225, startAngle: -155, endAngle: -25 },
@@ -60,31 +55,59 @@ export default function StampDesignerPage() {
   const [toast, setToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [openVersions, setOpenVersions] = useState<string | null>(null);
   const [versions, setVersions] = useState<any[]>([]);
+
+  // ── Shape sizing ──
+  const [outerRadius, setOuterRadius] = useState(280);
+  const [shapeWidth, setShapeWidth] = useState(560);
+  const [shapeHeight, setShapeHeight] = useState(560);
+  const [innerRingRadius, setInnerRingRadius] = useState(238);
+
+  // ── Drag state ──
+  const previewRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0, layerX: 0, layerY: 0 });
+
   const debounceRef = useRef<any>(null);
+  const mountedRef = useRef(true);
+  const renderFailures = useRef(0);
 
   const notify = (kind: 'ok' | 'err', text: string) => {
     setToast({ kind, text });
     setTimeout(() => setToast(null), 3500);
   };
 
+  // ── Sync shape dimensions when shape type changes ──
+  useEffect(() => {
+    if (shapeType === 'circle') {
+      setShapeWidth(outerRadius * 2);
+      setShapeHeight(outerRadius * 2);
+    } else {
+      const w = outerRadius * 2;
+      setShapeWidth(w);
+      setShapeHeight(shapeType === 'square' ? w : w);
+    }
+  }, [shapeType]);
+
   const configJson = useMemo(() => ({
-    canvas: { width: 600, height: 600, background: 'transparent' },
+    canvas: { width: CANVAS, height: CANVAS, background: 'transparent' },
     shape: {
       type: shapeType,
-      outerRadius: shapeType === 'circle' ? 280 : undefined,
-      width: shapeType !== 'circle' ? 560 : undefined,
-      height: shapeType !== 'circle' ? 560 : undefined,
+      outerRadius: shapeType === 'circle' ? outerRadius : undefined,
+      width: shapeType !== 'circle' ? shapeWidth : undefined,
+      height: shapeType !== 'circle' ? shapeHeight : undefined,
       borderWidth, borderColor, borderCount,
       innerRings: innerRing
-        ? [{ radius: shapeType === 'circle' ? 238 : undefined, inset: shapeType !== 'circle' ? 22 : undefined, width: 2, color: borderColor, dashed: innerRingDashed }]
+        ? [{ radius: shapeType === 'circle' ? innerRingRadius : undefined, inset: shapeType !== 'circle' ? 22 : undefined, width: 2, color: borderColor, dashed: innerRingDashed }]
         : [],
     },
     layers: layers
       .filter(l => l.enabled)
       .map(l => {
+        const cx = CANVAS / 2;
+        const cy = CANVAS / 2;
         if (l.type === 'curved-text') {
           return { id: l.id, type: l.type, name: l.name, content: l.content || '', x: l.x, y: l.y, rotation: l.rotation, opacity: l.opacity, zIndex: l.zIndex, fontFamily: l.fontFamily, fontSize: l.fontSize, fontWeight: l.fontWeight, letterSpacing: l.letterSpacing, color: l.color,
-            curve: { centerX: 300, centerY: 300, radius: l.curveRadius ?? 225, startAngle: l.startAngle ?? -150, endAngle: l.endAngle ?? -30, orientation: (l.startAngle ?? 0) > 90 ? 'inward' : 'outward' } };
+            curve: { centerX: cx, centerY: cy, radius: l.curveRadius ?? 225, startAngle: l.startAngle ?? -150, endAngle: l.endAngle ?? -30, orientation: (l.startAngle ?? 0) > 90 ? 'inward' : 'outward' } };
         }
         if (l.type === 'image') {
           return { id: l.id, type: l.type, name: l.name, x: l.x, y: l.y, rotation: l.rotation, opacity: l.opacity, zIndex: l.zIndex, assetId: l.assetId || undefined, width: l.width ?? 130, height: l.height ?? 130 };
@@ -95,29 +118,57 @@ export default function StampDesignerPage() {
         return { id: l.id, type: l.type, name: l.name, content: l.content || '', x: l.x, y: l.y, rotation: l.rotation, opacity: l.opacity, zIndex: l.zIndex, fontFamily: l.fontFamily, fontSize: l.fontSize, fontWeight: l.fontWeight, letterSpacing: l.letterSpacing, color: l.color, label: l.label || undefined, showTime: l.showTime };
       }),
     effects: { inkOpacity, texture, watermarkText: watermarkText || undefined, noiseAmount: 0.18 },
-  }), [shapeType, borderWidth, borderColor, borderCount, innerRing, innerRingDashed, inkOpacity, texture, watermarkText, layers]);
+  }), [shapeType, outerRadius, shapeWidth, shapeHeight, innerRingRadius, borderWidth, borderColor, borderCount, innerRing, innerRingDashed, inkOpacity, texture, watermarkText, layers]);
 
   const assetIds = useMemo(() => layers.filter(l => l.enabled && l.type === 'image' && l.assetId).map(l => l.assetId as string), [layers]);
 
-  // Debounced server-rendered live preview — same engine that stamps documents.
+  // ── Debounced server-rendered live preview with retry ──
   useEffect(() => {
+    mountedRef.current = true;
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
+      if (!mountedRef.current) return;
       try {
         const res = await stampEngineApi.renderPreview(configJson, assetIds);
-        setSvg(res.data.svg);
+        if (mountedRef.current) {
+          setSvg(res.data.svg);
+          renderFailures.current = 0;
+        }
       } catch {
-        /* preview is best-effort */
+        if (mountedRef.current && renderFailures.current < 3) {
+          renderFailures.current++;
+          const retryDelay = renderFailures.current * 500;
+          debounceRef.current = setTimeout(async () => {
+            if (!mountedRef.current) return;
+            try {
+              const res = await stampEngineApi.renderPreview(configJson, assetIds);
+              if (mountedRef.current) {
+                setSvg(res.data.svg);
+                renderFailures.current = 0;
+              }
+            } catch { /* give up after retries */ }
+          }, retryDelay);
+        }
       }
-    }, 250);
-    return () => clearTimeout(debounceRef.current);
+    }, 300);
+    return () => {
+      mountedRef.current = false;
+      clearTimeout(debounceRef.current);
+    };
   }, [configJson, assetIds]);
+
+  // ── Unmount cleanup ──
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const loadLists = useCallback(async () => {
     try {
       const [t, a] = await Promise.all([stampEngineApi.listTemplates(), stampEngineApi.listAssets()]);
-      setTemplates(t.data.templates || []);
-      setAssets(a.data.assets || []);
+      if (mountedRef.current) {
+        setTemplates(t.data.templates || []);
+        setAssets(a.data.assets || []);
+      }
     } catch { /* gated tiers */ }
   }, []);
 
@@ -125,6 +176,76 @@ export default function StampDesignerPage() {
 
   const updateLayer = (id: string, patch: Partial<LayerDraft>) =>
     setLayers(prev => prev.map(l => (l.id === id ? { ...l, ...patch } : l)));
+
+  // ── Drag-to-position handlers ──
+  const getCanvasCoords = useCallback((e: React.MouseEvent) => {
+    const el = previewRef.current;
+    if (!el) return { cx: 0, cy: 0 };
+    const rect = el.getBoundingClientRect();
+    const scaleX = CANVAS / rect.width;
+    const scaleY = CANVAS / rect.height;
+    return {
+      cx: (e.clientX - rect.left) * scaleX,
+      cy: (e.clientY - rect.top) * scaleY,
+    };
+  }, []);
+
+  const handlePreviewMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!selectedId || busy) return;
+    e.preventDefault();
+    const coords = getCanvasCoords(e);
+    const layer = layers.find(l => l.id === selectedId);
+    if (!layer) return;
+    isDragging.current = true;
+    dragStart.current = { x: coords.cx, y: coords.cy, layerX: layer.x, layerY: layer.y };
+  }, [selectedId, layers, busy, getCanvasCoords]);
+
+  const handlePreviewMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging.current || !selectedId) return;
+    const coords = getCanvasCoords(e);
+    const dx = coords.cx - dragStart.current.x;
+    const dy = coords.cy - dragStart.current.y;
+    const newX = Math.round(dragStart.current.layerX + dx);
+    const newY = Math.round(dragStart.current.layerY + dy);
+    updateLayer(selectedId, { x: Math.max(0, Math.min(CANVAS, newX)), y: Math.max(0, Math.min(CANVAS, newY)) });
+  }, [selectedId, getCanvasCoords]);
+
+  const handlePreviewMouseUp = useCallback(() => {
+    isDragging.current = false;
+  }, []);
+
+  // ── Keyboard nudge ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!selectedId || (e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'SELECT') return;
+      const step = e.shiftKey ? 10 : 1;
+      const layer = layers.find(l => l.id === selectedId);
+      if (!layer) return;
+      switch (e.key) {
+        case 'ArrowLeft': e.preventDefault(); updateLayer(selectedId, { x: Math.max(0, layer.x - step) }); break;
+        case 'ArrowRight': e.preventDefault(); updateLayer(selectedId, { x: Math.min(CANVAS, layer.x + step) }); break;
+        case 'ArrowUp': e.preventDefault(); updateLayer(selectedId, { y: Math.max(0, layer.y - step) }); break;
+        case 'ArrowDown': e.preventDefault(); updateLayer(selectedId, { y: Math.min(CANVAS, layer.y + step) }); break;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedId, layers]);
+
+  // ── Alignment helpers ──
+  const alignLayer = (axis: 'cx' | 'cy' | 'left' | 'right' | 'top' | 'bottom') => {
+    if (!selectedId) return;
+    const layer = layers.find(l => l.id === selectedId);
+    if (!layer) return;
+    switch (axis) {
+      case 'cx': updateLayer(selectedId, { x: CANVAS / 2 }); break;
+      case 'cy': updateLayer(selectedId, { y: CANVAS / 2 }); break;
+      case 'left': updateLayer(selectedId, { x: 20 }); break;
+      case 'right': updateLayer(selectedId, { x: CANVAS - 20 }); break;
+      case 'top': updateLayer(selectedId, { y: 20 }); break;
+      case 'bottom': updateLayer(selectedId, { y: CANVAS - 20 }); break;
+    }
+  };
 
   const handleUploadAsset = async (file: File) => {
     if (!file) return;
@@ -172,6 +293,10 @@ export default function StampDesignerPage() {
     const ring = (shape.innerRings || [])[0];
     setInnerRing(Boolean(ring));
     setInnerRingDashed(Boolean(ring?.dashed));
+    setOuterRadius(shape.outerRadius ?? 280);
+    setShapeWidth(shape.width ?? 560);
+    setShapeHeight(shape.height ?? 560);
+    setInnerRingRadius(ring?.radius ?? 238);
     setInkOpacity(effects.inkOpacity ?? 0.92);
     setTexture((effects.texture || 'ink') as any);
     setWatermarkText(effects.watermarkText || '');
@@ -233,7 +358,7 @@ export default function StampDesignerPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-6 max-w-[1600px] mx-auto">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Digital Stamp Designer</h1>
@@ -249,9 +374,9 @@ export default function StampDesignerPage() {
         <div className={`mb-4 px-4 py-2 rounded-lg text-sm ${toast.kind === 'ok' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>{toast.text}</div>
       )}
 
-      <div className="grid grid-cols-12 gap-6">
-        {/* ── Controls ── */}
-        <div className="col-span-4 space-y-4">
+      <div className="flex gap-6 items-start">
+        {/* ── Left: Controls ── */}
+        <div className="w-[340px] shrink-0 space-y-4">
           <section className="bg-white rounded-xl border p-4 space-y-3">
             <h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Identity</h2>
             <label className="block text-xs font-medium text-gray-600">Template name
@@ -289,6 +414,50 @@ export default function StampDesignerPage() {
             <label className="block text-xs font-medium text-gray-600">Watermark (optional)
               <input value={watermarkText} onChange={e => setWatermarkText(e.target.value)} placeholder="e.g. SPECIMEN" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
             </label>
+          </section>
+
+          {/* ── Shape sizing ── */}
+          <section className="bg-white rounded-xl border p-4 space-y-3">
+            <h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Shape Size</h2>
+            {shapeType === 'circle' ? (
+              <>
+                <label className="block text-xs font-medium text-gray-600">Outer radius
+                  <div className="flex items-center gap-2 mt-1">
+                    <input type="range" min={80} max={290} step={1} value={outerRadius}
+                      onChange={e => { const v = parseInt(e.target.value); setOuterRadius(v); setShapeWidth(v * 2); setShapeHeight(v * 2); }}
+                      className="flex-1" />
+                    <span className="text-xs text-gray-500 w-10 text-right">{outerRadius}</span>
+                  </div>
+                </label>
+                <label className="block text-xs font-medium text-gray-600">Inner ring radius
+                  <div className="flex items-center gap-2 mt-1">
+                    <input type="range" min={60} max={outerRadius - 10} step={1} value={innerRingRadius}
+                      onChange={e => setInnerRingRadius(parseInt(e.target.value))}
+                      className="flex-1" />
+                    <span className="text-xs text-gray-500 w-10 text-right">{innerRingRadius}</span>
+                  </div>
+                </label>
+              </>
+            ) : (
+              <>
+                <label className="block text-xs font-medium text-gray-600">Width
+                  <div className="flex items-center gap-2 mt-1">
+                    <input type="range" min={200} max={580} step={2} value={shapeWidth}
+                      onChange={e => setShapeWidth(parseInt(e.target.value))}
+                      className="flex-1" />
+                    <span className="text-xs text-gray-500 w-10 text-right">{shapeWidth}</span>
+                  </div>
+                </label>
+                <label className="block text-xs font-medium text-gray-600">Height
+                  <div className="flex items-center gap-2 mt-1">
+                    <input type="range" min={200} max={580} step={2} value={shapeHeight}
+                      onChange={e => setShapeHeight(parseInt(e.target.value))}
+                      className="flex-1" />
+                    <span className="text-xs text-gray-500 w-10 text-right">{shapeHeight}</span>
+                  </div>
+                </label>
+              </>
+            )}
           </section>
 
           <section className="bg-white rounded-xl border p-4 space-y-2">
@@ -351,9 +520,22 @@ export default function StampDesignerPage() {
                   <input value={selected.label || ''} onChange={e => updateLayer(selected.id, { label: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
                 </label>
               )}
+
+              {/* Position & alignment */}
               <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
                 <label>X<input type="number" value={selected.x} onChange={e => updateLayer(selected.id, { x: parseInt(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label>
                 <label>Y<input type="number" value={selected.y} onChange={e => updateLayer(selected.id, { y: parseInt(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label>
+              </div>
+              <div className="flex gap-1 flex-wrap">
+                <button onClick={() => alignLayer('cx')} className="px-2 py-1 text-[10px] border rounded hover:bg-gray-50" title="Center horizontally">⇔ Center</button>
+                <button onClick={() => alignLayer('cy')} className="px-2 py-1 text-[10px] border rounded hover:bg-gray-50" title="Center vertically">⇕ Center</button>
+                <button onClick={() => alignLayer('left')} className="px-2 py-1 text-[10px] border rounded hover:bg-gray-50">Left</button>
+                <button onClick={() => alignLayer('right')} className="px-2 py-1 text-[10px] border rounded hover:bg-gray-50">Right</button>
+                <button onClick={() => alignLayer('top')} className="px-2 py-1 text-[10px] border rounded hover:bg-gray-50">Top</button>
+                <button onClick={() => alignLayer('bottom')} className="px-2 py-1 text-[10px] border rounded hover:bg-gray-50">Bottom</button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
                 <label>Rotation°<input type="number" value={selected.rotation} onChange={e => updateLayer(selected.id, { rotation: parseFloat(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label>
                 <label>Z-index<input type="number" value={selected.zIndex} onChange={e => updateLayer(selected.id, { zIndex: parseInt(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label>
                 <label>Font size<input type="number" value={selected.fontSize} onChange={e => updateLayer(selected.id, { fontSize: parseInt(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label>
@@ -375,26 +557,44 @@ export default function StampDesignerPage() {
           )}
         </div>
 
-        {/* ── Live preview ── */}
-        <div className="col-span-5">
-          <div className="bg-white rounded-xl border p-6 sticky top-6">
+        {/* ── Center: Live preview ── */}
+        <div className="flex-1 min-w-0">
+          <div className="bg-white rounded-xl border p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Live Preview</h2>
-              <span className="text-[11px] px-2 py-0.5 bg-green-50 text-green-700 rounded-full">engine-rendered</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-gray-400">Use arrow keys to nudge · Shift = 10px</span>
+                <span className="text-[11px] px-2 py-0.5 bg-green-50 text-green-700 rounded-full">engine-rendered</span>
+              </div>
             </div>
             <div
-              className="mx-auto flex items-center justify-center"
-              style={{ width: 420, height: 420, backgroundImage: 'linear-gradient(45deg,#f8f8f8 25%,transparent 25%),linear-gradient(-45deg,#f8f8f8 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#f8f8f8 75%),linear-gradient(-45deg,transparent 75%,#f8f8f8 75%)', backgroundSize: '16px 16px', backgroundPosition: '0 0,0 8px,8px -8px,-8px 0' }}
-              dangerouslySetInnerHTML={{ __html: svg || '<span style="color:#9ca3af;font-size:13px">Rendering…</span>' }}
-            />
+              ref={previewRef}
+              className="mx-auto rounded-lg overflow-hidden cursor-crosshair select-none"
+              style={{
+                aspectRatio: '1 / 1',
+                maxWidth: '100%',
+                backgroundImage: 'linear-gradient(45deg,#f0f0f0 25%,transparent 25%),linear-gradient(-45deg,#f0f0f0 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#f0f0f0 75%),linear-gradient(-45deg,transparent 75%,#f0f0f0 75%)',
+                backgroundSize: '16px 16px',
+                backgroundPosition: '0 0,0 8px,8px -8px,-8px 0',
+              }}
+              onMouseDown={handlePreviewMouseDown}
+              onMouseMove={handlePreviewMouseMove}
+              onMouseUp={handlePreviewMouseUp}
+              onMouseLeave={handlePreviewMouseUp}
+            >
+              <div
+                className="w-full h-full flex items-center justify-center"
+                dangerouslySetInnerHTML={{ __html: svg || '<span style="color:#9ca3af;font-size:13px">Rendering…</span>' }}
+              />
+            </div>
             <p className="text-[11px] text-gray-400 mt-3 text-center">
               Finalised documents receive the authoritative date/time and serial number from the server.
             </p>
           </div>
         </div>
 
-        {/* ── Templates ── */}
-        <div className="col-span-3 space-y-3">
+        {/* ── Right: Templates + Security note ── */}
+        <div className="w-[280px] shrink-0 space-y-3">
           <section className="bg-white rounded-xl border p-4">
             <h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-2">Templates</h2>
             {templates.length === 0 && <p className="text-xs text-gray-400">No templates yet — save your first draft.</p>}
