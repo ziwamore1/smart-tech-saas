@@ -68,6 +68,36 @@ const defaultLayers = (): LayerDraft[] => ([
   { id: uid(), type: 'verification-marker', name: 'Verification check', enabled: false, x: 300, y: 520, rotation: 0, opacity: 1, zIndex: 33, fontFamily: 'sans-serif', fontSize: 11, fontWeight: 'bold', letterSpacing: 1, color: '#15803d', label: 'VERIFIED DIGITALLY', width: 34, height: 34 },
 ]);
 
+const rectangularStampLayers = (): LayerDraft[] => ([
+  { id: uid(), type: 'text', name: 'Institution name', enabled: true, content: 'INSTITUTION NAME', x: 300, y: 100, rotation: 0, opacity: 1, zIndex: 10, fontFamily: 'serif', fontSize: 24, fontWeight: 'bold', letterSpacing: 3, color: '#123456', direction: 'horizontal' },
+  { id: uid(), type: 'image', name: 'Left logo', enabled: false, x: 145, y: 280, rotation: 0, opacity: 1, zIndex: 15, fontFamily: 'serif', fontSize: 12, fontWeight: 'normal', letterSpacing: 0, color: '#123456', assetId: '', width: 70, height: 70 },
+  { id: uid(), type: 'image', name: 'Right logo', enabled: false, x: 455, y: 280, rotation: 0, opacity: 1, zIndex: 16, fontFamily: 'serif', fontSize: 12, fontWeight: 'normal', letterSpacing: 0, color: '#123456', assetId: '', width: 70, height: 70 },
+  { id: uid(), type: 'date', name: 'Stamp date (+ time)', enabled: true, label: 'DIGITALLY STAMPED', showTime: true, x: 300, y: 290, rotation: 0, opacity: 1, zIndex: 20, fontFamily: 'serif', fontSize: 13, fontWeight: 'bold', letterSpacing: 1, color: '#111827' },
+  { id: uid(), type: 'text', name: 'Department', enabled: true, content: 'DEPARTMENT OF EDUCATION', x: 300, y: 420, rotation: 0, opacity: 1, zIndex: 30, fontFamily: 'sans-serif', fontSize: 14, fontWeight: 'bold', letterSpacing: 2, color: '#1e3a5f', direction: 'horizontal' },
+  { id: uid(), type: 'text', name: 'Address', enabled: true, content: 'P.O. Box 1234, City', x: 300, y: 450, rotation: 0, opacity: 1, zIndex: 31, fontFamily: 'sans-serif', fontSize: 11, fontWeight: 'normal', letterSpacing: 1, color: '#4b5563', direction: 'horizontal' },
+  { id: uid(), type: 'serial', name: 'Serial number', enabled: true, label: '', x: 300, y: 475, rotation: 0, opacity: 1, zIndex: 32, fontFamily: 'monospace', fontSize: 11, fontWeight: 'bold', letterSpacing: 1, color: '#374151' },
+]);
+
+const squareStampLayers = (): LayerDraft[] => ([
+  { id: uid(), type: 'text', name: 'Institution name', enabled: true, content: 'INSTITUTION NAME', x: 300, y: 90, rotation: 0, opacity: 1, zIndex: 10, fontFamily: 'serif', fontSize: 22, fontWeight: 'bold', letterSpacing: 3, color: '#123456', direction: 'horizontal' },
+  { id: uid(), type: 'image', name: 'Left logo', enabled: false, x: 145, y: 300, rotation: 0, opacity: 1, zIndex: 15, fontFamily: 'serif', fontSize: 12, fontWeight: 'normal', letterSpacing: 0, color: '#123456', assetId: '', width: 65, height: 65 },
+  { id: uid(), type: 'image', name: 'Right logo', enabled: false, x: 455, y: 300, rotation: 0, opacity: 1, zIndex: 16, fontFamily: 'serif', fontSize: 12, fontWeight: 'normal', letterSpacing: 0, color: '#123456', assetId: '', width: 65, height: 65 },
+  { id: uid(), type: 'date', name: 'Stamp date (+ time)', enabled: true, label: 'DIGITALLY STAMPED', showTime: true, x: 300, y: 310, rotation: 0, opacity: 1, zIndex: 20, fontFamily: 'serif', fontSize: 13, fontWeight: 'bold', letterSpacing: 1, color: '#111827' },
+  { id: uid(), type: 'text', name: 'Department', enabled: true, content: 'DEPARTMENT OF EDUCATION', x: 300, y: 440, rotation: 0, opacity: 1, zIndex: 30, fontFamily: 'sans-serif', fontSize: 14, fontWeight: 'bold', letterSpacing: 2, color: '#1e3a5f', direction: 'horizontal' },
+  { id: uid(), type: 'text', name: 'Address', enabled: true, content: 'P.O. Box 1234, City', x: 300, y: 470, rotation: 0, opacity: 1, zIndex: 31, fontFamily: 'sans-serif', fontSize: 11, fontWeight: 'normal', letterSpacing: 1, color: '#4b5563', direction: 'horizontal' },
+  { id: uid(), type: 'serial', name: 'Serial number', enabled: true, label: '', x: 300, y: 495, rotation: 0, opacity: 1, zIndex: 32, fontFamily: 'monospace', fontSize: 11, fontWeight: 'bold', letterSpacing: 1, color: '#374151' },
+]);
+
+const ovalStampLayers = (): LayerDraft[] => ([
+  { id: uid(), type: 'curved-text', name: 'Top arc — institution name', enabled: true, content: 'INSTITUTION NAME', x: 300, y: 110, rotation: 0, opacity: 1, zIndex: 10, fontFamily: 'serif', fontSize: 32, fontWeight: 'bold', letterSpacing: 4, color: '#123456', curveRadius: 230, startAngle: -150, endAngle: -30 },
+  { id: uid(), type: 'image', name: 'Left logo', enabled: false, x: 130, y: 300, rotation: 0, opacity: 1, zIndex: 15, fontFamily: 'serif', fontSize: 12, fontWeight: 'normal', letterSpacing: 0, color: '#123456', assetId: '', width: 60, height: 60 },
+  { id: uid(), type: 'image', name: 'Right logo', enabled: false, x: 470, y: 300, rotation: 0, opacity: 1, zIndex: 16, fontFamily: 'serif', fontSize: 12, fontWeight: 'normal', letterSpacing: 0, color: '#123456', assetId: '', width: 60, height: 60 },
+  { id: uid(), type: 'date', name: 'Stamp date (+ time)', enabled: true, label: 'DIGITALLY STAMPED', showTime: true, x: 300, y: 300, rotation: 0, opacity: 1, zIndex: 20, fontFamily: 'serif', fontSize: 13, fontWeight: 'bold', letterSpacing: 1, color: '#111827' },
+  { id: uid(), type: 'text', name: 'Department', enabled: true, content: 'DEPARTMENT OF EDUCATION', x: 300, y: 420, rotation: 0, opacity: 1, zIndex: 30, fontFamily: 'sans-serif', fontSize: 14, fontWeight: 'bold', letterSpacing: 2, color: '#1e3a5f', direction: 'horizontal' },
+  { id: uid(), type: 'text', name: 'Address', enabled: true, content: 'P.O. Box 1234, City', x: 300, y: 450, rotation: 0, opacity: 1, zIndex: 31, fontFamily: 'sans-serif', fontSize: 11, fontWeight: 'normal', letterSpacing: 1, color: '#4b5563', direction: 'horizontal' },
+  { id: uid(), type: 'serial', name: 'Serial number', enabled: true, label: '', x: 300, y: 475, rotation: 0, opacity: 1, zIndex: 32, fontFamily: 'monospace', fontSize: 11, fontWeight: 'bold', letterSpacing: 1, color: '#374151' },
+]);
+
 export default function StampDesignerPage() {
   const [name, setName] = useState('Official School Stamp');
   const [shapeType, setShapeType] = useState<ShapeType>('circle');
@@ -474,6 +504,67 @@ export default function StampDesignerPage() {
             <label className="block text-xs font-medium text-gray-600">Watermark (optional)
               <input value={watermarkText} onChange={e => setWatermarkText(e.target.value)} placeholder="e.g. SPECIMEN" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
             </label>
+          </section>
+
+          <section className="bg-white rounded-xl border p-4 space-y-2">
+            <h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Presets</h2>
+            <button
+              onClick={() => {
+                setShapeType('rectangle');
+                setShapeWidth(560);
+                setShapeHeight(400);
+                setBorderWidth(4);
+                setBorderCount(1);
+                setInnerRing(true);
+                setInnerRingDashed(false);
+                setInnerInset(60);
+                setLayers(rectangularStampLayers());
+                setSelectedId(null);
+                notify('ok', 'Loaded rectangular stamp preset');
+              }}
+              className="w-full text-left px-3 py-2 text-xs border rounded-lg hover:bg-gray-50"
+            >
+              <span className="font-medium text-gray-800">Rectangular Stamp</span>
+              <span className="block text-gray-400 mt-0.5">Outer + inner rectangle, institution, department, logos</span>
+            </button>
+            <button
+              onClick={() => {
+                setShapeType('square');
+                setShapeWidth(500);
+                setShapeHeight(500);
+                setBorderWidth(4);
+                setBorderCount(1);
+                setInnerRing(true);
+                setInnerRingDashed(false);
+                setInnerInset(55);
+                setLayers(squareStampLayers());
+                setSelectedId(null);
+                notify('ok', 'Loaded square stamp preset');
+              }}
+              className="w-full text-left px-3 py-2 text-xs border rounded-lg hover:bg-gray-50"
+            >
+              <span className="font-medium text-gray-800">Square Stamp</span>
+              <span className="block text-gray-400 mt-0.5">Outer + inner square, institution, department, logos</span>
+            </button>
+            <button
+              onClick={() => {
+                setShapeType('oval');
+                setShapeWidth(560);
+                setShapeHeight(400);
+                setBorderWidth(4);
+                setBorderCount(1);
+                setInnerRing(true);
+                setInnerRingDashed(false);
+                setInnerInset(50);
+                setLayers(ovalStampLayers());
+                setSelectedId(null);
+                notify('ok', 'Loaded oval stamp preset');
+              }}
+              className="w-full text-left px-3 py-2 text-xs border rounded-lg hover:bg-gray-50"
+            >
+              <span className="font-medium text-gray-800">Oval Stamp</span>
+              <span className="block text-gray-400 mt-0.5">Outer oval, curved top text, inner oval, department</span>
+            </button>
           </section>
 
           {/* ── Shape sizing ── */}
