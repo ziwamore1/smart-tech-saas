@@ -2,12 +2,41 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  ConflictException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class TeachingAssignmentService {
   constructor(private prisma: PrismaService) {}
+
+  /**
+   * Maps the DB unique constraint [teacherId, classId, subjectId, academicYearId]
+   * to a friendly ConflictException instead of an opaque "Internal Server Error".
+   * Used both for explicit pre-checks and as a race-condition safety net.
+   */
+  private duplicateConflict(
+    teacherName: string,
+    subjectName: string,
+    className: string,
+    yearName?: string,
+  ): ConflictException {
+    const yearSuffix = yearName ? ` for ${yearName}` : '';
+    return new ConflictException(
+      `${teacherName} is already assigned to teach ${subjectName} in ${className}${yearSuffix}. ` +
+        'Remove the existing assignment first, or choose a different class or subject.',
+    );
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+  }
+
+  private displayTeacherName(teacher: { user?: { firstName?: string | null; lastName?: string | null } | null }): string {
+    const name = [teacher.user?.firstName, teacher.user?.lastName].filter(Boolean).join(' ').trim();
+    return name || 'This teacher';
+  }
 
   async assign(
     teacherId: string,
@@ -69,15 +98,48 @@ export class TeachingAssignmentService {
     if (!academicYear || academicYear.schoolId !== schoolId)
       throw new ForbiddenException('Invalid academic year or academic year does not belong to this school');
 
-    return this.prisma.teachingAssignment.create({
-      data: {
-        teacherId: resolvedUserId,
-        subjectId,
-        classId,
-        academicYearId,
+    // Friendly duplicate check — without this, re-assigning the same subject in
+    // the same class hits the DB unique constraint and surfaces as a 500.
+    const duplicate = await this.prisma.teachingAssignment.findFirst({
+      where: {
         schoolId,
+        teacherId: resolvedUserId,
+        classId,
+        subjectId,
+        academicYearId,
       },
+      select: { id: true },
     });
+    if (duplicate) {
+      throw this.duplicateConflict(
+        this.displayTeacherName(teacher),
+        subject.name,
+        classEntity.name,
+        academicYear.name,
+      );
+    }
+
+    try {
+      return await this.prisma.teachingAssignment.create({
+        data: {
+          teacherId: resolvedUserId,
+          subjectId,
+          classId,
+          academicYearId,
+          schoolId,
+        },
+      });
+    } catch (error) {
+      if (this.isUniqueViolation(error)) {
+        throw this.duplicateConflict(
+          this.displayTeacherName(teacher),
+          subject.name,
+          classEntity.name,
+          academicYear.name,
+        );
+      }
+      throw error;
+    }
   }
 
   async findAll(schoolId: string, page = 1, limit = 100) {
@@ -157,6 +219,33 @@ export class TeachingAssignmentService {
     if (!classEntity || classEntity.schoolId !== schoolId) throw new ForbiddenException('Invalid class');
     if (!academicYear || academicYear.schoolId !== schoolId) throw new ForbiddenException('Invalid academic year');
 
-    return this.prisma.teachingAssignment.update({ where: { id }, data });
+    // Moving THIS assignment onto a teacher+class+subject+year combination that
+    // already exists on a DIFFERENT assignment row would violate the unique
+    // constraint — give the Director a clear message instead of a 500.
+    const duplicate = await this.prisma.teachingAssignment.findFirst({
+      where: {
+        schoolId,
+        teacherId: data.teacherId,
+        classId: data.classId,
+        subjectId: data.subjectId,
+        academicYearId: data.academicYearId,
+        id: { not: id },
+      },
+      select: { id: true },
+    });
+    if (duplicate) {
+      const teacherName = [teacher.firstName, teacher.lastName].filter(Boolean).join(' ').trim() || 'This teacher';
+      throw this.duplicateConflict(teacherName, subject.name, classEntity.name, academicYear.name);
+    }
+
+    try {
+      return await this.prisma.teachingAssignment.update({ where: { id }, data });
+    } catch (error) {
+      if (this.isUniqueViolation(error)) {
+        const teacherName = [teacher.firstName, teacher.lastName].filter(Boolean).join(' ').trim() || 'This teacher';
+        throw this.duplicateConflict(teacherName, subject.name, classEntity.name, academicYear.name);
+      }
+      throw error;
+    }
   }
 }
