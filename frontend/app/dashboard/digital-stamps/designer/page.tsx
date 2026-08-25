@@ -14,6 +14,7 @@ interface LayerDraft {
   x: number; y: number; rotation: number; opacity: number; zIndex: number;
   fontFamily: string; fontSize: number; fontWeight: string; letterSpacing: number; color: string;
   curveRadius?: number; startAngle?: number; endAngle?: number;
+  autoFit?: boolean;
   assetId?: string; width?: number; height?: number;
   showTime?: boolean; label?: string;
 }
@@ -24,6 +25,36 @@ interface TemplateRow {
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const CANVAS = 600;
+
+/**
+ * Calculate the maximum font size that fits the full text on a curved arc.
+ * Uses the SVG arc length and a per-character width estimate that accounts
+ * for font family, weight and letter-spacing.
+ */
+function fitCurvedTextToArc(
+  content: string,
+  fontSize: number,
+  letterSpacing: number,
+  fontFamily: string,
+  fontWeight: string,
+  curveRadius: number,
+  startAngle: number,
+  endAngle: number,
+): number {
+  if (!content) return fontSize;
+  const arcLength = curveRadius * Math.abs(endAngle - startAngle) * (Math.PI / 180);
+  // Character width factor: bold serif is widest, sans is slightly narrower
+  const isSerif = fontFamily.toLowerCase().includes('serif');
+  const isBold = fontWeight === 'bold';
+  const charWidthFactor = isSerif ? (isBold ? 0.60 : 0.55) : (isBold ? 0.54 : 0.50);
+  const charCount = content.length;
+  // Total text width = sum of (charWidth * fontSize) + (charCount - 1) * letterSpacing
+  const textWidth = charCount * charWidthFactor * fontSize + (charCount - 1) * letterSpacing;
+  if (textWidth <= arcLength) return fontSize; // already fits
+  // Solve for the font size that makes textWidth == arcLength
+  const optimal = (arcLength - (charCount - 1) * letterSpacing) / (charCount * charWidthFactor);
+  return Math.max(8, Math.floor(optimal));
+}
 
 const defaultLayers = (): LayerDraft[] => ([
   { id: uid(), type: 'curved-text', name: 'Top arc — institution name', enabled: true, content: 'INSTITUTION NAME', x: 300, y: 120, rotation: 0, opacity: 1, zIndex: 10, fontFamily: 'serif', fontSize: 40, fontWeight: 'bold', letterSpacing: 4, color: '#123456', curveRadius: 225, startAngle: -155, endAngle: -25 },
@@ -121,6 +152,21 @@ export default function StampDesignerPage() {
   }), [shapeType, outerRadius, shapeWidth, shapeHeight, innerRingRadius, borderWidth, borderColor, borderCount, innerRing, innerRingDashed, inkOpacity, texture, watermarkText, layers]);
 
   const assetIds = useMemo(() => layers.filter(l => l.enabled && l.type === 'image' && l.assetId).map(l => l.assetId as string), [layers]);
+
+  // ── Auto-fit curved text font size when autoFit is enabled ──
+  useEffect(() => {
+    let changed = false;
+    const next = layers.map(l => {
+      if (l.type !== 'curved-text' || !l.autoFit || !l.content) return l;
+      const optimal = fitCurvedTextToArc(
+        l.content, l.fontSize, l.letterSpacing, l.fontFamily, l.fontWeight,
+        l.curveRadius ?? 225, l.startAngle ?? -150, l.endAngle ?? -30,
+      );
+      if (optimal !== l.fontSize) { changed = true; return { ...l, fontSize: optimal }; }
+      return l;
+    });
+    if (changed) setLayers(next);
+  }, [layers]);
 
   // ── Debounced server-rendered live preview with retry ──
   useEffect(() => {
@@ -502,11 +548,35 @@ export default function StampDesignerPage() {
                     <input value={selected.content || ''} onChange={e => updateLayer(selected.id, { content: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
                   </label>
                   {selected.type === 'curved-text' && (
-                    <div className="grid grid-cols-3 gap-2">
-                      <label className="text-xs text-gray-600">Radius<input type="number" value={selected.curveRadius ?? 225} onChange={e => updateLayer(selected.id, { curveRadius: parseInt(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1 text-sm" /></label>
-                      <label className="text-xs text-gray-600">Start°<input type="number" value={selected.startAngle ?? -150} onChange={e => updateLayer(selected.id, { startAngle: parseInt(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1 text-sm" /></label>
-                      <label className="text-xs text-gray-600">End°<input type="number" value={selected.endAngle ?? -30} onChange={e => updateLayer(selected.id, { endAngle: parseInt(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1 text-sm" /></label>
-                    </div>
+                    <>
+                      <div className="grid grid-cols-3 gap-2">
+                        <label className="text-xs text-gray-600">Radius<input type="number" value={selected.curveRadius ?? 225} onChange={e => updateLayer(selected.id, { curveRadius: parseInt(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1 text-sm" /></label>
+                        <label className="text-xs text-gray-600">Start°<input type="number" value={selected.startAngle ?? -150} onChange={e => updateLayer(selected.id, { startAngle: parseInt(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1 text-sm" /></label>
+                        <label className="text-xs text-gray-600">End°<input type="number" value={selected.endAngle ?? -30} onChange={e => updateLayer(selected.id, { endAngle: parseInt(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1 text-sm" /></label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-1 text-xs text-gray-600">
+                          <input type="checkbox" checked={Boolean(selected.autoFit)} onChange={e => updateLayer(selected.id, { autoFit: e.target.checked })} />
+                          Auto-fit font size
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!selected.content) return;
+                            const optimal = fitCurvedTextToArc(
+                              selected.content, selected.fontSize, selected.letterSpacing,
+                              selected.fontFamily, selected.fontWeight,
+                              selected.curveRadius ?? 225, selected.startAngle ?? -150, selected.endAngle ?? -30,
+                            );
+                            updateLayer(selected.id, { fontSize: optimal, autoFit: true });
+                          }}
+                          className="px-2 py-0.5 text-[10px] border rounded hover:bg-blue-50 text-blue-700"
+                        >
+                          Fit to arc
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-gray-400 -mt-1">Shrinks font to fit full text on the arc while preserving letter-spacing.</p>
+                    </>
                   )}
                 </>
               )}
