@@ -855,15 +855,15 @@ export default function StampDesignerPage() {
               {shapeType !== 'circle' && !selectedId && (
                 <>
                   {/* Edge handles */}
-                  <div onMouseDown={e => handleResizeStart('left', e)} className="absolute left-0 top-1/2 -translate-y-1/2 w-2 h-12 cursor-ew-resize hover:bg-blue-400/40 rounded-sm z-10" />
-                  <div onMouseDown={e => handleResizeStart('right', e)} className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-12 cursor-ew-resize hover:bg-blue-400/40 rounded-sm z-10" />
-                  <div onMouseDown={e => handleResizeStart('top', e)} className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-2 cursor-ns-resize hover:bg-blue-400/40 rounded-sm z-10" />
-                  <div onMouseDown={e => handleResizeStart('bottom', e)} className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-2 cursor-ns-resize hover:bg-blue-400/40 rounded-sm z-10" />
+                  <div onMouseDown={e => handleResizeStart('left', e)} className="absolute left-0 top-1/2 -translate-y-1/2 w-2 h-12 cursor-ew-resize bg-blue-400/20 hover:bg-blue-400/60 rounded-sm z-10" />
+                  <div onMouseDown={e => handleResizeStart('right', e)} className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-12 cursor-ew-resize bg-blue-400/20 hover:bg-blue-400/60 rounded-sm z-10" />
+                  <div onMouseDown={e => handleResizeStart('top', e)} className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-2 cursor-ns-resize bg-blue-400/20 hover:bg-blue-400/60 rounded-sm z-10" />
+                  <div onMouseDown={e => handleResizeStart('bottom', e)} className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-2 cursor-ns-resize bg-blue-400/20 hover:bg-blue-400/60 rounded-sm z-10" />
                   {/* Corner handles */}
-                  <div onMouseDown={e => handleResizeStart('tl', e)} className="absolute top-0 left-0 w-3 h-3 cursor-nwse-resize hover:bg-blue-500/50 rounded-sm z-10" />
-                  <div onMouseDown={e => handleResizeStart('tr', e)} className="absolute top-0 right-0 w-3 h-3 cursor-nesw-resize hover:bg-blue-500/50 rounded-sm z-10" />
-                  <div onMouseDown={e => handleResizeStart('bl', e)} className="absolute bottom-0 left-0 w-3 h-3 cursor-nesw-resize hover:bg-blue-500/50 rounded-sm z-10" />
-                  <div onMouseDown={e => handleResizeStart('br', e)} className="absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize hover:bg-blue-500/50 rounded-sm z-10" />
+                  <div onMouseDown={e => handleResizeStart('tl', e)} className="absolute top-0 left-0 w-3 h-3 cursor-nwse-resize bg-blue-500/30 hover:bg-blue-500/70 rounded-sm z-10" />
+                  <div onMouseDown={e => handleResizeStart('tr', e)} className="absolute top-0 right-0 w-3 h-3 cursor-nesw-resize bg-blue-500/30 hover:bg-blue-500/70 rounded-sm z-10" />
+                  <div onMouseDown={e => handleResizeStart('bl', e)} className="absolute bottom-0 left-0 w-3 h-3 cursor-nesw-resize bg-blue-500/30 hover:bg-blue-500/70 rounded-sm z-10" />
+                  <div onMouseDown={e => handleResizeStart('br', e)} className="absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize bg-blue-500/30 hover:bg-blue-500/70 rounded-sm z-10" />
                 </>
               )}
             </div>
