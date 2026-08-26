@@ -44,8 +44,9 @@ export default function IssueOfficialDocumentPage() {
     stampEngineApi.listTemplates().then(r => {
       const list = (r.data.templates || []).filter((t: any) => t.status === 'PUBLISHED');
       setTemplates(list);
-      const def = list.find((t: any) => t.isDefault);
-      if (def) setTemplateId(def.id);
+      const requestedId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('templateId') : null;
+      const selected = list.find((t: any) => t.id === requestedId) || list.find((t: any) => t.isDefault);
+      if (selected) setTemplateId(selected.id);
     }).catch(() => undefined);
   }, []);
 

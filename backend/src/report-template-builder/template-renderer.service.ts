@@ -4,6 +4,8 @@ import { CertificateRendererService } from './certificate-renderer.service';
 import { DigitalStampService } from './digital-stamp.service';
 import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
 import { VerificationService } from '../stamp-engine/verification.service';
+import { StampTemplateService } from '../stamp-engine/stamp-template.service';
+import { StampRendererService } from '../stamp-engine/stamp-renderer.service';
 import * as puppeteer from 'puppeteer';
 import * as handlebars from 'handlebars';
 import * as fs from 'fs';
@@ -21,6 +23,8 @@ export class TemplateRendererService {
     private cloudinary: CloudinaryService,
     private certificateRenderer: CertificateRendererService,
     private verification: VerificationService,
+    private stampTemplates: StampTemplateService,
+    private stampRenderer: StampRendererService,
   ) {}
 
   async getSchool(schoolId: string) {
@@ -998,7 +1002,8 @@ export class TemplateRendererService {
       templateMetadata.source === 'marketplace-download'
     );
     if (isProfessionalHbs) {
-      return this.renderProfessionalHbsPreview(renderTemplate, defaultData, school);
+      const html = this.renderProfessionalHbsPreview(renderTemplate, defaultData, school);
+      return this.applyDefaultStamp(schoolId, html);
     }
 
     const pageSize = renderTemplate.pageSize || 'A4';
@@ -1079,7 +1084,7 @@ export class TemplateRendererService {
     const pageWidth = isLandscape ? '297mm' : '210mm';
     const pageHeight = isLandscape ? '210mm' : '297mm';
 
-    return `<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
@@ -1101,6 +1106,22 @@ export class TemplateRendererService {
   ${renderTemplate.footerText ? `<div style="text-align:center;margin-top:10px;font-size:11px;color:#4b5563;border-top:1px solid #9ca3af;padding-top:5px;">${renderTemplate.footerText}</div>` : ''}
 </body>
 </html>`;
+    return this.applyDefaultStamp(schoolId, html);
+  }
+
+  /** Apply the school's published default Stamp Designer template to every generated page. */
+  async applyDefaultStamp(schoolId: string | undefined, html: string): Promise<string> {
+    if (!schoolId) return html;
+    try {
+      const defaultTemplate = await this.stampTemplates.getDefault(schoolId);
+      if (!defaultTemplate) return html;
+      const template = await this.stampTemplates.getById(schoolId, defaultTemplate.id);
+      const svg = this.stampRenderer.render(template.configJson as any, { assets: {} });
+      const overlay = `<div style="position:fixed;right:18mm;bottom:18mm;width:42mm;height:42mm;z-index:9999;pointer-events:none;">${svg}</div>`;
+      return html.includes('</body>') ? html.replace('</body>', `${overlay}</body>`) : `${html}${overlay}`;
+    } catch {
+      return html;
+    }
   }
 
   private renderProfessionalHbsPreview(template: any, data: any, school?: any): string {

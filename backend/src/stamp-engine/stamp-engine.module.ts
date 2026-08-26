@@ -48,6 +48,7 @@ import { AuthenticationPipelineService } from './authentication-pipeline.service
   exports: [
     // Composable building blocks for other modules (report-engine, report-queue…)
     StampRendererService,
+    StampTemplateService,
     SerialNumberService,
     DocumentHashService,
     VerificationService,

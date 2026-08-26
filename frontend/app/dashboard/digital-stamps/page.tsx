@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { digitalStampApi } from '@/lib/api';
+import { digitalStampApi, stampEngineApi } from '@/lib/api';
 import { DigitalStamp, StampPreview } from '@/components/stamps/DigitalStamp';
 import type { DigitalStamp as StampType, DocumentStamp, ApprovalRequest, StampConfig } from '@/types/stamps';
 import { STAMP_COLORS } from '@/types/stamps';
@@ -17,6 +17,7 @@ export default function DigitalStampsPage() {
 
   const [activeTab, setActiveTab] = useState<'stamps' | 'documents' | 'approvals'>('stamps');
   const [stamps, setStamps] = useState<StampType[]>([]);
+  const [engineTemplates, setEngineTemplates] = useState<any[]>([]);
   const [stampedDocs, setStampedDocs] = useState<DocumentStamp[]>([]);
   const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,8 +31,9 @@ export default function DigitalStampsPage() {
 
   const loadData = async () => {
     try {
-      const [stampsRes, docsRes, approvalsRes] = await Promise.allSettled([
+      const [stampsRes, templatesRes, docsRes, approvalsRes] = await Promise.allSettled([
         digitalStampApi.getStamps(),
+        stampEngineApi.listTemplates(),
         digitalStampApi.getStampedDocuments(),
         (isDirector || isAdmin) ? digitalStampApi.getApprovalRequests() : Promise.resolve({ data: [] }),
       ]);
@@ -39,6 +41,10 @@ export default function DigitalStampsPage() {
       if (stampsRes.status === 'fulfilled') {
         const data = stampsRes.value.data?.stamps ?? stampsRes.value.data ?? [];
         setStamps(Array.isArray(data) ? data : []);
+      }
+      if (templatesRes.status === 'fulfilled') {
+        const data = templatesRes.value.data?.templates ?? templatesRes.value.data ?? [];
+        setEngineTemplates(Array.isArray(data) ? data.filter((template: any) => template.status === 'PUBLISHED') : []);
       }
       if (docsRes.status === 'fulfilled') {
         const data = docsRes.value.data?.documents ?? docsRes.value.data ?? [];
@@ -133,6 +139,40 @@ export default function DigitalStampsPage() {
 
       {activeTab === 'stamps' && (
         <div>
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Stamp Designer Templates</h2>
+                <p className="text-sm text-gray-500">Published templates created in Stamp Designer</p>
+              </div>
+              <span className="text-sm text-gray-500">{engineTemplates.length} templates</span>
+            </div>
+            {engineTemplates.length === 0 ? (
+              <div className="text-center py-8 bg-white rounded-xl border border-gray-200">
+                <p className="text-gray-500 font-medium">No published designer templates</p>
+                <p className="text-sm text-gray-400 mt-1">Publish a design and set it as Default to apply it to generated documents.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {engineTemplates.map(template => (
+                  <div key={template.id} className="bg-white rounded-xl border border-gray-200 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-gray-900">{template.name}</p>
+                        <p className="text-xs text-gray-500 mt-1">Version {template.version}</p>
+                      </div>
+                      {template.isDefault && <span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">Default</span>}
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                      <Link href="/dashboard/digital-stamps/designer" className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50">Edit in Designer</Link>
+                      <Link href={`/dashboard/digital-stamps/issue?templateId=${template.id}`} className="text-xs px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Use Template</Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Available Stamps</h2>
             <span className="text-sm text-gray-500">{stamps.length} stamps</span>

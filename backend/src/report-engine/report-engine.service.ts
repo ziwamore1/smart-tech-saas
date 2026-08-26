@@ -1000,7 +1000,7 @@ export class ReportEngineService {
       content,
       orientation: 'portrait',
     });
-    const buffer = await this.renderHtmlToPdf(html);
+    const buffer = await this.renderHtmlToPdf(html, request.schoolId);
     const result = await this.cloudinary.uploadBuffer(buffer, {
       folder: `${FOLDERS.system}/reports`,
       publicId: `performance-${request.studentId}-${request.termId}-${Date.now()}`,
@@ -1184,7 +1184,7 @@ export class ReportEngineService {
       orientation: 'landscape',
     });
 
-    const buffer = await this.renderHtmlToPdf(html);
+    const buffer = await this.renderHtmlToPdf(html, request.schoolId);
     const result = await this.cloudinary.uploadBuffer(buffer, {
       folder: `${FOLDERS.system}/reports`,
       publicId: `attendance-${request.termId}-${Date.now()}`,
@@ -1620,7 +1620,7 @@ export class ReportEngineService {
       orientation: 'landscape',
     });
 
-    const buffer = await this.renderHtmlToPdf(html);
+    const buffer = await this.renderHtmlToPdf(html, request.schoolId);
     const result = await this.cloudinary.uploadBuffer(buffer, {
       folder: `${FOLDERS.system}/reports`,
       publicId: `analytics-${request.termId}-${Date.now()}`,
@@ -1782,7 +1782,7 @@ export class ReportEngineService {
       orientation: 'landscape',
     });
 
-    const buffer = await this.renderHtmlToPdf(html);
+    const buffer = await this.renderHtmlToPdf(html, request.schoolId);
     const result = await this.cloudinary.uploadBuffer(buffer, {
       folder: `${FOLDERS.system}/reports`,
       publicId: `mark-schedule-${request.classId}-${request.termId}-${Date.now()}`,
@@ -1896,7 +1896,7 @@ export class ReportEngineService {
       ]) + content,
       orientation: 'landscape',
     });
-    const buffer = await this.renderHtmlToPdf(html);
+    const buffer = await this.renderHtmlToPdf(html, request.schoolId);
     const result = await this.cloudinary.uploadBuffer(buffer, {
       folder: `${FOLDERS.system}/reports`,
       publicId: `results-analysis-${request.classId}-${request.termId}-${Date.now()}`,
@@ -1945,12 +1945,12 @@ export class ReportEngineService {
       ]) + `<div class="summary-grid"><div class="summary-card"><div class="summary-value">${validRankings.length}</div><div class="summary-label">Students Ranked</div></div><div class="summary-card"><div class="summary-value">${average.toFixed(1)}%</div><div class="summary-label">Class Average</div></div><div class="summary-card"><div class="summary-value pass">${validRankings.length ? (passCount / validRankings.length * 100).toFixed(1) : '0.0'}%</div><div class="summary-label">Pass Rate</div></div><div class="summary-card"><div class="summary-value" style="color:#7c3aed">${distinctionCount}</div><div class="summary-label">Distinction (75%+)</div></div><div class="summary-card"><div class="summary-value fail">${atRiskCount}</div><div class="summary-label">At Risk (&lt;40%)</div></div></div><div class="section-title">Top Three Performers</div><div class="summary-grid">${podium || '<p>No ranked students available.</p>'}</div><div class="section-title">Full Class Ranking</div><table><thead><tr><th class="text-center">Rank</th><th>Student</th><th>Admission No.</th><th class="text-center">Gender</th><th class="text-center">Average</th><th class="text-center">Grade</th><th class="text-center">Subjects</th><th class="text-center">Percentile</th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="text-center">No ranking data available.</td></tr>'}</tbody></table>`,
       orientation: 'portrait',
     });
-    const buffer = await this.renderHtmlToPdf(html);
+    const buffer = await this.renderHtmlToPdf(html, request.schoolId);
     const result = await this.cloudinary.uploadBuffer(buffer, { folder: `${FOLDERS.system}/reports`, publicId: `ranking-${request.classId}-${request.termId}-${Date.now()}`, resourceType: 'raw' });
     return { buffer, url: result.secureUrl, publicId: result.publicId };
   }
 
-  private async renderHtmlToPdf(html: string): Promise<Buffer> {
+  private async renderHtmlToPdf(html: string, schoolId: string): Promise<Buffer> {
     const puppeteer = await import('puppeteer');
     const os = await import('os');
     const crypto = await import('crypto');
@@ -1967,7 +1967,8 @@ export class ReportEngineService {
 
     const page = await browser.newPage();
     page.setDefaultTimeout(60000);
-    await page.setContent(this.enforceMinimumFontSize(html), { waitUntil: 'networkidle0' as any });
+    const stampedHtml = await this.templateRenderer.applyDefaultStamp(schoolId, html);
+    await page.setContent(this.enforceMinimumFontSize(stampedHtml), { waitUntil: 'networkidle0' as any });
 
     const pdf = await page.pdf({
       format: 'A4',
