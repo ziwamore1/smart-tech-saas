@@ -852,20 +852,24 @@ export default function StampDesignerPage() {
                 className="w-full h-full flex items-center justify-center"
                 dangerouslySetInnerHTML={{ __html: svg || '<span style="color:#9ca3af;font-size:13px">Rendering…</span>' }}
               />
-              {shapeType !== 'circle' && !selectedId && (
-                <>
-                  {/* Edge handles */}
-                  <div onMouseDown={e => handleResizeStart('left', e)} className="absolute left-0 top-1/2 -translate-y-1/2 w-2 h-12 cursor-ew-resize bg-blue-400/20 hover:bg-blue-400/60 rounded-sm z-10" />
-                  <div onMouseDown={e => handleResizeStart('right', e)} className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-12 cursor-ew-resize bg-blue-400/20 hover:bg-blue-400/60 rounded-sm z-10" />
-                  <div onMouseDown={e => handleResizeStart('top', e)} className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-2 cursor-ns-resize bg-blue-400/20 hover:bg-blue-400/60 rounded-sm z-10" />
-                  <div onMouseDown={e => handleResizeStart('bottom', e)} className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-2 cursor-ns-resize bg-blue-400/20 hover:bg-blue-400/60 rounded-sm z-10" />
-                  {/* Corner handles */}
-                  <div onMouseDown={e => handleResizeStart('tl', e)} className="absolute top-0 left-0 w-3 h-3 cursor-nwse-resize bg-blue-500/30 hover:bg-blue-500/70 rounded-sm z-10" />
-                  <div onMouseDown={e => handleResizeStart('tr', e)} className="absolute top-0 right-0 w-3 h-3 cursor-nesw-resize bg-blue-500/30 hover:bg-blue-500/70 rounded-sm z-10" />
-                  <div onMouseDown={e => handleResizeStart('bl', e)} className="absolute bottom-0 left-0 w-3 h-3 cursor-nesw-resize bg-blue-500/30 hover:bg-blue-500/70 rounded-sm z-10" />
-                  <div onMouseDown={e => handleResizeStart('br', e)} className="absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize bg-blue-500/30 hover:bg-blue-500/70 rounded-sm z-10" />
-                </>
-              )}
+              {shapeType !== 'circle' && !selectedId && (() => {
+                const shapeLeft = ((600 - shapeWidth) / 2 / 600) * 100;
+                const shapeTop = ((600 - shapeHeight) / 2 / 600) * 100;
+                const shapeRight = ((600 + shapeWidth) / 2 / 600) * 100;
+                const shapeBottom = ((600 + shapeHeight) / 2 / 600) * 100;
+                return (
+                  <>
+                    <div onMouseDown={e => handleResizeStart('left', e)} className="absolute -translate-x-1/2 cursor-ew-resize bg-blue-500/40 hover:bg-blue-500/80 rounded-full z-20" style={{ left: `${shapeLeft}%`, top: '50%', transform: 'translate(-50%, -50%)', width: 10, height: 40 }} />
+                    <div onMouseDown={e => handleResizeStart('right', e)} className="absolute translate-x-1/2 cursor-ew-resize bg-blue-500/40 hover:bg-blue-500/80 rounded-full z-20" style={{ left: `${shapeRight}%`, top: '50%', transform: 'translate(-50%, -50%)', width: 10, height: 40 }} />
+                    <div onMouseDown={e => handleResizeStart('top', e)} className="absolute -translate-y-1/2 cursor-ns-resize bg-blue-500/40 hover:bg-blue-500/80 rounded-full z-20" style={{ top: `${shapeTop}%`, left: '50%', transform: 'translate(-50%, -50%)', width: 40, height: 10 }} />
+                    <div onMouseDown={e => handleResizeStart('bottom', e)} className="absolute translate-y-1/2 cursor-ns-resize bg-blue-500/40 hover:bg-blue-500/80 rounded-full z-20" style={{ top: `${shapeBottom}%`, left: '50%', transform: 'translate(-50%, -50%)', width: 40, height: 10 }} />
+                    <div onMouseDown={e => handleResizeStart('tl', e)} className="absolute cursor-nwse-resize bg-blue-600/50 hover:bg-blue-600 rounded-full z-20" style={{ left: `${shapeLeft}%`, top: `${shapeTop}%`, transform: 'translate(-50%, -50%)', width: 12, height: 12 }} />
+                    <div onMouseDown={e => handleResizeStart('tr', e)} className="absolute cursor-nesw-resize bg-blue-600/50 hover:bg-blue-600 rounded-full z-20" style={{ left: `${shapeRight}%`, top: `${shapeTop}%`, transform: 'translate(-50%, -50%)', width: 12, height: 12 }} />
+                    <div onMouseDown={e => handleResizeStart('bl', e)} className="absolute cursor-nesw-resize bg-blue-600/50 hover:bg-blue-600 rounded-full z-20" style={{ left: `${shapeLeft}%`, top: `${shapeBottom}%`, transform: 'translate(-50%, -50%)', width: 12, height: 12 }} />
+                    <div onMouseDown={e => handleResizeStart('br', e)} className="absolute cursor-nwse-resize bg-blue-600/50 hover:bg-blue-600 rounded-full z-20" style={{ left: `${shapeRight}%`, top: `${shapeBottom}%`, transform: 'translate(-50%, -50%)', width: 12, height: 12 }} />
+                  </>
+                );
+              })()}
             </div>
             <p className="text-[11px] text-gray-400 mt-3 text-center">
               Finalised documents receive the authoritative date/time and serial number from the server.
