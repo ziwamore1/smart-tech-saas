@@ -356,8 +356,8 @@ export default function StampDesignerPage() {
           if (handle === 'top') newInset = resizeStart.current.innerVal + dy;
           if (handle === 'bottom') newInset = resizeStart.current.innerVal - dy;
           if (handle.length === 2) newInset = resizeStart.current.innerVal + (dx + dy) / 2;
-          const maxInset = Math.floor(Math.min(shapeWidth, shapeHeight) / 2) - 10;
-          setInnerInset(Math.round(Math.max(5, Math.min(maxInset, newInset))));
+          const maxInset = Math.floor(Math.min(shapeWidth, shapeHeight) / 2) - 2;
+          setInnerInset(Math.round(Math.max(0, Math.min(maxInset, newInset))));
         } else {
           let newW = shapeWidth;
           let newH = shapeHeight;
@@ -693,7 +693,7 @@ export default function StampDesignerPage() {
                 </label>
                 <label className="block text-xs font-medium text-gray-600">Inner inset
                   <div className="flex items-center gap-2 mt-1">
-                    <input type="range" min={5} max={Math.floor(Math.min(shapeWidth, shapeHeight) / 2) - 10} step={1} value={innerInset}
+                    <input type="range" min={0} max={Math.floor(Math.min(shapeWidth, shapeHeight) / 2) - 2} step={1} value={innerInset}
                       onChange={e => setInnerInset(parseInt(e.target.value))}
                       className="flex-1" />
                     <span className="text-xs text-gray-500 w-10 text-right">{innerInset}</span>
@@ -707,20 +707,19 @@ export default function StampDesignerPage() {
             <h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Logo / Emblem</h2>
             <input type="file" accept=".png,.svg,.webp" onChange={e => handleUploadAsset(e.target.files?.[0] as File)} className="block w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700" />
             <p className="text-[11px] text-gray-400">PNG / SVG / WebP · transparency preserved · upload only assets your institution is authorised to use.</p>
-            {assets.length > 0 && (
-              <select
-                value={layers.find(l => l.type === 'image')?.assetId || ''}
-                onChange={e => {
-                  const logoLayer = layers.find(l => l.type === 'image');
-                  if (!logoLayer) return;
-                  updateLayer(logoLayer.id, { assetId: e.target.value, enabled: Boolean(e.target.value) });
-                }}
-                className="w-full border rounded-lg px-2 py-2 text-sm"
-              >
-                <option value="">— No logo —</option>
-                {assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-            )}
+            {assets.length > 0 && layers.filter(l => l.type === 'image').map(imgLayer => (
+              <div key={imgLayer.id} className="flex items-center gap-2">
+                <span className="text-[11px] text-gray-500 w-16 shrink-0 truncate">{imgLayer.name}</span>
+                <select
+                  value={imgLayer.assetId || ''}
+                  onChange={e => updateLayer(imgLayer.id, { assetId: e.target.value, enabled: Boolean(e.target.value) })}
+                  className="flex-1 border rounded-lg px-2 py-1.5 text-xs"
+                >
+                  <option value="">— None —</option>
+                  {assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+            ))}
           </section>
 
           <section className="bg-white rounded-xl border p-4">
@@ -856,6 +855,12 @@ export default function StampDesignerPage() {
                 <label>Colour<input type="color" value={selected.color} onChange={e => updateLayer(selected.id, { color: e.target.value })} className="mt-1 w-full h-8 rounded cursor-pointer" /></label>
                 <label>Opacity<input type="range" min={0.1} max={1} step={0.05} value={selected.opacity} onChange={e => updateLayer(selected.id, { opacity: parseFloat(e.target.value) })} className="mt-2 w-full" /></label>
               </div>
+              {selected.type === 'image' && (
+                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                  <label>Width<input type="number" min={10} max={300} value={selected.width ?? 130} onChange={e => updateLayer(selected.id, { width: parseInt(e.target.value) || 10 })} className="mt-1 w-full border rounded px-2 py-1" /></label>
+                  <label>Height<input type="number" min={10} max={300} value={selected.height ?? 130} onChange={e => updateLayer(selected.id, { height: parseInt(e.target.value) || 10 })} className="mt-1 w-full border rounded px-2 py-1" /></label>
+                </div>
+              )}
             </section>
           )}
         </div>
