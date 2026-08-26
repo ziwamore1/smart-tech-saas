@@ -134,8 +134,8 @@ export default function StampDesignerPage() {
 
   // ── Shape resize state ──
   const isResizing = useRef(false);
-  const resizeHandle = useRef<string>('');
-  const resizeStart = useRef({ mouseX: 0, mouseY: 0, w: 0, h: 0 });
+  const resizeHandleRef = useRef<string>('');
+  const resizeStart = useRef({ mouseX: 0, mouseY: 0, w: 0, h: 0, innerVal: 0 });
 
   const debounceRef = useRef<any>(null);
   const mountedRef = useRef(true);
@@ -299,49 +299,86 @@ export default function StampDesignerPage() {
   const handlePreviewMouseUp = useCallback(() => {
     isDragging.current = false;
     isResizing.current = false;
-    resizeHandle.current = '';
+    resizeHandleRef.current = '';
     setDragging(false);
   }, []);
 
   // ── Shape resize handlers ──
   const handleResizeStart = useCallback((handle: string, e: React.MouseEvent) => {
-    if (shapeType === 'circle') return;
     e.preventDefault();
     e.stopPropagation();
     isResizing.current = true;
-    resizeHandle.current = handle;
-    resizeStart.current = { mouseX: e.clientX, mouseY: e.clientY, w: shapeWidth, h: shapeHeight };
-  }, [shapeType, shapeWidth, shapeHeight]);
+    resizeHandleRef.current = handle;
+    const innerVal = handle.startsWith('i-')
+      ? (shapeType === 'circle' ? innerRingRadius : innerInset)
+      : 0;
+    resizeStart.current = { mouseX: e.clientX, mouseY: e.clientY, w: shapeWidth, h: shapeHeight, innerVal };
+  }, [shapeType, shapeWidth, shapeHeight, innerRingRadius, innerInset]);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!isResizing.current || !previewRef.current) return;
       const rect = previewRef.current.getBoundingClientRect();
-      const scaleX = shapeWidth / rect.width;
-      const scaleY = shapeHeight / rect.height;
+      const scaleX = CANVAS / rect.width;
+      const scaleY = CANVAS / rect.height;
       const dx = (e.clientX - resizeStart.current.mouseX) * scaleX;
       const dy = (e.clientY - resizeStart.current.mouseY) * scaleY;
-      const h = resizeHandle.current;
-      let newW = shapeWidth;
-      let newH = shapeHeight;
-      if (h.includes('r') || h === 'right') newW = Math.max(100, Math.min(580, resizeStart.current.w + dx * 2));
-      if (h.includes('l') || h === 'left') newW = Math.max(100, Math.min(580, resizeStart.current.w - dx * 2));
-      if (h.includes('b') || h === 'bottom') newH = Math.max(100, Math.min(580, resizeStart.current.h + dy * 2));
-      if (h.includes('t') || h === 'top') newH = Math.max(100, Math.min(580, resizeStart.current.h - dy * 2));
-      if (h.length === 2) {
-        if (h.includes('r')) newW = Math.max(100, Math.min(580, resizeStart.current.w + dx * 2));
-        if (h.includes('l')) newW = Math.max(100, Math.min(580, resizeStart.current.w - dx * 2));
-        if (h.includes('b')) newH = Math.max(100, Math.min(580, resizeStart.current.h + dy * 2));
-        if (h.includes('t')) newH = Math.max(100, Math.min(580, resizeStart.current.h - dy * 2));
+      const h = resizeHandleRef.current;
+      const isInner = h.startsWith('i-');
+      const handle = h.replace(/^i-/, '');
+
+      if (shapeType === 'circle') {
+        if (isInner) {
+          let newR = resizeStart.current.innerVal;
+          if (handle.includes('r') || handle === 'right') newR = resizeStart.current.innerVal + dx;
+          if (handle.includes('l') || handle === 'left') newR = resizeStart.current.innerVal - dx;
+          if (handle.includes('b') || handle === 'bottom') newR = resizeStart.current.innerVal + dy;
+          if (handle.includes('t') || handle === 'top') newR = resizeStart.current.innerVal - dy;
+          if (handle.length === 2) newR = resizeStart.current.innerVal + (dx + dy) / 2;
+          setInnerRingRadius(Math.round(Math.max(40, Math.min(outerRadius - 10, newR))));
+        } else {
+          let newR = outerRadius;
+          if (handle.includes('r') || handle === 'right') newR = resizeStart.current.w / 2 + dx;
+          if (handle.includes('l') || handle === 'left') newR = resizeStart.current.w / 2 - dx;
+          if (handle.includes('b') || handle === 'bottom') newR = resizeStart.current.h / 2 + dy;
+          if (handle.includes('t') || handle === 'top') newR = resizeStart.current.h / 2 - dy;
+          if (handle.length === 2) newR = resizeStart.current.w / 2 + (dx + dy) / 2;
+          const clamped = Math.round(Math.max(80, Math.min(290, newR)));
+          setOuterRadius(clamped);
+          setShapeWidth(clamped * 2);
+          setShapeHeight(clamped * 2);
+        }
+      } else {
+        if (isInner) {
+          let newInset = resizeStart.current.innerVal;
+          if (handle === 'left') newInset = resizeStart.current.innerVal + dx;
+          if (handle === 'right') newInset = resizeStart.current.innerVal - dx;
+          if (handle === 'top') newInset = resizeStart.current.innerVal + dy;
+          if (handle === 'bottom') newInset = resizeStart.current.innerVal - dy;
+          if (handle.length === 2) newInset = resizeStart.current.innerVal + (dx + dy) / 2;
+          const maxInset = Math.floor(Math.min(shapeWidth, shapeHeight) / 2) - 10;
+          setInnerInset(Math.round(Math.max(5, Math.min(maxInset, newInset))));
+        } else {
+          let newW = shapeWidth;
+          let newH = shapeHeight;
+          if (handle.includes('r') || handle === 'right') newW = resizeStart.current.w + dx * 2;
+          if (handle.includes('l') || handle === 'left') newW = resizeStart.current.w - dx * 2;
+          if (handle.includes('b') || handle === 'bottom') newH = resizeStart.current.h + dy * 2;
+          if (handle.includes('t') || handle === 'top') newH = resizeStart.current.h - dy * 2;
+          if (handle.length === 2) {
+            newW = resizeStart.current.w + dx * 2;
+            newH = resizeStart.current.h + dy * 2;
+          }
+          setShapeWidth(Math.round(Math.max(100, Math.min(580, newW)) / 2) * 2);
+          setShapeHeight(Math.round(Math.max(100, Math.min(580, newH)) / 2) * 2);
+        }
       }
-      setShapeWidth(Math.round(newW / 2) * 2);
-      setShapeHeight(Math.round(newH / 2) * 2);
     };
-    const onUp = () => { isResizing.current = false; resizeHandle.current = ''; };
+    const onUp = () => { isResizing.current = false; resizeHandleRef.current = ''; };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-  }, [shapeWidth, shapeHeight, shapeType]);
+  }, [shapeWidth, shapeHeight, shapeType, outerRadius, innerRingRadius, innerInset]);
 
   // ── Keyboard nudge ──
   useEffect(() => {
@@ -852,21 +889,45 @@ export default function StampDesignerPage() {
                 className="w-full h-full flex items-center justify-center"
                 dangerouslySetInnerHTML={{ __html: svg || '<span style="color:#9ca3af;font-size:13px">Rendering…</span>' }}
               />
-              {shapeType !== 'circle' && !selectedId && (() => {
-                const shapeLeft = ((600 - shapeWidth) / 2 / 600) * 100;
-                const shapeTop = ((600 - shapeHeight) / 2 / 600) * 100;
-                const shapeRight = ((600 + shapeWidth) / 2 / 600) * 100;
-                const shapeBottom = ((600 + shapeHeight) / 2 / 600) * 100;
+              {!selectedId && (() => {
+                const isCircle = shapeType === 'circle';
+                const oR = isCircle ? outerRadius : shapeWidth / 2;
+                const oRB = isCircle ? outerRadius : shapeHeight / 2;
+                const oL = ((300 - oR) / 600) * 100;
+                const oT = ((300 - oRB) / 600) * 100;
+                const oRr = ((300 + oR) / 600) * 100;
+                const oB = ((300 + oRB) / 600) * 100;
+                const iRad = isCircle ? innerRingRadius : 0;
+                const iInset = isCircle ? 0 : innerInset;
+                const iL = ((300 - (isCircle ? iRad : shapeWidth / 2 - iInset)) / 600) * 100;
+                const iT = ((300 - (isCircle ? iRad : shapeHeight / 2 - iInset)) / 600) * 100;
+                const iRr = ((300 + (isCircle ? iRad : shapeWidth / 2 - iInset)) / 600) * 100;
+                const iB = ((300 + (isCircle ? iRad : shapeHeight / 2 - iInset)) / 600) * 100;
+                const showInner = isCircle ? innerRing : true;
                 return (
                   <>
-                    <div onMouseDown={e => handleResizeStart('left', e)} className="absolute -translate-x-1/2 cursor-ew-resize bg-blue-500/40 hover:bg-blue-500/80 rounded-full z-20" style={{ left: `${shapeLeft}%`, top: '50%', transform: 'translate(-50%, -50%)', width: 10, height: 40 }} />
-                    <div onMouseDown={e => handleResizeStart('right', e)} className="absolute translate-x-1/2 cursor-ew-resize bg-blue-500/40 hover:bg-blue-500/80 rounded-full z-20" style={{ left: `${shapeRight}%`, top: '50%', transform: 'translate(-50%, -50%)', width: 10, height: 40 }} />
-                    <div onMouseDown={e => handleResizeStart('top', e)} className="absolute -translate-y-1/2 cursor-ns-resize bg-blue-500/40 hover:bg-blue-500/80 rounded-full z-20" style={{ top: `${shapeTop}%`, left: '50%', transform: 'translate(-50%, -50%)', width: 40, height: 10 }} />
-                    <div onMouseDown={e => handleResizeStart('bottom', e)} className="absolute translate-y-1/2 cursor-ns-resize bg-blue-500/40 hover:bg-blue-500/80 rounded-full z-20" style={{ top: `${shapeBottom}%`, left: '50%', transform: 'translate(-50%, -50%)', width: 40, height: 10 }} />
-                    <div onMouseDown={e => handleResizeStart('tl', e)} className="absolute cursor-nwse-resize bg-blue-600/50 hover:bg-blue-600 rounded-full z-20" style={{ left: `${shapeLeft}%`, top: `${shapeTop}%`, transform: 'translate(-50%, -50%)', width: 12, height: 12 }} />
-                    <div onMouseDown={e => handleResizeStart('tr', e)} className="absolute cursor-nesw-resize bg-blue-600/50 hover:bg-blue-600 rounded-full z-20" style={{ left: `${shapeRight}%`, top: `${shapeTop}%`, transform: 'translate(-50%, -50%)', width: 12, height: 12 }} />
-                    <div onMouseDown={e => handleResizeStart('bl', e)} className="absolute cursor-nesw-resize bg-blue-600/50 hover:bg-blue-600 rounded-full z-20" style={{ left: `${shapeLeft}%`, top: `${shapeBottom}%`, transform: 'translate(-50%, -50%)', width: 12, height: 12 }} />
-                    <div onMouseDown={e => handleResizeStart('br', e)} className="absolute cursor-nwse-resize bg-blue-600/50 hover:bg-blue-600 rounded-full z-20" style={{ left: `${shapeRight}%`, top: `${shapeBottom}%`, transform: 'translate(-50%, -50%)', width: 12, height: 12 }} />
+                    {/* Outer handles (blue) */}
+                    <div onMouseDown={e => handleResizeStart('left', e)} className="absolute cursor-ew-resize bg-blue-500/40 hover:bg-blue-500/80 rounded-full z-20" style={{ left: `${oL}%`, top: '50%', transform: 'translate(-50%, -50%)', width: 10, height: 40 }} />
+                    <div onMouseDown={e => handleResizeStart('right', e)} className="absolute cursor-ew-resize bg-blue-500/40 hover:bg-blue-500/80 rounded-full z-20" style={{ left: `${oRr}%`, top: '50%', transform: 'translate(-50%, -50%)', width: 10, height: 40 }} />
+                    <div onMouseDown={e => handleResizeStart('top', e)} className="absolute cursor-ns-resize bg-blue-500/40 hover:bg-blue-500/80 rounded-full z-20" style={{ top: `${oT}%`, left: '50%', transform: 'translate(-50%, -50%)', width: 40, height: 10 }} />
+                    <div onMouseDown={e => handleResizeStart('bottom', e)} className="absolute cursor-ns-resize bg-blue-500/40 hover:bg-blue-500/80 rounded-full z-20" style={{ top: `${oB}%`, left: '50%', transform: 'translate(-50%, -50%)', width: 40, height: 10 }} />
+                    <div onMouseDown={e => handleResizeStart('tl', e)} className="absolute cursor-nwse-resize bg-blue-600/50 hover:bg-blue-600 rounded-full z-20" style={{ left: `${oL}%`, top: `${oT}%`, transform: 'translate(-50%, -50%)', width: 12, height: 12 }} />
+                    <div onMouseDown={e => handleResizeStart('tr', e)} className="absolute cursor-nesw-resize bg-blue-600/50 hover:bg-blue-600 rounded-full z-20" style={{ left: `${oRr}%`, top: `${oT}%`, transform: 'translate(-50%, -50%)', width: 12, height: 12 }} />
+                    <div onMouseDown={e => handleResizeStart('bl', e)} className="absolute cursor-nesw-resize bg-blue-600/50 hover:bg-blue-600 rounded-full z-20" style={{ left: `${oL}%`, top: `${oB}%`, transform: 'translate(-50%, -50%)', width: 12, height: 12 }} />
+                    <div onMouseDown={e => handleResizeStart('br', e)} className="absolute cursor-nwse-resize bg-blue-600/50 hover:bg-blue-600 rounded-full z-20" style={{ left: `${oRr}%`, top: `${oB}%`, transform: 'translate(-50%, -50%)', width: 12, height: 12 }} />
+                    {/* Inner handles (orange) */}
+                    {showInner && (
+                      <>
+                        <div onMouseDown={e => handleResizeStart('i-left', e)} className="absolute cursor-ew-resize bg-orange-500/40 hover:bg-orange-500/80 rounded-full z-20" style={{ left: `${iL}%`, top: '50%', transform: 'translate(-50%, -50%)', width: 10, height: 32 }} />
+                        <div onMouseDown={e => handleResizeStart('i-right', e)} className="absolute cursor-ew-resize bg-orange-500/40 hover:bg-orange-500/80 rounded-full z-20" style={{ left: `${iRr}%`, top: '50%', transform: 'translate(-50%, -50%)', width: 10, height: 32 }} />
+                        <div onMouseDown={e => handleResizeStart('i-top', e)} className="absolute cursor-ns-resize bg-orange-500/40 hover:bg-orange-500/80 rounded-full z-20" style={{ top: `${iT}%`, left: '50%', transform: 'translate(-50%, -50%)', width: 32, height: 10 }} />
+                        <div onMouseDown={e => handleResizeStart('i-bottom', e)} className="absolute cursor-ns-resize bg-orange-500/40 hover:bg-orange-500/80 rounded-full z-20" style={{ top: `${iB}%`, left: '50%', transform: 'translate(-50%, -50%)', width: 32, height: 10 }} />
+                        <div onMouseDown={e => handleResizeStart('i-tl', e)} className="absolute cursor-nwse-resize bg-orange-600/50 hover:bg-orange-600 rounded-full z-20" style={{ left: `${iL}%`, top: `${iT}%`, transform: 'translate(-50%, -50%)', width: 10, height: 10 }} />
+                        <div onMouseDown={e => handleResizeStart('i-tr', e)} className="absolute cursor-nesw-resize bg-orange-600/50 hover:bg-orange-600 rounded-full z-20" style={{ left: `${iRr}%`, top: `${iT}%`, transform: 'translate(-50%, -50%)', width: 10, height: 10 }} />
+                        <div onMouseDown={e => handleResizeStart('i-bl', e)} className="absolute cursor-nesw-resize bg-orange-600/50 hover:bg-orange-600 rounded-full z-20" style={{ left: `${iL}%`, top: `${iB}%`, transform: 'translate(-50%, -50%)', width: 10, height: 10 }} />
+                        <div onMouseDown={e => handleResizeStart('i-br', e)} className="absolute cursor-nwse-resize bg-orange-600/50 hover:bg-orange-600 rounded-full z-20" style={{ left: `${iRr}%`, top: `${iB}%`, transform: 'translate(-50%, -50%)', width: 10, height: 10 }} />
+                      </>
+                    )}
                   </>
                 );
               })()}
