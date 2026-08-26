@@ -183,15 +183,21 @@ export class StampRendererService {
       ? ` stroke-dasharray="${ring.dashGap?.[0] ?? 4},${ring.dashGap?.[1] ?? 4}"`
       : '';
     if (shapeType === 'rectangle' || shapeType === 'square' || shapeType === 'oval') {
-      const inset = ring.inset ?? ring.radius ?? 14;
+      const scale = Math.max(0.1, Math.min(1, (ring.scale ?? 100) / 100));
+      const outerW = w - 40;
+      const outerH = h - 40;
+      const inset = Math.max(0, ring.inset ?? 14);
+      const innerW = Math.max(2, (outerW - inset * 2) * scale);
+      const innerH = Math.max(2, (outerH - inset * 2) * scale);
+      const cx = w / 2;
+      const cy = h / 2;
       const isOval = shapeType === 'oval';
-      const rx = ((isOval ? w - 40 : w - 40) / 2) - inset;
-      const ry = ((shapeType === 'oval' ? h - 40 : h - 40) / 2) - inset;
       return isOval
-        ? `<ellipse cx="${w / 2}" cy="${h / 2}" rx="${rx}" ry="${ry}" fill="none" stroke="${ring.color}" stroke-width="${ring.width}"${dash}/>`
-        : `<rect x="${inset + 4}" y="${inset + 4}" width="${w - (inset + 4) * 2}" height="${h - (inset + 4) * 2}" rx="8" fill="none" stroke="${ring.color}" stroke-width="${ring.width}"${dash}/>`;
+        ? `<ellipse cx="${cx}" cy="${cy}" rx="${innerW / 2}" ry="${innerH / 2}" fill="none" stroke="${ring.color}" stroke-width="${ring.width}"${dash}/>`
+        : `<rect x="${cx - innerW / 2}" y="${cy - innerH / 2}" width="${innerW}" height="${innerH}" rx="8" fill="none" stroke="${ring.color}" stroke-width="${ring.width}"${dash}/>`;
     }
-    const R = ring.radius ?? Math.min(w, h) / 2 - 34;
+    const scale = Math.max(0.1, Math.min(1, (ring.scale ?? 100) / 100));
+    const R = Math.max(2, (ring.radius ?? Math.min(w, h) / 2 - 34) * scale);
     return `<circle cx="${w / 2}" cy="${h / 2}" r="${R}" fill="none" stroke="${ring.color}" stroke-width="${ring.width}"${dash}/>`;
   }
 
