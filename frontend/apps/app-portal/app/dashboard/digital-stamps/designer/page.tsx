@@ -428,15 +428,26 @@ export default function StampDesignerPage() {
   const saveTemplate = async (publish: boolean) => {
     setBusy(true);
     try {
-      let templateId: string | null = (templates.find(t => t.name === name && t.status === 'DRAFT') as any)?.id || null;
-      if (templateId) {
+      const draft = templates.find(t => t.name === name && t.status === 'DRAFT') as any;
+      const published = templates.find(t => t.name === name && t.status === 'PUBLISHED') as any;
+
+      let templateId: string | null = draft?.id || null;
+
+      if (publish && published) {
+        templateId = published.id;
         await stampEngineApi.updateTemplate(templateId, { configJson });
+        await stampEngineApi.publishTemplate(templateId, 'Updated from designer');
+      } else if (templateId) {
+        await stampEngineApi.updateTemplate(templateId, { configJson });
+        if (publish) {
+          await stampEngineApi.publishTemplate(templateId, 'Published from designer');
+        }
       } else {
         const res = await stampEngineApi.createTemplate({ name, configJson });
         templateId = res.data.id;
-      }
-      if (publish && templateId) {
-        await stampEngineApi.publishTemplate(templateId, 'Published from designer');
+        if (publish) {
+          await stampEngineApi.publishTemplate(templateId, 'Published from designer');
+        }
       }
       await loadLists();
       notify('ok', publish ? 'Template published' : 'Draft saved');
