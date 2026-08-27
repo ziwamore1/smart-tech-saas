@@ -10,6 +10,7 @@ export class ReportWorker {
   private fetcher: DataFetcher;
   private renderer: ReportRenderer;
   private storage: PdfStorage;
+  private lastRedisErrorLog = 0;
 
   constructor() {
     this.fetcher = new DataFetcher();
@@ -22,7 +23,7 @@ export class ReportWorker {
         return this.processJob(job);
       },
       {
-        connection: config.redis,
+        connection: config.redis!,
         concurrency: config.queue.concurrency,
       },
     );
@@ -36,7 +37,10 @@ export class ReportWorker {
     });
 
     this.worker.on('error', (error: Error) => {
-      console.error('❌ Worker connection error:', error.message || error);
+      if (Date.now() - this.lastRedisErrorLog > 30_000) {
+        this.lastRedisErrorLog = Date.now();
+        console.error('Report worker Redis connection error:', error.message || error);
+      }
     });
 
     console.log(`📋 Report worker started, listening on queue: ${config.queue.name}`);

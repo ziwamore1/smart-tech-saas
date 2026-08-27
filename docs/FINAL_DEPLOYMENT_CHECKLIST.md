@@ -50,7 +50,7 @@ Companion documents: `PRODUCTION_INTEGRATION_MAP.md`, `FINAL_PRODUCTION_ACCEPTAN
 - Tenancy: every authenticity row carries `schoolId`; all access paths re-check ownership (verified).
 
 ## 4. Redis Requirements
-**Currently DISABLED in production** (Upstash cost/predictability). Impact:
+**Production provider:** Railway private Redis service (`smarttech-redis`). Impact:
 - Caching features degrade gracefully; queues already moved to Postgres.
 - If re-enabled later: set `REDIS_URL`, confirm `[RedisProvider] connected` at boot, and load-test before enabling for hot paths. Nothing in the authenticity pipeline requires Redis.
 

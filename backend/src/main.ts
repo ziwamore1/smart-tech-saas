@@ -16,6 +16,7 @@ import { isSentryEnabled, getSentryConfig } from './common/sentry.config';
 import { setupSecurity } from './common/security.middleware';
 import { ProductionLogger } from './common/production-logger';
 import { json } from 'express';
+import { REDIS_CLIENT_TOKEN } from './queues/queue-definitions';
 
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
@@ -55,7 +56,7 @@ async function bootstrap() {
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   });
-  setupSecurity(app);
+  setupSecurity(app, app.get(REDIS_CLIENT_TOKEN, { strict: false }) || null);
 
   app.use((req: any, _res: any, next: any) => {
     global.request = req;

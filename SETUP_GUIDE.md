@@ -34,12 +34,11 @@ NODE_ENV=development
 FRONTEND_URL="http://localhost:3000"
 
 # ===========================================
-# REDIS (for Bull queues - optional - NOT required for production)
+# REDIS (development)
 # ===========================================
-REDIS_HOST=localhost
-REDIS_PORT=6379
-# Note: Email, SMS, and WhatsApp queues now use PostgreSQL.
-# Redis is only needed if you use legacy BullMQ background queues.
+REDIS_URL=redis://localhost:6379
+# Production uses REDIS_URL from the private Railway smarttech-redis service.
+# PostgreSQL remains the authoritative database; Redis is disposable infrastructure.
 
 # ===========================================
 # COMMUNICATION SERVICES (Optional - for real SMS/Email)

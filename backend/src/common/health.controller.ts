@@ -1,4 +1,5 @@
-import { BadRequestException, Controller, Get, Head, Query, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Head, Query, ForbiddenException, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { HealthService } from './health.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { getCurriculumData } from './curriculum-data';
@@ -18,6 +19,16 @@ export class HealthController {
   @Get('detailed')
   async checkDetailed() {
     return this.healthService.checkDetailed();
+  }
+
+  @Get('redis')
+  async checkRedis(@Res({ passthrough: true }) response: Response) {
+    const redis = await this.healthService.checkRedis();
+    response.status(redis.status === 'up' ? 200 : 503);
+    return {
+      statusCode: redis.status === 'up' ? 200 : 503,
+      data: { status: redis.status === 'up' ? 'ok' : 'degraded', redis: redis.status === 'up' ? 'connected' : 'unavailable' },
+    };
   }
 
   @Get('backfill-marketplace-templates')

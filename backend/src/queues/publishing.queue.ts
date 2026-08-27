@@ -1,10 +1,7 @@
 import { Queue } from 'bullmq';
-import IORedis from 'ioredis';
+import { createRedisClient } from './redis.config';
 
-const redisUrl = process.env.REDIS_URL || '';
-const connection = redisUrl.startsWith('rediss://')
-  ? new IORedis(redisUrl, { maxRetriesPerRequest: null, lazyConnect: true, enableReadyCheck: false, retryStrategy: () => null, enableOfflineQueue: false, connectTimeout: 5000, commandTimeout: 5000 })
-  : undefined;
+const connection = createRedisClient();
 
 export const publishingQueue = connection
   ? new Queue('report-generation', { connection, defaultJobOptions: { removeOnComplete: { age: 86400 } } })

@@ -97,9 +97,8 @@ const server = http.createServer(async (req, res) => {
 });
 
 async function checkRedis(): Promise<boolean> {
-  const redisOptions: any = 'url' in config.redis
-    ? { url: config.redis.url, tls: config.redis.tls, retryStrategy: () => null, maxRetriesPerRequest: 1, lazyConnect: true }
-    : { host: config.redis.host, port: config.redis.port, retryStrategy: () => null, maxRetriesPerRequest: 1, lazyConnect: true };
+  if (!config.redis) return false;
+  const redisOptions: any = { ...config.redis, retryStrategy: () => null, maxRetriesPerRequest: 1, lazyConnect: true };
   const redis = new Redis(redisOptions);
 
   try {
@@ -116,7 +115,8 @@ async function checkRedis(): Promise<boolean> {
 
 async function main() {
   console.log('🚀 Starting SmartTech Report Service...');
-  console.log(`   Redis: ${process.env.REDIS_URL || `${config.redis.host}:${config.redis.port}`}`);
+  const redisUrl = process.env.REDIS_URL;
+  console.log(`   Redis: ${redisUrl ? (() => { const u = new URL(redisUrl); return `${u.protocol}//${u.hostname}:${u.port || 6379}`; })() : 'not configured'}`);
   console.log(`   Queue: ${config.queue.name}`);
 
   const redisOk = await checkRedis();

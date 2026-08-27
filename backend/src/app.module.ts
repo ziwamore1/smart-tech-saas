@@ -99,34 +99,12 @@ import { HolidayModule } from './holiday/holiday.module';
 import { ReportEngineModule } from './report-engine/report-engine.module';
 import { StudentSubjectModule } from './student-subject/student-subject.module';
 import { StampEngineModule } from './stamp-engine/stamp-engine.module';
+import { getRedisConnectionOptions } from './queues/redis.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ...(() => {
-      const redisUrl = process.env.REDIS_URL;
-      if (!redisUrl) return [];
-      try {
-        const url = new URL(redisUrl);
-        return [BullModule.forRoot({
-          connection: {
-            host: url.hostname,
-            port: parseInt(url.port || '6379', 10),
-            password: url.password ? decodeURIComponent(url.password) : undefined,
-            tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
-            retryStrategy: () => null,
-            lazyConnect: true,
-            maxRetriesPerRequest: null,
-            enableOfflineQueue: false,
-            connectTimeout: 5000,
-            commandTimeout: 5000,
-          },
-        })];
-      } catch {
-        console.error('[BullModule] Invalid REDIS_URL');
-        return [];
-      }
-    })(),
+    ...(getRedisConnectionOptions() ? [BullModule.forRoot({ connection: getRedisConnectionOptions()! })] : []),
     CommonModule,
     AuthModule,
     PrismaModule,

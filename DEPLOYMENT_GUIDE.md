@@ -134,8 +134,10 @@ BEEM_SECRET_KEY=your_secret_key
 BEEM_SENDER_NAME=SMARTECH
 BEEM_ENABLED=true
 
-# Redis (Optional — only needed for BullMQ background queues)
-REDIS_URL=rediss://default:password@host:6379
+# Redis (separate private Railway service: smarttech-redis)
+# Configure this on the API and any worker service using a Railway reference
+# variable. Do not expose Redis publicly or commit credentials.
+REDIS_URL=${{smarttech-redis.REDIS_URL}}
 
 # SMS (Optional — legacy)
 TWILIO_ACCOUNT_SID=your_sid

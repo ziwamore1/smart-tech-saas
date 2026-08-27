@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import Redis from 'ioredis';
+import { REDIS_CLIENT_TOKEN } from '../queues/queue-definitions';
 import { PrismaService } from '../prisma/prisma.service';
 import { MinistryAdapterFactory } from '../ministry-gateway/adapters/adapter-factory';
 import { BlockchainService } from '../blockchain-service/blockchain.service';
@@ -40,6 +42,7 @@ export class HealthService {
     private ministryAdapterFactory: MinistryAdapterFactory,
     private blockchainService: BlockchainService,
     private admissionNumberService: AdmissionNumberService,
+    @Optional() @Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis | null,
   ) {}
 
   async check(): Promise<HealthCheckResult> {
@@ -50,6 +53,7 @@ export class HealthService {
     checks.blockchain = await this.checkBlockchain();
     checks.memory = this.checkMemory();
     checks.classIdBackfill = await this.checkClassIdBackfill();
+    checks.redis = await this.checkRedis();
 
     const allStatuses = Object.values(checks).map(c => c.status);
     let status: HealthCheckResult['status'] = 'healthy';
@@ -212,6 +216,7 @@ export class HealthService {
     checks.blockchain = await this.checkBlockchain();
     checks.memory = this.checkMemory();
     checks.disk = this.checkDisk();
+    checks.redis = await this.checkRedis();
 
     const allStatuses = Object.values(checks).map(c => c.status);
     let status: HealthCheckResult['status'] = 'healthy';
@@ -608,6 +613,18 @@ export class HealthService {
       };
     } finally {
       if (pool) await pool.end().catch(() => {});
+    }
+  }
+
+  async checkRedis(): Promise<HealthCheck> {
+    if (!this.redis) return { status: 'degraded', message: 'Redis not configured' };
+    const start = Date.now();
+    try {
+      await this.redis.ping();
+      const latency = Date.now() - start;
+      return { status: latency > 1000 ? 'degraded' : 'up', message: `Pong in ${latency}ms`, latency };
+    } catch (error: any) {
+      return { status: 'degraded', message: `Redis unavailable: ${error?.message || 'connection failed'}`, latency: Date.now() - start };
     }
   }
 

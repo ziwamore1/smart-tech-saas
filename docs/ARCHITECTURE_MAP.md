@@ -14,13 +14,20 @@
 | File storage | `CloudinaryService.upload/uploadBuffer/delete` with local fallback | `backend/src/cloudinary/cloudinary.service.ts` | Stamp assets, signature assets, rendered stamp PNG/SVG |
 | PDF pipeline | Puppeteer + Handlebars (`TemplateRendererService.renderPdfFromHtml/renderPdf`) | `backend/src/report-template-builder/template-renderer.service.ts` | Finalized documents render through the same pipeline; no `window.print()` |
 | QR codes | `qrcode` npm lib; base URL from `VERIFICATION_URL` env | `backend/src/qr-service/qr.service.ts` | Same lib + URL base for serial-based QR |
-| Queues/workers | BullMQ global `QueuesModule` + `RedisProvider` (no-op safe when REDIS_URL absent) | `backend/src/queues/queues.module.ts` | Batch stamping enqueued on existing infra |
+| Queues/workers | BullMQ global `QueuesModule` + centralized `RedisProvider`; private Railway Redis in production | `backend/src/queues/redis.config.ts` | Batch stamping and background jobs use the same REDIS_URL |
 | DB | Prisma + PostgreSQL (Supabase in prod), timestamped SQL migrations | `backend/prisma` | Additive models + one migration folder |
 | Existing stamp models | `DigitalStamp`, `TemplateStamp`, `StampVerification`, `DocumentStamp`, `ApprovalRequest/Workflow/Step/AuditLog`, `DocumentSignature`, `DigitalSignature` | schema.prisma:3649-3930 | Kept untouched for backward compatibility; new engine composes alongside |
 | Report templates | `ReportTemplate` (+components, layoutJson, version fields) | schema.prisma:2139 | Authenticity tokens resolved at render time |
 | Public verification page | `frontend/app/verify/[hash]/page.tsx` | frontend | Extended to resolve serial numbers / short codes |
 
 ## 2. What was missing → built now
+
+### Runtime infrastructure
+
+- PostgreSQL is the authoritative persistent database.
+- Redis is a disposable production infrastructure layer for BullMQ, caching, rate limiting, sessions/state, and future real-time fan-out where required.
+- Railway deploys Redis as a separate private `smarttech-redis` service. The API and future `smarttech-worker` receive its `REDIS_URL` through Railway reference variables.
+- Business logic is provider-agnostic: moving Redis to another private managed service requires changing `REDIS_URL`, not application code.
 
 1. **Layer-based `StampTemplate`** with JSON config (canvas/shape/rings/layers/effects),
    draft→published→archived lifecycle, immutable `StampTemplateVersion` snapshots + rollback.
