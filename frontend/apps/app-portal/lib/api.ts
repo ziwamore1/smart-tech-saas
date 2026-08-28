@@ -2478,9 +2478,13 @@ export const schoolMembershipApi = {
 };
 
 export const accessApi = {
+  getAvailableClasses: (academicYearId?: string) => api.get('/classes/available', { params: academicYearId ? { academicYearId } : undefined }),
+  getTeachingClasses: (academicYearId?: string) => api.get('/classes/teaching', { params: academicYearId ? { academicYearId } : undefined }),
+  getAvailableSubjects: (classId: string, academicYearId?: string) => api.get(`/classes/available/${classId}/subjects`, { params: academicYearId ? { academicYearId } : undefined }),
+  getTeachingSubjects: (classId: string, academicYearId?: string) => api.get(`/classes/teaching/${classId}/subjects`, { params: academicYearId ? { academicYearId } : undefined }),
   getUserPermissions: (userId: string) => api.get(`/users/${userId}/permissions`),
-  saveUserPermissions: (userId: string, permissions: string[]) =>
-    api.patch(`/users/${userId}/permissions`, { permissions }),
+  saveUserPermissions: (userId: string, permissions: string[], resultEntryPermissions?: Array<{ classId: string; subjectId: string; academicYearId: string }>) =>
+    api.patch(`/users/${userId}/permissions`, { permissions, resultEntryPermissions }),
   getLiveResults: (termId?: string) => api.get('/results/live', { params: termId ? { termId } : undefined }),
   getResultsCompletion: (termId?: string) => api.get('/results/completion', { params: termId ? { termId } : undefined }),
 };

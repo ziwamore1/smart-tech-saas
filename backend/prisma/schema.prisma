@@ -342,6 +342,7 @@ model AcademicYear {
   CurriculumLessonPlan    CurriculumLessonPlan[]
   classTeacherAssignments ClassTeacherAssignment[]
   studentSubjects         StudentSubject[]
+  resultEntryPermissions  ResultEntryPermission[]
 
   @@index([schoolId])
   @@index([isCurrent])
@@ -401,73 +402,74 @@ model Holiday {
 }
 
 model User {
-  id                      String                   @id @default(uuid())
-  firstName               String
-  lastName                String
-  email                   String                   @unique
-  phone                   String?
-  username                String?                  @unique
-  password                String
-  photoUrl                String?
-  photoPublicId           String?
-  isActive                Boolean                  @default(true)
-  accountStatus           String                   @default("ACTIVE")
-  mustChangePassword      Boolean                  @default(false)
-  failedAttempts          Int                      @default(0)
-  mfaEnabled              Boolean                  @default(false)
-  mfaSecret               String?
-  lastLogin               DateTime?
-  lastPasswordChange      DateTime?
-  resetToken              String?
-  resetTokenExpiry        DateTime?
-  lockoutUntil            DateTime?
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime?                @updatedAt
-  schoolId                String?
-  studentId               String?                  @unique
-  auditLogs               AuditLog[]
-  communications          Communication[]
-  deviceTokens            DeviceToken[]
-  notificationDevices     NotificationDevice[]
-  createdExams            Exam[]
-  createdTemplates        ExamTemplate[]
-  createdBankQuestions    QuestionBank[]
-  uploadedExams           UploadedExam[]
-  createdHomeworks        Homework[]
-  lessonPlans             LessonPlan[]
-  NoticeBoard             NoticeBoard[]
-  notifications           Notification[]
-  readingSessions         ReadingSession[]
-  results                 Result[]                 @relation("TeacherResults")
-  schoolUsers             SchoolUser[]
-  teacher                 Teacher?
-  teachingAssignments     TeachingAssignment[]
-  school                  School?                  @relation(fields: [schoolId], references: [id])
-  student                 Student?                 @relation(fields: [studentId], references: [id])
-  studentPhotos           StudentPhoto[]
-  userRoles               UserRole[]
-  aiTutorSessions         AiTutorSession[]
-  appliedStamps           DocumentStamp[]          @relation("DocumentStampAppliedBy")
-  requestedApprovals      ApprovalRequest[]        @relation("ApprovalRequestRequestedBy")
-  approvedRequests        ApprovalRequest[]        @relation("ApprovalRequestApprover")
-  createdWorkflows        ApprovalWorkflow[]       @relation("ApprovalWorkflowCreatedBy")
-  auditTrailLogs          ApprovalAuditLog[]       @relation("ApprovalAuditLogUser")
-  userCredentials         UserCredential[]         @relation("UserCredentials")
-  passwordHistory         PasswordHistory[]        @relation("UserPasswordHistory")
-  securityLogs            AccountSecurityLog[]     @relation("AccountSecurityLogs")
-  loginSessions           LoginSession[]
-  otpVerifications        OtpVerification[]
-  deviceSessions          DeviceSession[]
-  credentialDeliveries    CredentialDeliveryLog[]  @relation("CredentialDeliveries")
-  permissionOverridesGiven UserPermissionOverride[] @relation("PermissionOverrideAssigner")
-  generatedCredentials    UserCredential[]         @relation("GeneratedByUser")
-  classTeacherOf          Class[]
-  platformRoleAssignments PlatformRoleAssignment[]
-  schoolRoleAssignments   SchoolRoleAssignment[]   @relation("SchoolRoleUser")
-  classTeacherAssignments ClassTeacherAssignment[]
-  departmentAssignments   DepartmentAssignment[]
-  clubAssignments         ClubAssignment[]
-  committeeAssignments    CommitteeAssignment[]
+  id                          String                   @id @default(uuid())
+  firstName                   String
+  lastName                    String
+  email                       String                   @unique
+  phone                       String?
+  username                    String?                  @unique
+  password                    String
+  photoUrl                    String?
+  photoPublicId               String?
+  isActive                    Boolean                  @default(true)
+  accountStatus               String                   @default("ACTIVE")
+  mustChangePassword          Boolean                  @default(false)
+  failedAttempts              Int                      @default(0)
+  mfaEnabled                  Boolean                  @default(false)
+  mfaSecret                   String?
+  lastLogin                   DateTime?
+  lastPasswordChange          DateTime?
+  resetToken                  String?
+  resetTokenExpiry            DateTime?
+  lockoutUntil                DateTime?
+  createdAt                   DateTime                 @default(now())
+  updatedAt                   DateTime?                @updatedAt
+  schoolId                    String?
+  studentId                   String?                  @unique
+  auditLogs                   AuditLog[]
+  communications              Communication[]
+  deviceTokens                DeviceToken[]
+  notificationDevices         NotificationDevice[]
+  createdExams                Exam[]
+  createdTemplates            ExamTemplate[]
+  createdBankQuestions        QuestionBank[]
+  uploadedExams               UploadedExam[]
+  createdHomeworks            Homework[]
+  lessonPlans                 LessonPlan[]
+  NoticeBoard                 NoticeBoard[]
+  notifications               Notification[]
+  readingSessions             ReadingSession[]
+  results                     Result[]                 @relation("TeacherResults")
+  schoolUsers                 SchoolUser[]
+  teacher                     Teacher?
+  teachingAssignments         TeachingAssignment[]
+  school                      School?                  @relation(fields: [schoolId], references: [id])
+  student                     Student?                 @relation(fields: [studentId], references: [id])
+  studentPhotos               StudentPhoto[]
+  userRoles                   UserRole[]
+  aiTutorSessions             AiTutorSession[]
+  appliedStamps               DocumentStamp[]          @relation("DocumentStampAppliedBy")
+  requestedApprovals          ApprovalRequest[]        @relation("ApprovalRequestRequestedBy")
+  approvedRequests            ApprovalRequest[]        @relation("ApprovalRequestApprover")
+  createdWorkflows            ApprovalWorkflow[]       @relation("ApprovalWorkflowCreatedBy")
+  auditTrailLogs              ApprovalAuditLog[]       @relation("ApprovalAuditLogUser")
+  userCredentials             UserCredential[]         @relation("UserCredentials")
+  passwordHistory             PasswordHistory[]        @relation("UserPasswordHistory")
+  securityLogs                AccountSecurityLog[]     @relation("AccountSecurityLogs")
+  loginSessions               LoginSession[]
+  otpVerifications            OtpVerification[]
+  deviceSessions              DeviceSession[]
+  credentialDeliveries        CredentialDeliveryLog[]  @relation("CredentialDeliveries")
+  permissionOverridesGiven    UserPermissionOverride[] @relation("PermissionOverrideAssigner")
+  resultEntryPermissionsGiven ResultEntryPermission[]  @relation("ResultEntryPermissionAssigner")
+  generatedCredentials        UserCredential[]         @relation("GeneratedByUser")
+  classTeacherOf              Class[]
+  platformRoleAssignments     PlatformRoleAssignment[]
+  schoolRoleAssignments       SchoolRoleAssignment[]   @relation("SchoolRoleUser")
+  classTeacherAssignments     ClassTeacherAssignment[]
+  departmentAssignments       DepartmentAssignment[]
+  clubAssignments             ClubAssignment[]
+  committeeAssignments        CommitteeAssignment[]
 
   @@index([schoolId])
   @@index([isActive])
@@ -540,6 +542,7 @@ model Class {
   CurriculumCoverage      CurriculumCoverage[]
   classTeacherAssignments ClassTeacherAssignment[]
   studentSubjects         StudentSubject[]
+  ResultEntryPermission   ResultEntryPermission[]
 
   @@index([reportTemplateId])
 }
@@ -590,6 +593,7 @@ model Subject {
   CurriculumCoverage         CurriculumCoverage[]
   compositeSubjectComponents CompositeSubjectComponent[]
   studentSubjects            StudentSubject[]
+  resultEntryPermissions     ResultEntryPermission[]
 
   @@unique([name, code, schoolId])
   @@index([schoolId])
@@ -2486,15 +2490,16 @@ model TeacherAbsence {
 }
 
 model SchoolUser {
-  id                   String                 @id @default(uuid())
-  userId               String
-  schoolId             String
-  isPrimary            Boolean                @default(false)
-  createdAt            DateTime               @default(now())
-  school               School                 @relation(fields: [schoolId], references: [id])
-  user                 User                   @relation(fields: [userId], references: [id])
-  SchoolRoleAssignment SchoolRoleAssignment[]
-  permissionOverrides  UserPermissionOverride[]
+  id                    String                   @id @default(uuid())
+  userId                String
+  schoolId              String
+  isPrimary             Boolean                  @default(false)
+  createdAt             DateTime                 @default(now())
+  school                School                   @relation(fields: [schoolId], references: [id])
+  user                  User                     @relation(fields: [userId], references: [id])
+  SchoolRoleAssignment  SchoolRoleAssignment[]
+  permissionOverrides   UserPermissionOverride[]
+  ResultEntryPermission ResultEntryPermission[]
 
   @@unique([userId, schoolId])
   @@index([userId])
@@ -2502,19 +2507,39 @@ model SchoolUser {
 }
 
 model UserPermissionOverride {
-  id                   String     @id @default(uuid())
-  schoolMembershipId   String
-  permission           String
-  granted              Boolean    @default(true)
-  assignedBy           String?
-  createdAt            DateTime   @default(now())
-  updatedAt            DateTime   @updatedAt
+  id                 String   @id @default(uuid())
+  schoolMembershipId String
+  permission         String
+  granted            Boolean  @default(true)
+  assignedBy         String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   membership SchoolUser @relation(fields: [schoolMembershipId], references: [id], onDelete: Cascade)
   assigner   User?      @relation("PermissionOverrideAssigner", fields: [assignedBy], references: [id], onDelete: SetNull)
 
   @@unique([schoolMembershipId, permission])
   @@index([permission])
+}
+
+model ResultEntryPermission {
+  id                 String   @id @default(uuid())
+  schoolMembershipId String
+  classId            String
+  subjectId          String
+  academicYearId     String
+  assignedBy         String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  membership   SchoolUser   @relation(fields: [schoolMembershipId], references: [id], onDelete: Cascade)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  assigner     User?        @relation("ResultEntryPermissionAssigner", fields: [assignedBy], references: [id], onDelete: SetNull)
+
+  @@unique([schoolMembershipId, classId, subjectId, academicYearId])
+  @@index([classId, subjectId, academicYearId])
 }
 
 model SchoolRoleAssignment {
@@ -5958,24 +5983,24 @@ enum StampAssetKind {
 }
 
 model StampTemplate {
-  id          String              @id @default(uuid())
-  schoolId    String
-  name        String
-  description String?
-  type        StampType           @default(CUSTOM)
-  status      StampTemplateStatus @default(DRAFT)
-  version     Int                 @default(1)
-  isActive    Boolean             @default(true)
-  isDefault   Boolean             @default(false)
-  configJson  Json
+  id           String                 @id @default(uuid())
+  schoolId     String
+  name         String
+  description  String?
+  type         StampType              @default(CUSTOM)
+  status       StampTemplateStatus    @default(DRAFT)
+  version      Int                    @default(1)
+  isActive     Boolean                @default(true)
+  isDefault    Boolean                @default(false)
+  configJson   Json
   thumbnailUrl String?
-  publishedAt DateTime?
-  createdBy   String?
-  updatedBy   String?
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  school      School              @relation(fields: [schoolId], references: [id])
-  versions    StampTemplateVersion[]
+  publishedAt  DateTime?
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  school       School                 @relation(fields: [schoolId], references: [id])
+  versions     StampTemplateVersion[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -5983,13 +6008,13 @@ model StampTemplate {
 }
 
 model StampTemplateVersion {
-  id          String       @id @default(uuid())
+  id          String        @id @default(uuid())
   templateId  String
   version     Int
   configJson  Json
   changeNote  String?
   createdById String?
-  createdAt   DateTime     @default(now())
+  createdAt   DateTime      @default(now())
   template    StampTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@unique([templateId, version])
@@ -6050,39 +6075,39 @@ model DocumentSerial {
 }
 
 model DocumentVerification {
-  id                  String                     @id @default(uuid())
-  schoolId            String
-  documentId          String
-  documentType        String
-  documentTitle       String?
-  serialNumber        String?                    @unique
-  documentHash        String                     @unique
-  algorithm           String                     @default("SHA-256")
-  hashBasis           Json? // summary of canonical payload fields used for the hash
-  status              DocumentVerificationStatus @default(VALID)
-  stampedAt           DateTime                   @default(now()) // authoritative server time
-  timezone            String                     @default("Africa/Lusaka")
-  stampDate           String? // visual date e.g. "23 AUG 2026" (derived server-side)
-  stampTime           String? // visual time e.g. "13:42:17 CAT"
-  templateId          String? // StampTemplate used at finalize time (snapshot kept below)
-  templateVersion     Int?
-  templateSnapshot    Json? // immutable copy of the layer config used for this document
-  verificationCode    String                     @unique // short opaque QR token, e.g. 7H4K9X2P
-  verificationUrl     String?
-  qrCodeDataUrl       String?
-  issuedToLabel       String? // safe public label (e.g. student name or class), never internal ids
-  disclaimerText      String?
-  expiresAt           DateTime?
-  revokedAt           DateTime?
-  revokedById         String?
-  revocationReason    String?
-  supersededBySerial  String?
-  finalizedById       String
-  signatureRecordId   String? // DocumentSignature id when signed through signing-service
-  metadata            Json?                      @default("{}")
-  createdAt           DateTime                   @default(now())
-  updatedAt           DateTime                   @updatedAt
-  school              School                     @relation(fields: [schoolId], references: [id])
+  id                 String                     @id @default(uuid())
+  schoolId           String
+  documentId         String
+  documentType       String
+  documentTitle      String?
+  serialNumber       String?                    @unique
+  documentHash       String                     @unique
+  algorithm          String                     @default("SHA-256")
+  hashBasis          Json? // summary of canonical payload fields used for the hash
+  status             DocumentVerificationStatus @default(VALID)
+  stampedAt          DateTime                   @default(now()) // authoritative server time
+  timezone           String                     @default("Africa/Lusaka")
+  stampDate          String? // visual date e.g. "23 AUG 2026" (derived server-side)
+  stampTime          String? // visual time e.g. "13:42:17 CAT"
+  templateId         String? // StampTemplate used at finalize time (snapshot kept below)
+  templateVersion    Int?
+  templateSnapshot   Json? // immutable copy of the layer config used for this document
+  verificationCode   String                     @unique // short opaque QR token, e.g. 7H4K9X2P
+  verificationUrl    String?
+  qrCodeDataUrl      String?
+  issuedToLabel      String? // safe public label (e.g. student name or class), never internal ids
+  disclaimerText     String?
+  expiresAt          DateTime?
+  revokedAt          DateTime?
+  revokedById        String?
+  revocationReason   String?
+  supersededBySerial String?
+  finalizedById      String
+  signatureRecordId  String? // DocumentSignature id when signed through signing-service
+  metadata           Json?                      @default("{}")
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+  school             School                     @relation(fields: [schoolId], references: [id])
 
   @@index([documentId])
   @@index([schoolId])
@@ -6109,21 +6134,21 @@ model ApprovalWorkflowConfig {
 }
 
 model DocumentAuditLog {
-  id                      String   @id @default(uuid())
-  schoolId                String?
-  actorId                 String?
-  action                  String // SIGNATURE_CREATED | STAMP_TEMPLATE_PUBLISHED | DOCUMENT_FINALIZED | DOCUMENT_REVOKED | ...
-  entityType              String // StampTemplate | DocumentVerification | DigitalSignature ...
-  entityId                String?
-  documentVerificationId  String?
-  beforeStatus            String?
-  afterStatus             String?
-  ipAddress               String?
-  userAgent               String?
-  detail                  Json?    @default("{}")
-  result                  String? // SUCCESS | DENIED
-  createdAt               DateTime @default(now())
-  school                  School?  @relation(fields: [schoolId], references: [id])
+  id                     String   @id @default(uuid())
+  schoolId               String?
+  actorId                String?
+  action                 String // SIGNATURE_CREATED | STAMP_TEMPLATE_PUBLISHED | DOCUMENT_FINALIZED | DOCUMENT_REVOKED | ...
+  entityType             String // StampTemplate | DocumentVerification | DigitalSignature ...
+  entityId               String?
+  documentVerificationId String?
+  beforeStatus           String?
+  afterStatus            String?
+  ipAddress              String?
+  userAgent              String?
+  detail                 Json?    @default("{}")
+  result                 String? // SUCCESS | DENIED
+  createdAt              DateTime @default(now())
+  school                 School?  @relation(fields: [schoolId], references: [id])
 
   @@index([entityType, entityId])
   @@index([schoolId])

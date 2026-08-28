@@ -30,6 +30,8 @@ export default function TeachersPage() {
   const [showAccessModal, setShowAccessModal] = useState(false);
   const [accessTeacher, setAccessTeacher] = useState<any>(null);
   const [accessPermissions, setAccessPermissions] = useState<string[]>([]);
+  const [accessResultEntries, setAccessResultEntries] = useState<Array<{ classId: string; subjectId: string; academicYearId: string }>>([]);
+  const [newAccessEntry, setNewAccessEntry] = useState({ classId: '', subjectId: '', academicYearId: '' });
   const [classTeacherForm, setClassTeacherForm] = useState({ teacherId: '', classId: '', academicYearId: '', isPrimary: true });
 
   const accessUserId = accessTeacher?.userId || accessTeacher?.user?.id;
@@ -40,11 +42,18 @@ export default function TeachersPage() {
       const res = await accessApi.getUserPermissions(accessUserId);
       const data = res.data?.data || res.data || {};
       setAccessPermissions(Array.isArray(data.permissions) ? data.permissions : []);
+      setAccessResultEntries(Array.isArray(data.resultEntryPermissions) ? data.resultEntryPermissions.map((entry: any) => ({ classId: entry.classId, subjectId: entry.subjectId, academicYearId: entry.academicYearId })) : []);
       return data;
     },
   });
+  const { data: accessClassesData } = useQuery({ queryKey: ['access-classes'], enabled: showAccessModal, queryFn: async () => (await accessApi.getAvailableClasses()).data });
+  const { data: accessSubjectsData } = useQuery({ queryKey: ['access-class-subjects', newAccessEntry.classId], enabled: showAccessModal && !!newAccessEntry.classId, queryFn: async () => (await accessApi.getAvailableSubjects(newAccessEntry.classId)).data });
+  const { data: accessYearsData } = useQuery({ queryKey: ['access-academic-years'], enabled: showAccessModal, queryFn: async () => (await academicYearApi.getAll()).data });
+  const accessClasses = accessClassesData?.data || accessClassesData || [];
+  const accessSubjects = accessSubjectsData?.data || accessSubjectsData || [];
+  const accessYears = accessYearsData?.data || accessYearsData || [];
   const saveAccessMutation = useMutation({
-    mutationFn: () => accessApi.saveUserPermissions(accessUserId, accessPermissions),
+    mutationFn: () => accessApi.saveUserPermissions(accessUserId, accessPermissions, accessResultEntries),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-access', accessUserId] });
       setMessage({ type: 'success', text: 'Permissions saved.' });
@@ -55,7 +64,7 @@ export default function TeachersPage() {
 
   const permissionGroups = [
     { label: 'Classes', values: ['CLASS_VIEW', 'CLASS_MANAGE', 'CLASS_STUDENT_VIEW'] },
-    { label: 'Results', values: ['RESULTS_VIEW', 'RESULTS_ENTER', 'RESULTS_EDIT', 'RESULTS_APPROVE', 'RESULTS_PUBLISH'] },
+    { label: 'Results', values: ['RESULTS_VIEW', 'RESULTS_ENTER', 'RESULTS_EDIT', 'RESULTS_APPROVE', 'RESULTS_PUBLISH', 'RESULTS_DELEGATED_ENTRY'] },
     { label: 'Attendance and Reports', values: ['ATTENDANCE_VIEW', 'ATTENDANCE_MARK', 'REPORT_VIEW', 'REPORT_GENERATE'] },
     { label: 'Analytics and Assignments', values: ['ANALYTICS_VIEW', 'ASSIGNMENT_VIEW', 'ASSIGNMENT_MANAGE'] },
   ];
@@ -693,7 +702,7 @@ export default function TeachersPage() {
                         </button>
                         {canManageStaff && (
                         <>
-                        <button onClick={() => { setAccessTeacher(teacher); setAccessPermissions([]); setShowAccessModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors">
+                         <button onClick={() => { setAccessTeacher(teacher); setAccessPermissions([]); setAccessResultEntries([]); setNewAccessEntry({ classId: '', subjectId: '', academicYearId: '' }); setShowAccessModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors">
                           Access
                         </button>
                         <button onClick={async () => {
@@ -1117,7 +1126,7 @@ export default function TeachersPage() {
             ) : (
               <div className="space-y-6">
                 <p className="text-sm text-gray-600 bg-violet-50 border border-violet-100 rounded-lg p-3">Role defaults are applied automatically. Selecting or clearing a permission creates a school-specific override.</p>
-                {permissionGroups.map((group) => (
+                 {permissionGroups.map((group) => (
                   <section key={group.label}>
                     <h3 className="font-semibold text-gray-900 mb-3">{group.label}</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1128,9 +1137,31 @@ export default function TeachersPage() {
                         </label>
                       ))}
                     </div>
-                  </section>
-                ))}
-              </div>
+                   </section>
+                 ))}
+                <section className="border-t pt-5">
+                  <h3 className="font-semibold text-gray-900 mb-1">Delegated Result Entry Scope</h3>
+                  <p className="text-sm text-gray-600 mb-3">This grants result entry only for the selected combinations. It does not transfer analytics or reporting ownership from the assigned teacher.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <select value={newAccessEntry.classId} onChange={(event) => setNewAccessEntry({ ...newAccessEntry, classId: event.target.value, subjectId: '' })} className="border rounded-lg px-3 py-2 text-sm">
+                      <option value="">Select class</option>
+                      {accessClasses.map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    </select>
+                    <select value={newAccessEntry.subjectId} onChange={(event) => setNewAccessEntry({ ...newAccessEntry, subjectId: event.target.value })} className="border rounded-lg px-3 py-2 text-sm" disabled={!newAccessEntry.classId}>
+                      <option value="">Select subject</option>
+                      {accessSubjects.map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    </select>
+                    <select value={newAccessEntry.academicYearId} onChange={(event) => setNewAccessEntry({ ...newAccessEntry, academicYearId: event.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+                      <option value="">Select academic year</option>
+                      {accessYears.map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    </select>
+                  </div>
+                  <button type="button" onClick={() => { if (newAccessEntry.classId && newAccessEntry.subjectId && newAccessEntry.academicYearId && !accessResultEntries.some((entry) => entry.classId === newAccessEntry.classId && entry.subjectId === newAccessEntry.subjectId && entry.academicYearId === newAccessEntry.academicYearId)) { setAccessResultEntries([...accessResultEntries, newAccessEntry]); setNewAccessEntry({ ...newAccessEntry, subjectId: '' }); } }} className="mt-2 px-3 py-1.5 rounded-lg text-sm bg-gray-100 hover:bg-gray-200">Add scope</button>
+                  <div className="mt-3 space-y-2">
+                    {accessResultEntries.map((entry) => <div key={`${entry.classId}-${entry.subjectId}-${entry.academicYearId}`} className="flex items-center justify-between rounded-lg bg-violet-50 px-3 py-2 text-sm"><span>{accessClasses.find((item: any) => item.id === entry.classId)?.name || entry.classId} / {entry.subjectId} / {accessYears.find((item: any) => item.id === entry.academicYearId)?.name || entry.academicYearId}</span><button type="button" onClick={() => setAccessResultEntries(accessResultEntries.filter((item) => item !== entry))} className="text-red-600">Remove</button></div>)}
+                  </div>
+                </section>
+               </div>
             )}
             <div className="flex justify-end gap-3 pt-6 mt-6 border-t">
               <button onClick={() => setShowAccessModal(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>

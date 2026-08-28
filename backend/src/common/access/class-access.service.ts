@@ -95,6 +95,7 @@ export class ClassAccessService {
     if (await this.isSchoolAdministrator(user)) return this.schoolClasses(user, academicYearId);
 
     const yearFilter = academicYearId ? { academicYearId } : {};
+    const delegated = await this.delegatedEntries(user, academicYearId);
     const [subjectAssignments, classAssignments, directClasses] = await Promise.all([
       this.prisma.teachingAssignment.findMany({
         where: { teacherId: user.id, schoolId: user.schoolId, ...yearFilter },
@@ -113,6 +114,7 @@ export class ClassAccessService {
       ...subjectAssignments.map(({ classId }) => classId),
       ...classAssignments.map(({ classId }) => classId),
       ...directClasses.map(({ id }) => id),
+      ...delegated.map(({ classId }) => classId),
     ]));
     if (!ids.length) {
       // No assignment rows. Fall back to all school classes when the user is
@@ -156,19 +158,24 @@ export class ClassAccessService {
       select: { subjectId: true },
     });
     const assignedIds = new Set(assignments.map(({ subjectId }) => subjectId));
+    const delegated = await this.delegatedEntries(user, yearId, classId);
+    const delegatedIds = new Set(delegated.map(({ subjectId }) => subjectId));
     if (assignedIds.size === 0 && (await this.canAccessClasses(user))) {
       return classSubjects.map(({ subject }) => subject);
     }
     return classSubjects
-      .filter(({ subject }) => assignedIds.has(subject.id))
+      .filter(({ subject }) => assignedIds.has(subject.id) || delegatedIds.has(subject.id))
       .map(({ subject }) => subject);
   }
 
   async assertCanEnterResults(user: AccessUser, classId: string, subjectId: string, academicYearId: string) {
     if (!user.schoolId) throw new ForbiddenException('No school context is active');
     const permissions = await this.getPermissions(user);
+    let delegated = false;
     if (!permissions.includes(PERMISSIONS.RESULTS_ENTER)) {
-      throw new ForbiddenException('You do not have permission to enter results');
+      delegated = permissions.includes(PERMISSIONS.RESULTS_DELEGATED_ENTRY)
+        && (await this.delegatedEntries(user, academicYearId, classId, subjectId)).length > 0;
+      if (!delegated) throw new ForbiddenException('You do not have permission to enter results. Contact the Director to request access for this class and subject.');
     }
     const [classEntity, subject, year] = await Promise.all([
       this.prisma.class.findUnique({ where: { id: classId }, select: { id: true, schoolId: true } }),
@@ -182,6 +189,7 @@ export class ClassAccessService {
       where: { teacherId: user.id, schoolId: user.schoolId, classId, subjectId, academicYearId },
     });
     if (subjectAssignment) return true;
+    if (delegated) return true;
 
     // No assignment for this exact class+subject. Fall back to the permission
     // grant when the user has no teaching assignments at all in this academic
@@ -192,7 +200,7 @@ export class ClassAccessService {
       where: { teacherId: user.id, schoolId: user.schoolId, academicYearId },
       select: { id: true },
     });
-    if (!anyAssignment) return true;
+    if (!anyAssignment && permissions.includes(PERMISSIONS.RESULTS_ENTER)) return true;
 
     throw new ForbiddenException('You are not assigned to enter results for this class and subject');
   }
@@ -356,14 +364,33 @@ export class ClassAccessService {
       this.schoolClasses(actor),
       this.prisma.teachingAssignment.findMany({ where: { teacherId: userId, schoolId: actor.schoolId }, select: { classId: true, subjectId: true, academicYearId: true } }),
     ]);
-    const overrides = await this.prisma.userPermissionOverride.findMany({ where: { schoolMembershipId: membership.id }, select: { permission: true, granted: true } });
-    return { user, roles: membership.SchoolRoleAssignment.map(({ role }) => role), permissions, overrides, classes, assignments };
+    const [overrides, resultEntryPermissions] = await Promise.all([
+      this.prisma.userPermissionOverride.findMany({ where: { schoolMembershipId: membership.id }, select: { permission: true, granted: true } }),
+      this.prisma.resultEntryPermission.findMany({ where: { schoolMembershipId: membership.id }, include: { class: { select: { id: true, name: true } }, subject: { select: { id: true, name: true, code: true } }, academicYear: { select: { id: true, name: true } } } }),
+    ]);
+    return { user, roles: membership.SchoolRoleAssignment.map(({ role }) => role), permissions, overrides, classes, assignments, resultEntryPermissions };
   }
 
-  async saveUserPermissions(actor: AccessUser, userId: string, permissions: string[]) {
+  async saveUserPermissions(actor: AccessUser, userId: string, permissions: string[], resultEntryPermissions: Array<{ classId: string; subjectId: string; academicYearId: string }> = []) {
     if (!actor.schoolId) throw new ForbiddenException('No school context is active');
     const membership = await this.prisma.schoolUser.findFirst({ where: { userId, schoolId: actor.schoolId } });
     if (!membership) throw new NotFoundException('User is not a member of this school');
+    const entries = resultEntryPermissions.filter((entry, index, all) => all.findIndex((item) => item.classId === entry.classId && item.subjectId === entry.subjectId && item.academicYearId === entry.academicYearId) === index);
+    if (entries.length) {
+      const [classes, subjects, years, links] = await Promise.all([
+        this.prisma.class.findMany({ where: { schoolId: actor.schoolId, id: { in: entries.map((entry) => entry.classId) } }, select: { id: true } }),
+        this.prisma.subject.findMany({ where: { schoolId: actor.schoolId, id: { in: entries.map((entry) => entry.subjectId) } }, select: { id: true } }),
+        this.prisma.academicYear.findMany({ where: { schoolId: actor.schoolId, id: { in: entries.map((entry) => entry.academicYearId) } }, select: { id: true } }),
+        this.prisma.classSubject.findMany({ where: { schoolId: actor.schoolId, classId: { in: entries.map((entry) => entry.classId) }, subjectId: { in: entries.map((entry) => entry.subjectId) } }, select: { classId: true, subjectId: true } }),
+      ]);
+      const validClasses = new Set(classes.map(({ id }) => id));
+      const validSubjects = new Set(subjects.map(({ id }) => id));
+      const validYears = new Set(years.map(({ id }) => id));
+      const validLinks = new Set(links.map(({ classId, subjectId }) => `${classId}:${subjectId}`));
+      if (entries.some((entry) => !validClasses.has(entry.classId) || !validSubjects.has(entry.subjectId) || !validYears.has(entry.academicYearId) || !validLinks.has(`${entry.classId}:${entry.subjectId}`))) {
+        throw new ForbiddenException('Each delegated result-entry scope must belong to this school and an assigned class subject');
+      }
+    }
     const valid = new Set(Object.values(PERMISSIONS));
     const selected = new Set(permissions.filter((permission) => valid.has(permission as Permission)));
     const all = Object.values(PERMISSIONS);
@@ -372,6 +399,17 @@ export class ClassAccessService {
       create: { schoolMembershipId: membership.id, permission, granted: selected.has(permission), assignedBy: actor.id },
       update: { granted: selected.has(permission), assignedBy: actor.id },
     })));
+    await this.prisma.resultEntryPermission.deleteMany({ where: { schoolMembershipId: membership.id } });
+    if (selected.has(PERMISSIONS.RESULTS_DELEGATED_ENTRY) && entries.length) {
+      await this.prisma.resultEntryPermission.createMany({ data: entries.map((entry) => ({ ...entry, schoolMembershipId: membership.id, assignedBy: actor.id })) });
+    }
     return this.getUserAccess(actor, userId);
+  }
+
+  private async delegatedEntries(user: AccessUser, academicYearId?: string, classId?: string, subjectId?: string) {
+    if (!user.schoolId || !(await this.getPermissions(user)).includes(PERMISSIONS.RESULTS_DELEGATED_ENTRY)) return [];
+    const membership = await this.prisma.schoolUser.findFirst({ where: { userId: user.id, schoolId: user.schoolId }, select: { id: true } });
+    if (!membership) return [];
+    return this.prisma.resultEntryPermission?.findMany({ where: { schoolMembershipId: membership.id, ...(academicYearId ? { academicYearId } : {}), ...(classId ? { classId } : {}), ...(subjectId ? { subjectId } : {}) }, select: { classId: true, subjectId: true, academicYearId: true } }) || [];
   }
 }

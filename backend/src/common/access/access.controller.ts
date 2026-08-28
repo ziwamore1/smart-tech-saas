@@ -28,6 +28,11 @@ export class AccessController {
     return this.access.teachingSubjects(req.user, classId, academicYearId);
   }
 
+  @Get('classes/available/:classId/subjects')
+  availableSubjects(@Req() req: any, @Param('classId') classId: string, @Query('academicYearId') academicYearId?: string) {
+    return this.access.teachingSubjects(req.user, classId, academicYearId);
+  }
+
   @Get('me/access/classes')
   diagnose(@Req() req: any, @Query('academicYearId') academicYearId?: string) {
     return this.access.diagnose(req.user, academicYearId);
@@ -57,7 +62,7 @@ export class AccessController {
   @Patch('users/:userId/permissions')
   @UseGuards(RolesGuard)
   @Roles('Director', 'Deputy Director', 'Head Teacher')
-  saveUserPermissions(@Req() req: any, @Param('userId') userId: string, @Body() body: { permissions: string[] }) {
-    return this.access.saveUserPermissions(req.user, userId, body.permissions || []);
+  saveUserPermissions(@Req() req: any, @Param('userId') userId: string, @Body() body: { permissions: string[]; resultEntryPermissions?: Array<{ classId: string; subjectId: string; academicYearId: string }> }) {
+    return this.access.saveUserPermissions(req.user, userId, body.permissions || [], body.resultEntryPermissions || []);
   }
 }

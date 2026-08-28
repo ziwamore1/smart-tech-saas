@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, classApi, termApi, gradingSystemApi, teacherApi, assessmentEngineApi, bulkSaveResults, bulkSaveAssessmentScores } from '@/lib/api';
+import { api, classApi, termApi, gradingSystemApi, teacherApi, assessmentEngineApi, bulkSaveResults, bulkSaveAssessmentScores, accessApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import { EXAM_TYPE_OPTIONS, examTypeLabel } from '@/lib/exam-types';
@@ -168,24 +168,15 @@ export default function ResultEntryPage() {
     return () => { socket.off('results:saved', handler); };
   }, [user?.schoolId, selectedClass, selectedTerm, queryClient]);
 
-  const { data: classesData } = useQuery({
-    queryKey: isTeacher ? ['teacher-classes'] : ['classes'],
+  const { data: classesData, isLoading: classesLoading, isError: classesError } = useQuery({
+    queryKey: ['result-entry-classes'],
     queryFn: async () => {
-      const fetchAll = async () => {
-        const r = await classApi.getAll();
-        const d = r.data?.data || r.data;
-        return Array.isArray(d) ? d : [];
-      };
-      if (!isTeacher) return fetchAll();
       try {
-        const r = await teacherApi.getClasses();
+        const r = await accessApi.getTeachingClasses();
         const d = r.data?.data || r.data;
         return Array.isArray(d) ? d : [];
       } catch (error) {
-        // Fall back to the unrestricted class list (same source used by the
-        // Results sheet) so the class dropdown is never empty when the
-        // teacher endpoint fails.
-        return fetchAll();
+        return [];
       }
     },
   });
@@ -205,7 +196,7 @@ export default function ResultEntryPage() {
     queryKey: ['class-subjects', selectedClass],
     queryFn: async () => {
       if (!selectedClass) return [];
-      const r = await api.get(`/class-subjects/class/${selectedClass}`);
+       const r = await accessApi.getTeachingSubjects(selectedClass);
       const d = r.data?.data || r.data;
       return Array.isArray(d) ? d : [];
     },
@@ -754,6 +745,15 @@ export default function ResultEntryPage() {
       || students.some((student: any) => (student.results || []).some((result: any) => result.score != null || result.isAbsent));
   const saveCount = componentMode ? dirtyComponentCells.size : dirtyCells.size;
   const saving = componentMode ? savingComponents : (bulkSaving || bulkSaveMutation.isPending);
+
+  if (!classesLoading && (classesError || (classesData && classes.length === 0))) {
+    return (
+      <div style={{ maxWidth: '640px', margin: '64px auto', padding: '32px', textAlign: 'center', border: '1px solid #fecaca', borderRadius: '16px', background: '#fff7f7' }}>
+        <h1 style={{ color: '#991b1b', fontSize: '24px', fontWeight: 700, marginBottom: '12px' }}>ACCESS DENIED</h1>
+        <p style={{ color: '#7f1d1d' }}>You are not authorized to enter results for any class or subject. Result entry is available only to assigned teachers or staff with explicit delegated access. Contact the Director to request access.</p>
+      </div>
+    );
+  }
 
   return (
     <div>
