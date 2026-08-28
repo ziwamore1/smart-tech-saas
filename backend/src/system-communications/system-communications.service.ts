@@ -14,6 +14,7 @@ import { NotificationService } from '../notification/notification.service';
 import { StudentFilterService } from '../common/services/student-filter.service';
 import * as nodemailer from 'nodemailer';
 import { google } from 'googleapis';
+import { mapBounded } from '../common/utils/concurrency.util';
 
 @Injectable()
 export class SystemCommunicationsService {
@@ -1594,14 +1595,13 @@ export class SystemCommunicationsService {
   }
 
   private async sendSmsToRecipients(item: any, recipients: any[]) {
-    for (const recipient of recipients) {
+    const twilioConfigured = await this.twilioService.isConfigured();
+    const beemConfigured = await this.beemService.isConfigured();
+
+    await mapBounded(recipients.filter((r) => r.phone), async (recipient) => {
       const phone = recipient.phone;
-      if (!phone) continue;
 
       try {
-        const twilioConfigured = await this.twilioService.isConfigured();
-        const beemConfigured = await this.beemService.isConfigured();
-
         if (twilioConfigured) {
           const result = await this.twilioService.sendSms(phone, item.message);
           await this.logMessageSent('SMS', result.success ? 'SENT' : 'FAILED', {
@@ -1610,7 +1610,7 @@ export class SystemCommunicationsService {
             errorMessage: result.error,
             message: item.message,
           });
-          if (result.success) continue;
+          if (result.success) return;
           this.logger.warn(`[SMS] Twilio failed, falling back to Beem: ${result.error}`);
         }
 
@@ -1638,7 +1638,7 @@ export class SystemCommunicationsService {
           message: item.message,
         });
       }
-    }
+    });
   }
 
   private async sendWhatsAppToRecipients(item: any, recipients: any[]) {

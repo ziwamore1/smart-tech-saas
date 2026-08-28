@@ -8,6 +8,7 @@ import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 import { SchoolActivityService } from '../common/services/school-activity.service';
 import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
+import { mapBounded } from '../common/utils/concurrency.util';
 
 @Injectable()
 export class ResultService {
@@ -584,7 +585,7 @@ export class ResultService {
     }
 
     const permissionErrors: any[] = [];
-    for (const pair of uniqueClassSubjectPairs) {
+    const permissionChecks = await mapBounded([...uniqueClassSubjectPairs], async (pair) => {
       const [classId, subjectId] = pair.split('::');
       try {
         await this.classAccess.assertCanEnterResults(
@@ -593,10 +594,12 @@ export class ResultService {
           subjectId,
           academicYearId,
         );
+        return null;
       } catch (e: any) {
-        permissionErrors.push({ classId, subjectId, error: e.message });
+        return { classId, subjectId, error: e.message };
       }
-    }
+    }, 8);
+    permissionErrors.push(...permissionChecks.filter(Boolean));
 
     if (permissionErrors.length > 0 || missingEnrollment.length > 0) {
       const allErrors = [...missingEnrollment, ...permissionErrors];

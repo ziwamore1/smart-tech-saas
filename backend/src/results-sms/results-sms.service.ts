@@ -4,6 +4,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SmsProviderFactory } from '../communications-cloud/providers/sms/sms-provider.factory';
 import { SmsProvider } from '../communications-cloud/interfaces/provider.interface';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
+import { mapBounded } from '../common/utils/concurrency.util';
+import { QueuesService } from '../queues/queues.service';
+import { QUEUE_NAMES } from '../queues/queue-definitions';
 
 const SINGLE_SMS_LIMIT = 160;
 
@@ -15,6 +18,7 @@ export class ResultsSmsService {
     private prisma: PrismaService,
     private smsProviderFactory: SmsProviderFactory,
     private compositeSubjectService: CompositeSubjectService,
+    private queuesService: QueuesService,
   ) {}
 
   /** The formatter consumes published computed results; it never grades or recalculates them. */
@@ -68,6 +72,12 @@ export class ResultsSmsService {
       positions.set(studentId, lastPosition);
     });
 
+    const compositesByStudent = new Map<string, any[]>();
+    const computedComposites = await mapBounded(students, (student) =>
+      this.compositeSubjectService.getCompositeResultsForStudent(student.id, termId, classId, schoolId),
+    );
+    computedComposites.forEach((comps, i) => compositesByStudent.set(students[i].id, comps));
+
     const recipients: any[] = [];
     for (const student of students) {
       const rows = computed.filter((r) => r.studentId === student.id);
@@ -94,9 +104,7 @@ export class ResultsSmsService {
       }));
 
       // Replace component subjects with composite subjects (e.g. Physics+Chemistry → Science)
-      const composites = await this.compositeSubjectService.getCompositeResultsForStudent(
-        student.id, termId, classId, schoolId,
-      );
+      const composites = compositesByStudent.get(student.id) ?? [];
       if (composites.length > 0) {
         const componentIds = new Set<string>();
         for (const comp of composites) {
@@ -177,45 +185,49 @@ export class ResultsSmsService {
     }
     const batchId = `RESULTS-${Date.now()}`;
     const logs: any[] = [];
-    for (const r of preview.recipients.filter((item) => !targets.includes(item))) {
-      logs.push(await this.prisma.resultSmsLog.create({ data: {
+    logs.push(...(await mapBounded(
+      preview.recipients.filter((item) => !targets.includes(item)),
+      (r) => this.prisma.resultSmsLog.create({ data: {
         schoolId, classId, termId, studentId: r.studentId, parentId: r.parentId, parentName: r.parentName, studentName: r.studentName,
         admissionNumber: r.admissionNumber, phoneNumber: r.phoneNumber, message: r.message, status: 'SKIPPED', failureCode: r.errorCode || 'NO_PHONE_NUMBER',
         errorMessage: r.errorCode === 'INVALID_PHONE_NUMBER' ? 'Parent phone number is invalid.' : 'No parent phone number is registered.', errorSuggestion: r.errorSuggestion,
         resultVersion: r.resultVersion, initiatedById: userId, messageHash: this.hash(r.message), batchId, retryCount: 0,
-      } }));
-    }
-    let provider: SmsProvider;
-    try {
-      provider = await this.resolveProvider(schoolId);
-    } catch (error: any) {
-      for (const r of targets) {
-        logs.push(await this.prisma.resultSmsLog.create({ data: {
-          schoolId, classId, termId, studentId: r.studentId, parentId: r.parentId, parentName: r.parentName, studentName: r.studentName,
-          admissionNumber: r.admissionNumber, phoneNumber: r.phoneNumber, message: r.message, status: 'PROVIDER_ERROR', failureCode: 'PROVIDER_NOT_CONFIGURED',
-          errorMessage: 'SMS provider is not configured for this school.', errorSuggestion: 'Configure an SMS provider in Communications Settings.', resultVersion: r.resultVersion, initiatedById: userId, messageHash: this.hash(r.message), batchId, failedAt: new Date(),
-        } }));
-      }
-      return { success: false, batchId, total: targets.length, sent: 0, failed: targets.length, skipped: preview.recipients.length - targets.length, estimatedUnits: preview.estimatedUnits, logs, message: error.message };
-    }
-    for (const r of targets) {
+      } }),
+    )));
+    const queuedLogs = await mapBounded(targets, (r) => this.prisma.resultSmsLog.create({ data: {
+      schoolId, classId, termId, studentId: r.studentId, parentId: r.parentId, parentName: r.parentName, studentName: r.studentName,
+      admissionNumber: r.admissionNumber, phoneNumber: r.phoneNumber, message: r.message, status: 'QUEUED',
+      resultVersion: r.resultVersion, initiatedById: userId, messageHash: this.hash(r.message), batchId, retryCount: 0,
+    } }));
+    logs.push(...queuedLogs);
+    const job = await this.queuesService.addJob(QUEUE_NAMES.RESULTS_SMS, 'send-results', {
+      schoolId,
+      batchId,
+      logs: queuedLogs.map((log, index) => ({ id: log.id, recipient: targets[index] })),
+    }, { jobId: batchId });
+    if (!job) throw new Error('Redis is unavailable; results SMS was not queued.');
+    return { success: true, batchId, total: targets.length, sent: 0, queued: targets.length, failed: 0, skipped: preview.recipients.length - targets.length, estimatedUnits: preview.estimatedUnits, logs };
+  }
+
+  async processQueuedBatch(data: { schoolId: string; logs: Array<{ id: string; recipient: any }> }) {
+    const provider = await this.resolveProvider(data.schoolId);
+    await mapBounded(data.logs, async ({ id, recipient }) => {
       let result: any;
       let providerName: string | undefined;
       try {
-        const sent = await provider.send({ to: r.phoneNumber, body: r.message });
+        const sent = await provider.send({ to: recipient.phoneNumber, body: recipient.message });
         result = { success: sent.success, id: sent.providerMessageId || sent.messageId, error: sent.error, response: JSON.stringify(sent) };
         providerName = sent.provider || 'sms-provider';
       } catch (error: any) { result = { success: false, error: error.message, response: error.stack }; }
-      logs.push(await this.prisma.resultSmsLog.create({ data: {
-        schoolId, classId, termId, studentId: r.studentId, parentId: r.parentId, parentName: r.parentName, studentName: r.studentName,
-        admissionNumber: r.admissionNumber, phoneNumber: r.phoneNumber, message: r.message, status: result.success ? 'SENT' : this.failureStatus(result.error),
-        provider: providerName, providerMessageId: result.id, providerResponse: result.response, errorMessage: result.success ? undefined : this.diagnostic(result.error).message,
-        errorSuggestion: result.success ? undefined : this.diagnostic(result.error).action, failureCode: result.success ? undefined : this.diagnostic(result.error).code,
-        resultVersion: r.resultVersion, initiatedById: userId, messageHash: this.hash(r.message), batchId, sentAt: result.success ? new Date() : undefined, failedAt: result.success ? undefined : new Date(), retryCount: 0,
-      } }));
-    }
-    const sent = logs.filter((l) => l.status === 'SENT').length;
-    return { success: sent === targets.length, batchId, total: targets.length, sent, failed: targets.length - sent, skipped: preview.recipients.length - targets.length, estimatedUnits: preview.estimatedUnits, logs };
+      await this.prisma.resultSmsLog.update({ where: { id }, data: {
+        status: result.success ? 'SENT' : this.failureStatus(result.error), provider: providerName,
+        providerMessageId: result.id, providerResponse: result.response,
+        errorMessage: result.success ? null : this.diagnostic(result.error).message,
+        errorSuggestion: result.success ? null : this.diagnostic(result.error).action,
+        failureCode: result.success ? null : this.diagnostic(result.error).code,
+        sentAt: result.success ? new Date() : null, failedAt: result.success ? null : new Date(),
+      } });
+    });
   }
 
   async retryLog(schoolId: string, id: string, userId: string) {

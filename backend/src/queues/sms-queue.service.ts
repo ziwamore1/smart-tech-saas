@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BeemService } from '../beem/beem.service';
 import { TwilioService } from '../twilio/twilio.service';
+import { mapBounded } from '../common/utils/concurrency.util';
 
 @Injectable()
 export class SmsQueueService {
@@ -36,7 +37,7 @@ export class SmsQueueService {
     if (jobs.length === 0) return 0;
 
     let processed = 0;
-    for (const job of jobs) {
+    await mapBounded(jobs, async (job) => {
       try {
         await this.prisma.smsQueue.update({
           where: { id: job.id },
@@ -64,7 +65,7 @@ export class SmsQueueService {
           },
         });
       }
-    }
+    });
     return processed;
   }
 

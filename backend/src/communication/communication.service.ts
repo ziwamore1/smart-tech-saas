@@ -12,6 +12,7 @@ import { CommunicationsCloudService } from '../communications-cloud/communicatio
 import mail from '@sendgrid/mail';
 import * as nodemailer from 'nodemailer';
 import { google } from 'googleapis';
+import { mapBounded } from '../common/utils/concurrency.util';
 
 @Injectable()
 export class CommunicationService {
@@ -245,20 +246,20 @@ export class CommunicationService {
       `[SMS] Sending to ${recipients.length} recipients: ${communication.message.substring(0, 50)}...`,
     );
 
-    for (const recipient of recipients) {
-      if (recipient.phone) {
-        await this.simulateSMSApi(
-          settings,
-          recipient.phone,
-          communication.message,
-          communication.schoolId,
-        );
-        await this.addLog(communication.id, 'sent', {
-          recipientId: recipient.id,
-          phone: recipient.phone,
-        });
-      }
-    }
+    await mapBounded(recipients.filter((recipient) => recipient.phone), async (recipient) => {
+      const result = await this.simulateSMSApi(
+        settings,
+        recipient.phone,
+        communication.message,
+        communication.schoolId,
+      );
+      await this.addLog(communication.id, result.success ? 'queued' : 'failed', {
+        recipientId: recipient.id,
+        phone: recipient.phone,
+        error: result.error,
+        messageId: result.messageId,
+      });
+    });
 
     return {
       success: true,
@@ -688,17 +689,21 @@ export class CommunicationService {
       select: { id: true, phone: true },
     });
 
-    let sentCount = 0;
-    for (const user of users) {
-      if (user.phone) {
-        await this.simulateSMSApi(settings, user.phone, communication.message, communication.schoolId);
-        await this.addLog(communication.id, 'sent', {
-          recipientId: user.id,
-          phone: user.phone,
-        });
-        sentCount++;
-      }
-    }
+    const results = await mapBounded(
+      users.filter((user) => user.phone),
+      async (user) => {
+        const result = await this.simulateSMSApi(settings, user.phone!, communication.message, communication.schoolId);
+        if (result.success) {
+          await this.addLog(communication.id, 'queued', {
+            recipientId: user.id,
+            phone: user.phone,
+            messageId: result.messageId,
+          });
+        }
+        return result.success;
+      },
+    );
+    const sentCount = results.filter(Boolean).length;
 
     return {
       success: true,

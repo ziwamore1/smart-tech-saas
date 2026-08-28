@@ -5,11 +5,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SmsProviderFactory } from '../communications-cloud/providers/sms/sms-provider.factory';
 import { CommunicationsCloudModule } from '../communications-cloud/communications-cloud.module';
 import { CompositeSubjectModule } from '../composite-subject/composite-subject.module';
+import { ResultsSmsWorker } from './results-sms.worker';
 
 @Module({
   imports: [CommunicationsCloudModule, CompositeSubjectModule],
   controllers: [ResultsSmsController],
-  providers: [ResultsSmsService, PrismaService],
+  providers: [ResultsSmsService, PrismaService, ResultsSmsWorker],
   exports: [ResultsSmsService],
 })
 export class ResultsSmsModule {}

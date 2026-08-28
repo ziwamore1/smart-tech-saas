@@ -6,6 +6,7 @@ export const QUEUE_NAMES = {
   EXPORT: 'export-jobs',
   AI_REPORT: 'ai-report-generation',
   NOTIFICATION: 'notification-delivery',
+  RESULTS_SMS: 'results-sms',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -36,6 +37,12 @@ export const QUEUE_DEFAULT_OPTIONS: Record<QueueName, JobsOptions> = {
     removeOnFail: { age: 604800, count: 50 },
   },
   [QUEUE_NAMES.NOTIFICATION]: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 2000 },
+    removeOnComplete: { age: 86400, count: 200 },
+    removeOnFail: { age: 604800, count: 100 },
+  },
+  [QUEUE_NAMES.RESULTS_SMS]: {
     attempts: 3,
     backoff: { type: 'exponential', delay: 2000 },
     removeOnComplete: { age: 86400, count: 200 },

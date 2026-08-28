@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Logger, Inject, Optional, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { mapBounded } from '../common/utils/concurrency.util';
 import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { RankingService } from '../ranking-service/ranking.service';
 import { ResultAnalyticsService } from '../result-analytics/result-analytics.service';
@@ -1942,83 +1943,65 @@ export class ResultsManagementService {
       });
     }
 
-    for (const row of rows) {
+    const admissionNumbers = [...new Set(rows.map((row) => String(row['AdmissionNumber'] || '').trim()).filter(Boolean))];
+    const students = await this.prisma.student.findMany({
+      where: { admissionNumber: { in: admissionNumbers }, schoolId, status: 'ACTIVE' },
+      select: { id: true, admissionNumber: true },
+    });
+    const studentMap = new Map(students.map((student) => [student.admissionNumber, student]));
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { studentId: { in: students.map((student) => student.id) }, academicYearId: currentAcYear, status: 'ACTIVE' },
+      select: { studentId: true, classId: true },
+    });
+    const enrollmentMap = new Map(enrollments.map((enrollment) => [enrollment.studentId, enrollment]));
+    const subjectIds = [...new Set(subjectMap.values())];
+    const existingResults = await this.prisma.result.findMany({
+      where: { studentId: { in: students.map((student) => student.id) }, subjectId: { in: subjectIds }, termId },
+      select: { id: true, studentId: true, subjectId: true },
+    });
+    const existingMap = new Map(existingResults.map((result) => [`${result.studentId}:${result.subjectId}`, result]));
+
+    const rowStats = await mapBounded(rows, async (row) => {
+      let rowCreated = 0;
+      let rowUpdated = 0;
+      let rowSkipped = 0;
+      const rowErrors: string[] = [];
       const admissionNumber = String(row['AdmissionNumber'] || '').trim();
-      if (!admissionNumber) {
-        skipped++;
-        continue;
-      }
+      if (!admissionNumber) return { rowCreated, rowUpdated, rowSkipped: 1, rowErrors };
 
-      const student = await this.prisma.student.findFirst({
-        where: { admissionNumber, schoolId, status: 'ACTIVE' },
-      });
-
-      if (!student) {
-        errors.push(`Student not found: ${admissionNumber}`);
-        skipped++;
-        continue;
-      }
-
-      const enrollment = await this.prisma.enrollment.findFirst({
-        where: {
-          studentId: student.id,
-          academicYearId: currentAcYear,
-          status: 'ACTIVE',
-          student: { status: 'ACTIVE' },
-        },
-      });
+      const student = studentMap.get(admissionNumber);
+      if (!student) return { rowCreated, rowUpdated, rowSkipped: 1, rowErrors: [`Student not found: ${admissionNumber}`] };
+      const enrollment = enrollmentMap.get(student.id);
 
       for (const column in row) {
         const colLower = column.toLowerCase();
         if (['admissionnumber', 'firstname', 'lastname', 'class'].includes(colLower)) continue;
-
         const subjectId = subjectMap.get(colLower);
-        if (!subjectId) continue;
-
         const val = row[column];
-        if (val === undefined || val === '' || val === null) continue;
-
+        if (!subjectId || val === undefined || val === '' || val === null) continue;
         const score = Number(val);
         if (isNaN(score) || score < 0 || score > 100) {
-          errors.push(`Invalid score for ${admissionNumber} in ${column}`);
+          rowErrors.push(`Invalid score for ${admissionNumber} in ${column}`);
           continue;
         }
-
         const gradeResult = await this.gradingEngine.computeGradeFull(
           score, enrollment?.classId || classId, subjectId, termId, schoolId,
         );
-
-        const existing = await this.prisma.result.findFirst({
-          where: { studentId: student.id, subjectId, termId, student: { status: 'ACTIVE' } },
+        await this.prisma.result.upsert({
+          where: { studentId_subjectId_termId: { studentId: student.id, subjectId, termId } },
+          update: { score, grade: gradeResult.grade, remark: gradeResult.remark, teacherId: userId },
+          create: { studentId: student.id, subjectId, termId, schoolId, teacherId: userId, score, grade: gradeResult.grade, remark: gradeResult.remark },
         });
-
-        if (existing) {
-          await this.prisma.result.update({
-            where: { id: existing.id },
-            data: {
-              score,
-              grade: gradeResult.grade,
-              remark: gradeResult.remark,
-              teacherId: userId,
-            },
-          });
-          updated++;
-        } else {
-          await this.prisma.result.create({
-            data: {
-              studentId: student.id,
-              subjectId,
-              termId,
-              schoolId,
-              teacherId: userId,
-              score,
-              grade: gradeResult.grade,
-              remark: gradeResult.remark,
-            },
-          });
-          created++;
-        }
+        if (existingMap.has(`${student.id}:${subjectId}`)) rowUpdated++;
+        else rowCreated++;
       }
+      return { rowCreated, rowUpdated, rowSkipped, rowErrors };
+    });
+    for (const stats of rowStats) {
+      created += stats.rowCreated;
+      updated += stats.rowUpdated;
+      skipped += stats.rowSkipped;
+      errors.push(...stats.rowErrors);
     }
 
     this.ensureComputedResults(classId, termId, schoolId);
