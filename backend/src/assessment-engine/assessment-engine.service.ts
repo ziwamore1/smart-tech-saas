@@ -1250,42 +1250,45 @@ export class AssessmentEngineService {
       ? await this.prisma.term.findFirst({ where: { id: termId, academicYear: { schoolId } } })
       : await this.prisma.term.findFirst({ where: { academicYear: { schoolId }, isCurrent: true } });
     if (!selectedTerm) return pending;
-    const enrollmentCounts = new Map<string, number>();
-
-    for (const assignment of assignments) {
-      const configs = await this.prisma.termAssessmentConfiguration.findMany({
-        where: {
-          classId: assignment.classId,
-          subjectId: assignment.subjectId,
-          termId: selectedTerm.id,
-        },
+    const classIds = [...new Set(assignments.map((assignment) => assignment.classId))];
+    const subjectIds = [...new Set(assignments.map((assignment) => assignment.subjectId))];
+    const [configs, enrollmentCounts, enteredCounts] = await Promise.all([
+      this.prisma.termAssessmentConfiguration.findMany({
+        where: { termId: selectedTerm.id, classId: { in: classIds }, subjectId: { in: subjectIds } },
         include: { assessmentDef: true },
         orderBy: { sequenceOrder: 'asc' },
-      });
+      }),
+      this.prisma.enrollment.groupBy({
+        by: ['classId'],
+        where: { classId: { in: classIds }, academicYearId: selectedTerm.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+        _count: { _all: true },
+      }),
+      this.prisma.studentAssessmentResult.groupBy({
+        by: ['classId', 'subjectId', 'assessmentDefId', 'enteredBy'],
+        where: {
+          classId: { in: classIds },
+          subjectId: { in: subjectIds },
+          termId: selectedTerm.id,
+          enteredBy: { in: teacherIds?.length ? teacherIds : [teacherId] },
+          OR: [{ rawScore: { not: null } }, { isAbsent: true }],
+        },
+        _count: { _all: true },
+      }),
+    ]);
+    const enrolledByClass = new Map(enrollmentCounts.map((row) => [row.classId, row._count._all]));
+    const enteredByKey = new Map(enteredCounts.map((row) => [`${row.classId}:${row.subjectId}:${row.assessmentDefId}:${row.enteredBy}`, row._count._all]));
+    const configsByPair = new Map<string, typeof configs>();
+    for (const config of configs) {
+      const key = `${config.classId}:${config.subjectId}`;
+      const current = configsByPair.get(key) || [];
+      current.push(config);
+      configsByPair.set(key, current);
+    }
 
-      for (const config of configs) {
-        let enrolledStudents = enrollmentCounts.get(assignment.classId);
-        if (enrolledStudents == null) {
-          enrolledStudents = await this.prisma.enrollment.count({
-            where: { classId: assignment.classId, academicYearId: selectedTerm.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
-          });
-          enrollmentCounts.set(assignment.classId, enrolledStudents);
-        }
-
-        const enteredCount = await this.prisma.studentAssessmentResult.count({
-          where: {
-            classId: assignment.classId,
-            subjectId: assignment.subjectId,
-            termId: selectedTerm.id,
-            assessmentDefId: config.assessmentDefId,
-            OR: [
-              { rawScore: { not: null } },
-              { isAbsent: true },
-            ],
-            enteredBy: assignment.teacherId,
-          },
-        });
-
+    for (const assignment of assignments) {
+      const enrolledStudents = enrolledByClass.get(assignment.classId) || 0;
+      for (const config of configsByPair.get(`${assignment.classId}:${assignment.subjectId}`) || []) {
+        const enteredCount = enteredByKey.get(`${assignment.classId}:${assignment.subjectId}:${config.assessmentDefId}:${assignment.teacherId}`) || 0;
         if (includeCompleted || enteredCount < enrolledStudents) {
           pending.push({
             teacherId: assignment.teacherId,
