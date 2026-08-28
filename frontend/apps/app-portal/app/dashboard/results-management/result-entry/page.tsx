@@ -488,6 +488,12 @@ export default function ResultEntryPage() {
     setDirtyComponentCells(prev => new Set(prev).add(`${key}::${defId}`));
   }, []);
 
+  const componentEntryCount = useMemo(() => {
+    let count = 0;
+    Object.values(componentScores).forEach((cell) => { count += Object.keys(cell).length; });
+    return count;
+  }, [componentScores]);
+
   const handleSaveComponents = useCallback(async () => {
     if (!selectedClass || !selectedSubject || !selectedTerm || selectedSubject === 'all') {
       toast.error('Please select class, subject, term and subject');
