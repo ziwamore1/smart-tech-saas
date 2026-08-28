@@ -46,12 +46,16 @@ export default function TeachersPage() {
       return data;
     },
   });
+  const unwrapList = (value: any) => {
+    const data = value?.data?.data ?? value?.data ?? value;
+    return Array.isArray(data) ? data : [];
+  };
   const { data: accessClassesData } = useQuery({ queryKey: ['access-classes'], enabled: showAccessModal, queryFn: async () => (await accessApi.getAvailableClasses()).data });
   const { data: accessSubjectsData } = useQuery({ queryKey: ['access-class-subjects', newAccessEntry.classId], enabled: showAccessModal && !!newAccessEntry.classId, queryFn: async () => (await accessApi.getAvailableSubjects(newAccessEntry.classId)).data });
   const { data: accessYearsData } = useQuery({ queryKey: ['access-academic-years'], enabled: showAccessModal, queryFn: async () => (await academicYearApi.getAll()).data });
-  const accessClasses = accessClassesData?.data || accessClassesData || [];
-  const accessSubjects = accessSubjectsData?.data || accessSubjectsData || [];
-  const accessYears = accessYearsData?.data || accessYearsData || [];
+  const accessClasses = unwrapList(accessClassesData);
+  const accessSubjects = unwrapList(accessSubjectsData).map((item: any) => item.subject || item);
+  const accessYears = unwrapList(accessYearsData);
   const saveAccessMutation = useMutation({
     mutationFn: () => accessApi.saveUserPermissions(accessUserId, accessPermissions, accessResultEntries),
     onSuccess: () => {
@@ -1156,7 +1160,8 @@ export default function TeachersPage() {
                       {accessYears.map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}
                     </select>
                   </div>
-                  <button type="button" onClick={() => { if (newAccessEntry.classId && newAccessEntry.subjectId && newAccessEntry.academicYearId && !accessResultEntries.some((entry) => entry.classId === newAccessEntry.classId && entry.subjectId === newAccessEntry.subjectId && entry.academicYearId === newAccessEntry.academicYearId)) { setAccessResultEntries([...accessResultEntries, newAccessEntry]); setNewAccessEntry({ ...newAccessEntry, subjectId: '' }); } }} className="mt-2 px-3 py-1.5 rounded-lg text-sm bg-gray-100 hover:bg-gray-200">Add scope</button>
+                  <button type="button" disabled={!newAccessEntry.classId || !newAccessEntry.subjectId || !newAccessEntry.academicYearId} onClick={() => { if (!accessResultEntries.some((entry) => entry.classId === newAccessEntry.classId && entry.subjectId === newAccessEntry.subjectId && entry.academicYearId === newAccessEntry.academicYearId)) { setAccessResultEntries([...accessResultEntries, newAccessEntry]); setNewAccessEntry({ ...newAccessEntry, subjectId: '' }); } }} className="mt-2 px-3 py-1.5 rounded-lg text-sm bg-violet-600 text-white hover:bg-violet-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed">Add scope</button>
+                  {(!newAccessEntry.classId || !newAccessEntry.subjectId || !newAccessEntry.academicYearId) && <p className="mt-2 text-xs text-gray-500">Select a class, an allowed subject, and an academic year before adding a scope.</p>}
                   <div className="mt-3 space-y-2">
                     {accessResultEntries.map((entry) => <div key={`${entry.classId}-${entry.subjectId}-${entry.academicYearId}`} className="flex items-center justify-between rounded-lg bg-violet-50 px-3 py-2 text-sm"><span>{accessClasses.find((item: any) => item.id === entry.classId)?.name || entry.classId} / {entry.subjectId} / {accessYears.find((item: any) => item.id === entry.academicYearId)?.name || entry.academicYearId}</span><button type="button" onClick={() => setAccessResultEntries(accessResultEntries.filter((item) => item !== entry))} className="text-red-600">Remove</button></div>)}
                   </div>
