@@ -7,16 +7,16 @@ export class SchoolActivityController {
   constructor(private readonly activityService: SchoolActivityService) {}
 
   @Get('stats')
-  getStats(@Query('schoolId') schoolId: string) {
+  async getStats(@Query('schoolId') schoolId: string) {
     if (!schoolId) {
       return { statusCode: 400, message: 'schoolId required', data: null };
     }
-    const stats = this.activityService.getLiveStats(schoolId);
+    const stats = await this.activityService.getPersistentStats(schoolId);
     return { statusCode: 200, data: stats };
   }
 
   @Get('feed')
-  getFeed(
+  async getFeed(
     @Query('schoolId') schoolId: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
@@ -31,7 +31,7 @@ export class SchoolActivityController {
       ? (category as ActivityCategory)
       : undefined;
 
-    const feed = this.activityService.getFeed(schoolId, parsedLimit, parsedOffset, parsedCategory);
+    const feed = await this.activityService.getFeed(schoolId, parsedLimit, parsedOffset, parsedCategory);
     return { statusCode: 200, data: feed };
   }
 

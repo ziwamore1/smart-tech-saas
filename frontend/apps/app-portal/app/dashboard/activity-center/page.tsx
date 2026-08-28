@@ -219,7 +219,7 @@ function ClassCompletionPanel() {
     refetchInterval: 60000,
   });
 
-  const classes = completionData?.classes || [];
+  const classes = Array.isArray(completionData) ? completionData : (completionData?.classes || []);
 
   return (
     <div>
@@ -230,13 +230,13 @@ function ClassCompletionPanel() {
       ) : (
         <div style={{ display: 'grid', gap: '8px' }}>
           {classes.map((cls: any) => {
-            const pct = cls.completionPercent || 0;
+            const pct = cls.completionPercent ?? cls.completionRate ?? 0;
             const color = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
             return (
               <div key={cls.classId || cls.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{cls.className || cls.name || 'Class'}</div>
-                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{cls.completed || 0} / {cls.total || 0} subjects entered</div>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{cls.completed ?? cls.completeSubjects ?? 0} / {cls.total ?? cls.totalSubjects ?? 0} subjects entered</div>
                 </div>
                 <div style={{ width: '120px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>

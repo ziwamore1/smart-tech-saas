@@ -1,5 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { SchoolEventsGateway } from '../school-events.gateway';
+import { PrismaService } from '../../prisma/prisma.service';
 import {
   ActivityEvent,
   ActivityEventType,
@@ -21,7 +22,7 @@ export class SchoolActivityService {
   private presenceBySchool = new Map<string, Map<string, PresenceInfo>>();
   private dailyCountersBySchool = new Map<string, Map<string, number>>();
 
-  private constructor() {}
+  constructor(private readonly prisma: PrismaService) {}
 
   getGateway(): SchoolEventsGateway | undefined {
     return this._gateway;
@@ -43,6 +44,9 @@ export class SchoolActivityService {
     this.addToFeed(event.schoolId, fullEvent);
     this.incrementCounter(event.schoolId, 'total');
     this.incrementCounter(event.schoolId, event.type);
+    void this.prisma.schoolActivityEvent.create({
+      data: { ...fullEvent, metadata: fullEvent.metadata as any },
+    }).catch((error) => this.logger.warn(`Could not persist activity event: ${error.message}`));
 
     if (this._gateway) {
       this._gateway.emitToSchool(event.schoolId, 'activity:live', fullEvent);
@@ -64,13 +68,18 @@ export class SchoolActivityService {
     }
   }
 
-  getFeed(schoolId: string, limit = 50, offset = 0, category?: ActivityCategory): ActivityEvent[] {
+  async getFeed(schoolId: string, limit = 50, offset = 0, category?: ActivityCategory): Promise<ActivityEvent[]> {
     const feed = this.activityFeedBySchool.get(schoolId) || [];
-    if (category) {
-      const categoryEvents = this.getEventsForCategory(category);
-      return feed.filter(e => categoryEvents.includes(e.type)).slice(offset, offset + limit);
-    }
-    return feed.slice(offset, offset + limit);
+    const categoryEvents = category ? this.getEventsForCategory(category) : undefined;
+    const persisted = await this.prisma.schoolActivityEvent.findMany({
+      where: { schoolId, ...(categoryEvents ? { type: { in: categoryEvents } } : {}) },
+      orderBy: { timestamp: 'desc' },
+      skip: offset,
+      take: limit,
+    });
+    const memory = (category ? feed.filter(e => categoryEvents!.includes(e.type)) : feed)
+      .filter((event) => !persisted.some((saved) => saved.id === event.id));
+    return [...memory, ...persisted].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, limit);
   }
 
   private getEventsForCategory(category: ActivityCategory): ActivityEventType[] {
@@ -139,11 +148,32 @@ export class SchoolActivityService {
       activeExams: counters.get('EXAM_STARTED') || 0,
       aiTutorSessions: counters.get('AI_TUTOR_SESSION_STARTED') || 0,
       attendanceMarkedToday: (counters.get('ATTENDANCE_MARKED') || 0) + (counters.get('ATTENDANCE_BULK_MARKED') || 0),
-      attendancePendingToday: Math.max(0, (counters.get('ATTENDANCE_MARKED') || 0) - (counters.get('ATTENDANCE_MARKED') || 0)),
+      attendancePendingToday: counters.get('ATTENDANCE_PENDING') || 0,
       resultsEnteredToday: (counters.get('RESULT_ENTERED') || 0) + (counters.get('RESULT_BULK_ENTERED') || 0) + (counters.get('RESULT_SAVED') || 0),
       assignmentsGradedToday: counters.get('ASSIGNMENT_GRADED') || 0,
       classesWithActivity: this.getUniqueClassesWithActivity(schoolId),
       averageAttendanceRate: 0,
+    };
+  }
+
+  async getPersistentStats(schoolId: string): Promise<LiveStats> {
+    const stats = this.getLiveStats(schoolId);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const counts = await this.prisma.schoolActivityEvent.groupBy({
+      by: ['type'],
+      where: { schoolId, timestamp: { gte: today } },
+      _count: { _all: true },
+    });
+    const persisted = new Map(counts.map((row) => [row.type, row._count._all]));
+    const count = (type: string) => persisted.get(type) || 0;
+    return {
+      ...stats,
+      activeExams: Math.max(stats.activeExams, count(ActivityEventType.EXAM_STARTED)),
+      aiTutorSessions: Math.max(stats.aiTutorSessions, count(ActivityEventType.AI_TUTOR_SESSION_STARTED)),
+      attendanceMarkedToday: Math.max(stats.attendanceMarkedToday, count(ActivityEventType.ATTENDANCE_MARKED) + count(ActivityEventType.ATTENDANCE_BULK_MARKED)),
+      resultsEnteredToday: Math.max(stats.resultsEnteredToday, count(ActivityEventType.RESULT_ENTERED) + count(ActivityEventType.RESULT_BULK_ENTERED) + count(ActivityEventType.RESULT_SAVED)),
+      assignmentsGradedToday: Math.max(stats.assignmentsGradedToday, count(ActivityEventType.ASSIGNMENT_GRADED)),
     };
   }
 
