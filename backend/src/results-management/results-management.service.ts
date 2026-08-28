@@ -686,8 +686,7 @@ export class ResultsManagementService {
       where: { classId: sheet.classId },
     });
 
-    const computationResults: { subjectId: string; computed: number; failed: number; error?: string }[] = [];
-    for (const cs of classSubjects) {
+    const computationResults = await mapBounded(classSubjects, async (cs) => {
       try {
         const result = await this.gradingEngine.computeAllClassResults(
           sheet.classId,
@@ -695,12 +694,12 @@ export class ResultsManagementService {
           sheet.termId,
           sheet.schoolId,
         );
-        computationResults.push({ subjectId: cs.subjectId, ...result });
+        return { subjectId: cs.subjectId, ...result };
       } catch (error: any) {
         this.logger.error(`Verification compute failed for subject ${cs.subjectId}: ${error.message}`);
-      computationResults.push({ subjectId: cs.subjectId, computed: 0, failed: 0, error: error.message });
+        return { subjectId: cs.subjectId, computed: 0, failed: 0, error: error.message };
       }
-    }
+    }, 4);
 
     // Recompute all composite subjects for this class/term
     const compositeResults = await this.compositeSubjectService.recomputeAllCompositesForClass(sheet.classId, sheet.termId, sheet.schoolId).catch(e => {

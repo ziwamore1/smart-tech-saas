@@ -210,8 +210,25 @@ export class ResultsSmsService {
   }
 
   async processQueuedBatch(data: { schoolId: string; logs: Array<{ id: string; recipient: any }> }) {
-    const provider = await this.resolveProvider(data.schoolId);
+    let provider: SmsProvider;
+    try {
+      provider = await this.resolveProvider(data.schoolId);
+    } catch (error: any) {
+      await this.prisma.resultSmsLog.updateMany({
+        where: { id: { in: data.logs.map((log) => log.id) }, status: { in: ['PENDING', 'QUEUED'] } },
+        data: {
+          status: 'PROVIDER_ERROR',
+          failureCode: 'PROVIDER_NOT_CONFIGURED',
+          errorMessage: 'SMS provider is not configured for this school.',
+          errorSuggestion: 'Configure an SMS provider in Communications Settings, then retry.',
+          failedAt: new Date(),
+        },
+      });
+      throw error;
+    }
     await mapBounded(data.logs, async ({ id, recipient }) => {
+      const current = await this.prisma.resultSmsLog.findUnique({ where: { id }, select: { status: true } });
+      if (!current || ['SENT', 'DELIVERED', 'FAILED', 'REJECTED', 'INVALID_NUMBER', 'PROVIDER_ERROR', 'INSUFFICIENT_BALANCE', 'OPTED_OUT'].includes(current.status)) return;
       let result: any;
       let providerName: string | undefined;
       try {

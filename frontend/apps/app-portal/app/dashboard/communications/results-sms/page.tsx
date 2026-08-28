@@ -1,13 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { resultsSmsApi, classApi, termApi } from '@/lib/api';
 import { PermissionGuard } from '@/components/permissions/PermissionGuard';
 
 const statusStyles: Record<string, string> = {
   VALID: 'bg-emerald-50 text-emerald-700', MISSING: 'bg-amber-50 text-amber-700', INVALID: 'bg-rose-50 text-rose-700',
-  SENT: 'bg-emerald-50 text-emerald-700', DELIVERED: 'bg-sky-50 text-sky-700', FAILED: 'bg-rose-50 text-rose-700',
+  SENT: 'bg-emerald-50 text-emerald-700', DELIVERED: 'bg-sky-50 text-sky-700', QUEUED: 'bg-amber-50 text-amber-700', PENDING: 'bg-amber-50 text-amber-700', FAILED: 'bg-rose-50 text-rose-700',
   PROVIDER_ERROR: 'bg-rose-50 text-rose-700', SKIPPED: 'bg-amber-50 text-amber-700',
 };
 
@@ -21,6 +21,7 @@ export default function ResultsSmsPage() {
   const [openStudent, setOpenStudent] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [allowResend, setAllowResend] = useState(false);
+  const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
 
   const { data: classes } = useQuery({ queryKey: ['classes'], queryFn: () => classApi.getAll().then((r) => r.data) });
   const { data: terms } = useQuery({ queryKey: ['terms'], queryFn: () => termApi.getAll().then((r) => r.data) });
@@ -32,9 +33,25 @@ export default function ResultsSmsPage() {
   });
   const { data: history } = useQuery({ queryKey: ['results-sms-history', classId, termId], queryFn: () => resultsSmsApi.getHistory(classId || undefined, termId || undefined).then((r) => r.data), enabled: tab === 'history' });
   const { data: failed } = useQuery({ queryKey: ['results-sms-failed'], queryFn: () => resultsSmsApi.getFailedLogs().then((r) => r.data), enabled: tab === 'failed' });
+  const { data: activeBatchLogs } = useQuery({
+    queryKey: ['results-sms-batch', activeBatchId],
+    queryFn: () => resultsSmsApi.getBatchLogs(activeBatchId!).then((r) => r.data),
+    enabled: Boolean(activeBatchId),
+    refetchInterval: activeBatchId ? 2000 : false,
+  });
+  useEffect(() => {
+    if (!activeBatchId || !activeBatchLogs?.length) return;
+    const finished = activeBatchLogs.every((log: any) => ['SENT', 'DELIVERED', 'FAILED', 'REJECTED', 'INVALID_NUMBER', 'PROVIDER_ERROR', 'SKIPPED', 'INSUFFICIENT_BALANCE', 'OPTED_OUT'].includes(log.status));
+    if (finished) {
+      setActiveBatchId(null);
+      queryClient.invalidateQueries({ queryKey: ['results-sms-history'] });
+      queryClient.invalidateQueries({ queryKey: ['results-sms-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['results-sms-failed'] });
+    }
+  }, [activeBatchId, activeBatchLogs, queryClient]);
   const send = useMutation({
     mutationFn: () => resultsSmsApi.send({ classId, termId, studentIds: scope === 'selected' ? selectedStudents : undefined, allowResend }),
-    onSuccess: () => { setConfirm(false); setAllowResend(false); queryClient.invalidateQueries({ queryKey: ['results-sms'] }); setTab('history'); },
+    onSuccess: (response: any) => { setConfirm(false); setAllowResend(false); setActiveBatchId(response.data?.batchId || null); queryClient.invalidateQueries({ queryKey: ['results-sms'] }); setTab('history'); },
   });
   const retry = useMutation({ mutationFn: (id: string) => resultsSmsApi.retry(id), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['results-sms'] }) });
 
@@ -74,7 +91,7 @@ export default function ResultsSmsPage() {
         </>}
       </>}
 
-      {tab === 'history' && <LogTable title="Send history" rows={history || []} batch />}
+       {tab === 'history' && <>{activeBatchId && <BatchProgress batchId={activeBatchId} rows={activeBatchLogs || []} />}{!activeBatchId && <LogTable title="Send history" rows={history || []} batch />}</>}
       {tab === 'failed' && <LogTable title="Failed SMS diagnostics" rows={failed || []} onRetry={(id: string) => retry.mutate(id)} />}
 
       {confirm && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"><div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"><h2 className="text-xl font-bold text-slate-950">Confirm Results SMS</h2><p className="mt-2 text-sm text-slate-600">Send the exact previews to <strong>{target.length} valid parent number(s)</strong> using approximately <strong>{segments} SMS unit(s)</strong>.</p>{alreadySent > 0 && <label className="mt-4 flex gap-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900"><input type="checkbox" checked={allowResend} onChange={(e) => setAllowResend(e.target.checked)} />Allow explicit resend of {alreadySent} already-sent result version(s).</label>}<div className="mt-6 flex justify-end gap-3"><button onClick={() => setConfirm(false)} className="rounded-xl border px-4 py-2 text-sm">Cancel</button><button onClick={() => send.mutate()} disabled={send.isPending || (alreadySent > 0 && !allowResend)} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300">{send.isPending ? 'Queuing...' : 'Send results SMS'}</button></div>{send.isError && <p className="mt-3 text-sm text-rose-600">{String((send.error as any)?.response?.data?.message || 'Unable to send. Review provider and balance settings.')}</p>}</div></div>}
@@ -84,4 +101,14 @@ export default function ResultsSmsPage() {
 
 function Select({ label, value, onChange, options, placeholder }: any) { return <div><label className="mb-2 block text-sm font-medium text-slate-700">{label}</label><select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-indigo-500"><option value="">{placeholder}</option>{(Array.isArray(options) ? options : []).map((o: any) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></div>; }
 function MessagePreview({ recipient }: { recipient: any }) { if (!recipient) return null; return <div><div className="mb-2 flex justify-between text-xs text-slate-500"><span>Exact SMS preview</span><span>{recipient.characters} characters · {recipient.segments} segment(s) · {recipient.estimatedUnits} unit(s)</span></div><div className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-4 font-mono text-sm leading-6 text-slate-700">{recipient.message}</div><div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">{recipient.result.subjects.map((s: any) => <span key={s.name} className="rounded bg-slate-100 px-2 py-1">{s.name}: {recipient.result.bestSix != null ? `Points ${s.points ?? '-'}` : s.absent ? 'Absent' : s.mark ?? '-'} {recipient.result.bestSix == null ? (s.grade || '') : ''}</span>)}</div></div>; }
-function LogTable({ title, rows, onRetry, batch }: any) { return <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="mb-4 font-semibold text-slate-950">{title}</h2>{!rows.length ? <div className="py-12 text-center text-sm text-slate-500">No records found.</div> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="border-b text-xs uppercase tracking-wide text-slate-400"><tr><th className="py-3">{batch ? 'Batch' : 'Student'}</th><th>{batch ? 'Created' : 'Phone / reason'}</th><th>Status</th><th>{batch ? 'Volume' : 'Action'}</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map((r: any) => <tr key={r.batchId || r.id}><td className="py-3 font-medium text-slate-800">{batch ? r.batchId : `${r.studentName} (${r.admissionNumber || 'N/A'})`}</td><td className="text-slate-500">{batch ? new Date(r.createdAt).toLocaleString() : <>{r.phoneNumber || 'No phone'}<div className="text-xs text-rose-600">{r.errorMessage || r.errorSuggestion || ''}</div></>}</td><td>{batch ? <span className="text-xs text-slate-600">{r.sent} sent · {r.failed} failed · {r.delivered} delivered</span> : <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusStyles[r.status] || 'bg-slate-100 text-slate-600'}`}>{r.status}</span>}</td><td>{batch ? `${r.total} messages · ${r.units} units` : onRetry && <button onClick={() => onRetry(r.id)} className="text-sm font-semibold text-indigo-600 hover:underline">Retry</button>}</td></tr>)}</tbody></table></div>}</section>; }
+function BatchProgress({ batchId, rows }: { batchId: string; rows: any[] }) {
+  const sent = rows.filter((r) => ['SENT', 'DELIVERED'].includes(r.status)).length;
+  const failed = rows.filter((r) => ['FAILED', 'REJECTED', 'INVALID_NUMBER', 'PROVIDER_ERROR', 'INSUFFICIENT_BALANCE'].includes(r.status)).length;
+  const complete = sent + failed;
+  const percent = rows.length ? Math.round((complete / rows.length) * 100) : 0;
+  return <section className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5 shadow-sm"><div className="flex items-center justify-between"><div><h2 className="font-semibold text-indigo-950">Sending results SMS</h2><p className="text-sm text-indigo-800">Batch {batchId} is being processed in the background.</p></div><span className="text-lg font-bold text-indigo-700">{percent}%</span></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-indigo-100"><div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${percent}%` }} /></div><div className="mt-3 flex flex-wrap gap-3 text-sm"><span className="text-emerald-700">{sent} sent</span><span className="text-rose-700">{failed} failed</span><span className="text-amber-700">{Math.max(0, rows.length - complete)} pending</span></div>{failed > 0 && <p className="mt-3 text-xs text-rose-800">Failed messages include a specific recommendation in the Failed queue. Correct the phone number, balance, or provider configuration, then retry.</p>}</section>;
+}
+
+function LogTable({ title, rows, onRetry, batch }: any) { return <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="mb-4 font-semibold text-slate-950">{title}</h2>{!rows.length ? <div className="py-12 text-center text-sm text-slate-500">No records found.</div> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="border-b text-xs uppercase tracking-wide text-slate-400"><tr><th className="py-3">{batch ? 'Batch' : 'Student'}</th><th>{batch ? 'Created' : 'Phone / reason'}</th><th>Status</th><th>{batch ? 'Volume' : 'Action'}</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map((r: any) => <tr key={r.batchId || r.id}><td className="py-3 font-medium text-slate-800">{batch ? r.batchId : `${r.studentName} (${r.admissionNumber || 'N/A'})`}</td><td className="text-slate-500">{batch ? new Date(r.createdAt).toLocaleString() : <>{r.phoneNumber || 'No phone'}<div className="text-xs text-rose-600">{r.errorMessage || r.errorSuggestion || recommendation(r)}</div></>}</td><td>{batch ? <span className="text-xs text-slate-600">{r.sent} sent · {r.failed} failed · {r.delivered} delivered</span> : <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusStyles[r.status] || 'bg-slate-100 text-slate-600'}`}>{r.status}</span>}</td><td>{batch ? `${r.total} messages · ${r.units} units` : onRetry && <button onClick={() => onRetry(r.id)} className="text-sm font-semibold text-indigo-600 hover:underline">Retry</button>}</td></tr>)}</tbody></table></div>}</section>; }
+
+function recommendation(row: any) { if (row.status === 'INVALID_NUMBER') return 'Update the parent phone number in Parent Management.'; if (row.status === 'INSUFFICIENT_BALANCE') return 'Top up SMS units in Communications Wallet.'; if (row.status === 'PROVIDER_ERROR') return 'Check provider settings and retry.'; return row.status === 'SKIPPED' ? 'Add a valid parent phone number, then send again.' : ''; }

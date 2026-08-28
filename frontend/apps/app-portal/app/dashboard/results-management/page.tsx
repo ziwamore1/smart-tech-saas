@@ -26,6 +26,7 @@ export default function ResultsManagementPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({ classId: '', termId: '', examType: 'END_TERM', academicYearId: '', title: '' });
   const [actionMenu, setActionMenu] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ id: string; action: string } | null>(null);
 
   const { data: classesData } = useQuery({
     queryKey: ['classes'],
@@ -97,7 +98,7 @@ export default function ResultsManagementPage() {
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, action }: { id: string; action: string }) =>
-      api.post(`/results-management/sheets/${id}/${action}`),
+      api.post(`/results-management/sheets/${id}/${action}`, undefined, { timeout: 120000 }),
     onSuccess: (r: any) => {
       queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
       queryClient.invalidateQueries({ queryKey: ['view-results-sheet'] });
@@ -105,12 +106,20 @@ export default function ResultsManagementPage() {
       queryClient.invalidateQueries({ queryKey: ['result-sheet-entry'] });
       queryClient.refetchQueries({ queryKey: ['result-sheets'] });
       setActionMenu(null);
+      setPendingAction(null);
       toast.success(r.data?.message || 'Status updated');
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || err?.message || 'Failed to update status');
+      setPendingAction(null);
     },
   });
+
+  const runStatusAction = (id: string, action: string) => {
+    if (updateStatusMutation.isPending) return;
+    setPendingAction({ id, action });
+    updateStatusMutation.mutate({ id, action });
+  };
 
   useEffect(() => {
     if (!actionMenu) return;
@@ -382,52 +391,57 @@ export default function ResultsManagementPage() {
                             }}>
                               {sheet.status === 'DRAFT' && (
                                 <button
-                                  onClick={() => updateStatusMutation.mutate({ id: sheet.id, action: 'submit' })}
+                                   onClick={() => runStatusAction(sheet.id, 'submit')}
+                                   disabled={updateStatusMutation.isPending}
                                   style={{ display: 'block', width: '100%', padding: '10px 16px', fontSize: '13px', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', borderRadius: '6px' }}
                                   onMouseEnter={e => e.currentTarget.style.background = '#f5efe8'}
                                   onMouseLeave={e => e.currentTarget.style.background = 'none'}
                                 >
-                                  <i className="fa fa-paper-plane" style={{ marginRight: '8px', width: '16px' }}></i>Submit
+                                   <i className={`fa ${pendingAction?.id === sheet.id && pendingAction.action === 'submit' ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`} style={{ marginRight: '8px', width: '16px' }}></i>{pendingAction?.id === sheet.id && pendingAction.action === 'submit' ? 'Submitting...' : 'Submit'}
                                 </button>
                               )}
                               {sheet.status === 'SUBMITTED' && (
                                 <button
-                                  onClick={() => updateStatusMutation.mutate({ id: sheet.id, action: 'verify' })}
+                                   onClick={() => runStatusAction(sheet.id, 'verify')}
+                                   disabled={updateStatusMutation.isPending}
                                   style={{ display: 'block', width: '100%', padding: '10px 16px', fontSize: '13px', color: '#059669', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', borderRadius: '6px' }}
                                   onMouseEnter={e => e.currentTarget.style.background = '#f5efe8'}
                                   onMouseLeave={e => e.currentTarget.style.background = 'none'}
                                 >
-                                  <i className="fa fa-check-circle" style={{ marginRight: '8px', width: '16px' }}></i>Verify
+                                   <i className={`fa ${pendingAction?.id === sheet.id && pendingAction.action === 'verify' ? 'fa-spinner fa-spin' : 'fa-check-circle'}`} style={{ marginRight: '8px', width: '16px' }}></i>{pendingAction?.id === sheet.id && pendingAction.action === 'verify' ? 'Verifying...' : 'Verify'}
                                 </button>
                               )}
                               {sheet.status === 'VERIFIED' && (
                                 <>
                                   <button
-                                    onClick={() => updateStatusMutation.mutate({ id: sheet.id, action: 'publish' })}
+                                     onClick={() => runStatusAction(sheet.id, 'publish')}
+                                     disabled={updateStatusMutation.isPending}
                                     style={{ display: 'block', width: '100%', padding: '10px 16px', fontSize: '13px', color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', borderRadius: '6px' }}
                                     onMouseEnter={e => e.currentTarget.style.background = '#f5efe8'}
                                     onMouseLeave={e => e.currentTarget.style.background = 'none'}
                                   >
-                                    <i className="fa fa-globe" style={{ marginRight: '8px', width: '16px' }}></i>Publish
+                                     <i className={`fa ${pendingAction?.id === sheet.id && pendingAction.action === 'publish' ? 'fa-spinner fa-spin' : 'fa-globe'}`} style={{ marginRight: '8px', width: '16px' }}></i>{pendingAction?.id === sheet.id && pendingAction.action === 'publish' ? 'Publishing...' : 'Publish'}
                                   </button>
                                   <button
-                                    onClick={() => updateStatusMutation.mutate({ id: sheet.id, action: 'lock' })}
+                                     onClick={() => runStatusAction(sheet.id, 'lock')}
+                                     disabled={updateStatusMutation.isPending}
                                     style={{ display: 'block', width: '100%', padding: '10px 16px', fontSize: '13px', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', borderRadius: '6px' }}
                                     onMouseEnter={e => e.currentTarget.style.background = '#f5efe8'}
                                     onMouseLeave={e => e.currentTarget.style.background = 'none'}
                                   >
-                                    <i className="fa fa-lock" style={{ marginRight: '8px', width: '16px' }}></i>Lock
+                                     <i className={`fa ${pendingAction?.id === sheet.id && pendingAction.action === 'lock' ? 'fa-spinner fa-spin' : 'fa-lock'}`} style={{ marginRight: '8px', width: '16px' }}></i>{pendingAction?.id === sheet.id && pendingAction.action === 'lock' ? 'Locking...' : 'Lock'}
                                   </button>
                                 </>
                               )}
                               {sheet.status === 'LOCKED' && (
                                 <button
-                                  onClick={() => updateStatusMutation.mutate({ id: sheet.id, action: 'unlock' })}
+                                   onClick={() => runStatusAction(sheet.id, 'unlock')}
+                                   disabled={updateStatusMutation.isPending}
                                   style={{ display: 'block', width: '100%', padding: '10px 16px', fontSize: '13px', color: '#f59e0b', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', borderRadius: '6px' }}
                                   onMouseEnter={e => e.currentTarget.style.background = '#f5efe8'}
                                   onMouseLeave={e => e.currentTarget.style.background = 'none'}
                                 >
-                                  <i className="fa fa-unlock" style={{ marginRight: '8px', width: '16px' }}></i>Unlock
+                                   <i className={`fa ${pendingAction?.id === sheet.id && pendingAction.action === 'unlock' ? 'fa-spinner fa-spin' : 'fa-unlock'}`} style={{ marginRight: '8px', width: '16px' }}></i>{pendingAction?.id === sheet.id && pendingAction.action === 'unlock' ? 'Unlocking...' : 'Unlock'}
                                 </button>
                               )}
                               <a
