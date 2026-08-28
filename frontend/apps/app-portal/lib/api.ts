@@ -2541,7 +2541,7 @@ export const reportEngineApi = {
 /**
  * Chunked bulk save with retry — prevents timeouts on large payloads.
  * Splits scores into chunks of `chunkSize` (default 50) and sends each
- * sequentially with exponential backoff retry on transient failures.
+ * concurrently with exponential backoff retry on transient failures.
  */
 export async function bulkSaveResults(
   results: Array<{ studentId: string; subjectId: string; termId: string; score: number; isAbsent?: boolean; absentCode?: 'X' | 'A' }>,
@@ -2557,48 +2557,50 @@ export async function bulkSaveResults(
   const timeout = options?.timeout ?? 120000;
   const totalCreated = { created: 0, errors: 0, details: [] as any[] };
 
-  for (let i = 0; i < results.length; i += chunkSize) {
-    const chunk = results.slice(i, i + chunkSize);
-    let lastError: any = null;
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        const res = await api.post('/results/bulk', { results: chunk }, { timeout });
-        const data = res.data;
-        totalCreated.created += data?.created ?? chunk.length;
-        totalCreated.errors += data?.errors ?? 0;
-        if (data?.details?.length) totalCreated.details.push(...data.details);
-        lastError = null;
-        break;
-      } catch (err: any) {
-        lastError = err;
-        // Don't retry on client errors (4xx) — only on 5xx and network errors
-        const status = err?.response?.status;
-        if (status && status >= 400 && status < 500) {
-          totalCreated.errors += chunk.length;
-          totalCreated.details.push({
-            error: err?.response?.data?.message || `HTTP ${status}`,
-            count: chunk.length,
-          });
+  const chunks = Array.from({ length: Math.ceil(results.length / chunkSize) }, (_, index) => ({
+    index,
+    values: results.slice(index * chunkSize, (index + 1) * chunkSize),
+  }));
+  let nextChunk = 0;
+  let completed = 0;
+  const runChunk = async () => {
+    while (true) {
+      const chunkIndex = nextChunk++;
+      if (chunkIndex >= chunks.length) return;
+      const chunk = chunks[chunkIndex].values;
+      let lastError: any = null;
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const res = await api.post('/results/bulk', { results: chunk }, { timeout });
+          const data = res.data;
+          totalCreated.created += data?.created ?? chunk.length;
+          totalCreated.errors += data?.errors ?? 0;
+          if (data?.details?.length) totalCreated.details.push(...data.details);
+          lastError = null;
           break;
-        }
-        if (attempt < maxRetries) {
-          const delay = Math.min(1000 * Math.pow(2, attempt), 8000);
-          await new Promise(r => setTimeout(r, delay));
+        } catch (err: any) {
+          lastError = err;
+          const status = err?.response?.status;
+          if (status && status >= 400 && status < 500) {
+            totalCreated.errors += chunk.length;
+            totalCreated.details.push({ error: err?.response?.data?.message || `HTTP ${status}`, count: chunk.length });
+            lastError = null;
+            break;
+          }
+          if (attempt < maxRetries) {
+            await new Promise(r => setTimeout(r, Math.min(1000 * Math.pow(2, attempt), 8000)));
+          }
         }
       }
+      if (lastError) {
+        totalCreated.errors += chunk.length;
+        totalCreated.details.push({ error: lastError?.response?.data?.message || lastError?.message || 'Network error after retries', count: chunk.length });
+      }
+      completed += chunk.length;
+      options?.onProgress?.(Math.min(completed, results.length), results.length);
     }
-
-    if (lastError) {
-      totalCreated.errors += chunk.length;
-      totalCreated.details.push({
-        error: lastError?.response?.data?.message || lastError?.message || 'Network error after retries',
-        count: chunk.length,
-      });
-    }
-
-    options?.onProgress?.(Math.min(i + chunkSize, results.length), results.length);
-  }
+  };
+  await Promise.all(Array.from({ length: Math.min(3, chunks.length) }, runChunk));
 
   return totalCreated;
 }

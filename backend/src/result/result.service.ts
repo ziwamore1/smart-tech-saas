@@ -676,33 +676,30 @@ export class ResultService {
     const errors: any[] = [...missingEnrollment];
     const permBlockedPairs = new Set(permissionErrors.map(e => `${e.classId}::${e.subjectId}`));
 
-    // Process in chunks of 50 to avoid transaction timeout
+    // Keep each score atomic, but persist independent scores concurrently.
+    // This avoids holding one interactive transaction open for the whole batch.
     const CHUNK_SIZE = 50;
     for (let i = 0; i < results.length; i += CHUNK_SIZE) {
       const chunk = results.slice(i, i + CHUNK_SIZE);
-      const chunkResult = await this.prisma.$transaction(async (tx) => {
-        const chunkCreated: any[] = [];
-        const chunkErrors: any[] = [];
+      const chunkResult = await mapBounded(chunk, async (item) => {
+        try {
+          const classId = enrollmentMap.get(item.studentId);
+          if (!classId) return { result: null, error: null };
 
-        for (const item of chunk) {
-          try {
-            const classId = enrollmentMap.get(item.studentId);
-            if (!classId) continue; // already recorded in errors
+          const pairKey = `${classId}::${item.subjectId}`;
+          if (permBlockedPairs.has(pairKey)) return { result: null, error: null };
 
-            const pairKey = `${classId}::${item.subjectId}`;
-            if (permBlockedPairs.has(pairKey)) continue;
+          // X/A absences are stored with score 0 in the legacy Result table
+          // but remain explicitly flagged in ComputedResult.
+          const isAbsent = !!item.isAbsent;
+          const absentCode = item.absentCode ?? 'X';
+          const effectiveScore = isAbsent ? 0 : item.score;
+          const gradeData = isAbsent
+            ? { grade: null, remark: `ABSENT (${absentCode})`, points: null, gpa: null }
+            : computeGradeInMemory(item.score, classId);
 
-            // X/A absences are stored with score 0 in the legacy Result table
-            // (same convention as the Excel import) but the ComputedResult
-            // keeps them flagged as absent so they never count as a zero mark.
-            const isAbsent = !!item.isAbsent;
-            const absentCode = item.absentCode ?? 'X';
-            const effectiveScore = isAbsent ? 0 : item.score;
-            const gradeData = isAbsent
-              ? { grade: null, remark: `ABSENT (${absentCode})`, points: null, gpa: null }
-              : computeGradeInMemory(item.score, classId);
-
-            const result = await tx.result.upsert({
+          const result = await this.prisma.$transaction(async (tx) => {
+            const saved = await tx.result.upsert({
               where: {
                 studentId_subjectId_termId: {
                   studentId: item.studentId,
@@ -726,7 +723,7 @@ export class ResultService {
                 grade: gradeData.grade,
                 remark: gradeData.remark,
               },
-            });
+              });
 
             await tx.computedResult.upsert({
               where: {
@@ -770,21 +767,19 @@ export class ResultService {
                 computedAt: new Date(),
               },
             });
-
-            chunkCreated.push(result);
-          } catch (error: any) {
-            chunkErrors.push({
-              studentId: item.studentId,
-              subjectId: item.subjectId,
-              error: error.message,
-            });
-          }
+            return saved;
+          }, { maxWait: 30000, timeout: 60000 });
+          return { result, error: null };
+        } catch (error: any) {
+          return {
+            result: null,
+            error: { studentId: item.studentId, subjectId: item.subjectId, error: error.message },
+          };
         }
-        return { created: chunkCreated, errors: chunkErrors };
-      }, { maxWait: 30000, timeout: 60000 });
+      }, 10);
 
-      created.push(...chunkResult.created);
-      errors.push(...chunkResult.errors);
+      created.push(...chunkResult.filter((entry) => entry.result).map((entry) => entry.result));
+      errors.push(...chunkResult.filter((entry) => entry.error).map((entry) => entry.error));
     }
 
     // ── Post-batch: Update result sheets ──
