@@ -308,6 +308,9 @@ export default function TeacherResultsPage() {
     bulkEnterScoresMutation.mutate(scoreList);
   };
 
+  const hasSavedResults = existingResultsMap.size > 0 || sheetResultsMap.size > 0;
+  const pendingScoreCount = Object.keys(scores).length + absentCells.size;
+
   const currentTerm = terms?.find((t: any) => t.isCurrent);
 
   return (
@@ -484,15 +487,26 @@ export default function TeacherResultsPage() {
                   Compute Final Results
                 </button>
               )}
-              {isBulkEntry && (Object.keys(scores).length > 0 || absentCells.size > 0) && (
+              {isBulkEntry && pendingScoreCount > 0 && <>
                 <button
                   onClick={handleSaveAll}
-                  disabled={bulkEnterScoresMutation.isPending}
+                  disabled={bulkEnterScoresMutation.isPending || hasSavedResults}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
+                  title={hasSavedResults ? 'Existing results found. Use Update Scores for changes.' : 'Save scores for the first time.'}
                 >
-                  Save All ({Object.keys(scores).length + absentCells.size})
+                  <i className={`fa ${bulkEnterScoresMutation.isPending && !hasSavedResults ? 'fa-spinner fa-spin' : 'fa-save'} mr-1`}></i>
+                  {bulkEnterScoresMutation.isPending && !hasSavedResults ? 'Saving...' : `First Save (${pendingScoreCount})`}
                 </button>
-              )}
+                <button
+                  onClick={handleSaveAll}
+                  disabled={bulkEnterScoresMutation.isPending || !hasSavedResults}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+                  title={!hasSavedResults ? 'Use First Save until results have been saved.' : 'Save only the scores changed in this session.'}
+                >
+                  <i className={`fa ${bulkEnterScoresMutation.isPending && hasSavedResults ? 'fa-spinner fa-spin' : 'fa-pen'} mr-1`}></i>
+                  {bulkEnterScoresMutation.isPending && hasSavedResults ? 'Updating...' : `Update Scores (${pendingScoreCount})`}
+                </button>
+              </>}
             </div>
           </div>
 

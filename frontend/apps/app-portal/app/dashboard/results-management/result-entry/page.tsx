@@ -136,6 +136,7 @@ export default function ResultEntryPage() {
   const [showSavedBanner, setShowSavedBanner] = useState(false);
   const [lastSavedCount, setLastSavedCount] = useState(0);
   const [componentScores, setComponentScores] = useState<Record<string, Record<string, { rawScore: number | null; isAbsent: boolean }>>>({});
+  const [dirtyComponentCells, setDirtyComponentCells] = useState<Set<string>>(new Set());
   const [savingComponents, setSavingComponents] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(true);
   const [sheetId, setSheetId] = useState<string | null>(null);
@@ -262,6 +263,7 @@ export default function ResultEntryPage() {
     // result sheet — drop any unsaved cells and the cached sheet reference so
     // they can never leak into the wrong exam's save batch.
     setComponentScores({});
+    setDirtyComponentCells(new Set());
     setScores({});
     setDirtyCells(new Set());
     setAbsentCells(new Set());
@@ -277,7 +279,7 @@ export default function ResultEntryPage() {
       map[key] = map[key] || {};
       map[key][r.assessmentDefId] = { rawScore: r.rawScore ?? null, isAbsent: !!r.isAbsent };
     });
-    setComponentScores(map);
+      setComponentScores(map);
   }, [existingComponentsData]);
 
   // Find-or-create the result sheet for the selected class + term + exam.
@@ -464,6 +466,13 @@ export default function ResultEntryPage() {
   const handleComponentCell = useCallback((studentId: string, subjectId: string, defId: string, max: number, value: string) => {
     const key = `${studentId}::${subjectId}`;
     const trimmed = value.trim().toUpperCase();
+    if (trimmed !== 'X' && trimmed !== 'A' && trimmed !== '' && trimmed !== 'null') {
+      const num = parseFloat(trimmed);
+      if (isNaN(num) || num < 0 || num > max) {
+        toast.error(`Score must be between 0 and ${max}, or X/A for absent`);
+        return;
+      }
+    }
     setComponentScores(prev => {
       const cell = { ...(prev[key] || {}) };
       if (trimmed === 'X' || trimmed === 'A') {
@@ -472,21 +481,12 @@ export default function ResultEntryPage() {
         delete cell[defId];
       } else {
         const num = parseFloat(trimmed);
-        if (isNaN(num) || num < 0 || num > max) {
-          toast.error(`Score must be between 0 and ${max}, or X/A for absent`);
-          return prev;
-        }
         cell[defId] = { rawScore: num, isAbsent: false };
       }
       return { ...prev, [key]: cell };
     });
+    setDirtyComponentCells(prev => new Set(prev).add(`${key}::${defId}`));
   }, []);
-
-  const componentEntryCount = useMemo(() => {
-    let n = 0;
-    Object.values(componentScores).forEach(cell => { n += Object.keys(cell).length; });
-    return n;
-  }, [componentScores]);
 
   const handleSaveComponents = useCallback(async () => {
     if (!selectedClass || !selectedSubject || !selectedTerm || selectedSubject === 'all') {
@@ -505,6 +505,7 @@ export default function ResultEntryPage() {
       const [studentId, subjId] = key.split('::');
       if (subjId !== subjectId) return;
       Object.entries(cell).forEach(([defId, entry]) => {
+        if (!dirtyComponentCells.has(`${key}::${defId}`)) return;
         entriesForDef[defId] = entriesForDef[defId] || [];
         entriesForDef[defId].push({ studentId, rawScore: entry.rawScore, isAbsent: entry.isAbsent });
       });
@@ -557,6 +558,7 @@ export default function ResultEntryPage() {
       }
 
       setLastSavedCount(defIds.length);
+      setDirtyComponentCells(new Set());
       setLastSavedAt(new Date().toLocaleTimeString());
       setShowSavedBanner(true);
       setTimeout(() => setShowSavedBanner(false), 8000);
@@ -569,7 +571,7 @@ export default function ResultEntryPage() {
     } finally {
       setSavingComponents(false);
     }
-  }, [selectedClass, selectedSubject, selectedTerm, selectedExamType, componentScores, students, subjectConfigs, savingComponents, sheetId, queryClient]);
+  }, [selectedClass, selectedSubject, selectedTerm, selectedExamType, componentScores, dirtyComponentCells, students, subjectConfigs, savingComponents, sheetId, queryClient]);
 
   const handleBulkSaveAll = useCallback(() => {
     if (dirtyCells.size === 0) {
@@ -740,7 +742,11 @@ export default function ResultEntryPage() {
     return cs?.subject?.name || cs?.subjectName || 'Subject';
   }, [classSubjects, selectedSubject]);
 
-  const saveCount = componentMode ? componentEntryCount : dirtyCells.size;
+  const hasSavedResults = componentMode
+    ? Boolean(existingComponentsData?.length)
+    : Boolean(sheetData?.enteredCount)
+      || students.some((student: any) => (student.results || []).some((result: any) => result.score != null || result.isAbsent));
+  const saveCount = componentMode ? dirtyComponentCells.size : dirtyCells.size;
   const saving = componentMode ? savingComponents : (bulkSaving || bulkSaveMutation.isPending);
 
   return (
@@ -1101,16 +1107,29 @@ export default function ResultEntryPage() {
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
               onClick={componentMode ? handleSaveComponents : handleBulkSaveAll}
-              disabled={saveCount === 0 || saving}
+              disabled={saveCount === 0 || saving || hasSavedResults}
               style={{
                 padding: '10px 20px', fontSize: '13px', fontWeight: 600, color: 'white',
-                background: saveCount === 0 ? '#d1d5db' : '#059669',
-                border: 'none', borderRadius: '8px', cursor: saveCount === 0 ? 'not-allowed' : 'pointer',
+                background: saveCount === 0 || hasSavedResults ? '#d1d5db' : '#059669',
+                border: 'none', borderRadius: '8px', cursor: saveCount === 0 || hasSavedResults ? 'not-allowed' : 'pointer',
                 display: 'flex', alignItems: 'center', gap: '6px'
               }}
             >
               <i className={`fa ${saving ? 'fa-spinner fa-spin' : 'fa-save'}`}></i>
-              {saving ? 'Saving...' : componentMode ? `Save Components (${saveCount})` : `Save All (${saveCount})`}
+              {saving ? 'Saving...' : componentMode ? `First Save (${saveCount})` : `First Save (${saveCount})`}
+            </button>
+            <button
+              onClick={componentMode ? handleSaveComponents : handleBulkSaveAll}
+              disabled={saveCount === 0 || saving || !hasSavedResults}
+              style={{
+                padding: '10px 20px', fontSize: '13px', fontWeight: 600, color: 'white',
+                background: saveCount === 0 || !hasSavedResults ? '#d1d5db' : '#2563eb',
+                border: 'none', borderRadius: '8px', cursor: saveCount === 0 || !hasSavedResults ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px'
+              }}
+            >
+              <i className={`fa ${saving ? 'fa-spinner fa-spin' : 'fa-pen'}`}></i>
+              {saving ? 'Updating...' : componentMode ? `Update Scores (${saveCount})` : `Update Scores (${saveCount})`}
             </button>
           </div>
         </div>
