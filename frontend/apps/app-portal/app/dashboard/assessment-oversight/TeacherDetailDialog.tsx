@@ -85,7 +85,7 @@ export default function TeacherDetailDialog({
 
         <div className="p-6">
           <h4 className="font-semibold text-gray-900 mb-3">
-            Pending Assessments {teacher.pendingItems.length > 0 && <span className="text-gray-400 font-normal">({teacher.pendingItems.length})</span>}
+            Assigned Assessment Progress {teacher.pendingItems.length > 0 && <span className="text-gray-400 font-normal">({teacher.pendingItems.length})</span>}
           </h4>
 
           {teacher.pendingItems.length === 0 ? (
@@ -96,8 +96,9 @@ export default function TeacherDetailDialog({
             </div>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {teacher.pendingItems.map((item: any, i: number) => (
-                <div key={i} className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-3 hover:bg-amber-100 transition-colors">
+              {teacher.pendingItems.map((item: any, i: number) => {
+                const complete = item.completed || item.missingCount === 0;
+                return <div key={i} className={`flex items-center justify-between ${complete ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'} border rounded-lg p-3 transition-colors`}>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
                       {item.assessmentName || item.assessmentDef?.name || 'Assessment'}
@@ -107,12 +108,12 @@ export default function TeacherDetailDialog({
                       {item.className ? ` — ${item.className}` : ''}
                     </p>
                   </div>
-                  <div className="ml-3 text-right flex-shrink-0">
-                    <p className="text-sm font-bold text-amber-700">{item.missingCount} of {item.totalStudents}</p>
-                    <p className="text-xs text-amber-600">missing</p>
+                   <div className="ml-3 text-right flex-shrink-0">
+                    <p className={`text-sm font-bold ${complete ? 'text-green-700' : 'text-amber-700'}`}>{complete ? `${item.totalStudents} of ${item.totalStudents}` : `${item.enteredCount} of ${item.totalStudents}`}</p>
+                    <p className={`text-xs ${complete ? 'text-green-600' : 'text-amber-600'}`}>{complete ? 'completed' : `${item.missingCount} missing`}</p>
                   </div>
-                </div>
-              ))}
+                </div>;
+              })}
             </div>
           )}
         </div>

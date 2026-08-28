@@ -129,8 +129,14 @@ export class AssessmentEngineController {
   }
 
   @Get('teacher/pending')
-  getTeacherPendingAssessments(@Request() req) {
-    return this.assessmentEngine.getTeacherPendingAssessments(req.user.id, req.user.schoolId);
+  getTeacherPendingAssessments(@Request() req, @Query('termId') termId?: string) {
+    return this.assessmentEngine.getTeacherPendingAssessments(req.user.id, req.user.schoolId, termId);
+  }
+
+  @Get('teacher/overview')
+  getTeacherAssessmentOverview(@Request() req, @Query('teacherIds') teacherIds?: string, @Query('termId') termId?: string) {
+    const ids = teacherIds?.split(',').map((id) => id.trim()).filter(Boolean) || [req.user.id];
+    return this.assessmentEngine.getTeacherPendingAssessments(req.user.id, req.user.schoolId, termId, ids, true);
   }
 
   @Get('completion-stats')

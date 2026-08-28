@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { staffPositionApi, assessmentEngineApi, termApi } from '@/lib/api';
 import TeacherDetailDialog from './TeacherDetailDialog';
+import { socket } from '@/lib/socket';
 
 function generateHtmlReport(teachers: any[], date: string) {
   const totalAssessments = teachers.reduce((s, t) => s + t.totalAssessments, 0);
@@ -128,23 +129,19 @@ export default function AssessmentOversightPage() {
     setLoading(true); setError(null);
     const teacherId = user?.teacherId || user?.id || '';
     try {
-      const [chainRes, pendingRes] = await Promise.allSettled([
-        staffPositionApi.getMonitoringChain(teacherId),
-        assessmentEngineApi.teacher.pending(),
-      ]);
-
-      const chain = chainRes.status === 'fulfilled' ? chainRes.value?.data || chainRes.value : null;
+      const chainRes = await staffPositionApi.getMonitoringChain(teacherId);
+      const chain = chainRes?.data || chainRes;
       setMonitoringChain(chain);
+      const supervisees = chain?.supervises || [];
+      const teacherIds = supervisees.map((s: any) => s.teacher?.user?.id || s.teacher?.id).filter(Boolean);
+      const pendingRes = await assessmentEngineApi.teacher.overview(teacherIds, termId);
 
-      const pending = pendingRes.status === 'fulfilled'
-        ? (pendingRes.value?.data || pendingRes.value?.pending || pendingRes.value || [])
-        : [];
+      const pending = pendingRes?.data || pendingRes?.pending || pendingRes || [];
       const pendingList = Array.isArray(pending) ? pending : [];
       setPendingAssessments(pendingList);
 
-      const supervisees = chain?.supervises || [];
       const teacherList = supervisees.map((s: any) => {
-        const tid = s.teacher?.id;
+        const tid = s.teacher?.user?.id || s.teacher?.id;
         const teacherName = `${s.teacher?.user?.firstName || ''} ${s.teacher?.user?.lastName || ''}`.trim();
         const teacherPending = pendingList.filter(
           (p: any) => p.teacherId === tid || p.teacherName === teacherName
@@ -162,8 +159,9 @@ export default function AssessmentOversightPage() {
           totalAssessments: total,
           completedAssessments: completed,
           pendingCount: teacherPending.filter((p: any) => p.missingCount > 0).length,
-          completionRate: avgRate,
-          pendingItems: teacherPending.filter((p: any) => p.missingCount > 0),
+           completionRate: avgRate,
+           assessmentItems: teacherPending,
+           pendingItems: teacherPending.filter((p: any) => p.missingCount > 0),
         };
       });
       setTeachers(teacherList);
@@ -172,15 +170,23 @@ export default function AssessmentOversightPage() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, user?.schoolId]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push('/login?redirect=/dashboard/assessment-oversight');
       return;
     }
-    if (isAuthenticated && !authLoading) fetchData();
-  }, [isAuthenticated, authLoading, fetchData, router]);
+    if (isAuthenticated && !authLoading) fetchData(selectedTermId || undefined);
+  }, [isAuthenticated, authLoading, fetchData, router, selectedTermId]);
+
+  useEffect(() => {
+    if (!user?.schoolId || !isAuthenticated) return;
+    const eventName = `result:updated:${user.schoolId}`;
+    const refresh = () => fetchData(selectedTermId || undefined);
+    socket.on(eventName, refresh);
+    return () => { socket.off(eventName, refresh); };
+  }, [user?.schoolId, isAuthenticated, selectedTermId, fetchData]);
 
   const handleExportCSV = () => {
     if (teachers.length === 0) return;
@@ -368,11 +374,19 @@ export default function AssessmentOversightPage() {
                     <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${Math.min(teacher.completionRate, 100)}%` }} />
                   </div>
 
-                  <div className="flex gap-4 mt-3 text-sm text-gray-500">
+                   <div className="flex gap-4 mt-3 text-sm text-gray-500">
                     <span>{teacher.totalAssessments} assessments</span>
                     <span>{teacher.completedAssessments} completed</span>
                     {teacher.pendingCount > 0 && <span className="text-amber-600 font-medium">{teacher.pendingCount} pending</span>}
-                  </div>
+                   </div>
+
+                  {teacher.assessmentItems?.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {[...new Map(teacher.assessmentItems.map((item: any) => [`${item.classId}:${item.subjectId}`, `${item.className} · ${item.subjectName}`])).values()].slice(0, 6).map((label: any) => (
+                        <span key={label} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">{label}</span>
+                      ))}
+                    </div>
+                  )}
 
                   {teacher.pendingItems.length > 0 && (
                     <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">

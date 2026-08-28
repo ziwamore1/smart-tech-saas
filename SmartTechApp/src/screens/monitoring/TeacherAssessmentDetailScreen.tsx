@@ -5,6 +5,8 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, spacing, borderRadius } from '../../theme';
 import { apiService } from '../../services/api';
+import { useAuthStore } from '../../store';
+import { socketService } from '../../services/socket';
 
 type RouteParams = {
   TeacherAssessmentDetail: {
@@ -17,6 +19,7 @@ export const TeacherAssessmentDetailScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const route = useRoute<RouteProp<RouteParams, 'TeacherAssessmentDetail'>>();
   const { teacherId, teacherName } = route.params;
+  const schoolId = useAuthStore((s) => s.user?.schoolId);
 
   const [pendingItems, setPendingItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,10 +28,24 @@ export const TeacherAssessmentDetailScreen: React.FC = () => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (!schoolId) return;
+    socketService.connect();
+    socketService.joinSchool(schoolId);
+    socketService.on(`result:updated:${schoolId}`, loadData);
+    socketService.on('results:saved', loadData);
+    socketService.on('results:live', loadData);
+    return () => {
+      socketService.off(`result:updated:${schoolId}`, loadData);
+      socketService.off('results:saved', loadData);
+      socketService.off('results:live', loadData);
+    };
+  }, [schoolId]);
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const pendingRes = await apiService.getPendingAssessments();
+      const pendingRes = await apiService.getAssessmentOversight([teacherId]);
       const all = Array.isArray(pendingRes) ? pendingRes : pendingRes?.data || pendingRes?.pending || [];
       const filtered = (Array.isArray(all) ? all : []).filter(
         (p: any) => p.teacherId === teacherId || (p.teacherName || '').includes(teacherName)

@@ -1677,7 +1677,8 @@ export const assessmentEngineApi = {
     lock: (batchId: string) => api.post(`/assessment-engine/batches/${batchId}/lock`),
   },
   teacher: {
-    pending: () => api.get('/assessment-engine/teacher/pending'),
+    pending: (termId?: string) => api.get('/assessment-engine/teacher/pending', { params: { termId } }),
+    overview: (teacherIds: string[], termId?: string) => api.get('/assessment-engine/teacher/overview', { params: { teacherIds: teacherIds.join(','), termId } }),
   },
   completionStats: (classId: string, subjectId: string, termId: string) =>
     api.get(`/assessment-engine/completion-stats?classId=${classId}&subjectId=${subjectId}&termId=${termId}`),

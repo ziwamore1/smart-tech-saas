@@ -1229,69 +1229,73 @@ export class AssessmentEngineService {
     return this.getBatchResults(batchId);
   }
 
-  async getTeacherPendingAssessments(teacherId: string, schoolId: string) {
+  async getTeacherPendingAssessments(
+    teacherId: string,
+    schoolId: string,
+    termId?: string,
+    teacherIds?: string[],
+    includeCompleted = false,
+  ) {
     const assignments = await this.prisma.teachingAssignment.findMany({
-      where: { teacherId, schoolId },
+      where: { teacherId: { in: teacherIds?.length ? teacherIds : [teacherId] }, schoolId },
       include: {
         class: true,
         subject: true,
+        teacher: { select: { id: true, firstName: true, lastName: true } },
       },
     });
 
     const pending = [];
+    const selectedTerm = termId
+      ? await this.prisma.term.findFirst({ where: { id: termId, academicYear: { schoolId } } })
+      : await this.prisma.term.findFirst({ where: { academicYear: { schoolId }, isCurrent: true } });
+    if (!selectedTerm) return pending;
+    const enrollmentCounts = new Map<string, number>();
 
     for (const assignment of assignments) {
-      const currentTerm = await this.prisma.term.findFirst({
-        where: {
-          academicYear: { schoolId },
-          isCurrent: true,
-        },
-      });
-
-      if (!currentTerm) continue;
-
       const configs = await this.prisma.termAssessmentConfiguration.findMany({
         where: {
           classId: assignment.classId,
           subjectId: assignment.subjectId,
-          termId: currentTerm.id,
+          termId: selectedTerm.id,
         },
         include: { assessmentDef: true },
         orderBy: { sequenceOrder: 'asc' },
       });
 
       for (const config of configs) {
-        const enrolledStudents = await this.prisma.enrollment.count({
-          where: {
-            classId: assignment.classId,
-            academicYearId: currentTerm.academicYearId,
-            status: 'ACTIVE',
-            student: { status: 'ACTIVE' },
-          },
-        });
+        let enrolledStudents = enrollmentCounts.get(assignment.classId);
+        if (enrolledStudents == null) {
+          enrolledStudents = await this.prisma.enrollment.count({
+            where: { classId: assignment.classId, academicYearId: selectedTerm.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+          });
+          enrollmentCounts.set(assignment.classId, enrolledStudents);
+        }
 
         const enteredCount = await this.prisma.studentAssessmentResult.count({
           where: {
             classId: assignment.classId,
             subjectId: assignment.subjectId,
-            termId: currentTerm.id,
+            termId: selectedTerm.id,
             assessmentDefId: config.assessmentDefId,
             OR: [
               { rawScore: { not: null } },
               { isAbsent: true },
             ],
-            enteredBy: teacherId,
+            enteredBy: assignment.teacherId,
           },
         });
 
-        if (enteredCount < enrolledStudents) {
+        if (includeCompleted || enteredCount < enrolledStudents) {
           pending.push({
+            teacherId: assignment.teacherId,
+            teacherName: `${assignment.teacher.firstName || ''} ${assignment.teacher.lastName || ''}`.trim(),
             classId: assignment.classId,
             className: assignment.class.name,
             subjectId: assignment.subjectId,
             subjectName: assignment.subject.name,
-            termId: currentTerm.id,
-            termName: currentTerm.name,
+            termId: selectedTerm.id,
+            termName: selectedTerm.name,
             assessmentDefId: config.assessmentDefId,
             assessmentName: config.assessmentDef.name,
             maxScore: config.maxScore,
@@ -1300,6 +1304,7 @@ export class AssessmentEngineService {
             enteredCount,
             missingCount: enrolledStudents - enteredCount,
             completionRate: enrolledStudents > 0 ? (enteredCount / enrolledStudents) * 100 : 0,
+            completed: enteredCount >= enrolledStudents,
           });
         }
       }

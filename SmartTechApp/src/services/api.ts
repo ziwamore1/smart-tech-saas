@@ -1933,6 +1933,13 @@ class ApiService {
     return response.data;
   }
 
+  async getAssessmentOversight(teacherIds: string[], termId?: string) {
+    const response = await this.client.get('/assessment-engine/teacher/overview', {
+      params: { teacherIds: teacherIds.join(','), termId },
+    });
+    return response.data;
+  }
+
   async getDepartmentTeachers(departmentId: string) {
     const response = await this.client.get(`/mobile/staff-positions/department/${departmentId}/teachers`);
     return response.data;

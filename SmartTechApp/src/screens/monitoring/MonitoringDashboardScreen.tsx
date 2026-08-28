@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, WidgetCard } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
 import { apiService } from '../../services/api';
+import { socketService } from '../../services/socket';
 import { useAuthStore } from '../../store';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -23,6 +24,7 @@ interface TeacherAssessmentStatus {
   pendingCount: number;
   completionRate: number;
   totalAssessments: number;
+  assignments: string[];
 }
 
 export const MonitoringDashboardScreen: React.FC<MonitoringProps> = ({ onToggleDrawer, onNavigate, stackNavigation }) => {
@@ -58,12 +60,29 @@ export const MonitoringDashboardScreen: React.FC<MonitoringProps> = ({ onToggleD
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  useEffect(() => {
+    const schoolId = user?.schoolId;
+    if (!schoolId) return;
+    socketService.connect();
+    socketService.joinSchool(schoolId);
+    const refresh = () => loadData();
+    socketService.on(`result:updated:${schoolId}`, refresh);
+    socketService.on('results:saved', refresh);
+    socketService.on('results:live', refresh);
+    return () => {
+      socketService.off(`result:updated:${schoolId}`, refresh);
+      socketService.off('results:saved', refresh);
+      socketService.off('results:live', refresh);
+    };
+  }, [user?.schoolId, loadData]);
+
   const loadTeacherAssessmentStatus = async (supervises: any[]) => {
     setAssessmentsLoading(true);
     try {
       let pendingData: any[] = [];
       try {
-        const pendingRes = await apiService.getPendingAssessments();
+        const teacherIds = supervises.map((s: any) => s.teacher?.user?.id || s.teacher?.id).filter(Boolean);
+        const pendingRes = await apiService.getAssessmentOversight(teacherIds);
         pendingData = Array.isArray(pendingRes) ? pendingRes : pendingRes?.data || pendingRes?.pending || [];
       } catch (e) {
         console.warn('Failed to fetch pending assessments:', e);
@@ -71,7 +90,7 @@ export const MonitoringDashboardScreen: React.FC<MonitoringProps> = ({ onToggleD
 
       const statuses: TeacherAssessmentStatus[] = [];
       for (const s of supervises) {
-        const teacherId = s.teacher?.id;
+        const teacherId = s.teacher?.user?.id || s.teacher?.id;
         const teacherName = `${s.teacher?.user?.firstName || ''} ${s.teacher?.user?.lastName || ''}`.trim();
         if (!teacherId) continue;
 
@@ -79,6 +98,7 @@ export const MonitoringDashboardScreen: React.FC<MonitoringProps> = ({ onToggleD
         const total = teacherPending.length;
         const completed = teacherPending.filter((p: any) => p.completionRate >= 100).length;
         const avgRate = total > 0 ? teacherPending.reduce((sum: number, p: any) => sum + (p.completionRate || 0), 0) / total : 100;
+        const assignments = [...new Set(teacherPending.map((p: any) => `${p.className} · ${p.subjectName}`))];
 
         statuses.push({
           teacherId,
@@ -88,6 +108,7 @@ export const MonitoringDashboardScreen: React.FC<MonitoringProps> = ({ onToggleD
           pendingCount: teacherPending.filter((p: any) => p.missingCount > 0).length,
           completionRate: Math.round(avgRate),
           totalAssessments: total,
+          assignments,
         });
       }
       setTeacherStatuses(statuses);
@@ -178,6 +199,7 @@ export const MonitoringDashboardScreen: React.FC<MonitoringProps> = ({ onToggleD
                     <Text style={styles.statusName}>{t.teacherName}</Text>
                     <Text style={styles.statusRole}>{t.teacherRole} — {t.deptName}</Text>
                     <Text style={styles.statusMeta}>{t.totalAssessments} assessments · {t.pendingCount} pending</Text>
+                    {t.assignments.slice(0, 3).map((assignment, index) => <Text key={index} style={styles.assignmentText}>{assignment}</Text>)}
                   </View>
                   <View style={[styles.completionBadge, { backgroundColor: rateBg }]}>
                     <Text style={[styles.completionText, { color: rateColor }]}>{t.completionRate}%</Text>
@@ -502,6 +524,7 @@ const styles = StyleSheet.create({
   statusName: { fontSize: 14, fontWeight: '600', color: colors.text },
   statusRole: { fontSize: 11, color: colors.textLight, marginTop: 1 },
   statusMeta: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
+  assignmentText: { fontSize: 10, color: colors.textLight, marginTop: 2 },
   completionBadge: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: borderRadius.sm, minWidth: 48, alignItems: 'center' },
   completionText: { fontSize: 13, fontWeight: '700' },
   progressBarBg: { height: 4, backgroundColor: colors.borderLight, borderRadius: 2, marginTop: spacing.sm, overflow: 'hidden' },
