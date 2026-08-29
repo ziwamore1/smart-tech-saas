@@ -197,8 +197,13 @@ export default function ResultEntryPage() {
     queryFn: async () => {
       if (!selectedClass) return [];
        const r = await accessApi.getTeachingSubjects(selectedClass);
-      const d = r.data?.data || r.data;
-      return Array.isArray(d) ? d : [];
+       const d = r.data?.data || r.data;
+       // The access endpoint returns subjects directly, while older endpoints
+       // return class-subject rows with a nested `subject` property. Keep one
+       // shape here because the table and score keys use `cs.subject.*`.
+       return Array.isArray(d)
+         ? d.map((item: any) => item?.subject ? item : { subject: item, subjectId: item?.id })
+         : [];
     },
     enabled: !!selectedClass,
   });
