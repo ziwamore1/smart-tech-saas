@@ -85,7 +85,7 @@ export class ClassAccessService {
     const where: any = { schoolId: user.schoolId };
     return this.prisma.class.findMany({
       where,
-      select: { id: true, name: true, schoolId: true, levelTypeId: true, levelType: { select: { id: true, name: true } } },
+      select: { id: true, name: true, schoolId: true, levelTypeId: true, gradingSystemId: true, levelType: { select: { id: true, name: true } } },
       orderBy: [{ levelTypeId: 'asc' }, { order: 'asc' }],
     });
   }
@@ -126,7 +126,7 @@ export class ClassAccessService {
     }
     return this.prisma.class.findMany({
       where: { schoolId: user.schoolId, id: { in: ids } },
-      select: { id: true, name: true, schoolId: true, levelTypeId: true, levelType: { select: { id: true, name: true } } },
+      select: { id: true, name: true, schoolId: true, levelTypeId: true, gradingSystemId: true, levelType: { select: { id: true, name: true } } },
       orderBy: [{ levelTypeId: 'asc' }, { order: 'asc' }],
     });
   }
