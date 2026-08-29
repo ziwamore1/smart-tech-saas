@@ -1,7 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import Redis from 'ioredis';
+import { createHash } from 'crypto';
 
 class RedisRateLimitStore {
   constructor(private readonly redis: Redis, private readonly prefix: string) {}
@@ -37,10 +38,16 @@ export function setupSecurity(app: INestApplication, redis: Redis | null = null)
 
   const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    // A dashboard load can make many legitimate API calls. Keep abuse
+    // protection here, but do not make normal refreshes look like missing
+    // data, especially when several users share one public IP.
+    max: 1000,
     message: 'Too many requests from this IP, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
+    // Authentication has its own limiter below. Counting it here means a
+    // busy dashboard can prevent a user from logging in again.
+    skip: (req) => req.path.startsWith('/api/v1/auth'),
     ...(redis ? { store: new RedisRateLimitStore(redis, 'ratelimit:global') } : {}),
     passOnStoreError: true,
   });
@@ -49,8 +56,14 @@ export function setupSecurity(app: INestApplication, redis: Redis | null = null)
 
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: 30,
     message: 'Too many authentication attempts, please try again later.',
+    // Rate-limit a login identity and its client together. Using only req.ip
+    // makes one school/office NAT or reverse proxy block every user.
+    keyGenerator: (req: any) => {
+      const identifier = String(req.body?.identifier || req.body?.email || '').trim().toLowerCase();
+      return createHash('sha256').update(`${ipKeyGenerator(req.ip)}|${identifier || req.path}`).digest('hex');
+    },
     ...(redis ? { store: new RedisRateLimitStore(redis, 'ratelimit:auth') } : {}),
     passOnStoreError: true,
   });

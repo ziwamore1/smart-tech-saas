@@ -56,6 +56,10 @@ async function bootstrap() {
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   });
+
+  // Parse login bodies before the auth limiter so it can isolate attempts by
+  // identifier instead of treating every user behind one proxy as one key.
+  app.use(json({ limit: '10mb' }));
   setupSecurity(app, app.get(REDIS_CLIENT_TOKEN, { strict: false }) || null);
 
   app.use((req: any, _res: any, next: any) => {
@@ -112,7 +116,6 @@ async function bootstrap() {
     next();
   });
 
-  app.use(json({ limit: '10mb' }));
   app.use(compression());
 
   app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads/' });
