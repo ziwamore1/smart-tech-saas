@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { mapBounded } from '../common/utils/concurrency.util';
 
 @Injectable()
 export class CompositeSubjectService {
@@ -209,20 +210,18 @@ export class CompositeSubjectService {
       select: { studentId: true },
     });
 
-    const results: any[] = [];
-    for (const composite of composites) {
-      for (const enrollment of enrollments) {
-        const result = await this.computeCompositeForStudent(
-          composite.id,
-          enrollment.studentId,
-          termId,
-          classId,
-          schoolId,
-        );
-        if (result) results.push(result);
-      }
-    }
-    return results;
+    const jobs = composites.flatMap(composite => enrollments.map(enrollment => ({
+      compositeId: composite.id,
+      studentId: enrollment.studentId,
+    })));
+    const results = await mapBounded(jobs, job => this.computeCompositeForStudent(
+      job.compositeId,
+      job.studentId,
+      termId,
+      classId,
+      schoolId,
+    ), 8);
+    return results.filter(Boolean);
   }
 
   async findEnrollments(classId: string, termId: string) {

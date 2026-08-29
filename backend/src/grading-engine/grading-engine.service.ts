@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StudentSubjectService } from '../student-subject/student-subject.service';
 import { Decimal } from 'decimal.js';
+import { mapBounded } from '../common/utils/concurrency.util';
 
 export interface GradeResult {
   grade: string;
@@ -353,12 +354,12 @@ export class GradingEngineService {
     const studentIds = enrollments.map(e => e.studentId);
     const subjectMap = await this.studentSubjectService.getClassSubjectsForStudents(studentIds, classId);
 
-    const computed = [];
-    const failed = [];
-
-    for (const enrollment of enrollments) {
+    // A verification covers every student in the class. Process a bounded
+    // number in parallel instead of awaiting the full class serially, while
+    // keeping database pressure predictable.
+    const studentResults = await mapBounded(enrollments, async (enrollment) => {
       const validSubjectIds = subjectMap.get(enrollment.studentId) ?? [];
-      if (!validSubjectIds.includes(subjectId)) continue;
+      if (!validSubjectIds.includes(subjectId)) return null;
 
       try {
         const result = await this.computeWeightedTotal(
@@ -369,7 +370,7 @@ export class GradingEngineService {
           schoolId,
         );
 
-        const computedResult = await this.prisma.computedResult.upsert({
+        return await this.prisma.computedResult.upsert({
           where: {
             studentId_subjectId_termId: {
               studentId: enrollment.studentId,
@@ -393,13 +394,16 @@ export class GradingEngineService {
             computedAt: new Date(),
           },
         });
-
-        computed.push(computedResult);
       } catch (error) {
         this.logger.error(`Failed to compute result for student ${enrollment.studentId}: ${error.message}`);
-        failed.push(enrollment.studentId);
+        return { failedStudentId: enrollment.studentId };
       }
-    }
+    }, 8);
+
+    const computed = studentResults.filter((result): result is any => result !== null && !('failedStudentId' in result));
+    const failed = studentResults
+      .filter((result): result is { failedStudentId: string } => result !== null && 'failedStudentId' in result)
+      .map(result => result.failedStudentId);
 
     this.logger.log(`Computed ${computed.length} results for class ${classId}, subject ${subjectId}, term ${termId}`);
 
