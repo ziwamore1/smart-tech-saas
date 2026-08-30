@@ -164,6 +164,57 @@ export class ReportTemplateBuilderController {
     return this.brandingService.getPresets(req.user.schoolId);
   }
 
+  // ===== Digital Signature Routes =====
+  // Kept above the generic :id routes so the static "signatures" paths are not
+  // shadowed by @Get(':id')/@Post(':id/preview') template routes.
+
+  @Post('signatures')
+  @Roles('Director', 'Head Teacher', 'Deputy Head', 'Deputy')
+  async createSignature(@Req() req, @Body() data: any) {
+    return this.signatureService.createSignature(req.user.schoolId, { ...data, userId: req.user.id, processing: data.processing });
+  }
+
+  @Post('signatures/preview')
+  @Roles('Director', 'Head Teacher', 'Deputy Head', 'Deputy')
+  async previewSignature(@Req() req, @Body() body: { image: string; threshold?: number; contrast?: number; rotation?: number; crop?: { left: number; top: number; width: number; height: number } }) {
+    const image = body?.image;
+    if (!image) return { message: 'image is required', statusCode: 400 };
+    const t0 = Date.now();
+    console.error(`[signaturePreview] start school=${req.user?.schoolId} bytes=${image.length}`);
+    try {
+      const result = await this.signatureService.previewSignature(image, body);
+      console.error(`[signaturePreview] done ${Date.now() - t0}ms outputBytes=${(result?.transparentImage || '').length}`);
+      return result;
+    } catch (error: any) {
+      console.error(`[signaturePreview] error after ${Date.now() - t0}ms: ${error?.message || error}`);
+      throw error;
+    }
+  }
+
+  @Patch('signatures/:id')
+  @Roles('Director')
+  async updateSignature(@Req() req, @Param('id') id: string, @Body() data: any) {
+    return this.signatureService.updateSignature(req.user.schoolId, id, data);
+  }
+
+  @Delete('signatures/:id')
+  @Roles('Director')
+  async deleteSignature(@Req() req, @Param('id') id: string) {
+    return this.signatureService.deleteSignature(req.user.schoolId, id);
+  }
+
+  @Patch('signatures/:id/revoke')
+  @Roles('Director')
+  async revokeSignature(@Req() req, @Param('id') id: string, @Body('reason') reason?: string) {
+    return this.signatureService.revokeSignature(req.user.schoolId, id, reason);
+  }
+
+  @Post('signatures/sign')
+  @Roles('Director')
+  async signDocument(@Req() req, @Body() body: { signatureId: string; documentHash: string }) {
+    return this.signatureService.signDocument(req.user.schoolId, body.signatureId, body.documentHash);
+  }
+
   @Get(':id')
   @Roles('Director', 'Teacher')
   async getTemplate(@Req() req, @Param('id') id: string) {
@@ -468,55 +519,6 @@ export class ReportTemplateBuilderController {
   @Roles('Director', 'Teacher')
   async getAssetUsage(@Req() req, @Param('id') id: string) {
     return this.cloudAssetService.getAssetUsage(req.user.schoolId, id);
-  }
-
-  // ===== Digital Signature Routes =====
-
-  @Post('signatures')
-  @Roles('Director', 'Head Teacher', 'Deputy Head', 'Deputy')
-  async createSignature(@Req() req, @Body() data: any) {
-    return this.signatureService.createSignature(req.user.schoolId, { ...data, userId: req.user.id, processing: data.processing });
-  }
-
-  @Post('signatures/preview')
-  @Roles('Director', 'Head Teacher', 'Deputy Head', 'Deputy')
-  async previewSignature(@Req() req, @Body() body: { image: string; threshold?: number; contrast?: number; rotation?: number; crop?: { left: number; top: number; width: number; height: number } }) {
-    const image = body?.image;
-    if (!image) return { message: 'image is required', statusCode: 400 };
-    const t0 = Date.now();
-    console.error(`[signaturePreview] start school=${req.user?.schoolId} bytes=${image.length}`);
-    try {
-      const result = await this.signatureService.previewSignature(image, body);
-      console.error(`[signaturePreview] done ${Date.now() - t0}ms outputBytes=${(result?.transparentImage || '').length}`);
-      return result;
-    } catch (error: any) {
-      console.error(`[signaturePreview] error after ${Date.now() - t0}ms: ${error?.message || error}`);
-      throw error;
-    }
-  }
-
-  @Patch('signatures/:id')
-  @Roles('Director')
-  async updateSignature(@Req() req, @Param('id') id: string, @Body() data: any) {
-    return this.signatureService.updateSignature(req.user.schoolId, id, data);
-  }
-
-  @Delete('signatures/:id')
-  @Roles('Director')
-  async deleteSignature(@Req() req, @Param('id') id: string) {
-    return this.signatureService.deleteSignature(req.user.schoolId, id);
-  }
-
-  @Patch('signatures/:id/revoke')
-  @Roles('Director')
-  async revokeSignature(@Req() req, @Param('id') id: string, @Body('reason') reason?: string) {
-    return this.signatureService.revokeSignature(req.user.schoolId, id, reason);
-  }
-
-  @Post('signatures/sign')
-  @Roles('Director')
-  async signDocument(@Req() req, @Body() body: { signatureId: string; documentHash: string }) {
-    return this.signatureService.signDocument(req.user.schoolId, body.signatureId, body.documentHash);
   }
 
   // ===== Digital Stamp Routes =====
