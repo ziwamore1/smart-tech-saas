@@ -29,7 +29,7 @@ export default function DigitalSignaturesPage() {
     if (!file || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) { setMessage('Choose a PNG, JPG/JPEG, or WebP image.'); return; }
     if (file.size > 5 * 1024 * 1024) { setMessage('The image must be 5 MB or smaller.'); return; }
     const reader = new FileReader();
-    reader.onload = () => { const value = String(reader.result); setSource(value); setResult(''); void process(value); };
+    reader.onload = () => { const value = String(reader.result); setSource(value); setResult(''); setMessage('Image uploaded. Select Extract Signature to isolate the handwriting.'); };
     reader.readAsDataURL(file);
   };
 
@@ -54,6 +54,7 @@ export default function DigitalSignaturesPage() {
       <section className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
         <h2 className="font-semibold">Upload and adjust</h2>
         <div onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); choose(e.dataTransfer.files[0]); }} onClick={() => fileRef.current?.click()} className="border border-dashed border-cyan-400 rounded-xl p-6 text-center cursor-pointer hover:bg-cyan-50"><input ref={fileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={e => choose(e.target.files?.[0])} /><span className="text-cyan-700 text-sm font-medium">Drop image or browse</span><span className="block text-xs text-gray-400 mt-1">PNG, JPG, WebP up to 5 MB</span></div>
+        <button disabled={!source || busy} onClick={() => void process()} className="w-full rounded-lg border border-cyan-700 text-cyan-800 py-2.5 font-semibold disabled:opacity-50">{busy ? 'Extracting handwriting…' : 'Extract Signature'}</button>
         <label className="block text-xs text-gray-600">Background threshold: {threshold}<input className="w-full" type="range" min="180" max="254" value={threshold} onChange={e => update('threshold', Number(e.target.value))} /></label>
         <label className="block text-xs text-gray-600">Contrast: {contrast.toFixed(1)}<input className="w-full" type="range" min="0.5" max="2" step="0.1" value={contrast} onChange={e => update('contrast', Number(e.target.value))} /></label>
         <label className="block text-xs text-gray-600">Rotation: {rotation}°<input className="w-full" type="range" min="-15" max="15" value={rotation} onChange={e => update('rotation', Number(e.target.value))} /></label>

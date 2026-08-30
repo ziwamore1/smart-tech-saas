@@ -26,7 +26,7 @@ export default function DigitalSignaturesPage() {
       setOriginal(value);
       const probe = new Image(); probe.onload = () => setSourceSize({ width: probe.naturalWidth, height: probe.naturalHeight }); probe.src = value;
       setMessage('');
-      await process(value, processing);
+      setMessage('Image uploaded. Select Extract Signature to isolate the handwriting.');
     };
     reader.readAsDataURL(file);
   };
@@ -70,8 +70,9 @@ export default function DigitalSignaturesPage() {
           <div onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); void loadImage(e.dataTransfer.files[0]); }} onClick={() => inputRef.current?.click()} className="border border-dashed border-cyan-700 rounded-xl p-8 text-center cursor-pointer hover:bg-slate-800">
             <input ref={inputRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={e => void loadImage(e.target.files?.[0])} />
             <div className="text-cyan-300 text-lg">Drop a scanned signature here</div><div className="text-xs text-slate-500 mt-2">or browse PNG, JPG, or WebP</div>
-          </div>
-          <h2 className="font-medium pt-2">2. Adjust extraction</h2>
+           </div>
+           <button disabled={!original || busy} onClick={() => void process()} className="w-full rounded-lg border border-cyan-400 text-cyan-200 py-2.5 font-semibold disabled:opacity-50">{busy ? 'Extracting handwriting…' : 'Extract Signature'}</button>
+           <h2 className="font-medium pt-2">2. Adjust extraction</h2>
           {original && sourceSize.width > 0 && <div className="text-xs text-slate-400">Drag over the original preview to crop. <button onClick={() => adjust({ crop: undefined })} className="text-cyan-300">Reset crop</button></div>}
           <label className="block text-xs text-slate-400">Background threshold: {processing.threshold}<input className="w-full" type="range" min="180" max="254" value={processing.threshold} onChange={e => adjust({ threshold: Number(e.target.value) })} /></label>
           <label className="block text-xs text-slate-400">Contrast: {processing.contrast.toFixed(1)}<input className="w-full" type="range" min="0.5" max="2" step="0.1" value={processing.contrast} onChange={e => adjust({ contrast: Number(e.target.value) })} /></label>
