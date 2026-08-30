@@ -17,6 +17,7 @@ export default function DigitalSignaturesPage() {
   const process = async (image = source, options = { threshold, contrast, rotation }) => {
     if (!image) return;
     setBusy(true);
+    setMessage('Extracting handwriting…');
     try {
       const response = await templateBuilderApi.previewSignature(image, options);
       const data = response.data?.data || response.data;

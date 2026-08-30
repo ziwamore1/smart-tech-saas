@@ -483,7 +483,10 @@ export class ReportTemplateBuilderController {
   async previewSignature(@Req() req, @Body() body: { image: string; threshold?: number; contrast?: number; rotation?: number; crop?: { left: number; top: number; width: number; height: number } }) {
     const image = body?.image;
     if (!image) return { message: 'image is required', statusCode: 400 };
-    return this.signatureService.previewSignature(image, body);
+    this.logger.log(`Signature extraction started: school=${req.user.schoolId} bytes=${image.length}`);
+    const result = await this.signatureService.previewSignature(image, body);
+    this.logger.log(`Signature extraction completed: school=${req.user.schoolId}`);
+    return result;
   }
 
   @Patch('signatures/:id')

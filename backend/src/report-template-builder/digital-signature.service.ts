@@ -100,6 +100,8 @@ export class DigitalSignatureService {
     }
 
     try {
+      // Camera images can be very large. Bound the working raster before
+      // converting to raw RGBA so one preview cannot exhaust Railway memory.
       const image = sharp(input, { limitInputPixels: 16_000_000 });
       const metadata = await image.metadata();
       if (!metadata.width || !metadata.height || metadata.width > 4000 || metadata.height > 4000) {
@@ -119,6 +121,7 @@ export class DigitalSignatureService {
       const contrast = Math.max(0.5, Math.min(2, Number(options.contrast ?? 1)));
       const { data: pixels, info } = await image
         .rotate(rotation)
+        .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
         .greyscale()
         .linear(contrast, 128 * (1 - contrast))
         .ensureAlpha()
