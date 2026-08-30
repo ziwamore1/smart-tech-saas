@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { templateBuilderApi } from '@/lib/api';
 
 const PREVIEW_EDGE = 1600;
@@ -35,6 +35,19 @@ export default function DigitalSignaturesPage() {
   const [rotation, setRotation] = useState(0);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [saved, setSaved] = useState<Signature[]>([]);
+
+  const loadSaved = useCallback(async () => {
+    try {
+      const response = await templateBuilderApi.getSignatures();
+      const data = response.data?.data || response.data || [];
+      setSaved(Array.isArray(data) ? data : []);
+    } catch {
+      // keep the current list on transient failures
+    }
+  }, []);
+
+  useEffect(() => { void loadSaved(); }, [loadSaved]);
 
   const process = async (image = prepared || source, options = { threshold, contrast, rotation }) => {
     if (!image) return;
@@ -71,8 +84,23 @@ export default function DigitalSignaturesPage() {
   const save = async () => {
     if (!name.trim() || !source || !result) { setMessage('Upload, extract, and name the signature first.'); return; }
     setBusy(true);
-    try { await templateBuilderApi.createSignature({ name: name.trim(), imageUrl: prepared || source, processing: { threshold, contrast, rotation } }); setMessage('Digital signature saved.'); setName(''); }
+    try { await templateBuilderApi.createSignature({ name: name.trim(), imageUrl: prepared || source, processing: { threshold, contrast, rotation } }); setMessage('Digital signature saved.'); setName(''); void loadSaved(); }
     catch (error: any) { setMessage(error?.response?.data?.message || 'Could not save signature'); }
+    finally { setBusy(false); }
+  };
+
+  const remove = async (id: string, signatureName: string) => {
+    if (!window.confirm(`Delete "${signatureName}"?`)) return;
+    setBusy(true);
+    try { await templateBuilderApi.deleteSignature(id); setMessage('Signature deleted.'); void loadSaved(); }
+    catch (error: any) { setMessage(error?.response?.data?.message || 'Could not delete signature'); }
+    finally { setBusy(false); }
+  };
+
+  const setDefault = async (id: string) => {
+    setBusy(true);
+    try { await templateBuilderApi.updateSignature(id, { isDefault: true }); setMessage('Default signature updated.'); void loadSaved(); }
+    catch (error: any) { setMessage(error?.response?.data?.message || 'Could not update signature'); }
     finally { setBusy(false); }
   };
 
@@ -99,7 +127,42 @@ export default function DigitalSignaturesPage() {
       </section>
       <section className="grid md:grid-cols-2 gap-4"><Preview title="Before · original" image={source} /><Preview title="After · transparent extracted handwriting" image={result} transparent /></section>
     </div>
+    <section className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-semibold">Saved signatures</h2>
+        <span className="text-xs text-gray-400">{saved.length} saved</span>
+      </div>
+      {saved.length === 0 ? (
+        <p className="text-sm text-gray-400">No signatures saved yet. Create one above and it will appear here, ready to use in templates and official documents.</p>
+      ) : (
+        <ul className="divide-y divide-gray-100">
+          {saved.map((sig) => (
+            <li key={sig.id} className="py-3 flex items-center gap-4">
+              <div className="h-10 w-24 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden">
+                <img src={sig.transparentImageUrl || sig.processedImageUrl || sig.imageUrl} alt={sig.name} className="max-h-8 max-w-20 object-contain" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-gray-900 truncate">{sig.name}</p>
+                <p className="text-xs text-gray-400">{sig.isDefault ? 'Default signature · ' : ''}Saved {sig.createdAt ? new Date(sig.createdAt).toLocaleDateString() : '-'}</p>
+              </div>
+              {!sig.isDefault && <button onClick={() => void setDefault(sig.id)} className="text-xs text-cyan-700 border border-cyan-700 rounded-lg px-2.5 py-1.5 font-semibold hover:bg-cyan-50">Set default</button>}
+              <button onClick={() => void remove(sig.id, sig.name)} className="text-xs text-red-600 border border-red-200 rounded-lg px-2.5 py-1.5 font-semibold hover:bg-red-50">Delete</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   </div>;
+}
+
+interface Signature {
+  id: string;
+  name: string;
+  imageUrl?: string;
+  processedImageUrl?: string;
+  transparentImageUrl?: string;
+  isDefault: boolean;
+  createdAt?: string;
 }
 
 function Preview({ title, image, transparent }: { title: string; image: string; transparent?: boolean }) {
