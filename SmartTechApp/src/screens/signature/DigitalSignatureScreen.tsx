@@ -146,6 +146,7 @@ export function DigitalSignatureScreen({ navigation }: any) {
   const [signatureImageUrl, setSignatureImageUrl] = useState('');
   const [signatureData, setSignatureData] = useState('');
   const [processedPreview, setProcessedPreview] = useState('');
+  const [extractionError, setExtractionError] = useState('');
   const [threshold, setThreshold] = useState(245);
   const [contrast, setContrast] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -186,6 +187,7 @@ export function DigitalSignatureScreen({ navigation }: any) {
     setSignatureImageUrl('');
     setSignatureData('');
     setProcessedPreview('');
+    setExtractionError('');
     setThreshold(245);
     setContrast(1);
     setRotation(0);
@@ -205,8 +207,8 @@ export function DigitalSignatureScreen({ navigation }: any) {
        const mimeType = file.mimeType || 'image/png';
        const original = `data:${mimeType};base64,${base64}`;
        setSignatureImageUrl(original);
-       const preview = await apiService.previewSignature(original, { threshold: 245, contrast: 1, rotation: 0 });
-       setProcessedPreview(preview.transparentImage || preview.processedImage || '');
+        setProcessedPreview('');
+        setExtractionError('');
       setSignatureMethod('upload');
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to pick image');
@@ -234,17 +236,28 @@ export function DigitalSignatureScreen({ navigation }: any) {
     const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
     const original = `data:${mimeType};base64,${base64}`;
     setSignatureImageUrl(original);
-    const preview = await apiService.previewSignature(original, { threshold: 245, contrast: 1, rotation: 0 });
-    setProcessedPreview(preview.transparentImage || preview.processedImage || '');
+    setProcessedPreview('');
+    setExtractionError('');
     setSignatureMethod('upload');
   };
 
   const reprocessPreview = async (next: { threshold?: number; contrast?: number; rotation?: number } = {}) => {
     if (!signatureImageUrl) return;
     const options = { threshold: next.threshold ?? threshold, contrast: next.contrast ?? contrast, rotation: next.rotation ?? rotation };
-    const preview = await apiService.previewSignature(signatureImageUrl, options);
-    setProcessedPreview(preview.transparentImage || preview.processedImage || '');
+    try {
+      const preview = await apiService.previewSignature(signatureImageUrl, options);
+      const data = preview?.data || preview;
+      const output = data?.transparentImage || data?.processedImage;
+      if (!output) throw new Error('The server returned no extracted signature');
+      setProcessedPreview(output);
+      setExtractionError('');
+    } catch (err: any) {
+      setProcessedPreview('');
+      setExtractionError(err?.response?.data?.message || err?.message || 'Signature extraction failed');
+    }
   };
+
+  const handleExtractSignature = () => { void reprocessPreview(); };
 
   const handleCaptureSignature = (data: string) => {
     setSignatureData(data);
@@ -479,15 +492,20 @@ export function DigitalSignatureScreen({ navigation }: any) {
                     {signatureImageUrl ? 'Change Image' : 'Pick Signature Image'}
                   </Text>
                 </TouchableOpacity>
-                <View style={styles.captureRow}>
+                  <View style={styles.captureRow}>
                   <TouchableOpacity style={styles.captureBtn} onPress={() => handlePickFromDevice(false)}><Text style={styles.captureBtnText}>Gallery</Text></TouchableOpacity>
                   <TouchableOpacity style={styles.captureBtn} onPress={() => handlePickFromDevice(true)}><Text style={styles.captureBtnText}>Camera</Text></TouchableOpacity>
-                </View>
-                {signatureImageUrl ? (
-                  <View style={styles.beforeAfterRow}>
-                    <View style={styles.beforeAfterItem}><Text style={styles.beforeAfterLabel}>Before</Text><Image source={{ uri: signatureImageUrl }} style={styles.processPreview} contentFit="contain" /></View>
-                    <View style={styles.beforeAfterItem}><Text style={styles.beforeAfterLabel}>Extracted</Text><Image source={{ uri: processedPreview || signatureImageUrl }} style={[styles.processPreview, styles.checkerboard]} contentFit="contain" /></View>
                   </View>
+                  <TouchableOpacity style={styles.extractBtn} onPress={handleExtractSignature} disabled={!signatureImageUrl}>
+                    <Text style={styles.extractBtnText}>Extract Signature</Text>
+                  </TouchableOpacity>
+                {signatureImageUrl ? (
+                  <View>
+                    <View style={styles.beforeAfterRow}>
+                    <View style={styles.beforeAfterItem}><Text style={styles.beforeAfterLabel}>Before</Text><Image source={{ uri: signatureImageUrl }} style={styles.processPreview} contentFit="contain" /></View>
+                    <View style={styles.beforeAfterItem}><Text style={styles.beforeAfterLabel}>Extracted</Text>{processedPreview ? <Image source={{ uri: processedPreview }} style={[styles.processPreview, styles.checkerboard]} contentFit="contain" /> : <View style={[styles.processPreview, styles.waitingPreview]}><Text style={styles.waitingText}>Waiting for extraction</Text></View>}</View>
+                    </View>
+                    {extractionError ? <Text style={styles.extractionError}>{extractionError}</Text> : null}
                   <Text style={styles.adjustLabel}>Adjust extraction</Text>
                   <View style={styles.adjustRow}>
                     <TouchableOpacity style={styles.adjustBtn} onPress={() => { const value = Math.max(180, threshold - 10); setThreshold(value); void reprocessPreview({ threshold: value }); }}><Text style={styles.adjustBtnText}>Less background</Text></TouchableOpacity>
@@ -498,6 +516,7 @@ export function DigitalSignatureScreen({ navigation }: any) {
                     <TouchableOpacity style={styles.adjustBtn} onPress={() => { const value = Math.min(2, contrast + 0.1); setContrast(value); void reprocessPreview({ contrast: value }); }}><Text style={styles.adjustBtnText}>Higher contrast</Text></TouchableOpacity>
                   </View>
                   <View style={styles.adjustRow}><TouchableOpacity style={styles.adjustBtn} onPress={() => { const value = rotation - 1; setRotation(value); void reprocessPreview({ rotation: value }); }}><Text style={styles.adjustBtnText}>Rotate left</Text></TouchableOpacity><TouchableOpacity style={styles.adjustBtn} onPress={() => { const value = rotation + 1; setRotation(value); void reprocessPreview({ rotation: value }); }}><Text style={styles.adjustBtnText}>Rotate right</Text></TouchableOpacity></View>
+                  </View>
                 ) : null}
               </View>
             )}

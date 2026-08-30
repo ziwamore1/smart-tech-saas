@@ -36,7 +36,10 @@ export default function DigitalSignaturesPage() {
     setBusy(true);
     try {
       const result = await api.post('/template-builder/signatures/preview', { image, ...options });
-      setProcessed(result.data?.transparentImage || result.data?.processedImage || '');
+      const data = result.data?.data || result.data;
+      const extracted = data?.transparentImage || data?.processedImage;
+      if (!extracted) throw new Error('The server returned no extracted signature image.');
+      setProcessed(extracted);
     } catch (error: any) { setMessage(error?.response?.data?.message || 'Could not extract handwriting'); }
     finally { setBusy(false); }
   };

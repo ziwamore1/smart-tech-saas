@@ -19,7 +19,10 @@ export default function DigitalSignaturesPage() {
     setBusy(true);
     try {
       const response = await templateBuilderApi.previewSignature(image, options);
-      setResult(response.data?.transparentImage || response.data?.processedImage || '');
+      const data = response.data?.data || response.data;
+      const extracted = data?.transparentImage || data?.processedImage;
+      if (!extracted) throw new Error('The server returned no extracted signature image.');
+      setResult(extracted);
       setMessage('Handwriting extracted from the background.');
     } catch (error: any) { setMessage(error?.response?.data?.message || 'Signature extraction failed'); }
     finally { setBusy(false); }

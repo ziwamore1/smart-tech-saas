@@ -473,7 +473,7 @@ export class ReportTemplateBuilderController {
   // ===== Digital Signature Routes =====
 
   @Post('signatures')
-  @Roles('Director')
+  @Roles('Director', 'Head Teacher', 'Deputy Head', 'Deputy')
   async createSignature(@Req() req, @Body() data: any) {
     return this.signatureService.createSignature(req.user.schoolId, { ...data, userId: req.user.id, processing: data.processing });
   }
