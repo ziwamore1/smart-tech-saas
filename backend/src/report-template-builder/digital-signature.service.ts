@@ -145,7 +145,7 @@ export class DigitalSignatureService {
   async previewSignature(value: string, options?: SignatureProcessingOptions) {
     const processed = await this.normalizeVisual(value, options);
     const metadata = await this.getImageMetadata(processed);
-    return { originalImage: value, processedImage: processed, transparentImage: processed, ...metadata, processingVersion: 'v2', options: options || {} };
+    return { processedImage: processed, transparentImage: processed, ...metadata, processingVersion: 'v2', options: options || {} };
   }
 
   private async getImageMetadata(value: string) {

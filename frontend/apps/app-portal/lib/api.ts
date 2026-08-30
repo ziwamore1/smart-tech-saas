@@ -1347,7 +1347,7 @@ export const templateBuilderApi = {
 
   getSignatures: () => api.get('/template-builder/signatures'),
 
-  previewSignature: (image: string, options?: any) => api.post('/template-builder/signatures/preview', { image, ...(options || {}) }),
+  previewSignature: (image: string, options?: any) => api.post('/template-builder/signatures/preview', { image, ...(options || {}) }, { timeout: 60000 }),
 
   createSignature: (data: any) => api.post('/template-builder/signatures', data),
 

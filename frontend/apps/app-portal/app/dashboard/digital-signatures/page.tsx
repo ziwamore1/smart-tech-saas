@@ -3,9 +3,31 @@
 import { useRef, useState } from 'react';
 import { templateBuilderApi } from '@/lib/api';
 
+const PREVIEW_EDGE = 1600;
+
+async function prepareForUpload(dataUrl: string): Promise<string> {
+  const img = new Image();
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error('Could not read the uploaded image'));
+    img.src = dataUrl;
+  });
+  const edge = Math.max(img.naturalWidth, img.naturalHeight);
+  if (edge <= PREVIEW_EDGE) return dataUrl;
+  const scale = PREVIEW_EDGE / edge;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return dataUrl;
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.9);
+}
+
 export default function DigitalSignaturesPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [source, setSource] = useState('');
+  const [prepared, setPrepared] = useState('');
   const [result, setResult] = useState('');
   const [name, setName] = useState('');
   const [threshold, setThreshold] = useState(245);
@@ -14,7 +36,7 @@ export default function DigitalSignaturesPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
-  const process = async (image = source, options = { threshold, contrast, rotation }) => {
+  const process = async (image = prepared || source, options = { threshold, contrast, rotation }) => {
     if (!image) return;
     setBusy(true);
     setMessage('Extracting handwriting…');
@@ -25,7 +47,7 @@ export default function DigitalSignaturesPage() {
       if (!extracted) throw new Error('The server returned no extracted signature image.');
       setResult(extracted);
       setMessage('Handwriting extracted from the background.');
-    } catch (error: any) { setMessage(error?.response?.data?.message || 'Signature extraction failed'); }
+    } catch (error: any) { setMessage(error?.response?.data?.message || error?.message || 'Signature extraction failed'); }
     finally { setBusy(false); }
   };
 
@@ -33,14 +55,23 @@ export default function DigitalSignaturesPage() {
     if (!file || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) { setMessage('Choose a PNG, JPG/JPEG, or WebP image.'); return; }
     if (file.size > 5 * 1024 * 1024) { setMessage('The image must be 5 MB or smaller.'); return; }
     const reader = new FileReader();
-    reader.onload = () => { const value = String(reader.result); setSource(value); setResult(''); setMessage('Image uploaded. Select Extract Signature to isolate the handwriting.'); };
+    reader.onload = () => {
+      const value = String(reader.result);
+      setSource(value);
+      setResult('');
+      setPrepared('');
+      setMessage('Preparing image…');
+      void prepareForUpload(value)
+        .then((ready) => { setPrepared(ready); setResult(''); setMessage('Image uploaded. Select Extract Signature to isolate the handwriting.'); })
+        .catch((error: any) => setMessage(error?.message || 'Could not prepare the image.'));
+    };
     reader.readAsDataURL(file);
   };
 
   const save = async () => {
     if (!name.trim() || !source || !result) { setMessage('Upload, extract, and name the signature first.'); return; }
     setBusy(true);
-    try { await templateBuilderApi.createSignature({ name: name.trim(), imageUrl: source, processing: { threshold, contrast, rotation } }); setMessage('Digital signature saved.'); setName(''); }
+    try { await templateBuilderApi.createSignature({ name: name.trim(), imageUrl: prepared || source, processing: { threshold, contrast, rotation } }); setMessage('Digital signature saved.'); setName(''); }
     catch (error: any) { setMessage(error?.response?.data?.message || 'Could not save signature'); }
     finally { setBusy(false); }
   };
@@ -48,7 +79,7 @@ export default function DigitalSignaturesPage() {
   const update = (key: 'threshold' | 'contrast' | 'rotation', value: number) => {
     const next = { threshold, contrast, rotation, [key]: value };
     if (key === 'threshold') setThreshold(value); if (key === 'contrast') setContrast(value); if (key === 'rotation') setRotation(value);
-    void process(source, next);
+    void process(prepared || source, next);
   };
 
   return <div className="space-y-6">

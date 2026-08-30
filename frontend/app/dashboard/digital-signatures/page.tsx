@@ -6,9 +6,31 @@ import { api } from '@/lib/api';
 
 type Processing = { threshold: number; contrast: number; rotation: number; crop?: { left: number; top: number; width: number; height: number } };
 
+const PREVIEW_EDGE = 1600;
+
+async function prepareForUpload(dataUrl: string): Promise<string> {
+  const img = new Image();
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error('Could not read the uploaded image'));
+    img.src = dataUrl;
+  });
+  const edge = Math.max(img.naturalWidth, img.naturalHeight);
+  if (edge <= PREVIEW_EDGE) return dataUrl;
+  const scale = PREVIEW_EDGE / edge;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return dataUrl;
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.9);
+}
+
 export default function DigitalSignaturesPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [original, setOriginal] = useState('');
+  const [prepared, setPrepared] = useState('');
   const [processed, setProcessed] = useState('');
   const [name, setName] = useState('');
   const [processing, setProcessing] = useState<Processing>({ threshold: 245, contrast: 1, rotation: 0 });
@@ -24,22 +46,31 @@ export default function DigitalSignaturesPage() {
     reader.onload = async () => {
       const value = String(reader.result);
       setOriginal(value);
+      setPrepared('');
+      setMessage('Preparing image…');
       const probe = new Image(); probe.onload = () => setSourceSize({ width: probe.naturalWidth, height: probe.naturalHeight }); probe.src = value;
-      setMessage('');
-      setMessage('Image uploaded. Select Extract Signature to isolate the handwriting.');
+      try {
+        const ready = await prepareForUpload(value);
+        setPrepared(ready);
+        setMessage('Image uploaded. Select Extract Signature to isolate the handwriting.');
+      } catch (error: any) {
+        setMessage(error?.message || 'Could not prepare the image.');
+      }
     };
     reader.readAsDataURL(file);
   };
 
-  const process = async (image = original, options = processing) => {
+  const process = async (image = prepared || original, options = processing) => {
     if (!image) return;
     setBusy(true);
+    setMessage('Extracting handwriting…');
     try {
-      const result = await api.post('/template-builder/signatures/preview', { image, ...options });
+      const result = await api.post('/template-builder/signatures/preview', { image, ...options }, { timeout: 60000 });
       const data = result.data?.data || result.data;
       const extracted = data?.transparentImage || data?.processedImage;
       if (!extracted) throw new Error('The server returned no extracted signature image.');
       setProcessed(extracted);
+      setMessage('Handwriting extracted from the background.');
     } catch (error: any) { setMessage(error?.response?.data?.message || 'Could not extract handwriting'); }
     finally { setBusy(false); }
   };
@@ -47,14 +78,14 @@ export default function DigitalSignaturesPage() {
   const adjust = (change: Partial<Processing>) => {
     const next = { ...processing, ...change };
     setProcessing(next);
-    void process(original, next);
+    void process(prepared || original, next);
   };
 
   const save = async () => {
     if (!name.trim() || !original || !processed) { setMessage('Add an image, process it, and enter a name first.'); return; }
     setBusy(true);
     try {
-      await api.post('/template-builder/signatures', { name: name.trim(), imageUrl: original, processing });
+      await api.post('/template-builder/signatures', { name: name.trim(), imageUrl: prepared || original, processing }, { timeout: 60000 });
       setMessage('Signature saved as a transparent digital asset.');
       setName('');
     } catch (error: any) { setMessage(error?.response?.data?.message || 'Could not save signature'); }
