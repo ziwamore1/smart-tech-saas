@@ -121,6 +121,7 @@ export default function TemplateBuilderPage() {
   const [newName, setNewName] = useState('');
   const [showLibrary, setShowLibrary] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [signatures, setSignatures] = useState<any[]>([]);
 
   const { data: templatesData } = useQuery({
     queryKey: ['template-builder-templates'],
@@ -130,6 +131,13 @@ export default function TemplateBuilderPage() {
   useEffect(() => {
     if (templatesData && Array.isArray(templatesData)) setTemplates(templatesData);
   }, [templatesData]);
+
+  useEffect(() => {
+    api.get('/template-builder/signatures').then(res => {
+      const list = Array.isArray(res.data) ? res.data : (res.data?.signatures || []);
+      setSignatures(list.filter((signature: any) => signature.status !== 'REVOKED'));
+    }).catch(() => setSignatures([]));
+  }, []);
 
   useEffect(() => {
     if (selectedId) loadTemplate(selectedId);
@@ -155,6 +163,7 @@ export default function TemplateBuilderPage() {
     try {
       await api.patch(`/template-builder/${selectedId}/components/${cid}`, data);
       setComponents(prev => prev.map(c => c.id === cid ? { ...c, ...data } : c));
+      setSelectedComponent((current: any) => current?.id === cid ? { ...current, ...data } : current);
     } catch {}
   };
 
@@ -320,6 +329,17 @@ export default function TemplateBuilderPage() {
                   <span className="text-[8px] text-gray-300">{selectedComponent.type}</span>
                 </div>
                 <div className="space-y-1.5">
+                  {selectedComponent.type === 'SIGNATURE' && (
+                    <div>
+                      <label className="text-[7px] text-gray-400">Authorized signature</label>
+                      <select value={selectedComponent.content?.signatureId || ''}
+                        onChange={(e) => handleUpdateComponent(selectedComponent.id, { content: { ...selectedComponent.content, signatureId: e.target.value || undefined } })}
+                        className="w-full px-1 py-1 border border-gray-200 rounded text-[10px]">
+                        <option value="">Use institution default</option>
+                        {signatures.map((signature: any) => <option key={signature.id} value={signature.id}>{signature.name}{signature.isDefault ? ' (Default)' : ''}</option>)}
+                      </select>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-1">
                     <div>
                       <label className="text-[7px] text-gray-400">X</label>

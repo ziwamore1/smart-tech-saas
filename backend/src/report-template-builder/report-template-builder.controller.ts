@@ -475,7 +475,15 @@ export class ReportTemplateBuilderController {
   @Post('signatures')
   @Roles('Director')
   async createSignature(@Req() req, @Body() data: any) {
-    return this.signatureService.createSignature(req.user.schoolId, data);
+    return this.signatureService.createSignature(req.user.schoolId, { ...data, userId: req.user.id, processing: data.processing });
+  }
+
+  @Post('signatures/preview')
+  @Roles('Director')
+  async previewSignature(@Req() req, @Body() body: { image: string; threshold?: number; contrast?: number; rotation?: number; crop?: { left: number; top: number; width: number; height: number } }) {
+    const image = body?.image;
+    if (!image) return { message: 'image is required', statusCode: 400 };
+    return this.signatureService.previewSignature(image, body);
   }
 
   @Patch('signatures/:id')
@@ -488,6 +496,12 @@ export class ReportTemplateBuilderController {
   @Roles('Director')
   async deleteSignature(@Req() req, @Param('id') id: string) {
     return this.signatureService.deleteSignature(req.user.schoolId, id);
+  }
+
+  @Patch('signatures/:id/revoke')
+  @Roles('Director')
+  async revokeSignature(@Req() req, @Param('id') id: string, @Body('reason') reason?: string) {
+    return this.signatureService.revokeSignature(req.user.schoolId, id, reason);
   }
 
   @Post('signatures/sign')

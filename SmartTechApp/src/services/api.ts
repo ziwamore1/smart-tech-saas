@@ -1933,6 +1933,11 @@ class ApiService {
     return response.data;
   }
 
+  async previewSignature(image: string, options?: any) {
+    const response = await this.client.post('/template-builder/signatures/preview', { image, ...(options || {}) });
+    return response.data;
+  }
+
   async getAssessmentOversight(teacherIds: string[], termId?: string) {
     const response = await this.client.get('/assessment-engine/teacher/overview', {
       params: { teacherIds: teacherIds.join(','), termId },

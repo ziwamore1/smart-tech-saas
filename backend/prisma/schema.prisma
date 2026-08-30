@@ -3633,11 +3633,25 @@ model BrandPreset {
 model DigitalSignature {
   id            String   @id @default(uuid())
   schoolId      String
+  userId        String?
   name          String
   title         String?
   email         String?
   imageUrl      String?
   signatureData String?
+  originalImageUrl    String?
+  processedImageUrl   String?
+  transparentImageUrl String?
+  thumbnailUrl        String?
+  originalAssetId     String?
+  processedAssetId    String?
+  thumbnailAssetId    String?
+  width               Int?
+  height              Int?
+  aspectRatio        Float?
+  processingVersion  String?
+  processingMetadata Json?
+  status             String   @default("ACTIVE")
   certificate   String?
   isDefault     Boolean  @default(false)
   passcode      String?
@@ -3646,6 +3660,7 @@ model DigitalSignature {
   school        School   @relation(fields: [schoolId], references: [id])
 
   @@index([schoolId])
+  @@index([schoolId, status])
 }
 
 model CollaborationSession {

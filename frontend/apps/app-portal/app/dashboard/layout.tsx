@@ -591,6 +591,14 @@ const regularNav: NavItem[] = [
     typeRoles: ROLE_MAP.teaching,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
+  {
+    name: 'Digital Signatures',
+    href: '/dashboard/digital-signatures',
+    icon: 'fa-signature',
+    color: '#0e7490',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
+  },
   { 
     name: 'Account Center', 
     href: '/security/account-center', 

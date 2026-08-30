@@ -109,6 +109,9 @@ export default function DigitalStampsPage() {
           <Link href="/dashboard/digital-stamps/designer" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
             🎨 Stamp Designer
           </Link>
+          {isDirector && <Link href="/dashboard/digital-signatures" className="px-4 py-2 bg-cyan-700 text-white rounded-lg text-sm font-medium hover:bg-cyan-800">
+            ✍ Signature Designer
+          </Link>}
           <Link href="/dashboard/digital-stamps/apply" className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700">
             🔏 Apply Stamp
           </Link>

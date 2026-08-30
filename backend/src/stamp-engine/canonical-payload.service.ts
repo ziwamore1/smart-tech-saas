@@ -12,6 +12,7 @@ export interface CanonicalDocumentPayload {
   contentHash: string; // SHA-256 of the content-only payload (pre-stamp)
   stampInstanceId: string | null;
   signerIdentities: { signerId: string; signerRole?: string }[];
+  signatureAssetId?: string | null;
   templateVersion: number | null;
 }
 
@@ -55,6 +56,7 @@ export class CanonicalPayloadService {
       signerIdentities: [...payload.signerIdentities].sort((a, b) =>
         `${a.signerId}|${a.signerRole ?? ''}`.localeCompare(`${b.signerId}|${b.signerRole ?? ''}`),
       ),
+      signatureAssetId: payload.signatureAssetId ?? null,
       templateVersion: payload.templateVersion,
     };
     return { canonical, finalHash: this.canonicalSha256(canonical) };

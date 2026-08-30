@@ -18,6 +18,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { captureRef } from 'react-native-view-shot';
 import Svg, { Path, G } from 'react-native-svg';
@@ -66,6 +67,10 @@ function SignaturePad({ onCapture }: { onCapture: (data: string) => void }) {
           }
           return [];
         });
+      },
+      onPanResponderTerminate: () => {
+        isDrawingRef.current = false;
+        setCurrentPath([]);
       },
     })
   ).current;
@@ -140,6 +145,10 @@ export function DigitalSignatureScreen({ navigation }: any) {
   const [signatureMethod, setSignatureMethod] = useState<'draw' | 'upload'>('draw');
   const [signatureImageUrl, setSignatureImageUrl] = useState('');
   const [signatureData, setSignatureData] = useState('');
+  const [processedPreview, setProcessedPreview] = useState('');
+  const [threshold, setThreshold] = useState(245);
+  const [contrast, setContrast] = useState(1);
+  const [rotation, setRotation] = useState(0);
   const [saving, setSaving] = useState(false);
 
   const [signDocModalVisible, setSignDocModalVisible] = useState(false);
@@ -176,6 +185,10 @@ export function DigitalSignatureScreen({ navigation }: any) {
     setSignatureMethod('draw');
     setSignatureImageUrl('');
     setSignatureData('');
+    setProcessedPreview('');
+    setThreshold(245);
+    setContrast(1);
+    setRotation(0);
   };
 
   const handleUploadImage = async () => {
@@ -190,15 +203,52 @@ export function DigitalSignatureScreen({ navigation }: any) {
       const file = result.assets[0];
        const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: FileSystem.EncodingType.Base64 });
        const mimeType = file.mimeType || 'image/png';
-       setSignatureImageUrl(`data:${mimeType};base64,${base64}`);
+       const original = `data:${mimeType};base64,${base64}`;
+       setSignatureImageUrl(original);
+       const preview = await apiService.previewSignature(original, { threshold: 245, contrast: 1, rotation: 0 });
+       setProcessedPreview(preview.transparentImage || preview.processedImage || '');
       setSignatureMethod('upload');
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to pick image');
     }
   };
 
+  const handlePickFromDevice = async (camera: boolean) => {
+    const permission = camera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission Required', `Allow ${camera ? 'camera' : 'photo library'} access to add a signature`);
+      return;
+    }
+    const result = camera
+      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType || 'image/jpeg';
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(mimeType)) {
+      Alert.alert('Unsupported Image', 'Use a PNG, JPG/JPEG, or WebP image');
+      return;
+    }
+    const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+    const original = `data:${mimeType};base64,${base64}`;
+    setSignatureImageUrl(original);
+    const preview = await apiService.previewSignature(original, { threshold: 245, contrast: 1, rotation: 0 });
+    setProcessedPreview(preview.transparentImage || preview.processedImage || '');
+    setSignatureMethod('upload');
+  };
+
+  const reprocessPreview = async (next: { threshold?: number; contrast?: number; rotation?: number } = {}) => {
+    if (!signatureImageUrl) return;
+    const options = { threshold: next.threshold ?? threshold, contrast: next.contrast ?? contrast, rotation: next.rotation ?? rotation };
+    const preview = await apiService.previewSignature(signatureImageUrl, options);
+    setProcessedPreview(preview.transparentImage || preview.processedImage || '');
+  };
+
   const handleCaptureSignature = (data: string) => {
     setSignatureData(data);
+    setProcessedPreview(data);
     setSignatureMethod('draw');
     Alert.alert('Success', 'Signature captured');
   };
@@ -206,6 +256,10 @@ export function DigitalSignatureScreen({ navigation }: any) {
   const handleCreateSignature = async () => {
     if (!name.trim()) {
       Alert.alert('Input Required', 'Please enter a name');
+      return;
+    }
+    if ((signatureMethod === 'draw' && !signatureData) || (signatureMethod === 'upload' && !signatureImageUrl)) {
+      Alert.alert('Signature Required', 'Draw or select a signature image before saving');
       return;
     }
     setSaving(true);
@@ -220,6 +274,7 @@ export function DigitalSignatureScreen({ navigation }: any) {
       } else if (signatureMethod === 'draw' && signatureData) {
         payload.signatureData = signatureData;
       }
+      payload.processing = { threshold, contrast, rotation };
       const result = await apiService.createSignature(payload);
       setSignatures((prev) => [...prev, result?.signature ?? result]);
       setModalVisible(false);
@@ -416,15 +471,33 @@ export function DigitalSignatureScreen({ navigation }: any) {
 
             {signatureMethod === 'draw' ? (
               <SignaturePad onCapture={handleCaptureSignature} />
-            ) : (
-              <View>
+              ) : (
+                <View>
+                  <Text style={styles.processingInstructions}>Write on clean white paper with a dark pen. Use good lighting, avoid shadows, folds, and keep the complete signature visible.</Text>
                 <TouchableOpacity style={styles.uploadImageBtn} onPress={handleUploadImage}>
                   <Text style={styles.uploadImageBtnText}>
                     {signatureImageUrl ? 'Change Image' : 'Pick Signature Image'}
                   </Text>
                 </TouchableOpacity>
+                <View style={styles.captureRow}>
+                  <TouchableOpacity style={styles.captureBtn} onPress={() => handlePickFromDevice(false)}><Text style={styles.captureBtnText}>Gallery</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.captureBtn} onPress={() => handlePickFromDevice(true)}><Text style={styles.captureBtnText}>Camera</Text></TouchableOpacity>
+                </View>
                 {signatureImageUrl ? (
-                  <Text style={styles.uploadedFileName} numberOfLines={1}>Image selected</Text>
+                  <View style={styles.beforeAfterRow}>
+                    <View style={styles.beforeAfterItem}><Text style={styles.beforeAfterLabel}>Before</Text><Image source={{ uri: signatureImageUrl }} style={styles.processPreview} contentFit="contain" /></View>
+                    <View style={styles.beforeAfterItem}><Text style={styles.beforeAfterLabel}>Extracted</Text><Image source={{ uri: processedPreview || signatureImageUrl }} style={[styles.processPreview, styles.checkerboard]} contentFit="contain" /></View>
+                  </View>
+                  <Text style={styles.adjustLabel}>Adjust extraction</Text>
+                  <View style={styles.adjustRow}>
+                    <TouchableOpacity style={styles.adjustBtn} onPress={() => { const value = Math.max(180, threshold - 10); setThreshold(value); void reprocessPreview({ threshold: value }); }}><Text style={styles.adjustBtnText}>Less background</Text></TouchableOpacity>
+                    <TouchableOpacity style={styles.adjustBtn} onPress={() => { const value = Math.min(254, threshold + 10); setThreshold(value); void reprocessPreview({ threshold: value }); }}><Text style={styles.adjustBtnText}>More ink</Text></TouchableOpacity>
+                  </View>
+                  <View style={styles.adjustRow}>
+                    <TouchableOpacity style={styles.adjustBtn} onPress={() => { const value = Math.max(0.5, contrast - 0.1); setContrast(value); void reprocessPreview({ contrast: value }); }}><Text style={styles.adjustBtnText}>Lower contrast</Text></TouchableOpacity>
+                    <TouchableOpacity style={styles.adjustBtn} onPress={() => { const value = Math.min(2, contrast + 0.1); setContrast(value); void reprocessPreview({ contrast: value }); }}><Text style={styles.adjustBtnText}>Higher contrast</Text></TouchableOpacity>
+                  </View>
+                  <View style={styles.adjustRow}><TouchableOpacity style={styles.adjustBtn} onPress={() => { const value = rotation - 1; setRotation(value); void reprocessPreview({ rotation: value }); }}><Text style={styles.adjustBtnText}>Rotate left</Text></TouchableOpacity><TouchableOpacity style={styles.adjustBtn} onPress={() => { const value = rotation + 1; setRotation(value); void reprocessPreview({ rotation: value }); }}><Text style={styles.adjustBtnText}>Rotate right</Text></TouchableOpacity></View>
                 ) : null}
               </View>
             )}
@@ -555,7 +628,20 @@ const styles = StyleSheet.create({
   savePadBtnText: { color: colors.white, fontWeight: '600' },
   uploadImageBtn: { backgroundColor: colors.secondary, paddingVertical: spacing.md, borderRadius: borderRadius.md, alignItems: 'center', marginBottom: spacing.sm },
   uploadImageBtnText: { color: colors.white, fontWeight: '600', fontSize: 15 },
+  captureRow: { flexDirection: 'row', gap: spacing.sm },
+  captureBtn: { flex: 1, paddingVertical: spacing.sm, borderRadius: borderRadius.md, alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
+  captureBtnText: { ...typography.bodySmall, fontWeight: '600' },
   uploadedFileName: { ...typography.bodySmall, textAlign: 'center', color: colors.success },
+  processingInstructions: { ...typography.caption, color: colors.textLight, marginBottom: spacing.sm, lineHeight: 17 },
+  beforeAfterRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  beforeAfterItem: { flex: 1, alignItems: 'center' },
+  beforeAfterLabel: { ...typography.caption, fontWeight: '600', marginBottom: spacing.xs },
+  processPreview: { width: '100%', height: 90, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: colors.border },
+  checkerboard: { backgroundColor: '#e5e7eb' },
+  adjustLabel: { ...typography.caption, fontWeight: '600', marginTop: spacing.sm, marginBottom: spacing.xs },
+  adjustRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  adjustBtn: { flex: 1, paddingVertical: spacing.xs, borderRadius: borderRadius.sm, alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
+  adjustBtnText: { ...typography.caption, fontWeight: '600' },
   modalActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
   cancelModalBtn: { flex: 1, paddingVertical: spacing.md, borderRadius: borderRadius.md, alignItems: 'center', backgroundColor: colors.background },
   cancelModalBtnText: { ...typography.body, fontWeight: '600', color: colors.text },

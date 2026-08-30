@@ -15,6 +15,7 @@ export interface IssueDocumentInput {
   documentData?: Record<string, any>;
   stampTemplateId?: string;
   requiresSignature: boolean;
+  signatureId?: string;
   signers: Array<{ signerId: string; signerRole?: string; signerName?: string }>;
   organizationRef?: string;
   serialPolicy?: Record<string, unknown>;
@@ -71,6 +72,10 @@ export class AuthenticationPipelineService {
     if (!input.signers?.length && input.requiresSignature) {
       throw new BadRequestException('requiresSignature=true but no signers supplied');
     }
+    if (input.signatureId) {
+      const signature = await this.prisma.digitalSignature.findFirst({ where: { id: input.signatureId, schoolId: input.schoolId, status: 'ACTIVE' } });
+      if (!signature) throw new NotFoundException('Selected signature not found in your institution');
+    }
     if (!this.bridge.configured && input.requiresSignature) {
       notes.push('Signature service not configured — issue will proceed STAMP-ONLY.');
     }
@@ -115,7 +120,8 @@ export class AuthenticationPipelineService {
         documentType: input.documentType,
         documentTitle: input.documentTitle,
         issuedToLabel: input.issuedToLabel,
-        documentData: input.documentData,
+         documentData: input.documentData,
+         signatureId: input.signatureId,
         stampTemplateId: input.stampTemplateId,
         serialPolicy: input.serialPolicy as any,
         timezone: input.timezone,
@@ -163,7 +169,8 @@ export class AuthenticationPipelineService {
         issuedAt: finalized.stampedAt.toISOString(),
         contentHash: originalHash,
         stampInstanceId: stampInstance.id,
-        signerIdentities: (input.signers || []).map(s => ({ signerId: s.signerId, signerRole: s.signerRole })),
+         signerIdentities: (input.signers || []).map(s => ({ signerId: s.signerId, signerRole: s.signerRole })),
+         signatureAssetId: input.signatureId ?? null,
         templateVersion: verificationRecord.templateVersion ?? null,
       });
       pushTrace('CANONICAL_PAYLOAD_HASHED', finalHash.slice(0, 16));

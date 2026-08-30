@@ -513,8 +513,11 @@ export class TemplateRendererService {
 
       case 'SIGNATURE':
         const sigUrl = content.signatureUrl || data?.signatureUrl;
-        return sigUrl
-          ? `<img src="${sigUrl}" alt="Signature" style="${styleStr}" />`
+        const safeSigUrl = typeof sigUrl === 'string' && (/^https:\/\//i.test(sigUrl) || /^data:image\/(png|jpe?g|webp);base64,/i.test(sigUrl))
+          ? this.escapeHtml(sigUrl)
+          : '';
+        return safeSigUrl
+          ? `<img src="${safeSigUrl}" alt="Signature" style="${styleStr}" />`
           : `<div style="${styleStr};border-top:1px solid #000;width:150px;margin-top:20px;"></div>`;
 
       case 'STAMP':
@@ -980,6 +983,23 @@ export class TemplateRendererService {
       headComment: 'Keep up the good work.',
     };
 
+    // Resolve a school-owned handwritten asset once, so SIGNATURE components
+    // render the preserved artwork without exposing cross-school records.
+    const hasSignatureComponent = template.components.some((component: any) => component.type === 'SIGNATURE');
+    const requestedSignatureId = data?.signatureId;
+    if (schoolId && (hasSignatureComponent || requestedSignatureId)) {
+      const signature = await this.prisma.digitalSignature.findFirst({
+        where: {
+          schoolId,
+          ...(requestedSignatureId ? { id: requestedSignatureId } : { isDefault: true }),
+        },
+        select: { imageUrl: true, signatureData: true, transparentImageUrl: true, processedImageUrl: true },
+      });
+      if (signature) {
+        defaultData.signatureUrl = signature.transparentImageUrl || signature.processedImageUrl || signature.imageUrl || signature.signatureData || undefined;
+      }
+    }
+
     const templateMetadata = (template.metadata as any) || {};
     const fallbackCertificate = template.templateType === 'CERTIFICATE' && !template.certificate
       ? {
@@ -995,6 +1015,20 @@ export class TemplateRendererService {
         }
       : null;
     const renderTemplate = fallbackCertificate ? { ...template, certificate: fallbackCertificate } : template;
+    const resolvedComponents = await Promise.all(renderTemplate.components.map(async (component: any) => {
+      if (component.type !== 'SIGNATURE' || !schoolId || !component.content?.signatureId) return component;
+      const selected = await this.prisma.digitalSignature.findFirst({
+        where: { id: component.content.signatureId, schoolId, status: 'ACTIVE' },
+        select: { transparentImageUrl: true, processedImageUrl: true, imageUrl: true, signatureData: true },
+      });
+      return selected ? {
+        ...component,
+        content: {
+          ...component.content,
+          signatureUrl: selected.transparentImageUrl || selected.processedImageUrl || selected.imageUrl || selected.signatureData,
+        },
+      } : component;
+    }));
     const isProfessionalHbs = !renderTemplate.certificate && (
       templateMetadata.enhancedProfessional ||
       templateMetadata.professionalHbs ||
@@ -1018,7 +1052,7 @@ export class TemplateRendererService {
 
     const isEnhancedTemplate = Boolean((renderTemplate.metadata as any)?.enhancedProfessional);
     const componentsHtml = this.renderComponentsToHtml(
-      renderTemplate.components,
+      resolvedComponents,
       defaultData,
       school,
       pageWidthPx,

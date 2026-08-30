@@ -1347,6 +1347,8 @@ export const templateBuilderApi = {
 
   getSignatures: () => api.get('/template-builder/signatures'),
 
+  previewSignature: (image: string, options?: any) => api.post('/template-builder/signatures/preview', { image, ...(options || {}) }),
+
   createSignature: (data: any) => api.post('/template-builder/signatures', data),
 
   updateSignature: (id: string, data: any) => api.patch(`/template-builder/signatures/${id}`, data),

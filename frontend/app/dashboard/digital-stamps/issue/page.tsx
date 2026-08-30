@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { stampEngineApi } from '@/lib/api';
+import { api, stampEngineApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
 /**
@@ -31,6 +31,8 @@ export default function IssueOfficialDocumentPage() {
   const [templateId, setTemplateId] = useState('');
   const [requiresSignature, setRequiresSignature] = useState(true);
   const [signerRole, setSignerRole] = useState('Head Teacher');
+  const [signatureId, setSignatureId] = useState('');
+  const [signatures, setSignatures] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [capabilities, setCapabilities] = useState<any>(null);
   const [busy, setBusy] = useState(false);
@@ -47,6 +49,12 @@ export default function IssueOfficialDocumentPage() {
       const requestedId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('templateId') : null;
       const selected = list.find((t: any) => t.id === requestedId) || list.find((t: any) => t.isDefault);
       if (selected) setTemplateId(selected.id);
+    }).catch(() => undefined);
+    api.get('/template-builder/signatures').then(r => {
+      const list = Array.isArray(r.data) ? r.data : (r.data?.signatures || []);
+      const active = list.filter((s: any) => s.status !== 'REVOKED');
+      setSignatures(active);
+      setSignatureId(active.find((s: any) => s.isDefault)?.id || active[0]?.id || '');
     }).catch(() => undefined);
   }, []);
 
@@ -81,6 +89,7 @@ export default function IssueOfficialDocumentPage() {
         issuedToLabel: issuedTo || undefined,
         stampTemplateId: templateId || undefined,
         requiresSignature: withSig,
+        signatureId: signatureId || undefined,
         signers: withSig
           ? [{ signerId: user?.id || 'authorised-signatory', signerName: user?.name, signerRole }]
           : [],
@@ -159,6 +168,12 @@ export default function IssueOfficialDocumentPage() {
 
           {requiresSignature && (
             <div className="grid grid-cols-2 gap-4">
+              <label className="block text-xs font-medium text-gray-600">Handwritten signature
+                <select value={signatureId} onChange={e => setSignatureId(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                  <option value="">Institution default</option>
+                  {signatures.map(s => <option key={s.id} value={s.id}>{s.name}{s.isDefault ? ' (Default)' : ''}</option>)}
+                </select>
+              </label>
               <label className="block text-xs font-medium text-gray-600">Signing authority role
                 <select value={signerRole} onChange={e => setSignerRole(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
                   {['Head Teacher', 'Director', 'Registrar', 'Principal', 'Examination Officer'].map(r => <option key={r}>{r}</option>)}
