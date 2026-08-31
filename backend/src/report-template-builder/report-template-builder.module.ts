@@ -14,6 +14,7 @@ import { CertificateCommentService } from './certificate-comment.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { FeatureLockModule } from '../feature-lock/feature-lock.module';
 import { StampEngineModule } from '../stamp-engine/stamp-engine.module';
+import { StampAssetService } from '../stamp-engine/stamp-asset.service';
 
 @Module({
   imports: [FeatureLockModule, StampEngineModule],
@@ -30,6 +31,7 @@ import { StampEngineModule } from '../stamp-engine/stamp-engine.module';
     DigitalSignatureService,
     DigitalStampService,
     CertificateCommentService,
+    StampAssetService,
     PrismaService,
   ],
   exports: [
