@@ -4,6 +4,7 @@ import {
   Post,
   Patch,
   Delete,
+  Put,
   Param,
   Body,
   Req,
@@ -148,13 +149,25 @@ export class ReportTemplateBuilderController {
 
   @Get('signatures')
   @Roles('Director', 'Teacher')
-  async getSignatures(@Req() req) {
-    return this.signatureService.getSignatures(req.user.schoolId);
+  async getSignatures(
+    @Req() req,
+    @Query('scope') scope?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    // Super admins manage signatures across every school plus platform assets.
+    if (req.user?.isSuperAdmin) {
+      return this.signatureService.getSignatures(null, { scope, status, search });
+    }
+    return this.signatureService.getSignatures(req.user.schoolId, { status });
   }
 
   @Get('stamps')
   @Roles('Director', 'Teacher')
-  async getStamps(@Req() req, @Query('type') type?: string) {
+  async getStamps(@Req() req, @Query('type') type?: string, @Query('scope') scope?: string, @Query('status') status?: string, @Query('search') search?: string) {
+    if (req.user?.isSuperAdmin) {
+      return this.digitalStampService.getStamps(null, type, { scope, status, search });
+    }
     return this.digitalStampService.getStamps(req.user.schoolId, type);
   }
 
@@ -194,25 +207,56 @@ export class ReportTemplateBuilderController {
   @Patch('signatures/:id')
   @Roles('Director')
   async updateSignature(@Req() req, @Param('id') id: string, @Body() data: any) {
-    return this.signatureService.updateSignature(req.user.schoolId, id, data);
+    return this.signatureService.updateSignature(req.user.schoolId, id, data, { isSuperAdmin: !!req.user?.isSuperAdmin });
   }
 
   @Delete('signatures/:id')
   @Roles('Director')
   async deleteSignature(@Req() req, @Param('id') id: string) {
-    return this.signatureService.deleteSignature(req.user.schoolId, id);
+    return this.signatureService.deleteSignature(req.user.schoolId, id, { isSuperAdmin: !!req.user?.isSuperAdmin });
+  }
+
+  @Patch('signatures/:id/status')
+  @Roles('Director')
+  async setSignatureStatus(@Req() req, @Param('id') id: string, @Body() body: { status?: string; reason?: string }) {
+    return this.signatureService.setSignatureStatus({
+      actor: { id: req.user.id, isSuperAdmin: !!req.user?.isSuperAdmin },
+      schoolId: req.user.schoolId,
+      id,
+      status: body.status,
+      reason: body.reason,
+    });
   }
 
   @Patch('signatures/:id/revoke')
   @Roles('Director')
   async revokeSignature(@Req() req, @Param('id') id: string, @Body('reason') reason?: string) {
-    return this.signatureService.revokeSignature(req.user.schoolId, id, reason);
+    return this.signatureService.revokeSignature(req.user.schoolId, id, reason, { id: req.user.id, isSuperAdmin: !!req.user?.isSuperAdmin });
   }
 
   @Post('signatures/sign')
   @Roles('Director')
   async signDocument(@Req() req, @Body() body: { signatureId: string; documentHash: string }) {
     return this.signatureService.signDocument(req.user.schoolId, body.signatureId, body.documentHash);
+  }
+
+  // ===== Template Signatory Positions =====
+
+  @Get('templates/:templateId/signatories')
+  @Roles('Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Teacher')
+  async getTemplateSignatories(@Req() req, @Param('templateId') templateId: string) {
+    return this.signatureService.getTemplateSignatories(templateId, req.user.schoolId);
+  }
+
+  @Put('templates/:templateId/signatories')
+  @Roles('Director')
+  async saveTemplateSignatories(@Req() req, @Param('templateId') templateId: string, @Body() body: any) {
+    return this.signatureService.saveTemplateSignatories(
+      { id: req.user.id, isSuperAdmin: !!req.user?.isSuperAdmin },
+      req.user.schoolId,
+      templateId,
+      body.signatories || [],
+    );
   }
 
   @Get(':id')
@@ -523,6 +567,12 @@ export class ReportTemplateBuilderController {
 
   // ===== Digital Stamp Routes =====
 
+  @Get('stamps/defaults')
+  @Roles('Director', 'Teacher')
+  async getDefaultStamps(@Req() req) {
+    return this.digitalStampService.getDefaultStamps(req.user.schoolId);
+  }
+
   @Get('stamps/:id')
   @Roles('Director', 'Teacher')
   async getStamp(@Req() req, @Param('id') id: string) {
@@ -532,31 +582,43 @@ export class ReportTemplateBuilderController {
   @Post('stamps')
   @Roles('Director')
   async createStamp(@Req() req, @Body() data: any) {
-    return this.digitalStampService.createStamp(req.user.schoolId, data);
+    return this.digitalStampService.createStamp(req.user.schoolId, { ...data, createdBy: req.user.id });
+  }
+
+  @Patch('stamps/:id/status')
+  @Roles('Director')
+  async setStampStatus(@Req() req, @Param('id') id: string, @Body() body: { status?: string; reason?: string }) {
+    return this.digitalStampService.setStampStatus({
+      actor: { id: req.user.id, isSuperAdmin: !!req.user?.isSuperAdmin },
+      schoolId: req.user.schoolId,
+      id,
+      status: body.status,
+      reason: body.reason,
+    });
+  }
+
+  @Patch('stamps/:id/revoke')
+  @Roles('Director')
+  async revokeStamp(@Req() req, @Param('id') id: string, @Body('reason') reason?: string) {
+    return this.digitalStampService.revokeStamp(req.user.schoolId, id, reason, { id: req.user.id, isSuperAdmin: !!req.user?.isSuperAdmin });
   }
 
   @Patch('stamps/:id')
   @Roles('Director')
   async updateStamp(@Req() req, @Param('id') id: string, @Body() data: any) {
-    return this.digitalStampService.updateStamp(req.user.schoolId, id, data);
+    return this.digitalStampService.updateStamp(req.user.schoolId, id, data, { isSuperAdmin: !!req.user?.isSuperAdmin });
   }
 
   @Delete('stamps/:id')
   @Roles('Director')
   async deleteStamp(@Req() req, @Param('id') id: string) {
-    return this.digitalStampService.deleteStamp(req.user.schoolId, id);
+    return this.digitalStampService.deleteStamp(req.user.schoolId, id, { isSuperAdmin: !!req.user?.isSuperAdmin });
   }
 
   @Post('stamps/:id/duplicate')
   @Roles('Director')
   async duplicateStamp(@Req() req, @Param('id') id: string) {
     return this.digitalStampService.duplicateStamp(req.user.schoolId, id);
-  }
-
-  @Get('stamps/defaults')
-  @Roles('Director', 'Teacher')
-  async getDefaultStamps(@Req() req) {
-    return this.digitalStampService.getDefaultStamps(req.user.schoolId);
   }
 
   // Template-Stamp assignment

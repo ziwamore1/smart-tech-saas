@@ -2200,6 +2200,7 @@ model ReportTemplate {
   collaborationSessions CollaborationSession[]
   editorSnapshots       EditorSnapshot[]
   templateStamps        TemplateStamp[]
+  signatories           TemplateSignatory[]
   assignedClasses       Class[]
 
   @@unique([name, schoolId])
@@ -3632,7 +3633,7 @@ model BrandPreset {
 
 model DigitalSignature {
   id            String   @id @default(uuid())
-  schoolId      String
+  schoolId      String?
   userId        String?
   name          String
   title         String?
@@ -3652,15 +3653,21 @@ model DigitalSignature {
   processingVersion  String?
   processingMetadata Json?
   status             String   @default("ACTIVE")
+  scope              String   @default("SCHOOL")
+  revokedReason      String?
+  revokedAt          DateTime?
+  revokedBy          String?
   certificate   String?
   isDefault     Boolean  @default(false)
   passcode      String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  school        School   @relation(fields: [schoolId], references: [id])
+  school        School?  @relation(fields: [schoolId], references: [id])
+  signatorySlots TemplateSignatory[]
 
   @@index([schoolId])
   @@index([schoolId, status])
+  @@index([scope, status])
 }
 
 model CollaborationSession {
@@ -3736,7 +3743,7 @@ enum StampShape {
 
 model DigitalStamp {
   id                 String              @id @default(uuid())
-  schoolId           String
+  schoolId           String?
   name               String
   type               StampType           @default(CUSTOM)
   shape              StampShape          @default(CIRCULAR)
@@ -3747,17 +3754,23 @@ model DigitalStamp {
   height             Int                 @default(150)
   isActive           Boolean             @default(true)
   isDefault          Boolean             @default(false)
+  status             String              @default("ACTIVE")
+  scope              String              @default("SCHOOL")
+  revokedReason      String?
+  revokedAt          DateTime?
+  revokedBy          String?
   metadata           Json?               @default("{}")
   createdBy          String?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
-  school             School              @relation(fields: [schoolId], references: [id])
+  school             School?             @relation(fields: [schoolId], references: [id])
   templateStamps     TemplateStamp[]
   stampVerifications StampVerification[]
   documentStamps     DocumentStamp[]
 
   @@index([schoolId])
   @@index([type])
+  @@index([scope, status])
 }
 
 model TemplateStamp {
@@ -3780,6 +3793,23 @@ model TemplateStamp {
 
   @@index([templateId])
   @@index([stampId])
+}
+
+model TemplateSignatory {
+  id          String           @id @default(uuid())
+  templateId  String
+  label       String
+  role        String?
+  position    Int              @default(0)
+  isRequired  Boolean          @default(true)
+  signatureId String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  template    ReportTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  signature   DigitalSignature? @relation(fields: [signatureId], references: [id], onDelete: SetNull)
+
+  @@index([templateId])
+  @@index([signatureId])
 }
 
 model StampVerification {
@@ -3913,9 +3943,11 @@ model DocumentSignature {
   id                    String                 @id @default(uuid())
   documentId            String
   documentType          String
-  documentHash          String                 @unique
+  documentHash          String
   signerId              String
   signerRole            String
+  signatoryLabel        String?
+  signatureAssetId      String?
   signatureCertificate  String?
   signedAt              DateTime               @default(now())
   verificationToken     String                 @unique

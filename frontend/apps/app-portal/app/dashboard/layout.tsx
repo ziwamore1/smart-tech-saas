@@ -599,6 +599,14 @@ const regularNav: NavItem[] = [
     typeRoles: ROLE_MAP.admin,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
+  {
+    name: 'Signatory Positions',
+    href: '/dashboard/template-signatories',
+    icon: 'fa-bars',
+    color: '#0d9488',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
+  },
   { 
     name: 'Account Center', 
     href: '/security/account-center', 

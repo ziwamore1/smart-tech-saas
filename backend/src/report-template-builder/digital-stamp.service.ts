@@ -8,21 +8,43 @@ import * as fs from 'fs';
 export class DigitalStampService {
   constructor(private prisma: PrismaService) {}
 
-  async getStamps(schoolId: string | null, type?: string) {
-    if (!schoolId) return [];
-    const where: any = { schoolId };
-    if (type) where.type = type;
-    return this.prisma.digitalStamp.findMany({ where, orderBy: { createdAt: 'desc' } });
+  async getStamps(
+    schoolId: string | null,
+    type?: string,
+    options: { scope?: string; status?: string; search?: string } = {},
+  ) {
+    const clauses: any[] = [];
+    if (schoolId) {
+      // Schools see their own stamps plus published platform stamps.
+      clauses.push({ OR: [{ schoolId }, { scope: 'PLATFORM', status: 'ACTIVE' }] });
+    } else if (options.scope) {
+      clauses.push({ scope: options.scope });
+    } else {
+      return [];
+    }
+    if (type) clauses.push({ type });
+    if (options.status) clauses.push({ status: options.status });
+    if (options.search?.trim()) {
+      clauses.push({ name: { contains: options.search.trim(), mode: 'insensitive' } });
+    }
+    const where: any = clauses.length === 1 ? clauses[0] : { AND: clauses };
+    return this.prisma.digitalStamp.findMany({
+      where,
+      include: { school: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
-  async getStamp(schoolId: string, id: string) {
-    const stamp = await this.prisma.digitalStamp.findFirst({ where: { id, schoolId } });
+  async getStamp(schoolId: string | null, id: string) {
+    const where: any = { id };
+    if (schoolId) where.OR = [{ schoolId }, { scope: 'PLATFORM', status: 'ACTIVE' }];
+    const stamp = await this.prisma.digitalStamp.findFirst({ where });
     if (!stamp) throw new NotFoundException('Digital stamp not found');
     return stamp;
   }
 
   async createStamp(
-    schoolId: string,
+    schoolId: string | null,
     data: {
       name: string;
       type: string;
@@ -34,9 +56,14 @@ export class DigitalStampService {
       height?: number;
       isDefault?: boolean;
       createdBy?: string;
+      scope?: string;
     },
   ) {
-    if (data.isDefault) {
+    const scope = (data.scope || (schoolId ? 'SCHOOL' : 'PLATFORM')).toUpperCase();
+    if (!schoolId && scope !== 'PLATFORM') throw new NotFoundException('School ID required');
+    if (!data.name?.trim()) throw new BadRequestException('Stamp name is required');
+
+    if (data.isDefault && scope === 'SCHOOL') {
       await this.prisma.digitalStamp.updateMany({
         where: { schoolId, isDefault: true },
         data: { isDefault: false },
@@ -58,7 +85,7 @@ export class DigitalStampService {
     return this.prisma.digitalStamp.create({
       data: {
         schoolId,
-        name: data.name,
+        name: data.name.trim(),
         type: data.type as any,
         shape: (data.shape as any) || 'CIRCULAR',
         imageUrl: data.imageUrl,
@@ -66,19 +93,24 @@ export class DigitalStampService {
         opacity: data.opacity ?? 1.0,
         width: data.width || 150,
         height: data.height || 150,
-        isDefault: data.isDefault || false,
+        isActive: true,
+        status: 'ACTIVE',
+        scope,
+        isDefault: scope === 'SCHOOL' ? data.isDefault || false : false,
         createdBy: data.createdBy,
       },
     });
   }
 
-  async updateStamp(schoolId: string, id: string, data: any) {
-    const stamp = await this.prisma.digitalStamp.findFirst({ where: { id, schoolId } });
+  async updateStamp(schoolId: string | null, id: string, data: any, actor?: { isSuperAdmin?: boolean }) {
+    const stamp = (actor?.isSuperAdmin && !schoolId)
+      ? await this.prisma.digitalStamp.findUnique({ where: { id } })
+      : await this.prisma.digitalStamp.findFirst({ where: { id, schoolId } });
     if (!stamp) throw new NotFoundException('Digital stamp not found');
 
-    if (data.isDefault && !stamp.isDefault) {
+    if (data.isDefault && stamp.scope === 'SCHOOL' && stamp.schoolId && !stamp.isDefault) {
       await this.prisma.digitalStamp.updateMany({
-        where: { schoolId, isDefault: true, id: { not: id } },
+        where: { schoolId: stamp.schoolId, isDefault: true, id: { not: id } },
         data: { isDefault: false },
       });
     }
@@ -98,19 +130,52 @@ export class DigitalStampService {
     return this.prisma.digitalStamp.update({ where: { id }, data });
   }
 
-  async deleteStamp(schoolId: string, id: string) {
-    const stamp = await this.prisma.digitalStamp.findFirst({ where: { id, schoolId } });
+  async deleteStamp(schoolId: string | null, id: string, actor?: { isSuperAdmin?: boolean }) {
+    const stamp = (actor?.isSuperAdmin && !schoolId)
+      ? await this.prisma.digitalStamp.findUnique({ where: { id } })
+      : await this.prisma.digitalStamp.findFirst({ where: { id, schoolId } });
     if (!stamp) throw new NotFoundException('Digital stamp not found');
     await this.prisma.templateStamp.deleteMany({ where: { stampId: id } });
     return this.prisma.digitalStamp.delete({ where: { id } });
   }
 
-  async duplicateStamp(schoolId: string, id: string) {
-    const original = await this.prisma.digitalStamp.findFirst({ where: { id, schoolId } });
+  async setStampStatus(params: { actor: { id?: string; isSuperAdmin?: boolean }; schoolId: string | null; id: string; status: string; reason?: string }) {
+    const where: any = { id: params.id };
+    if (!params.actor?.isSuperAdmin || params.schoolId) where.schoolId = params.schoolId;
+    const stamp = await this.prisma.digitalStamp.findFirst({ where });
+    if (!stamp) throw new NotFoundException('Digital stamp not found');
+
+    const status = String(params.status || 'ACTIVE').toUpperCase();
+    if (!['ACTIVE', 'REVOKED', 'SUSPENDED', 'ARCHIVED'].includes(status)) {
+      throw new BadRequestException(`Invalid stamp status: ${status}`);
+    }
+    const data: any = { status };
+    if (status !== 'ACTIVE') {
+      data.revokedReason = params.reason?.trim() || `Revoked as ${status}`;
+      data.revokedAt = new Date();
+      data.revokedBy = params.actor?.id;
+      data.isActive = false;
+    } else {
+      data.revokedReason = null;
+      data.revokedAt = null;
+      data.revokedBy = null;
+      data.isActive = true;
+    }
+    return this.prisma.digitalStamp.update({ where: { id: params.id }, data });
+  }
+
+  async revokeStamp(schoolId: string | null, id: string, reason?: string, actor?: { id?: string; isSuperAdmin?: boolean }) {
+    return this.setStampStatus({ actor, schoolId, id, status: 'REVOKED', reason });
+  }
+
+  async duplicateStamp(schoolId: string | null, id: string) {
+    const original = schoolId
+      ? await this.prisma.digitalStamp.findFirst({ where: { id, OR: [{ schoolId }, { scope: 'PLATFORM', status: 'ACTIVE' }] } })
+      : await this.prisma.digitalStamp.findUnique({ where: { id } });
     if (!original) throw new NotFoundException('Digital stamp not found');
     return this.prisma.digitalStamp.create({
       data: {
-        schoolId,
+        schoolId: schoolId ?? original.schoolId,
         name: `${original.name} (Copy)`,
         type: original.type,
         shape: original.shape,
@@ -119,6 +184,8 @@ export class DigitalStampService {
         opacity: original.opacity,
         width: original.width,
         height: original.height,
+        status: 'ACTIVE',
+        scope: schoolId ? 'SCHOOL' : original.scope || 'PLATFORM',
         metadata: original.metadata as any,
       },
     });
@@ -138,7 +205,9 @@ export class DigitalStampService {
       layerOrder?: number;
     },
   ) {
-    const stamp = await this.prisma.digitalStamp.findFirst({ where: { id: stampId, schoolId } });
+    const stamp = await this.prisma.digitalStamp.findFirst({
+      where: { id: stampId, OR: [{ schoolId }, { scope: 'PLATFORM', status: 'ACTIVE' }] },
+    });
     if (!stamp) throw new NotFoundException('Digital stamp not found');
 
     const template = await this.prisma.reportTemplate.findFirst({

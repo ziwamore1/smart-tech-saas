@@ -13,6 +13,7 @@ const gradPurple = 'linear-gradient(135deg, #8b5cf6, #7c3aed)';
 const gradBlue = 'linear-gradient(135deg, #3b82f6, #2563eb)';
 const gradPink = 'linear-gradient(135deg, #ec4899, #db2777)';
 const gradAmber = 'linear-gradient(135deg, #f59e0b, #d97706)';
+const gradIndigo = 'linear-gradient(135deg, #6366f1, #4f46e5)';
 
 const STAMP_TYPES = [
   { value: '', label: 'All Types', color: '#6b7280' },
@@ -31,6 +32,13 @@ const STAMP_TYPES = [
 
 const SHAPES = ['Circular', 'Rectangular', 'Square', 'Oval'];
 
+const STATUS_META: Record<string, { label: string; color: string }> = {
+  ACTIVE: { label: 'Active', color: '#10b981' },
+  REVOKED: { label: 'Revoked', color: '#ef4444' },
+  SUSPENDED: { label: 'Suspended', color: '#f59e0b' },
+  ARCHIVED: { label: 'Archived', color: '#6b7280' },
+};
+
 interface Stamp {
   id: string;
   name: string;
@@ -43,6 +51,9 @@ interface Stamp {
   height?: number;
   isDefault: boolean;
   isActive?: boolean;
+  scope?: string;
+  status?: string;
+  revokedReason?: string;
   createdAt: string;
   school?: { id: string; name: string };
 }
@@ -54,6 +65,8 @@ export default function StampsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterType, setFilterType] = useState('');
+  const [filterScope, setFilterScope] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -78,14 +91,17 @@ export default function StampsPage() {
     if (isAuthenticated) {
       loadStamps();
     }
-  }, [isAuthenticated, filterType]);
+  }, [isAuthenticated, filterType, filterScope, filterStatus]);
 
   const loadStamps = async () => {
     try {
       setLoading(true);
       setError('');
-      const params = filterType ? { type: filterType } : undefined;
-      const response = await stampApi.getStamps(params);
+      const params: Record<string, string> = {};
+      if (filterType) params.type = filterType;
+      if (filterScope) params.scope = filterScope;
+      if (filterStatus) params.status = filterStatus;
+      const response = await stampApi.getStamps(Object.keys(params).length ? params : undefined);
       setStamps(response.data?.data || response.data || []);
     } catch (err) {
       console.error('Failed to load stamps:', err);
@@ -111,6 +127,29 @@ export default function StampsPage() {
       loadStamps();
     } catch (err) {
       console.error('Failed to duplicate stamp:', err);
+    }
+  };
+
+  const handleRevoke = async (stamp: Stamp) => {
+    const reason = window.prompt(`Reason for revoking "${stamp.name}"?`, 'No longer valid');
+    if (reason === null) return;
+    try {
+      await stampApi.setStampStatus(stamp.id, 'REVOKED', reason);
+      loadStamps();
+    } catch (err) {
+      console.error('Failed to revoke stamp:', err);
+      alert('Failed to revoke stamp.');
+    }
+  };
+
+  const handleRestore = async (stamp: Stamp) => {
+    if (!window.confirm(`Restore the stamp "${stamp.name}" to Active?`)) return;
+    try {
+      await stampApi.setStampStatus(stamp.id, 'ACTIVE');
+      loadStamps();
+    } catch (err) {
+      console.error('Failed to restore stamp:', err);
+      alert('Failed to restore stamp.');
     }
   };
 
@@ -169,10 +208,15 @@ export default function StampsPage() {
 
   if (!isAuthenticated) return null;
 
-  const filtered = filterType ? stamps.filter(s => s.type === filterType) : stamps;
+  const filtered = stamps
+    .filter(s => (filterType ? s.type === filterType : true))
+    .filter(s => (filterScope ? (s.scope || 'SCHOOL') === filterScope : true))
+    .filter(s => (filterStatus ? (s.status || 'ACTIVE') === filterStatus : true));
   const totalStamps = stamps.length;
   const typesAvailable = new Set(stamps.map(s => s.type)).size;
-  const activeStamps = stamps.filter(s => s.isActive !== false).length;
+  const activeStamps = stamps.filter(s => (s.status || 'ACTIVE') === 'ACTIVE').length;
+  const revokedStamps = stamps.filter(s => s.status === 'REVOKED').length;
+  const platformStamps = stamps.filter(s => s.scope === 'PLATFORM').length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -191,31 +235,72 @@ export default function StampsPage() {
             </div>
             Stamp Management
           </h1>
-          <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 0 56px' }}>Manage all digital stamps across schools</p>
+          <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 0 56px' }}>Manage all digital stamps across schools and the platform</p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          style={{ padding: '12px 24px', background: gradOrange, color: 'white', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(234,102,69,0.3)' }}
-        >
-          <i className="fa fa-plus"></i>
-          Create Stamp
-        </button>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => router.push('/super-admin/stamps/designer')}
+            style={{ padding: '12px 20px', background: gradIndigo, color: 'white', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(99,102,241,0.3)' }}
+          >
+            <i className="fa fa-paint-brush"></i>
+            Platform Designer
+          </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            style={{ padding: '12px 24px', background: gradOrange, color: 'white', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(234,102,69,0.3)' }}
+          >
+            <i className="fa fa-plus"></i>
+            Create Stamp
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
         <div style={{ background: '#fefcf9', borderRadius: '14px', padding: '20px', border: '1px solid #f3f4f6', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
           <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px' }}>Total Stamps</p>
           <p style={{ fontSize: '28px', fontWeight: 700, color: '#1f2937', margin: 0 }}>{totalStamps}</p>
         </div>
         <div style={{ background: '#fefcf9', borderRadius: '14px', padding: '20px', border: '1px solid #f3f4f6', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px' }}>Types Available</p>
-          <p style={{ fontSize: '28px', fontWeight: 700, color: '#1f2937', margin: 0 }}>{typesAvailable}</p>
+          <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px' }}>Platform Stamps</p>
+          <p style={{ fontSize: '28px', fontWeight: 700, color: '#7c3aed', margin: 0 }}>{platformStamps}</p>
         </div>
         <div style={{ background: '#fefcf9', borderRadius: '14px', padding: '20px', border: '1px solid #f3f4f6', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
           <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px' }}>Active Stamps</p>
-          <p style={{ fontSize: '28px', fontWeight: 700, color: '#1f2937', margin: 0 }}>{activeStamps}</p>
+          <p style={{ fontSize: '28px', fontWeight: 700, color: '#10b981', margin: 0 }}>{activeStamps}</p>
         </div>
+        <div style={{ background: '#fefcf9', borderRadius: '14px', padding: '20px', border: '1px solid #f3f4f6', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px' }}>Types / Revoked</p>
+          <p style={{ fontSize: '22px', fontWeight: 700, color: '#ef4444', margin: 0 }}>{typesAvailable} · {revokedStamps}</p>
+        </div>
+      </div>
+
+      {/* Scope + Status Filters */}
+      {filterScope !== '' || filterStatus !== '' || (
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '4px' }}>Scope:</span>
+          {[['', 'All'], ['SCHOOL', 'Schools'], ['PLATFORM', 'Platform']].map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => setFilterScope(value)}
+              style={{ padding: '6px 14px', borderRadius: '16px', border: filterScope === value ? '2px solid #7c3aed' : '1px solid #e8ddd0', background: filterScope === value ? '#ede9fe' : 'white', color: filterScope === value ? '#7c3aed' : '#6b7280', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '4px' }}>Status:</span>
+        {[['', 'All'], ['ACTIVE', 'Active'], ['REVOKED', 'Revoked'], ['SUSPENDED', 'Suspended'], ['ARCHIVED', 'Archived']].map(([value, label]) => (
+          <button
+            key={value}
+            onClick={() => setFilterStatus(value)}
+            style={{ padding: '6px 14px', borderRadius: '16px', border: filterStatus === value ? '2px solid ' + (STATUS_META[value]?.color || '#6b7280') : '1px solid #e8ddd0', background: filterStatus === value ? (STATUS_META[value]?.color || '#6b7280') + '15' : 'white', color: filterStatus === value ? (STATUS_META[value]?.color || '#6b7280') : '#6b7280', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Type Filter Chips */}
@@ -256,115 +341,145 @@ export default function StampsPage() {
         <div style={{ background: '#fefcf9', borderRadius: '16px', padding: '48px', textAlign: 'center', border: '1px solid #f3f4f6', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
           <i className="fa fa-stamp" style={{ fontSize: '48px', color: '#d1d5db', marginBottom: '16px', display: 'block' }}></i>
           <p style={{ fontSize: '16px', color: '#6b7280', margin: 0 }}>No stamps found</p>
-          <p style={{ fontSize: '13px', color: '#9ca3af', margin: '8px 0 0' }}>Create your first stamp to get started</p>
+          <p style={{ fontSize: '13px', color: '#9ca3af', margin: '8px 0 0' }}>Adjust your filters or create your first stamp</p>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-          {filtered.map(stamp => (
-            <div key={stamp.id} className="stamp-card" style={{ background: '#fefcf9', borderRadius: '16px', border: '1px solid #f3f4f6', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-              {/* SVG Preview */}
-              <div style={{
-                background: '#f5efe8',
-                padding: '24px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: '160px',
-                borderBottom: '1px solid #f3f4f6',
-              }}>
-                {stamp.svgContent ? (
-                  <div
-                    style={{
-                      width: stamp.width || 120,
-                      height: stamp.height || 120,
+          {filtered.map(stamp => {
+            const status = STATUS_META[stamp.status || 'ACTIVE'] || { label: stamp.status || 'Active', color: '#6b7280' };
+            return (
+              <div key={stamp.id} className="stamp-card" style={{ background: '#fefcf9', borderRadius: '16px', border: stamp.status === 'REVOKED' ? '1px solid #fecaca' : '1px solid #f3f4f6', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                {/* SVG Preview */}
+                <div style={{
+                  background: '#f5efe8',
+                  padding: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: '160px',
+                  borderBottom: '1px solid #f3f4f6',
+                }}>
+                  {stamp.svgContent ? (
+                    <div
+                      style={{
+                        width: stamp.width || 120,
+                        height: stamp.height || 120,
+                        opacity: stamp.opacity ?? 1,
+                      }}
+                      dangerouslySetInnerHTML={{ __html: stamp.svgContent }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: stamp.width || 100,
+                      height: stamp.height || 100,
+                      borderRadius: stamp.shape === 'Circular' ? '50%' : stamp.shape === 'Oval' ? '50%' : stamp.shape === 'Square' ? '8px' : '4px',
+                      background: 'linear-gradient(135deg, #e8ddd0, #d1d5db)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#6b7280',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      textAlign: 'center',
+                      padding: '8px',
                       opacity: stamp.opacity ?? 1,
-                    }}
-                    dangerouslySetInnerHTML={{ __html: stamp.svgContent }}
-                  />
-                ) : (
-                  <div style={{
-                    width: stamp.width || 100,
-                    height: stamp.height || 100,
-                    borderRadius: stamp.shape === 'Circular' ? '50%' : stamp.shape === 'Oval' ? '50%' : stamp.shape === 'Square' ? '8px' : '4px',
-                    background: 'linear-gradient(135deg, #e8ddd0, #d1d5db)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#6b7280',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    textAlign: 'center',
-                    padding: '8px',
-                    opacity: stamp.opacity ?? 1,
-                  }}>
-                    {stamp.name}
+                    }}>
+                      {stamp.name}
+                    </div>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div style={{ padding: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>{stamp.name}</div>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {stamp.isDefault && (
+                        <span style={{ padding: '2px 8px', fontSize: '10px', fontWeight: 600, borderRadius: '4px', background: '#d1fae5', color: '#065f46', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <i className="fa fa-check-circle" style={{ fontSize: '8px' }}></i>
+                          Default
+                        </span>
+                      )}
+                      {stamp.scope === 'PLATFORM' && (
+                        <span style={{ padding: '2px 8px', fontSize: '10px', fontWeight: 600, borderRadius: '4px', background: '#ede9fe', color: '#6d28d9', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <i className="fa fa-globe" style={{ fontSize: '8px' }}></i>
+                          Platform
+                        </span>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
 
-              {/* Info */}
-              <div style={{ padding: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>{stamp.name}</div>
-                  {stamp.isDefault && (
-                    <span style={{ padding: '2px 8px', fontSize: '10px', fontWeight: 600, borderRadius: '4px', background: '#d1fae5', color: '#065f46', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                      <i className="fa fa-check-circle" style={{ fontSize: '8px' }}></i>
-                      Default
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                    <span style={{ padding: '3px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '6px', background: typeInfo(stamp.type).color + '15', color: typeInfo(stamp.type).color }}>
+                      {stamp.type}
                     </span>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-                  <span style={{ padding: '3px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '6px', background: typeInfo(stamp.type).color + '15', color: typeInfo(stamp.type).color }}>
-                    {stamp.type}
-                  </span>
-                  {stamp.shape && (
-                    <span style={{ padding: '3px 10px', fontSize: '11px', fontWeight: 500, borderRadius: '6px', background: '#f3f4f6', color: '#6b7280' }}>
-                      {stamp.shape}
+                    {stamp.shape && (
+                      <span style={{ padding: '3px 10px', fontSize: '11px', fontWeight: 500, borderRadius: '6px', background: '#f3f4f6', color: '#6b7280' }}>
+                        {stamp.shape}
+                      </span>
+                    )}
+                    <span style={{ padding: '3px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '6px', background: status.color + '15', color: status.color, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: status.color }}></span>
+                      {status.label}
                     </span>
-                  )}
-                </div>
+                  </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: stamp.isActive !== false ? '#10b981' : '#d1d5db',
-                  }}></div>
-                  <span style={{ fontSize: '12px', color: stamp.isActive !== false ? '#065f46' : '#9ca3af', fontWeight: 500 }}>
-                    {stamp.isActive !== false ? 'Active' : 'Inactive'}
-                  </span>
-                  {stamp.school && (
-                    <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: 'auto' }}>
+                  {stamp.revokedReason && (
+                    <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '8px', lineHeight: 1.4 }}>
+                      <i className="fa fa-info-circle" style={{ fontSize: '9px', marginRight: '3px' }}></i>
+                      {stamp.revokedReason}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '12px', color: '#9ca3af' }}>
                       <i className="fa fa-building" style={{ fontSize: '9px', marginRight: '3px' }}></i>
-                      {stamp.school.name}
+                      {stamp.scope === 'PLATFORM' ? 'Platform (all schools)' : stamp.school?.name || '—'}
                     </span>
-                  )}
-                </div>
+                  </div>
 
-                {/* Actions */}
-                <div style={{ display: 'flex', gap: '8px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f3f4f6' }}>
-                  <button
-                    onClick={() => handleDuplicate(stamp.id)}
-                    style={{ flex: 1, padding: '8px', fontSize: '12px', fontWeight: 600, background: '#f3f4f6', color: '#374151', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                    title="Duplicate"
-                  >
-                    <i className="fa fa-copy" style={{ fontSize: '10px' }}></i>
-                    Duplicate
-                  </button>
-                  <button
-                    onClick={() => handleDelete(stamp.id, stamp.name)}
-                    style={{ flex: 1, padding: '8px', fontSize: '12px', fontWeight: 600, background: '#fef2f2', color: '#dc2626', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                    title="Delete"
-                  >
-                    <i className="fa fa-trash" style={{ fontSize: '10px' }}></i>
-                    Delete
-                  </button>
+                  {/* Actions */}
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f3f4f6' }}>
+                    {(stamp.status || 'ACTIVE') === 'ACTIVE' ? (
+                      <button
+                        onClick={() => handleRevoke(stamp)}
+                        style={{ flex: 1, padding: '8px', fontSize: '12px', fontWeight: 600, background: '#fef2f2', color: '#dc2626', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                        title="Revoke"
+                      >
+                        <i className="fa fa-ban" style={{ fontSize: '10px' }}></i>
+                        Revoke
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleRestore(stamp)}
+                        style={{ flex: 1, padding: '8px', fontSize: '12px', fontWeight: 600, background: '#d1fae5', color: '#065f46', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                        title="Restore"
+                      >
+                        <i className="fa fa-undo" style={{ fontSize: '10px' }}></i>
+                        Restore
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDuplicate(stamp.id)}
+                      style={{ flex: 1, padding: '8px', fontSize: '12px', fontWeight: 600, background: '#f3f4f6', color: '#374151', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                      title="Duplicate"
+                    >
+                      <i className="fa fa-copy" style={{ fontSize: '10px' }}></i>
+                      Duplicate
+                    </button>
+                    <button
+                      onClick={() => handleDelete(stamp.id, stamp.name)}
+                      style={{ flex: 1, padding: '8px', fontSize: '12px', fontWeight: 600, background: '#fef2f2', color: '#dc2626', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                      title="Delete"
+                    >
+                      <i className="fa fa-trash" style={{ fontSize: '10px' }}></i>
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

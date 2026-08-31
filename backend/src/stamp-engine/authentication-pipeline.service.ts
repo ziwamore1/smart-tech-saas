@@ -17,6 +17,8 @@ export interface IssueDocumentInput {
   requiresSignature: boolean;
   signatureId?: string;
   signers: Array<{ signerId: string; signerRole?: string; signerName?: string }>;
+  /** Multi-signatory positions: declare the asset bound to each slot. */
+  signatories?: Array<{ label: string; role?: string; userId?: string; signatureId: string }>;
   organizationRef?: string;
   serialPolicy?: Record<string, unknown>;
   timezone?: string;
@@ -69,12 +71,33 @@ export class AuthenticationPipelineService {
       if (t.status !== 'PUBLISHED') throw new ConflictException('Stamp template must be published before use');
     }
     const notes: string[] = [];
-    if (!input.signers?.length && input.requiresSignature) {
+    const boundSigners = input.signers?.length ? input.signers : (input.signatories || []).map((s) => ({
+      signerId: s.userId || s.signatureId,
+      signerRole: s.role || s.label,
+    }));
+    if (!boundSigners.length && input.requiresSignature) {
       throw new BadRequestException('requiresSignature=true but no signers supplied');
     }
-    if (input.signatureId) {
-      const signature = await this.prisma.digitalSignature.findFirst({ where: { id: input.signatureId, schoolId: input.schoolId, status: 'ACTIVE' } });
-      if (!signature) throw new NotFoundException('Selected signature not found in your institution');
+    // Validate every bound signature asset (single or multi-signatory).
+    const boundAssets = input.signatories
+      ? input.signatories.map((s) => s.signatureId)
+      : input.signatureId
+        ? [input.signatureId]
+        : [];
+    if (boundAssets.length) {
+      const sigs = await this.prisma.digitalSignature.findMany({
+        where: { id: { in: boundAssets }, status: 'ACTIVE' },
+        select: { id: true, schoolId: true },
+      });
+      const found = new Set(sigs.map((s) => s.id));
+      for (const assetId of boundAssets) {
+        if (!found.has(assetId)) throw new NotFoundException('Selected signature not found in your institution');
+      }
+      for (const s of sigs) {
+        if (s.schoolId && s.schoolId !== input.schoolId) {
+          throw new NotFoundException('Selected signature not found in your institution');
+        }
+      }
     }
     if (!this.bridge.configured && input.requiresSignature) {
       notes.push('Signature service not configured — issue will proceed STAMP-ONLY.');
@@ -97,6 +120,17 @@ export class AuthenticationPipelineService {
       this.logger.log(`[${correlationId}] ${step}${detail ? ` — ${detail}` : ''}`);
     };
 
+    // Multi-signatory documents bind one signature asset per position.
+    const boundSigners = input.signers?.length
+      ? input.signers
+      : (input.signatories || []).map((s) => ({
+          signerId: s.userId || s.signatureId,
+          signerRole: s.role || s.label,
+          signerName: s.label || undefined,
+        }));
+    const signatureAssetIds = (input.signatories || []).map((s) => s.signatureId);
+    const primarySignatureAssetId = input.signatureId ?? signatureAssetIds[0] ?? null;
+
     const pending = await this.prisma.documentAuthentication.create({
       data: {
         schoolId: input.schoolId,
@@ -104,7 +138,7 @@ export class AuthenticationPipelineService {
         documentId: input.documentId,
         documentType: input.documentType.toUpperCase(),
         status: 'PENDING',
-        signerId: input.signers[0]?.signerId ?? null,
+        signerId: boundSigners[0]?.signerId ?? null,
         issuedBy: input.actor.userId,
         pipelineTrace: { correlationId, steps: [] } as any,
       },
@@ -169,8 +203,9 @@ export class AuthenticationPipelineService {
         issuedAt: finalized.stampedAt.toISOString(),
         contentHash: originalHash,
         stampInstanceId: stampInstance.id,
-         signerIdentities: (input.signers || []).map(s => ({ signerId: s.signerId, signerRole: s.signerRole })),
-         signatureAssetId: input.signatureId ?? null,
+        signerIdentities: boundSigners.map(s => ({ signerId: s.signerId, signerRole: s.signerRole })),
+        signatureAssetId: primarySignatureAssetId,
+        ...(signatureAssetIds.length > 1 ? { signatureAssetIds } : {}),
         templateVersion: verificationRecord.templateVersion ?? null,
       });
       pushTrace('CANONICAL_PAYLOAD_HASHED', finalHash.slice(0, 16));
@@ -183,7 +218,7 @@ export class AuthenticationPipelineService {
         if (!this.bridge.configured) {
           throw new ConflictException('Digital signature required but Signature Service is not configured');
         }
-        for (const signer of input.signers) {
+        for (const signer of boundSigners) {
           pushTrace('SIGNATURE_REQUEST', signer.signerRole || signer.signerId);
           const sig = await this.bridge.sign({
             organizationId: input.organizationRef ?? input.schoolId,
@@ -227,7 +262,7 @@ export class AuthenticationPipelineService {
           signatureServiceId: primarySignatureId,
           signingKeyId: primaryKeyId,
           signaturesJson: signaturesJson.length ? (signaturesJson as any) : undefined,
-          signerId: input.signers[0]?.signerId ?? null,
+          signerId: boundSigners[0]?.signerId ?? null,
           issuedAt: finalized.stampedAt,
           expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
           status: 'VALID',

@@ -13,6 +13,7 @@ class PrepareDto {
   @IsOptional() stampTemplateId?: string;
   @IsBoolean() requiresSignature!: boolean;
   @IsOptional() @IsArray() signers?: Array<{ signerId: string; signerRole?: string; signerName?: string }>;
+  @IsOptional() @IsArray() signatories?: Array<{ label: string; role?: string; userId?: string; signatureId: string }>;
 }
 
 class IssueDto extends PrepareDto {
@@ -159,6 +160,7 @@ export class DocumentAuthenticationController {
       stampTemplateId: dto.stampTemplateId,
       requiresSignature: dto.requiresSignature,
       signers: dto.signers || [],
+      signatories: (dto as IssueDto).signatories,
       organizationRef: (dto as IssueDto).organizationRef,
       serialPolicy: (dto as IssueDto).serialPolicy as any,
       timezone: (dto as IssueDto).timezone,

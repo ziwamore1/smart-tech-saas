@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { stampEngineApi } from '@/lib/api';
+import { stampEngineApi, templateBuilderApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
 /**
@@ -22,6 +22,17 @@ const initialSteps = (withSig: boolean): StepState[] => [
 
 const DOC_TYPES = ['TRANSCRIPT', 'REPORT_CARD', 'CERTIFICATE', 'LEAVING_CERTIFICATE', 'REFERENCE_LETTER'];
 
+interface SignatorySlot { id: string; label: string; role: string; signatureId: string; }
+
+const ROLES = ['Head Teacher', 'Director', 'Registrar', 'Principal', 'Examination Officer', 'Deputy Head', 'Teacher'];
+
+function boundSignaturesHint(slots: SignatorySlot[]): string {
+  const n = slots.filter(s => s.signatureId).length;
+  if (n === 0) return ' with no bound signature asset';
+  if (n === 1) return ' with 1 bound signature asset';
+  return ` with ${n} bound signature assets`;
+}
+
 export default function IssueOfficialDocumentPage() {
   const { user } = useAuth() as any;
   const [documentId, setDocumentId] = useState('');
@@ -30,7 +41,8 @@ export default function IssueOfficialDocumentPage() {
   const [issuedTo, setIssuedTo] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [requiresSignature, setRequiresSignature] = useState(true);
-  const [signerRole, setSignerRole] = useState('Head Teacher');
+  const [slots, setSlots] = useState<SignatorySlot[]>([{ id: 's1', label: 'Primary signatory', role: 'Head Teacher', signatureId: '' }]);
+  const [signatureOptions, setSignatureOptions] = useState<{ id: string; name: string; title?: string; scope?: string }[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [capabilities, setCapabilities] = useState<any>(null);
   const [busy, setBusy] = useState(false);
@@ -48,6 +60,10 @@ export default function IssueOfficialDocumentPage() {
       const selected = list.find((t: any) => t.id === requestedId) || list.find((t: any) => t.isDefault);
       if (selected) setTemplateId(selected.id);
     }).catch(() => undefined);
+    templateBuilderApi.getSignatures().then(r => {
+      const data = r.data?.data || r.data || [];
+      setSignatureOptions(Array.isArray(data) ? data.filter((s: any) => (s.status || 'ACTIVE') === 'ACTIVE') : []);
+    }).catch(() => undefined);
   }, []);
 
   // Marketplace-driven capability detection — teachers never configure manually.
@@ -61,10 +77,19 @@ export default function IssueOfficialDocumentPage() {
       .catch(() => undefined);
   }, [templateId]);
 
-  const canIssue = useMemo(() => documentId && documentType && (!requiresSignature || signerRole), [documentId, documentType, requiresSignature, signerRole]);
+  const canIssue = useMemo(() => documentId && documentType && (!requiresSignature || slots.length > 0), [documentId, documentType, requiresSignature, slots.length]);
 
   const setStep = (key: string, state: StepState['state']) =>
     setSteps(prev => prev.map(s => (s.key === key ? { ...s, state } : s)));
+
+  const patchSlot = (id: string, patch: Partial<SignatorySlot>) =>
+    setSlots(prev => prev.map(s => (s.id === id ? { ...s, ...patch } : s)));
+
+  const addSlot = () =>
+    setSlots(prev => [...prev, { id: `s${Date.now().toString(36)}`, label: `Additional signatory ${prev.length + 1}`, role: ROLES[Math.min(prev.length, ROLES.length - 1)], signatureId: '' }]);
+
+  const removeSlot = (id: string) =>
+    setSlots(prev => prev.filter(s => s.id !== id));
 
   const issue = async () => {
     setError(''); setResult(null); setCopied(false);
@@ -73,6 +98,7 @@ export default function IssueOfficialDocumentPage() {
     setStep('stamp', 'running');
     setBusy(true);
     try {
+      const boundSlots = withSig ? slots.filter(s => s.signatureId) : [];
       const res = await stampEngineApi.authentication.issue({
         schoolId: user?.schoolId,
         documentId,
@@ -82,8 +108,11 @@ export default function IssueOfficialDocumentPage() {
         stampTemplateId: templateId || undefined,
         requiresSignature: withSig,
         signers: withSig
-          ? [{ signerId: user?.id || 'authorised-signatory', signerName: user?.name, signerRole }]
+          ? slots.map(s => ({ signerId: s.signatureId || user?.id || 'authorised-signatory', signerName: user?.name, signerRole: s.role || 'Head Teacher' }))
           : [],
+        ...(boundSlots.length
+          ? { signatories: boundSlots.map(s => ({ label: s.label, role: s.role, userId: user?.id, signatureId: s.signatureId })) }
+          : {}),
       });
       const d = res.data;
       setStep('stamp', 'done');
@@ -158,13 +187,40 @@ export default function IssueOfficialDocumentPage() {
           </label>
 
           {requiresSignature && (
-            <div className="grid grid-cols-2 gap-4">
-              <label className="block text-xs font-medium text-gray-600">Signing authority role
-                <select value={signerRole} onChange={e => setSignerRole(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
-                  {['Head Teacher', 'Director', 'Registrar', 'Principal', 'Examination Officer'].map(r => <option key={r}>{r}</option>)}
-                </select>
-              </label>
-              <div className="text-xs text-gray-400 self-end pb-2">Signed by you as authorised signatory</div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Signature positions</span>
+                <button type="button" onClick={addSlot} className="text-xs text-blue-600 font-semibold border border-blue-200 rounded-lg px-2.5 py-1.5 hover:bg-blue-50">
+                  <i className="fa fa-plus" style={{ fontSize: '10px' }}></i> Add position
+                </button>
+              </div>
+              <p className="text-xs text-gray-400">Bind each position to a saved signature from the designer (e.g. Director + Head Teacher). Multi-signature documents are cryptographically bound to every bound asset.</p>
+              {slots.map((slot, index) => (
+                <div key={slot.id} className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-3 items-end border border-gray-100 rounded-lg p-3 bg-gray-50/50">
+                  <label className="block text-xs font-medium text-gray-600">Position label
+                    <input value={slot.label} onChange={e => patchSlot(slot.id, { label: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                  </label>
+                  <label className="block text-xs font-medium text-gray-600">Authority role
+                    <select value={slot.role} onChange={e => patchSlot(slot.id, { role: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                      {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </label>
+                  <label className="block text-xs font-medium text-gray-600">Saved signature to bind
+                    <select value={slot.signatureId} onChange={e => patchSlot(slot.id, { signatureId: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                      <option value="">None (role-only signature)</option>
+                      {signatureOptions.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}{s.title ? ` — ${s.title}` : ''}{s.scope === 'PLATFORM' ? ' (platform)' : ''}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {slots.length > 1 && (
+                    <button type="button" onClick={() => removeSlot(slot.id)} className="text-xs text-red-500 border border-red-100 rounded-lg px-2.5 py-2 hover:bg-red-50" title="Remove this position">
+                      <i className="fa fa-times" style={{ fontSize: '11px' }}></i>
+                    </button>
+                  )}
+                </div>
+              ))}
+              <div className="text-xs text-gray-400">Signed by you as the authorised signatory{boundSignaturesHint(slots)}.</div>
             </div>
           )}
 

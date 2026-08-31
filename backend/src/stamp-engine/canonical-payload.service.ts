@@ -13,6 +13,12 @@ export interface CanonicalDocumentPayload {
   stampInstanceId: string | null;
   signerIdentities: { signerId: string; signerRole?: string }[];
   signatureAssetId?: string | null;
+  /**
+   * Present only for multi-signatory documents (>1 bound signature asset).
+   * Omitted for single-signature issues so already-issued documents keep the
+   * exact same canonical payload and continue to verify.
+   */
+  signatureAssetIds?: string[];
   templateVersion: number | null;
 }
 
@@ -43,6 +49,7 @@ export class CanonicalPayloadService {
     });
   }
   buildAndHash(payload: CanonicalDocumentPayload): { canonical: Record<string, unknown>; finalHash: string } {
+    const multiSignature = Array.isArray(payload.signatureAssetIds) && payload.signatureAssetIds.length > 1;
     const canonical = {
       documentId: payload.documentId,
       documentVersion: payload.documentVersion,
@@ -57,6 +64,7 @@ export class CanonicalPayloadService {
         `${a.signerId}|${a.signerRole ?? ''}`.localeCompare(`${b.signerId}|${b.signerRole ?? ''}`),
       ),
       signatureAssetId: payload.signatureAssetId ?? null,
+      ...(multiSignature ? { signatureAssetIds: [...payload.signatureAssetIds!].sort() } : {}),
       templateVersion: payload.templateVersion,
     };
     return { canonical, finalHash: this.canonicalSha256(canonical) };

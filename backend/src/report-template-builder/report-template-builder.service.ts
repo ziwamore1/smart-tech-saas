@@ -174,6 +174,7 @@ export class ReportTemplateBuilderService {
         category: true,
         components: { orderBy: { sortOrder: 'asc' }, include: { children: { orderBy: { sortOrder: 'asc' } } } },
         certificate: true,
+        signatories: { orderBy: { position: 'asc' } },
         versions: { orderBy: { version: 'desc' }, take: 10 },
       },
     });
@@ -184,6 +185,7 @@ export class ReportTemplateBuilderService {
           category: true,
           components: { orderBy: { sortOrder: 'asc' }, include: { children: { orderBy: { sortOrder: 'asc' } } } },
           certificate: true,
+          signatories: { orderBy: { position: 'asc' } },
           versions: { orderBy: { version: 'desc' }, take: 10 },
         },
       });

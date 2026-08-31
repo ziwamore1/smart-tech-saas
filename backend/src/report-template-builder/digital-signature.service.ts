@@ -15,15 +15,118 @@ export interface SignatureProcessingOptions {
 export class DigitalSignatureService {
   constructor(private prisma: PrismaService, private cloudinary: CloudinaryService) {}
 
-  async getSignatures(schoolId: string | null) {
-    if (!schoolId) return [];
-    return this.prisma.digitalSignature.findMany({ where: { schoolId }, orderBy: { updatedAt: 'desc' } });
+  async getSignatures(schoolId: string | null, options: { scope?: string; status?: string; search?: string; limit?: number } = {}) {
+    const clauses: any[] = [];
+    if (schoolId) {
+      // Schools see their own signatures plus published platform signatures.
+      clauses.push({ OR: [{ schoolId }, { scope: 'PLATFORM', status: 'ACTIVE' }] });
+    } else if (options.scope) {
+      clauses.push({ scope: options.scope });
+    }
+    if (options.status) clauses.push({ status: options.status });
+    if (options.search?.trim()) {
+      clauses.push({
+        OR: [
+          { name: { contains: options.search.trim(), mode: 'insensitive' } },
+          { title: { contains: options.search.trim(), mode: 'insensitive' } },
+        ],
+      });
+    }
+    const where: any = clauses.length === 1 ? clauses[0] : clauses.length ? { AND: clauses } : {};
+    return this.prisma.digitalSignature.findMany({
+      where,
+      include: { school: { select: { id: true, name: true } } },
+      orderBy: { updatedAt: 'desc' },
+      ...(options.limit ? { take: options.limit } : {}),
+    });
   }
 
-  async createSignature(schoolId: string, data: {
-    name: string; title?: string; email?: string; imageUrl?: string; signatureData?: string; isDefault?: boolean; userId?: string; processing?: SignatureProcessingOptions;
+  async getTemplateSignatories(templateId: string, schoolId: string | null) {
+    const template = await this.prisma.reportTemplate.findFirst({
+      where: { id: templateId, ...(schoolId ? { schoolId } : {}) },
+    });
+    if (!template) throw new NotFoundException('Report template not found');
+    return this.prisma.templateSignatory.findMany({
+      where: { templateId },
+      include: { signature: { select: { id: true, name: true, title: true, thumbnailUrl: true } } },
+      orderBy: { position: 'asc' },
+    });
+  }
+
+  async saveTemplateSignatories(
+    actor: { id?: string; isSuperAdmin?: boolean },
+    schoolId: string | null,
+    templateId: string,
+    signatories: Array<{
+      id?: string;
+      label: string;
+      role?: string | null;
+      position?: number;
+      isRequired?: boolean;
+      signatureId?: string | null;
+    }>,
+  ) {
+    const template = await this.prisma.reportTemplate.findFirst({
+      where: { id: templateId, ...(schoolId ? { schoolId } : {}) },
+    });
+    if (!template) throw new NotFoundException('Report template not found');
+
+    const list = Array.isArray(signatories) ? signatories : [];
+    if (list.length > 10) {
+      throw new BadRequestException('A template may declare at most 10 signature positions');
+    }
+
+    // Validate that every bound signature exists and is active in the same scope.
+    const boundIds = list.map((s) => s.signatureId).filter((id): id is string => !!id);
+    if (boundIds.length) {
+      const signatures = await this.prisma.digitalSignature.findMany({
+        where: { id: { in: boundIds }, status: 'ACTIVE' },
+        select: { id: true, scope: true, schoolId: true },
+      });
+      const found = new Set(signatures.map((s) => s.id));
+      for (const id of boundIds) {
+        if (!found.has(id)) throw new BadRequestException(`Bound signature no longer exists or is not active: ${id}`);
+      }
+      for (const s of signatures) {
+        if (schoolId && s.scope === 'SCHOOL' && s.schoolId && s.schoolId !== schoolId) {
+          throw new BadRequestException(`Signature does not belong to this school: ${s.id}`);
+        }
+      }
+    }
+
+    const existing = await this.prisma.templateSignatory.findMany({ where: { templateId } });
+    const existingMap = new Map(existing.map((e) => [e.id, e]));
+    const incoming = new Set(list.map((s) => s.id).filter((id): id is string => !!id));
+    const toDelete = existing.filter((e) => !incoming.has(e.id)).map((e) => e.id);
+
+    if (toDelete.length) {
+      await this.prisma.templateSignatory.deleteMany({ where: { id: { in: toDelete } } });
+    }
+
+    for (let i = 0; i < list.length; i++) {
+      const item = list[i];
+      const data = {
+        label: String(item.label || `Signatory ${i + 1}`).trim().slice(0, 120),
+        role: item.role?.trim() || null,
+        position: item.position ?? i,
+        isRequired: item.isRequired !== false,
+        signatureId: item.signatureId || null,
+      };
+      if (item.id && existingMap.has(item.id)) {
+        await this.prisma.templateSignatory.update({ where: { id: item.id }, data });
+      } else {
+        await this.prisma.templateSignatory.create({ data: { templateId, ...data } });
+      }
+    }
+
+    return this.getTemplateSignatories(templateId, schoolId);
+  }
+
+  async createSignature(schoolId: string | null, data: {
+    name: string; title?: string; email?: string; imageUrl?: string; signatureData?: string; isDefault?: boolean; userId?: string; scope?: string; processing?: SignatureProcessingOptions;
   }) {
-    if (!schoolId) throw new NotFoundException('School ID required');
+    const scope = (data.scope || (schoolId ? 'SCHOOL' : 'PLATFORM')).toUpperCase();
+    if (!schoolId && scope !== 'PLATFORM') throw new NotFoundException('School ID required');
     if (!data.name?.trim()) throw new BadRequestException('Signature name is required');
     if (!data.imageUrl && !data.signatureData) {
       throw new BadRequestException('A drawn or uploaded signature image is required');
@@ -33,13 +136,14 @@ export class DigitalSignatureService {
     // keeps the handwriting intact while making it usable on any document.
     const visual = data.signatureData || data.imageUrl;
     const normalized = await this.normalizeVisual(visual, data.processing);
-    const assets = await this.persistAssets(schoolId, visual, normalized);
+    const assets = await this.persistAssets(schoolId, visual, normalized, scope);
     if (data.isDefault) {
-      await this.prisma.digitalSignature.updateMany({ where: { schoolId, isDefault: true }, data: { isDefault: false } });
+      await this.prisma.digitalSignature.updateMany({ where: { schoolId, scope, isDefault: true }, data: { isDefault: false } });
     }
     return this.prisma.digitalSignature.create({
       data: {
         schoolId, userId: data.userId, name: data.name.trim(), title: data.title, email: data.email,
+        scope,
         imageUrl: assets.processedImageUrl || (data.signatureData ? undefined : normalized),
         signatureData: data.signatureData ? normalized : undefined,
         originalImageUrl: assets.originalImageUrl,
@@ -58,14 +162,16 @@ export class DigitalSignatureService {
     });
   }
 
-  private async persistAssets(schoolId: string, original: string, processed: string) {
+  private async persistAssets(schoolId: string | null, original: string, processed: string, scope = 'SCHOOL') {
     const originalMatch = original.match(/^data:image\/[^;]+;base64,([\s\S]+)$/i);
     const processedMatch = processed.match(/^data:image\/[^;]+;base64,([\s\S]+)$/i);
     if (!processedMatch) return { originalImageUrl: original, processedImageUrl: original, transparentImageUrl: original, thumbnailUrl: original, originalAssetId: null, processedAssetId: null, thumbnailAssetId: null, width: null, height: null, aspectRatio: null, sourceMime: 'remote' };
     const processedBuffer = Buffer.from(processedMatch[1], 'base64');
     const meta = await sharp(processedBuffer).metadata();
     const thumb = await sharp(processedBuffer).resize({ width: 320, height: 160, fit: 'inside' }).png().toBuffer();
-    const folder = `smarttech/signatures/${schoolId}`;
+    const folder = scope === 'PLATFORM'
+      ? 'smarttech/signatures/platform'
+      : `smarttech/signatures/${schoolId}`;
     const [originalAsset, processedAsset, thumbAsset] = await Promise.all([
       originalMatch ? this.cloudinary.uploadBuffer(Buffer.from(originalMatch[1], 'base64'), { folder, publicId: `original-${crypto.randomUUID()}`, resourceType: 'image' }) : null,
       this.cloudinary.uploadBuffer(processedBuffer, { folder, publicId: `transparent-${crypto.randomUUID()}`, resourceType: 'image' }),
@@ -159,8 +265,10 @@ export class DigitalSignatureService {
     };
   }
 
-  async updateSignature(schoolId: string, id: string, data: any) {
-    const s = await this.prisma.digitalSignature.findFirst({ where: { id, schoolId } });
+  async updateSignature(schoolId: string | null, id: string, data: any, actor?: { isSuperAdmin?: boolean }) {
+    const s = (actor?.isSuperAdmin && !schoolId)
+      ? await this.prisma.digitalSignature.findUnique({ where: { id } })
+      : await this.prisma.digitalSignature.findFirst({ where: { id, schoolId } });
     if (!s) throw new NotFoundException('Signature not found');
     const update: any = {};
     for (const field of ['name', 'title', 'email', 'isDefault']) {
@@ -176,25 +284,48 @@ export class DigitalSignatureService {
       throw new BadRequestException('Signature name is required');
     }
     if (data.isDefault && !s.isDefault) {
-      await this.prisma.digitalSignature.updateMany({ where: { schoolId, isDefault: true, id: { not: id } }, data: { isDefault: false } });
+      const scope = s.scope || 'SCHOOL';
+      const where: any = { scope, isDefault: true, id: { not: id } };
+      if (s.schoolId) where.schoolId = s.schoolId;
+      await this.prisma.digitalSignature.updateMany({ where, data: { isDefault: false } });
     }
     return this.prisma.digitalSignature.update({ where: { id }, data: update });
   }
 
-  async deleteSignature(schoolId: string, id: string) {
-    const s = await this.prisma.digitalSignature.findFirst({ where: { id, schoolId } });
+  async deleteSignature(schoolId: string | null, id: string, actor?: { isSuperAdmin?: boolean }) {
+    const s = (actor?.isSuperAdmin && !schoolId)
+      ? await this.prisma.digitalSignature.findUnique({ where: { id } })
+      : await this.prisma.digitalSignature.findFirst({ where: { id, schoolId } });
     if (!s) throw new NotFoundException('Signature not found');
     await Promise.all([s.originalAssetId, s.processedAssetId, s.thumbnailAssetId].filter(Boolean).map(assetId => this.cloudinary.delete(assetId as string).catch(() => false)));
     return this.prisma.digitalSignature.delete({ where: { id } });
   }
 
-  async revokeSignature(schoolId: string, id: string, reason?: string) {
-    const signature = await this.prisma.digitalSignature.findFirst({ where: { id, schoolId, status: 'ACTIVE' } });
-    if (!signature) throw new NotFoundException('Active signature not found');
-    return this.prisma.digitalSignature.update({
-      where: { id },
-      data: { status: 'REVOKED', processingMetadata: { ...(signature.processingMetadata as any || {}), revokedReason: reason || 'Revoked by institution', revokedAt: new Date().toISOString() } },
-    });
+  async setSignatureStatus(params: { actor: { id?: string; isSuperAdmin?: boolean }; schoolId: string | null; id: string; status: string; reason?: string }) {
+    const where: any = { id: params.id };
+    if (!params.actor?.isSuperAdmin || params.schoolId) where.schoolId = params.schoolId;
+    const signature = await this.prisma.digitalSignature.findFirst({ where });
+    if (!signature) throw new NotFoundException('Signature not found');
+
+    const status = String(params.status || 'ACTIVE').toUpperCase();
+    if (!['ACTIVE', 'REVOKED', 'SUSPENDED', 'ARCHIVED'].includes(status)) {
+      throw new BadRequestException(`Invalid signature status: ${status}`);
+    }
+    const data: any = { status };
+    if (status !== 'ACTIVE') {
+      data.revokedReason = params.reason?.trim() || `Revoked as ${status}`;
+      data.revokedAt = new Date();
+      data.revokedBy = params.actor?.id;
+    } else {
+      data.revokedReason = null;
+      data.revokedAt = null;
+      data.revokedBy = null;
+    }
+    return this.prisma.digitalSignature.update({ where: { id: params.id }, data });
+  }
+
+  async revokeSignature(schoolId: string | null, id: string, reason?: string, actor?: { id?: string; isSuperAdmin?: boolean }) {
+    return this.setSignatureStatus({ actor, schoolId, id, status: 'REVOKED', reason });
   }
 
   async signDocument(schoolId: string, signatureId: string, documentHash: string): Promise<string> {

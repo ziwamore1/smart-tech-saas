@@ -1345,7 +1345,8 @@ export const templateBuilderApi = {
 
   getAssetCategories: () => api.get('/template-builder/cloud-assets/categories'),
 
-  getSignatures: () => api.get('/template-builder/signatures'),
+getSignatures: (params?: { scope?: string; status?: string; search?: string }) =>
+    api.get('/template-builder/signatures', { params }),
 
   previewSignature: (image: string, options?: any) => api.post('/template-builder/signatures/preview', { image, ...(options || {}) }, { timeout: 60000 }),
 
@@ -1354,6 +1355,18 @@ export const templateBuilderApi = {
   updateSignature: (id: string, data: any) => api.patch(`/template-builder/signatures/${id}`, data),
 
   deleteSignature: (id: string) => api.delete(`/template-builder/signatures/${id}`),
+
+  setSignatureStatus: (id: string, status: string, reason?: string) =>
+    api.patch(`/template-builder/signatures/${id}/status`, { status, reason }),
+
+  revokeSignature: (id: string, reason?: string) =>
+    api.patch(`/template-builder/signatures/${id}/revoke`, { reason }),
+
+  getTemplateSignatories: (templateId: string) =>
+    api.get(`/template-builder/templates/${templateId}/signatories`),
+
+  saveTemplateSignatories: (templateId: string, signatories: any[]) =>
+    api.put(`/template-builder/templates/${templateId}/signatories`, { signatories }),
 
   signDocument: (signatureId: string, documentHash: string) =>
     api.post('/template-builder/signatures/sign', { signatureId, documentHash }),
@@ -1391,7 +1404,7 @@ export const academicTemplateApi = {
 };
 
 export const stampApi = {
-  getStamps: (params?: { type?: string }) =>
+  getStamps: (params?: { type?: string; scope?: string; status?: string; search?: string }) =>
     api.get('/template-builder/stamps', { params }),
 
   getStamp: (id: string) => api.get(`/template-builder/stamps/${id}`),
@@ -1406,6 +1419,7 @@ export const stampApi = {
     width?: number;
     height?: number;
     isDefault?: boolean;
+    scope?: string;
   }) => api.post('/template-builder/stamps', data),
 
   updateStamp: (id: string, data: any) =>
@@ -1415,6 +1429,12 @@ export const stampApi = {
 
   duplicateStamp: (id: string) =>
     api.post(`/template-builder/stamps/${id}/duplicate`),
+
+  setStampStatus: (id: string, status: string, reason?: string) =>
+    api.patch(`/template-builder/stamps/${id}/status`, { status, reason }),
+
+  revokeStamp: (id: string, reason?: string) =>
+    api.patch(`/template-builder/stamps/${id}/revoke`, { reason }),
 
   getDefaultStamps: () => api.get('/template-builder/stamps/defaults'),
 
