@@ -29,3 +29,7 @@ backend/uploads/
 backend/blockchain/artifacts/
 backend/blockchain/cache/
 backend/blockchain/typechain-types/
+
+# Debug probe scripts
+backend/probe-*
+probe-*
