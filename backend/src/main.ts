@@ -80,7 +80,8 @@ async function bootstrap() {
       req.path === '/api/v1/gallery/public/recent' ||
       req.path === '/api/v1/health' ||
       req.path === '/api/v1/health/detailed' ||
-      req.path.startsWith('/api/v1/health/');
+      req.path.startsWith('/api/v1/health/') ||
+      req.path.startsWith('/api/v1/template-builder/stamps/verify');
     if (isPublicPath) return next();
 
     // Skip auth for webhook delivery endpoints
