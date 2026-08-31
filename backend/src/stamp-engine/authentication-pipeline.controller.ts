@@ -39,7 +39,7 @@ export class SupersedeAuthDto {
  * Unified Document Authentication pipeline — one professional workflow:
  * generate → stamp → sign → register → verify. Users never see the plumbing.
  */
-@Controller('document-authentication')
+@Controller('stamp-engine/document-authentication')
 export class DocumentAuthenticationController {
   constructor(
     private pipeline: AuthenticationPipelineService,
