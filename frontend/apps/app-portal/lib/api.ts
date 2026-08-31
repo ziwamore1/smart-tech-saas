@@ -52,12 +52,9 @@ api.interceptors.response.use(
       const silentUrls = [
         '/substitutions', 
         '/notifications', 
-        '/my-timetable',
-        '/student/timetable',
         '/teacher', 
         '/school/stats',
         '/subscription/status',
-        '/timetable/job/',
         '/school/profile',
         '/school/current',
         '/term/current',
@@ -199,142 +196,6 @@ export const classroomApi = {
     api.post('/classrooms', data),
   update: (id: string, data: any) => api.patch(`/classrooms/${id}`, data),
   delete: (id: string) => api.delete(`/classrooms/${id}`),
-};
-
-export const timetableApi = {
-  getCurrentTerm: () => api.get('/timetable/current-term'),
-  
-  getMyTimetable: (termId?: string) => 
-    api.get('/timetable/my-timetable', { params: { termId } }),
-  
-  getStudentTimetable: (termId?: string) => 
-    api.get('/timetable/student/timetable', { params: { termId } }),
-  
-  getChildrenTimetables: (termId?: string) => 
-    api.get('/timetable/parent/children-timetable', { params: { termId } }),
-  
-  getChildTimetable: (studentId: string, termId?: string) => 
-    api.get(`/timetable/parent/child/${studentId}`, { params: { termId } }),
-  
-  getClassTimetable: (classId: string, termId: string) => 
-    api.get('/timetable/class', { params: { classId, termId } }),
-  
-  publishTimetable: (timetableId: string) => 
-    api.post(`/timetable/${timetableId}/publish`),
-  
-  getClassesWithTimetables: (termId: string) => 
-    api.get('/timetable/class/list', { params: { termId } }),
-  
-  getTeacherTimetable: (teacherId: string, termId: string) => 
-    api.get('/timetable/teacher', { params: { teacherId, termId } }),
-  
-  getTeachersWithTimetables: (termId: string) => 
-    api.get('/timetable/teacher/list', { params: { termId } }),
-  
-  getRooms: () => api.get('/timetable/room/list'),
-  
-  getRoomTimetable: (roomId: string, termId: string) => 
-    api.get('/timetable/room', { params: { roomId, termId } }),
-  
-  getLessonRequirements: (classId: string) => 
-    api.get('/timetable/lesson-requirements', { params: { classId } }),
-  
-  getAllLessonRequirements: () => 
-    api.get('/timetable/lesson-requirements/all').catch(() => ({ data: [] })),
-  
-  createLessonRequirement: (data: {
-    classId: string;
-    subjectId: string;
-    teacherId: string;
-    lessonsPerWeek: number;
-    lessonType?: string;
-  }) => api.post('/timetable/lesson-requirement', data),
-  
-  deleteLessonRequirement: (id: string) => 
-    api.delete(`/timetable/lesson-requirement/${id}`),
-  
-  deleteLessonRequirementsByClass: (classId: string) =>
-    api.delete(`/timetable/lesson-requirements/class/${classId}`),
-  
-  generateTimetable: (classId: string, termId: string, teacherConstraints?: Record<string, any>) => 
-    api.post(`/timetable/generate/${classId}`, { termId, teacherConstraints }),
-  
-  generateTimetableAI: (classId: string, termId: string) => 
-    api.post(`/timetable/generate-ai/${classId}`, { termId }),
-  
-  generateAllClasses: (termId: string) =>
-    api.post('/timetable/generate/queue/all-classes', { termId }),
-  
-  generateSelectedClasses: (termId: string, classIds: string[]) =>
-    api.post('/timetable/generate/queue/classes', { termId, classIds }),
-  
-  getJobStatus: (jobId: string) => api.get(`/timetable/job/${jobId}/status`),
-  
-  getSchoolJobStatus: () => api.get('/timetable/job/status/list'),
-  
-  moveSlot: (slotId: string, day: number, period: number) => 
-    api.post(`/timetable/moveSlot/${slotId}`, { day, period }),
-  
-  swapSlot: (sourceSlotId: string, targetDay: number, targetPeriod: number) => 
-    api.post(`/timetable/swapSlot/${sourceSlotId}`, { sourceSlotId, targetDay, targetPeriod }),
-  
-  previewMove: (slotId: string, targetDay: number, targetPeriod: number) => 
-    api.post('/timetable/previewMove', { slotId, targetDay, targetPeriod }),
-  
-  createSnapshot: (timetableId: string) => 
-    api.post(`/timetable/snapshot/${timetableId}`),
-  
-  getVersions: (timetableId: string) => 
-    api.get(`/timetable/versions/${timetableId}`),
-  
-  restoreVersion: (versionId: string) => 
-    api.post(`/timetable/restoreVersion/${versionId}`),
-  
-  deleteTimetable: (timetableId: string) => 
-    api.delete(`/timetable/${timetableId}`),
-
-  getSubstitutions: (params: { 
-    termId: string; 
-    classId?: string; 
-    teacherId?: string; 
-    roomId?: string;
-    startDate?: string;
-    endDate?: string;
-  }) => api.get('/timetable/substitutions', { params }),
-  
-  createSubstitution: (data: {
-    originalSlotId: string;
-    date: string;
-    newTeacherId?: string;
-    newRoomId?: string;
-    newSubjectId?: string;
-    reason: string;
-    isCancelled?: boolean;
-  }) => api.post('/timetable/substitution', data),
-  
-  updateSubstitution: (id: string, data: any) => 
-    api.patch(`/timetable/substitution/${id}`, data),
-  
-  deleteSubstitution: (id: string) => 
-    api.delete(`/timetable/substitution/${id}`),
-  
-  getWeekRotation: (classId: string, termId: string) => 
-    api.get('/timetable/week-rotation', { params: { classId, termId } }),
-  
-  setWeekRotation: (classId: string, termId: string, weekType: 'A' | 'B' | 'regular') => 
-    api.post('/timetable/week-rotation', { classId, termId, weekType }),
-  
-  getTeacherAbsences: (params?: { startDate?: string; endDate?: string }) =>
-    api.get('/timetable/teacher-absences', { params }),
-  
-  createTeacherAbsence: (data: {
-    teacherId: string;
-    startDate: string;
-    endDate: string;
-    reason: string;
-  }) => api.post('/timetable/teacher-absence', data),
-  
-  getRealTimeUpdates: () => api.get('/timetable/realtime/status'),
 };
 
 export const subscriptionApi = {

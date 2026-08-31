@@ -14,7 +14,6 @@ export default function ParentLayout({
 
   const navItems = [
     { href: '/parent', label: 'Dashboard', icon: '🏠' },
-    { href: '/parent/timetable', label: "Timetable", icon: '📅' },
     { href: '/parent/results', label: "Results", icon: '📝' },
     { href: '/parent/homework', label: "Homework", icon: '📚' },
     { href: '/parent/report-cards', label: "Reports", icon: '📄' },

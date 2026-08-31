@@ -15,7 +15,6 @@ const basicActions = [
   { name: 'Form Classes', href: '/dashboard/classes', icon3d: 'classes', desc: 'Manage Form 1–6 classes' },
   { name: 'Students', href: '/dashboard/students', icon3d: 'students', desc: 'Student admissions & records' },
   { name: 'Teachers', href: '/dashboard/teachers', icon3d: 'teachers', desc: 'Teaching staff management' },
-  { name: 'Timetable', href: '/timetable', icon3d: 'timetable', desc: 'Lesson scheduling' },
   { name: 'Exams', href: '/dashboard/exams', icon3d: 'exam', desc: 'GCE & internal exams' },
   { name: 'Results', href: '/dashboard/results', icon3d: 'results', desc: 'GCE grading & analysis' },
   { name: 'Report Cards', href: '/dashboard/report-cards', icon3d: 'reports', desc: 'Cumulative reports' },
@@ -23,14 +22,12 @@ const basicActions = [
 ];
 
 const standardHighlightActions = [
-  { name: 'AI Timetable', href: '/timetable/generator', icon3d: 'timetable', desc: 'Auto-generate schedule', featureKey: 'timetable.generate' },
   { name: 'Result Reports', href: '/dashboard/results/reports', icon3d: 'results', desc: 'Comprehensive reports', featureKey: 'results.reports' },
   { name: 'Custom Reports', href: '/dashboard/report-cards/custom', icon3d: 'reports', desc: 'Customized report layouts', featureKey: 'reports.custom' },
   { name: 'Bulk Messaging', href: '/dashboard/communications', icon3d: 'communications', desc: 'Bulk SMS & email', featureKey: 'communications.bulk' },
 ];
 
 const premiumHighlightActions = [
-  { name: 'Timetable Constraints', href: '/timetable/constraints', icon3d: 'timetable', desc: 'Advanced scheduling rules', featureKey: 'timetable.constraints' },
   { name: 'AI Analytics', href: '/dashboard/analytics/ai', icon3d: 'analytics', desc: 'AI-powered insights', featureKey: 'analytics.ai' },
   { name: 'WhatsApp Comms', href: '/dashboard/communications/whatsapp', icon3d: 'communications', desc: 'WhatsApp messaging', featureKey: 'communications.whatsapp' },
   { name: 'Online Payments', href: '/dashboard/fees/online', icon3d: 'fees', desc: 'Payment gateway', featureKey: 'fees.onlinePayment' },

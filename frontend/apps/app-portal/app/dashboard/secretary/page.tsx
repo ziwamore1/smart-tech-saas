@@ -66,7 +66,6 @@ function SecretaryDashboardContent() {
     { name: 'Students', href: '/dashboard/students', icon: 'fa-user-graduate', desc: 'Student admissions & records', color: '#3b82f6' },
     { name: 'Teachers', href: '/dashboard/teachers', icon: 'fa-chalkboard-teacher', desc: 'Teaching staff records', color: '#10b981' },
     { name: 'Classes', href: '/dashboard/classes', icon: 'fa-school', desc: 'Class information', color: '#8b5cf6' },
-    { name: 'Timetable', href: '/timetable', icon: 'fa-calendar-alt', desc: 'School timetable', color: '#ec4899' },
     { name: 'Photo Gallery', href: '/dashboard/gallery', icon: 'fa-images', desc: 'School photo gallery', color: '#db2777' },
     { name: 'Digital Stamps', href: '/dashboard/digital-stamps', icon: 'fa-stamp', desc: 'Digital stamps', color: '#7c3aed' },
   ];

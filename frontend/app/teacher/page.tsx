@@ -46,13 +46,6 @@ export default function TeacherDashboard() {
       description: 'Enter and manage results',
       color: 'purple',
     },
-    {
-      href: '/teacher/timetable',
-      icon: '📅',
-      label: 'Timetable',
-      description: 'View teaching schedule',
-      color: 'orange',
-    },
   ];
 
   return (

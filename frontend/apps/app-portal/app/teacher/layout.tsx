@@ -14,7 +14,6 @@ export default function TeacherLayout({
 
   const navItems = [
     { href: '/teacher', label: 'Dashboard', icon: '🏠' },
-    { href: '/teacher/timetable', label: 'Timetable', icon: '📅' },
     { href: '/teacher/class', label: 'My Class', icon: '👥' },
     { href: '/teacher/enrollments', label: 'Enrollments', icon: '📝' },
     { href: '/teacher/results', label: 'Results', icon: '📊' },

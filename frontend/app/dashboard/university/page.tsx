@@ -14,7 +14,6 @@ const quickActions = [
   { name: 'Courses', href: '/dashboard/subjects', icon3d: 'subjects', desc: 'Course catalog & curriculum' },
   { name: 'Research', href: '/dashboard/research', icon3d: 'intelligence', desc: 'Research management' },
   { name: 'Transcripts', href: '/dashboard/report-cards', icon3d: 'reports', desc: 'Academic transcripts & CWA' },
-  { name: 'Timetable', href: '/timetable', icon3d: 'timetable', desc: 'Lecture & lab scheduling' },
   { name: 'Library', href: '/dashboard/library', icon3d: 'books', desc: 'Digital library & resources' },
 ];
 

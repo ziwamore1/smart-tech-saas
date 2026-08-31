@@ -215,9 +215,6 @@ export default function ParentDashboard() {
 
           {/* Quick Links */}
           <div className="flex gap-3 flex-wrap">
-            <Link href="/parent/timetable" className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-              📅 Timetables
-            </Link>
             <Link href="/parent/results" className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
               📝 Results
             </Link>

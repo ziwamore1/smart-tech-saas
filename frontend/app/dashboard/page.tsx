@@ -138,7 +138,6 @@ export default function DashboardPage() {
   const quickActions = [
     { name: 'Students', href: '/dashboard/students', icon3d: 'students' },
     { name: 'Teachers', href: '/dashboard/teachers', icon3d: 'teachers' },
-    { name: 'Timetable', href: '/timetable', icon3d: 'timetable' },
     { name: 'Results', href: '/dashboard/results', icon3d: 'results' },
     { name: 'Classes', href: '/dashboard/classes', icon3d: 'classes' },
     { name: 'Subjects', href: '/dashboard/subjects', icon3d: 'subjects' },

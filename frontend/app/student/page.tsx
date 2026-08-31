@@ -107,13 +107,6 @@ export default function StudentPortal() {
                 <h2 className="text-xl font-semibold">Quick Actions</h2>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <Link href="/student/timetable" className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
-                  <span className="text-3xl">📅</span>
-                  <div>
-                    <p className="font-medium text-gray-900">My Timetable</p>
-                    <p className="text-sm text-gray-500">View class schedule</p>
-                  </div>
-                </Link>
                 <Link href="/student/results" className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors">
                   <span className="text-3xl">📝</span>
                   <div>

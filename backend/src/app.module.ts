@@ -23,7 +23,6 @@ import { SchoolModule } from './school/school.module';
 import { PublishingModule } from './publishing/publishing.module';
 import { ParentModule } from './parent/parent.module';
 import { AssessmentModule } from './assessment/assessment.module';
-import { TimetableModule } from './timetable/timetable.module';
 import { ConstraintsModule } from './constraints/constraints.module';
 import { DashboardConfigModule } from './dashboard-config/dashboard-config.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
@@ -128,7 +127,6 @@ import { getRedisConnectionOptions } from './queues/redis.config';
     PublishingModule,
     ParentModule,
     AssessmentModule,
-    TimetableModule,
     ConstraintsModule,
     DashboardConfigModule,
     SuperAdminModule,

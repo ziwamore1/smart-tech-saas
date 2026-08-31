@@ -8,3 +8,24 @@ boot-*.log
 *.db
 .next
 .tsbuildinfo
+
+# Secrets (never commit)
+**/.env
+**/.env.local
+**/google-services.json
+**/google-services*.json
+
+# Build / bytecode / IDE artifacts
+**/__pycache__/
+**.pyc
+.idea/
+backend/uploads/
+**/temp_install/
+**/swfcombiner.swf
+**/playerProductInstall.swf
+%MSG_FILE%
+
+# Blockchain compiled artifacts
+backend/blockchain/artifacts/
+backend/blockchain/cache/
+backend/blockchain/typechain-types/

@@ -70,7 +70,6 @@ function ClassTeacherDashboardContent() {
     { name: 'My Class', href: '/teacher/class', icon: 'fa-school', desc: 'View your form class', color: '#8b5cf6' },
     { name: 'Students', href: '/dashboard/students', icon: 'fa-user-graduate', desc: 'Student records and profiles', color: '#3b82f6' },
     { name: 'Class List', href: '/dashboard/class-list', icon: 'fa-list-alt', desc: 'Class enrollment list', color: '#06b6d4' },
-    { name: 'Timetable', href: '/timetable', icon: 'fa-calendar-alt', desc: 'Class timetable', color: '#ec4899' },
     { name: 'Lesson Plans', href: '/dashboard/lesson-plans', icon: 'fa-clipboard-list', desc: 'Lesson planning', color: '#f59e0b' },
     { name: 'Attendance Dashboard', href: '/dashboard/attendance/dashboard', icon: 'fa-chart-pie', desc: 'Attendance analytics', color: '#0d9488' },
     { name: 'Digital Stamps', href: '/dashboard/digital-stamps', icon: 'fa-stamp', desc: 'Digital stamps', color: '#7c3aed' },

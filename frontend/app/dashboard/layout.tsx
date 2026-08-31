@@ -174,14 +174,6 @@ const regularNav: NavItem[] = [
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
-    name: 'Timetable', 
-    href: '/timetable', 
-    icon: 'fa-calendar-alt',
-    color: '#ec4899',
-    typeRoles: ROLE_MAP.teaching,
-    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
-  },
-  { 
     name: 'Attendance Register', 
     href: '/dashboard/attendance-register', 
     icon: 'fa-clipboard-list',
@@ -756,16 +748,6 @@ export default function DashboardLayout({
             animation: 'spin 1s linear infinite'
           }}></div>
           <p style={{ color: '#666', fontSize: '14px' }}>Redirecting...</p>
-        </div>
-        <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
-      </div>
-    );
-  }
-          <span style={{ color: '#666', fontSize: '14px' }}>Redirecting to login...</span>
         </div>
         <style>{`
           @keyframes spin {

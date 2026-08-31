@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { classApi, levelTypeApi, enrollmentApi, studentApi, subjectApi, classSubjectApi, gradingSystemApi, api, classTeacherAssignmentApi, academicYearApi } from '@/lib/api';
 import { usePermissions } from '@/lib/permission-context';
-import TooltipWrap from '@/components/timetable/TooltipWrap';
+import TooltipWrap from '@/components/ui/TooltipWrap';
 
 type LevelCategory = 'FORM' | 'GRADE' | 'OTHER';
 

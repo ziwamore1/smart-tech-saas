@@ -60,7 +60,6 @@ function DeputyDashboardContent() {
     { name: 'Attendance Dashboard', href: '/dashboard/attendance/dashboard', icon: 'fa-chart-pie', desc: 'Attendance analytics and reports', color: '#0d9488' },
     { name: 'Results Analytics', href: '/dashboard/result-analytics', icon: 'fa-chart-line', desc: 'Academic performance trends', color: '#059669' },
     { name: 'Staff Returns Hub', href: '/dashboard/staff-records', icon: 'fa-id-card', desc: 'HR records and staff profiles', color: '#a855f7' },
-    { name: 'Timetable', href: '/timetable', icon: 'fa-calendar-alt', desc: 'Lesson scheduling overview', color: '#ec4899' },
     { name: 'Analytics', href: '/dashboard/analytics', icon: 'fa-chart-bar', desc: 'School performance analytics', color: '#a855f7' },
     { name: 'Benchmarking', href: '/dashboard/benchmarking', icon: 'fa-trophy', desc: 'Compare with national standards', color: '#f59e0b' },
     { name: 'Exam Quality', href: '/dashboard/exam-quality', icon: 'fa-clipboard-check', desc: 'Exam quality & inflation detection', color: '#f97316' },

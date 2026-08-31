@@ -68,7 +68,6 @@ function TeacherDashboardContent() {
 
   const classroomActions = [
     { name: 'My Classes', href: '/teacher/class', icon: 'fa-school', desc: 'View your assigned classes', color: '#8b5cf6' },
-    { name: 'Timetable', href: '/timetable', icon: 'fa-calendar-alt', desc: 'Your lesson schedule', color: '#ec4899' },
     { name: 'Lesson Plans', href: '/dashboard/lesson-plans', icon: 'fa-clipboard-list', desc: 'Plan and manage lessons', color: '#f59e0b' },
     { name: 'Class List', href: '/dashboard/class-list', icon: 'fa-list-alt', desc: 'View student enrollment', color: '#06b6d4' },
     { name: 'SBA Tasks', href: '/dashboard/sba-tasks', icon: 'fa-tasks', desc: 'School-based assessment tasks', color: '#22c55e' },

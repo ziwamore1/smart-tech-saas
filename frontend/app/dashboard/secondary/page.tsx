@@ -11,7 +11,6 @@ const quickActions = [
   { name: 'Form Classes', href: '/dashboard/classes', icon3d: 'classes', desc: 'Manage Form 1–6 classes' },
   { name: 'Students', href: '/dashboard/students', icon3d: 'students', desc: 'Student admissions & records' },
   { name: 'Teachers', href: '/dashboard/teachers', icon3d: 'teachers', desc: 'Teaching staff management' },
-  { name: 'Timetable', href: '/timetable', icon3d: 'timetable', desc: 'Lesson scheduling' },
   { name: 'Exams', href: '/dashboard/exams', icon3d: 'exam', desc: 'GCE & internal exams' },
   { name: 'Results', href: '/dashboard/results', icon3d: 'results', desc: 'GCE grading & analysis' },
   { name: 'Report Cards', href: '/dashboard/report-cards', icon3d: 'reports', desc: 'Cumulative reports' },

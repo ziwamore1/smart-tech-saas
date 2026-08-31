@@ -11,7 +11,6 @@ const quickActions = [
   { name: 'Form Classes', href: '/dashboard/classes', icon3d: 'classes', desc: 'Advanced Level Form classes' },
   { name: 'Students', href: '/dashboard/students', icon3d: 'students', desc: 'Student records & admissions' },
   { name: 'Teachers', href: '/dashboard/teachers', icon3d: 'teachers', desc: 'Teaching staff' },
-  { name: 'Timetable', href: '/timetable', icon3d: 'timetable', desc: 'Advanced Level scheduling' },
   { name: 'Exams', href: '/dashboard/exams', icon3d: 'exam', desc: 'GCE Advanced Level exams' },
   { name: 'Results', href: '/dashboard/results', icon3d: 'results', desc: 'A-Level grading & analysis' },
   { name: 'Report Cards', href: '/dashboard/report-cards', icon3d: 'reports', desc: 'Academic transcripts' },

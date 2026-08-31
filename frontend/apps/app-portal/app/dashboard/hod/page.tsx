@@ -75,7 +75,6 @@ function HODDashboardContent() {
   const classActions = [
     { name: 'Classes', href: '/dashboard/classes', icon: 'fa-school', desc: 'Manage classes', color: '#8b5cf6' },
     { name: 'Class List', href: '/dashboard/class-list', icon: 'fa-list-alt', desc: 'Student enrollment by class', color: '#06b6d4' },
-    { name: 'Timetable', href: '/timetable', icon: 'fa-calendar-alt', desc: 'Department timetable', color: '#ec4899' },
     { name: 'Digital Stamps', href: '/dashboard/digital-stamps', icon: 'fa-stamp', desc: 'Digital stamps and verification', color: '#7c3aed' },
   ];
 

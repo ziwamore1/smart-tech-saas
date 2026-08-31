@@ -278,14 +278,6 @@ const regularNav: NavItem[] = [
     institutionTypes: ['SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
-    name: 'Timetable', 
-    href: '/timetable', 
-    icon: 'fa-calendar-alt',
-    color: '#ec4899',
-    typeRoles: ROLE_MAP.teaching,
-    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
-  },
-  { 
     name: 'Attendance Register', 
     href: '/dashboard/attendance-register', 
     icon: 'fa-clipboard-list',
