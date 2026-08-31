@@ -85,6 +85,12 @@ export class ReportTemplateBuilderService {
       if (existing._count.components === 0) {
         await this.seedEnhancedProfessionalComponents(existing.id);
       }
+      if (isPremium && !existing.includeStamp) {
+        await this.prisma.reportTemplate.update({
+          where: { id: existing.id },
+          data: { includeStamp: true },
+        });
+      }
       return existing;
     }
     if (isPremium) {
@@ -101,6 +107,7 @@ export class ReportTemplateBuilderService {
         templateType: 'REPORT_CARD',
         status: 'PUBLISHED',
         isDefault: isPremium,
+        includeStamp: isPremium,
         primaryColor: '#1e3a8a',
         secondaryColor: '#eff6ff',
         metadata: { enhancedProfessional: true, premiumOnly: true },
