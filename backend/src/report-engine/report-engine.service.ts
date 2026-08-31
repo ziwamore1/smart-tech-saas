@@ -603,7 +603,8 @@ export class ReportEngineService {
 
     const rendered = await this.renderReportCardWithTemplate(request);
     if (rendered) {
-      return this.templateRenderer.renderPdfFromHtml(schoolId, rendered.templateId, rendered.html);
+      const html = await this.attachReportAuthenticity(schoolId, rendered);
+      return this.templateRenderer.renderPdfFromHtml(schoolId, rendered.templateId, html);
     }
 
     const selectedTemplate = request.templateId
@@ -616,6 +617,48 @@ export class ReportEngineService {
 
     // Last resort: use the curriculum report card pipeline
     return this.reportCardService.generateCurriculumReportCardPdf(schoolId, studentId, termId, request.examType);
+  }
+
+  /**
+   * When the report template opts in via includeStamp, finalize a canonical
+   * Digital Stamp Engine verification record and append the authenticity block
+   * (stamp, serial, date, QR, verification code/URL) to the rendered HTML.
+   * Fail-safe: any error (or opt-out) returns the HTML unchanged.
+   */
+  private async attachReportAuthenticity(
+    schoolId: string,
+    rendered: { html: string; templateId: string },
+  ): Promise<string> {
+    try {
+      const auth = await this.templateRenderer.finalizeReportAuthenticity(schoolId, rendered.templateId);
+      if (!auth) return rendered.html;
+
+      const html = rendered.html
+        .replace(/\{\{\s*digital_stamp\s*\}\}/g, auth.placeholders.digital_stamp || '')
+        .replace(/\{\{\s*verification_qr\s*\}\}/g, auth.placeholders.verification_qr || '')
+        .replace(/\{\{\s*document_serial\s*\}\}/g, auth.placeholders.document_serial || '')
+        .replace(/\{\{\s*document_hash\s*\}\}/g, auth.placeholders.document_hash || '')
+        .replace(/\{\{\s*issued_date\s*\}\}/g, auth.placeholders.issued_date || '')
+        .replace(/\{\{\s*issued_timestamp\s*\}\}/g, auth.placeholders.issued_timestamp || '');
+
+      const verifyUrl = auth.verificationUrl;
+      const block = `
+      <div style="page-break-inside:avoid;margin-top:22px;padding:14px 16px;border:1px solid #d1d5db;border-radius:8px;background:#f9fafb;display:flex;align-items:center;gap:16px;">
+        <div style="flex:0 0 auto;">${auth.placeholders.digital_stamp || ''}</div>
+        <div style="flex:0 0 auto;">${auth.placeholders.verification_qr || ''}</div>
+        <div style="font-size:11px;line-height:1.55;color:#374151;">
+          <div style="font-weight:700;color:#111827;margin-bottom:3px;">Digitally Verified Document</div>
+          <div>Serial: <strong>${auth.placeholders.document_serial || ''}</strong></div>
+          <div>Issued: ${auth.placeholders.issued_timestamp || auth.placeholders.issued_date || ''}</div>
+          <div>Verification code: <strong>${auth.verificationCode}</strong></div>
+          <div>Verify online: <a href="${verifyUrl}">${verifyUrl}</a></div>
+        </div>
+      </div>`;
+      return html.includes('</body>') ? html.replace('</body>', `${block}\n</body>`) : `${html}\n${block}`;
+    } catch (e: any) {
+      this.logger.warn(`Report authenticity attach skipped: ${e?.message ?? e}`);
+      return rendered.html;
+    }
   }
 
   /**

@@ -1456,4 +1456,54 @@ export class TemplateRendererService {
       return data;
     }
   }
+
+  /**
+   * Finalize a canonical verification record for a report template that opts
+   * in via includeStamp and return the data needed to render the authenticity
+   * block on the generated document. Returns null when the template is not
+   * opted in or when finalization fails (fail-safe: never a fake stamp).
+   */
+  async finalizeReportAuthenticity(
+    schoolId: string,
+    templateId: string,
+  ): Promise<{
+    placeholders: Record<string, string>;
+    verificationCode: string;
+    verificationUrl: string;
+  } | null> {
+    try {
+      const template = await this.prisma.reportTemplate.findFirst({
+        where: { id: templateId, schoolId },
+        select: { id: true, name: true, templateType: true, includeStamp: true },
+      });
+      if (!template?.includeStamp) return null;
+
+      await this.verification.assertEntitlement(schoolId);
+
+      const finalized = await this.verification.finalize({
+        actor: { userId: 'report-pipeline', schoolId, roles: [], isSuperAdmin: true },
+        schoolId,
+        documentId: crypto.randomUUID(),
+        documentType: template.templateType || 'REPORT_CARD',
+        documentTitle: template.name,
+        documentData: {
+          templateId: template.id,
+          generatedAt: new Date().toISOString(),
+        },
+        ipAddress: undefined,
+        userAgent: 'report-pipeline',
+      });
+
+      return {
+        placeholders: this.verification.buildAuthenticityPlaceholders(finalized as any),
+        verificationCode: finalized.verificationCode,
+        verificationUrl: finalized.verificationUrl,
+      };
+    } catch (e: any) {
+      this.logger.warn(
+        `Report authenticity finalize skipped for template ${templateId}: ${e?.message ?? e}`,
+      );
+      return null;
+    }
+  }
 }
