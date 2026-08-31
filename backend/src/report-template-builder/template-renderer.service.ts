@@ -6,6 +6,7 @@ import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
 import { VerificationService } from '../stamp-engine/verification.service';
 import { StampTemplateService } from '../stamp-engine/stamp-template.service';
 import { StampRendererService } from '../stamp-engine/stamp-renderer.service';
+import { StampAssetService } from '../stamp-engine/stamp-asset.service';
 import * as puppeteer from 'puppeteer';
 import * as handlebars from 'handlebars';
 import * as fs from 'fs';
@@ -25,6 +26,7 @@ export class TemplateRendererService {
     private verification: VerificationService,
     private stampTemplates: StampTemplateService,
     private stampRenderer: StampRendererService,
+    private stampAssets: StampAssetService,
   ) {}
 
   async getSchool(schoolId: string) {
@@ -1150,12 +1152,74 @@ export class TemplateRendererService {
       const defaultTemplate = await this.stampTemplates.getDefault(schoolId);
       if (!defaultTemplate) return html;
       const template = await this.stampTemplates.getById(schoolId, defaultTemplate.id);
-      const svg = this.stampRenderer.render(template.configJson as any, { assets: {} });
+      const cfg = (template.configJson || {}) as any;
+
+      const now = new Date();
+      const tz = this.stampTimezone();
+      const stampDate = this.formatStampDate(now, tz);
+      const stampTime = this.formatStampTime(now, tz);
+
+      const assetIds = (cfg.layers || [])
+        .filter(l => l.type === 'image' && l.assetId)
+        .map(l => l.assetId as string);
+      const assetMap = await this.stampAssets.resolveAssetMap(schoolId, assetIds);
+
+      const svg = this.stampRenderer.render(cfg, {
+        serialNumber: this.formatReportSerial(),
+        stampDate,
+        stampTime,
+        timezoneLabel: this.stampTimezoneLabel(tz),
+        assets: assetMap,
+      });
       const overlay = `<div style="position:fixed;right:18mm;bottom:18mm;width:42mm;height:42mm;z-index:9999;pointer-events:none;">${svg}</div>`;
       return html.includes('</body>') ? html.replace('</body>', `${overlay}</body>`) : `${html}${overlay}`;
     } catch {
       return html;
     }
+  }
+
+  private stampTimezone(): string {
+    return process.env.STAMP_DEFAULT_TIMEZONE || 'Africa/Lusaka';
+  }
+
+  private formatStampDate(date: Date, timeZone: string): string {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).formatToParts(date);
+    const get = (t: string) => parts.find(p => p.type === t)?.value || '';
+    return `${get('day')} ${get('month').toUpperCase()} ${get('year')}`;
+  }
+
+  private formatStampTime(date: Date, timeZone: string): string {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(date);
+    const get = (t: string) => parts.find(p => p.type === t)?.value || '';
+    return `${get('hour')}:${get('minute')}:${get('second')}`;
+  }
+
+  private formatReportSerial(): string {
+    const year = new Date().getUTCFullYear();
+    const seq = crypto.randomInt(0x10000000).toString(16).toUpperCase().padStart(8, '0');
+    return `STS-RPT-${year}-${seq}`;
+  }
+
+  private stampTimezoneLabel(tz: string): string {
+    const labels: Record<string, string> = {
+      'Africa/Lusaka': 'CAT',
+      'Africa/Harare': 'CAT',
+      'Africa/Johannesburg': 'SAST',
+      'Africa/Nairobi': 'EAT',
+      UTC: 'UTC',
+    };
+    return labels[tz] || '';
   }
 
   private renderProfessionalHbsPreview(template: any, data: any, school?: any): string {
