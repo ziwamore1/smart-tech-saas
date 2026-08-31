@@ -235,39 +235,44 @@ export class AuthenticationPipelineService {
       let signaturesJson: Array<Record<string, unknown>> = [];
       let primarySignatureId: string | null = null;
       let primaryKeyId: string | null = null;
+      let signatureNote: string | null = null;
 
       if (input.requiresSignature) {
         if (!this.bridge.configured) {
-          throw new ConflictException('Digital signature required but Signature Service is not configured');
-        }
-        for (const signer of boundSigners) {
-          pushTrace('SIGNATURE_REQUEST', signer.signerRole || signer.signerId);
-          const sig = await this.bridge.sign({
-            organizationId: input.organizationRef ?? input.schoolId,
-            documentId: input.documentId,
-            documentName: input.documentTitle || input.documentId,
-            documentType: input.documentType,
-            canonicalHash: finalHash,
-            signerId: signer.signerId,
-            signerRole: signer.signerRole,
-            metadata: { correlationId },
-            correlationId,
-          });
-          signaturesJson.push({
-            signatureId: sig.signatureId,
-            keyId: sig.keyId,
-            keyFingerprint: sig.keyFingerprint,
-            signer: sig.signedBy,
-            signerRole: signer.signerRole,
-            algorithm: sig.algorithm,
-            signedAt: sig.signedAt,
-          });
-          if (!primarySignatureId) {
-            primarySignatureId = sig.signatureId;
-            primaryKeyId = sig.keyId;
+          // Graceful degradation: without the digital Signature Service the
+          // document is authenticated stamp-only (Fig. documented intent).
+          pushTrace('SIGNATURES_DEGRADED_STAMP_ONLY', 'Signature Service not configured');
+          signatureNote = 'Digital signature was requested but the Signature Service is not configured — document issued stamp-only.';
+        } else {
+          for (const signer of boundSigners) {
+            pushTrace('SIGNATURE_REQUEST', signer.signerRole || signer.signerId);
+            const sig = await this.bridge.sign({
+              organizationId: input.organizationRef ?? input.schoolId,
+              documentId: input.documentId,
+              documentName: input.documentTitle || input.documentId,
+              documentType: input.documentType,
+              canonicalHash: finalHash,
+              signerId: signer.signerId,
+              signerRole: signer.signerRole,
+              metadata: { correlationId },
+              correlationId,
+            });
+            signaturesJson.push({
+              signatureId: sig.signatureId,
+              keyId: sig.keyId,
+              keyFingerprint: sig.keyFingerprint,
+              signer: sig.signedBy,
+              signerRole: signer.signerRole,
+              algorithm: sig.algorithm,
+              signedAt: sig.signedAt,
+            });
+            if (!primarySignatureId) {
+              primarySignatureId = sig.signatureId;
+              primaryKeyId = sig.keyId;
+            }
           }
+          pushTrace('SIGNATURES_COMPLETE', `${signaturesJson.length} signature(s)`);
         }
-        pushTrace('SIGNATURES_COMPLETE', `${signaturesJson.length} signature(s)`);
       } else {
         pushTrace('SIGNATURES_SKIPPED');
       }
@@ -306,6 +311,7 @@ export class AuthenticationPipelineService {
         originalHash,
         finalHash,
         signatures: signaturesJson,
+        signatureNote,
         correlationId,
       };
     } catch (err: any) {
