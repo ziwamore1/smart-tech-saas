@@ -174,7 +174,7 @@ export class StampRendererService {
   }
 
   private renderRing(
-    ring: { radius?: number; inset?: number; width: number; color: string; dashed?: boolean; dashGap?: [number, number] },
+    ring: { radius?: number; inset?: number; scale?: number; innerWidth?: number; innerHeight?: number; width: number; color: string; dashed?: boolean; dashGap?: [number, number] },
     shapeType: string,
     w: number,
     h: number,
@@ -183,14 +183,23 @@ export class StampRendererService {
       ? ` stroke-dasharray="${ring.dashGap?.[0] ?? 4},${ring.dashGap?.[1] ?? 4}"`
       : '';
     if (shapeType === 'rectangle' || shapeType === 'square' || shapeType === 'oval') {
-      const scale = Math.max(0.1, Math.min(1, (ring.scale ?? 100) / 100));
       const outerW = w - 40;
       const outerH = h - 40;
-      const inset = Math.max(0, ring.inset ?? 14);
-      const innerW = Math.max(2, (outerW - inset * 2) * scale);
-      const innerH = Math.max(2, (outerH - inset * 2) * scale);
       const cx = w / 2;
       const cy = h / 2;
+      let innerW: number;
+      let innerH: number;
+      if (ring.innerWidth && ring.innerHeight) {
+        // Explicit independent inner dimensions (non-proportional resizing).
+        innerW = Math.max(2, Math.min(outerW, ring.innerWidth));
+        innerH = Math.max(2, Math.min(outerH, ring.innerHeight));
+      } else {
+        // Backward-compatible proportional fallback.
+        const scale = Math.max(0.1, Math.min(1, (ring.scale ?? 100) / 100));
+        const inset = Math.max(0, ring.inset ?? 14);
+        innerW = Math.max(2, (outerW - inset * 2) * scale);
+        innerH = Math.max(2, (outerH - inset * 2) * scale);
+      }
       const isOval = shapeType === 'oval';
       return isOval
         ? `<ellipse cx="${cx}" cy="${cy}" rx="${innerW / 2}" ry="${innerH / 2}" fill="none" stroke="${ring.color}" stroke-width="${ring.width}"${dash}/>`

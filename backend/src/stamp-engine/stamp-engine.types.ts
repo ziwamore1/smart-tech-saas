@@ -22,6 +22,8 @@ export interface StampRingConfig {
   radius?: number; // circle/oval ring radius (or inset for rect)
   inset?: number; // rectangular rings inset from edge
   scale?: number; // 10..100 percentage of the available inner shape
+  innerWidth?: number; // rectangular/oval ring explicit inner width (canvas px)
+  innerHeight?: number; // rectangular/oval ring explicit inner height (canvas px)
   width: number;
   color: string;
   dashed?: boolean;

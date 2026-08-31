@@ -113,6 +113,7 @@ export default function StampDesignerPage() {
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [svg, setSvg] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
@@ -126,6 +127,8 @@ export default function StampDesignerPage() {
   const [innerRingRadius, setInnerRingRadius] = useState(238);
   const [innerInset, setInnerInset] = useState(22);
   const [innerScale, setInnerScale] = useState(100);
+  const [innerWidth, setInnerWidth] = useState(460);
+  const [innerHeight, setInnerHeight] = useState(340);
 
   // ── Drag state ──
   const previewRef = useRef<HTMLDivElement>(null);
@@ -136,7 +139,7 @@ export default function StampDesignerPage() {
   // ── Shape resize state ──
   const isResizing = useRef(false);
   const resizeHandleRef = useRef<string>('');
-  const resizeStart = useRef({ mouseX: 0, mouseY: 0, w: 0, h: 0, innerVal: 0 });
+  const resizeStart = useRef({ mouseX: 0, mouseY: 0, w: 0, h: 0, innerVal: 0, iw: 0, ih: 0 });
 
   const debounceRef = useRef<any>(null);
   const mountedRef = useRef(true);
@@ -168,7 +171,7 @@ export default function StampDesignerPage() {
       height: shapeType !== 'circle' ? shapeHeight : undefined,
       borderWidth, borderColor, borderCount,
       innerRings: innerRing
-         ? [{ radius: shapeType === 'circle' ? innerRingRadius : undefined, inset: shapeType !== 'circle' ? innerInset : undefined, scale: innerScale, width: 2, color: borderColor, dashed: innerRingDashed }]
+         ? [{ radius: shapeType === 'circle' ? innerRingRadius : undefined, inset: shapeType !== 'circle' ? innerInset : undefined, scale: innerScale, width: 2, color: borderColor, dashed: innerRingDashed, innerWidth: shapeType !== 'circle' ? innerWidth : undefined, innerHeight: shapeType !== 'circle' ? innerHeight : undefined }]
         : [],
     },
     layers: layers
@@ -189,7 +192,7 @@ export default function StampDesignerPage() {
         return { id: l.id, type: l.type, name: l.name, content: l.content || '', x: l.x, y: l.y, rotation: l.rotation, opacity: l.opacity, zIndex: l.zIndex, fontFamily: l.fontFamily, fontSize: l.fontSize, fontWeight: l.fontWeight, letterSpacing: l.letterSpacing, color: l.color, label: l.label || undefined, showTime: l.showTime, direction: l.direction || undefined };
       }),
     effects: { inkOpacity, texture: noiseAmount > 0 ? 'ink' : 'none', watermarkText: watermarkText || undefined, noiseAmount },
-  }), [shapeType, outerRadius, shapeWidth, shapeHeight, innerRingRadius, innerInset, innerScale, borderWidth, borderColor, borderCount, innerRing, innerRingDashed, inkOpacity, noiseAmount, watermarkText, layers]);
+  }), [shapeType, outerRadius, shapeWidth, shapeHeight, innerRingRadius, innerInset, innerScale, innerWidth, innerHeight, borderWidth, borderColor, borderCount, innerRing, innerRingDashed, inkOpacity, noiseAmount, watermarkText, layers]);
 
   const assetIds = useMemo(() => layers.filter(l => l.enabled && l.type === 'image' && l.assetId).map(l => l.assetId as string), [layers]);
 
@@ -313,8 +316,8 @@ export default function StampDesignerPage() {
     const innerVal = handle.startsWith('i-')
       ? (shapeType === 'circle' ? innerRingRadius : innerInset)
       : 0;
-    resizeStart.current = { mouseX: e.clientX, mouseY: e.clientY, w: shapeWidth, h: shapeHeight, innerVal };
-  }, [shapeType, shapeWidth, shapeHeight, innerRingRadius, innerInset]);
+    resizeStart.current = { mouseX: e.clientX, mouseY: e.clientY, w: shapeWidth, h: shapeHeight, innerVal, iw: innerWidth, ih: innerHeight };
+  }, [shapeType, shapeWidth, shapeHeight, innerRingRadius, innerInset, innerWidth, innerHeight]);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -351,14 +354,20 @@ export default function StampDesignerPage() {
         }
       } else {
         if (isInner) {
-          let newInset = resizeStart.current.innerVal;
-          if (handle === 'left') newInset = resizeStart.current.innerVal + dx;
-          if (handle === 'right') newInset = resizeStart.current.innerVal - dx;
-          if (handle === 'top') newInset = resizeStart.current.innerVal + dy;
-          if (handle === 'bottom') newInset = resizeStart.current.innerVal - dy;
-          if (handle.length === 2) newInset = resizeStart.current.innerVal + (dx + dy) / 2;
-          const maxInset = Math.floor(Math.min(shapeWidth, shapeHeight) / 2) - 2;
-          setInnerInset(Math.round(Math.max(0, Math.min(maxInset, newInset))));
+          const clampW = (v: number) => Math.round(Math.max(60, Math.min(shapeWidth - 20, v)));
+          const clampH = (v: number) => Math.round(Math.max(60, Math.min(shapeHeight - 20, v)));
+          if (handle === 'left' || handle === 'right' || handle === 'tl' || handle === 'bl') {
+            let nw = resizeStart.current.iw;
+            if (handle === 'left' || handle === 'tl' || handle === 'bl') nw = resizeStart.current.iw - dx * 2;
+            else nw = resizeStart.current.iw + dx * 2;
+            setInnerWidth(clampW(nw));
+          }
+          if (handle === 'top' || handle === 'bottom' || handle === 'tl' || handle === 'tr') {
+            let nh = resizeStart.current.ih;
+            if (handle === 'top' || handle === 'tl' || handle === 'tr') nh = resizeStart.current.ih - dy * 2;
+            else nh = resizeStart.current.ih + dy * 2;
+            setInnerHeight(clampH(nh));
+          }
         } else {
           let newW = shapeWidth;
           let newH = shapeHeight;
@@ -379,7 +388,7 @@ export default function StampDesignerPage() {
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-  }, [shapeWidth, shapeHeight, shapeType, outerRadius, innerRingRadius, innerInset]);
+  }, [shapeWidth, shapeHeight, shapeType, outerRadius, innerRingRadius, innerInset, innerWidth, innerHeight]);
 
   // ── Keyboard nudge ──
   useEffect(() => {
@@ -429,19 +438,14 @@ export default function StampDesignerPage() {
   const saveTemplate = async (publish: boolean) => {
     setBusy(true);
     try {
-      const draft = templates.find(t => t.name === name && t.status === 'DRAFT') as any;
-      const published = templates.find(t => t.name === name && t.status === 'PUBLISHED') as any;
+      const targetId = editingId;
+      let templateId: string | null = targetId;
 
-      let templateId: string | null = draft?.id || null;
-
-      if (publish && published) {
-        templateId = published.id;
-        await stampEngineApi.updateTemplate(templateId, { configJson });
-        await stampEngineApi.publishTemplate(templateId, 'Updated from designer');
-      } else if (templateId) {
+      if (templateId) {
+        // Editing an existing template: write back to that exact id.
         await stampEngineApi.updateTemplate(templateId, { configJson });
         if (publish) {
-          await stampEngineApi.publishTemplate(templateId, 'Published from designer');
+          await stampEngineApi.publishTemplate(templateId, 'Updated from designer');
         }
       } else {
         const res = await stampEngineApi.createTemplate({ name, configJson });
@@ -449,6 +453,7 @@ export default function StampDesignerPage() {
         if (publish) {
           await stampEngineApi.publishTemplate(templateId, 'Published from designer');
         }
+        setEditingId(templateId);
       }
       await loadLists();
       // Refresh the preview after save so the displayed SVG keeps the current effects.
@@ -456,7 +461,28 @@ export default function StampDesignerPage() {
         const preview = await stampEngineApi.renderPreview(configJson, assetIds);
         if (mountedRef.current) setSvg(preview.data.svg);
       } catch { /* the existing preview remains visible if refresh fails */ }
-      notify('ok', publish ? 'Template published' : 'Draft saved');
+      notify('ok', publish ? 'Template published' : templateId ? 'Template updated' : 'Draft saved');
+    } catch (e: any) {
+      notify('err', e?.response?.data?.message || e?.message || 'Save failed');
+    } finally { setBusy(false); }
+  };
+
+  const saveAsNewTemplate = async (publish: boolean) => {
+    setBusy(true);
+    try {
+      const res = await stampEngineApi.createTemplate({ name, configJson });
+      const templateId = res.data.id;
+      if (publish) {
+        await stampEngineApi.publishTemplate(templateId, 'Published from designer');
+      }
+      setEditingId(templateId);
+      await loadLists();
+      // Refresh the preview after save so the displayed SVG keeps the current effects.
+      try {
+        const preview = await stampEngineApi.renderPreview(configJson, assetIds);
+        if (mountedRef.current) setSvg(preview.data.svg);
+      } catch { /* the existing preview remains visible if refresh fails */ }
+      notify('ok', publish ? 'Template published' : 'Draft saved as new');
     } catch (e: any) {
       notify('err', e?.response?.data?.message || e?.message || 'Save failed');
     } finally { setBusy(false); }
@@ -482,6 +508,8 @@ export default function StampDesignerPage() {
     setInnerRingRadius(ring?.radius ?? 238);
     setInnerInset(ring?.inset ?? 22);
     setInnerScale(ring?.scale ?? 100);
+    setInnerWidth(ring?.innerWidth ?? 460);
+    setInnerHeight(ring?.innerHeight ?? 340);
     setInkOpacity(effects.inkOpacity ?? 0.92);
     setNoiseAmount(effects.noiseAmount ?? 0.18);
     setWatermarkText(effects.watermarkText || '');
@@ -502,14 +530,18 @@ export default function StampDesignerPage() {
     notify('ok', `Loaded "${tplName}" into the designer`);
   };
 
-  const loadIntoDesigner = async (t: TemplateRow) => {
+  const loadIntoDesigner = async (t: TemplateRow, edit = false) => {
     try {
       const res = await stampEngineApi.getTemplate(t.id);
+      if (edit) setEditingId(t.id); else setEditingId(null);
       hydrateFromConfig(t.name, res.data?.configJson);
+      if (edit) notify('ok', `Editing "${t.name}" — changes will update this template`);
     } catch (e: any) {
       notify('err', e?.response?.data?.message || 'Load failed');
     }
   };
+
+  const editTemplate = (t: TemplateRow) => loadIntoDesigner(t, true);
 
   const duplicateTemplate = async (t: TemplateRow) => {
     setBusy(true);
@@ -551,9 +583,13 @@ export default function StampDesignerPage() {
           <h1 className="text-2xl font-bold text-gray-900">Digital Stamp Designer</h1>
           <p className="text-sm text-gray-500">Reproduce your institution&apos;s official stamp. Preview uses the production rendering engine.</p>
         </div>
-        <div className="flex gap-2">
-          <button disabled={busy} onClick={() => saveTemplate(false)} className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">Save Draft</button>
-          <button disabled={busy} onClick={() => saveTemplate(true)} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50">Publish</button>
+        <div className="flex items-center gap-2">
+          {editingId && (
+            <span className="px-2 py-1 text-[11px] font-medium bg-blue-50 text-blue-700 rounded-lg border border-blue-100">Editing saved template</span>
+          )}
+          <button disabled={busy} onClick={() => saveTemplate(false)} className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">{editingId ? 'Update Draft' : 'Save New Draft'}</button>
+          <button disabled={busy} onClick={() => saveTemplate(true)} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{editingId ? 'Update & Publish' : 'Create & Publish'}</button>
+          <button disabled={busy} onClick={() => saveAsNewTemplate(false)} className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50">Save As New</button>
         </div>
       </div>
 
@@ -571,7 +607,7 @@ export default function StampDesignerPage() {
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-xs font-medium text-gray-600">Shape
-                <select value={shapeType} onChange={e => setShapeType(e.target.value as ShapeType)} className="mt-1 w-full border rounded-lg px-2 py-2 text-sm">
+                <select value={shapeType} onChange={e => { setShapeType(e.target.value as ShapeType); setEditingId(null); }} className="mt-1 w-full border rounded-lg px-2 py-2 text-sm">
                   <option value="circle">Circle</option><option value="oval">Oval</option>
                   <option value="rectangle">Rectangle</option><option value="square">Square</option>
                 </select>
@@ -613,6 +649,7 @@ export default function StampDesignerPage() {
             <button
               onClick={() => {
                 setShapeType('rectangle');
+                setEditingId(null);
                 setShapeWidth(560);
                 setShapeHeight(400);
                 setBorderWidth(4);
@@ -620,6 +657,8 @@ export default function StampDesignerPage() {
                 setInnerRing(true);
                 setInnerRingDashed(false);
                 setInnerInset(60);
+                setInnerWidth(440);
+                setInnerHeight(280);
                 setLayers(rectangularStampLayers());
                 setSelectedId(null);
                 notify('ok', 'Loaded rectangular stamp preset');
@@ -632,6 +671,7 @@ export default function StampDesignerPage() {
             <button
               onClick={() => {
                 setShapeType('square');
+                setEditingId(null);
                 setShapeWidth(500);
                 setShapeHeight(500);
                 setBorderWidth(4);
@@ -639,6 +679,8 @@ export default function StampDesignerPage() {
                 setInnerRing(true);
                 setInnerRingDashed(false);
                 setInnerInset(55);
+                setInnerWidth(390);
+                setInnerHeight(390);
                 setLayers(squareStampLayers());
                 setSelectedId(null);
                 notify('ok', 'Loaded square stamp preset');
@@ -651,6 +693,7 @@ export default function StampDesignerPage() {
             <button
               onClick={() => {
                 setShapeType('oval');
+                setEditingId(null);
                 setShapeWidth(560);
                 setShapeHeight(400);
                 setBorderWidth(4);
@@ -658,6 +701,8 @@ export default function StampDesignerPage() {
                 setInnerRing(true);
                 setInnerRingDashed(false);
                 setInnerInset(50);
+                setInnerWidth(460);
+                setInnerHeight(300);
                 setLayers(ovalStampLayers());
                 setSelectedId(null);
                 notify('ok', 'Loaded oval stamp preset');
@@ -709,17 +754,25 @@ export default function StampDesignerPage() {
                     <span className="text-xs text-gray-500 w-10 text-right">{shapeHeight}</span>
                   </div>
                 </label>
-                <label className="block text-xs font-medium text-gray-600">Inner inset
+                <label className="block text-xs font-medium text-gray-600">Inner width
                   <div className="flex items-center gap-2 mt-1">
-                    <input type="range" min={0} max={Math.floor(Math.min(shapeWidth, shapeHeight) / 2) - 2} step={1} value={innerInset}
-                      onChange={e => setInnerInset(parseInt(e.target.value))}
+                    <input type="range" min={60} max={shapeWidth - 20} step={2} value={Math.min(innerWidth, shapeWidth - 20)}
+                      onChange={e => setInnerWidth(parseInt(e.target.value))}
                       className="flex-1" />
-                    <span className="text-xs text-gray-500 w-10 text-right">{innerInset}</span>
+                    <span className="text-xs text-gray-500 w-10 text-right">{innerWidth}</span>
+                  </div>
+                </label>
+                <label className="block text-xs font-medium text-gray-600">Inner height
+                  <div className="flex items-center gap-2 mt-1">
+                    <input type="range" min={60} max={shapeHeight - 20} step={2} value={Math.min(innerHeight, shapeHeight - 20)}
+                      onChange={e => setInnerHeight(parseInt(e.target.value))}
+                      className="flex-1" />
+                    <span className="text-xs text-gray-500 w-10 text-right">{innerHeight}</span>
                   </div>
                 </label>
               </>
             )}
-            <label className="block text-xs font-medium text-gray-600">Inner shape scale
+            <label className="block text-xs font-medium text-gray-600">Inner shape scale <span className="text-gray-400">(circle)</span>
               <div className="flex items-center gap-2 mt-1">
                 <input type="range" min={10} max={100} step={1} value={innerScale}
                   onChange={e => setInnerScale(parseInt(e.target.value))}
@@ -930,10 +983,12 @@ export default function StampDesignerPage() {
                 const oB = ((300 + oRB) / 600) * 100;
                 const iRad = isCircle ? innerRingRadius : 0;
                 const iInset = isCircle ? 0 : innerInset;
-                const iL = ((300 - (isCircle ? iRad : shapeWidth / 2 - iInset)) / 600) * 100;
-                const iT = ((300 - (isCircle ? iRad : shapeHeight / 2 - iInset)) / 600) * 100;
-                const iRr = ((300 + (isCircle ? iRad : shapeWidth / 2 - iInset)) / 600) * 100;
-                const iB = ((300 + (isCircle ? iRad : shapeHeight / 2 - iInset)) / 600) * 100;
+                const iHalfW = isCircle ? iRad : shapeType === 'rectangle' || shapeType === 'square' || shapeType === 'oval' ? innerWidth / 2 : shapeWidth / 2 - iInset;
+                const iHalfH = isCircle ? iRad : shapeType === 'rectangle' || shapeType === 'square' || shapeType === 'oval' ? innerHeight / 2 : shapeHeight / 2 - iInset;
+                const iL = ((300 - (isCircle ? iRad : iHalfW)) / 600) * 100;
+                const iT = ((300 - (isCircle ? iRad : iHalfH)) / 600) * 100;
+                const iRr = ((300 + (isCircle ? iRad : iHalfW)) / 600) * 100;
+                const iB = ((300 + (isCircle ? iRad : iHalfH)) / 600) * 100;
                 const showInner = isCircle ? innerRing : true;
                 return (
                   <>
@@ -985,6 +1040,7 @@ export default function StampDesignerPage() {
                     <span className="text-gray-400">v{t.version}{t.isDefault ? ' · default' : ''}</span>
                     <div className="flex gap-1">
                       <button onClick={() => loadIntoDesigner(t)} className="px-1.5 py-0.5 border rounded hover:bg-gray-50">Load</button>
+                      <button onClick={() => editTemplate(t)} className={`px-1.5 py-0.5 border rounded ${editingId === t.id ? 'bg-blue-600 text-white' : 'hover:bg-blue-50 text-blue-700'}`}>Edit</button>
                       <button disabled={busy} onClick={() => duplicateTemplate(t)} className="px-1.5 py-0.5 border rounded hover:bg-gray-50">Copy</button>
                       <button onClick={() => toggleVersions(t)} className={`px-1.5 py-0.5 border rounded ${openVersions === t.id ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50'}`}>History</button>
                       {!t.isDefault && t.status === 'PUBLISHED' && (
