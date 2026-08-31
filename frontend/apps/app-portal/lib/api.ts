@@ -1368,6 +1368,12 @@ getSignatures: (params?: { scope?: string; status?: string; search?: string }) =
   saveTemplateSignatories: (templateId: string, signatories: any[]) =>
     api.put(`/template-builder/templates/${templateId}/signatories`, { signatories }),
 
+  getStampTemplateSignatories: (templateId: string) =>
+    api.get(`/template-builder/stamp-templates/${templateId}/signatories`),
+
+  saveStampTemplateSignatories: (templateId: string, signatories: any[]) =>
+    api.put(`/template-builder/stamp-templates/${templateId}/signatories`, { signatories }),
+
   signDocument: (signatureId: string, documentHash: string) =>
     api.post('/template-builder/signatures/sign', { signatureId, documentHash }),
 

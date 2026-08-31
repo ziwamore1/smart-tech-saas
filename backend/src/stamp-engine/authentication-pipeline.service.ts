@@ -99,6 +99,28 @@ export class AuthenticationPipelineService {
         }
       }
     }
+
+    // Enforce every REQUIRED signatory position declared on the stamp template.
+    if (input.stampTemplateId) {
+      const declared = await this.prisma.stampTemplateSignatory.findMany({
+        where: { templateId: input.stampTemplateId, isRequired: true },
+        select: { id: true, label: true, signatureId: true },
+      });
+      if (declared.length) {
+        const missing = declared.filter((slot) => {
+          const label = slot.label.toLowerCase().trim();
+          const bound = (input.signatories || []);
+          return slot.signatureId
+            ? !bound.some((s) => (s.label || '').toLowerCase().trim() === label || s.signatureId === slot.signatureId)
+            : !bound.some((s) => (s.label || '').toLowerCase().trim() === label);
+        });
+        if (missing.length) {
+          throw new BadRequestException(
+            `This template requires signatures for: ${missing.map((m) => m.label).join(', ')}`,
+          );
+        }
+      }
+    }
     if (!this.bridge.configured && input.requiresSignature) {
       notes.push('Signature service not configured — issue will proceed STAMP-ONLY.');
     }

@@ -91,6 +91,26 @@ export default function IssueOfficialDocumentPage() {
   const removeSlot = (id: string) =>
     setSlots(prev => prev.filter(s => s.id !== id));
 
+  // Load the stamp template's declared signatory positions (e.g. Class Teacher +
+  // Head Teacher) so issuance knows exactly which positions are required. Only
+  // seeds our editable slots; the user still binds each to a saved signature asset.
+  useEffect(() => {
+    if (!templateId) return;
+    templateBuilderApi.getStampTemplateSignatories(templateId)
+      .then(r => {
+        const data = r.data?.data || r.data || [];
+        const list = Array.isArray(data) ? data : [];
+        if (!list.length) return;
+        setSlots(list.map((s: any, i: number) => ({
+          id: `sig${i}-${Date.now().toString(36)}`,
+          label: s.label || `Signatory ${i + 1}`,
+          role: s.role || ROLES[Math.min(i, ROLES.length - 1)],
+          signatureId: s.signatureId || '',
+        })));
+      })
+      .catch(() => undefined);
+  }, [templateId]);
+
   const issue = async () => {
     setError(''); setResult(null); setCopied(false);
     const withSig = requiresSignature;

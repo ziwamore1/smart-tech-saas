@@ -242,6 +242,23 @@ export class ReportTemplateBuilderController {
 
   // ===== Template Signatory Positions =====
 
+  @Put('stamp-templates/:templateId/signatories')
+  @Roles('Director')
+  async saveStampTemplateSignatories(@Req() req, @Param('templateId') templateId: string, @Body() body: any) {
+    return this.signatureService.saveStampTemplateSignatories(
+      { id: req.user.id, isSuperAdmin: !!req.user?.isSuperAdmin },
+      req.user.schoolId,
+      templateId,
+      body.signatories || [],
+    );
+  }
+
+  @Get('stamp-templates/:templateId/signatories')
+  @Roles('Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Teacher')
+  async getStampTemplateSignatories(@Req() req, @Param('templateId') templateId: string) {
+    return this.signatureService.getStampTemplateSignatories(templateId, req.user.schoolId);
+  }
+
   @Get('templates/:templateId/signatories')
   @Roles('Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Teacher')
   async getTemplateSignatories(@Req() req, @Param('templateId') templateId: string) {

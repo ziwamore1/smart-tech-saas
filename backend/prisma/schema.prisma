@@ -3663,7 +3663,8 @@ model DigitalSignature {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   school        School?  @relation(fields: [schoolId], references: [id])
-  signatorySlots TemplateSignatory[]
+  signatorySlots TemplateSignatory[] @relation("ReportTemplateSignatories")
+  stampTemplateSignatories StampTemplateSignatory[] @relation("StampTemplateSignatories")
 
   @@index([schoolId])
   @@index([schoolId, status])
@@ -3806,7 +3807,7 @@ model TemplateSignatory {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   template    ReportTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  signature   DigitalSignature? @relation(fields: [signatureId], references: [id], onDelete: SetNull)
+  signature   DigitalSignature? @relation("ReportTemplateSignatories", fields: [signatureId], references: [id], onDelete: SetNull)
 
   @@index([templateId])
   @@index([signatureId])
@@ -6066,10 +6067,29 @@ model StampTemplate {
   updatedAt    DateTime               @updatedAt
   school       School                 @relation(fields: [schoolId], references: [id])
   versions     StampTemplateVersion[]
+  signatories  StampTemplateSignatory[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
   @@index([status])
+}
+
+/// Required signatory positions declared on a stamp/document template.
+model StampTemplateSignatory {
+  id          String         @id @default(uuid())
+  templateId  String
+  label       String
+  role        String?
+  position    Int            @default(0)
+  isRequired  Boolean        @default(true)
+  signatureId String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  template    StampTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  signature   DigitalSignature? @relation("StampTemplateSignatories", fields: [signatureId], references: [id], onDelete: SetNull)
+
+  @@index([templateId])
+  @@index([signatureId])
 }
 
 model StampTemplateVersion {

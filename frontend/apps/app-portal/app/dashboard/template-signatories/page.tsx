@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { templateBuilderApi } from '@/lib/api';
+import { stampEngineApi, templateBuilderApi } from '@/lib/api';
 
 interface Template {
   id: string;
@@ -43,10 +43,10 @@ export default function TemplateSignatoriesPage() {
   useEffect(() => { void loadSignatures(); }, [loadSignatures]);
 
   useEffect(() => {
-    templateBuilderApi.getTemplates({ status: 'PUBLISHED' })
+    stampEngineApi.listTemplates()
       .then(r => {
-        const data = r.data?.data || r.data || [];
-        setTemplates(Array.isArray(data) ? data.filter((t: any) => t.id && t.name) : []);
+        const data = r.data?.templates || r.data || [];
+        setTemplates(Array.isArray(data) ? data.filter((t: any) => t.id && t.name && (t.status || 'DRAFT') === 'PUBLISHED') : []);
       })
       .catch(() => undefined);
   }, []);
@@ -57,7 +57,7 @@ export default function TemplateSignatoriesPage() {
     if (!id) { setRows([]); return; }
     setBusy(true);
     try {
-      const response = await templateBuilderApi.getTemplateSignatories(id);
+      const response = await templateBuilderApi.getStampTemplateSignatories(id);
       const data = response.data?.data || response.data || [];
       const list = Array.isArray(data) ? data : [];
       setRows(list.map((s: any, i: number) => ({
@@ -90,7 +90,7 @@ export default function TemplateSignatoriesPage() {
     if (!labelsOk) { setMessage('Every position needs a label (e.g. "Class Teacher").'); return; }
     setBusy(true);
     try {
-      await templateBuilderApi.saveTemplateSignatories(selectedId, rows.map((r, i) => ({
+      await templateBuilderApi.saveStampTemplateSignatories(selectedId, rows.map((r, i) => ({
         id: r.id, label: r.label.trim(), role: r.role.trim() || null, position: i, isRequired: r.isRequired, signatureId: r.signatureId || null,
       })));
       setMessage('Signatory positions saved for this document type.');
@@ -105,7 +105,7 @@ export default function TemplateSignatoriesPage() {
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Document Type Signatories</h1>
-        <p className="text-sm text-gray-500 mt-1">Each document template declares the signature positions it requires. At issuance, every position is bound to a staff member and their saved signature — so a document can need both a Class Teacher and a Head Teacher.</p>
+        <p className="text-sm text-gray-500 mt-1">Each stamp/document template declares the signature positions it requires. At issuance, every position is bound to a staff member and their saved signature — so a document can need both a Class Teacher and a Head Teacher.</p>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
@@ -119,7 +119,7 @@ export default function TemplateSignatoriesPage() {
         {selectedTemplate && (
           <div className="text-xs bg-blue-50 text-blue-900 rounded-lg px-3 py-2">
             <i className="fa fa-file-text-o" style={{ marginRight: '6px' }}></i>
-            {selectedTemplate.name}{selectedTemplate.templateType ? ` · ${selectedTemplate.templateType.replace(/_/g, ' ')}` : ''}
+            {selectedTemplate.name}{selectedTemplate.type ? ` · ${String(selectedTemplate.type).replace(/_/g, ' ')}` : ''}
           </div>
         )}
 

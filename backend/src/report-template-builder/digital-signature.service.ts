@@ -122,6 +122,86 @@ export class DigitalSignatureService {
     return this.getTemplateSignatories(templateId, schoolId);
   }
 
+  async getStampTemplateSignatories(templateId: string, schoolId: string | null) {
+    const template = await this.prisma.stampTemplate.findFirst({
+      where: { id: templateId, ...(schoolId ? { schoolId } : {}) },
+    });
+    if (!template) throw new NotFoundException('Stamp template not found');
+    return this.prisma.stampTemplateSignatory.findMany({
+      where: { templateId },
+      include: { signature: { select: { id: true, name: true, title: true, thumbnailUrl: true } } },
+      orderBy: { position: 'asc' },
+    });
+  }
+
+  async saveStampTemplateSignatories(
+    actor: { id?: string; isSuperAdmin?: boolean },
+    schoolId: string | null,
+    templateId: string,
+    signatories: Array<{
+      id?: string;
+      label: string;
+      role?: string | null;
+      position?: number;
+      isRequired?: boolean;
+      signatureId?: string | null;
+    }>,
+  ) {
+    const template = await this.prisma.stampTemplate.findFirst({
+      where: { id: templateId, ...(schoolId ? { schoolId } : {}) },
+    });
+    if (!template) throw new NotFoundException('Stamp template not found');
+
+    const list = Array.isArray(signatories) ? signatories : [];
+    if (list.length > 10) {
+      throw new BadRequestException('A template may declare at most 10 signature positions');
+    }
+
+    const boundIds = list.map((s) => s.signatureId).filter((id): id is string => !!id);
+    if (boundIds.length) {
+      const signatures = await this.prisma.digitalSignature.findMany({
+        where: { id: { in: boundIds }, status: 'ACTIVE' },
+        select: { id: true, scope: true, schoolId: true },
+      });
+      const found = new Set(signatures.map((s) => s.id));
+      for (const id of boundIds) {
+        if (!found.has(id)) throw new BadRequestException(`Bound signature no longer exists or is not active: ${id}`);
+      }
+      for (const s of signatures) {
+        if (schoolId && s.scope === 'SCHOOL' && s.schoolId && s.schoolId !== schoolId) {
+          throw new BadRequestException(`Signature does not belong to this school: ${s.id}`);
+        }
+      }
+    }
+
+    const existing = await this.prisma.stampTemplateSignatory.findMany({ where: { templateId } });
+    const existingMap = new Map(existing.map((e) => [e.id, e]));
+    const incoming = new Set(list.map((s) => s.id).filter((id): id is string => !!id));
+    const toDelete = existing.filter((e) => !incoming.has(e.id)).map((e) => e.id);
+
+    if (toDelete.length) {
+      await this.prisma.stampTemplateSignatory.deleteMany({ where: { id: { in: toDelete } } });
+    }
+
+    for (let i = 0; i < list.length; i++) {
+      const item = list[i];
+      const data = {
+        label: String(item.label || `Signatory ${i + 1}`).trim().slice(0, 120),
+        role: item.role?.trim() || null,
+        position: item.position ?? i,
+        isRequired: item.isRequired !== false,
+        signatureId: item.signatureId || null,
+      };
+      if (item.id && existingMap.has(item.id)) {
+        await this.prisma.stampTemplateSignatory.update({ where: { id: item.id }, data });
+      } else {
+        await this.prisma.stampTemplateSignatory.create({ data: { templateId, ...data } });
+      }
+    }
+
+    return this.getStampTemplateSignatories(templateId, schoolId);
+  }
+
   async createSignature(schoolId: string | null, data: {
     name: string; title?: string; email?: string; imageUrl?: string; signatureData?: string; isDefault?: boolean; userId?: string; scope?: string; processing?: SignatureProcessingOptions;
   }) {
