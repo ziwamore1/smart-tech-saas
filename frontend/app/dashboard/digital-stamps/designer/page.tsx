@@ -129,9 +129,30 @@ export default function StampDesignerPage() {
 
   // ── Drag state ──
   const previewRef = useRef<HTMLDivElement>(null);
+  const scrollBoxRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0, layerX: 0, layerY: 0 });
   const [dragging, setDragging] = useState(false);
+
+  // ── Canvas zoom + independent scrolling ──
+  const [zoom, setZoom] = useState(1);
+  const [baseW, setBaseW] = useState(CANVAS);
+  const minZoom = 0.25;
+  const maxZoom = 3;
+  const clampZoom = (z: number) => Math.min(maxZoom, Math.max(minZoom, Math.round(z * 100) / 100));
+  const canvasSize = Math.round(baseW * zoom);
+
+  // Keep the canvas's unscaled width in sync with its viewport so zooming
+  // produces real scrollable overflow (scrollbars) instead of just scaling.
+  useEffect(() => {
+    const el = scrollBoxRef.current;
+    if (!el) return;
+    const update = () => setBaseW(Math.max(120, Math.floor(el.clientWidth || CANVAS)));
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // ── Shape resize state ──
   const isResizing = useRef(false);
@@ -901,26 +922,36 @@ export default function StampDesignerPage() {
                 <span className="text-[11px] px-2 py-0.5 bg-green-50 text-green-700 rounded-full">engine-rendered</span>
               </div>
             </div>
-            <div
-              ref={previewRef}
-              className={`mx-auto rounded-lg select-none relative ${dragging ? 'cursor-grabbing' : selectedId ? 'cursor-grab' : 'cursor-crosshair'}`}
-              style={{
-                aspectRatio: '1 / 1',
-                maxWidth: '100%',
-                backgroundImage: 'linear-gradient(45deg,#f0f0f0 25%,transparent 25%),linear-gradient(-45deg,#f0f0f0 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#f0f0f0 75%),linear-gradient(-45deg,transparent 75%,#f0f0f0 75%)',
-                backgroundSize: '16px 16px',
-                backgroundPosition: '0 0,0 8px,8px -8px,-8px 0',
-              }}
-              onMouseDown={handlePreviewMouseDown}
-              onMouseMove={handlePreviewMouseMove}
-              onMouseUp={handlePreviewMouseUp}
-              onMouseLeave={handlePreviewMouseUp}
-            >
+            <div className="flex items-start gap-3">
               <div
-                className="w-full h-full flex items-center justify-center"
-                dangerouslySetInnerHTML={{ __html: svg || '<span style="color:#9ca3af;font-size:13px">Rendering…</span>' }}
-              />
-              {!selectedId && (() => {
+                ref={scrollBoxRef}
+                className="flex-1 min-w-0 overflow-auto max-h-[75vh] rounded-lg"
+                onWheel={e => {
+                  if (!e.ctrlKey && !e.metaKey) return;
+                  e.preventDefault();
+                  setZoom(z => clampZoom(z - e.deltaY * 0.001));
+                }}
+              >
+                <div
+                  ref={previewRef}
+                  className={`rounded-lg select-none relative ${dragging ? 'cursor-grabbing' : selectedId ? 'cursor-grab' : 'cursor-crosshair'}`}
+                  style={{
+                    width: `${canvasSize}px`,
+                    height: `${canvasSize}px`,
+                    backgroundImage: 'linear-gradient(45deg,#f0f0f0 25%,transparent 25%),linear-gradient(-45deg,#f0f0f0 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#f0f0f0 75%),linear-gradient(-45deg,transparent 75%,#f0f0f0 75%)',
+                    backgroundSize: `${Math.round(16 * zoom)}px ${Math.round(16 * zoom)}px`,
+                    backgroundPosition: '0 0,0 8px,8px -8px,-8px 0',
+                  }}
+                  onMouseDown={handlePreviewMouseDown}
+                  onMouseMove={handlePreviewMouseMove}
+                  onMouseUp={handlePreviewMouseUp}
+                  onMouseLeave={handlePreviewMouseUp}
+                >
+                  <div
+                    className="w-full h-full flex items-center justify-center"
+                    dangerouslySetInnerHTML={{ __html: svg || '<span style="color:#9ca3af;font-size:13px">Rendering…</span>' }}
+                  />
+                  {!selectedId && (() => {
                 const isCircle = shapeType === 'circle';
                 const oR = isCircle ? outerRadius : shapeWidth / 2;
                 const oRB = isCircle ? outerRadius : shapeHeight / 2;
@@ -962,6 +993,30 @@ export default function StampDesignerPage() {
                   </>
                 );
               })()}
+                </div>
+              </div>
+
+              {/* ── Right: vertical canvas toolbar ── */}
+              <div className="w-11 shrink-0 flex flex-col items-center gap-1.5 py-1 border-l border-gray-200">
+                <button
+                  onClick={() => setZoom(z => clampZoom(z + 0.25))}
+                  className="w-8 h-8 rounded-lg text-lg leading-none text-gray-600 hover:bg-blue-50 hover:text-blue-700"
+                  title="Zoom in"
+                >＋</button>
+                <span className="text-[10px] font-medium text-gray-500 tabular-nums">{Math.round(zoom * 100)}%</span>
+                <button
+                  onClick={() => setZoom(z => clampZoom(z - 0.25))}
+                  className="w-8 h-8 rounded-lg text-lg leading-none text-gray-600 hover:bg-blue-50 hover:text-blue-700"
+                  title="Zoom out"
+                >－</button>
+                <button
+                  onClick={() => setZoom(1)}
+                  className="w-8 h-8 mt-1 rounded-lg text-[10px] text-gray-600 hover:bg-blue-50 hover:text-blue-700"
+                  title="Reset zoom to fit"
+                >1:1</button>
+                <div className="flex-1 min-h-2" />
+                <span className="w-7 h-24 flex items-center justify-center text-[9px] text-gray-400 [writing-mode:vertical-rl]">scroll · Ctrl+wheel to zoom</span>
+              </div>
             </div>
             <p className="text-[11px] text-gray-400 mt-3 text-center">
               Finalised documents receive the authoritative date/time and serial number from the server.
