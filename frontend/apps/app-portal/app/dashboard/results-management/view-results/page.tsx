@@ -6,6 +6,7 @@ import { api, classApi, termApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import { EXAM_TYPE_OPTIONS, examTypeLabel } from '@/lib/exam-types';
+import { getSubjectShortcut } from '@/config/subjectColors';
 import {
   openMarkScheduleReport, openAnalysisReport, openRankingReport,
   ReportStudent, ReportMeta, AnalysisData, RankingStudent,
@@ -431,11 +432,15 @@ export default function ViewResultsPage() {
                     Student {sortField === 'name' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                   </th>
                   <th style={{ textAlign: 'left', padding: '10px 12px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '100px', background: '#5f4b3a', position: 'sticky', left: '220px', zIndex: 2 }}>Admission</th>
-                  {subjects.map((subj) => (
-                    <th key={subj} title={subj} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '96px', background: '#5f4b3a', lineHeight: 1.3 }}>
-                      {subj}
-                    </th>
-                  ))}
+                  {subjects.map((subj) => {
+                    const isNumericCode = /^\d+$/.test(subj.trim());
+                    const headerLabel = isNumericCode ? subj : (getSubjectShortcut(subj) || subj);
+                    return (
+                      <th key={subj} title={subj} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', minWidth: '96px', background: '#5f4b3a', lineHeight: 1.3 }}>
+                        {headerLabel}
+                      </th>
+                    );
+                  })}
                   <th onClick={() => handleSort('average')} style={{ textAlign: 'center', padding: '10px 8px', color: 'white', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer', minWidth: '70px', background: '#5f4b3a' }}>
                     Avg {sortField === 'average' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                   </th>
