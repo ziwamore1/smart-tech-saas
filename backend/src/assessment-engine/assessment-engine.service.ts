@@ -205,9 +205,51 @@ export class AssessmentEngineService {
       throw new NotFoundException('Term not found or access denied');
     }
 
+    // If every component assessment for the subject has been unconfigured
+    // (all rows removed), automatically revert the subject to a single
+    // aggregate assessment — the End of Term examination (or Mid-Term as a
+    // fallback) — weighted 100%, so one score still drives the subject.
+    let effectiveConfigs = configurations;
+    if (!configurations || configurations.length === 0) {
+      const fallbackDef = await this.prisma.assessmentDefinition.findFirst({
+        where: {
+          schoolId,
+          active: true,
+          examType: { in: ['END_TERM', 'MID_TERM'] },
+        },
+        orderBy: [
+          { examType: 'asc' },
+          { sortOrder: 'asc' },
+        ],
+        select: {
+          id: true,
+          defaultMaxScore: true,
+          defaultWeight: true,
+          examType: true,
+        },
+      });
+
+      if (fallbackDef) {
+        effectiveConfigs = [{
+          assessmentDefId: fallbackDef.id,
+          maxScore: fallbackDef.defaultMaxScore ?? 100,
+          weightPercentage: 100,
+          mandatory: true,
+          sequenceOrder: 0,
+          allowHalfMarks: true,
+          allowNegative: false,
+          decimalPlaces: 0,
+        }];
+        this.logger.log(
+          `No configured assessments for class ${classId}, subject ${subjectId}, term ${termId} — ` +
+          `reverting to single ${String(fallbackDef.examType).replace('_', '-')} assessment at 100%`,
+        );
+      }
+    }
+
     const results = [];
 
-    for (const config of configurations) {
+    for (const config of effectiveConfigs) {
       const assessmentDef = await this.prisma.assessmentDefinition.findUnique({
         where: { id: config.assessmentDefId },
         select: { schoolId: true },
@@ -256,7 +298,7 @@ export class AssessmentEngineService {
       results.push(result);
     }
 
-    const submittedDefIds = configurations.map((c) => c.assessmentDefId);
+    const submittedDefIds = effectiveConfigs.map((c) => c.assessmentDefId);
     const deleted = await this.prisma.termAssessmentConfiguration.deleteMany({
       where: {
         classId,

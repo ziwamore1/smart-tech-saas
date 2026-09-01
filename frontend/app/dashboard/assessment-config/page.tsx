@@ -80,27 +80,46 @@ export default function AssessmentConfigPage() {
       return;
     }
 
-    if (configs.length === 0) {
-      toast.error('Please add at least one assessment');
-      return;
-    }
-
     const hasEmptyDef = configs.some(c => !c.assessmentDefId);
     if (hasEmptyDef) {
       toast.error('Please select an assessment type for all entries');
       return;
     }
 
-    const totalWeight = configs.reduce((sum, c) => sum + c.weightPercentage, 0);
-    if (totalWeight !== 100) {
-      toast.warning(`Total weight is ${totalWeight}% (expected 100%). Saving anyway.`);
+    // When every component assessment for this subject has been removed, send
+    // an empty configuration list so the backend reverts the subject to a
+    // single End of Term (or Mid-Term) assessment at 100% weight.
+    let payload = configs;
+
+    if (configs.length === 0) {
+      const fallback = assessmentDefs?.find((d: any) =>
+        d.active !== false && ['END_TERM', 'MID_TERM'].includes(d.examType)
+      );
+      if (fallback) {
+        toast.info(`No assessments configured — reverting to single ${fallback.name} at 100%.`);
+        payload = [{
+          assessmentDefId: fallback.id,
+          maxScore: fallback.defaultMaxScore || 100,
+          weightPercentage: 100,
+          mandatory: true,
+          sequenceOrder: 0,
+        }];
+      } else {
+        toast.error('All assessments were removed but no End of Term / Mid-Term assessment type exists to revert to. Please add an assessment.');
+        return;
+      }
+    } else {
+      const totalWeight = configs.reduce((sum, c) => sum + c.weightPercentage, 0);
+      if (totalWeight !== 100) {
+        toast.warning(`Total weight is ${totalWeight}% (expected 100%). Saving anyway.`);
+      }
     }
 
     configureMutation.mutate({
       classId: selectedClass,
       subjectId: selectedSubject,
       termId: selectedTerm,
-      configurations: configs,
+      configurations: payload,
     });
   };
 
@@ -254,7 +273,8 @@ export default function AssessmentConfigPage() {
               {configs.length === 0 && (
                 <div className="text-center py-8 text-gray-400">
                   <i className="fa fa-cog text-3xl mb-2"></i>
-                  <p>No assessments configured. Click &quot;Add Assessment&quot; to begin.</p>
+                  <p>No assessments configured for this subject.</p>
+                  <p className="text-sm">Click &quot;Update Configuration&quot; to revert to a single End of Term / Mid-Term assessment at 100%, or use &quot;Add Assessment&quot; to build a custom weighting.</p>
                 </div>
               )}
             </div>
@@ -266,9 +286,9 @@ export default function AssessmentConfigPage() {
                 className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {configureMutation.isPending ? (
-                  <><i className="fa fa-spinner fa-spin mr-1"></i>Saving...</>
+                  <><i className="fa fa-spinner fa-spin mr-1"></i>Updating...</>
                 ) : (
-                  <><i className="fa fa-save mr-1"></i>Save Configuration</>
+                  <><i className="fa fa-pen mr-1"></i>Update Configuration</>
                 )}
               </button>
             </div>
