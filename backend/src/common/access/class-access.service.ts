@@ -170,13 +170,6 @@ export class ClassAccessService {
 
   async assertCanEnterResults(user: AccessUser, classId: string, subjectId: string, academicYearId: string) {
     if (!user.schoolId) throw new ForbiddenException('No school context is active');
-    const permissions = await this.getPermissions(user);
-    let delegated = false;
-    if (!permissions.includes(PERMISSIONS.RESULTS_ENTER)) {
-      delegated = permissions.includes(PERMISSIONS.RESULTS_DELEGATED_ENTRY)
-        && (await this.delegatedEntries(user, academicYearId, classId, subjectId)).length > 0;
-      if (!delegated) throw new ForbiddenException('You do not have permission to enter results. Contact the Director to request access for this class and subject.');
-    }
     const [classEntity, subject, year] = await Promise.all([
       this.prisma.class.findUnique({ where: { id: classId }, select: { id: true, schoolId: true } }),
       this.prisma.subject.findUnique({ where: { id: subjectId }, select: { id: true, schoolId: true } }),
@@ -185,6 +178,18 @@ export class ClassAccessService {
     if (!classEntity || classEntity.schoolId !== user.schoolId) throw new ForbiddenException('This class belongs to a different school');
     if (!subject || subject.schoolId !== user.schoolId) throw new ForbiddenException('This subject belongs to a different school');
     if (!year || year.schoolId !== user.schoolId) throw new ForbiddenException('Invalid academic year');
+    // School administrators (Director / SuperAdmin) have full, unrestricted
+    // results-entry access across every class and subject in their school.
+    // They are never bound by teaching-assignment or delegation rows, matching
+    // the unrestricted class list they see in the UI.
+    if (await this.isSchoolAdministrator(user)) return true;
+    const permissions = await this.getPermissions(user);
+    let delegated = false;
+    if (!permissions.includes(PERMISSIONS.RESULTS_ENTER)) {
+      delegated = permissions.includes(PERMISSIONS.RESULTS_DELEGATED_ENTRY)
+        && (await this.delegatedEntries(user, academicYearId, classId, subjectId)).length > 0;
+      if (!delegated) throw new ForbiddenException('You do not have permission to enter results. Contact the Director to request access for this class and subject.');
+    }
     const subjectAssignment = await this.prisma.teachingAssignment.findFirst({
       where: { teacherId: user.id, schoolId: user.schoolId, classId, subjectId, academicYearId },
     });

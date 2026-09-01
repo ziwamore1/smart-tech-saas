@@ -379,7 +379,7 @@ export default function ResultEntryPage() {
           if (total > 50) toast.info(`Saving... ${sent}/${total} scores`, { id: 'bulk-progress', duration: 2000 });
         },
       }),
-    onSuccess: async (_data: any, variables: any) => {
+    onSuccess: async (data: any, variables: any) => {
       queryClient.invalidateQueries({ queryKey: ['sheet-students'] });
       queryClient.invalidateQueries({ queryKey: ['result-sheets'] });
       queryClient.invalidateQueries({ queryKey: ['view-results-sheet'] });
@@ -397,19 +397,40 @@ export default function ResultEntryPage() {
       setDirtyCells(new Set());
       setAbsentCells(new Set());
       setBulkSaving(false);
-      const count = variables?.length || 0;
-      setLastSavedCount(count);
+      const requested = variables?.length || 0;
+      const confirmed = data?.created ?? requested;
+      const errorCount = data?.errors ?? 0;
+
+      if (confirmed === 0) {
+        setShowSavedBanner(false);
+        toast.error(`No scores were saved`, {
+          description: errorCount > 0
+            ? `${errorCount} score${errorCount !== 1 ? 's' : ''} failed. ${data?.details?.[0]?.error || 'Check that the term is not locked and that you have permission to enter results for this class and subject.'}`
+            : 'The server did not confirm any saved results. Please try again.',
+          duration: 10000,
+        });
+        return;
+      }
+
+      setLastSavedCount(confirmed);
       setLastSavedAt(new Date().toLocaleTimeString());
       setShowSavedBanner(true);
       setTimeout(() => setShowSavedBanner(false), 8000);
-      toast.success(`${count} score${count !== 1 ? 's' : ''} saved and auto-submitted for review`, {
-        description: `${count} result${count !== 1 ? 's' : ''} have been recorded and submitted. They are now visible in the results sheet.`,
-        action: {
-          label: 'View Results',
-          onClick: () => window.location.href = '/dashboard/results-management/view-results',
-        },
-        duration: 8000,
-      });
+      if (errorCount > 0) {
+        toast.warning(`${confirmed} of ${requested} score${requested !== 1 ? 's' : ''} saved`, {
+          description: `${errorCount} score${errorCount !== 1 ? 's' : ''} could not be saved. ${data?.details?.[0]?.error || 'See server details for the failure reason.'}`,
+          duration: 10000,
+        });
+      } else {
+        toast.success(`${confirmed} score${confirmed !== 1 ? 's' : ''} saved and auto-submitted for review`, {
+          description: `${confirmed} result${confirmed !== 1 ? 's' : ''} have been recorded and submitted. They are now visible in the results sheet.`,
+          action: {
+            label: 'View Results',
+            onClick: () => window.location.href = '/dashboard/results-management/view-results',
+          },
+          duration: 8000,
+        });
+      }
     },
     onError: (err: any) => {
       setBulkSaving(false);
