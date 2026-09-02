@@ -402,7 +402,11 @@ export class TemplateRendererService {
       case 'SCHOOL_LOGO':
         const logoUrl = school?.logoUrl || school?.logo;
         if (!logoUrl) return '';
-        return `<img src="${logoUrl}" alt="School Logo" style="${styleStr}" />`;
+        // Slightly larger default footprint on report cards for better legibility,
+        // keeping images proportional and never exceeding a sensible maximum.
+        const logoW = Math.min(Math.max(size.width || 60, 80), 140);
+        const logoH = size.height ? Math.max(size.height, logoW) : logoW;
+        return `<img src="${logoUrl}" alt="School Logo" style="${styleStr};width:${logoW}px;height:auto;max-height:${logoH}px;object-fit:contain;" />`;
 
       case 'SCHOOL_NAME':
         return `<div style="${styleStr}">${school?.name || ''}</div>`;

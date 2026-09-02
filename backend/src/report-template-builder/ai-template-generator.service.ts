@@ -16,7 +16,7 @@ export class AiTemplateGeneratorService {
         pageSize: 'A4', orientation: 'portrait',
         components: [
           { type: 'HEADER', label: 'Report Header', content: { text: 'ACADEMIC REPORT', fontSize: 16, color: '#1a365d' }, styles: { color: '#1a365d' }, position: { x: 30, y: 20 }, size: { width: 535, height: 30 } },
-          { type: 'SCHOOL_LOGO', label: 'School Logo', content: {}, styles: {}, position: { x: 30, y: 55 }, size: { width: 60, height: 60 } },
+          { type: 'SCHOOL_LOGO', label: 'School Logo', content: {}, styles: {}, position: { x: 30, y: 50 }, size: { width: 80, height: 80 } },
           { type: 'SCHOOL_NAME', label: 'School Name', content: { fontSize: 18, color: '#1a365d' }, styles: { color: '#1a365d' }, position: { x: 100, y: 65 }, size: { width: 300, height: 20 } },
           { type: 'STUDENT_INFO', label: 'Student Info', content: { fontSize: 11 }, styles: { color: '#555' }, position: { x: 100, y: 90 }, size: { width: 300, height: 50 } },
           { type: 'STUDENT_PHOTO', label: 'Photo', content: {}, styles: {}, position: { x: 495, y: 55 }, size: { width: 70, height: 70 } },
