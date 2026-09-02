@@ -11,6 +11,7 @@ describe('ClassAccessService', () => {
     classSubject: { findMany: jest.fn() },
     schoolUser: { findFirst: jest.fn() },
     userPermissionOverride: { findMany: jest.fn() },
+    resultEntryPermission: { findMany: jest.fn() },
   };
   let service: ClassAccessService;
 
@@ -84,5 +85,52 @@ describe('ClassAccessService', () => {
     expect(prisma.class.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { schoolId: 'school-a', id: { in: ['class-a'] } },
     }));
+  });
+
+  it('allows a delegated teacher to enter results even with RESULTS_ENTER role default', async () => {
+    prisma.class.findUnique.mockResolvedValue({ id: 'class-a', schoolId: 'school-a' });
+    prisma.subject.findUnique.mockResolvedValue({ id: 'subject-a', schoolId: 'school-a' });
+    prisma.academicYear.findUnique.mockResolvedValue({ id: 'year-a', schoolId: 'school-a' });
+    // No teaching assignment at all
+    prisma.teachingAssignment.findFirst.mockResolvedValue(null);
+    // Teacher is granted RESULTS_DELEGATED_ENTRY via an explicit override
+    prisma.schoolUser.findFirst.mockResolvedValue({ id: 'membership-a', SchoolRoleAssignment: [], userId: 'teacher-a', schoolId: 'school-a' });
+    prisma.userPermissionOverride.findMany.mockResolvedValue([{ permission: 'RESULTS_DELEGATED_ENTRY', granted: true }]);
+    // And has a delegation scope row for this class+subject+year
+    prisma.resultEntryPermission.findMany.mockResolvedValue([{ classId: 'class-a', subjectId: 'subject-a', academicYearId: 'year-a' }]);
+
+    await expect(service.assertCanEnterResults(
+      { id: 'teacher-a', schoolId: 'school-a', roles: ['Teacher'] },
+      'class-a', 'subject-a', 'year-a',
+    )).resolves.toBe(true);
+  });
+
+  it('allows a delegated teacher with an unrelated teaching assignment elsewhere', async () => {
+    prisma.class.findUnique.mockResolvedValue({ id: 'class-a', schoolId: 'school-a' });
+    prisma.subject.findUnique.mockResolvedValue({ id: 'subject-a', schoolId: 'school-a' });
+    prisma.academicYear.findUnique.mockResolvedValue({ id: 'year-a', schoolId: 'school-a' });
+    prisma.schoolUser.findFirst.mockResolvedValue({ id: 'membership-a', SchoolRoleAssignment: [], userId: 'teacher-a', schoolId: 'school-a' });
+    prisma.userPermissionOverride.findMany.mockResolvedValue([{ permission: 'RESULTS_DELEGATED_ENTRY', granted: true }]);
+    prisma.resultEntryPermission.findMany.mockResolvedValue([{ classId: 'class-a', subjectId: 'subject-a', academicYearId: 'year-a' }]);
+
+    await expect(service.assertCanEnterResults(
+      { id: 'teacher-a', schoolId: 'school-a', roles: ['Teacher'] },
+      'class-a', 'subject-a', 'year-a',
+    )).resolves.toBe(true);
+  });
+
+  it('rejects a teacher not assigned nor delegated for the class/subject', async () => {
+    prisma.class.findUnique.mockResolvedValue({ id: 'class-a', schoolId: 'school-a' });
+    prisma.subject.findUnique.mockResolvedValue({ id: 'subject-a', schoolId: 'school-a' });
+    prisma.academicYear.findUnique.mockResolvedValue({ id: 'year-a', schoolId: 'school-a' });
+    prisma.teachingAssignment.findFirst.mockResolvedValue(null);
+    prisma.schoolUser.findFirst.mockResolvedValue({ id: 'membership-a', SchoolRoleAssignment: [], userId: 'teacher-a', schoolId: 'school-a' });
+    prisma.userPermissionOverride.findMany.mockResolvedValue([{ permission: 'RESULTS_DELEGATED_ENTRY', granted: true }]);
+    prisma.resultEntryPermission.findMany.mockResolvedValue([]);
+
+    await expect(service.assertCanEnterResults(
+      { id: 'teacher-a', schoolId: 'school-a', roles: ['Teacher'] },
+      'class-a', 'subject-a', 'year-a',
+    )).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

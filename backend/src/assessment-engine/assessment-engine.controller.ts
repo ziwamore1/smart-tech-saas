@@ -9,8 +9,11 @@ import {
   Query,
   UseGuards,
   Request,
+  ForbiddenException,
 } from '@nestjs/common';
 import { AssessmentEngineService } from './assessment-engine.service';
+import { ClassAccessService } from '../common/access/class-access.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -24,7 +27,26 @@ import { Roles } from '../auth/decorators/roles.decorator';
 // both to DEPUTY).
 @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
 export class AssessmentEngineController {
-  constructor(private assessmentEngine: AssessmentEngineService) {}
+  constructor(
+    private assessmentEngine: AssessmentEngineService,
+    private classAccess: ClassAccessService,
+    private prisma: PrismaService,
+  ) {}
+
+  private async assertCanEnterScores(req: any, entries: Array<{ classId: string; subjectId: string; termId: string }>) {
+    const pairs = new Set(entries.filter(e => e.classId && e.subjectId && e.termId).map(e => `${e.classId}::${e.subjectId}::${e.termId}`));
+    for (const pair of pairs) {
+      const [classId, subjectId, termId] = pair.split('::');
+      const term = await this.prisma.term.findUnique({ where: { id: termId }, select: { academicYearId: true } });
+      if (!term) throw new ForbiddenException('Invalid term for score entry');
+      await this.classAccess.assertCanEnterResults(
+        { id: req.user.id, schoolId: req.user.schoolId, roles: req.user.roles || [], isSuperAdmin: req.user.isSuperAdmin },
+        classId,
+        subjectId,
+        term.academicYearId,
+      );
+    }
+  }
 
   @Post('definitions')
   createDefinition(@Request() req, @Body() body: any) {
@@ -80,7 +102,11 @@ export class AssessmentEngineController {
   }
 
   @Post('scores/bulk')
-  bulkEnterScores(@Request() req, @Body() body: any) {
+  async bulkEnterScores(@Request() req, @Body() body: any) {
+    const entries = Array.isArray(body?.scores) && body.scores.length
+      ? body.scores.map((s: any) => ({ classId: s?.classId || body.classId, subjectId: s?.subjectId || body.subjectId, termId: s?.termId || body.termId }))
+      : [{ classId: body.classId, subjectId: body.subjectId, termId: body.termId }];
+    await this.assertCanEnterScores(req, entries);
     return this.assessmentEngine.bulkEnterScores(req.user.schoolId, {
       ...body,
       enteredBy: req.user.id,
@@ -88,7 +114,8 @@ export class AssessmentEngineController {
   }
 
   @Post('scores')
-  enterSingleScore(@Request() req, @Body() body: any) {
+  async enterSingleScore(@Request() req, @Body() body: any) {
+    await this.assertCanEnterScores(req, [{ classId: body.classId, subjectId: body.subjectId, termId: body.termId }]);
     return this.assessmentEngine.enterSingleScore(req.user.schoolId, {
       ...body,
       enteredBy: req.user.id,

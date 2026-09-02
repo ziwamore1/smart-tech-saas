@@ -183,29 +183,34 @@ export class ClassAccessService {
     // They are never bound by teaching-assignment or delegation rows, matching
     // the unrestricted class list they see in the UI.
     if (await this.isSchoolAdministrator(user)) return true;
-    const permissions = await this.getPermissions(user);
-    let delegated = false;
-    if (!permissions.includes(PERMISSIONS.RESULTS_ENTER)) {
-      delegated = permissions.includes(PERMISSIONS.RESULTS_DELEGATED_ENTRY)
-        && (await this.delegatedEntries(user, academicYearId, classId, subjectId)).length > 0;
-      if (!delegated) throw new ForbiddenException('You do not have permission to enter results. Contact the Director to request access for this class and subject.');
-    }
+
+    // ── 1. Explicit teaching assignment for this class+subject+year ──
     const subjectAssignment = await this.prisma.teachingAssignment.findFirst({
       where: { teacherId: user.id, schoolId: user.schoolId, classId, subjectId, academicYearId },
     });
     if (subjectAssignment) return true;
-    if (delegated) return true;
 
-    // No assignment for this exact class+subject. Fall back to the permission
-    // grant when the user has no teaching assignments at all in this academic
-    // year (i.e. the school has not set up assignments, so RESULTS_ENTER is the
-    // gate). This keeps the results-entry flow usable for teachers, class
+    // ── 2. Delegated entry: RESULTS_DELEGATED_ENTRY grant + explicit scope row ──
+    // This is checked *before* the RESULTS_ENTER gate because teachers hold
+    // RESULTS_ENTER by default, and the delegation grant must be honoured
+    // independently of role-default permissions.
+    if ((await this.delegatedEntries(user, academicYearId, classId, subjectId)).length > 0) return true;
+
+    // ── 3. RESULTS_ENTER permission gate ──
+    const permissions = await this.getPermissions(user);
+    if (!permissions.includes(PERMISSIONS.RESULTS_ENTER)) {
+      throw new ForbiddenException('You do not have permission to enter results. Contact the Director to request access for this class and subject.');
+    }
+
+    // ── 4. Fallback: no teaching assignments at all in this academic year ──
+    // When the school has not set up teaching assignments, RESULTS_ENTER is the
+    // gate. This keeps the results-entry flow usable for teachers, class
     // teachers and HODs that were granted access but have no assignment rows.
     const anyAssignment = await this.prisma.teachingAssignment.findFirst({
       where: { teacherId: user.id, schoolId: user.schoolId, academicYearId },
       select: { id: true },
     });
-    if (!anyAssignment && permissions.includes(PERMISSIONS.RESULTS_ENTER)) return true;
+    if (!anyAssignment) return true;
 
     throw new ForbiddenException('You are not assigned to enter results for this class and subject');
   }
