@@ -648,10 +648,16 @@ export class ReportEngineService {
       );
       const block = `
       <div style="page-break-inside:avoid;margin-top:22px;padding:14px 16px;border:1px solid #d1d5db;border-radius:8px;background:#f9fafb;">
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">
-          <div style="flex:0 0 110px;max-width:110px;">${stampSvg}</div>
-          <div style="flex:0 0 auto;">${auth.placeholders.verification_qr || ''}</div>
-        </div>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="width:150px;vertical-align:middle;text-align:center;padding:0;">
+              ${stampSvg}
+            </td>
+            <td style="width:110px;vertical-align:middle;text-align:center;padding:0;">
+              ${auth.placeholders.verification_qr || ''}
+            </td>
+          </tr>
+        </table>
         <div style="font-size:11px;line-height:1.55;color:#374151;">
           <div style="font-weight:700;color:#111827;margin-bottom:3px;">Digitally Verified Document</div>
           <div>Serial: <strong>${auth.placeholders.document_serial || ''}</strong></div>
