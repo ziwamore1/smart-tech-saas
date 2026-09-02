@@ -2429,7 +2429,7 @@ export const reportEngineApi = {
     api.get('/report-engine/reports', { params }),
   getReport: (id: string) => api.get(`/report-engine/reports/${id}`),
   deleteReport: (id: string) => api.delete(`/report-engine/reports/${id}`),
-  downloadReport: (id: string) => api.get(`/report-engine/download/${id}`, { responseType: 'blob' }),
+  downloadReport: (id: string) => api.get(`/report-engine/download/${id}`, { responseType: 'blob', timeout: 300000 }),
 };
 
 /**

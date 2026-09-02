@@ -339,7 +339,6 @@ export class SchoolService {
         name: true,
         motto: true,
         logoUrl: true,
-        updatedAt: true,
       },
     });
     return school;
