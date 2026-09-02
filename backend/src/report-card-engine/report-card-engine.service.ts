@@ -147,6 +147,17 @@ export class ReportCardEngineService {
         }
       }
 
+      // Guard against a legacy data inconsistency where an overall score was
+      // recorded in the Result/weighted tables but no component (assessment)
+      // rows exist, leaving totalRawScore at 0 while finalPercentage is valid.
+      // This happens for the earliest-enrolled students whose results were
+      // entered before per-assessment entry existed. Surface the real score
+      // instead of a misleading zero in the report's Score column.
+      if (totalRawScore === 0 && finalPercentage != null && finalPercentage > 0) {
+        const legacy = legacyResultMap.get(result.subjectId);
+        totalRawScore = legacy?.score != null ? legacy.score : finalPercentage;
+      }
+
       // Compute points from grading engine if not available
       if (points == null && finalPercentage != null) {
         try {

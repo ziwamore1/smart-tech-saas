@@ -37,7 +37,7 @@ export default function PublishPage() {
   [allSheets]);
 
   const publishedSheets = useMemo(() =>
-    allSheets.filter((s: any) => s.status === 'PUBLISHED'),
+    allSheets.filter((s: any) => s.status === 'PUBLISHED' || s.status === 'LOCKED'),
   [allSheets]);
 
   const updateStatusMutation = useMutation({
@@ -66,11 +66,17 @@ export default function PublishPage() {
         title: 'Publish to Parents',
         description: 'This will send notifications to parents about published results. Continue?'
       });
-    } else if (action === 'unpublish') {
+    } else if (action === 'lock') {
+      setShowConfirm({
+        id, action: 'lock',
+        title: 'Lock Results',
+        description: 'This will lock the results, preventing teachers from editing them. Students and parents will still see them. Are you sure?'
+      });
+    } else if (action === 'unlock') {
       setShowConfirm({
         id, action: 'unlock',
-        title: 'Unpublish Results',
-        description: 'This will hide results from students and parents. Are you sure?'
+        title: 'Unlock Results',
+        description: 'This will unlock the results, allowing teachers to edit them again. Are you sure?'
       });
     }
   };
@@ -187,9 +193,11 @@ export default function PublishPage() {
                   </h4>
                   <span style={{
                     padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600,
-                    background: '#f3e8ff', color: '#7c3aed'
+                    background: sheet.status === 'LOCKED' ? '#fee2e2' : '#f3e8ff',
+                    color: sheet.status === 'LOCKED' ? '#dc2626' : '#7c3aed'
                   }}>
-                    <i className="fa fa-globe" style={{ marginRight: '4px' }}></i>Published
+                    <i className={`fa ${sheet.status === 'LOCKED' ? 'fa-lock' : 'fa-globe'}`} style={{ marginRight: '4px' }}></i>
+                    {sheet.status === 'LOCKED' ? 'Locked' : 'Published'}
                   </span>
                 </div>
                 <div style={{ fontSize: '13px', color: '#6b7280', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
@@ -201,17 +209,29 @@ export default function PublishPage() {
                   )}
                 </div>
               </div>
-              {isDirector && (
+              {isDirector && sheet.status === 'LOCKED' ? (
                 <button
-                  onClick={() => confirmPublish(sheet.id, 'unpublish')}
+                  onClick={() => confirmPublish(sheet.id, 'unlock')}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '6px',
-                    padding: '8px 16px', fontSize: '13px', fontWeight: 500,
-                    color: '#dc2626', background: '#fee2e2', border: '1px solid #fecaca',
+                    padding: '8px 16px', fontSize: '13px', fontWeight: 600,
+                    color: '#f59e0b', background: '#fef3c7', border: '1px solid #fcd34d',
                     borderRadius: '8px', cursor: 'pointer'
                   }}
                 >
-                  <i className="fa fa-undo"></i> Unpublish
+                  <i className="fa fa-unlock"></i> Unlock
+                </button>
+              ) : isDirector && (
+                <button
+                  onClick={() => confirmPublish(sheet.id, 'lock')}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '8px 16px', fontSize: '13px', fontWeight: 600,
+                    color: '#7c3aed', background: '#f3e8ff', border: '1px solid #d8b4fe',
+                    borderRadius: '8px', cursor: 'pointer'
+                  }}
+                >
+                  <i className="fa fa-lock"></i> Lock
                 </button>
               )}
             </div>
@@ -261,7 +281,7 @@ export default function PublishPage() {
                 style={{
                   padding: '10px 24px', fontSize: '14px', fontWeight: 600, color: 'white',
                   background: updateStatusMutation.isPending ? '#d1d5db' :
-                    showConfirm.action === 'unlock' ? '#dc2626' : '#7c3aed',
+                    showConfirm.action === 'unlock' ? '#f59e0b' : '#7c3aed',
                   border: 'none', borderRadius: '8px',
                   cursor: updateStatusMutation.isPending ? 'not-allowed' : 'pointer'
                 }}
