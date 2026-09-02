@@ -642,10 +642,16 @@ export class ReportEngineService {
         .replace(/\{\{\s*issued_timestamp\s*\}\}/g, auth.placeholders.issued_timestamp || '');
 
       const verifyUrl = auth.verificationUrl;
+      const stampSvg = (auth.placeholders.digital_stamp || '').replace(
+        /<svg /i,
+        '<svg style="width:100%;height:auto;display:block;" ',
+      );
       const block = `
-      <div style="page-break-inside:avoid;margin-top:22px;padding:14px 16px;border:1px solid #d1d5db;border-radius:8px;background:#f9fafb;display:flex;align-items:center;gap:16px;">
-        <div style="flex:0 0 auto;">${auth.placeholders.digital_stamp || ''}</div>
-        <div style="flex:0 0 auto;">${auth.placeholders.verification_qr || ''}</div>
+      <div style="page-break-inside:avoid;margin-top:22px;padding:14px 16px;border:1px solid #d1d5db;border-radius:8px;background:#f9fafb;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">
+          <div style="flex:0 0 110px;max-width:110px;">${stampSvg}</div>
+          <div style="flex:0 0 auto;">${auth.placeholders.verification_qr || ''}</div>
+        </div>
         <div style="font-size:11px;line-height:1.55;color:#374151;">
           <div style="font-weight:700;color:#111827;margin-bottom:3px;">Digitally Verified Document</div>
           <div>Serial: <strong>${auth.placeholders.document_serial || ''}</strong></div>
