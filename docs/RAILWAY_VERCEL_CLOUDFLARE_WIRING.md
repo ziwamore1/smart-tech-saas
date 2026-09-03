@@ -39,10 +39,10 @@ Set these in **Railway → smarttech-prod → smart-tech-saas → Variables**:
 
 | Variable | Value (example) | Notes |
 |---|---|---|
-| `PORT` | `3001` | NestJS listens on this |
+| `PORT` | *(already set — leave it)* | Railway injects `PORT`; if a manual `PORT` (e.g. `4000`) already exists on this service, **do not add another one** — only one `PORT` var allowed per service. The app reads `process.env.PORT`. |
 | `NODE_ENV` | `production` | |
-| `DATABASE_URL` | `<Supabase POOLED URL>` | port **6543**, `sb-pooler....transact=pooled` |
-| `DIRECT_URL` | `<Supabase DIRECT URL>` | port **5432**, the raw connection string from Supabase dashboard → Connect → Connection string (non-pooled) |
+| `DATABASE_URL` | *(already set — reuse)* | **Supabase POOLED** (port **6543**). Already configured on this service — do not duplicate. |
+| `DIRECT_URL` | *(already set — reuse)* | **Supabase DIRECT** (port **5432**). Already configured on this service — do not duplicate. |
 | `JWT_SECRET` | *(keep your existing)* | |
 | `REDIS_URL` | `redis://default:<pwd>@...` | reference the existing `smarttech-redis` (import its `REDIS_PASSWORD` via a reference variable, or paste the URL) |
 | `CLOUDINARY_CLOUD_NAME` | … | keep existing |
@@ -68,14 +68,14 @@ and the migrate+boot start command.
 
 | Variable | Value (example) | Notes |
 |---|---|---|
-| `DATABASE_URL` | `<Supabase POOLED URL>?schema=signatures` | same Supabase DB as Part A, **own schema** `signatures` |
-| `DIRECT_URL` | `<Supabase DIRECT URL>?schema=signatures` | port 5432 direct URL + same `?schema=` |
+| `DATABASE_URL` | `<same Supabase POOLED URL>?schema=signatures` | **new service → add fresh.** Same Supabase DB as Part A, own `signatures` schema. Do not set on both services — this is a different service so a new var is fine. |
+| `DIRECT_URL` | `<same Supabase DIRECT URL>?schema=signatures` | new service → add fresh. Port 5432 direct URL + same `?schema=`. |
 | `JWT_SECRET` | `openssl rand -base64 48` (unique, **not** the same as Part A) | |
 | `ENCRYPTION_KEY` | `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` — **64 hex** | AES-256-GCM master key for signing keys at rest. **Back it up NOW** (losing it breaks every signing key). |
 | `INTERNAL_SERVICE_KEYS` | `stamp-engine:<shared-secret>` | must equal Part A `SIGNATURE_SERVICE_KEY` |
 | `NODE_ENV` | `production` | |
 | `CORS_ORIGIN` | `https://signature.smarttechsaas.com` | only if deploying the operator UI; else omit |
-| `PORT` | `4001` | Railway injects `PORT`; set explicitly for clarity |
+| `PORT` | *(skip — do NOT set)* | Railway injects `PORT` automatically; the app binds to it. No need to create a `PORT` var here. |
 
 **Private networking (required):** Railway → new service → **Settings → Networking →
 Private Networking → enable private domain**. Copy the generated private hostname, e.g.
