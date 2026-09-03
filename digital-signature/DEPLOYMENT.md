@@ -10,6 +10,20 @@ The Digital **Stamp** Service is already running. This guide puts the Digital
 **Signature** Service into production so documents can carry both an
 institutional stamp **and** a cryptographic signature.
 
+> ## 🚫 Non-negotiable cost rule (Supabase is the ONLY Postgres host)
+>
+> **Production PostgreSQL lives in Supabase. NO database may be created inside
+> Railway.** Creating any Postgres/MySQL database on Railway consumes
+> Hobby-plan credit and increases charges — this is explicitly forbidden.
+>
+> - The signature service **reuses the same Supabase PostgreSQL** as the main
+>   backend, isolated in its **own schema** (`?schema=signatures`).
+> - The only Railway resource are **application services** (the main backend,
+>   the signature backend) plus `smarttech-redis` (in-memory cache, already
+>   present and required by the main backend).
+> - If you ever find yourself about to click **“PostgreSQL”** / **“MySQL”** in
+>   the Railway dashboard: **stop** — use Supabase instead.
+
 ---
 
 ## 1. Architecture recap
@@ -143,13 +157,16 @@ builder, healthcheck (`/health`) and the migration+boot start command.
 **2. Add the shared variables**
 On the new service's **Variables** tab set:
 ```
-DATABASE_URL=<your external Postgres URL with ?schema=signatures>
+DATABASE_URL=<SUPABASE Postgres URL with ?schema=signatures>
 JWT_SECRET=<long random base64>
 ENCRYPTION_KEY=<64 hex chars — generated once, backed up>
 INTERNAL_SERVICE_KEYS=stamp-engine:<shared-secret>
 NODE_ENV=production
 ```
-- For the external Postgres (Supabase) URL, append **`?schema=signatures`** so
+- `DATABASE_URL` **must be the Supabase Postgres URL** — never a Railway DB.
+  (If a Railway “PostgreSQL” / “MySQL” option appears while creating the
+  service, **do not** select it.)
+- Append **`?schema=signatures`** so
   the signature tables live in their own schema and never collide with the
   school schema. Prisma creates the schema on first `migrate deploy`.
   (Omitting `?schema=` also works — tables land in `public` under distinct
