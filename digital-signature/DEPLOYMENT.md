@@ -123,6 +123,69 @@ The main backend connects to the signature service at
 > been removed — deliberately. A fixed/predictable `SIG_ENCRYPTION_KEY` would
 > encrypt every signing key with a widely-known key.
 
+### 5c. Railway — single project (recommended to keep Hobby-plan costs flat)
+
+Deploy the signature backend as a **second service inside the SAME Railway
+project as the main backend** (e.g. `smarttech-prod`). No new Railway project,
+no new paid database — storage reuses the external Postgres the main backend
+already uses, so charges stay within the existing Hobby-plan credit envelope.
+
+A `railway.toml` ships in `digital-signature/backend/` that pins the Dockerfile
+builder, healthcheck (`/health`) and the migration+boot start command.
+
+**1. Add the service (Railway dashboard)**
+- Open `smarttech-prod` → **New → Service**.
+- Choose **“Deploy from GitHub repo”** → select `ziwamore1/smart-tech-saas`.
+- Root directory: set to **`digital-signature/backend`**.
+- Railway detects `railway.toml` (Dockerfile builder) and pairs the service
+  automatically. Create the service.
+
+**2. Add the shared variables**
+On the new service's **Variables** tab set:
+```
+DATABASE_URL=<your external Postgres URL with ?schema=signatures>
+JWT_SECRET=<long random base64>
+ENCRYPTION_KEY=<64 hex chars — generated once, backed up>
+INTERNAL_SERVICE_KEYS=stamp-engine:<shared-secret>
+NODE_ENV=production
+```
+- For the external Postgres (Supabase) URL, append **`?schema=signatures`** so
+  the signature tables live in their own schema and never collide with the
+  school schema. Prisma creates the schema on first `migrate deploy`.
+  (Omitting `?schema=` also works — tables land in `public` under distinct
+  names — but a dedicated schema is cleaner.)
+- `ENCRYPTION_KEY` is the AES-256-GCM master key for signing keys **at rest**.
+  Losing it permanently breaks all existing signatures. Backup it now.
+
+**3. Enable private networking for the service**
+- Variables → add **`RAILWAY_PRIVATE_DOMAIN=true`** (or Service Settings →
+  Private Networking → enable private domain). Copy the generated private URL,
+  e.g. `https://signature-service.up.railway.internal`.
+
+**4. Point the main backend at it**
+On the **main backend service** (`smart-tech-saas`) set these variables:
+```
+SIGNATURE_SERVICE_URL=<private URL from step 3, e.g. http://signature-service.up.railway.internal>
+SIGNATURE_SERVICE_KEY=stamp-engine:<shared-secret>     # MUST equal INTERNAL_SERVICE_KEYS above
+SIGNATURE_SERVICE_TIMEOUT_MS=15000
+```
+- `SIGNATURE_SERVICE_URL` must be the **private** `*.railway.internal` URL —
+  never a public domain.
+- Redeploy the main backend after adding these so it starts in
+  **signature-enabled** mode (it will show `signatureStatus` other than
+  `SKIPPED`).
+
+**5. Verify**
+- `GET <private-url>/health` → `{"status":"ok","service":"digital-signature",…}`
+  (liveness only; it is never exposed publicly).
+- From the main backend, run the stamp/sign smoke suite
+  (`npx tsx scripts/stamp-engine-smoke.ts`) and confirm a cryptographic
+  signature is produced and verifies.
+
+> All three secrets above (`JWT_SECRET`, `ENCRYPTION_KEY`,
+> `INTERNAL_SERVICE_KEYS`) plus the backend's `SIGNATURE_SERVICE_KEY` are set
+> only in Railway's secret store — never in a committed `.env`.
+
 ---
 
 ## 6. Optional operator UI (Part B frontend)
