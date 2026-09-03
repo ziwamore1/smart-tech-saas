@@ -52,7 +52,11 @@ export class SignatureBridgeService {
     signedBy: string;
   }> {
     if (!this.configured) throw new ServiceUnavailableException('Signature service not configured');
-    const res = await this.request<any>('POST', '/internal/signatures/sign', input);
+    const { canonicalHash, ...rest } = input;
+    const res = await this.request<any>('POST', '/internal/signatures/sign', {
+      ...rest,
+      documentHash: canonicalHash,
+    });
     if (!res?.signatureId) {
       throw new ServiceUnavailableException(`Signature service rejected signing request: ${res?.message || 'unknown error'}`);
     }
