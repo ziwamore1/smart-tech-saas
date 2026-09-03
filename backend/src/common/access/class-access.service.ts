@@ -63,7 +63,7 @@ export class ClassAccessService {
   private async isSchoolAdministrator(user: AccessUser): Promise<boolean> {
     if (user.isSuperAdmin === true) return true;
     const roles = await this.effectiveRoles(user);
-    return roles.some((role) => ['DIRECTOR', 'SUPERADMIN'].includes(role));
+    return roles.some((role) => ['DIRECTOR', 'DEPUTY DIRECTOR', 'SUPERADMIN'].includes(role));
   }
 
   /**

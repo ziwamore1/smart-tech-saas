@@ -1126,6 +1126,7 @@ export class ResultService {
     const normalizedRoles = (roles || []).map((r) => r.toUpperCase());
     const isFullAccess =
       normalizedRoles.includes('DIRECTOR') ||
+      normalizedRoles.includes('DEPUTY DIRECTOR') ||
       normalizedRoles.includes('CLASS TEACHER');
 
     let className = '';
@@ -1473,6 +1474,7 @@ export class ResultService {
     const normalizedRoles = (roles || []).map((r) => r.toUpperCase());
     const isFullAccess =
       normalizedRoles.includes('DIRECTOR') ||
+      normalizedRoles.includes('DEPUTY DIRECTOR') ||
       normalizedRoles.includes('CLASS TEACHER');
 
     const workbook = XLSX.read(file.buffer, { type: 'buffer' });
