@@ -4,6 +4,8 @@ import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { StampEngineController } from './stamp-engine.controller';
 import { PublicVerificationController } from './public-verification.controller';
 import { DocumentAuthenticationController } from './authentication-pipeline.controller';
+import { StampMarketplaceController } from './stamp-marketplace.controller';
+import { StampMarketplaceService } from './stamp-marketplace.service';
 import { StampPermissionService } from './stamp-permission.service';
 import { StampTemplateService } from './stamp-template.service';
 import { StampAssetService } from './stamp-asset.service';
@@ -30,9 +32,10 @@ import { AuthenticationPipelineService } from './authentication-pipeline.service
  */
 @Module({
   imports: [PrismaModule, CloudinaryModule],
-  controllers: [StampEngineController, PublicVerificationController, DocumentAuthenticationController],
+  controllers: [StampEngineController, PublicVerificationController, DocumentAuthenticationController, StampMarketplaceController],
   providers: [
     StampPermissionService,
+    StampMarketplaceService,
     StampTemplateService,
     StampAssetService,
     StampRendererService,
@@ -59,6 +62,7 @@ import { AuthenticationPipelineService } from './authentication-pipeline.service
     SignatureBridgeService,
     CanonicalPayloadService,
     AuthenticationPipelineService,
+    StampMarketplaceService,
   ],
 })
 export class StampEngineModule {}

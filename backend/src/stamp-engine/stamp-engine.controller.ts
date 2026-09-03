@@ -265,11 +265,15 @@ export class StampEngineController {
     @Req() req: any,
     @Body() body: { configJson: StampTemplateConfig; assetIds?: string[] },
   ) {
-    const schoolId = this.schoolId(req);
-    await this.permissions.assert(this.actor(req), 'DOCUMENT_STAMP_VIEW', { schoolId });
+    const actor = this.actor(req);
+    // Super admins preview platform-authored stamps without a school context.
+    const schoolId = actor.isSuperAdmin ? null : this.schoolId(req);
+    await this.permissions.assert(actor, 'DOCUMENT_STAMP_VIEW', { schoolId: schoolId || undefined });
     // Preview renders placeholder date/serial — nothing authoritative leaks,
     // and only assets belonging to this school can be referenced.
-    const owned = await this.assets.resolveAssetMap(schoolId, body.assetIds || []);
+    const owned = schoolId
+      ? await this.assets.resolveAssetMap(schoolId, body.assetIds || [])
+      : {};
     const svg = this.renderer.render(body.configJson, {
       serialNumber: 'STS-PREVIEW',
       stampDate: '01 JAN 2030',

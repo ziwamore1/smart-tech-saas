@@ -311,6 +311,7 @@ model School {
   holidays                     Holiday[]
   studentSubjects              StudentSubject[]
   stampTemplates               StampTemplate[]
+  stampMarketplaceInstalls     StampMarketplaceInstall[]
   stampDesignAssets            StampAsset[]
   serialSequences              SerialSequence[]
   documentSerials              DocumentSerial[]
@@ -6050,7 +6051,8 @@ enum StampAssetKind {
 
 model StampTemplate {
   id           String                 @id @default(uuid())
-  schoolId     String
+  schoolId     String?
+  scope        String                 @default("SCHOOL")
   name         String
   description  String?
   type         StampType              @default(CUSTOM)
@@ -6065,13 +6067,61 @@ model StampTemplate {
   updatedBy    String?
   createdAt    DateTime               @default(now())
   updatedAt    DateTime               @updatedAt
-  school       School                 @relation(fields: [schoolId], references: [id])
+  school       School?                @relation(fields: [schoolId], references: [id])
   versions     StampTemplateVersion[]
   signatories  StampTemplateSignatory[]
+  marketplace  StampMarketplace?
+  stampMarketplaceInstalls StampMarketplaceInstall[] @relation("StampMarketplaceInstalls")
 
-  @@unique([schoolId, name])
   @@index([schoolId])
+  @@index([scope, status])
   @@index([status])
+}
+
+/// A super-admin-authored advanced stamp published to schools via the marketplace.
+/// The source-of-truth is a PLATFORM-scoped StampTemplate (schoolId = null).
+/// "Installing / publishing" copies its snapshot into each target school's own
+/// StampTemplate (schoolId set → school gets an editable copy).
+model StampMarketplace {
+  id           String                  @id @default(uuid())
+  templateId   String                  @unique
+  name         String
+  description  String?
+  category     String?
+  tags         String[]
+  thumbnailUrl String?
+  minTier      SubscriptionTier        @default(STANDARD)
+  status       String                  @default("DRAFT")
+  version      Int                     @default(1)
+  installCount Int                     @default(0)
+  createdBy    String?
+  publishedAt  DateTime?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  template     StampTemplate           @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  installs     StampMarketplaceInstall[]
+
+  @@unique([name])
+  @@index([status, minTier])
+  @@index([category])
+}
+
+/// A record of a marketplace stamp having been installed into a school's stamp
+/// library. `templateId` points at the school's own (editable) StampTemplate copy.
+model StampMarketplaceInstall {
+  id            String            @id @default(uuid())
+  marketplaceId String
+  schoolId      String
+  templateId    String
+  installedBy   String?
+  createdAt     DateTime          @default(now())
+  marketplace   StampMarketplace  @relation(fields: [marketplaceId], references: [id], onDelete: Cascade)
+  school        School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  template      StampTemplate     @relation("StampMarketplaceInstalls", fields: [templateId], references: [id])
+
+  @@unique([marketplaceId, schoolId])
+  @@index([schoolId])
+  @@index([templateId])
 }
 
 /// Required signatory positions declared on a stamp/document template.

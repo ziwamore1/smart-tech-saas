@@ -5,9 +5,16 @@ import { stampEngineApi } from '@/lib/api';
 
 type ShapeType = 'circle' | 'rectangle' | 'square' | 'oval';
 
+type ShapeKind =
+  | 'triangle' | 'pentagon' | 'hexagon' | 'octagon'
+  | 'star' | 'star-4' | 'star-5' | 'star-6' | 'star-8'
+  | 'diamond' | 'cross' | 'shield' | 'heart' | 'arrow'
+  | 'rounded-rect' | 'square' | 'circle' | 'oval'
+  | 'parallelogram' | 'trapezoid' | 'flag';
+
 interface LayerDraft {
   id: string;
-  type: 'curved-text' | 'text' | 'image' | 'date' | 'serial' | 'verification-marker';
+  type: 'curved-text' | 'text' | 'image' | 'shape' | 'date' | 'serial' | 'verification-marker';
   name: string;
   enabled: boolean;
   content?: string;
@@ -19,7 +26,38 @@ interface LayerDraft {
   direction?: 'horizontal' | 'vertical';
   assetId?: string; width?: number; height?: number;
   showTime?: boolean; label?: string;
+  shape?: ShapeKind;
+  size?: number;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  rx?: number;
+  innerRatio?: number;
+  tint?: 'none' | 'fill' | 'multiply';
 }
+
+const SHAPE_OPTIONS: { value: ShapeKind; label: string }[] = [
+  { value: 'shield', label: 'Shield (crest)' },
+  { value: 'hexagon', label: 'Hexagon' },
+  { value: 'octagon', label: 'Octagon' },
+  { value: 'pentagon', label: 'Pentagon' },
+  { value: 'triangle', label: 'Triangle' },
+  { value: 'star', label: 'Star (5)' },
+  { value: 'star-4', label: 'Star (4)' },
+  { value: 'star-6', label: 'Star (6)' },
+  { value: 'star-8', label: 'Star (8)' },
+  { value: 'diamond', label: 'Diamond' },
+  { value: 'cross', label: 'Cross' },
+  { value: 'heart', label: 'Heart' },
+  { value: 'arrow', label: 'Arrow' },
+  { value: 'rounded-rect', label: 'Rounded box' },
+  { value: 'square', label: 'Square' },
+  { value: 'circle', label: 'Circle' },
+  { value: 'oval', label: 'Oval' },
+  { value: 'parallelogram', label: 'Parallelogram' },
+  { value: 'trapezoid', label: 'Trapezoid' },
+  { value: 'flag', label: 'Banner / pennant' },
+];
 
 interface TemplateRow {
   id: string; name: string; status: string; version: number; isDefault: boolean; updatedAt: string;
@@ -206,6 +244,9 @@ export default function StampDesignerPage() {
         }
         if (l.type === 'image') {
           return { id: l.id, type: l.type, name: l.name, x: l.x, y: l.y, rotation: l.rotation, opacity: l.opacity, zIndex: l.zIndex, assetId: l.assetId || undefined, width: l.width ?? 130, height: l.height ?? 130 };
+        }
+        if (l.type === 'shape') {
+          return { id: l.id, type: l.type, name: l.name, x: l.x, y: l.y, rotation: l.rotation, opacity: l.opacity, zIndex: l.zIndex, shape: l.shape || 'shield', size: l.size ?? 120, width: l.width, height: l.height, fill: l.fill || '#1e3a5f', stroke: l.stroke || undefined, strokeWidth: l.strokeWidth, rx: l.rx, innerRatio: l.innerRatio, tint: l.tint || undefined };
         }
         if (l.type === 'verification-marker') {
           return { id: l.id, type: l.type, name: l.name, x: l.x, y: l.y, rotation: l.rotation, opacity: l.opacity, zIndex: l.zIndex, text: l.label || undefined, size: 36, fontSize: l.fontSize };
@@ -848,6 +889,19 @@ export default function StampDesignerPage() {
                   }} className="block w-full text-left px-3 py-2 text-xs hover:bg-gray-50 rounded-b-lg">Curved</button>
                 </div>
               </div>
+              <div className="relative group">
+                <button className="px-2 py-1 text-[10px] font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">+ Add Shape</button>
+                <div className="hidden group-hover:block absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg z-10 max-h-72 overflow-y-auto whitespace-nowrap">
+                  {SHAPE_OPTIONS.map(opt => (
+                    <button key={opt.value} onClick={() => {
+                      const id = uid();
+                      const newLayer: LayerDraft = { id, type: 'shape', name: opt.label, enabled: true, x: 300, y: 300, rotation: 0, opacity: 1, zIndex: 40 + layers.length, fontFamily: 'serif', fontSize: 12, fontWeight: 'normal', letterSpacing: 0, color: '#123456', shape: opt.value, size: 120, fill: '#1e3a5f', stroke: undefined, strokeWidth: 0, innerRatio: opt.value === 'star' || opt.value.startsWith('star') ? 0.5 : undefined };
+                      setLayers(prev => [...prev, newLayer]);
+                      setSelectedId(id);
+                    }} className="block w-full text-left px-3 py-2 text-xs hover:bg-gray-50">{opt.label}</button>
+                  ))}
+                </div>
+              </div>
             </div>
             <div className="space-y-1">
               {[...layers].sort((a, b) => a.zIndex - b.zIndex).map(l => (
@@ -910,6 +964,32 @@ export default function StampDesignerPage() {
                       <p className="text-[10px] text-gray-400 -mt-1">Places a character at the midpoint of the arc gap (where text doesn&apos;t cover).</p>
                     </>
                   )}
+                </>
+              )}
+              {selected.type === 'shape' && (
+                <>
+                  <label className="block text-xs font-medium text-gray-600">Shape
+                    <select value={selected.shape || 'shield'} onChange={e => updateLayer(selected.id, { shape: e.target.value as ShapeKind })} className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm">
+                      {SHAPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                    <label>Size<input type="number" min={20} max={400} value={selected.size ?? 120} onChange={e => updateLayer(selected.id, { size: parseInt(e.target.value) || 20 })} className="mt-1 w-full border rounded px-2 py-1" /></label>
+                    <div className="grid grid-cols-2 gap-1">
+                      <label>W<input type="number" min={10} max={400} value={selected.width ?? ''} onChange={e => updateLayer(selected.id, { width: e.target.value ? parseInt(e.target.value) : undefined })} className="mt-1 w-full border rounded px-2 py-1" placeholder="auto" /></label>
+                      <label>H<input type="number" min={10} max={400} value={selected.height ?? ''} onChange={e => updateLayer(selected.id, { height: e.target.value ? parseInt(e.target.value) : undefined })} className="mt-1 w-full border rounded px-2 py-1" placeholder="auto" /></label>
+                    </div>
+                    <label>Ink fill<input type="color" value={selected.fill || '#1e3a5f'} onChange={e => updateLayer(selected.id, { fill: e.target.value })} className="mt-1 w-full h-8 rounded cursor-pointer" /></label>
+                    <label>Stroke colour<input type="color" value={selected.stroke || '#1e3a5f'} onChange={e => updateLayer(selected.id, { stroke: e.target.value })} className="mt-1 w-full h-8 rounded cursor-pointer" /></label>
+                    <label>Stroke width<input type="number" min={0} max={12} step={0.5} value={selected.strokeWidth ?? 0} onChange={e => updateLayer(selected.id, { strokeWidth: parseFloat(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label>
+                    <label>Corner radius<input type="number" min={0} max={80} value={selected.rx ?? 0} onChange={e => updateLayer(selected.id, { rx: parseInt(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label>
+                  </div>
+                  {(selected.shape === 'star' || (selected.shape && selected.shape.startsWith('star'))) && (
+                    <label className="block text-xs font-medium text-gray-600">Star inner ratio (spikiness)
+                      <input type="range" min={0.2} max={1} step={0.05} value={selected.innerRatio ?? 0.5} onChange={e => updateLayer(selected.id, { innerRatio: parseFloat(e.target.value) })} className="mt-1 w-full" />
+                    </label>
+                  )}
+                  <p className="text-[10px] text-gray-400 -mt-1">Free-position secondary shape: drag on the canvas to move it, rotate and recolor to match the stamp ink. Set <i>Size</i> for uniform scaling, or W/H for non-uniform.</p>
                 </>
               )}
               {selected.type === 'date' && (

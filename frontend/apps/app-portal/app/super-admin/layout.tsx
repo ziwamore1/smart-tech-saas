@@ -213,6 +213,18 @@ const superAdminNav = [
     color: '#ef4444'
   },
   { 
+    name: 'Advanced Stamp Designer', 
+    href: '/super-admin/stamp-engine/designer', 
+    icon: 'fa-draw-polygon',
+    color: '#8b5cf6'
+  },
+  { 
+    name: 'Stamp Marketplace', 
+    href: '/super-admin/stamp-engine/marketplace', 
+    icon: 'fa-store',
+    color: '#0ea5e9'
+  },
+  { 
     name: 'Verifications', 
     href: '/super-admin/stamp-verifications', 
     icon: 'fa-check-circle',

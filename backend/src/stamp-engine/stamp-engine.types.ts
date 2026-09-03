@@ -37,6 +37,7 @@ export interface StampLayerBase {
     | 'text'
     | 'curved-text'
     | 'image'
+    | 'shape'
     | 'date'
     | 'serial'
     | 'verification-marker';
@@ -47,6 +48,66 @@ export interface StampLayerBase {
   visible?: boolean;
   locked?: boolean;
   zIndex?: number;
+}
+
+/**
+ * Data-driven catalog of free-position "secondary shapes" that can be placed
+ * inside (or around) the outer stamp shape. The catalog is future-proof — new
+ * shapes are added by dropping a path into {@link SHAPE_CATALOG} without any
+ * renderer changes.
+ */
+export type StampShapeKind =
+  | 'triangle'
+  | 'pentagon'
+  | 'hexagon'
+  | 'octagon'
+  | 'star'
+  | 'star-4'
+  | 'star-5'
+  | 'star-6'
+  | 'star-8'
+  | 'diamond'
+  | 'cross'
+  | 'shield'
+  | 'heart'
+  | 'arrow'
+  | 'rounded-rect'
+  | 'square'
+  | 'circle'
+  | 'oval'
+  | 'parallelogram'
+  | 'trapezoid'
+  | 'flag';
+
+/**
+ * A vector "secondary shape" layer. Unlike the single fixed outer shape, these
+ * can be dragged to any (x, y), resized (uniform via `size`, or non-uniform via
+ * `width`/`height`), rotated, recolored to the stamp ink, and reordered. This
+ * lets a designer recreate real institutional stamps (e.g. a square date box, a
+ * coat-of-arms crest, a star, etc.) exactly.
+ */
+export interface StampShapeLayer extends StampLayerBase {
+  type: 'shape';
+  shape: StampShapeKind;
+  /** Uniform bounding size in canvas px (polygons scale around x/y). */
+  size?: number;
+  /** Independent width (overrides `size` for non-uniform resize). */
+  width?: number;
+  /** Independent height (overrides `size` for non-uniform resize). */
+  height?: number;
+  /** Fill color — set to the stamp ink color to emulate a single-ink rubber stamp. */
+  fill?: string;
+  /** Stroke color on the shape edge. */
+  stroke?: string;
+  strokeWidth?: number;
+  /** Round corners (rounded-rect only). */
+  rx?: number;
+  /** Optional explicit vertex points overriding the catalog (advanced/custom). */
+  points?: string;
+  /** Inner ratio for star/diamond-like shapes (0..1). */
+  innerRatio?: number;
+  /** For image/emblem shapes: recolor the pixels to fill (stamp-ink tint). */
+  tint?: 'none' | 'fill' | 'multiply';
 }
 
 export interface StampTextLayer extends StampLayerBase {
@@ -121,6 +182,7 @@ export type StampLayer =
   | StampTextLayer
   | StampCurvedTextLayer
   | StampImageLayer
+  | StampShapeLayer
   | StampDateLayer
   | StampSerialLayer
   | StampVerificationMarkerLayer;

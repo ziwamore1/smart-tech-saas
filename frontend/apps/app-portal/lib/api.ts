@@ -1538,6 +1538,27 @@ export const stampEngineApi = {
   },
 };
 
+export const stampMarketplaceApi = {
+  // Super-admin platform authoring (advanced stamp designer)
+  adminPlatformList: () => api.get('/stamp-marketplace/admin/platform'),
+  adminPlatformGet: (id: string) => api.get(`/stamp-marketplace/admin/platform/${id}`),
+  adminPlatformCreate: (data: { name: string; type?: string; configJson: any }) =>
+    api.post('/stamp-marketplace/admin/platform', data),
+  adminPlatformUpdate: (id: string, data: { name?: string; configJson?: any }) =>
+    api.patch(`/stamp-marketplace/admin/platform/${id}`, data),
+  adminPlatformDelete: (id: string) => api.delete(`/stamp-marketplace/admin/platform/${id}`),
+  adminPublish: (id: string, data: { name: string; description?: string; category?: string; tags?: string[]; minTier?: string }) =>
+    api.post(`/stamp-marketplace/admin/platform/${id}/publish`, data),
+  adminUnpublish: (id: string) => api.post(`/stamp-marketplace/admin/platform/${id}/unpublish`),
+  adminEntries: () => api.get('/stamp-marketplace/admin/entries'),
+
+  // School-facing marketplace
+  browse: (category?: string) => api.get(`/stamp-marketplace/browse${category && category !== 'ALL' ? `?category=${encodeURIComponent(category)}` : ''}`),
+  installed: () => api.get('/stamp-marketplace/installed'),
+  install: (marketplaceId: string) => api.post(`/stamp-marketplace/install/${marketplaceId}`),
+  uninstall: (marketplaceId: string) => api.post(`/stamp-marketplace/uninstall/${marketplaceId}`),
+};
+
 export const assessmentEngineApi = {
   definitions: {
     create: (data: any) => api.post('/assessment-engine/definitions', data),
