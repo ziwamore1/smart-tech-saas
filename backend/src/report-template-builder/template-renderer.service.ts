@@ -7,6 +7,7 @@ import { VerificationService } from '../stamp-engine/verification.service';
 import { StampTemplateService } from '../stamp-engine/stamp-template.service';
 import { StampRendererService } from '../stamp-engine/stamp-renderer.service';
 import { StampAssetService } from '../stamp-engine/stamp-asset.service';
+import { SignatureBridgeService } from '../stamp-engine/signature-bridge.service';
 import * as puppeteer from 'puppeteer';
 import * as handlebars from 'handlebars';
 import * as fs from 'fs';
@@ -27,6 +28,7 @@ export class TemplateRendererService {
     private stampTemplates: StampTemplateService,
     private stampRenderer: StampRendererService,
     private stampAssets: StampAssetService,
+    private signatureBridge: SignatureBridgeService,
   ) {}
 
   async getSchool(schoolId: string) {
@@ -1383,10 +1385,10 @@ export class TemplateRendererService {
     // assets keep the network busy, fall back to domcontentloaded so rendering
     // degrades to embedded content instead of failing the whole document.
     try {
-      await page.setContent(html, { waitUntil: 'networkidle0' as any, timeout: 30000 });
+      await page.setContent(this.enforceMinimumFontSize(html), { waitUntil: 'networkidle0' as any, timeout: 30000 });
     } catch {
       this.logger?.warn?.('setContent networkidle0 timed out — falling back to domcontentloaded');
-      await page.setContent(html, { waitUntil: 'domcontentloaded' as any, timeout: 60000 });
+      await page.setContent(this.enforceMinimumFontSize(html), { waitUntil: 'domcontentloaded' as any, timeout: 60000 });
     }
 
     const pdf = await page.pdf({
@@ -1416,6 +1418,165 @@ export class TemplateRendererService {
   }
 
   /**
+   * Signs the report card's bound signatories (Class Teacher + Head Teacher)
+   * through the SignatureBridgeService. The Class Teacher is bound to the
+   * SPECIFIC class the report card belongs to (so Form 1A and Form 1B never
+   * cross-sign), while the Head Teacher is a single school-level signer.
+   *
+   * Each signatory slot on the template is resolved to a concrete signer:
+   *   - "Class Teacher" → the class's assigned teacher (classTeacherId/Name).
+   *   - "Head Teacher"/"Principal"/"Director" → school-level signer.
+   *
+   * Signatures are memoized on the DocumentVerification row (signatureRecordId +
+   * metadata) and a visible role + name + status block is returned for the
+   * `{{digital_signature}}` placeholder. Fail-safe: never breaks rendering.
+   */
+  private async signReportCardSignatories(
+    schoolId: string,
+    template: { templateType?: string | null; name?: string | null; includeSignature: boolean; id: string },
+    finalized: { id: string; documentHash: string },
+    context: {
+      documentId?: string;
+      classId?: string | null;
+      className?: string | null;
+      classTeacherId?: string | null;
+      classTeacherName?: string | null;
+    },
+  ): Promise<{ html: string; signatureRecordId: string | null; signatures: Record<string, unknown>[] }> {
+    if (!template.includeSignature || !this.signatureBridge.configured) {
+      return { html: '', signatureRecordId: null, signatures: [] };
+    }
+
+    const slots = await this.prisma.templateSignatory.findMany({
+      where: { templateId: template.id, isRequired: true },
+      select: { id: true, label: true, role: true, position: true },
+      orderBy: { position: 'asc' },
+    });
+    if (!slots.length) return { html: '', signatureRecordId: null, signatures: [] };
+
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { name: true, headTeacherName: true },
+    });
+
+    const signed: Record<string, unknown>[] = [];
+    let signatureRecordId: string | null = null;
+
+    for (const slot of slots) {
+      const label = (slot.label || '').trim();
+      const norm = (slot.role || label || '').toLowerCase();
+
+      let signerId: string | null = null;
+      let signerName: string | null = null;
+      let signerRole = label;
+
+      if (/(class teacher|form mistress|form master|class mistress|class master)/i.test(norm)) {
+        signerId = context.classTeacherId || null;
+        signerName = context.classTeacherName || null;
+        if (context.className) signerRole = `${signerRole} — ${context.className}`;
+      } else if (/(head teacher|headteacher|principal|director|deputy)/i.test(norm)) {
+        signerId = 'head-teacher';
+        signerName = school?.headTeacherName || undefined as any || null;
+      }
+
+      if (!signerId) {
+        this.logger.warn(
+          `Skipping report signatory "${label}" for template ${template.id}: no resolvable signer (school ${schoolId}).`,
+        );
+        continue;
+      }
+
+      try {
+        const sig = await this.signatureBridge.sign({
+          organizationId: schoolId,
+          documentId: context.documentId || finalized.id,
+          documentName: template.name || 'Report Card',
+          documentType: template.templateType || 'REPORT_CARD',
+          canonicalHash: finalized.documentHash,
+          signerId: signerId,
+          signerRole: signerRole || undefined,
+          metadata: {
+            classId: context.classId || null,
+            className: context.className || null,
+            templateId: template.id,
+            source: 'report-card-pipeline',
+          },
+        });
+        if (!signatureRecordId) signatureRecordId = sig.signatureId;
+        signed.push({
+          signerId,
+          signerName: signerName || '',
+          signerRole: signerRole || label,
+          signatureId: sig.signatureId,
+          algorithm: sig.algorithm,
+          canonicalHash: sig.canonicalHash,
+          signedAt: sig.signedAt,
+          fingerprint: sig.keyFingerprint || null,
+        });
+      } catch (e: any) {
+        this.logger.warn(
+          `Report signatory "${signerRole}" signature failed (template ${template.id}): ${e?.message ?? e}`,
+        );
+      }
+    }
+
+    if (signatureRecordId) {
+      try {
+        await this.prisma.documentVerification.update({
+          where: { id: finalized.id },
+          data: {
+            signatureRecordId,
+            metadata: { signatures: signed },
+          },
+        });
+      } catch (e: any) {
+        this.logger.warn(`Could not persist report signatures: ${e?.message ?? e}`);
+      }
+    }
+
+    const html = this.renderDigitalSignatureBlock(signed);
+    return { html, signatureRecordId, signatures: signed };
+  }
+
+  /**
+   * Builds a VISIBLE, legible digital-signature block (role + name + verified
+   * status) with explicit font sizes so signatures are never rendered too small,
+   * plus per-document cryptographic metadata. Mirrors the offline issuance block.
+   */
+  private renderDigitalSignatureBlock(signed: Record<string, unknown>[]): string {
+    if (!signed.length) return '';
+    const fields = signed
+      .map((s) => {
+        const name = String(s.signerName || '').trim();
+        const role = String(s.signerRole || '').trim();
+        const when = s.signedAt
+          ? new Date(String(s.signedAt)).toLocaleString(undefined, {
+              year: 'numeric', month: 'short', day: 'numeric',
+              hour: '2-digit', minute: '2-digit',
+            })
+          : '';
+        return `
+        <div style="flex:1;min-width:220px;padding:0 6px;page-break-inside:avoid;">
+          <div style="font-family:Georgia,'Times New Roman',serif;">
+            <div style="font-size:11px;letter-spacing:.4px;color:#059669;font-weight:700;">DIGITALLY SIGNED</div>
+            <div style="font-size:19px;font-weight:700;color:#111827;margin:3px 0;">${this.escapeHtml(name || 'Signatory')}</div>
+            <div style="font-size:14px;color:#374151;">${this.escapeHtml(role)}</div>
+            <div style="border-top:1px solid #9ca3af;margin-top:9px;padding-top:5px;">
+              <div style="font-size:12px;color:#6b7280;">${when ? `Signed: ${this.escapeHtml(when)}` : 'Verified'}</div>
+              ${s.fingerprint ? `<div style="font-size:10px;color:#9ca3af;word-break:break-all;">Key: ${this.escapeHtml(String(s.fingerprint))}</div>` : ''}
+            </div>
+          </div>
+        </div>`;
+      })
+      .join('');
+
+    return `
+      <div style="display:flex;flex-wrap:wrap;gap:22px;margin-top:20px;page-break-inside:avoid;">
+        ${fields}
+      </div>`;
+  }
+
+  /**
    * Automatic authenticity workflow (marketplace-driven): if the ReportTemplate
    * opts in via includeStamp/includeSignature, run stamp-engine finalize
    * (serial → hash → QR → verification record) and expose the result to the
@@ -1427,7 +1588,7 @@ export class TemplateRendererService {
         where: { id: templateId, schoolId },
         select: { id: true, name: true, templateType: true, includeStamp: true, includeSignature: true },
       });
-      if (!template?.includeStamp) return data;
+      if (!template?.includeStamp && !template?.includeSignature) return data;
 
       // Entitlement gate — missing PREMIUM feature ⇒ unauthenticated render.
       await this.verification.assertEntitlement(schoolId);
@@ -1448,9 +1609,22 @@ export class TemplateRendererService {
         userAgent: 'report-pipeline',
       });
 
+      const placeholders = this.verification.buildAuthenticityPlaceholders(finalized);
+
+      if (template.includeSignature) {
+        const signed = await this.signReportCardSignatories(schoolId, template, finalized, {
+          documentId: finalized.id,
+          classId: data?.class?.id ?? null,
+          className: data?.class?.name ?? null,
+          classTeacherId: data?.class?.classTeacherId ?? null,
+          classTeacherName: data?.class?.classTeacherName ?? null,
+        });
+        placeholders.digital_signature = signed.html;
+      }
+
       return {
         ...(data || {}),
-        authenticity: this.verification.buildAuthenticityPlaceholders(finalized),
+        authenticity: placeholders,
       };
     } catch (e: any) {
       // Fail-safe per spec §Failure Handling: no serial/QR/stamp on the output.
@@ -1470,6 +1644,12 @@ export class TemplateRendererService {
   async finalizeReportAuthenticity(
     schoolId: string,
     templateId: string,
+    classContext?: {
+      classId?: string | null;
+      className?: string | null;
+      classTeacherId?: string | null;
+      classTeacherName?: string | null;
+    } | null,
   ): Promise<{
     placeholders: Record<string, string>;
     verificationCode: string;
@@ -1478,9 +1658,9 @@ export class TemplateRendererService {
     try {
       const template = await this.prisma.reportTemplate.findFirst({
         where: { id: templateId, schoolId },
-        select: { id: true, name: true, templateType: true, includeStamp: true },
+        select: { id: true, name: true, templateType: true, includeStamp: true, includeSignature: true },
       });
-      if (!template?.includeStamp) return null;
+      if (!template?.includeStamp && !template?.includeSignature) return null;
 
       await this.verification.assertEntitlement(schoolId);
 
@@ -1498,8 +1678,21 @@ export class TemplateRendererService {
         userAgent: 'report-pipeline',
       });
 
+      const placeholders = this.verification.buildAuthenticityPlaceholders(finalized as any);
+
+      if (template.includeSignature) {
+        const signed = await this.signReportCardSignatories(schoolId, template, finalized, {
+          documentId: finalized.id,
+          classId: classContext?.classId ?? null,
+          className: classContext?.className ?? null,
+          classTeacherId: classContext?.classTeacherId ?? null,
+          classTeacherName: classContext?.classTeacherName ?? null,
+        });
+        placeholders.digital_signature = signed.html;
+      }
+
       return {
-        placeholders: this.verification.buildAuthenticityPlaceholders(finalized as any),
+        placeholders,
         verificationCode: finalized.verificationCode,
         verificationUrl: finalized.verificationUrl,
       };

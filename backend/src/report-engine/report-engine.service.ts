@@ -603,7 +603,15 @@ export class ReportEngineService {
 
     const rendered = await this.renderReportCardWithTemplate(request);
     if (rendered) {
-      const html = await this.attachReportAuthenticity(schoolId, rendered);
+      const classCtx = rendered.engineData?.class
+        ? {
+            classId: rendered.engineData.class.id ?? null,
+            className: rendered.engineData.class.name ?? null,
+            classTeacherId: rendered.engineData.class.classTeacherId ?? null,
+            classTeacherName: rendered.engineData.class.classTeacherName ?? null,
+          }
+        : null;
+      const html = await this.attachReportAuthenticity(schoolId, rendered, classCtx);
       return this.templateRenderer.renderPdfFromHtml(schoolId, rendered.templateId, html);
     }
 
@@ -628,13 +636,15 @@ export class ReportEngineService {
   private async attachReportAuthenticity(
     schoolId: string,
     rendered: { html: string; templateId: string },
+    classContext?: { classId?: string | null; className?: string | null; classTeacherId?: string | null; classTeacherName?: string | null } | null,
   ): Promise<string> {
     try {
-      const auth = await this.templateRenderer.finalizeReportAuthenticity(schoolId, rendered.templateId);
+      const auth = await this.templateRenderer.finalizeReportAuthenticity(schoolId, rendered.templateId, classContext);
       if (!auth) return rendered.html;
 
       const html = rendered.html
         .replace(/\{\{\s*digital_stamp\s*\}\}/g, auth.placeholders.digital_stamp || '')
+        .replace(/\{\{\s*digital_signature\s*\}\}/g, auth.placeholders.digital_signature || '')
         .replace(/\{\{\s*verification_qr\s*\}\}/g, auth.placeholders.verification_qr || '')
         .replace(/\{\{\s*document_serial\s*\}\}/g, auth.placeholders.document_serial || '')
         .replace(/\{\{\s*document_hash\s*\}\}/g, auth.placeholders.document_hash || '')

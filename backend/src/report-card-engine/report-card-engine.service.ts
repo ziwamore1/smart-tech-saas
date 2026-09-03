@@ -30,6 +30,9 @@ export class ReportCardEngineService {
             class: {
               include: {
                 levelType: true,
+                classTeacher: {
+                  select: { id: true, firstName: true, lastName: true },
+                },
               },
             },
             academicYear: true,
@@ -498,6 +501,10 @@ export class ReportCardEngineService {
         id: enrollment.classId,
         name: enrollment.class.name,
         level: enrollment.class.levelType?.name,
+        classTeacherId: enrollment.class.classTeacher?.id ?? null,
+        classTeacherName: enrollment.class.classTeacher
+          ? `${enrollment.class.classTeacher.firstName} ${enrollment.class.classTeacher.lastName}`.trim()
+          : null,
       },
       academicYear: {
         id: enrollment.academicYearId,
