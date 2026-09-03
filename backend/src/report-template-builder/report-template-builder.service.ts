@@ -85,10 +85,10 @@ export class ReportTemplateBuilderService {
       if (existing._count.components === 0) {
         await this.seedEnhancedProfessionalComponents(existing.id);
       }
-      if (isPremium && !existing.includeStamp) {
+      if (isPremium && (!existing.includeStamp || !existing.includeSignature)) {
         await this.prisma.reportTemplate.update({
           where: { id: existing.id },
-          data: { includeStamp: true },
+          data: { includeStamp: true, includeSignature: true },
         });
       }
       return existing;
@@ -108,6 +108,7 @@ export class ReportTemplateBuilderService {
         status: 'PUBLISHED',
         isDefault: isPremium,
         includeStamp: isPremium,
+        includeSignature: true,
         primaryColor: '#1e3a8a',
         secondaryColor: '#eff6ff',
         metadata: { enhancedProfessional: true, premiumOnly: true },

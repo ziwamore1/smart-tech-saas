@@ -444,19 +444,10 @@ export class ReportEngineService {
     const reports: ReportGenerationResult[] = [];
 
     if (request.type === ReportType.CLASS_REPORT && request.classId && request.termId) {
-      // Generate ONE combined class PDF (single Puppeteer render) instead of
-      // launching a browser per student — this is what made bulk generation time out.
-      try {
-        const report = await this.generateReport({
-          ...request,
-          type: ReportType.CLASS_REPORT,
-        });
-        reports.push(report);
-        return reports;
-      } catch (error) {
-        this.logger.error(`Failed to generate combined class report: ${error.message}`);
-        return reports;
-      }
+      // Generate ONE signed report card PER STUDENT so each card's Class Teacher
+      // signature is scoped to that student's specific class (never cross-signed).
+      // Run with limited concurrency so large classes don't blow the request timeout.
+      return this.generateClassReportCards(request);
     }
 
     if (
@@ -969,6 +960,47 @@ export class ReportEngineService {
       request.termId!,
       request.examType,
     );
+  }
+
+  /**
+   * Generates ONE signed report card per ACTIVE student in the class through the
+   * template/signature pipeline (`generateReportCard`). Each student's card is
+   * signed with that student's specific Class Teacher + the school Head Teacher,
+   * so classes never cross-sign. Runs with limited concurrency for large classes.
+   */
+  private async generateClassReportCards(request: ReportGenerationRequest): Promise<ReportGenerationResult[]> {
+    const reports: ReportGenerationResult[] = [];
+    const studentIds = request.studentIds?.length
+      ? request.studentIds
+      : (request.classId && request.termId
+          ? (await this.prisma.enrollment.findMany({
+              where: { classId: request.classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+              select: { studentId: true },
+            })).map(e => e.studentId)
+          : []);
+
+    let index = 0;
+    const worker = async () => {
+      while (index < studentIds.length) {
+        const studentId = studentIds[index++];
+        try {
+          const report = await this.generateReport({
+            ...request,
+            type: ReportType.REPORT_CARD,
+            studentId,
+          });
+          reports.push(report);
+        } catch (error: any) {
+          this.logger.error(
+            `Failed to generate signed report card for student ${studentId}: ${error.message}`,
+          );
+        }
+      }
+    };
+
+    const workers = Array.from({ length: Math.min(3, studentIds.length || 1) }, worker);
+    await Promise.all(workers);
+    return reports;
   }
 
   private async generateTranscript(request: ReportGenerationRequest) {
