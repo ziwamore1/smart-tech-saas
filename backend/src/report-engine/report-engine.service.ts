@@ -675,7 +675,8 @@ export class ReportEngineService {
           <div>Verification code: <strong>${auth.verificationCode}</strong></div>
           <div>Verify online: <a href="${verifyUrl}">${verifyUrl}</a></div>
         </div>
-      </div>`;
+      </div>
+      ${auth.placeholders.digital_signature || ''}`;
       return html.includes('</body>') ? html.replace('</body>', `${block}\n</body>`) : `${html}\n${block}`;
     } catch (e: any) {
       this.logger.warn(`Report authenticity attach skipped: ${e?.message ?? e}`);

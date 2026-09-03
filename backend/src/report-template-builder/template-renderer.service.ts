@@ -1371,7 +1371,16 @@ export class TemplateRendererService {
     // rendering. Fail-safe: any stamp-engine error renders the document
     // WITHOUT authenticity tokens (never a fake-authenticated document).
     const renderData = await this.maybeAttachAuthenticity(schoolId, templateId, data);
-    const html = await this.renderPreview(schoolId, templateId, renderData);
+    let html = await this.renderPreview(schoolId, templateId, renderData);
+
+    // Ensure the digital-signature block is always visible even when the
+    // template HTML does not declare a {{digital_signature}} placeholder.
+    const sigBlock = renderData?.authenticity?.digital_signature;
+    if (sigBlock && !html.includes('{{digital_signature}}')) {
+      html = html.includes('</body>')
+        ? html.replace('</body>', `${sigBlock}\n</body>`)
+        : `${html}\n${sigBlock}`;
+    }
 
     const template = await this.prisma.reportTemplate.findFirst({
       where: { id: templateId, schoolId },
@@ -1447,11 +1456,29 @@ export class TemplateRendererService {
       return { html: '', signatureRecordId: null, signatures: [] };
     }
 
-    const slots = await this.prisma.templateSignatory.findMany({
+    let slots = await this.prisma.templateSignatory.findMany({
       where: { templateId: template.id, isRequired: true },
       select: { id: true, label: true, role: true, position: true },
       orderBy: { position: 'asc' },
     });
+
+    // Auto-create default signatories if none configured yet (covers existing deployments).
+    if (!slots.length) {
+      const defaults = [
+        { label: 'Class Teacher', role: 'CLASS_TEACHER', position: 0 },
+        { label: 'Head Teacher', role: 'HEAD_TEACHER', position: 1 },
+      ];
+      for (const d of defaults) {
+        await this.prisma.templateSignatory.create({
+          data: { templateId: template.id, label: d.label, role: d.role, position: d.position, isRequired: true },
+        });
+      }
+      slots = await this.prisma.templateSignatory.findMany({
+        where: { templateId: template.id, isRequired: true },
+        select: { id: true, label: true, role: true, position: true },
+        orderBy: { position: 'asc' },
+      });
+    }
     if (!slots.length) return { html: '', signatureRecordId: null, signatures: [] };
 
     const school = await this.prisma.school.findUnique({
@@ -1476,7 +1503,7 @@ export class TemplateRendererService {
         if (context.className) signerRole = `${signerRole} — ${context.className}`;
       } else if (/(head teacher|headteacher|principal|director|deputy)/i.test(norm)) {
         signerId = 'head-teacher';
-        signerName = school?.headTeacherName || undefined as any || null;
+        signerName = school?.headTeacherName || null;
       }
 
       if (!signerId) {

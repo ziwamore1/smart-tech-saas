@@ -313,6 +313,17 @@ async function main() {
       });
     }
 
+    // Default report-card signatories (Class Teacher + Head Teacher). These
+    // become the cryptographically-signed slots when includeSignature is set.
+    if (tpl.templateType === 'REPORT_CARD' || tpl.templateType === 'PROGRESS_REPORT') {
+      await prisma.templateSignatory.createMany({
+        data: [
+          { templateId: template.id, label: 'Class Teacher', role: 'CLASS_TEACHER', position: 0, isRequired: true },
+          { templateId: template.id, label: 'Head Teacher', role: 'HEAD_TEACHER', position: 1, isRequired: true },
+        ],
+      });
+    }
+
     console.log(`  Created template: ${tpl.name}`);
   }
 
