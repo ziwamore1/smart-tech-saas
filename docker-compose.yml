@@ -103,23 +103,33 @@ services:
   # Digital Signature Service (Part B) — opt-in via profile so the default
   # `docker compose up -d` behaviour is unchanged:
   #   docker compose --profile authenticity up -d
+  # REQUIRES secrets in .env (never use the insecure placeholders below):
+  #   SIG_ENCRYPTION_KEY  (64 hex chars — encrypts Ed25519 private keys at rest)
+  #   SIG_JWT_SECRET      (long random — org-session signing)
+  #   INTERNAL_SERVICE_KEYS (must match the main backend's SIGNATURE_SERVICE_KEY)
+  # Optional override: SIG_DATABASE_URL (defaults to the shared Postgres schema).
   signature-service:
     build:
       context: ./digital-signature/backend
       dockerfile: Dockerfile
     container_name: smarttech-signature-service
     environment:
-      DATABASE_URL: ${SIG_DATABASE_URL:-file:/app/data/prod.db}
-      JWT_SECRET: ${SIG_JWT_SECRET:-change-this-to-a-secure-random-string-min-32-characters}
-      ENCRYPTION_KEY: ${SIG_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
-      INTERNAL_SERVICE_KEYS: ${INTERNAL_SERVICE_KEYS:-stamp-engine:dev-internal-service-secret}
+      # Signature tables (Organisation, SigningKey, Signature, …) live in the
+      # shared Postgres by default — no name collisions with the school schema.
+      # Override with SIG_DATABASE_URL / SIG_DIRECT_URL to isolate into its own DB.
+      DATABASE_URL: ${SIG_DATABASE_URL:-postgresql://${DB_USER:-smarttech}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-school_saas}}
+      DIRECT_URL: ${SIG_DIRECT_URL:-postgresql://${DB_USER:-smarttech}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-school_saas}}
+      JWT_SECRET: ${SIG_JWT_SECRET:?set SIG_JWT_SECRET in .env}
+      ENCRYPTION_KEY: ${SIG_ENCRYPTION_KEY:?set SIG_ENCRYPTION_KEY (64 hex chars) in .env}
+      INTERNAL_SERVICE_KEYS: ${INTERNAL_SERVICE_KEYS:?set INTERNAL_SERVICE_KEYS in .env}
       CORS_ORIGIN: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
       PORT: 4001
       NODE_ENV: production
     ports:
       - "4001:4001"
-    volumes:
-      - sig_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - smarttech-network
     restart: unless-stopped
@@ -157,7 +167,6 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  sig_data:
 
 networks:
   smarttech-network:

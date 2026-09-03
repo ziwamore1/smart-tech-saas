@@ -1,4 +1,4 @@
-﻿generator client {
+generator client {
   provider = "prisma-client-js"
 }
 
@@ -26,7 +26,7 @@ model Organisation {
   visualAssets     VisualSignatureAsset[]
 }
 
-// â”€â”€ Signing-key lifecycle: ACTIVE â†’ ROTATED â†’ REVOKED â”€â”€
+// ── Signing-key lifecycle: ACTIVE → ROTATED → REVOKED ──
 // Historical signatures stay verifiable because every Signature row pins the
 // publicKey that produced it; keyId identifies the lifecycle record.
 model SigningKey {
@@ -77,7 +77,7 @@ model Signature {
   @@index([organisationId, documentId])
 }
 
-// Visual representation of a handwritten/typed signature â€” NOT cryptographic.
+// Visual representation of a handwritten/typed signature — NOT cryptographic.
 // Purely presentational; authenticity comes exclusively from Signature rows.
 model VisualSignatureAsset {
   id             String   @id @default(uuid())
@@ -128,4 +128,3 @@ model VerificationEvent {
   @@index([identifier, createdAt])
   @@index([signatureId, createdAt])
 }
-

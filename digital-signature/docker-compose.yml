@@ -1,27 +1,53 @@
 version: '3.8'
 
 # Standalone deployment for the Digital Signature Service (Part B).
-#   cp .env.production.example .env  &&  docker compose --env-file .env up -d --build
-# The service is logically independent; it does NOT need the main stack to run.
+# Self-contained: brings its own PostgreSQL so it does NOT need the main stack.
+#
+#   cp .env.production.example .env
+#   # fill SIG_DATABASE_URL to a Postgres host, or keep defaults (local sig-postgres)
+#   docker compose up -d --build
+#
+# Secrets are REQUIRED (the compose will refuse to start without them):
+#   SIG_JWT_SECRET, SIG_ENCRYPTION_KEY (64 hex chars), INTERNAL_SERVICE_KEYS
 
 services:
+  sig-postgres:
+    image: postgres:15-alpine
+    container_name: sig-postgres
+    environment:
+      POSTGRES_USER: ${SIG_DB_USER:-smarttech}
+      POSTGRES_PASSWORD: ${SIG_DB_PASSWORD:-changeme}
+      POSTGRES_DB: ${SIG_DB_NAME:-signatures}
+    ports:
+      - "5433:5432"
+    volumes:
+      - sig_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SIG_DB_USER:-smarttech}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   signature-service:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: sig-service
     environment:
-      DATABASE_URL: ${SIG_DATABASE_URL:-file:/app/data/prod.db}
+      DATABASE_URL: ${SIG_DATABASE_URL:-postgresql://${SIG_DB_USER:-smarttech}:${SIG_DB_PASSWORD:-changeme}@sig-postgres:5432/${SIG_DB_NAME:-signatures}}
+      DIRECT_URL: ${SIG_DIRECT_URL:-postgresql://${SIG_DB_USER:-smarttech}:${SIG_DB_PASSWORD:-changeme}@sig-postgres:5432/${SIG_DB_NAME:-signatures}}
       JWT_SECRET: ${SIG_JWT_SECRET:?set SIG_JWT_SECRET in .env}
-      ENCRYPTION_KEY: ${SIG_ENCRYPTION_KEY:?set SIG_ENCRYPTION_KEY in .env}
+      ENCRYPTION_KEY: ${SIG_ENCRYPTION_KEY:?set SIG_ENCRYPTION_KEY (64 hex chars) in .env}
       INTERNAL_SERVICE_KEYS: ${INTERNAL_SERVICE_KEYS:?set INTERNAL_SERVICE_KEYS in .env}
       CORS_ORIGIN: ${SIG_CORS_ORIGIN:-http://localhost:3100}
       PORT: 4001
       NODE_ENV: production
     ports:
       - "4001:4001"
-    volumes:
-      - sig_data:/app/data
+    depends_on:
+      sig-postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   # Optional operator/issuer UI. Omit with: docker compose up -d signature-service
@@ -40,4 +66,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  sig_data:
+  sig_pgdata:
