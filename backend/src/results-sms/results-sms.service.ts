@@ -5,6 +5,7 @@ import { SmsProviderFactory } from '../communications-cloud/providers/sms/sms-pr
 import { SmsProvider } from '../communications-cloud/interfaces/provider.interface';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 import { mapBounded } from '../common/utils/concurrency.util';
+import { normalizeZambianPhone } from '../common/utils/phone.util';
 import { QueuesService } from '../queues/queues.service';
 import { QUEUE_NAMES } from '../queues/queue-definitions';
 
@@ -96,7 +97,7 @@ export class ResultsSmsService {
       })).map((subject: any) => ({
         name: subject.subjectName,
         code: subject.subjectCode,
-        mark: isPrimary ? subject.totalRawScore : null,
+        mark: subject.totalRawScore,
         grade: subject.finalGrade,
         remark: subject.finalRemark,
         points: subject.points,
@@ -118,7 +119,7 @@ export class ResultsSmsService {
           filtered.push({
             name: comp.composite.name,
             code: comp.composite.code,
-            mark: isPrimary ? comp.finalPercentage : null,
+            mark: comp.finalPercentage,
             grade: comp.finalGrade,
             remark: null,
             points: null,
@@ -152,15 +153,16 @@ export class ResultsSmsService {
       const existing = priorSent.get(`${student.id}:${version}`);
       for (const link of student.parents) {
         const parent = link.parent;
-        const phoneStatus = !parent.phone ? 'MISSING' : this.isValidPhone(parent.phone) ? 'VALID' : 'INVALID';
+        const normalizedPhone = normalizeZambianPhone(parent.phone);
+        const phoneStatus = normalizedPhone == null ? 'MISSING' : this.isValidPhone(normalizedPhone) ? 'VALID' : 'INVALID';
         recipients.push({
           parentId: parent.id, parentName: `${parent.firstName} ${parent.lastName}`, studentId: student.id,
           studentName: `${student.firstName} ${student.lastName}`, admissionNumber: student.admissionNumber,
-          phoneNumber: parent.phone ?? null, phoneStatus, message, result, resultVersion: version,
+          phoneNumber: normalizedPhone, phoneStatus, message, result, resultVersion: version,
           characters: length, segments: Math.max(1, Math.ceil(length / SINGLE_SMS_LIMIT)), estimatedUnits: Math.max(1, Math.ceil(length / SINGLE_SMS_LIMIT)),
           alreadySent: Boolean(existing), previousStatus: existing?.status ?? null,
-          errorCode: !parent.phone ? 'NO_PHONE_NUMBER' : phoneStatus === 'INVALID' ? 'INVALID_PHONE_NUMBER' : undefined,
-          errorSuggestion: !parent.phone ? 'Add a parent phone number in Parent Management.' : phoneStatus === 'INVALID' ? 'Use an international phone number, for example +260XXXXXXXXX.' : undefined,
+          errorCode: normalizedPhone == null ? 'NO_PHONE_NUMBER' : phoneStatus === 'INVALID' ? 'INVALID_PHONE_NUMBER' : undefined,
+          errorSuggestion: normalizedPhone == null ? 'Add a parent phone number in Parent Management.' : phoneStatus === 'INVALID' ? 'Use an international phone number, for example +260XXXXXXXXX.' : undefined,
         });
       }
     }
@@ -283,8 +285,10 @@ export class ResultsSmsService {
   private formatMessage(student: any, className: string | undefined, term: string | undefined, result: any) {
     const subjects = result.subjects.map((s: any) => {
       const label = this.subjectShortcut(s.name);
-      if (result.bestSix != null) return `${label} ${s.points ?? '-'}`;
-      return `${label} ${s.absent ? 'ABS' : s.mark == null ? '-' : Number(s.mark.toFixed(1))}`;
+      if (s.absent) return `${label} ABS`;
+      const mark = s.mark != null ? Number(s.mark.toFixed(1)) : null;
+      if (mark != null) return `${label} ${mark}`;
+      return `${label} ${s.points ?? '-'}`;
     }).join(', ');
     const overall = [
       result.total != null ? `Total ${result.total}` : '',
@@ -296,8 +300,13 @@ export class ResultsSmsService {
       result.attendance != null ? `Att ${Number(result.attendance.toFixed(1))}%` : '',
     ].filter(Boolean).join(', ');
     let message = `${student.firstName} ${student.lastName} (${student.admissionNumber || 'N/A'}), ${className || 'Class'}, ${term || 'Results'}: ${subjects}. ${overall}. app.smarttechsaas.com`;
+    // Trim optional parts when over budget, but always keep Pts, Avg, Pos and the domain.
     if (message.length > SINGLE_SMS_LIMIT && result.classSize) message = message.replace(`/${result.classSize}`, '');
     if (message.length > SINGLE_SMS_LIMIT) message = message.replace(/,\s*Att [\d.]+%/, '');
+    if (message.length > SINGLE_SMS_LIMIT) message = message.replace(/,\s*Grade [^,]+/, '');
+    if (message.length > SINGLE_SMS_LIMIT) message = message.replace(/,\s*Div [^,]+/, '');
+    if (message.length > SINGLE_SMS_LIMIT) message = message.replace(/,\s*Total [\d.]+/, '');
+    if (message.length > SINGLE_SMS_LIMIT && (student.admissionNumber || '').length > 0) message = message.replace(/\s*\([^)]*\)/g, '');
     return message;
   }
   private subjectShortcut(name: string) {

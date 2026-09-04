@@ -826,7 +826,7 @@ export class StudentService {
           const parentUpdateData: any = {};
           if (parentFirstName) parentUpdateData.firstName = parentFirstName;
           if (parentLastName) parentUpdateData.lastName = parentLastName;
-          if (dto.parentPhone) parentUpdateData.phone = dto.parentPhone;
+          if (dto.parentPhone) parentUpdateData.phone = normalizeZambianPhone(dto.parentPhone);
           if (dto.parentEmail) parentUpdateData.email = dto.parentEmail;
           await this.prisma.parent.update({ where: { id: existingParent.id }, data: parentUpdateData });
         } else {
@@ -835,7 +835,7 @@ export class StudentService {
             data: {
               firstName: parentFirstName,
               lastName: parentLastName,
-              phone: dto.parentPhone || null,
+              phone: normalizeZambianPhone(dto.parentPhone),
               email: parentEmail,
               schoolId: student.schoolId,
             },

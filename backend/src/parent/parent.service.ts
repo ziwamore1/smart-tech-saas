@@ -4,6 +4,7 @@ import { ReportCardService } from '../report-card/report-card.service';
 import { UnifiedMessagingService } from '../messaging/unified-messaging.service';
 import { CredentialDeliveryService } from '../identity-service/credential-delivery.service';
 import { PasswordGenerationService } from '../identity-service/password-generation.service';
+import { normalizeZambianPhone } from '../common/utils/phone.util';
 import { CreateParentDto } from './dto/create-parent.dto';
 import * as bcrypt from 'bcrypt';
 
@@ -147,7 +148,7 @@ export class ParentService {
         firstName: dto.firstName,
         lastName: dto.lastName,
         email: dto.email,
-        phone: dto.phone,
+        phone: normalizeZambianPhone(dto.phone),
         password: hashedPassword,
         schoolId,
         ...(dto.children && dto.children.length > 0 && {
@@ -469,9 +470,12 @@ export class ParentService {
     const parent = await this.prisma.parent.findUnique({ where: { id } });
     if (!parent) throw new NotFoundException('Parent not found');
 
+    const payload: { firstName?: string; lastName?: string; email?: string; phone?: string } = { ...data };
+    if (data.phone !== undefined) payload.phone = normalizeZambianPhone(data.phone) ?? undefined;
+
     return this.prisma.parent.update({
       where: { id },
-      data,
+      data: payload,
       include: {
         children: {
           include: {
