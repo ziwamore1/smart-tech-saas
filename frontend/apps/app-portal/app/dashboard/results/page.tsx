@@ -1397,7 +1397,7 @@ export default function ResultsPage() {
         status = 'SUBMITTED';
       }
       if (status === 'SUBMITTED') {
-        await api.post(`/results-management/sheets/${sheetData.id}/verify`);
+        await api.post(`/results-management/sheets/${sheetData.id}/verify`, undefined, { timeout: 300000 });
       }
     },
     onSuccess: async () => {
@@ -1419,7 +1419,7 @@ export default function ResultsPage() {
         status = 'SUBMITTED';
       }
       if (status === 'SUBMITTED') {
-        await api.post(`/results-management/sheets/${sheetData.id}/verify`);
+        await api.post(`/results-management/sheets/${sheetData.id}/verify`, undefined, { timeout: 300000 });
         status = 'VERIFIED';
       }
       if (status === 'VERIFIED') {

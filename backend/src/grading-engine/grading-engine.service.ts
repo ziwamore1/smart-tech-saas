@@ -27,6 +27,22 @@ export class GradingEngineService {
     private studentSubjectService: StudentSubjectService,
   ) {}
 
+  /**
+   * Deduplicates the identical grading/config queries that are re-issued for
+   * every student during a class-wide computation pass. The cache lives for the
+   * duration of one `computeAllClassResults` call, so results are never stale.
+   */
+  private async memoLookup<T>(
+    cache: Map<string, any> | undefined,
+    key: string,
+    loader: () => Promise<T>,
+  ): Promise<T> {
+    if (cache?.has(key)) return cache.get(key) as T;
+    const value = await loader();
+    if (cache) cache.set(key, value);
+    return value;
+  }
+
   async computeGrade(
     percentage: number,
     classId: string,
@@ -103,17 +119,18 @@ export class GradingEngineService {
     subjectId: string,
     termId: string,
     schoolId: string,
+    cache?: Map<string, any>,
   ): Promise<GradeResult> {
     // First check: new GradingSystem via class.gradingSystemId
     if (classId) {
-      const cls = await this.prisma.class.findUnique({
+      const cls = await this.memoLookup(cache, `class|${classId}`, () => this.prisma.class.findUnique({
         where: { id: classId },
         include: {
           gradingSystem: {
             include: { gradeScales: { orderBy: { minScore: 'asc' } } },
           },
         },
-      });
+      }));
 
       if (cls?.gradingSystem?.gradeScales?.length > 0) {
         const scale = cls.gradingSystem.gradeScales.find(
@@ -131,10 +148,10 @@ export class GradingEngineService {
     }
 
     // Check school's default grading system
-    const schoolDefault = await this.prisma.gradingSystem.findFirst({
+    const schoolDefault = await this.memoLookup(cache, `default|${schoolId}`, () => this.prisma.gradingSystem.findFirst({
       where: { schoolId, isDefault: true },
       include: { gradeScales: { orderBy: { minScore: 'asc' } } },
-    });
+    }));
     if (schoolDefault?.gradeScales?.length > 0) {
       const scale = schoolDefault.gradeScales.find(
         s => percentage >= s.minScore && percentage < s.maxScore + 1,
@@ -150,10 +167,10 @@ export class GradingEngineService {
     }
 
     // Check any grading system for the school
-    const anySystem = await this.prisma.gradingSystem.findFirst({
+    const anySystem = await this.memoLookup(cache, `any|${schoolId}`, () => this.prisma.gradingSystem.findFirst({
       where: { schoolId },
       include: { gradeScales: { orderBy: { minScore: 'asc' } } },
-    });
+    }));
     if (anySystem?.gradeScales?.length > 0) {
       const scale = anySystem.gradeScales.find(
         s => percentage >= s.minScore && percentage < s.maxScore + 1,
@@ -169,7 +186,11 @@ export class GradingEngineService {
     }
 
     // Fallback: old GradingPolicy via ClassGradingPolicy
-    const policy = await this.getActiveGradingPolicy(classId, subjectId, termId, schoolId);
+    const policy = await this.memoLookup(
+      cache,
+      `policy|${classId}|${subjectId}|${termId}|${schoolId}`,
+      () => this.getActiveGradingPolicy(classId, subjectId, termId, schoolId),
+    );
 
     if (!policy) {
       this.logger.warn(`No grading system found for school ${schoolId}, classId ${classId}`);
@@ -198,6 +219,7 @@ export class GradingEngineService {
     termId: string,
     classId: string,
     schoolId: string,
+    cache?: Map<string, any>,
   ): Promise<{
     totalRawScore: number | null;
     totalWeightedScore: number | null;
@@ -207,13 +229,17 @@ export class GradingEngineService {
     points: number | null;
     gpa: number | null;
   }> {
-    const configs = await this.prisma.termAssessmentConfiguration.findMany({
-      where: { classId, subjectId, termId },
-      orderBy: { sequenceOrder: 'asc' },
-    });
+    const configs = await this.memoLookup(
+      cache,
+      `configs|${classId}|${subjectId}|${termId}`,
+      () => this.prisma.termAssessmentConfiguration.findMany({
+        where: { classId, subjectId, termId },
+        orderBy: { sequenceOrder: 'asc' },
+      }),
+    );
 
     if (configs.length === 0) {
-      return this.getLegacyResultFallback(studentId, subjectId, termId, classId, schoolId);
+      return this.getLegacyResultFallback(studentId, subjectId, termId, classId, schoolId, cache);
     }
 
     const results = await this.prisma.studentAssessmentResult.findMany({
@@ -253,7 +279,7 @@ export class GradingEngineService {
     }
 
     if (totalWeight === 0 || !hasAllMandatory) {
-      const fallback = await this.getLegacyResultFallback(studentId, subjectId, termId, classId, schoolId);
+      const fallback = await this.getLegacyResultFallback(studentId, subjectId, termId, classId, schoolId, cache);
       if (fallback.finalPercentage != null) return fallback;
       return {
         totalRawScore: totalRawScore.toNumber(),
@@ -273,6 +299,7 @@ export class GradingEngineService {
       subjectId,
       termId,
       schoolId,
+      cache,
     );
 
     return {
@@ -292,6 +319,7 @@ export class GradingEngineService {
     termId: string,
     classId: string,
     schoolId: string,
+    cache?: Map<string, any>,
   ): Promise<{
     totalRawScore: number | null;
     totalWeightedScore: number | null;
@@ -323,6 +351,7 @@ export class GradingEngineService {
       subjectId,
       termId,
       schoolId,
+      cache,
     ).catch(() => null);
 
     return {
@@ -356,7 +385,10 @@ export class GradingEngineService {
 
     // A verification covers every student in the class. Process a bounded
     // number in parallel instead of awaiting the full class serially, while
-    // keeping database pressure predictable.
+    // keeping database pressure predictable. Gradient/config lookups are shared
+    // across the whole pass via cache so the same class-level data is not
+    // re-fetched once per student.
+    const cache = new Map<string, any>();
     const studentResults = await mapBounded(enrollments, async (enrollment) => {
       const validSubjectIds = subjectMap.get(enrollment.studentId) ?? [];
       if (!validSubjectIds.includes(subjectId)) return null;
@@ -368,6 +400,7 @@ export class GradingEngineService {
           termId,
           classId,
           schoolId,
+          cache,
         );
 
         return await this.prisma.computedResult.upsert({

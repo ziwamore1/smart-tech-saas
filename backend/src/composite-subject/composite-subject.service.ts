@@ -138,11 +138,17 @@ export class CompositeSubjectService {
     termId: string,
     classId: string,
     schoolId: string,
+    compositeCache?: Map<string, any>,
+    gradeCache?: Map<string, any>,
   ) {
-    const composite = await this.prisma.compositeSubject.findUnique({
-      where: { id: compositeSubjectId },
-      include: { components: true },
-    });
+    const composite = await this.memoLookup(
+      compositeCache,
+      `composite|${compositeSubjectId}`,
+      () => this.prisma.compositeSubject.findUnique({
+        where: { id: compositeSubjectId },
+        include: { components: true },
+      }),
+    );
     if (!composite) throw new NotFoundException('Composite subject not found');
 
     let totalWeighted = 0;
@@ -179,7 +185,7 @@ export class CompositeSubjectService {
     }
 
     const finalPct = parseFloat((totalWeighted / totalWeight).toFixed(2));
-    const finalGrade = await this.computeGrade(finalPct, classId, compositeSubjectId, termId, schoolId);
+    const finalGrade = await this.computeGrade(finalPct, classId, compositeSubjectId, termId, schoolId, gradeCache);
 
     return {
       composite: { id: composite.id, name: composite.name, code: composite.code },
@@ -250,20 +256,29 @@ export class CompositeSubjectService {
       select: { studentId: true },
     });
 
-    const results: any[] = [];
-    for (const composite of composites) {
-      for (const enrollment of enrollments) {
-        const result = await this.computeCompositeForStudent(
-          composite.id,
-          enrollment.studentId,
-          termId,
-          classId,
-          schoolId,
-        );
-        if (result) results.push(result);
-      }
-    }
-    return results;
+    // Run the composite×student matrix with bounded concurrency instead of a
+    // fully serial N+1 loop, and share the composite/grading lookups across the
+    // whole pass so identical queries are not re-issued for every student.
+    const compositeCache = new Map<string, any>();
+    const gradeCache = new Map<string, any>();
+    const jobs = composites.flatMap(composite => enrollments.map(enrollment => ({
+      compositeId: composite.id,
+      studentId: enrollment.studentId,
+    })));
+    const results = await mapBounded(
+      jobs,
+      job => this.computeCompositeForStudent(
+        job.compositeId,
+        job.studentId,
+        termId,
+        classId,
+        schoolId,
+        compositeCache,
+        gradeCache,
+      ),
+      8,
+    );
+    return results.filter(Boolean);
   }
 
   async getCompositeResultsForStudent(studentId: string, termId: string, classId: string, schoolId: string) {
@@ -306,18 +321,19 @@ export class CompositeSubjectService {
     subjectId: string,
     termId: string,
     schoolId: string,
+    gradeCache?: Map<string, any>,
   ): Promise<string | null> {
     try {
       // 1. Class-specific grading system (highest priority)
       if (classId) {
-        const cls = await this.prisma.class.findUnique({
+        const cls = await this.memoLookup(gradeCache, `class|${classId}`, () => this.prisma.class.findUnique({
           where: { id: classId },
           include: {
             gradingSystem: {
               include: { gradeScales: { orderBy: { minScore: 'asc' } } },
             },
           },
-        });
+        }));
         if (cls?.gradingSystem?.gradeScales?.length > 0) {
           const scale = cls.gradingSystem.gradeScales.find(
             s => percentage >= s.minScore && percentage < s.maxScore + 1,
@@ -327,10 +343,10 @@ export class CompositeSubjectService {
       }
 
       // 2. School default grading system
-      const defaultSystem = await this.prisma.gradingSystem.findFirst({
+      const defaultSystem = await this.memoLookup(gradeCache, `default|${schoolId}`, () => this.prisma.gradingSystem.findFirst({
         where: { schoolId, isDefault: true },
         include: { gradeScales: { orderBy: { minScore: 'asc' } } },
-      });
+      }));
       if (defaultSystem?.gradeScales?.length > 0) {
         const scale = defaultSystem.gradeScales.find(
           s => percentage >= s.minScore && percentage < s.maxScore + 1,
@@ -339,10 +355,10 @@ export class CompositeSubjectService {
       }
 
       // 3. Any grading system for the school
-      const anySystem = await this.prisma.gradingSystem.findFirst({
+      const anySystem = await this.memoLookup(gradeCache, `any|${schoolId}`, () => this.prisma.gradingSystem.findFirst({
         where: { schoolId },
         include: { gradeScales: { orderBy: { minScore: 'asc' } } },
-      });
+      }));
       if (anySystem?.gradeScales?.length > 0) {
         const scale = anySystem.gradeScales.find(
           s => percentage >= s.minScore && percentage < s.maxScore + 1,
@@ -354,5 +370,16 @@ export class CompositeSubjectService {
     } catch {
       return null;
     }
+  }
+
+  private async memoLookup<T>(
+    cache: Map<string, any> | undefined,
+    key: string,
+    loader: () => Promise<T>,
+  ): Promise<T> {
+    if (cache?.has(key)) return cache.get(key) as T;
+    const value = await loader();
+    if (cache) cache.set(key, value);
+    return value;
   }
 }

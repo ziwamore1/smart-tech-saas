@@ -739,10 +739,16 @@ export class ResultsManagementService {
         },
       });
 
+      const computationSummary = {
+        computed: computationResults.reduce((sum: number, r: any) => sum + (r.computed ?? 0), 0),
+        failed: computationResults.reduce((sum: number, r: any) => sum + (r.failed ?? 0), 0),
+        bySubject: computationResults.map((r: any) => ({ subjectId: r.subjectId, computed: r.computed, failed: r.failed, error: r.error })),
+        compositesComputed: compositeResults.length,
+      };
+
       return {
         ...updated,
-        computationResults,
-        compositeResults: compositeResults.length > 0 ? compositeResults : undefined,
+        computationResults: computationSummary,
       };
     });
   }

@@ -2682,7 +2682,7 @@ class ApiService {
   }
 
   async verifyResultSheet(sheetId: string) {
-    const response = await this.client.post(`/results-management/sheets/${sheetId}/verify`);
+    const response = await this.client.post(`/results-management/sheets/${sheetId}/verify`, undefined, { timeout: 300000 });
     return response.data;
   }
 

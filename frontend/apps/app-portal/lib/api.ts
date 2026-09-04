@@ -2282,7 +2282,7 @@ export const resultsManagementApi = {
 
   // Workflow Actions
   submitSheet: (id: string) => api.post(`/results-management/sheets/${id}/submit`),
-  verifySheet: (id: string) => api.post(`/results-management/sheets/${id}/verify`),
+  verifySheet: (id: string) => api.post(`/results-management/sheets/${id}/verify`, undefined, { timeout: 300000 }),
   publishSheet: (id: string) => api.post(`/results-management/sheets/${id}/publish`),
   lockSheet: (id: string) => api.post(`/results-management/sheets/${id}/lock`),
   unlockSheet: (id: string) => api.post(`/results-management/sheets/${id}/unlock`),
