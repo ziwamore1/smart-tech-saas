@@ -841,30 +841,31 @@ export class ResultsManagementService {
     }
 
     if (this.pushNotification) {
-      try {
-        const [termInfo, classInfo, enrollments] = await Promise.all([
-          this.prisma.term.findUnique({ where: { id: sheet.termId }, select: { name: true, academicYearId: true } }),
-          this.prisma.class.findUnique({ where: { id: sheet.classId }, select: { name: true } }),
-          this.prisma.enrollment.findMany({
-            where: {
-              classId: sheet.classId,
-              status: 'ACTIVE',
-            },
-            include: {
-              student: {
-                include: {
-                  user: { select: { id: true } },
-                  parents: { include: { parent: { select: { email: true } } } },
+      void (async () => {
+        try {
+          const [termInfo, classInfo, enrollments] = await Promise.all([
+            this.prisma.term.findUnique({ where: { id: sheet.termId }, select: { name: true, academicYearId: true } }),
+            this.prisma.class.findUnique({ where: { id: sheet.classId }, select: { name: true } }),
+            this.prisma.enrollment.findMany({
+              where: {
+                classId: sheet.classId,
+                status: 'ACTIVE',
+              },
+              include: {
+                student: {
+                  include: {
+                    user: { select: { id: true } },
+                    parents: { include: { parent: { select: { email: true } } } },
+                  },
                 },
               },
-            },
-          }),
-        ]);
-        const termName = termInfo?.name || '';
-        const className = classInfo?.name || '';
-        const baseData = { type: 'result_published', classId: sheet.classId, termId: sheet.termId };
+            }),
+          ]);
+          const termName = termInfo?.name || '';
+          const className = classInfo?.name || '';
+          const baseData = { type: 'result_published', classId: sheet.classId, termId: sheet.termId };
 
-        const parentTargets: { userId: string; childName: string; studentId: string }[] = [];
+          const parentTargets: { userId: string; childName: string; studentId: string }[] = [];
           for (const enrollment of enrollments) {
             const student = enrollment.student;
             // Some legacy student records have the User -> Student foreign key
@@ -879,45 +880,46 @@ export class ResultsManagementService {
                 title: 'Results Published',
                 body: `Your results for ${className}${termName ? ' - ' + termName : ''} are now available.`,
                 data: baseData,
-            });
-          }
-          for (const link of student?.parents || []) {
-            if (link.parent?.email) {
-              const parentUser = await this.prisma.user.findFirst({
-                where: { email: link.parent.email },
-                select: { id: true },
               });
-              if (parentUser) {
-                parentTargets.push({
-                  userId: parentUser.id,
-                  childName: `${student.firstName} ${student.lastName}`,
-                  studentId: student.id,
+            }
+            for (const link of student?.parents || []) {
+              if (link.parent?.email) {
+                const parentUser = await this.prisma.user.findFirst({
+                  where: { email: link.parent.email },
+                  select: { id: true },
                 });
+                if (parentUser) {
+                  parentTargets.push({
+                    userId: parentUser.id,
+                    childName: `${student.firstName} ${student.lastName}`,
+                    studentId: student.id,
+                  });
+                }
               }
             }
           }
-        }
 
-        for (const target of parentTargets) {
-          await this.pushNotification.sendToUser(target.userId, {
-            title: `${target.childName}'s Results Published`,
-            body: `Results for ${className}${termName ? ' - ' + termName : ''} are now available.`,
-            data: { ...baseData, studentId: target.studentId },
-          });
-        }
+          for (const target of parentTargets) {
+            await this.pushNotification.sendToUser(target.userId, {
+              title: `${target.childName}'s Results Published`,
+              body: `Results for ${className}${termName ? ' - ' + termName : ''} are now available.`,
+              data: { ...baseData, studentId: target.studentId },
+            });
+          }
 
-        await this.pushNotification.sendByRole(
-          'Director',
-          {
-            title: 'Results Published',
-            body: `Results for ${className}${termName ? ' - ' + termName : ''} were published.`,
-            data: baseData,
-          },
-          sheet.schoolId,
-        );
-      } catch (error: any) {
-        this.logger.error(`[Results Published Notification] Failed: ${error.message}`);
-      }
+          await this.pushNotification.sendByRole(
+            'Director',
+            {
+              title: 'Results Published',
+              body: `Results for ${className}${termName ? ' - ' + termName : ''} were published.`,
+              data: baseData,
+            },
+            sheet.schoolId,
+          );
+        } catch (error: any) {
+          this.logger.error(`[Results Published Notification] Failed: ${error.message}`);
+        }
+      })();
     }
 
     return result;

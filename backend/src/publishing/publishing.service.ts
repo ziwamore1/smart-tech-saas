@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportCardService } from '../report-card/report-card.service';
 import { PushNotificationService } from '../push-notification/push-notification.service';
@@ -8,6 +8,8 @@ import { PassThrough } from 'stream';
 
 @Injectable()
 export class PublishingService {
+  private readonly logger = new Logger(PublishingService.name);
+
   constructor(
     private prisma: PrismaService,
     private reportCardService: ReportCardService,
@@ -129,46 +131,54 @@ export class PublishingService {
       });
     }
 
-    for (const enrollment of enrollments) {
-      const studentUser = enrollment.student?.user;
-      if (studentUser) {
-        await this.pushNotificationService.sendToUser(studentUser.id, {
-          title: 'Results Published',
-          body: `Your results for ${classInfo.name} - ${term.name} are now available.`,
-          data: { type: 'result_published', classId, termId },
-        });
-      }
+    // Send results-published notifications in the background so the endpoint
+    // returns promptly after the publish work has committed.
+    void (async () => {
+      try {
+        for (const enrollment of enrollments) {
+          const studentUser = enrollment.student?.user;
+          if (studentUser) {
+            await this.pushNotificationService.sendToUser(studentUser.id, {
+              title: 'Results Published',
+              body: `Your results for ${classInfo.name} - ${term.name} are now available.`,
+              data: { type: 'result_published', classId, termId },
+            });
+          }
 
-      const parentLinks = await this.prisma.parentStudent.findMany({
-        where: { studentId: enrollment.studentId },
-        include: { parent: { select: { email: true } } },
-      });
-
-      for (const link of parentLinks) {
-        const parentUser = await this.prisma.user.findFirst({
-          where: { email: link.parent.email },
-          select: { id: true },
-        });
-        if (parentUser) {
-          await this.pushNotificationService.sendToUser(parentUser.id, {
-            title: `${enrollment.student.firstName} ${enrollment.student.lastName}'s Results Published`,
-            body: `Results for ${classInfo.name} - ${term.name} are now available.`,
-            data: { type: 'result_published', classId, termId, studentId: enrollment.studentId },
+          const parentLinks = await this.prisma.parentStudent.findMany({
+            where: { studentId: enrollment.studentId },
+            include: { parent: { select: { email: true } } },
           });
-        }
-      }
-    }
 
-    // Notify all Directors of the school so they can monitor result publications.
-    await this.pushNotificationService.sendByRole(
-      'Director',
-      {
-        title: 'Results Published',
-        body: `Results for ${classInfo.name} - ${term.name} were published (${enrollments.length} students).`,
-        data: { type: 'result_published', classId, termId },
-      },
-      schoolId,
-    );
+          for (const link of parentLinks) {
+            const parentUser = await this.prisma.user.findFirst({
+              where: { email: link.parent.email },
+              select: { id: true },
+            });
+            if (parentUser) {
+              await this.pushNotificationService.sendToUser(parentUser.id, {
+                title: `${enrollment.student.firstName} ${enrollment.student.lastName}'s Results Published`,
+                body: `Results for ${classInfo.name} - ${term.name} are now available.`,
+                data: { type: 'result_published', classId, termId, studentId: enrollment.studentId },
+              });
+            }
+          }
+        }
+
+        // Notify all Directors of the school so they can monitor result publications.
+        await this.pushNotificationService.sendByRole(
+          'Director',
+          {
+            title: 'Results Published',
+            body: `Results for ${classInfo.name} - ${term.name} were published (${enrollments.length} students).`,
+            data: { type: 'result_published', classId, termId },
+          },
+          schoolId,
+        );
+      } catch (error: any) {
+        this.logger.error(`[Results Published Notification] Failed: ${error.message}`);
+      }
+    })();
 
     return {
       message: 'Results published successfully',

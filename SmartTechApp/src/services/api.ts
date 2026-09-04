@@ -2687,7 +2687,7 @@ class ApiService {
   }
 
   async publishResultSheet(sheetId: string) {
-    const response = await this.client.post(`/results-management/sheets/${sheetId}/publish`);
+    const response = await this.client.post(`/results-management/sheets/${sheetId}/publish`, undefined, { timeout: 300000 });
     return response.data;
   }
 

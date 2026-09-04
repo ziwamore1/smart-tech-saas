@@ -1423,7 +1423,7 @@ export default function ResultsPage() {
         status = 'VERIFIED';
       }
       if (status === 'VERIFIED') {
-        await api.post(`/results-management/sheets/${sheetData.id}/publish`);
+        await api.post(`/results-management/sheets/${sheetData.id}/publish`, undefined, { timeout: 300000 });
         status = 'PUBLISHED';
       }
       return { status };

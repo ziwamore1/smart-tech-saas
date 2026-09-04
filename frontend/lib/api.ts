@@ -379,11 +379,11 @@ export const assessmentApi = {
 
 export const publishingApi = {
   publish: (classId: string, termId: string) =>
-    api.post('/publishing/publish-results', { classId, termId }),
+    api.post('/publishing/publish-results', { classId, termId }, { timeout: 300000 }),
   unpublish: (classId: string, termId: string) =>
-    api.post('/publishing/unpublish-results', { classId, termId }),
+    api.post('/publishing/unpublish-results', { classId, termId }, { timeout: 120000 }),
   publishAll: (termId: string) =>
-    api.post('/publishing/publish-all', { termId }),
+    api.post('/publishing/publish-all', { termId }, { timeout: 300000 }),
   getStatus: () => api.get('/publishing/status'),
   getTermLockStatus: (termId: string) => api.get(`/publishing/status/${termId}`),
   checkCompleteness: (classId: string, termId: string) =>
