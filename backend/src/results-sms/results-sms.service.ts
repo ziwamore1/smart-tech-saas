@@ -97,7 +97,7 @@ export class ResultsSmsService {
       })).map((subject: any) => ({
         name: subject.subjectName,
         code: subject.subjectCode,
-        mark: subject.totalRawScore,
+        mark: subject.finalPercentage,
         grade: subject.finalGrade,
         remark: subject.finalRemark,
         points: subject.points,
@@ -288,7 +288,7 @@ export class ResultsSmsService {
       if (s.absent) return `${label} ABS`;
       const mark = s.mark != null ? Number(s.mark.toFixed(1)) : null;
       if (mark != null) return `${label} ${mark}`;
-      return `${label} ${s.points ?? '-'}`;
+      return `${label} -`;
     }).join(', ');
     const overall = [
       result.total != null ? `Total ${result.total}` : '',
