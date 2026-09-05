@@ -64,6 +64,26 @@ export class ResultsSmsController {
     return this.resultsSmsService.getHistory(req.user.schoolId, classId, termId);
   }
 
+  @Get('batches/:batchId/status')
+  async getBatchStatus(@Request() req: any, @Param('batchId') batchId: string) {
+    return this.resultsSmsService.getBatchStatus(req.user.schoolId, batchId);
+  }
+
+  @Get('batches')
+  async getBatches(@Request() req: any, @Query('limit') limit?: string) {
+    return this.resultsSmsService.getRecentBatches(req.user.schoolId, limit ? parseInt(limit, 10) : undefined);
+  }
+
+  @Post('batches/:batchId/cancel')
+  async cancelBatch(@Request() req: any, @Param('batchId') batchId: string) {
+    return this.resultsSmsService.cancelBatch(req.user.schoolId, batchId);
+  }
+
+  @Post('batches/:batchId/retry-failed')
+  async retryFailedBatch(@Request() req: any, @Param('batchId') batchId: string) {
+    return this.resultsSmsService.retryFailedBatch(req.user.schoolId, batchId, req.user.id);
+  }
+
   @Get('batches/:batchId')
   async getBatchLogs(@Request() req: any, @Param('batchId') batchId: string) {
     return this.resultsSmsService.getBatchLogs(req.user.schoolId, batchId);

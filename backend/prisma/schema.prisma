@@ -5961,7 +5961,11 @@ model ResultSmsLog {
   admissionNumber   String?
   phoneNumber       String?
   message           String
-  status            String    @default("PENDING") // PENDING, SENT, FAILED, SKIPPED
+  // PENDING (created, not yet queued), QUEUED (waiting for a worker), SENDING (claimed,
+  // in-flight), SENT, DELIVERED, RETRYING (transient failure, retry scheduled), FAILED,
+  // REJECTED, INVALID_NUMBER, PROVIDER_ERROR, INSUFFICIENT_BALANCE, OPTED_OUT, SKIPPED,
+  // CANCELLED
+  status            String    @default("PENDING")
   provider          String? // twilio, beem
   providerMessageId String?
   errorMessage      String?
@@ -5972,18 +5976,56 @@ model ResultSmsLog {
   failedAt          DateTime?
   resultVersion     String?
   retryCount        Int       @default(0)
+  nextRetryAt       DateTime? // When a RETRYING message may be claimed again
   providerResponse  String?
   failureCode       String?
   initiatedById     String?
   messageHash       String?
   createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([schoolId])
   @@index([classId])
   @@index([termId])
   @@index([batchId])
   @@index([status])
+  @@index([nextRetryAt])
   @@index([studentId, termId, resultVersion])
+  @@index([createdAt])
+}
+
+model ResultSmsBatch {
+  id              String    @id
+  schoolId        String
+  classId         String?
+  termId          String?
+  initiatedById   String?
+  // QUEUED → STARTING → PROCESSING → COMPLETED | COMPLETED_WITH_FAILURES | FAILED | CANCELLED
+  status          String    @default("QUEUED")
+  total           Int       @default(0)
+  sent            Int       @default(0)
+  failed          Int       @default(0)
+  retrying        Int       @default(0)
+  skipped         Int       @default(0)
+  sending         Int       @default(0)
+  queued          Int       @default(0)
+  pending         Int       @default(0)
+  progress        Int       @default(0)
+  estimatedUnits  Int       @default(0)
+  queuedAt        DateTime  @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  lastActivityAt  DateTime  @default(now())
+  heartbeatAt     DateTime?
+  errorCode       String?
+  errorMessage    String?
+  errorSuggestion String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([schoolId])
+  @@index([schoolId, status])
+  @@index([classId, termId])
   @@index([createdAt])
 }
 

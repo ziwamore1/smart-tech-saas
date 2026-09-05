@@ -553,13 +553,19 @@ export const resultsSmsApi = {
     api.get('/results-sms/preview', { params: { classId, termId }, timeout: 60000 }),
 
   send: (data: { classId: string; termId: string; parentIds?: string[]; studentIds?: string[]; allowResend?: boolean }) =>
-    api.post('/results-sms/send', data),
+    api.post('/results-sms/send', data, { timeout: 30000 }),
 
   autoSend: (data: { classId: string; termId: string }) =>
-    api.post('/results-sms/auto-send', data),
+    api.post('/results-sms/auto-send', data, { timeout: 30000 }),
 
   getHistory: (classId?: string, termId?: string) =>
     api.get('/results-sms/history', { params: { classId, termId } }),
+
+  getBatches: (limit?: number) =>
+    api.get('/results-sms/batches', { params: limit ? { limit } : {} }),
+
+  getBatchStatus: (batchId: string) =>
+    api.get(`/results-sms/batches/${batchId}/status`),
 
   getBatchLogs: (batchId: string) =>
     api.get(`/results-sms/batches/${batchId}`),
@@ -569,6 +575,12 @@ export const resultsSmsApi = {
 
   getFailedLogs: (batchId?: string) =>
     api.get('/results-sms/failed', { params: { batchId } }),
+
+  cancelBatch: (batchId: string) =>
+    api.post(`/results-sms/batches/${batchId}/cancel`),
+
+  retryFailedBatch: (batchId: string) =>
+    api.post(`/results-sms/batches/${batchId}/retry-failed`),
 
   getSettings: () =>
     api.get('/results-sms/settings'),

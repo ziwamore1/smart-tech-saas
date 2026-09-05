@@ -11,6 +11,23 @@ import { QUEUE_NAMES } from '../queues/queue-definitions';
 
 const SINGLE_SMS_LIMIT = 160;
 
+export const RESULTS_SMS_BATCH_STATUSES = {
+  ACTIVE: ['QUEUED', 'STARTING', 'PROCESSING'] as string[],
+  TERMINAL: ['COMPLETED', 'COMPLETED_WITH_FAILURES', 'FAILED', 'CANCELLED'] as string[],
+} as const;
+
+const SENT_STATUSES = ['SENT', 'DELIVERED'];
+const FAILED_STATUSES = ['FAILED', 'REJECTED', 'INVALID_NUMBER', 'PROVIDER_ERROR', 'INSUFFICIENT_BALANCE', 'OPTED_OUT'];
+
+/** How long a batch may show zero activity before it is considered stalled. */
+export const resultsSmsStallMs = () => parseInt(process.env.RESULTS_SMS_STALL_MS ?? '90000', 10);
+/** How long a queued batch may wait for a dedicated worker before the scheduler takes over. */
+export const resultsSmsQueueGraceMs = () => parseInt(process.env.RESULTS_SMS_QUEUE_GRACE_MS ?? '15000', 10);
+/** Maximum attempts per recipient for transient failures (timeout, network, rate limit). */
+export const resultsSmsMaxRetries = () => parseInt(process.env.RESULTS_SMS_MAX_RETRIES ?? '3', 10);
+/** Base backoff for retries: base * 2^retryCount milliseconds. */
+export const resultsSmsRetryBaseDelayMs = () => parseInt(process.env.RESULTS_SMS_RETRY_BASE_DELAY_MS ?? '5000', 10);
+
 @Injectable()
 export class ResultsSmsService {
   private readonly logger = new Logger(ResultsSmsService.name);
@@ -325,14 +342,47 @@ export class ResultsSmsService {
     return { mark, absent };
   }
 
-  async sendResultsSms(schoolId: string, classId: string, termId: string, userId: string, options?: { parentIds?: string[]; studentIds?: string[]; allowResend?: boolean }) {
+  async sendResultsSms(schoolId: string, classId: string, termId: string, userId: string, options?: {
+    parentIds?: string[]; studentIds?: string[]; allowResend?: boolean;
+  }) {
     const preview = await this.getRecipients(schoolId, classId, termId, options?.studentIds);
     const targets = preview.recipients.filter((r) => (!options?.parentIds?.length || options.parentIds.includes(r.parentId)) && r.phoneStatus === 'VALID');
     if (!targets.length) throw new BadRequestException('No valid parent phone numbers are available for this send.');
     if (!options?.allowResend && targets.some((r) => r.alreadySent)) {
       throw new BadRequestException({ code: 'DUPLICATE_RESULT_SMS', message: 'One or more selected results were already sent. Confirm resend explicitly.', alreadySent: targets.filter((r) => r.alreadySent).map((r) => r.studentId) });
     }
+
+    // Refuse to queue a second batch for the same class/term while one is already
+    // being processed — prevents accidental duplicate sends from double-clicking.
+    const scoped = !options?.studentIds?.length && !options?.parentIds?.length;
+    const active = await this.prisma.resultSmsBatch.findFirst({
+      where: { schoolId, classId: classId || undefined, termId: termId || undefined, status: { in: RESULTS_SMS_BATCH_STATUSES.ACTIVE } },
+    });
+    if (active && scoped) {
+      throw new BadRequestException({ code: 'DUPLICATE_BATCH', message: `A results SMS batch for this class is already being processed (${active.id}).`, batchId: active.id });
+    }
+
+    // Do not silently start a send the provider cannot afford.
+    const balance = await this.getBalance(schoolId);
+    if (balance && Number(balance.balance) <= 0) {
+      throw new BadRequestException({ code: 'INSUFFICIENT_BALANCE', message: 'School SMS balance is 0 units. Top up SMS units in the Communications Wallet before sending.' });
+    }
+
     const batchId = `RESULTS-${Date.now()}`;
+    const skippedCount = preview.recipients.filter((item) => !targets.includes(item)).length;
+    const estimatedUnits = preview.estimatedUnits;
+    const now = new Date();
+
+    await this.prisma.resultSmsBatch.create({
+      data: {
+        id: batchId, schoolId, classId: classId || null, termId: termId || null, initiatedById: userId,
+        status: 'QUEUED', total: targets.length, skipped: skippedCount,
+        queued: targets.length, pending: targets.length, progress: 0, estimatedUnits,
+        queuedAt: now, lastActivityAt: now,
+      },
+    });
+    this.logger.log(`Results SMS batch ${batchId} created for class ${classId}, term ${termId} (${targets.length} recipients)`);
+
     const logs: any[] = [];
     logs.push(...(await mapBounded(
       preview.recipients.filter((item) => !targets.includes(item)),
@@ -349,51 +399,246 @@ export class ResultsSmsService {
       resultVersion: r.resultVersion, initiatedById: userId, messageHash: this.hash(r.message), batchId, retryCount: 0,
     } }));
     logs.push(...queuedLogs);
-    const job = await this.queuesService.addJob(QUEUE_NAMES.RESULTS_SMS, 'send-results', {
-      schoolId,
-      batchId,
-      logs: queuedLogs.map((log, index) => ({ id: log.id, recipient: targets[index] })),
-    }, { jobId: batchId });
-    if (!job) throw new Error('Redis is unavailable; results SMS was not queued.');
-    return { success: true, batchId, total: targets.length, sent: 0, queued: targets.length, failed: 0, skipped: preview.recipients.length - targets.length, estimatedUnits: preview.estimatedUnits, logs };
+
+    // Enqueue for background processing. The API returns here immediately; the
+    // batch, not the request, is the source of truth for progress. If the queue
+    // cannot accept the job we do NOT pretend it is being processed — the batch
+    // stays QUEUED and the scheduled monitor will pick it up (or mark it failed),
+    // so it is always observable.
+    const payload = { batchId, schoolId, logs: queuedLogs.map((log, index) => ({ id: log.id, recipient: targets[index] })) };
+    const job = await this.queuesService.addJob(QUEUE_NAMES.RESULTS_SMS, 'send-results', payload, { jobId: batchId });
+    if (!job) {
+      this.logger.warn(`Redis/BullMQ unavailable — batch ${batchId} will be picked up by the scheduled monitor`);
+    }
+    return { success: true, batchId, status: 'QUEUED', total: targets.length, sent: 0, failed: 0, queued: targets.length, pending: targets.length, skipped: skippedCount, estimatedUnits, logs };
   }
 
-  async processQueuedBatch(data: { schoolId: string; logs: Array<{ id: string; recipient: any }> }) {
+  /**
+   * Processes a batch (or a sub-set of its recipients). Called by the BullMQ
+   * worker and by the scheduled monitor during recovery. Safe to invoke
+   * concurrently: each recipient is claimed atomically (QUEUED→SENDING), so a
+   * restarted worker or a second processor can never send the same message twice.
+   */
+  async processQueuedBatch(data: { batchId?: string; schoolId: string; logs: Array<{ id: string; recipient: any }> }) {
+    const batchId = data.batchId;
+    const logIds = data.logs.map((log) => log.id);
+    const now = new Date();
+    if (batchId) {
+      await this.prisma.resultSmsBatch.updateMany({
+        where: { id: batchId, status: 'QUEUED' },
+        data: { status: 'STARTING', startedAt: now, heartbeatAt: now, lastActivityAt: now },
+      }).catch(() => {});
+      await this.prisma.resultSmsBatch.updateMany({
+        where: { id: batchId, status: { in: ['QUEUED', 'STARTING', 'PROCESSING'] } },
+        data: { status: 'PROCESSING', heartbeatAt: now },
+      }).catch(() => {});
+    }
+
     let provider: SmsProvider;
     try {
       provider = await this.resolveProvider(data.schoolId);
     } catch (error: any) {
+      const notConfigured = error?.response?.code === 'PROVIDER_NOT_CONFIGURED' || String(error?.message || '').includes('not configured');
+      const code = notConfigured ? 'PROVIDER_NOT_CONFIGURED' : this.diagnostic(error.message).code;
+      const message = notConfigured ? 'SMS provider is not configured for this school.' : this.diagnostic(error.message).message;
+      const suggestion = notConfigured ? 'Configure an SMS provider in Communications Settings, then retry.' : this.diagnostic(error.message).action;
       await this.prisma.resultSmsLog.updateMany({
-        where: { id: { in: data.logs.map((log) => log.id) }, status: { in: ['PENDING', 'QUEUED'] } },
-        data: {
-          status: 'PROVIDER_ERROR',
-          failureCode: 'PROVIDER_NOT_CONFIGURED',
-          errorMessage: 'SMS provider is not configured for this school.',
-          errorSuggestion: 'Configure an SMS provider in Communications Settings, then retry.',
-          failedAt: new Date(),
-        },
+        where: { id: { in: logIds }, status: { in: ['PENDING', 'QUEUED', 'RETRYING', 'SENDING'] } },
+        data: { status: 'PROVIDER_ERROR', failureCode: code, errorMessage: message, errorSuggestion: suggestion, failedAt: new Date() },
       });
-      throw error;
+      if (batchId) {
+        await this.syncBatchCounts(batchId, data.schoolId);
+        await this.failBatch(batchId, code, message, suggestion);
+      }
+      return;
     }
-    await mapBounded(data.logs, async ({ id, recipient }) => {
-      const current = await this.prisma.resultSmsLog.findUnique({ where: { id }, select: { status: true } });
-      if (!current || ['SENT', 'DELIVERED', 'FAILED', 'REJECTED', 'INVALID_NUMBER', 'PROVIDER_ERROR', 'INSUFFICIENT_BALANCE', 'OPTED_OUT'].includes(current.status)) return;
-      let result: any;
-      let providerName: string | undefined;
-      try {
-        const sent = await provider.send({ to: recipient.phoneNumber, body: recipient.message });
-        result = { success: sent.success, id: sent.providerMessageId || sent.messageId, error: sent.error, response: JSON.stringify(sent) };
-        providerName = sent.provider || 'sms-provider';
-      } catch (error: any) { result = { success: false, error: error.message, response: error.stack }; }
-      await this.prisma.resultSmsLog.update({ where: { id }, data: {
-        status: result.success ? 'SENT' : this.failureStatus(result.error), provider: providerName,
-        providerMessageId: result.id, providerResponse: result.response,
-        errorMessage: result.success ? null : this.diagnostic(result.error).message,
-        errorSuggestion: result.success ? null : this.diagnostic(result.error).action,
-        failureCode: result.success ? null : this.diagnostic(result.error).code,
-        sentAt: result.success ? new Date() : null, failedAt: result.success ? null : new Date(),
-      } });
+
+    try {
+      await mapBounded(data.logs, async ({ id, recipient }) => {
+        await this.processRecipient(batchId, data.schoolId, id, recipient, provider);
+      });
+    } catch (err) {
+      this.logger.error(`Processing error for batch ${batchId}: ${(err as Error).message}`);
+    } finally {
+      if (batchId) await this.finalizeBatch(batchId, data.schoolId);
+    }
+  }
+
+  /**
+   * Sends one recipient's message with an atomic claim so concurrent processors
+   * and restarts cannot double-send. Transient failures (timeout, network, rate
+   * limit) are retried with backoff; permanent failures are marked terminal with
+   * an actionable reason.
+   */
+  private async processRecipient(batchId: string | undefined, schoolId: string, logId: string, recipient: any, provider: SmsProvider) {
+    const claim = await this.prisma.resultSmsLog.updateMany({
+      where: { id: logId, status: { in: ['PENDING', 'QUEUED', 'RETRYING'] } },
+      data: { status: 'SENDING', nextRetryAt: null },
     });
+    if (claim.count === 0) return; // another worker already claimed/completed this recipient
+
+    await this.touchBatch(batchId);
+    this.logger.log(`Recipient ${logId} sending (batch ${batchId || 'n/a'})`);
+    let result: any;
+    let providerName: string | undefined;
+    try {
+      const sent = await provider.send({ to: recipient.phoneNumber, body: recipient.message });
+      result = { success: sent.success, id: sent.providerMessageId || sent.messageId, error: sent.error, response: JSON.stringify(sent) };
+      providerName = sent.provider || 'sms-provider';
+    } catch (error: any) { result = { success: false, error: error.message, response: error.stack, provider: (error as any).provider }; }
+
+    await this.touchBatch(batchId);
+    if (result.success) {
+      await this.prisma.resultSmsLog.update({ where: { id: logId }, data: {
+        status: 'SENT', provider: providerName, providerMessageId: result.id, providerResponse: result.response,
+        errorMessage: null, errorSuggestion: null, failureCode: null, sentAt: new Date(), failedAt: null, nextRetryAt: null,
+      } });
+      this.logger.log(`Recipient ${logId} sent (batch ${batchId || 'n/a'})`);
+    } else {
+      const diag = this.diagnostic(result.error);
+      const isTransient = ['PROVIDER_ERROR', 'RATE_LIMITED'].includes(diag.code);
+      const current = await this.prisma.resultSmsLog.findUnique({ where: { id: logId }, select: { retryCount: true } });
+      const retryCount = current?.retryCount ?? 0;
+      if (isTransient && retryCount < resultsSmsMaxRetries()) {
+        const nextRetryAt = new Date(Date.now() + resultsSmsRetryBaseDelayMs() * Math.pow(2, retryCount));
+        await this.prisma.resultSmsLog.update({ where: { id: logId }, data: {
+          status: 'RETRYING', retryCount: { increment: 1 }, nextRetryAt, provider: providerName, providerResponse: result.response,
+          failureCode: diag.code, errorMessage: diag.message, errorSuggestion: diag.action, failedAt: null, sentAt: null,
+        } });
+        this.logger.warn(`Recipient ${logId} transient failure (${diag.code}), retry ${retryCount + 1} scheduled (batch ${batchId || 'n/a'})`);
+      } else {
+        const finalStatus = this.failureStatus(result.error);
+        await this.prisma.resultSmsLog.update({ where: { id: logId }, data: {
+          status: finalStatus, retryCount: { increment: isTransient ? 1 : 0 }, nextRetryAt: null, provider: providerName,
+          providerResponse: result.response, failureCode: diag.code, errorMessage: diag.message, errorSuggestion: diag.action,
+          failedAt: new Date(), sentAt: null,
+        } });
+        this.logger.warn(`Recipient ${logId} failed (${diag.code}) (batch ${batchId || 'n/a'})`);
+      }
+    }
+    await this.syncBatchCounts(batchId, schoolId);
+  }
+
+  private async touchBatch(batchId: string | undefined) {
+    if (!batchId) return;
+    await this.prisma.resultSmsBatch.update({ where: { id: batchId }, data: { heartbeatAt: new Date(), lastActivityAt: new Date() } }).catch(() => {});
+  }
+
+  /** Recomputes batch counters from the persisted recipient logs. The database is the source of truth. */
+  async syncBatchCounts(batchId: string, schoolId: string) {
+    const counts = await this.prisma.resultSmsLog.groupBy({ by: ['status'], where: { schoolId, batchId }, _count: { _all: true } });
+    const c = (s: string) => counts.find((x) => x.status === s)?._count._all ?? 0;
+    const sent = c('SENT') + c('DELIVERED');
+    const failed = FAILED_STATUSES.reduce((sum, s) => sum + c(s), 0);
+    const retrying = c('RETRYING');
+    const sending = c('SENDING');
+    const queued = c('QUEUED') + c('PENDING');
+    const skipped = c('SKIPPED');
+    const total = sent + failed + retrying + sending + queued + skipped;
+    const target = total - skipped;
+    const progress = target ? Math.round(((sent + failed) / target) * 100) : 100;
+    await this.prisma.resultSmsBatch.update({
+      where: { id: batchId },
+      data: {
+        total, sent, failed, retrying, sending, queued, skipped,
+        pending: queued + sending + retrying, progress,
+        heartbeatAt: new Date(), lastActivityAt: new Date(),
+      },
+    }).catch(() => undefined);
+  }
+
+  /** Persists the batch terminal state once every recipient is terminal. */
+  async finalizeBatch(batchId: string, schoolId: string) {
+    await this.syncBatchCounts(batchId, schoolId);
+    const batch = await this.prisma.resultSmsBatch.findUnique({ where: { id: batchId } }).catch(() => null);
+    if (!batch || !RESULTS_SMS_BATCH_STATUSES.ACTIVE.includes(batch.status)) return;
+    if (batch.pending > 0) return; // retries scheduled in the future or work still in flight
+    const target = batch.total - batch.skipped;
+    let status = 'COMPLETED';
+    if (batch.failed > 0 && batch.sent > 0) status = 'COMPLETED_WITH_FAILURES';
+    else if (batch.failed === Math.max(target, 0)) status = 'FAILED';
+    await this.prisma.resultSmsBatch.update({
+      where: { id: batchId },
+      data: { status, completedAt: new Date(), heartbeatAt: new Date(), lastActivityAt: new Date() },
+    }).catch(() => undefined);
+    this.logger.log(`Results SMS batch ${batchId} completed as ${status} (${batch.sent} sent, ${batch.failed} failed, ${batch.skipped} skipped)`);
+  }
+
+  private async failBatch(batchId: string, errorCode: string, message: string, suggestion: string) {
+    await this.prisma.resultSmsBatch.update({
+      where: { id: batchId },
+      data: { status: 'FAILED', errorCode, errorMessage: message, errorSuggestion: suggestion, completedAt: new Date(), heartbeatAt: new Date(), lastActivityAt: new Date() },
+    }).catch(() => undefined);
+  }
+
+  /** Full persisted status of a batch with derived liveness/progress for the UI. */
+  async getBatchStatus(schoolId: string, batchId: string) {
+    const batch = await this.prisma.resultSmsBatch.findFirst({ where: { id: batchId, schoolId } });
+    if (!batch) throw new NotFoundException('SMS batch not found');
+    const counts = await this.prisma.resultSmsLog.groupBy({ by: ['status'], where: { schoolId, batchId }, _count: { _all: true } });
+    const c = (s: string) => counts.find((x) => x.status === s)?._count._all ?? 0;
+    const sent = c('SENT') + c('DELIVERED');
+    const failed = FAILED_STATUSES.reduce((sum, s) => sum + c(s), 0);
+    const retrying = c('RETRYING');
+    const sending = c('SENDING');
+    const queued = c('QUEUED') + c('PENDING');
+    const skipped = c('SKIPPED');
+    const total = sent + failed + retrying + sending + queued + skipped;
+    const target = Math.max(total - skipped, 0);
+    const progress = target ? Math.round(((sent + failed) / target) * 100) : 100;
+    const now = Date.now();
+    const lastActivitySecondsAgo = Math.round((now - batch.lastActivityAt.getTime()) / 1000);
+    const heartbeatSecondsAgo = batch.heartbeatAt ? Math.round((now - batch.heartbeatAt.getTime()) / 1000) : null;
+    const terminal = RESULTS_SMS_BATCH_STATUSES.TERMINAL.includes(batch.status);
+    const stallSeconds = Math.ceil(resultsSmsStallMs() / 1000);
+    const stalled = !terminal && (lastActivitySecondsAgo >= stallSeconds || (heartbeatSecondsAgo !== null && heartbeatSecondsAgo >= stallSeconds));
+    const workerAlive = !terminal && !stalled;
+    return {
+      batchId, status: batch.status, total, sent, failed, retrying, sending, queued, skipped,
+      pending: queued + sending + retrying, progress, estimatedUnits: batch.estimatedUnits,
+      queuedAt: batch.queuedAt, startedAt: batch.startedAt, completedAt: batch.completedAt,
+      lastActivityAt: batch.lastActivityAt, heartbeatAt: batch.heartbeatAt,
+      lastActivitySecondsAgo, heartbeatSecondsAgo, workerAlive, stalled,
+      errorCode: batch.errorCode, errorMessage: batch.errorMessage, errorSuggestion: batch.errorSuggestion,
+    };
+  }
+
+  async getRecentBatches(schoolId: string, limit = 25) {
+    const batches = await this.prisma.resultSmsBatch.findMany({ where: { schoolId }, orderBy: { createdAt: 'desc' }, take: limit });
+    return batches.map((b) => ({ ...b, active: RESULTS_SMS_BATCH_STATUSES.ACTIVE.includes(b.status) }));
+  }
+
+  async cancelBatch(schoolId: string, batchId: string) {
+    const batch = await this.prisma.resultSmsBatch.findFirst({ where: { id: batchId, schoolId } });
+    if (!batch) throw new NotFoundException('SMS batch not found');
+    if (!RESULTS_SMS_BATCH_STATUSES.ACTIVE.includes(batch.status)) throw new BadRequestException('Only an active batch can be cancelled.');
+    await this.prisma.resultSmsLog.updateMany({
+      where: { schoolId, batchId, status: { in: ['QUEUED', 'PENDING', 'RETRYING'] } },
+      data: { status: 'CANCELLED', errorMessage: 'Cancelled by an administrator.', failedAt: new Date() },
+    });
+    await this.prisma.resultSmsLog.updateMany({
+      where: { schoolId, batchId, status: 'SENDING' },
+      data: { status: 'PROVIDER_ERROR', failureCode: 'CANCELLED', errorMessage: 'Cancelled by an administrator while the message was in flight.', failedAt: new Date() },
+    });
+    await this.prisma.resultSmsBatch.update({ where: { id: batchId }, data: { status: 'CANCELLED', completedAt: new Date(), lastActivityAt: new Date() } });
+    await this.syncBatchCounts(batchId, schoolId);
+    return this.getBatchStatus(schoolId, batchId);
+  }
+
+  /** Controlled retry of a batch's failed messages: re-validates parent numbers and queues a fresh send. */
+  async retryFailedBatch(schoolId: string, batchId: string, userId: string) {
+    const batch = await this.prisma.resultSmsBatch.findFirst({ where: { id: batchId, schoolId } });
+    if (!batch) throw new NotFoundException('SMS batch not found');
+    const failedLogs = await this.prisma.resultSmsLog.findMany({
+      where: { schoolId, batchId, status: { in: FAILED_STATUSES } },
+      select: { studentId: true, classId: true, termId: true },
+    });
+    if (!failedLogs.length) throw new BadRequestException('No failed messages in this batch to retry.');
+    const studentIds = [...new Set(failedLogs.map((l) => l.studentId))];
+    const klass = batch.classId ?? failedLogs[0].classId;
+    const term = batch.termId ?? failedLogs[0].termId;
+    if (!klass || !term) throw new BadRequestException('The batch has no class/term to retry against.');
+    return this.sendResultsSms(schoolId, klass, term, userId, { studentIds, allowResend: true });
   }
 
   async retryLog(schoolId: string, id: string, userId: string) {
@@ -472,6 +717,6 @@ export class ResultsSmsService {
   }
   private isValidPhone(phone: string) { return /^\+?\d{9,15}$/.test(phone.replace(/[\s\-\(\)]/g, '')); }
   private hash(message: string) { return createHash('sha256').update(message).digest('hex'); }
-  private failureStatus(error?: string) { const code = this.diagnostic(error).code; return code === 'INVALID_PHONE_NUMBER' ? 'INVALID_NUMBER' : code === 'INSUFFICIENT_BALANCE' ? 'INSUFFICIENT_BALANCE' : code === 'RATE_LIMITED' ? 'QUEUED' : 'PROVIDER_ERROR'; }
-  private diagnostic(error?: string) { const e = (error || '').toLowerCase(); if (e.includes('balance') || e.includes('credit')) return { code: 'INSUFFICIENT_BALANCE', message: 'School SMS balance is insufficient.', action: 'Top up SMS units in Communications Wallet.' }; if (e.includes('invalid') || e.includes('number')) return { code: 'INVALID_PHONE_NUMBER', message: 'Parent phone number is invalid.', action: 'Update the parent phone number in Parent Management.' }; if (e.includes('rate')) return { code: 'RATE_LIMITED', message: 'Provider rate limit reached.', action: 'Retry after the provider window resets.' }; if (e.includes('timeout') || e.includes('network')) return { code: 'PROVIDER_ERROR', message: 'SMS provider timed out or returned an error.', action: 'Check provider status and retry later.' }; return { code: 'PROVIDER_ERROR', message: 'SMS provider returned an error.', action: 'Check provider configuration and retry later.' }; }
+  private failureStatus(error?: string) { const code = this.diagnostic(error).code; return code === 'INVALID_PHONE_NUMBER' ? 'INVALID_NUMBER' : code === 'INSUFFICIENT_BALANCE' ? 'INSUFFICIENT_BALANCE' : 'PROVIDER_ERROR'; }
+  private diagnostic(error?: string) { const e = (error || '').toLowerCase(); if (e.includes('balance') || e.includes('credit')) return { code: 'INSUFFICIENT_BALANCE', message: 'School SMS balance is insufficient.', action: 'Top up SMS units in Communications Wallet.' }; if (e.includes('invalid') || e.includes('number')) return { code: 'INVALID_PHONE_NUMBER', message: 'Parent phone number is invalid.', action: 'Update the parent phone number in Parent Management.' }; if (e.includes('rate')) return { code: 'RATE_LIMITED', message: 'Provider rate limit reached.', action: 'Retry after the provider window resets.' }; if (e.includes('timeout') || e.includes('timed out') || e.includes('network')) return { code: 'PROVIDER_ERROR', message: 'SMS provider timed out or returned an error.', action: 'Check provider status and retry later.' }; return { code: 'PROVIDER_ERROR', message: 'SMS provider returned an error.', action: 'Check provider configuration and retry later.' }; }
 }
