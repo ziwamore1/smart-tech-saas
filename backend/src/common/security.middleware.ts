@@ -41,13 +41,17 @@ export function setupSecurity(app: INestApplication, redis: Redis | null = null)
     // A dashboard load can make many legitimate API calls. Keep abuse
     // protection here, but do not make normal refreshes look like missing
     // data, especially when several users share one public IP.
-    max: 1000,
+    max: 5000,
     message: 'Too many requests from this IP, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
     // Authentication has its own limiter below. Counting it here means a
-    // busy dashboard can prevent a user from logging in again.
-    skip: (req) => req.path.startsWith('/api/v1/auth'),
+    // busy dashboard can prevent a user from logging in again. The health
+    // probe is infra-only and must never consume the browser budget.
+    skip: (req) =>
+      req.path.startsWith('/api/v1/auth') ||
+      req.path === '/api/v1/health' ||
+      req.path.startsWith('/api/v1/health/'),
     ...(redis ? { store: new RedisRateLimitStore(redis, 'ratelimit:global') } : {}),
     passOnStoreError: true,
   });

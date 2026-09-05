@@ -13,7 +13,12 @@ export default function Providers({ children }: { children: ReactNode }) {
       defaultOptions: {
         queries: {
           staleTime: 60 * 1000,
-          retry: 1,
+          retry: (failureCount, error) => {
+            // Never retry rate-limited requests — each retry re-uses the same
+            // IP bucket and only keeps a 429 regime alive.
+            const status = (error as any)?.response?.status
+            return status !== 429 && failureCount < 2
+          },
         },
       },
     })

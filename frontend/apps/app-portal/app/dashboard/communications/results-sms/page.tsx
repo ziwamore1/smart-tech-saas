@@ -42,14 +42,14 @@ export default function ResultsSmsPage() {
     queryKey: ['results-sms-batch-status', activeBatchId],
     queryFn: () => resultsSmsApi.getBatchStatus(activeBatchId!).then((r) => r.data),
     enabled: Boolean(activeBatchId),
-    refetchInterval: (q: any) => (activeBatchId && !TERMINAL.includes(q.state.data?.status ?? '') ? 2000 : false),
+    refetchInterval: (q: any) => (activeBatchId && !TERMINAL.includes(q.state.data?.status ?? '') ? 5000 : false),
   });
 
   // Recent batches keep a processing send visible across page refreshes.
   const { data: recentBatches } = useQuery({
     queryKey: ['results-sms-batches'],
     queryFn: () => resultsSmsApi.getBatches(25).then((r) => r.data),
-    refetchInterval: 5000,
+    refetchInterval: 15000,
   });
   useEffect(() => {
     if (activeBatchId) return;
