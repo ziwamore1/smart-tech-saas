@@ -464,13 +464,25 @@ export class PublishingService {
 
     const studentIds = enrollments.map((e) => e.studentId);
 
-    const results = await this.prisma.result.findMany({
-      where: {
-        termId,
-        studentId: { in: studentIds },
-        subjectId: { in: subjectIds },
-      },
-    });
+    const [results, absentMarks] = await Promise.all([
+      this.prisma.result.findMany({
+        where: {
+          termId,
+          studentId: { in: studentIds },
+          subjectId: { in: subjectIds },
+        },
+      }),
+      this.prisma.computedResult.findMany({
+        where: {
+          termId,
+          classId,
+          studentId: { in: studentIds },
+          subjectId: { in: subjectIds },
+          isAbsent: true,
+        },
+        select: { studentId: true, subjectId: true },
+      }),
+    ]);
 
     const resultMap = new Map<string, Set<string>>();
     for (const r of results) {
@@ -478,6 +490,12 @@ export class PublishingService {
         resultMap.set(r.studentId, new Set());
       }
       resultMap.get(r.studentId)!.add(r.subjectId);
+    }
+    for (const a of absentMarks) {
+      if (!resultMap.has(a.studentId)) {
+        resultMap.set(a.studentId, new Set());
+      }
+      resultMap.get(a.studentId)!.add(a.subjectId);
     }
 
     let completeStudents = 0;
@@ -559,23 +577,52 @@ export class PublishingService {
     const subjectIds = [...new Set(teachingAssignments.map((a) => a.subjectId))];
     const subjects = [...new Set(teachingAssignments.map((a) => a.subject.name))];
 
-    const results = await this.prisma.result.findMany({
-      where: {
-        termId,
-        studentId: { in: enrollments.map((e) => e.studentId) },
-      },
-      include: {
-        student: { select: { id: true, firstName: true, lastName: true } },
-        subject: { select: { id: true, name: true } },
-      },
-    });
+    const [results, absentMarks] = await Promise.all([
+      this.prisma.result.findMany({
+        where: {
+          termId,
+          studentId: { in: enrollments.map((e) => e.studentId) },
+        },
+        include: {
+          student: { select: { id: true, firstName: true, lastName: true } },
+          subject: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.computedResult.findMany({
+        where: {
+          termId,
+          classId,
+          studentId: { in: enrollments.map((e) => e.studentId) },
+          isAbsent: true,
+        },
+        include: {
+          student: { select: { id: true, firstName: true, lastName: true } },
+          subject: { select: { id: true, name: true } },
+        },
+      }),
+    ]);
 
     const studentResultsMap = new Map<string, Map<string, any>>();
+    const enteredPairs = new Set<string>();
     for (const r of results) {
       if (!studentResultsMap.has(r.studentId)) {
         studentResultsMap.set(r.studentId, new Map());
       }
       studentResultsMap.get(r.studentId)!.set(r.subjectId, r);
+      enteredPairs.add(`${r.studentId}::${r.subjectId}`);
+    }
+    for (const a of absentMarks) {
+      if (!studentResultsMap.has(a.studentId)) {
+        studentResultsMap.set(a.studentId, new Map());
+      }
+      studentResultsMap.get(a.studentId)!.set(a.subjectId, {
+        score: null,
+        grade: null,
+        subjectId: a.subjectId,
+        subject: a.subject,
+        isAbsent: true,
+      });
+      enteredPairs.add(`${a.studentId}::${a.subjectId}`);
     }
 
     const studentsWithResults = enrollments.map((enrollment) => {
@@ -585,6 +632,7 @@ export class PublishingService {
         subjectName: r.subject.name,
         score: r.score,
         grade: r.grade,
+        isAbsent: r.isAbsent ?? false,
       }));
 
       return {
@@ -610,10 +658,10 @@ export class PublishingService {
       totalSubjects: subjects.length,
       subjects,
       students: studentsWithResults,
-      resultsEntered: results.length,
+      resultsEntered: enteredPairs.size,
       expectedResults: enrollments.length * subjectIds.length,
       percentageComplete: enrollments.length * subjectIds.length > 0
-        ? Math.round((results.length / (enrollments.length * subjectIds.length)) * 100)
+        ? Math.round((enteredPairs.size / (enrollments.length * subjectIds.length)) * 100)
         : 100,
       isPublished: publication?.published || false,
       publishedAt: publication?.publishedAt,

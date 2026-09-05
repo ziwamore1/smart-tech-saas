@@ -665,7 +665,7 @@ function ReviewResultsTab({
       missing: subjectColumns
         .filter((subj) => {
           const r = (s.results || []).find((x: any) => x.subjectId === subj.id);
-          return !r || r.score == null;
+          return !r || (r.score == null && !r.isAbsent);
         })
         .map((subj) => subj.name),
     }))
@@ -792,7 +792,7 @@ function ReviewResultsTab({
           {subjectColumns.map((subject) => {
             const subjectResults = students.reduce((count: number, student: any) => {
               const r = (student.results || []).find((x: any) => x.subjectId === subject.id);
-              return count + (r && r.score != null ? 1 : 0);
+              return count + (r && (r.score != null || r.isAbsent) ? 1 : 0);
             }, 0);
             const expected = summary.totalStudents || 0;
             const isSubjectComplete = subjectResults >= expected;
@@ -828,7 +828,7 @@ function ReviewResultsTab({
             </thead>
             <tbody>
               {students.map((student: any) => {
-                const entered = (student.results || []).filter((r: any) => r.score != null).length;
+                const entered = (student.results || []).filter((r: any) => r.score != null || r.isAbsent).length;
                 const sComplete = summary.totalSubjects > 0 && entered >= summary.totalSubjects;
                 return (
                   <tr key={student.id} className="border-t">
@@ -1357,7 +1357,7 @@ export default function ResultsPage() {
     const totalStudents = studentRows.length;
     const totalSubjects = subjectColumns.length;
     const resultsEntered = studentRows.reduce(
-      (sum, row) => sum + [...row.cells.values()].filter((r: any) => r.score != null).length,
+      (sum, row) => sum + [...row.cells.values()].filter((r: any) => r.score != null || r.isAbsent).length,
       0,
     );
     const expectedResults = totalStudents * totalSubjects;
