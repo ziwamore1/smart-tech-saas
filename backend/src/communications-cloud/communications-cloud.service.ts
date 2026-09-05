@@ -583,12 +583,23 @@ export class CommunicationsCloudService {
     const settings = await this.prisma.communicationSettings.findUnique({
       where: { schoolId },
     });
+    const providerName = settings?.smsProvider ? settings.smsProvider.toLowerCase() : null;
     if (!settings?.smsProvider) {
       return { provider: null, balance: null, message: 'No SMS provider configured' };
     }
-    const providerName = settings.smsProvider.toLowerCase();
+    if (!settings.smsEnabled) {
+      return { provider: providerName, balance: null, message: 'SMS is disabled for this school' };
+    }
 
     try {
+      // School-level credentials take precedence (mirrors getSchoolSmsProvider),
+      // so a school's own Zamtel-Bulk / MTN / Airtel key is used for the balance.
+      const schoolProvider = await this.smsProviderFactory.getSchoolSmsProvider(schoolId);
+      if (schoolProvider) {
+        const balance = await schoolProvider.getBalance();
+        return { provider: providerName, balance: balance.balance, currency: balance.currency };
+      }
+
       const cloudProvider = await this.prisma.commCloudProvider.findFirst({
         where: { providerType: providerName, channel: 'SMS', isActive: true },
       });
