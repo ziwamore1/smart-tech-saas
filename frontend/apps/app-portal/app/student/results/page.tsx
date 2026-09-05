@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { resultApi, termApi, studentApi } from '@/lib/api';
 import Link from 'next/link';
-import { checkEczEligibility, scoreToEczGrade } from '@/lib/ecz-eligibility';
+import { checkEczEligibility, detectEczGradingSystem } from '@/lib/ecz-eligibility';
 import { useSchoolSocket } from '@/lib/use-school-socket';
 
 export default function StudentResultsPage() {
@@ -220,30 +220,36 @@ export default function StudentResultsPage() {
                   </div>
 
                   {(() => {
-                    const eczSubjects = results.map((r: any) => {
-                      const ecz = scoreToEczGrade(r.score);
-                      return { name: r.subject?.name || 'Subject', score: r.score, ...ecz };
+                    const eczSubjects = results.map((r: any) => ({
+                      name: r.subject?.name || 'Subject',
+                      score: r.score,
+                      grade: r.grade,
+                      points: r.points,
+                    }));
+                    const ecz = checkEczEligibility(eczSubjects, {
+                      gradingSystem: detectEczGradingSystem(student?.class?.name),
                     });
-                    const ecz = checkEczEligibility(eczSubjects);
+                    const statusText =
+                      ecz.status === 'UNIVERSITY' ? 'UNIVERSITY ELIGIBLE' : ecz.status === 'CERTIFICATE' ? 'CERTIFICATE ONLY' : 'NOT ELIGIBLE';
                     return (
-                      <div className={`mt-4 p-4 rounded-lg border-2 ${ecz.eligible ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`}>
+                      <div className={`mt-4 p-4 rounded-lg border-2 ${ecz.universityEligible ? 'border-green-200 bg-green-50' : ecz.certificateAwarded ? 'border-sky-200 bg-sky-50' : 'border-amber-200 bg-amber-50'}`}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="text-xl">{ecz.eligible ? '🎓' : '📋'}</span>
+                            <span className="text-xl">{ecz.universityEligible ? '🎓' : ecz.certificateAwarded ? '📘' : '📋'}</span>
                             <div>
-                              <h4 className={`font-semibold text-sm ${ecz.eligible ? 'text-green-800' : 'text-amber-800'}`}>
-                                ECZ Certificate Eligibility
+                              <h4 className={`font-semibold text-sm ${ecz.universityEligible ? 'text-green-800' : ecz.certificateAwarded ? 'text-sky-800' : 'text-amber-800'}`}>
+                                ECZ University &amp; Certificate Eligibility
                               </h4>
-                              <p className={`text-xs ${ecz.eligible ? 'text-green-700' : 'text-amber-700'}`}>{ecz.details}</p>
+                              <p className={`text-xs ${ecz.universityEligible ? 'text-green-700' : ecz.certificateAwarded ? 'text-sky-700' : 'text-amber-700'}`}>{ecz.details}</p>
                             </div>
                           </div>
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${ecz.eligible ? 'bg-green-200 text-green-800' : 'bg-amber-200 text-amber-800'}`}>
-                            {ecz.eligible ? 'ELIGIBLE' : 'NOT ELIGIBLE'}
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${ecz.universityEligible ? 'bg-green-200 text-green-800' : ecz.certificateAwarded ? 'bg-sky-200 text-sky-800' : 'bg-amber-200 text-amber-800'}`}>
+                            {statusText}
                           </span>
                         </div>
                         <div className="mt-2 flex flex-wrap gap-1">
                           {ecz.bestSix.map((s) => (
-                            <span key={s.name} className={`px-1.5 py-0.5 rounded text-xs border ${s.points < 7 ? 'border-green-200 text-green-700 bg-white' : 'border-red-200 text-red-700 bg-white'}`}>
+                            <span key={s.name} className={`px-1.5 py-0.5 rounded text-xs border ${s.universityPassed ? 'border-green-200 text-green-700 bg-white' : s.passed ? 'border-sky-200 text-sky-700 bg-white' : 'border-red-200 text-red-700 bg-white'}`}>
                               {s.name}: Grade {s.grade} ({s.points} pts)
                             </span>
                           ))}

@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { resultAnalyticsApi, rankingApi, classApi, termApi, resultApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { checkEczEligibility, scoreToEczGrade } from '@/lib/ecz-eligibility';
+import { checkEczEligibility, detectEczGradingSystem } from '@/lib/ecz-eligibility';
 
 export default function ResultAnalyticsPage() {
   const { user } = useAuth();
@@ -63,6 +63,11 @@ export default function ResultAnalyticsPage() {
     enabled: !!(selectedClass && selectedTerm),
   });
 
+  const selectedClassObj = classes?.find((c: any) => c.id === selectedClass);
+  const gradingSystem = detectEczGradingSystem(
+    selectedClassObj?.levelType?.name || selectedClassObj?.name,
+  );
+
   const eczEligibilityData = useMemo(() => {
     if (!classResults || !Array.isArray(classResults) || classResults.length === 0) return null;
     const grouped: Record<string, { studentId: string; studentName: string; admissionNumber?: string; subjects: any[] }> = {};
@@ -79,19 +84,29 @@ export default function ResultAnalyticsPage() {
       }
       grouped[sid].subjects.push({
         name: r.subject?.name || r.subjectName || 'Unknown',
-        score: r.finalPercentage ?? r.score ?? 0,
-        grade: r.finalGrade ?? r.grade ?? '-',
-        points: r.points ?? (r.finalPercentage != null ? scoreToEczGrade(r.finalPercentage).points : 0),
+        score: r.finalPercentage ?? r.score ?? null,
+        grade: r.finalGrade ?? r.grade ?? null,
+        points: typeof r.points === 'number' ? r.points : null,
         remark: r.finalRemark ?? r.remark ?? '-',
+        isAbsent: r.isAbsent,
       });
     }
     const entries = Object.values(grouped).map((s) => ({
       ...s,
-      eligibility: checkEczEligibility(s.subjects),
+      eligibility: checkEczEligibility(s.subjects, { gradingSystem }),
     }));
-    entries.sort((a, b) => Number(b.eligibility.eligible) - Number(a.eligibility.eligible));
-    return { total: entries.length, eligible: entries.filter((e) => e.eligibility.eligible).length, entries };
-  }, [classResults]);
+    const tier = (status: string) => (status === 'UNIVERSITY' ? 2 : status === 'CERTIFICATE' ? 1 : 0);
+    entries.sort((a: any, b: any) => tier(b.eligibility.status) - tier(a.eligibility.status));
+    const uniCount = entries.filter((e: any) => e.eligibility.status === 'UNIVERSITY').length;
+    const certCount = entries.filter((e: any) => e.eligibility.status === 'CERTIFICATE').length;
+    return {
+      total: entries.length,
+      uniCount,
+      certCount,
+      noneCount: Math.max(0, entries.length - uniCount - certCount),
+      entries,
+    };
+  }, [classResults, gradingSystem]);
 
   const tabs = [
     { id: 'overview' as const, label: 'Overview', icon: 'fa-chart-bar' },
@@ -401,25 +416,28 @@ export default function ResultAnalyticsPage() {
             <div className="space-y-6">
               {eczEligibilityData ? (
                 <>
-                  <div className={`rounded-lg p-4 ${eczEligibilityData.eligible === eczEligibilityData.total ? 'bg-green-50 border border-green-200' : 'bg-blue-50 border border-blue-200'}`}>
+                  <div className={`rounded-lg p-4 ${eczEligibilityData.noneCount === 0 ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'}`}>
                     <div className="flex items-center gap-3">
-                      <span className="text-3xl">{eczEligibilityData.eligible === eczEligibilityData.total ? '🎓' : '📋'}</span>
+                      <span className="text-3xl">{eczEligibilityData.noneCount === 0 ? '🎓' : '📋'}</span>
                       <div>
                         <p className="font-semibold text-gray-900">
                           ECZ Certificate Eligibility Summary
                         </p>
                         <p className="text-sm text-gray-600">
-                          {eczEligibilityData.eligible} of {eczEligibilityData.total} students eligible
-                          {eczEligibilityData.eligible < eczEligibilityData.total && (
-                            <span className="text-amber-600"> &mdash; {eczEligibilityData.total - eczEligibilityData.eligible} students need attention</span>
+                          {eczEligibilityData.uniCount} of {eczEligibilityData.total} university eligible
+                          {eczEligibilityData.certCount > 0 && (
+                            <span> &middot; {eczEligibilityData.certCount} School Certificate only</span>
+                          )}
+                          {eczEligibilityData.noneCount > 0 && (
+                            <span className="text-amber-600"> &mdash; {eczEligibilityData.noneCount} students need attention</span>
                           )}
                         </p>
                       </div>
                     </div>
                     <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
                       <div
-                        className={`h-2 rounded-full ${eczEligibilityData.eligible / eczEligibilityData.total >= 0.8 ? 'bg-green-500' : eczEligibilityData.eligible / eczEligibilityData.total >= 0.5 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                        style={{ width: `${(eczEligibilityData.eligible / eczEligibilityData.total) * 100}%` }}
+                        className={`h-2 rounded-full ${(eczEligibilityData.uniCount + eczEligibilityData.certCount) / eczEligibilityData.total >= 0.8 ? 'bg-green-500' : (eczEligibilityData.uniCount + eczEligibilityData.certCount) / eczEligibilityData.total >= 0.5 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                        style={{ width: `${((eczEligibilityData.uniCount + eczEligibilityData.certCount) / eczEligibilityData.total) * 100}%` }}
                       ></div>
                     </div>
                   </div>
@@ -439,17 +457,29 @@ export default function ResultAnalyticsPage() {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {eczEligibilityData.entries.map((entry: any, i: number) => {
                           const e = entry.eligibility;
-                          const formatSubject = (subject: any, passed: boolean) => subject ? (
-                            <div>
-                              <div className="font-medium text-gray-800">{subject.name}</div>
-                              <div className="text-xs text-gray-500">
-                                {Number(subject.score).toFixed(1)}% · Grade {subject.grade} · {subject.points} pts
+                          const formatSubject = (subject: any) => {
+                            if (!subject) return <span className="text-xs text-red-600">Not found</span>;
+                            const badge = subject.universityPassed
+                              ? { text: '✓ University', cls: 'text-green-600' }
+                              : subject.passed
+                                ? { text: '✓ Certificate', cls: 'text-amber-600' }
+                                : { text: '✗ Not passed', cls: 'text-red-600' };
+                            return (
+                              <div>
+                                <div className="font-medium text-gray-800">{subject.name}</div>
+                                <div className="text-xs text-gray-500">
+                                  {subject.score != null ? Number(subject.score).toFixed(1) : '—'}% · Grade {subject.grade} · {subject.points} pts
+                                </div>
+                                <span className={`text-xs font-semibold ${badge.cls}`}>{badge.text}</span>
                               </div>
-                              <span className={`text-xs font-semibold ${passed ? 'text-green-600' : 'text-red-600'}`}>
-                                {passed ? '✓ Passed' : '✗ Not passed'}
-                              </span>
-                            </div>
-                          ) : <span className="text-xs text-red-600">Not found</span>;
+                            );
+                          };
+                          const statusBadge =
+                            e.status === 'UNIVERSITY'
+                              ? { text: 'UNIVERSITY ELIGIBLE', cls: 'bg-green-100 text-green-800' }
+                              : e.status === 'CERTIFICATE'
+                                ? { text: 'CERTIFICATE ONLY', cls: 'bg-amber-100 text-amber-800' }
+                                : { text: 'NOT ELIGIBLE', cls: 'bg-red-100 text-red-800' };
                           return (
                             <tr key={entry.studentId} className={i % 2 === 0 ? 'bg-gray-50' : ''}>
                               <td className="px-4 py-3 text-sm font-medium text-gray-900">
@@ -459,20 +489,20 @@ export default function ResultAnalyticsPage() {
                                 )}
                               </td>
                               <td className="px-4 py-3 text-sm text-center text-gray-600">{e.totalSubjects}</td>
-                              <td className={`px-4 py-3 text-sm text-center font-semibold ${e.bestSixTotal <= 36 ? 'text-green-600' : 'text-red-600'}`}>
+                              <td className={`px-4 py-3 text-sm text-center font-semibold ${
+                                e.status === 'UNIVERSITY' ? 'text-green-600' : e.status === 'CERTIFICATE' ? 'text-amber-600' : 'text-red-600'
+                              }`}>
                                 {e.bestSixTotal}
                               </td>
                               <td className="px-4 py-3 text-sm">
-                                {formatSubject(e.englishSubject, e.englishPassed)}
+                                {formatSubject(e.englishSubject)}
                               </td>
                               <td className="px-4 py-3 text-sm">
-                                {formatSubject(e.mathSubject, e.mathPassed)}
+                                {formatSubject(e.mathSubject)}
                               </td>
                               <td className="px-4 py-3 text-sm text-center">
-                                <span className={`px-2 py-1 text-xs rounded-full font-medium ${
-                                  e.eligible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {e.eligible ? 'ELIGIBLE' : 'NOT ELIGIBLE'}
+                                <span className={`px-2 py-1 text-xs rounded-full font-medium ${statusBadge.cls}`}>
+                                  {statusBadge.text}
                                 </span>
                               </td>
                             </tr>

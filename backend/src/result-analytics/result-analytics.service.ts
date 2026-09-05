@@ -299,6 +299,15 @@ export class ResultAnalyticsService {
       return [];
     }
 
+    // Failing grade depends on the class grading system: Forms 1-4 (5 point)
+    // fail at grade 5, senior Grades 10-12 (9 point) fail at grade 8/9.
+    const klass = await this.prisma.class.findUnique({
+      where: { id: classId },
+      select: { name: true, levelType: { select: { name: true } } },
+    });
+    const isForms = /form\s*[1-4]\b/i.test(klass?.levelType?.name || klass?.name || '');
+    const failPointThreshold = isForms ? 5 : 8;
+
     const studentPerformance = computedResults.reduce((acc, result) => {
       if (!acc[result.studentId]) {
         acc[result.studentId] = {
@@ -321,7 +330,7 @@ export class ResultAnalyticsService {
       .map((student: any) => {
         const failingSubjects = student.subjects.filter((s: any) => {
           if (s.points !== null && s.points !== undefined) {
-            return s.points >= 8;
+            return s.points >= failPointThreshold;
           }
           return (s.percentage ?? 0) < 40;
         });
