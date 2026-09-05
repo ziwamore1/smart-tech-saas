@@ -22,7 +22,7 @@ export class ResultsSmsService {
     private queuesService: QueuesService,
   ) {}
 
-  /** The formatter consumes published computed results; it never grades or recalculates them. */
+  /** Builds the per-student subject list exactly like the results sheet, then formats and sends the SMS. */
   async getRecipients(schoolId: string, classId: string, termId: string, studentIds?: string[]) {
     const students = await this.prisma.student.findMany({
       where: { schoolId, ...(studentIds?.length ? { id: { in: studentIds } } : {}), enrollments: { some: { classId, status: 'ACTIVE' } } },
@@ -33,13 +33,66 @@ export class ResultsSmsService {
     });
     if (!students.length) return this.emptyPreview();
 
+    const studentIdsArr = students.map((s) => s.id);
+    // The subject list and every subject mark mirror the results sheet exactly:
+    // computed rows take precedence, then legacy single scores, then component
+    // marks aggregated into a weighted percentage. The SMS is therefore never able
+    // to omit a subject the teacher sees on the results table, and it never shows
+    // a raw sum of component scores in place of the computed result.
     const computed = await this.prisma.computedResult.findMany({
-      where: { schoolId, classId, termId, status: 'PUBLISHED', studentId: { in: students.map((s) => s.id) } },
-      include: { subject: { select: { name: true, code: true } } },
+      where: {
+        schoolId, classId, termId,
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        studentId: { in: studentIdsArr },
+      },
+      include: { subject: { select: { id: true, name: true, code: true } } },
       orderBy: { subject: { name: 'asc' } },
     });
+    const rawResults = await this.prisma.result.findMany({
+      where: { schoolId, termId, studentId: { in: studentIdsArr }, student: { status: 'ACTIVE' } },
+      include: { subject: { select: { id: true, name: true, code: true } } },
+    });
+    const componentResults = await this.prisma.studentAssessmentResult.findMany({
+      where: {
+        studentId: { in: studentIdsArr }, classId, termId,
+        OR: [{ rawScore: { not: null } }, { isAbsent: true }],
+        student: { status: 'ACTIVE' },
+      },
+      include: { subject: { select: { id: true, name: true, code: true } } },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    const rawResultMap = new Map<string, { score: number | null; grade: string | null; remark: string | null; subjectId: string; subject: any }>();
+    for (const r of rawResults) {
+      rawResultMap.set(`${r.studentId}::${r.subjectId}`, { score: r.score, grade: r.grade, remark: r.remark, subjectId: r.subjectId, subject: r.subject });
+    }
+
+    const configSubjectIds = [...new Set(componentResults.map((c) => c.subjectId))];
+    const configs = configSubjectIds.length > 0
+      ? await this.prisma.termAssessmentConfiguration.findMany({ where: { classId, termId, subjectId: { in: configSubjectIds } } })
+      : [];
+    const configMap = new Map<string, { assessmentDefId: string; maxScore: number; weightPercentage: number }[]>();
+    for (const cfg of configs) {
+      const arr = configMap.get(cfg.subjectId) || [];
+      arr.push({ assessmentDefId: cfg.assessmentDefId, maxScore: cfg.maxScore, weightPercentage: cfg.weightPercentage });
+      configMap.set(cfg.subjectId, arr);
+    }
+
+    const componentAggMap = new Map<string, { studentId: string; subjectId: string; subject: any; entries: any[] }>();
+    for (const result of componentResults) {
+      const key = `${result.studentId}::${result.subjectId}`;
+      const existing = componentAggMap.get(key);
+      if (!existing) componentAggMap.set(key, { studentId: result.studentId, subjectId: result.subjectId, subject: result.subject, entries: [result] });
+      else existing.entries.push(result);
+    }
+
+    const baseByStudent = new Map<string, any[]>();
+    for (const student of students) {
+      baseByStudent.set(student.id, this.buildBaseSubjects(student.id, computed, rawResultMap, componentAggMap, configMap));
+    }
+
     const summaries = await this.prisma.termSummary.findMany({
-      where: { schoolId, classId, termId, studentId: { in: students.map((s) => s.id) } },
+      where: { schoolId, classId, termId, studentId: { in: studentIdsArr } },
     });
     const [school, term, klass] = await Promise.all([
       this.prisma.school.findUnique({ where: { id: schoolId }, select: { name: true, institutionType: { select: { code: true } } } }),
@@ -57,9 +110,9 @@ export class ResultsSmsService {
     }
 
     const averages = new Map<string, number>();
-    for (const student of students) {
-      const rows = computed.filter((r) => r.studentId === student.id && r.finalPercentage != null);
-      if (rows.length) averages.set(student.id, rows.reduce((sum, row) => sum + (row.finalPercentage || 0), 0) / rows.length);
+    for (const [studentId, base] of baseByStudent) {
+      const marks = base.filter((s) => !s.absent && s.mark != null).map((s) => Number(s.mark));
+      if (marks.length) averages.set(studentId, marks.reduce((sum, m) => sum + m, 0) / marks.length);
     }
     const ranking = Array.from(averages.entries()).sort((a, b) => b[1] - a[1]);
     const positions = new Map<string, number>();
@@ -82,26 +135,18 @@ export class ResultsSmsService {
     const recipients: any[] = [];
     for (const student of students) {
       const rows = computed.filter((r) => r.studentId === student.id);
-      if (!rows.length) continue;
+      const base = baseByStudent.get(student.id) ?? [];
+      if (!base.length) continue;
       const summary = summaries.find((s) => s.studentId === student.id);
       const isPrimary = school?.institutionType?.code === 'PRIMARY_SCHOOL';
-      const officialSubjects = rows.map((row) => ({
-        subjectName: row.subject.name,
-        subjectCode: row.subject.code,
-        totalRawScore: row.totalRawScore,
-        finalPercentage: row.finalPercentage,
-        finalGrade: row.finalGrade,
-        finalRemark: row.finalRemark,
-        points: row.points,
-        isAbsent: row.isAbsent,
-      })).map((subject: any) => ({
+      const officialSubjects = base.map((subject: any) => ({
         name: subject.subjectName,
         code: subject.subjectCode,
-        mark: subject.finalPercentage,
-        grade: subject.finalGrade,
-        remark: subject.finalRemark,
+        mark: subject.mark,
+        grade: subject.grade,
+        remark: subject.remark,
         points: subject.points,
-        absent: subject.isAbsent ?? false,
+        absent: subject.absent ?? false,
       }));
 
       // Replace component subjects with composite subjects (e.g. Physics+Chemistry → Science)
@@ -134,7 +179,7 @@ export class ResultsSmsService {
       const bestSix = isPrimary || subjectPoints.length === 0
         ? null
         : subjectPoints.slice().sort((a: number, b: number) => a - b).slice(0, 6).reduce((sum: number, p: number) => sum + p, 0);
-      const version = createHash('sha256').update(JSON.stringify({ rows, summary })).digest('hex');
+      const version = createHash('sha256').update(JSON.stringify({ base, summary })).digest('hex');
       const result = {
         subjects: officialSubjects,
         total: isPrimary ? Number(officialSubjects.reduce((sum: number, subject: any) => sum + (subject.mark || 0), 0).toFixed(1)) : null,
@@ -144,8 +189,8 @@ export class ResultsSmsService {
           : averages.get(student.id) == null ? null : Number(averages.get(student.id)!.toFixed(1)),
         grade: summary?.overallGrade ?? null,
         division: (summary?.competencyScores as any)?.division ?? null,
-        position: positions.get(student.id) ?? null,
-        classSize: ranking.length || summary?.classSize || undefined,
+        position: summary?.classRank ?? positions.get(student.id) ?? null,
+        classSize: summary?.classSize || ranking.length || undefined,
         attendance: summary?.attendanceRate ?? null,
       };
       const message = this.formatMessage(student, klass?.name, term?.name, result);
@@ -176,6 +221,108 @@ export class ResultsSmsService {
       estimatedUnits: valid.reduce((sum, r) => sum + r.estimatedUnits, 0),
       multiSegment: valid.some((r) => r.segments > 1), recipients,
     };
+  }
+
+  private buildBaseSubjects(
+    studentId: string,
+    computed: any[],
+    rawResultMap: Map<string, { score: number | null; grade: string | null; remark: string | null; subjectId: string; subject: any }>,
+    componentAggMap: Map<string, { studentId: string; subjectId: string; subject: any; entries: any[] }>,
+    configMap: Map<string, { assessmentDefId: string; maxScore: number; weightPercentage: number }[]>,
+  ): any[] {
+    const rows = computed.filter((r) => r.studentId === studentId);
+    const base: any[] = [];
+    const crSubjects = new Set<string>();
+
+    // Computed final results take precedence.
+    for (const cr of rows) {
+      // Skip empty phantom rows (the results sheet deletes these): a subject with
+      // neither a final percentage, a raw score, nor an absence flag renders nothing.
+      if (cr.finalPercentage == null && !cr.totalRawScore && !cr.isAbsent) continue;
+      crSubjects.add(cr.subjectId);
+      let mark = cr.finalPercentage;
+      if (mark == null) {
+        // Never fall back to the raw sum of component scores; derive the weighted
+        // component percentage exactly like the results sheet, else the legacy score.
+        mark = this.componentAggregateMark(studentId, cr.subjectId, componentAggMap, configMap)
+          ?? rawResultMap.get(`${studentId}::${cr.subjectId}`)?.score ?? null;
+      }
+      base.push({
+        subjectName: cr.subject.name,
+        subjectCode: cr.subject.code,
+        mark,
+        grade: cr.finalGrade,
+        remark: cr.finalRemark,
+        points: cr.points,
+        absent: cr.isAbsent ?? false,
+      });
+    }
+
+    // Legacy single-score records for subjects that never received a computed row.
+    for (const [key, raw] of rawResultMap) {
+      if (key.startsWith(`${studentId}::`) && !crSubjects.has(raw.subjectId)) {
+        base.push({
+          subjectName: raw.subject.name,
+          subjectCode: raw.subject.code,
+          mark: raw.score ?? null,
+          grade: raw.grade ?? null,
+          remark: raw.remark ?? null,
+          points: null,
+          absent: false,
+        });
+      }
+    }
+
+    // Marks entered against assessment definitions, aggregated into a weighted
+    // percentage — again mirroring the results sheet.
+    for (const [key, agg] of componentAggMap) {
+      if (!key.startsWith(`${studentId}::`) || crSubjects.has(agg.subjectId) || rawResultMap.has(key)) continue;
+      const { mark, absent } = this.aggregateComponents(agg, configMap);
+      base.push({
+        subjectName: agg.subject.name,
+        subjectCode: agg.subject.code,
+        mark,
+        grade: agg.entries[0]?.grade ?? null,
+        remark: agg.entries[0]?.remarks ?? null,
+        points: null,
+        absent,
+      });
+    }
+
+    return base.sort((a: any, b: any) => a.subjectName.localeCompare(b.subjectName));
+  }
+
+  private componentAggregateMark(
+    studentId: string,
+    subjectId: string,
+    componentAggMap: Map<string, any>,
+    configMap: Map<string, { assessmentDefId: string; maxScore: number; weightPercentage: number }[]>,
+  ): number | null {
+    const agg = componentAggMap.get(`${studentId}::${subjectId}`);
+    if (!agg || agg.entries.every((e: any) => e.isAbsent)) return null;
+    return this.aggregateComponents(agg, configMap).mark;
+  }
+
+  private aggregateComponents(
+    agg: any,
+    configMap: Map<string, { assessmentDefId: string; maxScore: number; weightPercentage: number }[]>,
+  ): { mark: number | null; absent: boolean } {
+    const subjectConfigs = configMap.get(agg.subjectId) || [];
+    const absent = agg.entries.length > 0 && agg.entries.every((e: any) => e.isAbsent);
+    let totalWeighted = 0;
+    let totalWeight = 0;
+    for (const entry of agg.entries) {
+      if (entry.isAbsent) continue;
+      const cfg = subjectConfigs.find((c) => c.assessmentDefId === entry.assessmentDefId);
+      const maxScore = cfg?.maxScore || entry.maxScore || 100;
+      const weight = cfg?.weightPercentage || 0;
+      if (entry.rawScore != null && weight > 0) {
+        totalWeighted += ((entry.rawScore / maxScore) * 100) * (weight / 100);
+        totalWeight += weight;
+      }
+    }
+    const mark = totalWeight > 0 ? parseFloat(((totalWeighted / totalWeight) * 100).toFixed(2)) : null;
+    return { mark, absent };
   }
 
   async sendResultsSms(schoolId: string, classId: string, termId: string, userId: string, options?: { parentIds?: string[]; studentIds?: string[]; allowResend?: boolean }) {
