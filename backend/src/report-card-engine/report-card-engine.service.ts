@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { StudentSubjectService } from '../student-subject/student-subject.service';
+import { checkEczEligibility, detectEczGradingSystem, ECZ_MAX_BEST_SIX_POINTS } from '../ecz-eligibility/ecz-eligibility.util';
 
 @Injectable()
 export class ReportCardEngineService {
@@ -474,6 +475,17 @@ export class ReportCardEngineService {
 
     const totalPoints = bestSubjects.reduce((sum, s) => sum + (s.points ?? 0), 0);
 
+    // ECZ university / school-certificate eligibility over all graded subjects
+    const eligibility = checkEczEligibility(
+      enrichedBreakdown.map((s: any) => ({
+        name: s.subjectName,
+        score: s.finalPercentage,
+        grade: s.finalGrade,
+        points: s.points,
+      })),
+      detectEczGradingSystem(enrollment.class.levelType?.name ?? enrollment.class.name ?? null),
+    );
+
     // Load division rules for classification
     const divisionRules = await this.prisma.divisionRule.findMany({
       where: {
@@ -520,6 +532,43 @@ export class ReportCardEngineService {
       subjectBreakdown: enrichedBreakdown,
       bestSubjects,
       totalPoints,
+      bestSix: eligibility.bestSix.map((s) => ({
+        subjectName: s.name,
+        finalPercentage: s.score,
+        finalGrade: s.grade,
+        points: s.points,
+      })),
+      bestSixTotal: eligibility.bestSixTotal,
+      universityEligible: eligibility.universityEligible,
+      certificateAwarded: eligibility.certificateAwarded,
+      eligibilityStatus: eligibility.status,
+      eligibility: {
+        bestSix: eligibility.bestSix.map((s) => ({
+          subjectName: s.name,
+          finalPercentage: s.score,
+          finalGrade: s.grade,
+          points: s.points,
+          remark: s.remark,
+        })),
+        bestSixTotal: eligibility.bestSixTotal,
+        universityEligible: eligibility.universityEligible,
+        certificateAwarded: eligibility.certificateAwarded,
+        status: eligibility.status,
+        certificateName: eligibility.certificateName,
+        gradingSystem: eligibility.gradingSystem,
+        maxBestSixPoints: ECZ_MAX_BEST_SIX_POINTS[eligibility.gradingSystem],
+        englishPassed: eligibility.englishPassed,
+        mathPassed: eligibility.mathPassed,
+        englishSubject: eligibility.englishSubject
+          ? { subjectName: eligibility.englishSubject.name, finalPercentage: eligibility.englishSubject.score, finalGrade: eligibility.englishSubject.grade, points: eligibility.englishSubject.points }
+          : null,
+        mathSubject: eligibility.mathSubject
+          ? { subjectName: eligibility.mathSubject.name, finalPercentage: eligibility.mathSubject.score, finalGrade: eligibility.mathSubject.grade, points: eligibility.mathSubject.points }
+          : null,
+        hasFailingSubject: eligibility.hasFailingSubject,
+        failingSubjects: eligibility.failingSubjects,
+        details: eligibility.details,
+      },
       bestSubjectsAverage: bestSubjects.length > 0
         ? parseFloat((bestSubjects.reduce((sum, s) => sum + (s.finalPercentage ?? 0), 0) / bestSubjects.length).toFixed(2))
         : null,

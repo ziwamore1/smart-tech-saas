@@ -79,6 +79,9 @@ export interface ReportCardData {
     numberOfSubjects: number;
     bestSixTotal: number;
     eligibleForUniversity: boolean;
+    universityEligible?: boolean;
+    certificateEligible?: boolean;
+    eligibilityStatus?: string;
     positionInClass: number;
     totalStudents: number;
   };

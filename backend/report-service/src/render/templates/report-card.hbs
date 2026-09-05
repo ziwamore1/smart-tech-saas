@@ -119,8 +119,8 @@
   {{/if}}
   {{#if template.includeUniversity}}
   <div class="summary-item">
-    <div class="value">{{summary.eligibleForUniversity}}</div>
-    <div class="label">University Eligible</div>
+    <div class="value">{{#if summary.eligibleForUniversity}}Eligible for University{{else if summary.certificateEligible}}School Certificate Only{{else}}Not Eligible{{/if}}</div>
+    <div class="label">ECZ Status</div>
   </div>
   {{/if}}
   <div class="summary-item">

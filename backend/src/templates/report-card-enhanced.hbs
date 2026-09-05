@@ -183,7 +183,7 @@ tr:nth-child(even) { background: {{secondaryColor}}; }
 {{#if isPrimarySchool}}
 {{#if grade7Result.schoolRank}}<div class="stat-item" style="background:{{secondaryColor}}; border-color:{{primaryColor}}"><div class="stat-value" style="color:{{primaryColor}}">{{grade7Result.schoolRank}}</div><div class="stat-label">ECZ School Rank</div></div>{{/if}}
 {{else}}
-<div class="stat-item" style="background:#fefce8; border-color:#eab308"><div class="stat-value" style="color:#a16207">{{totalPoints}}</div><div class="stat-label">Best 6 Points</div></div>
+<div class="stat-item" style="background:#fefce8; border-color:#eab308"><div class="stat-value" style="color:#a16207">{{#if bestSixTotal}}{{bestSixTotal}}{{else}}{{totalPoints}}{{/if}}</div><div class="stat-label">Best 6 Points</div></div>
 {{#if bestSubjectsAverage}}<div class="stat-item"><div class="stat-value">{{bestSubjectsAverage}}%</div><div class="stat-label">Best Avg</div></div>{{/if}}
 {{/if}}
 {{#if attendance.attendanceRate}}<div class="stat-item"><div class="stat-value">{{attendance.attendanceRate}}%</div><div class="stat-label">Attendance</div></div>{{/if}}
@@ -207,15 +207,26 @@ tr:nth-child(even) { background: {{secondaryColor}}; }
 <!-- University Benchmark -->
 <div style="background: linear-gradient(135deg, #fefce8, #fef9c3); border: 2px solid #a16207; border-radius: 8px; padding: 10px; text-align: center; margin-top: 6px;">
 <div style="font-size: 12px; color: #713f12; margin-bottom: 5px; font-weight: 700;">University Benchmark — Best 6 Aggregate Points</div>
-<div style="font-size: 32px; font-weight: 900; color: #a16207; line-height: 1;">{{totalPoints}}</div>
-<div style="font-size: 11px; color: #854d0e; margin-top: 3px;">out of 6 (best) to 54 (worst)</div>
-{{#if bestSubjects.length}}
+<div style="font-size: 32px; font-weight: 900; color: #a16207; line-height: 1;">{{#if bestSixTotal}}{{bestSixTotal}}{{else}}{{totalPoints}}{{/if}}</div>
+<div style="font-size: 11px; color: #854d0e; margin-top: 3px;">out of 6 (best) to {{#if eligibility.maxBestSixPoints}}{{eligibility.maxBestSixPoints}}{{else}}54{{/if}} (worst)</div>
+{{#if eligibility.bestSix.length}}
+<div style="margin-top: 6px; font-size: 10px; color: #713f12;">
+<strong>Best 6:</strong> 
+{{#each eligibility.bestSix}}{{subjectName}} ({{#if (present points)}}{{points}}{{else}}—{{/if}} pts){{#unless @last}}, {{/unless}}{{/each}}
+</div>
+{{else if bestSubjects.length}}
 <div style="margin-top: 6px; font-size: 10px; color: #713f12;">
 <strong>Best {{bestSubjects.length}}:</strong> 
 {{#each bestSubjects}}{{subjectName}} ({{#if (present points)}}{{points}}{{else}}—{{/if}} pts){{#unless @last}}, {{/unless}}{{/each}}
 </div>
 {{/if}}
 <div style="margin-top: 4px; font-size: 10px; color: #92400e; font-style: italic;">Lower aggregate = stronger university admission</div>
+{{#if eligibility}}
+<div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed #facc15; background: #ffffff; border-radius: 6px;">
+<div style="font-size: 14px; font-weight: 900; color: {{#if eligibility.universityEligible}}#047857{{else if eligibility.certificateAwarded}}#b45309{{else}}#b91c1c{{/if}};">{{#if eligibility.universityEligible}}UNIVERSITY ELIGIBLE{{else if eligibility.certificateAwarded}}{{eligibility.certificateName}} ONLY{{else}}NOT ELIGIBLE{{/if}}</div>
+{{#if eligibility.details}}<div style="margin-top: 2px; font-size: 9px; color: #854d0e;">{{eligibility.details}}</div>{{/if}}
+</div>
+{{/if}}
 </div>
 {{/if}}
 </div>

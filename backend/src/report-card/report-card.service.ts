@@ -13,6 +13,7 @@ import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 import { SchoolActivityService } from '../common/services/school-activity.service';
 import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
+import { checkEczEligibility, detectEczGradingSystem, ECZ_MAX_BEST_SIX_POINTS } from '../ecz-eligibility/ecz-eligibility.util';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as handlebars from 'handlebars';
@@ -203,6 +204,11 @@ export class ReportCardService {
       throw new Error('Student not enrolled in this academic year');
     }
 
+    const classInfo = await this.prisma.class.findUnique({
+      where: { id: enrollment.classId },
+      include: { levelType: true },
+    });
+
     const classEnrollments = await this.prisma.enrollment.findMany({
       where: {
         classId: enrollment.classId,
@@ -362,17 +368,20 @@ export class ReportCardService {
 
     const average = totalMarks / results.length;
 
-    const bestSix = subjectsWithGrades
-      .map((s) => s.points)
-      .sort((a, b) => a - b)
-      .slice(0, 6);
+    const eligibility = checkEczEligibility(
+      subjectsWithGrades.map((s) => ({
+        name: s.subject,
+        score: s.score,
+        grade: s.grade,
+        points: s.points,
+        remark: s.remark,
+      })),
+      detectEczGradingSystem(classInfo?.levelType?.name ?? classInfo?.name ?? null),
+    );
 
-    const bestSixTotal = bestSix.reduce((a, b) => a + b, 0);
+    const bestSixTotal = eligibility.bestSixTotal;
 
-    const hasFail = subjectsWithGrades.some((s) => s.points === 9);
-
-    const eligibleForUniversity =
-      subjectsWithGrades.length >= 6 && !hasFail && bestSixTotal <= 36;
+    const eligibleForUniversity = eligibility.universityEligible;
 
     return {
       student: {
@@ -394,6 +403,22 @@ export class ReportCardService {
         numberOfSubjects: results.length,
         bestSixTotal,
         eligibleForUniversity,
+        universityEligible: eligibility.universityEligible,
+        certificateEligible: eligibility.certificateAwarded,
+        eligibilityStatus: eligibility.status,
+        certificateName: eligibility.certificateName,
+        gradingSystem: eligibility.gradingSystem,
+        maxBestSixPoints: ECZ_MAX_BEST_SIX_POINTS[eligibility.gradingSystem],
+        englishPassed: eligibility.englishPassed,
+        mathPassed: eligibility.mathPassed,
+        bestSix: eligibility.bestSix.map((s) => ({
+          subject: s.name,
+          score: s.score,
+          grade: s.grade,
+          points: s.points,
+          remark: s.remark,
+        })),
+        eligibilityDetails: eligibility.details,
         positionInClass: position,
         totalStudents: ranking.length,
       },
@@ -469,6 +494,12 @@ export class ReportCardService {
         eligibleForUniversity: report.summary.eligibleForUniversity
           ? 'YES'
           : 'NO',
+        eligibilityStatus: report.summary.eligibilityStatus
+          ?? (report.summary.eligibleForUniversity ? 'UNIVERSITY' : 'NONE'),
+        eligibilityDisplay: report.summary.eligibilityDisplay
+          ?? (report.summary.eligibilityStatus === 'CERTIFICATE'
+            ? 'School Certificate Only'
+            : (report.summary.eligibleForUniversity ? 'Eligible for University' : 'Not Eligible')),
       },
 
       teacherComment: reportTemplate?.includeComments !== false ? teacherComment : undefined,
@@ -602,6 +633,12 @@ export class ReportCardService {
           eligibleForUniversity: report.summary.eligibleForUniversity
             ? 'YES'
             : 'NO',
+          eligibilityStatus: report.summary.eligibilityStatus
+            ?? (report.summary.eligibleForUniversity ? 'UNIVERSITY' : 'NONE'),
+          eligibilityDisplay: report.summary.eligibilityDisplay
+            ?? (report.summary.eligibilityStatus === 'CERTIFICATE'
+              ? 'School Certificate Only'
+              : (report.summary.eligibleForUniversity ? 'Eligible for University' : 'Not Eligible')),
         },
 
         teacherComment: reportTemplate?.includeComments !== false ? teacherComment : undefined,
@@ -950,6 +987,12 @@ export class ReportCardService {
       subjectBreakdown: engineData.subjectBreakdown || [],
       bestSubjects: engineData.bestSubjects || [],
       totalPoints: engineData.totalPoints ?? 0,
+      bestSix: engineData.bestSix || null,
+      bestSixTotal: engineData.bestSixTotal ?? null,
+      universityEligible: engineData.universityEligible ?? null,
+      certificateAwarded: engineData.certificateAwarded ?? null,
+      eligibilityStatus: engineData.eligibilityStatus ?? null,
+      eligibility: engineData.eligibility ?? null,
       bestSubjectsAverage: engineData.bestSubjectsAverage != null ? Math.round(engineData.bestSubjectsAverage * 100) / 100 : null,
       division: engineData.division,
       performanceCategory: engineData.performanceCategory,

@@ -13,6 +13,7 @@ import { CertificateCommentService } from '../report-template-builder/certificat
 import { ReportTemplateBuilderService } from '../report-template-builder/report-template-builder.service';
 import { ResultsManagementService } from '../results-management/results-management.service';
 import { normalizeExamType } from '../common/utils/exam-type.util';
+import { checkEczEligibility, detectEczGradingSystem } from '../ecz-eligibility/ecz-eligibility.util';
 import * as crypto from 'crypto';
 
 export enum ReportType {
@@ -786,6 +787,23 @@ export class ReportEngineService {
       return [String(v)];
     };
     const overallPct = termSummary.overallPercentage;
+    const gradingSystemName = engineData?.class?.level ?? engineData?.class?.name ?? null;
+    const engineEligibility = engineData?.eligibility as any;
+    const computedEligibility = engineEligibility && typeof engineEligibility.status === 'string'
+      ? engineEligibility
+      : checkEczEligibility(
+          (breakdown || []).map((s: any) => ({
+            name: s.subjectName,
+            score: s.finalPercentage,
+            grade: s.finalGrade,
+            points: s.points,
+          })),
+          detectEczGradingSystem(gradingSystemName),
+        );
+    const bestSixTotal = typeof computedEligibility.bestSixTotal === 'number'
+      ? computedEligibility.bestSixTotal
+      : engineData.bestSixTotal ?? 0;
+    const eligibilityStatus = computedEligibility?.status ?? 'NONE';
     return {
       ...engineData,
       schoolName: school?.name,
@@ -803,8 +821,17 @@ export class ReportEngineService {
         totalPoints: engineData.totalPoints || 0,
         positionInClass: termSummary.classRank || 0,
         totalStudents: termSummary.classSize || 0,
-        bestSixTotal: engineData.totalPoints || 0,
-        eligibleForUniversity: 'YES',
+        bestSixTotal,
+        eligibleForUniversity: computedEligibility?.universityEligible ? 'YES' : 'NO',
+        eligibilityStatus,
+        universityEligible: computedEligibility?.universityEligible ?? false,
+        certificateEligible: computedEligibility?.certificateAwarded ?? false,
+        certificateName: computedEligibility?.certificateName ?? 'School Certificate',
+        eligibilityDisplay: eligibilityStatus === 'UNIVERSITY'
+          ? 'Eligible for University'
+          : eligibilityStatus === 'CERTIFICATE'
+            ? 'School Certificate Only'
+            : 'Not Eligible',
       },
       teacherComment: termSummary.teacherRemarks || '',
       headComment: engineData.headComment || '',
