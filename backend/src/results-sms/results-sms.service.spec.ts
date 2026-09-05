@@ -179,6 +179,54 @@ describe('ResultsSmsService', () => {
     } finally { delete process.env.RESULTS_SMS_MAX_RETRIES; }
   });
 
+  it('Self-heal — a PROCESSING batch whose recipients are all terminal finalizes on read', async () => {
+    jest.spyOn(svc as any, 'getRecipients').mockResolvedValue(preview);
+    const send = await svc.sendResultsSms('sch', 'c1', 't1', 'u1');
+    // Simulate a worker that finished every send but never called finalizeBatch.
+    await fake.resultSmsBatch.update({ where: { id: send.batchId }, data: { status: 'PROCESSING' } });
+    for (const l of fake.logs.filter((x) => x.batchId === send.batchId)) {
+      if (l.status === 'SKIPPED') continue;
+      await fake.resultSmsLog.update({ where: { id: l.id }, data: { status: 'SENT', sentAt: new Date() } });
+    }
+
+    const status = await svc.getBatchStatus('sch', send.batchId);
+
+    expect(status.status).toBe('COMPLETED');
+    expect(status.completedAt).toBeInstanceOf(Date);
+    expect(status.sent).toBe(2);
+    expect(status.pending).toBe(0);
+  });
+
+  it('Self-heal — getRecentBatches finalizes a terminal-work batch before reporting it active', async () => {
+    jest.spyOn(svc as any, 'getRecipients').mockResolvedValue(preview);
+    const send = await svc.sendResultsSms('sch', 'c1', 't1', 'u1');
+    await fake.resultSmsBatch.update({ where: { id: send.batchId }, data: { status: 'PROCESSING' } });
+    for (const l of fake.logs.filter((x) => x.batchId === send.batchId)) {
+      if (l.status === 'SKIPPED') continue;
+      await fake.resultSmsLog.update({ where: { id: l.id }, data: { status: 'SENT', sentAt: new Date() } });
+    }
+
+    const batches = await svc.getRecentBatches('sch');
+
+    expect(batches.find((b: any) => b.id === send.batchId)?.active).toBe(false);
+    const batch = await fake.resultSmsBatch.findUnique({ where: { id: send.batchId } });
+    expect(batch.status).toBe('COMPLETED');
+  });
+
+  it('Self-heal — a batch with real remaining work is never finalized', async () => {
+    jest.spyOn(svc as any, 'getRecipients').mockResolvedValue(preview);
+    const send = await svc.sendResultsSms('sch', 'c1', 't1', 'u1');
+    await fake.resultSmsBatch.update({ where: { id: send.batchId }, data: { status: 'PROCESSING' } });
+    // One recipient is still QUEUED, one is SENT.
+    const targets = fake.logs.filter((l) => l.batchId === send.batchId && l.status === 'QUEUED');
+    await fake.resultSmsLog.update({ where: { id: targets[0].id }, data: { status: 'SENT', sentAt: new Date() } });
+
+    const status = await svc.getBatchStatus('sch', send.batchId);
+
+    expect(status.status).toBe('PROCESSING');
+    expect(status.pending).toBe(1);
+  });
+
   it('Test 4 — worker restart: completed recipients are never sent twice', async () => {
     jest.spyOn(svc as any, 'getRecipients').mockResolvedValue(preview);
     const send = await svc.sendResultsSms('sch', 'c1', 't1', 'u1');

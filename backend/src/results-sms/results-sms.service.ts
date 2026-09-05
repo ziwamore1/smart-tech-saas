@@ -585,7 +585,7 @@ export class ResultsSmsService {
 
   /** Full persisted status of a batch with derived liveness/progress for the UI. */
   async getBatchStatus(schoolId: string, batchId: string) {
-    const batch = await this.prisma.resultSmsBatch.findFirst({ where: { id: batchId, schoolId } });
+    let batch = await this.prisma.resultSmsBatch.findFirst({ where: { id: batchId, schoolId } });
     if (!batch) throw new NotFoundException('SMS batch not found');
     const counts = await this.prisma.resultSmsLog.groupBy({ by: ['status'], where: { schoolId, batchId }, _count: { _all: true } });
     const c = (s: string) => counts.find((x) => x.status === s)?._count._all ?? 0;
@@ -596,6 +596,18 @@ export class ResultsSmsService {
     const queued = c('QUEUED') + c('PENDING');
     const skipped = c('SKIPPED');
     const total = sent + failed + retrying + sending + queued + skipped;
+    const pending = queued + sending + retrying;
+
+    // Self-heal: when every recipient is terminal (all sent/failed/skipped) but the
+    // batch never transitioned out of an active state — e.g. the worker or the
+    // scheduled monitor lost its window between the last send and the finalize step —
+    // resolve it on the next status read so the UI can never pin on PROCESSING.
+    if (RESULTS_SMS_BATCH_STATUSES.ACTIVE.includes(batch.status) && pending === 0) {
+      await this.finalizeBatch(batchId, schoolId);
+      batch = await this.prisma.resultSmsBatch.findFirst({ where: { id: batchId, schoolId } });
+      if (!batch) throw new NotFoundException('SMS batch not found');
+    }
+
     const target = Math.max(total - skipped, 0);
     const progress = target ? Math.round(((sent + failed) / target) * 100) : 100;
     const now = Date.now();
@@ -607,7 +619,7 @@ export class ResultsSmsService {
     const workerAlive = !terminal && !stalled;
     return {
       batchId, status: batch.status, total, sent, failed, retrying, sending, queued, skipped,
-      pending: queued + sending + retrying, progress, estimatedUnits: batch.estimatedUnits,
+      pending, progress, estimatedUnits: batch.estimatedUnits,
       queuedAt: batch.queuedAt, startedAt: batch.startedAt, completedAt: batch.completedAt,
       lastActivityAt: batch.lastActivityAt, heartbeatAt: batch.heartbeatAt,
       lastActivitySecondsAgo, heartbeatSecondsAgo, workerAlive, stalled,
@@ -617,7 +629,25 @@ export class ResultsSmsService {
 
   async getRecentBatches(schoolId: string, limit = 25) {
     const batches = await this.prisma.resultSmsBatch.findMany({ where: { schoolId }, orderBy: { createdAt: 'desc' }, take: limit });
-    return batches.map((b) => ({ ...b, active: RESULTS_SMS_BATCH_STATUSES.ACTIVE.includes(b.status) }));
+
+    // Self-heal the same way the status read does, so a batch whose recipients are
+    // all terminal gets finalized before the UI decides which batch is "active".
+    const active = batches.filter((b) => RESULTS_SMS_BATCH_STATUSES.ACTIVE.includes(b.status));
+    if (active.length) {
+      const rows = await this.prisma.resultSmsLog.groupBy({
+        by: ['batchId', 'status'],
+        where: { schoolId, batchId: { in: active.map((b) => b.id) } },
+        _count: { _all: true },
+      });
+      for (const b of active) {
+        const c = (s: string) => rows.find((r) => r.batchId === b.id && r.status === s)?._count._all ?? 0;
+        const pending = c('QUEUED') + c('PENDING') + c('SENDING') + c('RETRYING');
+        if (pending === 0) await this.finalizeBatch(b.id, schoolId);
+      }
+    }
+
+    const refreshed = await this.prisma.resultSmsBatch.findMany({ where: { schoolId }, orderBy: { createdAt: 'desc' }, take: limit });
+    return refreshed.map((b) => ({ ...b, active: RESULTS_SMS_BATCH_STATUSES.ACTIVE.includes(b.status) }));
   }
 
   async cancelBatch(schoolId: string, batchId: string) {
