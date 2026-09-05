@@ -143,9 +143,21 @@ export class ResultsSmsService {
       positions.set(studentId, lastPosition);
     });
 
+    // Reuse the computed rows already loaded above so composite resolution does
+    // not re-query the database per student (preview latency on slow DBs).
+    const computedByStudent = new Map<string, Map<string, { finalPercentage: number | null; subjectName: string }>>();
+    for (const r of computed) {
+      if (!computedByStudent.has(r.studentId)) computedByStudent.set(r.studentId, new Map());
+      computedByStudent.get(r.studentId)!.set(r.subjectId, { finalPercentage: r.finalPercentage ?? null, subjectName: r.subject.name });
+    }
+    const gradeCache = new Map<string, any>();
+
     const compositesByStudent = new Map<string, any[]>();
     const computedComposites = await mapBounded(students, (student) =>
-      this.compositeSubjectService.getCompositeResultsForStudent(student.id, termId, classId, schoolId),
+      this.compositeSubjectService.getCompositeResultsForStudent(student.id, termId, classId, schoolId, {
+        computedMap: computedByStudent.get(student.id),
+        gradeCache,
+      }),
     );
     computedComposites.forEach((comps, i) => compositesByStudent.set(students[i].id, comps));
 

@@ -31,9 +31,42 @@ function mergeById<T extends { id: string }>(...lists: T[][]): T[] {
   return [...seen.values()];
 }
 
+/**
+ * Small TTL memo that keeps repeated reads during a busy results pass off the DB.
+ * Class and school configuration changes are rare, so a few minutes of reuse is safe.
+ */
+class MemoCache<T> {
+  private store = new Map<string, { exp: number; value: T }>();
+
+  constructor(
+    private ttlMs = 5 * 60 * 1000,
+    private max = 300,
+  ) {}
+
+  get(key: string): T | undefined {
+    const hit = this.store.get(key);
+    if (!hit) return undefined;
+    if (Date.now() > hit.exp) {
+      this.store.delete(key);
+      return undefined;
+    }
+    return hit.value;
+  }
+
+  set(key: string, value: T): void {
+    if (this.store.size >= this.max && !this.store.has(key)) {
+      const oldest = this.store.keys().next().value as string | undefined;
+      if (oldest) this.store.delete(oldest);
+    }
+    this.store.set(key, { exp: Date.now() + this.ttlMs, value });
+  }
+}
+
 @Injectable()
 export class CompositeSubjectService {
   private readonly logger = new Logger(CompositeSubjectService.name);
+  private readonly classMemo = new MemoCache<any>();
+  private readonly candidatesMemo = new MemoCache<any[]>();
 
   constructor(private prisma: PrismaService) {}
 
@@ -169,6 +202,7 @@ export class CompositeSubjectService {
     schoolId: string,
     compositeCache?: Map<string, any>,
     gradeCache?: Map<string, any>,
+    computedMap?: Map<string, { finalPercentage: number | null; subjectName: string }>,
   ) {
     const composite = await this.memoLookup(
       compositeCache,
@@ -185,27 +219,37 @@ export class CompositeSubjectService {
     const componentResults: { subjectId: string; subjectName: string; percentage: number | null; weight: number; present: boolean }[] = [];
 
     for (const component of composite.components) {
-      const computed = await this.prisma.computedResult.findUnique({
-        where: {
-          studentId_subjectId_termId: {
-            studentId,
-            subjectId: component.subjectId,
-            termId,
-          },
-        },
-        include: { subject: true },
-      });
+      // Prefer rows the caller already loaded (bulk results passes); fall back to
+      // a per-subject read when computing a single composite in isolation.
+      const computed = computedMap
+        ? (computedMap.get(component.subjectId) ?? null)
+        : await this.prisma.computedResult.findUnique({
+            where: {
+              studentId_subjectId_termId: {
+                studentId,
+                subjectId: component.subjectId,
+                termId,
+              },
+            },
+            include: { subject: true },
+          });
+      const row = computed
+        ? {
+            finalPercentage: computed.finalPercentage,
+            subject: { name: computed.subjectName ?? computed.subject?.name },
+          }
+        : null;
 
       componentResults.push({
         subjectId: component.subjectId,
-        subjectName: computed?.subject?.name || component.subjectId,
-        percentage: computed?.finalPercentage ?? null,
+        subjectName: row?.subject?.name || component.subjectId,
+        percentage: row?.finalPercentage ?? null,
         weight: component.weight,
-        present: computed != null,
+        present: row != null,
       });
 
-      if (computed?.finalPercentage != null) {
-        totalWeighted += computed.finalPercentage * component.weight;
+      if (row?.finalPercentage != null) {
+        totalWeighted += row.finalPercentage * component.weight;
         totalWeight += component.weight;
       }
     }
@@ -311,12 +355,22 @@ export class CompositeSubjectService {
     return results.filter(Boolean);
   }
 
-  async getCompositeResultsForStudent(studentId: string, termId: string, classId: string, schoolId: string) {
-    const klass = await this.prisma.class.findUnique({
-      where: { id: classId },
-      include: { levelType: { select: { name: true } } },
-    });
+  /**
+   * Resolves the candidate composite subjects that can apply to a class. The
+   * result depends only on (classId, termId, schoolId), never on the student, so
+   * it is computed once and shared across every student in a results pass.
+   */
+  async getCompositeCandidatesForClass(classId: string, termId: string, schoolId: string): Promise<any[]> {
+    const key = `${classId}|${termId}|${schoolId}`;
+    const cached = this.candidatesMemo.get(key);
+    if (cached !== undefined) return cached;
+    const candidates = await this.loadCompositeCandidates(classId, termId, schoolId);
+    this.candidatesMemo.set(key, candidates);
+    return candidates;
+  }
 
+  private async loadCompositeCandidates(classId: string, termId: string, schoolId: string): Promise<any[]> {
+    const klass = await this.getClass(classId);
     // Composite subjects only replace their components in the senior band
     // (Grade 10-12). Forms 1-4 and other junior bands keep the standalone
     // subjects (e.g. Physics and Chemistry) untouched.
@@ -365,12 +419,41 @@ export class CompositeSubjectService {
         })
       : [];
 
-    const candidates = mergeById(linked, scoped, matched);
+    return mergeById(linked, scoped, matched);
+  }
+
+  private async getClass(classId: string): Promise<any> {
+    const cached = this.classMemo.get(classId);
+    if (cached !== undefined) return cached;
+    const klass = await this.prisma.class.findUnique({
+      where: { id: classId },
+      include: { levelType: { select: { name: true } } },
+    });
+    this.classMemo.set(classId, klass);
+    return klass ?? null;
+  }
+
+  async getCompositeResultsForStudent(
+    studentId: string,
+    termId: string,
+    classId: string,
+    schoolId: string,
+    options?: {
+      /** subjectId → { finalPercentage, subjectName } already loaded by the caller, skips per-component DB reads. */
+      computedMap?: Map<string, { finalPercentage: number | null; subjectName: string }>;
+      /** shared across students to avoid re-reading grading scales for every recipient. */
+      gradeCache?: Map<string, any>;
+    },
+  ) {
+    if (!isSeniorSecondaryClass(await this.getClass(classId))) return [];
+
+    const candidates = await this.getCompositeCandidatesForClass(classId, termId, schoolId);
 
     const results: any[] = [];
     for (const composite of candidates) {
       const computed = await this.computeCompositeForStudent(
         composite.id, studentId, termId, classId, schoolId,
+        undefined, options?.gradeCache, options?.computedMap,
       );
       // Only display the composite when every component subject actually has a
       // result row for this student (present or absent). Otherwise the components

@@ -54,22 +54,22 @@ function makeFakePrisma(options: {
   };
   return {
     class: {
-      findUnique: ({ include }: any) =>
-        include?.levelType ? klass : { ...klass, gradingSystem: null, levelType: null },
+      findUnique: jest.fn(({ include }: any) =>
+        include?.levelType ? klass : { ...klass, gradingSystem: null, levelType: null }),
     },
     teachingAssignment: {
-      findMany: () => (options.taught ?? []).map((subjectId) => ({ subjectId })),
+      findMany: jest.fn(() => (options.taught ?? []).map((subjectId) => ({ subjectId }))),
     },
     compositeSubject: {
-      findMany: async ({ where }: any) => route(where),
-      findUnique: async ({ where }: any) =>
+      findMany: jest.fn(async ({ where }: any) => route(where)),
+      findUnique: jest.fn(async ({ where }: any) =>
         [...(options.composites?.linked ?? []), ...(options.composites?.scoped ?? []), ...(options.composites?.matched ?? [])]
-          .find((c) => c.id === where.id) ?? null,
+          .find((c) => c.id === where.id) ?? null),
     },
     computedResult: {
-      findUnique: async ({ where }: any) => options.computed?.[where.studentId_subjectId_termId.subjectId] ?? null,
+      findUnique: jest.fn(async ({ where }: any) => options.computed?.[where.studentId_subjectId_termId.subjectId] ?? null),
     },
-    gradingSystem: { findFirst: async () => null },
+    gradingSystem: { findFirst: jest.fn(async () => null) },
   };
 }
 
@@ -154,5 +154,30 @@ describe('CompositeSubjectService.getCompositeResultsForStudent', () => {
     const results = await service.getCompositeResultsForStudent('stu-1', 'term-1', 'class-1', 'school-1');
 
     expect(results).toHaveLength(0);
+  });
+
+  it('hoists candidate queries and reuses preloaded computed rows across students', async () => {
+    const prisma = makeFakePrisma({
+      composites: { linked: [scienceComposite], matched: [scienceComposite] },
+      taught: ['sub-physics', 'sub-chemistry'],
+    });
+    const service = new CompositeSubjectService(prisma as any);
+    const computedMap = new Map<string, { finalPercentage: number | null; subjectName: string }>([
+      ['sub-physics', { finalPercentage: 44.4, subjectName: 'Physics' }],
+      ['sub-chemistry', { finalPercentage: 39, subjectName: 'Chemistry' }],
+    ]);
+    const opts = { computedMap, gradeCache: new Map() } as any;
+
+    const r1 = await service.getCompositeResultsForStudent('stu-1', 'term-1', 'class-1', 'school-1', opts);
+    const r2 = await service.getCompositeResultsForStudent('stu-2', 'term-1', 'class-1', 'school-1', opts);
+
+    expect(r1).toHaveLength(1);
+    expect(r2).toHaveLength(1);
+    // Class and candidates are loaded once, shared across every student (3 candidate
+    // queries + 1 class lookup total), and component marks come from the in-memory map.
+    expect(prisma.compositeSubject.findMany).toHaveBeenCalledTimes(3);
+    expect(prisma.class.findUnique).toHaveBeenCalledTimes(2); // levelType lookup + grading scale lookup
+    expect(prisma.computedResult.findUnique).not.toHaveBeenCalled();
+    expect(prisma.teachingAssignment.findMany).toHaveBeenCalledTimes(1);
   });
 });
