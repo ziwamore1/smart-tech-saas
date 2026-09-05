@@ -138,7 +138,7 @@ export class ZamtelBulkSmsAdapter implements SmsProvider {
 
       const data: any = response.data;
       if (data && typeof data === 'object') {
-        const balance = Number(data?.sms_balance ?? data?.balance ?? data?.data?.sms_balance ?? data?.data?.balance);
+        const balance = Number(data?.sms_balance ?? data?.balance ?? data?.responseObject?.sms_balance ?? data?.data?.sms_balance ?? data?.data?.balance);
         if (!Number.isNaN(balance) && data?.success !== false) {
           return { balance, currency: data?.currency || 'ZMW' };
         }

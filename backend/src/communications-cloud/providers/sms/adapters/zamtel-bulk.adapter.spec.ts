@@ -26,6 +26,15 @@ describe('ZamtelBulkSmsAdapter (v3 API)', () => {
     );
   });
 
+  it('parses balance from the responseObject nesting used by the live Zamtel platform', async () => {
+    mockedAxios.get.mockResolvedValue({
+      data: { success: true, responseObject: { sms_balance: 972, account_name: 'ADASTRA' } },
+    } as any);
+
+    const balance = await adapter.getBalance();
+    expect(balance.balance).toBe(972);
+  });
+
   it('sends via POST /v3/action/send with JSON body and Bearer auth', async () => {
     mockedAxios.post.mockResolvedValue({
       status: 202,
