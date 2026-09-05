@@ -2,6 +2,35 @@ import { Injectable, Logger, NotFoundException, ConflictException } from '@nestj
 import { PrismaService } from '../prisma/prisma.service';
 import { mapBounded } from '../common/utils/concurrency.util';
 
+/**
+ * Determines whether a class belongs to the senior secondary band (Grade 10-12)
+ * where composite subjects apply. Forms 1-4 and other junior bands keep their
+ * standalone component subjects (e.g. Physics and Chemistry) unchanged.
+ */
+export function isSeniorSecondaryClass(klass?: { name?: string; levelType?: { name?: string } } | null): boolean {
+  if (!klass) return false;
+  const labels = [klass.levelType?.name, klass.name].filter(Boolean) as string[];
+  if (labels.some((l) => /\bsenior\b/i.test(l))) return true;
+  return labels.some((l) => {
+    const numbers = l.match(/\d{1,2}/g) ?? [];
+    return numbers.some((t) => {
+      const n = Number(t);
+      return n >= 10 && n <= 12;
+    });
+  });
+}
+
+/** Loads a composite once per unique id, sharing the work across callers. */
+function mergeById<T extends { id: string }>(...lists: T[][]): T[] {
+  const seen = new Map<string, T>();
+  for (const list of lists) {
+    for (const item of list) {
+      if (!seen.has(item.id)) seen.set(item.id, item);
+    }
+  }
+  return [...seen.values()];
+}
+
 @Injectable()
 export class CompositeSubjectService {
   private readonly logger = new Logger(CompositeSubjectService.name);
@@ -153,7 +182,7 @@ export class CompositeSubjectService {
 
     let totalWeighted = 0;
     let totalWeight = 0;
-    const componentResults: { subjectId: string; subjectName: string; percentage: number | null; weight: number }[] = [];
+    const componentResults: { subjectId: string; subjectName: string; percentage: number | null; weight: number; present: boolean }[] = [];
 
     for (const component of composite.components) {
       const computed = await this.prisma.computedResult.findUnique({
@@ -172,6 +201,7 @@ export class CompositeSubjectService {
         subjectName: computed?.subject?.name || component.subjectId,
         percentage: computed?.finalPercentage ?? null,
         weight: component.weight,
+        present: computed != null,
       });
 
       if (computed?.finalPercentage != null) {
@@ -282,34 +312,71 @@ export class CompositeSubjectService {
   }
 
   async getCompositeResultsForStudent(studentId: string, termId: string, classId: string, schoolId: string) {
-    const school = await this.prisma.school.findUnique({
-      where: { id: schoolId },
-      include: {
-        schoolCurricula: {
-          where: { isActive: true },
-          include: {
-            curriculumVersion: {
-              include: {
-                compositeSubjects: {
-                  where: { isActive: true },
-                  include: { components: { include: { subject: true } } },
-                },
-              },
-            },
-          },
-        },
-      },
+    const klass = await this.prisma.class.findUnique({
+      where: { id: classId },
+      include: { levelType: { select: { name: true } } },
     });
 
-    if (!school) return [];
+    // Composite subjects only replace their components in the senior band
+    // (Grade 10-12). Forms 1-4 and other junior bands keep the standalone
+    // subjects (e.g. Physics and Chemistry) untouched.
+    if (!isSeniorSecondaryClass(klass)) return [];
+
+    const [linked, scoped, taughtIds] = await Promise.all([
+      // Composites attached to the curriculum versions the school linked (existing path).
+      this.prisma.compositeSubject.findMany({
+        where: {
+          isActive: true,
+          curriculum: { schoolCurricula: { some: { schoolId, isActive: true } } },
+        },
+        include: { components: { include: { subject: true } } },
+      }),
+      // Composites scoped to this school, or hosted on curriculum versions the school owns.
+      this.prisma.compositeSubject.findMany({
+        where: {
+          isActive: true,
+          OR: [{ schoolId }, { curriculum: { schoolId } }],
+        },
+        include: { components: { include: { subject: true } } },
+      }),
+      // Subjects actually taught in this class for the term's academic year.
+      this.prisma.teachingAssignment.findMany({
+        where: { classId, academicYear: { terms: { some: { id: termId } } } },
+        select: { subjectId: true },
+      }),
+    ]);
+
+    const taughtSubjectIds = [...new Set(taughtIds.map((t) => t.subjectId))];
+
+    // Components of a composite must all be taught in this class. This makes the
+    // feature work even when the school never linked the composite's curriculum
+    // version, and never fabricates a composite for a class that does not teach
+    // every component subject.
+    const matched = taughtSubjectIds.length > 0
+      ? await this.prisma.compositeSubject.findMany({
+          where: {
+            isActive: true,
+            components: {
+              some: {},
+              every: { subjectId: { in: taughtSubjectIds } },
+            },
+          },
+          include: { components: { include: { subject: true } } },
+        })
+      : [];
+
+    const candidates = mergeById(linked, scoped, matched);
 
     const results: any[] = [];
-    for (const sc of school.schoolCurricula) {
-      for (const composite of sc.curriculumVersion.compositeSubjects) {
-        const computed = await this.computeCompositeForStudent(
-          composite.id, studentId, termId, classId, schoolId,
-        );
-        if (computed) results.push(computed);
+    for (const composite of candidates) {
+      const computed = await this.computeCompositeForStudent(
+        composite.id, studentId, termId, classId, schoolId,
+      );
+      // Only display the composite when every component subject actually has a
+      // result row for this student (present or absent). Otherwise the components
+      // are left as standalone subjects.
+      if (computed && computed.components.every((c: any) => c.present)) {
+        results.push(computed);
       }
     }
     return results;

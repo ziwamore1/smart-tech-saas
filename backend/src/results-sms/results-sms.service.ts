@@ -196,7 +196,7 @@ export class ResultsSmsService {
       const bestSix = isPrimary || subjectPoints.length === 0
         ? null
         : subjectPoints.slice().sort((a: number, b: number) => a - b).slice(0, 6).reduce((sum: number, p: number) => sum + p, 0);
-      const version = createHash('sha256').update(JSON.stringify({ base, summary })).digest('hex');
+      const version = createHash('sha256').update(JSON.stringify({ base, summary, subjects: officialSubjects })).digest('hex');
       const result = {
         subjects: officialSubjects,
         total: isPrimary ? Number(officialSubjects.reduce((sum: number, subject: any) => sum + (subject.mark || 0), 0).toFixed(1)) : null,
