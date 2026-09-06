@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import ReactECharts from 'echarts-for-react';
 import { useAuth } from '@/lib/auth-context';
-import { parentApi, termApi, academicYearApi, schoolApi, notificationsApi, messagesApi } from '@/lib/api';
+import { parentApi, termApi, schoolApi, notificationsApi, messagesApi } from '@/lib/api';
 
 interface ChildResult {
   child: {
@@ -149,12 +149,6 @@ export default function ParentDashboard() {
     retry: false,
   });
 
-  const { data: academicYears } = useQuery({
-    queryKey: ['academic-years-parent'],
-    queryFn: () => academicYearApi.getAll().then(r => r.data?.data || r.data || []),
-    retry: false,
-  });
-
   const { data: school } = useQuery({
     queryKey: ['school-current-parent'],
     queryFn: () => schoolApi.getCurrentSchool().then(r => r.data),
@@ -188,11 +182,6 @@ export default function ParentDashboard() {
     enabled: !!activeChildId,
     retry: false,
   });
-
-  const myYearName = (academicYearId: string) => {
-    const ay = Array.isArray(academicYears) ? (academicYears as any[]).find((a: any) => a.id === academicYearId) : null;
-    return ay?.name || '';
-  };
 
   const currentChildResults = useMemo(() => {
     const childData = resultsChildren.find(c => c.child.id === activeChildId);
@@ -242,29 +231,29 @@ export default function ParentDashboard() {
     const results = selectedChildResults || [];
     if (results.length === 0) return null;
     const subjects = [...new Set(results.map(r => r.subject))];
-    const terms = [...new Set(results.map(r => `${r.term}${myYearName(r.academicYear) ? ' · ' + myYearName(r.academicYear) : ''}`))];
+    const terms = [...new Set(results.map(r => `${r.term}${r.academicYear ? ' · ' + r.academicYear : ''}`))];
     const values: number[][] = Array.from({ length: subjects.length }, () => Array(terms.length).fill(-1));
     results.forEach(r => {
       const si = subjects.indexOf(r.subject);
-      const ti = terms.indexOf(`${r.term}${myYearName(r.academicYear) ? ' · ' + myYearName(r.academicYear) : ''}`);
+      const ti = terms.indexOf(`${r.term}${r.academicYear ? ' · ' + r.academicYear : ''}`);
       if (si >= 0 && ti >= 0) values[si][ti] = r.score;
     });
     return { subjects, terms, values };
-  }, [selectedChildResults, academicYears]);
+  }, [selectedChildResults]);
 
   const termTrend = useMemo(() => {
     const results = selectedChildResults || [];
     if (results.length === 0) return [];
     const map = new Map<string, { total: number; count: number }>();
     results.forEach(r => {
-      const label = `${r.term}${myYearName(r.academicYear) ? ' (' + myYearName(r.academicYear) + ')' : ''}`;
+      const label = `${r.term}${r.academicYear ? ' (' + r.academicYear + ')' : ''}`;
       const cur = map.get(label) || { total: 0, count: 0 };
       cur.total += r.score;
       cur.count += 1;
       map.set(label, cur);
     });
     return [...map.entries()].map(([label, v]) => ({ label, value: v.total / v.count }));
-  }, [selectedChildResults, academicYears]);
+  }, [selectedChildResults]);
 
   const comparisonOption = useMemo(() => ({
     grid: { left: '8%', right: '8%', bottom: '15%', top: '12%' },
@@ -448,7 +437,7 @@ export default function ParentDashboard() {
 
         {(allData?.academicYear || allData?.term) && (
           <p className="text-sm text-gray-500 mt-2">
-            Results shown for {allData?.term || 'current term'}{allData?.academicYear ? ` · Academic Year: ${myYearName(allData.academicYear) || allData.academicYear}` : ''}
+            Results shown for {allData?.term || 'current term'}{allData?.academicYear ? ` · Academic Year: ${allData.academicYear}` : ''}
           </p>
         )}
       </div>

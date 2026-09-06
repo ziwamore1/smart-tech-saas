@@ -18,28 +18,44 @@ export class ParentService {
     private unifiedMessaging: UnifiedMessagingService,
   ) {}
 
-  async getChildren(parentId: string) {
-    const parentStudents = await this.prisma.parentStudent.findMany({
-      where: { parentId },
-      include: {
-        student: {
+  private async resolveParentId(userId: string): Promise<string | null> {
+    const direct = await this.prisma.parent.findUnique({ where: { id: userId }, select: { id: true } });
+    if (direct) return direct.id;
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    if (user?.email) {
+      const parent = await this.prisma.parent.findFirst({ where: { email: user.email }, select: { id: true } });
+      if (parent) return parent.id;
+    }
+
+    return null;
+  }
+
+  async getChildren(userId: string) {
+    const parentId = await this.resolveParentId(userId);
+    const parentStudents = parentId
+      ? await this.prisma.parentStudent.findMany({
+          where: { parentId },
           include: {
-            enrollments: {
+            student: {
               include: {
-                class: {
+                enrollments: {
                   include: {
-                    classTeacher: {
-                      select: { id: true, firstName: true, lastName: true },
+                    class: {
+                      include: {
+                        classTeacher: {
+                          select: { id: true, firstName: true, lastName: true },
+                        },
+                      },
                     },
+                    academicYear: true,
                   },
                 },
-                academicYear: true,
               },
             },
           },
-        },
-      },
-    });
+        })
+      : [];
 
     const currentTerm = await this.prisma.term.findFirst({
       where: {
@@ -240,7 +256,7 @@ export class ParentService {
       where,
       include: {
         subject: { select: { id: true, name: true } },
-        term: { select: { id: true, name: true, academicYearId: true } },
+        term: { select: { id: true, name: true, academicYearId: true, academicYear: { select: { id: true, name: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -249,7 +265,7 @@ export class ParentService {
       id: r.id,
       subject: r.subject.name,
       term: r.term.name,
-      academicYear: r.term.academicYearId,
+      academicYear: r.term.academicYear?.name || r.term.academicYearId,
       score: r.finalPercentage,
       grade: r.finalGrade,
       remark: r.finalRemark,
@@ -385,11 +401,12 @@ export class ParentService {
         isCurrent: true,
         academicYear: { isCurrent: true },
       },
+      include: { academicYear: { select: { id: true, name: true } } },
     });
 
     return {
       term: currentTerm?.name || null,
-      academicYear: currentTerm?.academicYearId || null,
+      academicYear: currentTerm?.academicYear?.name || currentTerm?.academicYearId || null,
       children: results,
     };
   }

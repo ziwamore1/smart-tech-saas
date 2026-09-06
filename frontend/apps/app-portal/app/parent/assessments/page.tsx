@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { parentApi, academicYearApi } from '@/lib/api';
+import { parentApi } from '@/lib/api';
 
 export default function ParentAssessments() {
   const [selectedChildId, setSelectedChildId] = useState<string>('');
@@ -14,14 +14,6 @@ export default function ParentAssessments() {
   });
 
   const childrenList = (Array.isArray(children) ? children : []) as any[];
-
-  const { data: academicYearsData } = useQuery({
-    queryKey: ['parent-academic-years'],
-    queryFn: () => academicYearApi.getAll().then(r => r.data?.data || r.data || []),
-    retry: false,
-  });
-  const academicYears = Array.isArray(academicYearsData) ? academicYearsData as any[] : [];
-  const yearName = (id: string) => academicYears.find((a: any) => a.id === id)?.name || '';
 
   useEffect(() => {
     if (!selectedChildId && childrenList.length > 0) {
@@ -121,7 +113,7 @@ export default function ParentAssessments() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h3 className="font-semibold text-gray-900">{r.subject || 'Subject'}</h3>
-                      <p className="text-sm text-gray-500 mt-0.5">{r.term}{yearName(r.academicYear) ? ` · ${yearName(r.academicYear)}` : ''}</p>
+                      <p className="text-sm text-gray-500 mt-0.5">{r.term}{r.academicYear ? ` · ${r.academicYear}` : ''}</p>
                     </div>
                     <div className="text-right shrink-0">
                       <span className={`inline-flex px-3 py-1 rounded-full text-sm font-semibold ${getScoreColor(score)}`}>{score.toFixed(1)}%</span>

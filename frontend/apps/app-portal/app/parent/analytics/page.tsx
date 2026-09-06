@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import ReactECharts from 'echarts-for-react';
-import { parentApi, termApi, academicYearApi, intelligenceApi } from '@/lib/api';
+import { parentApi, termApi, intelligenceApi } from '@/lib/api';
 
 interface ParentResult {
   id: string;
@@ -61,14 +61,6 @@ export default function ParentAnalytics() {
   });
   const currentTermId = termData?.data?.id;
 
-  const { data: academicYearsData } = useQuery({
-    queryKey: ['academic-years-analytics'],
-    queryFn: () => academicYearApi.getAll().then(r => r.data?.data || r.data || []),
-    retry: false,
-  });
-  const academicYears = Array.isArray(academicYearsData) ? academicYearsData as any[] : [];
-  const yearName = (id: string) => academicYears.find((a: any) => a.id === id)?.name || '';
-
   const { data: allResults = [] } = useQuery<ParentResult[]>({
     queryKey: ['parent-child-analytics-results', activeChildId],
     queryFn: () => activeChildId
@@ -114,23 +106,23 @@ export default function ParentAnalytics() {
     if (allResults.length === 0) return null;
     const subjects = [...new Set(allResults.map(r => r.subject))];
     const termLabels = [...new Set(allResults.map(r => {
-      const y = yearName(r.academicYear);
+      const y = r.academicYear;
       return y ? `${r.term} · ${y}` : r.term;
     }))];
     const values: number[][] = Array.from({ length: subjects.length }, () => Array(termLabels.length).fill(-1));
     allResults.forEach(r => {
       const si = subjects.indexOf(r.subject);
-      const label = yearName(r.academicYear) ? `${r.term} · ${yearName(r.academicYear)}` : r.term;
+      const label = r.academicYear ? `${r.term} · ${r.academicYear}` : r.term;
       const ti = termLabels.indexOf(label);
       if (si >= 0 && ti >= 0) values[si][ti] = r.score;
     });
     return { subjects, termLabels, values };
-  }, [allResults, academicYears]);
+  }, [allResults]);
 
   const termTrend = useMemo(() => {
     const map = new Map<string, number[]>();
     allResults.forEach(r => {
-      const label = `${r.term}${yearName(r.academicYear) ? ' (' + yearName(r.academicYear) + ')' : ''}`;
+      const label = `${r.term}${r.academicYear ? ' (' + r.academicYear + ')' : ''}`;
       const arr = map.get(label) || [];
       arr.push(r.score);
       map.set(label, arr);
@@ -139,7 +131,7 @@ export default function ParentAnalytics() {
       label,
       avg: scores.reduce((s, v) => s + v, 0) / scores.length,
     }));
-  }, [allResults, academicYears]);
+  }, [allResults]);
 
   const overallAverage = useMemo(
     () => currentTermResults.length > 0
