@@ -164,6 +164,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     document.cookie = 'institution_type=;path=/;max-age=0';
     setToken(null);
     setUser(null);
+    setTimeout(() => {
+      window.location.href = '/login';
+    }, 50);
   };
 
   const switchToSchool = async (schoolId: string) => {

@@ -46,6 +46,7 @@ export default function StudentReportCards() {
         type: 'REPORT_CARD',
         studentId: 'me',
         termId: defaultTermId,
+        examType: 'END_TERM',
       });
       const blob = res.data instanceof Blob ? res.data : new Blob([res.data]);
       const url = window.URL.createObjectURL(blob);

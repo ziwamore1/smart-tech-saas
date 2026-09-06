@@ -56,16 +56,29 @@ export class ReportCardEngineService {
       include: { academicYear: true },
     });
 
-    const resultSheet = await this.prisma.resultSheet.findFirst({
-      where: {
-        schoolId,
-        classId: enrollment.classId,
-        termId,
-        ...(examType ? { examType } : {}),
-      },
-      orderBy: { updatedAt: 'desc' },
-      select: { examType: true },
-    });
+let resultSheet = examType
+      ? await this.prisma.resultSheet.findFirst({
+          where: { schoolId, classId: enrollment.classId, termId, examType },
+          orderBy: { updatedAt: 'desc' },
+          select: { examType: true },
+        })
+      : null;
+
+    if (!resultSheet && !examType) {
+      resultSheet = await this.prisma.resultSheet.findFirst({
+        where: { schoolId, classId: enrollment.classId, termId, examType: 'END_TERM' },
+        orderBy: { updatedAt: 'desc' },
+        select: { examType: true },
+      });
+    }
+
+    if (!resultSheet && !examType) {
+      resultSheet = await this.prisma.resultSheet.findFirst({
+        where: { schoolId, classId: enrollment.classId, termId },
+        orderBy: { updatedAt: 'desc' },
+        select: { examType: true },
+      });
+    }
 
     const computedResults = await this.prisma.computedResult.findMany({
       where: {

@@ -61,6 +61,7 @@ export default function ParentReportCards() {
       type: 'REPORT_CARD',
       studentId: selectedChildId,
       termId: selectedTermId,
+      examType: 'END_TERM',
     });
     return res.data instanceof Blob ? res.data : new Blob([res.data]);
   };

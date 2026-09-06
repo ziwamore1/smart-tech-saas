@@ -29,7 +29,7 @@ export function ReportCardViewer({
     setLoading(true);
     setError(null);
     try {
-      const res = await reportEngineApi.previewReportCard({ studentId, termId });
+      const res = await reportEngineApi.previewReportCard({ studentId, termId, examType: 'END_TERM' });
       setHtml(res.data?.html || '');
       setData(res.data?.data || null);
     } catch (err: any) {
@@ -58,6 +58,7 @@ export function ReportCardViewer({
         type: 'REPORT_CARD',
         studentId,
         termId,
+        examType: 'END_TERM',
       });
       const blob = res.data as Blob;
       const url = URL.createObjectURL(blob);
