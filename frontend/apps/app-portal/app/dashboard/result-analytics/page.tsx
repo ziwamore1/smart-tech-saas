@@ -432,6 +432,9 @@ export default function ResultAnalyticsPage() {
                             <span className="text-amber-600"> &mdash; {eczEligibilityData.noneCount} students need attention</span>
                           )}
                         </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          University eligibility requires a qualifying science subject — Forms: Agricultural Science, Physics, Chemistry or Biology; Grades: Science (Composite), Biology or Agricultural Science.
+                        </p>
                       </div>
                     </div>
                     <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
@@ -449,9 +452,10 @@ export default function ResultAnalyticsPage() {
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
                           <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Subjects</th>
                           <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Best 6 Pts</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">English Result</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mathematics Result</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+<th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">English Result</th>
+<th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mathematics Result</th>
+<th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Science Result</th>
+<th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -500,8 +504,11 @@ export default function ResultAnalyticsPage() {
                               <td className="px-4 py-3 text-sm">
                                 {formatSubject(e.mathSubject)}
                               </td>
+                              <td className="px-4 py-3 text-sm">
+                                {formatSubject(e.scienceSubject)}
+                              </td>
                               <td className="px-4 py-3 text-sm text-center">
-                                <span className={`px-2 py-1 text-xs rounded-full font-medium ${statusBadge.cls}`}>
+                                <span className={`px-2 py-1 text-xs rounded-full font-medium ${statusBadge.cls}`} title={e.details}>
                                   {statusBadge.text}
                                 </span>
                               </td>
