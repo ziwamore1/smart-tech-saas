@@ -7,6 +7,8 @@ import Link from 'next/link';
 
 import '../super-admin-fix.css';
 
+import { getDefaultHomePath } from '@/lib/role-home';
+
 function LoginForm() {
   const [loginMode, setLoginMode] = useState<'email' | 'phone' | 'student' | 'username'>('email');
   const [identifier, setIdentifier] = useState('');
@@ -29,12 +31,12 @@ function LoginForm() {
     setIsLoading(true);
 
     try {
-      await login(identifier, password, loginAsSuperAdmin, schoolId || undefined);
+      const loggedInUser = await login(identifier, password, loginAsSuperAdmin, schoolId || undefined);
       
       if (loginAsSuperAdmin) {
         router.push('/super-admin');
       } else {
-        router.push('/dashboard');
+        router.push(getDefaultHomePath(loggedInUser));
       }
     } catch (err: any) {
       console.error('Login error:', err);

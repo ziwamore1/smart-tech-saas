@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { schoolApi } from '@/lib/api';
 import '../dashboard-fix.css';
 import { PresentationMode } from '@/components/presentation-mode';
+import { getDefaultHomePath } from '@/lib/role-home';
 
 type NavItem = {
   name: string;
@@ -74,6 +75,13 @@ const ROLE_MAP: Record<string, Record<string, string[]>> = {
     ADVANCED_SECONDARY: ['Parent'],
     COLLEGE: [],
     UNIVERSITY: [],
+  },
+  staff: {
+    PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Primary Teacher', 'Accountant', 'Secretary'],
+    SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Accountant', 'Secretary'],
+    ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Accountant', 'Secretary'],
+    COLLEGE: ['Principal', 'Registrar', 'Lecturer', 'Accountant', 'Secretary'],
+    UNIVERSITY: ['Vice Chancellor', 'Dean', 'Lecturer', 'Research Supervisor', 'Accountant', 'Secretary'],
   },
   everyone: {
     PRIMARY_SCHOOL: ALL_PRIMARY.concat(['Parent', 'Learner']),
@@ -604,7 +612,7 @@ const regularNav: NavItem[] = [
     href: '/security/account-center', 
     icon: 'fa-user-circle',
     color: '#6366f1',
-    typeRoles: ROLE_MAP.everyone,
+    typeRoles: ROLE_MAP.staff,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
   { 
@@ -612,7 +620,7 @@ const regularNav: NavItem[] = [
     href: '/security/device-manager', 
     icon: 'fa-laptop',
     color: '#06b6d4',
-    typeRoles: ROLE_MAP.everyone,
+    typeRoles: ROLE_MAP.staff,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
   { 
@@ -620,7 +628,7 @@ const regularNav: NavItem[] = [
     href: '/security/otp', 
     icon: 'fa-shield-alt',
     color: '#0d9488',
-    typeRoles: ROLE_MAP.everyone,
+    typeRoles: ROLE_MAP.staff,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
   { 
@@ -644,7 +652,7 @@ const regularNav: NavItem[] = [
     href: '/security/recovery', 
     icon: 'fa-life-ring',
     color: '#10b981',
-    typeRoles: ROLE_MAP.everyone,
+    typeRoles: ROLE_MAP.staff,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
   { 
@@ -821,6 +829,17 @@ export default function DashboardLayout({
       router.push('/login');
     }
   }, [isAuthenticated, isLoading, router]);
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && !isPureSuperAdmin) {
+      const home = getDefaultHomePath(user);
+      if (home === '/parent' && !pathname.startsWith('/parent')) {
+        router.replace('/parent');
+      } else if (home === '/student' && !pathname.startsWith('/student')) {
+        router.replace('/student');
+      }
+    }
+  }, [isLoading, isAuthenticated, isPureSuperAdmin, user, pathname, router]);
 
   useEffect(() => {
     if (!isLoading && isPureSuperAdmin && pathname === '/dashboard') {

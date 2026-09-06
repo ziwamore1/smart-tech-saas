@@ -122,6 +122,13 @@ export default function StudentPortal() {
                     <p className="text-sm text-gray-500">View assignments & submit</p>
                   </div>
                 </Link>
+                <Link href="/student/attendance" className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
+                  <span className="text-3xl">✅</span>
+                  <div>
+                    <p className="font-medium text-gray-900">Attendance</p>
+                    <p className="text-sm text-gray-500">Track your attendance record</p>
+                  </div>
+                </Link>
                 <Link href="/student/report-cards" className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-teal-500 hover:bg-teal-50 transition-colors">
                   <span className="text-3xl">📄</span>
                   <div>

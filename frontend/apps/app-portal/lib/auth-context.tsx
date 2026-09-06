@@ -31,7 +31,7 @@ interface AuthContextType {
   isTeacher: boolean;
   isClassTeacher: boolean;
   allRoles: string[];
-  login: (identifier: string, password: string, isSuperAdmin?: boolean, schoolId?: string) => Promise<void>;
+  login: (identifier: string, password: string, isSuperAdmin?: boolean, schoolId?: string) => Promise<User>;
   logout: () => void;
   switchToSchool: (schoolId: string) => Promise<void>;
   switchToSuperAdmin: () => void;
@@ -147,6 +147,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       document.cookie = `auth_token=${access_token};path=/;max-age=${7 * 24 * 60 * 60};SameSite=Lax`;
       const instType = userData.institutionType || '';
       document.cookie = `institution_type=${instType};path=/;max-age=${7 * 24 * 60 * 60};SameSite=Lax`;
+
+      return userData;
     } catch (error: any) {
       console.error('[Auth] Login error:', error);
       throw error;
