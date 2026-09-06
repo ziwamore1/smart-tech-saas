@@ -1946,6 +1946,43 @@ export const parentApi = {
 };
 
 // ==========================================
+// PARENT-SCHOOL MESSAGING API
+// ==========================================
+
+export const messagesApi = {
+  getConversations: () => api.get('/messages'),
+
+  getConversation: (conversationId: string) =>
+    api.get(`/messages/${conversationId}`),
+
+  getUnreadCount: () => api.get('/messages/unread-count'),
+
+  createConversation: (participants: string[], message: string) =>
+    api.post('/messages', { participants, message }),
+
+  sendMessage: (conversationId: string, content: string) =>
+    api.post(`/messages/${conversationId}`, { content }),
+
+  markAsRead: (conversationId: string) =>
+    api.patch(`/messages/${conversationId}/read`),
+};
+
+// ==========================================
+// PARENT NOTIFICATIONS API
+// ==========================================
+
+export const notificationsApi = {
+  getNotifications: (params?: { page?: number; limit?: number; category?: string }) =>
+    api.get('/notifications', { params }),
+
+  getUnreadCount: () => api.get('/notifications/unread-count'),
+
+  markAsRead: (id: string) => api.put(`/notifications/${id}/read`),
+
+  markAllAsRead: () => api.put('/notifications/read-all'),
+};
+
+// ==========================================
 // PREMIUM STAFF RECORDS API (Staff Returns Hub)
 // ==========================================
 

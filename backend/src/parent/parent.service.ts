@@ -26,7 +26,13 @@ export class ParentService {
           include: {
             enrollments: {
               include: {
-                class: true,
+                class: {
+                  include: {
+                    classTeacher: {
+                      select: { id: true, firstName: true, lastName: true },
+                    },
+                  },
+                },
                 academicYear: true,
               },
             },
@@ -49,6 +55,12 @@ export class ParentService {
         );
         const currentEnrollment = enrollments[0];
         const classId = currentEnrollment?.classId;
+        const classTeacher = currentEnrollment?.class?.classTeacher
+          ? {
+              userId: currentEnrollment.class.classTeacher.id,
+              name: `${currentEnrollment.class.classTeacher.firstName} ${currentEnrollment.class.classTeacher.lastName}`.trim(),
+            }
+          : null;
 
         const attendance = await this.prisma.attendance.findMany({
           where: {
@@ -93,6 +105,7 @@ export class ParentService {
           lastName: ps.student.lastName,
           admissionNumber: ps.student.admissionNumber,
           class: currentEnrollment?.class?.name || 'Not assigned',
+          classTeacher,
           attendancePercentage: attendanceRate,
           upcomingActivity,
           photoUrl: ps.student.photoUrl || null,

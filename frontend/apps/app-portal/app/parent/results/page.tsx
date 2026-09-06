@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { studentApi, termApi, resultApi } from '@/lib/api';
@@ -10,6 +10,7 @@ import { useSchoolSocket } from '@/lib/use-school-socket';
 export default function ParentResultsPage() {
   const [selectedChild, setSelectedChild] = useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
+  const [isDesktop, setIsDesktop] = useState(true);
   const queryClient = useQueryClient();
 
   // Real-time: refresh when results are published
@@ -33,6 +34,20 @@ export default function ParentResultsPage() {
 
   const children: any[] = (childrenData as any)?.data || childrenData || [];
   const terms: any[] = termsData?.data || termsData || [];
+
+  useEffect(() => {
+    if (children.length > 0 && !selectedChild) {
+      setSelectedChild(children[0].id);
+    }
+  }, [children, selectedChild]);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
 
   const { data: resultsData } = useQuery({
     queryKey: ['child-results', selectedChild, selectedTermId],
@@ -136,10 +151,12 @@ export default function ParentResultsPage() {
           {!selectedChild ? (
             <div className="bg-white rounded-xl p-6 shadow-sm">
               <div className="text-center py-12">
-                <span className="text-6xl">👈</span>
+                <span className="text-6xl">{isDesktop ? '👈' : '👆'}</span>
                 <h3 className="text-xl font-semibold mt-4">Select a Child</h3>
                 <p className="text-gray-500 mt-2">
-                  Choose a child from the left to view their results.
+                  {isDesktop
+                    ? 'Choose a child from the left to view their results.'
+                    : 'Choose a child from the options above to view their results.'}
                 </p>
               </div>
             </div>
@@ -260,8 +277,10 @@ export default function ParentResultsPage() {
                           <td className="py-4 px-6 font-medium text-gray-900">
                             {result.subject?.name || 'Subject'}
                           </td>
-                          <td className="py-4 px-4 text-center text-lg font-semibold">
-                            {result.score?.toFixed(1)}%
+                          <td className="py-4 px-4 text-center">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-bold bg-white border border-gray-200 text-gray-800">
+                              {result.score?.toFixed(1)}%
+                            </span>
                           </td>
                           <td className="py-4 px-4 text-center">
                             <span className={`px-3 py-1 rounded-full font-bold ${getGradeColor(result.score)}`}>
@@ -269,9 +288,8 @@ export default function ParentResultsPage() {
                             </span>
                           </td>
                           <td className="py-4 px-4 text-center">
-                            <span className={`text-sm ${
-                              result.score >= 50 ? 'text-green-600' : 'text-red-600'
-                            }`}>
+                            <span className={`inline-flex items-center gap-1 text-sm font-medium ${result.score >= 50 ? 'text-emerald-600' : 'text-red-600'}`}>
+                              <span className={`w-2 h-2 rounded-full ${result.score >= 50 ? 'bg-emerald-500' : 'bg-red-500'}`} />
                               {result.score >= 50 ? 'Passed' : 'Needs Improvement'}
                             </span>
                           </td>

@@ -7,6 +7,31 @@ export class MessagingService {
 
   constructor(private prisma: PrismaService) {}
 
+  private async resolveParticipantDetails(conversations: any[]) {
+    const userIds = [
+      ...new Set(conversations.flatMap((c) => c.participants as string[])),
+    ];
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, firstName: true, lastName: true, email: true },
+    });
+    return users.map((u) => ({
+      id: u.id,
+      name: `${u.firstName} ${u.lastName}`.trim() || u.email,
+    }));
+  }
+
+  private attachDetails(conversations: any[], participantDetails: any[]) {
+    return conversations.map((c) => ({
+      id: c.id,
+      lastMessage: c.lastMessage,
+      lastMessageAt: c.lastMessageAt,
+      unreadCount: c.messages.filter((m: any) => !m.isRead && m.senderId !== c._viewerId).length,
+      participants: c.participants,
+      participantDetails,
+    }));
+  }
+
   async getConversations(userId: string, schoolId: string) {
     const conversations = await this.prisma.conversation.findMany({
       where: {
@@ -22,13 +47,10 @@ export class MessagingService {
       orderBy: { lastMessageAt: 'desc' },
     });
 
-    return conversations.map((c) => ({
-      id: c.id,
-      lastMessage: c.lastMessage,
-      lastMessageAt: c.lastMessageAt,
-      unreadCount: c.messages.filter((m) => !m.isRead && m.senderId !== userId).length,
-      participants: c.participants,
-    }));
+    const withViewer = conversations.map((c) => ({ ...c, _viewerId: userId }));
+    const participantDetails = await this.resolveParticipantDetails(withViewer);
+
+    return this.attachDetails(withViewer, participantDetails);
   }
 
   async getConversation(conversationId: string, userId: string) {
@@ -49,7 +71,17 @@ export class MessagingService {
       throw new BadRequestException('You are not part of this conversation');
     }
 
-    return conversation;
+    const participantDetails = await this.resolveParticipantDetails([conversation]);
+
+    return {
+      ...conversation,
+      participantDetails,
+      messages: conversation.messages.map((m: any) => ({
+        ...m,
+        senderName:
+          participantDetails.find((p) => p.id === m.senderId)?.name || m.senderId,
+      })),
+    };
   }
 
   async createConversation(schoolId: string, participants: string[], message: string, senderId: string) {

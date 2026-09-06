@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { parentApi } from '@/lib/api';
 
@@ -14,9 +14,17 @@ export default function ParentHomework() {
 
   const childrenList = Array.isArray(children) ? children : [];
 
+  useEffect(() => {
+    if (!selectedChildId && childrenList.length > 0) {
+      setSelectedChildId(childrenList[0].id);
+    }
+  }, [childrenList, selectedChildId]);
+
   const { data: homework } = useQuery({
     queryKey: ['parent-homework', selectedChildId],
-    queryFn: () => parentApi.getChildHomework(selectedChildId).then(r => r.data?.data || r.data || []),
+    queryFn: () => selectedChildId
+      ? parentApi.getChildHomework(selectedChildId).then(r => r.data?.data || r.data || [])
+      : Promise.resolve([]),
     enabled: !!selectedChildId,
   });
 
