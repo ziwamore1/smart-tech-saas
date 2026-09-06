@@ -59,25 +59,11 @@ export class ResultController {
     @Query('termId') termId: string,
     @Req() req: any,
   ) {
-    return this.prisma.computedResult.findMany({
-      where: {
-        schoolId: req.user.schoolId,
-        classId,
-        termId,
-        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
-        student: { status: 'ACTIVE' },
-      },
-      include: {
-        student: {
-          select: { id: true, firstName: true, lastName: true, admissionNumber: true },
-        },
-        subject: { select: { id: true, name: true, code: true } },
-      },
-      orderBy: [
-        { student: { firstName: 'asc' } },
-        { subject: { name: 'asc' } },
-      ],
-    });
+    return this.resultService.findComputed(
+      classId,
+      termId,
+      req.user.schoolId,
+    );
   }
 
   @Get('template/:termId')

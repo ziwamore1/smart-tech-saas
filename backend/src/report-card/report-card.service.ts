@@ -794,6 +794,30 @@ export class ReportCardService {
           }));
         }
 
+        // Apply composite subject transform (Grades 10-12): render the composite
+        // subject (e.g. Science, English, Mathematics) instead of its components.
+        const composites = await this.compositeSubjectService.getCompositeResultsForStudent(
+          studentId, term.id, enrollment.classId, schoolId,
+        );
+        if (composites.length > 0) {
+          const componentIds = new Set<string>();
+          for (const comp of composites) {
+            for (const c of comp.components) componentIds.add(c.subjectId);
+          }
+          const filtered = results.filter((r: any) => !componentIds.has(r.subjectId));
+          for (const comp of composites) {
+            filtered.push({
+              subject: { id: comp.composite.id, name: comp.composite.name, code: comp.composite.code },
+              finalPercentage: comp.finalPercentage,
+              finalGrade: comp.finalGrade,
+              finalRemark: null,
+              points: null,
+              isComposite: true,
+            } as any);
+          }
+          results = filtered;
+        }
+
         for (const r of results) {
           const finalPercentage = r.finalPercentage ?? 0;
           const grade = (r.finalGrade != null && r.points != null)

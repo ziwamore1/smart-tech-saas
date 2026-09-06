@@ -118,6 +118,87 @@ export class ResultService {
     });
   }
 
+  async findComputed(classId: string, termId: string, schoolId: string) {
+    const rows = await this.prisma.computedResult.findMany({
+      where: {
+        schoolId,
+        classId,
+        termId,
+        status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+        student: { status: 'ACTIVE' },
+      },
+      include: {
+        student: {
+          select: { id: true, firstName: true, lastName: true, admissionNumber: true },
+        },
+        subject: { select: { id: true, name: true, code: true } },
+      },
+      orderBy: [
+        { student: { firstName: 'asc' } },
+        { subject: { name: 'asc' } },
+      ],
+    });
+
+    // Composite subjects only exist for the senior band, so this short-circuits
+    // for Forms 1-4 and other junior classes. Composite results are computed on
+    // the fly (never stored), so we replace each student's component rows with
+    // the composite row, mirroring the report-card generators.
+    const candidates = await this.compositeSubjectService.getCompositeCandidatesForClass(classId, termId, schoolId);
+    if (candidates.length === 0 || rows.length === 0) return rows;
+
+    const compositeCache = new Map<string, any>();
+    const gradeCache = new Map<string, any>();
+    const byStudent = new Map<string, any[]>();
+    for (const r of rows) {
+      const arr = byStudent.get(r.studentId) ?? [];
+      arr.push(r);
+      byStudent.set(r.studentId, arr);
+    }
+
+    const output: any[] = [];
+    for (const [studentId, studentRows] of byStudent) {
+      const computedMap = new Map<string, { finalPercentage: number | null; subjectName: string }>();
+      for (const r of studentRows) {
+        computedMap.set(r.subjectId, { finalPercentage: r.finalPercentage, subjectName: r.subject?.name ?? '' });
+      }
+
+      let studentResult = studentRows;
+      for (const candidate of candidates) {
+        const computed = await this.compositeSubjectService.computeCompositeForStudent(
+          candidate.id, studentId, termId, classId, schoolId,
+          compositeCache, gradeCache, computedMap,
+        ).catch(() => null);
+        if (!computed || computed.finalPercentage == null) continue;
+        if (!computed.components.every((c: any) => c.present)) continue;
+
+        const componentIds = new Set(computed.components.map((c: any) => c.subjectId));
+        const base = studentResult.find((r: any) => componentIds.has(r.subjectId));
+        if (!base) continue;
+
+        studentResult = studentResult.filter((r: any) => !componentIds.has(r.subjectId));
+        studentResult.push({
+          ...base,
+          subjectId: candidate.id,
+          subject: { id: candidate.id, name: candidate.name, code: candidate.code },
+          finalPercentage: computed.finalPercentage,
+          finalGrade: computed.finalGrade ?? null,
+          finalRemark: null,
+          points: null,
+          isComposite: true,
+          isAbsent: false,
+        });
+      }
+
+      studentResult.sort((a: any, b: any) => (a.subject?.name || '').localeCompare(b.subject?.name || ''));
+      output.push(...studentResult);
+    }
+
+    return output.sort((a: any, b: any) =>
+      (a.student?.firstName || '').localeCompare(b.student?.firstName || '')
+      || (a.subject?.name || '').localeCompare(b.subject?.name || ''),
+    );
+  }
+
   async findOne(id: string, schoolId: string) {
     const result = await this.prisma.result.findUnique({
       where: { id },
