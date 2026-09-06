@@ -54,6 +54,54 @@ function weaknessColor(score: number): string {
   return 'text-yellow-700 bg-yellow-50 border-yellow-200';
 }
 
+function percentilePhrase(p?: number): string {
+  if (p == null) return '';
+  if (p >= 90) return `performs better than ${Math.round(p)}% of the class — that is outstanding work`;
+  if (p >= 75) return `performs better than ${Math.round(p)}% of the class — strong, above-average performance`;
+  if (p >= 50) return `performs better than ${Math.round(p)}% of the class — right around the class middle`;
+  if (p >= 25) return `performs better than ${Math.round(p)}% of the class — a little below the class average`;
+  return `performs better than only ${Math.round(p)}% of the class — well below the class average`;
+}
+
+function zScorePhrase(z?: number): string {
+  if (z == null) return '';
+  if (z >= 1) return `is scoring well above the school average for this term`;
+  if (z >= 0.3) return `is scoring above the school average`;
+  if (z > -0.3) return `is performing right in line with the school average`;
+  if (z > -1) return `is scoring slightly below the school average`;
+  return `is scoring well below the school average right now`;
+}
+
+function consistencyPhrase(sd?: number): string {
+  if (sd == null) return '';
+  if (sd < 6) return `very consistent — results stay close together across subjects`;
+  if (sd < 12) return `steady overall, with a few naturally stronger or weaker subjects`;
+  return `uneven — some subjects are much stronger than others, worth a closer look`;
+}
+
+function trendPhrase(direction?: string, slope?: number): string {
+  if (direction === 'improving') return `showing a clear upward trend — keep encouraging the hard work`;
+  if (direction === 'declining') return `scores have been trending downward — early support now will help turn it around`;
+  if (direction === 'volatile') return `performance has swung between terms — steady study habits may help`;
+  return `staying steady across terms, which is a solid foundation`;
+}
+
+function bandOf(avg: number) {
+  if (avg >= 80) return { label: 'Excellent', tone: 'text-emerald-700 bg-emerald-100 border-emerald-200', icon: '🏆', blurb: 'Consistently strong across subjects.' };
+  if (avg >= 70) return { label: 'Strong', tone: 'text-blue-700 bg-blue-100 border-blue-200', icon: '💪', blurb: 'Solid overall performance.' };
+  if (avg >= 60) return { label: 'Good', tone: 'text-indigo-700 bg-indigo-100 border-indigo-200', icon: '👍', blurb: 'Healthy average — room to reach even higher.' };
+  if (avg >= 50) return { label: 'Fair', tone: 'text-amber-700 bg-amber-100 border-amber-200', icon: '📘', blurb: 'Passing, but focused support can raise the grades.' };
+  if (avg >= 40) return { label: 'Needs support', tone: 'text-orange-700 bg-orange-100 border-orange-200', icon: '⚠️', blurb: 'Below pass mark — targeted help is recommended.' };
+  return { label: 'At risk', tone: 'text-red-700 bg-red-100 border-red-200', icon: '🚨', blurb: 'Urgent attention and intervention are recommended.' };
+}
+
+function subjectStatus(score: number) {
+  if (score >= 75) return { label: 'Strong', cls: 'bg-emerald-100 text-emerald-700' };
+  if (score >= 60) return { label: 'Good', cls: 'bg-blue-100 text-blue-700' };
+  if (score >= 50) return { label: 'Developing', cls: 'bg-amber-100 text-amber-700' };
+  return { label: 'At risk', cls: 'bg-red-100 text-red-700' };
+}
+
 export default function ParentAnalytics() {
   const [selectedChildId, setSelectedChildId] = useState<string>('');
 
@@ -71,7 +119,9 @@ export default function ParentAnalytics() {
     queryFn: () => termApi.getCurrent().then(r => r.data),
     retry: false,
   });
-  const currentTermId = termData?.data?.id;
+  const currentTermId = termData?.id;
+  const currentTermName = termData?.name;
+  const currentYearName = termData?.academicYear?.name;
 
   const { data: allResults = [] } = useQuery<ParentResult[]>({
     queryKey: ['parent-child-analytics-results', activeChildId],
@@ -140,6 +190,7 @@ export default function ParentAnalytics() {
         learningArea: a.area,
         subject: a.subject,
         currentScore: a.score,
+        trend: a.status === 'CRITICAL' ? 'declining' : '',
         recommendation: a.status === 'CRITICAL'
           ? `Critical weakness in ${a.area}. This area needs urgent attention in ${a.subject}.`
           : `Below expectations in ${a.area}. Recommend focused practice and support in ${a.subject}.`,
@@ -156,12 +207,12 @@ export default function ParentAnalytics() {
   }, [competencyDiag]);
 
   const currentTermResults = useMemo(() => {
-    if (!currentTermId || !activeChildId) return [];
-    const childData = (allChildrenResults?.children || []).find(
-      (cd: any) => cd.child.id === activeChildId,
+    if (!currentTermId || !currentTermName) return [];
+    return allResults.filter(r =>
+      r.term === currentTermName &&
+      (!currentYearName || !r.academicYear || r.academicYear === currentYearName),
     );
-    return childData?.results || [];
-  }, [allChildrenResults, activeChildId, currentTermId]);
+  }, [allResults, currentTermId, currentTermName, currentYearName]);
 
   const heatmap = useMemo(() => {
     if (allResults.length === 0) return null;
@@ -196,21 +247,21 @@ export default function ParentAnalytics() {
 
   const overallAverage = useMemo(
     () => currentTermResults.length > 0
-      ? currentTermResults.reduce((s: number, r: any) => s + r.score, 0) / currentTermResults.length
+      ? currentTermResults.reduce((s: number, r: ParentResult) => s + r.score, 0) / currentTermResults.length
       : 0,
     [currentTermResults],
   );
 
   const gradeDist = useMemo(() => {
     const counts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, F: 0 };
-    currentTermResults.forEach((r: any) => { counts[getGrade(r.score)]++; });
+    currentTermResults.forEach((r: ParentResult) => { counts[getGrade(r.score)]++; });
     return Object.entries(counts).filter(([, c]) => c > 0);
   }, [currentTermResults]);
 
   const subjectBars = useMemo(
     () => [...currentTermResults]
       .sort((a, b) => a.subject.localeCompare(b.subject))
-      .map((r: any) => ({ subject: r.subject, score: r.score })),
+      .map((r: ParentResult) => ({ subject: r.subject, score: r.score })),
     [currentTermResults],
   );
 
@@ -258,16 +309,17 @@ export default function ParentAnalytics() {
   };
 
   const pieOption = {
-    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-    legend: { bottom: 0, textStyle: { fontSize: 12 } },
+    tooltip: { trigger: 'item', formatter: '{b}: {c} subject(s) ({d}%)' },
+    legend: { bottom: 0, icon: 'circle', itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11 } },
     color: ['#10b981', '#3b82f6', '#f59e0b', '#f97316', '#ef4444'],
     series: [{
       name: 'Grades',
       type: 'pie',
-      radius: ['45%', '70%'],
-      center: ['50%', '45%'],
+      radius: ['40%', '65%'],
+      center: ['50%', '44%'],
       itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
-      label: { fontSize: 11, formatter: '{b} ({c})' },
+      label: { fontSize: 11, formatter: '{b}: {d}%', avoidLabelOverlap: true },
+      labelLine: { length: 10, length2: 6, smooth: true },
       data: gradeDist.map(([g, c]) => ({ name: g, value: c })),
     }],
   };
@@ -322,9 +374,11 @@ export default function ParentAnalytics() {
   };
 
   const growthPoints = useMemo(() => {
-    if (growthError || !growth?.terms || growth.terms.length === 0) return [];
-    return growth.terms.map((t: any) => ({ label: t.termName, value: t.average }));
+    if (growthError || !growth?.trajectory || growth.trajectory.length === 0) return [];
+    return growth.trajectory.map((t: any) => ({ label: t.termName, value: t.average }));
   }, [growth, growthError]);
+
+  const overallTrend = growth?.overallTrend;
 
   const growthOption = growthPoints.length > 0 ? {
     grid: { left: '8%', right: '8%', bottom: '18%', top: '10%' },
@@ -340,14 +394,30 @@ export default function ParentAnalytics() {
       itemStyle: { color: '#10b981' },
       areaStyle: { color: 'rgba(16,185,129,0.12)' },
       label: { show: true, position: 'top', fontSize: 10, formatter: (p: any) => p.value.toFixed(1) },
-      markLine: growth.direction ? {
+      markLine: overallTrend ? {
         data: [{ type: 'average', name: 'Average' }],
         lineStyle: { color: '#6366f1', type: 'dashed' },
       } : undefined,
     }],
   } : null;
 
-  const recList = (recommendations?.recommendations || []).slice(0, 5) as any[];
+  const recList = (recommendations?.recommendations || []).slice(0, 6) as any[];
+
+  const ds = aiStats?.descriptiveStats || {};
+  const cs = aiStats?.comparativeStats || {};
+  const dsMean = typeof ds.mean === 'number' ? ds.mean : overallAverage;
+  const band = bandOf(dsMean || overallAverage);
+  const avgUsed = currentTermResults.length > 0
+    ? currentTermResults.reduce((s, r) => s + r.score, 0) / currentTermResults.length
+    : dsMean;
+
+  const sortedCurrent = useMemo(() => [...currentTermResults].sort((a, b) => b.score - a.score), [currentTermResults]);
+  const topSubjects = sortedCurrent.slice(0, 3);
+  const supportSubjects = useMemo(() => currentTermResults.filter(r => r.score < 60).sort((a, b) => a.score - b.score), [currentTermResults]);
+
+  const hasAi = !!aiStats || !!competencyDiag || !!weaknessProfile || (recommendations?.recommendations?.length || 0) > 0 || (growth?.trajectory?.length || 0) > 0;
+  const hasCurrentData = currentTermResults.length > 0;
+  const childFirstName = activeChild?.firstName || 'Your child';
 
   return (
     <div className="px-4 py-8 max-w-7xl mx-auto space-y-6">
@@ -380,7 +450,7 @@ export default function ParentAnalytics() {
         </div>
       )}
 
-      {childrenComparison.length === 0 ? (
+      {childrenComparison.length === 0 && !hasCurrentData && !hasAi ? (
         <div className="text-center py-20 bg-white rounded-2xl shadow-sm border border-gray-100">
           <span className="text-5xl">📊</span>
           <p className="text-gray-500 mt-4">No analytics data available yet</p>
@@ -390,19 +460,21 @@ export default function ParentAnalytics() {
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="rounded-2xl bg-white shadow-sm border border-gray-100 p-5 text-center">
-              <p className={`text-3xl font-bold ${overallAverage >= 75 ? 'text-emerald-600' : overallAverage >= 50 ? 'text-amber-600' : 'text-red-600'}`}>{overallAverage.toFixed(1)}%</p>
-              <p className="text-xs text-gray-500 mt-1">Current Term Average</p>
+              <p className={`text-3xl font-bold ${avgUsed >= 75 ? 'text-emerald-600' : avgUsed >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                {avgUsed ? avgUsed.toFixed(1) : '0.0'}%
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Current Term Average{currentTermName ? ` · ${currentTermName}` : ''}</p>
             </div>
             <div className="rounded-2xl bg-white shadow-sm border border-gray-100 p-5 text-center">
-              <p className="text-3xl font-bold text-indigo-600">{currentTermResults.length}</p>
-              <p className="text-xs text-gray-500 mt-1">Subjects Tracked</p>
+              <p className="text-3xl font-bold text-indigo-600">{hasCurrentData ? currentTermResults.length : allResults.length}</p>
+              <p className="text-xs text-gray-500 mt-1">Subjects Tracked{!hasCurrentData && allResults.length > 0 ? ' (all terms)' : ''}</p>
             </div>
             <div className="rounded-2xl bg-white shadow-sm border border-gray-100 p-5 text-center">
               <p className="text-3xl font-bold text-blue-600">{allResults.length}</p>
-              <p className="text-xs text-gray-500 mt-1">Results (All Terms)</p>
+              <p className="text-xs text-gray-500 mt-1">Published Results</p>
             </div>
             <div className="rounded-2xl bg-white shadow-sm border border-gray-100 p-5 text-center">
-              <p className="text-3xl font-bold text-emerald-600">{activeChild?.attendancePercentage ?? '—'}%</p>
+              <p className="text-3xl font-bold text-emerald-600">{activeChild?.attendancePercentage != null ? `${activeChild.attendancePercentage}%` : '—'}</p>
               <p className="text-xs text-gray-500 mt-1">Attendance</p>
             </div>
           </div>
@@ -423,13 +495,19 @@ export default function ParentAnalytics() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100">
                 <h2 className="font-semibold text-gray-900">Subject Performance</h2>
-                <p className="text-sm text-gray-500">{activeChild?.firstName} {activeChild?.lastName}</p>
+                <p className="text-sm text-gray-500">{hasCurrentData ? `${activeChild?.firstName} ${activeChild?.lastName} · ${currentTermName || 'This term'}` : 'No published results for the current term yet'}</p>
               </div>
               <div className="p-5">
-                {subjectBars.length > 0 ? (
+                {hasCurrentData ? (
                   <ReactECharts option={subjectOption} style={{ height: 260 }} notMerge lazyUpdate />
                 ) : (
-                  <p className="text-center py-12 text-gray-400">No published results</p>
+                  <div className="text-center py-12">
+                    <span className="block text-3xl mb-2">📭</span>
+                    <p className="text-gray-400 text-sm">No published results for {currentTermName || 'the current term'}</p>
+                    {allResults.length > 0 && (
+                      <p className="text-xs text-gray-400 mt-2">This term's results haven't been published yet — results from past terms are shown below.</p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -437,13 +515,16 @@ export default function ParentAnalytics() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100">
                 <h2 className="font-semibold text-gray-900">Grade Distribution</h2>
-                <p className="text-sm text-gray-500">Grades for this term</p>
+                <p className="text-sm text-gray-500">{hasCurrentData ? `Grades for ${currentTermName || 'this term'}` : 'No grades published yet'}</p>
               </div>
               <div className="p-5">
-                {gradeDist.length > 0 ? (
-                  <ReactECharts option={pieOption} style={{ height: 260 }} notMerge lazyUpdate />
+                {hasCurrentData ? (
+                  <ReactECharts option={pieOption} style={{ height: 280 }} notMerge lazyUpdate />
                 ) : (
-                  <p className="text-center py-12 text-gray-400">No grades yet</p>
+                  <div className="text-center py-12">
+                    <span className="block text-3xl mb-2">🎯</span>
+                    <p className="text-gray-400 text-sm">Grades appear once results are published</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -451,29 +532,45 @@ export default function ParentAnalytics() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100">
                 <h2 className="font-semibold text-gray-900">Performance Summary</h2>
-                <p className="text-sm text-gray-500">Strengths & areas to improve</p>
+                <p className="text-sm text-gray-500">AI-backed snapshot for {hasCurrentData ? `${activeChild?.firstName} ${activeChild?.lastName}` : 'your child'}</p>
               </div>
               <div className="p-5 space-y-4">
+                <div className={`flex items-center gap-3 p-3 rounded-xl border ${band.tone}`}>
+                  <span className="text-2xl">{band.icon}</span>
+                  <div>
+                    <p className="text-sm font-semibold">Overall: {band.label} {avgUsed ? `(${avgUsed.toFixed(1)}%)` : ''}</p>
+                    <p className="text-xs opacity-80 mt-0.5">{band.blurb}</p>
+                  </div>
+                </div>
+
+                {cs.percentile != null && (
+                  <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-100">
+                    <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">Class Standing</p>
+                    <p className="text-sm text-gray-700 mt-1">{childFirstName} {percentilePhrase(cs.percentile)}.</p>
+                  </div>
+                )}
+
                 <div>
-                  <h3 className="text-sm font-semibold text-emerald-700 mb-2">💪 Strengths (≥75%)</h3>
-                  {currentTermResults.filter((r: any) => r.score >= 75).length === 0 ? (
-                    <p className="text-xs text-gray-400">None yet</p>
+                  <h3 className="text-sm font-semibold text-emerald-700 mb-2">🏅 Top Subjects</h3>
+                  {topSubjects.length === 0 ? (
+                    <p className="text-xs text-gray-400">Publish results for this term to see the top subjects.</p>
                   ) : (
-                    currentTermResults.filter((r: any) => r.score >= 75).map((r: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-0">
-                        <span className="text-sm text-gray-700">{r.subject}</span>
+                    topSubjects.map((r: ParentResult, i: number) => (
+                      <div key={r.id || i} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-0">
+                        <span className="text-sm text-gray-700">{['🥇', '🥈', '🥉'][i]} {r.subject}</span>
                         <span className="text-sm font-semibold text-emerald-600">{r.score.toFixed(1)}%</span>
                       </div>
                     ))
                   )}
                 </div>
+
                 <div>
-                  <h3 className="text-sm font-semibold text-red-700 mb-2">🎯 Needs Support (&lt;50%)</h3>
-                  {currentTermResults.filter((r: any) => r.score < 50).length === 0 ? (
-                    <p className="text-xs text-emerald-600">All subjects above 50% — great job!</p>
+                  <h3 className="text-sm font-semibold text-red-700 mb-2">🎯 Areas That Need Support (&lt;60%)</h3>
+                  {supportSubjects.length === 0 ? (
+                    <p className="text-xs text-emerald-600">All current subjects are at or above 60% — great job!</p>
                   ) : (
-                    currentTermResults.filter((r: any) => r.score < 50).map((r: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-0">
+                    supportSubjects.map((r: ParentResult, i: number) => (
+                      <div key={r.id || i} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-0">
                         <span className="text-sm text-gray-700">{r.subject}</span>
                         <span className="text-sm font-semibold text-red-600">{r.score.toFixed(1)}%</span>
                       </div>
@@ -484,31 +581,124 @@ export default function ParentAnalytics() {
             </div>
           </div>
 
-          {(activeChild && (aiWeaknesses.length > 0 || aiStrengths.length > 0 || aiStats?.comparativeStats)) && (
+          {hasAi && (
             <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-purple-50 to-white shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-indigo-100 flex items-start justify-between flex-wrap gap-2">
                 <div>
                   <h2 className="font-semibold text-gray-900">🤖 AI Performance Analysis</h2>
-                  <p className="text-sm text-gray-500">Smart diagnosis for {activeChild.firstName} {activeChild.lastName}</p>
+                  <p className="text-sm text-gray-500">Everything the AI understands about {childFirstName}'s learning, in plain language</p>
                 </div>
-                {aiStats?.comparativeStats && (
-                  <span className="text-xs font-medium px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700">
-                    Percentile: {aiStats.comparativeStats.percentile != null ? `#${Math.round(aiStats.comparativeStats.percentile)}` : '—'} · Z-score: {aiStats.comparativeStats.zScore != null ? aiStats.comparativeStats.zScore.toFixed(2) : '—'}
-                  </span>
-                )}
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${band.tone}`}>
+                  {band.icon} {band.label}
+                </span>
               </div>
 
               <div className="p-5 space-y-5">
-                {aiStats?.comparativeStats?.interpretation && (
+                {(dsMean || cs.percentile != null || growthPoints.length > 0) && (
                   <div className="p-4 rounded-xl bg-white border border-gray-100">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Relative standing</p>
-                    <p className="text-sm text-gray-700 mt-1">{aiStats.comparativeStats.interpretation}</p>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">What this means</p>
+                    <p className="text-sm text-gray-700 mt-2 leading-relaxed">
+                      {childFirstName} is averaging <strong>{avgUsed ? avgUsed.toFixed(1) + '%' : '—'}</strong> this term, which is an{' '}
+                      <strong className="text-indigo-700">{band.label.toLowerCase()}</strong> overall result.{' '}
+                      {cs.percentile != null && <>Compared with the rest of the class, {childFirstName} {percentilePhrase(cs.percentile)}.</>}{' '}
+                      {typeof cs.zScore === 'number' && <>Their performance {zScorePhrase(cs.zScore)}.</>}{' '}
+                      {overallTrend?.direction && trendPhrase(overallTrend.direction, overallTrend.slope)}.{' '}
+                      {typeof ds.stdDev === 'number' && <>Their results are {consistencyPhrase(ds.stdDev)} — this tells us how reliable their scores are.</>}
+                    </p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {typeof cs.percentile === 'number' && (
+                    <div className="p-3 rounded-xl bg-white border border-gray-100">
+                      <p className="text-2xl font-bold text-indigo-600">#{Math.round(cs.percentile)}</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Percentile — better than {Math.round(cs.percentile)}% of the class</p>
+                    </div>
+                  )}
+                  {typeof cs.zScore === 'number' && (
+                    <div className="p-3 rounded-xl bg-white border border-gray-100">
+                      <p className={`text-2xl font-bold ${cs.zScore >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{cs.zScore >= 0 ? '+' : ''}{cs.zScore.toFixed(2)}</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Z-score — standing vs the school average</p>
+                    </div>
+                  )}
+                  {typeof cs.studentMean === 'number' && cs.schoolMean != null && (
+                    <div className="p-3 rounded-xl bg-white border border-gray-100">
+                      <p className="text-2xl font-bold text-gray-800">{cs.studentMean.toFixed(1)}%</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Their average vs school {cs.schoolMean.toFixed(1)}%</p>
+                    </div>
+                  )}
+                  {typeof ds.stdDev === 'number' && (
+                    <div className="p-3 rounded-xl bg-white border border-gray-100">
+                      <p className="text-2xl font-bold text-gray-800">{ds.stdDev.toFixed(1)}</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Consistency score (lower = steadier)</p>
+                    </div>
+                  )}
+                  {typeof ds.median === 'number' && (
+                    <div className="p-3 rounded-xl bg-white border border-gray-100">
+                      <p className="text-2xl font-bold text-gray-800">{ds.median.toFixed(1)}%</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Median subject score</p>
+                    </div>
+                  )}
+                  {typeof ds.min === 'number' && typeof ds.max === 'number' && (
+                    <div className="p-3 rounded-xl bg-white border border-gray-100">
+                      <p className="text-2xl font-bold text-gray-800">{ds.min.toFixed(0)}–{ds.max.toFixed(0)}%</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Lowest to highest subject score</p>
+                    </div>
+                  )}
+                  {typeof ds.count === 'number' && (
+                    <div className="p-3 rounded-xl bg-white border border-gray-100">
+                      <p className="text-2xl font-bold text-gray-800">{ds.count}</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Results analysed</p>
+                    </div>
+                  )}
+                  {growthPoints.length > 0 && overallTrend?.direction && (
+                    <div className="p-3 rounded-xl bg-white border border-gray-100">
+                      <p className="text-2xl font-bold text-gray-800">{overallTrend.direction === 'improving' ? '📈' : overallTrend.direction === 'declining' ? '📉' : '➖'}</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Trend: {overallTrend.direction}</p>
+                    </div>
+                  )}
+                </div>
+
+                {hasCurrentData && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2">📚 Subject-by-subject detail</h3>
+                    <div className="overflow-x-auto rounded-xl border border-gray-100">
+                      <table className="w-full bg-white">
+                        <thead>
+                          <tr className="bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
+                            <th className="px-3 py-2 font-semibold">Subject</th>
+                            <th className="px-3 py-2 text-center font-semibold">Score</th>
+                            <th className="px-3 py-2 text-center font-semibold">Grade</th>
+                            <th className="px-3 py-2 text-center font-semibold">Standing</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sortedCurrent.map((r: ParentResult, i: number) => {
+                            const st = subjectStatus(r.score);
+                            return (
+                              <tr key={r.id || i} className="border-t border-gray-50">
+                                <td className="px-3 py-2 text-sm font-medium text-gray-800">{r.subject}</td>
+                                <td className="px-3 py-2 text-center">
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{ backgroundColor: `${scoreColor(r.score)}18`, color: scoreColor(r.score) }}>
+                                    {r.score.toFixed(1)}%
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-center text-sm text-gray-700">{r.grade || '-'}</td>
+                                <td className="px-3 py-2 text-center">
+                                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${st.cls}`}>{st.label}</span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
 
                 {aiStrengths.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold text-emerald-700 mb-2">💪 Where {activeChild.firstName} shines</h3>
+                    <h3 className="text-sm font-semibold text-emerald-700 mb-2">💪 Where {childFirstName} shines</h3>
                     <div className="flex flex-wrap gap-2">
                       {aiStrengths.map((s: any, i: number) => (
                         <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 text-sm font-medium text-emerald-700">
@@ -523,7 +713,7 @@ export default function ParentAnalytics() {
 
                 {aiWeaknesses.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold text-red-700 mb-2">🎯 Areas needing support</h3>
+                    <h3 className="text-sm font-semibold text-red-700 mb-2">🎯 Where help is needed</h3>
                     <div className="space-y-2">
                       {aiWeaknesses.map((w: any, i: number) => {
                         const tb = trendBadge(w.trend);
@@ -548,6 +738,24 @@ export default function ParentAnalytics() {
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+                )}
+
+                {competencyDiag?.summary && (
+                  <div className="p-4 rounded-xl bg-white border border-gray-100">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2">🧩 Competency breakdown</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: 'Strong areas', value: competencyDiag.summary.strong, cls: 'bg-emerald-100 text-emerald-700' },
+                        { label: 'Acceptable', value: competencyDiag.summary.acceptable, cls: 'bg-blue-100 text-blue-700' },
+                        { label: 'Need reinforcement', value: competencyDiag.summary.needsReinforcement, cls: 'bg-amber-100 text-amber-700' },
+                        { label: 'Critical gaps', value: competencyDiag.summary.criticalWeaknesses, cls: 'bg-red-100 text-red-700' },
+                      ].map((s, i) => (
+                        <span key={i} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${s.cls}`}>
+                          {s.label}: <strong>{s.value}</strong>
+                        </span>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -595,6 +803,9 @@ export default function ParentAnalytics() {
               </div>
               <div className="p-5">
                 <ReactECharts option={growthOption} style={{ height: 280 }} notMerge lazyUpdate />
+                {overallTrend?.interpretation && (
+                  <p className="text-xs text-gray-500 mt-3">{overallTrend.interpretation}</p>
+                )}
               </div>
             </div>
           )}
@@ -602,8 +813,8 @@ export default function ParentAnalytics() {
           {!recError && recList.length > 0 && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100">
-                <h2 className="font-semibold text-gray-900">Smart Recommendations</h2>
-                <p className="text-sm text-gray-500">Personalised suggestions to help your child improve</p>
+                <h2 className="font-semibold text-gray-900">✅ Recommended Next Steps</h2>
+                <p className="text-sm text-gray-500">Actionable advice to help {childFirstName} improve</p>
               </div>
               <div className="divide-y divide-gray-50">
                 {recList.map((r: any, i: number) => (
