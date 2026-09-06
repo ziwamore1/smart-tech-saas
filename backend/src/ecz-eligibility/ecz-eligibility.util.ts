@@ -32,8 +32,10 @@ export interface EczEligibilityResult {
   hasFailingSubject: boolean;
   englishPassed: boolean;
   mathPassed: boolean;
+  sciencePassed: boolean;
   englishSubject?: ResolvedEczSubject;
   mathSubject?: ResolvedEczSubject;
+  scienceSubject?: ResolvedEczSubject;
   failingSubjects: string[];
   details: string;
 }
@@ -143,6 +145,19 @@ function isMath(name: string): boolean {
   return n === 'mathematics' || n === 'math' || n === 'maths' || n.startsWith('mathematics ') || n.startsWith('math ');
 }
 
+// University science requirement:
+//  Forms 1-4  -> best of Agricultural Science, Physics, Chemistry or Biology
+//  Grades 10-12 -> best of Science (Composite), Biology or Agricultural Science
+const SCIENCE_SUBJECTS: Record<EczGradingSystem, string[]> = {
+  FORMS: ['agricultural science', 'agriculture', 'physics', 'chemistry', 'biology'],
+  SECONDARY: ['science', 'biology', 'agricultural science', 'agriculture'],
+};
+
+export function isScienceSubject(name: string, system: EczGradingSystem): boolean {
+  const n = normalizeSubjectName(name);
+  return (SCIENCE_SUBJECTS[system] || []).some((k) => n === k || n.startsWith(`${k} `));
+}
+
 export type EczEligibilityOptions =
   | EczGradingSystem
   | { gradingSystem?: EczGradingSystem; levelTypeName?: string };
@@ -167,6 +182,7 @@ export function checkEczEligibility(
 
   const english = resolved.find((s) => isEnglish(s.name));
   const math = resolved.find((s) => isMath(s.name));
+  const science = resolved.find((s) => isScienceSubject(s.name, gradingSystem));
 
   const uniCut = ECZ_UNIVERSITY_CUT[gradingSystem];
   const certCut = ECZ_CERTIFICATE_CUT[gradingSystem];
@@ -174,13 +190,14 @@ export function checkEczEligibility(
   const failsCertificate = resolved.filter((s) => !s.passed);
   const englishOkUni = !!english && english.points <= uniCut;
   const mathOkUni = !!math && math.points <= uniCut;
+  const scienceOkUni = !!science && science.points <= uniCut;
   const englishOkCert = !!english && english.points <= certCut;
 
   const hasSix = resolved.length >= 6;
   const bestSixUniOk = bestSix.length === 6 && bestSix.every((s) => s.points <= uniCut);
   const bestSixCertOk = bestSix.length === 6 && bestSix.every((s) => s.points <= certCut);
 
-  const universityEligible = hasSix && bestSixUniOk && englishOkUni && mathOkUni;
+  const universityEligible = hasSix && bestSixUniOk && englishOkUni && mathOkUni && scienceOkUni;
   const certificateAwarded = hasSix && bestSixCertOk && englishOkCert;
 
   const status: EczEligibilityStatus = universityEligible
@@ -193,11 +210,13 @@ export function checkEczEligibility(
   if (!hasSix) {
     details = `Minimum 6 subjects required (${resolved.length} enrolled)`;
   } else if (universityEligible) {
-    details = `University eligible — best 6 in grades 1-${uniCut} including English and Mathematics`;
+    details = `University eligible — best 6 in grades 1-${uniCut} including English, Mathematics and a science subject`;
   } else if (!englishOkUni) {
     details = `English not at university grade (Grade ${english?.grade ?? 'N/A'}; requires ${uniCut} or better)`;
   } else if (!mathOkUni) {
     details = `Mathematics not at university grade (Grade ${math?.grade ?? 'N/A'}; requires ${uniCut} or better)`;
+  } else if (!scienceOkUni) {
+    details = `Science not at university grade (Grade ${science?.grade ?? 'N/A'}; requires ${uniCut} or better in one of: ${SCIENCE_SUBJECTS[gradingSystem].join(', ')})`;
   } else if (!bestSixUniOk) {
     details = `Best 6 (${bestSixTotal} pts, max ${ECZ_MAX_BEST_SIX_POINTS[gradingSystem]}) contains grades above ${uniCut}`;
   } else if (certificateAwarded) {
@@ -221,8 +240,10 @@ export function checkEczEligibility(
     hasFailingSubject: failsCertificate.length > 0,
     englishPassed: englishOkUni,
     mathPassed: mathOkUni,
+    sciencePassed: scienceOkUni,
     englishSubject: english,
     mathSubject: math,
+    scienceSubject: science,
     failingSubjects: failsCertificate.map((s) => s.name),
     details,
   };

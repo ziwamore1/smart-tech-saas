@@ -280,6 +280,10 @@ Student Report Card
 <div class="summary-item">
 <strong>ECZ Status</strong><br>
 {{summary.eligibilityDisplay}}
+{{#if summary.eligibilityDetails}}<div style="font-size:11px;color:#6b7280;margin-top:4px;">{{summary.eligibilityDetails}}</div>{{/if}}
+{{#if summary.sciencePassed}}
+<div style="font-size:11px;color:#6b7280;margin-top:2px;">Science: {{summary.scienceSubject.name}} ({{summary.scienceSubject.grade}})</div>
+{{/if}}
 </div>
 {{/if}}
 

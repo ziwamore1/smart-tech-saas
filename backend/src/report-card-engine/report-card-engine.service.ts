@@ -559,11 +559,15 @@ export class ReportCardEngineService {
         maxBestSixPoints: ECZ_MAX_BEST_SIX_POINTS[eligibility.gradingSystem],
         englishPassed: eligibility.englishPassed,
         mathPassed: eligibility.mathPassed,
+        sciencePassed: eligibility.sciencePassed,
         englishSubject: eligibility.englishSubject
           ? { subjectName: eligibility.englishSubject.name, finalPercentage: eligibility.englishSubject.score, finalGrade: eligibility.englishSubject.grade, points: eligibility.englishSubject.points }
           : null,
         mathSubject: eligibility.mathSubject
           ? { subjectName: eligibility.mathSubject.name, finalPercentage: eligibility.mathSubject.score, finalGrade: eligibility.mathSubject.grade, points: eligibility.mathSubject.points }
+          : null,
+        scienceSubject: eligibility.scienceSubject
+          ? { subjectName: eligibility.scienceSubject.name, finalPercentage: eligibility.scienceSubject.score, finalGrade: eligibility.scienceSubject.grade, points: eligibility.scienceSubject.points }
           : null,
         hasFailingSubject: eligibility.hasFailingSubject,
         failingSubjects: eligibility.failingSubjects,

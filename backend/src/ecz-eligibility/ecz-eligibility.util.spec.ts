@@ -82,7 +82,7 @@ describe('ecz-eligibility util', () => {
       const base: Record<string, number> = {
         English: 72,
         'Mathematics I': 65,
-        'Integrated Science': 55,
+        Physics: 55,
         'Social Studies': 52,
         'Religious Education': 50,
         'Expressive Arts': 59,
@@ -238,6 +238,98 @@ describe('ecz-eligibility util', () => {
       );
       expect(r.certificateAwarded).toBe(false);
       expect(r.englishPassed).toBe(false);
+    });
+  });
+
+  describe('checkEczEligibility — science subject requirement', () => {
+    it('Forms: university grades WITHOUT a qualifying science (AgriSci/Physics/Chem/Bio) -> CERTIFICATE only', () => {
+      const r = checkEczEligibility(
+        [
+          { name: 'English', score: 72 },
+          { name: 'Mathematics I', score: 80 },
+          { name: 'Integrated Science', score: 55 },
+          { name: 'Social Studies', score: 80 },
+          { name: 'Religious Education', score: 60 },
+          { name: 'Expressive Arts', score: 55 },
+        ],
+        'FORMS',
+      );
+      expect(r.status).toBe('CERTIFICATE');
+      expect(r.universityEligible).toBe(false);
+      expect(r.sciencePassed).toBe(false);
+      expect(r.scienceSubject).toBeUndefined();
+      expect(r.details).toContain('Science');
+    });
+
+    it('Forms: Agricultural Science qualifies for university', () => {
+      const r = checkEczEligibility(
+        [
+          { name: 'English', score: 72 },
+          { name: 'Mathematics I', score: 65 },
+          { name: 'Agricultural Science', score: 62 },
+          { name: 'Social Studies', score: 52 },
+          { name: 'Religious Education', score: 50 },
+          { name: 'Expressive Arts', score: 59 },
+        ],
+        'FORMS',
+      );
+      expect(r.status).toBe('UNIVERSITY');
+      expect(r.sciencePassed).toBe(true);
+      expect(r.scienceSubject?.name).toBe('Agricultural Science');
+      expect(r.scienceSubject?.points).toBeLessThanOrEqual(3);
+    });
+
+    it('Secondary: strong Physics/Chemistry WITHOUT Science/Biology/AgriSci -> CERTIFICATE only', () => {
+      const r = checkEczEligibility(
+        [
+          { name: 'English', score: 78 },
+          { name: 'Mathematics', score: 66 },
+          { name: 'Physics', score: 80 },
+          { name: 'Chemistry', score: 80 },
+          { name: 'Computer Studies', score: 65 },
+          { name: 'Geography', score: 66 },
+        ],
+        'SECONDARY',
+      );
+      expect(r.status).toBe('CERTIFICATE');
+      expect(r.universityEligible).toBe(false);
+      expect(r.sciencePassed).toBe(false);
+    });
+
+    it('Secondary: Biology qualifies as the university science', () => {
+      const r = checkEczEligibility(
+        [
+          { name: 'English', score: 78 },
+          { name: 'Mathematics', score: 66 },
+          { name: 'Biology', score: 60 },
+          { name: 'Physics', score: 68 },
+          { name: 'Chemistry', score: 62 },
+          { name: 'Geography', score: 55 },
+        ],
+        'SECONDARY',
+      );
+      expect(r.status).toBe('UNIVERSITY');
+      expect(r.sciencePassed).toBe(true);
+      expect(r.scienceSubject?.name).toBe('Biology');
+    });
+
+    it('Secondary: failing Science (Composite) blocks university but not the certificate', () => {
+      const r = checkEczEligibility(
+        [
+          { name: 'English', score: 78 },
+          { name: 'Mathematics', score: 66 },
+          { name: 'Science', score: 25 },
+          { name: 'Physics', score: 68 },
+          { name: 'Chemistry', score: 62 },
+          { name: 'Geography', score: 55 },
+          { name: 'Accounts', score: 60 },
+        ],
+        'SECONDARY',
+      );
+      expect(r.universityEligible).toBe(false);
+      expect(r.certificateAwarded).toBe(true);
+      expect(r.sciencePassed).toBe(false);
+      expect(r.scienceSubject?.name).toBe('Science');
     });
   });
 

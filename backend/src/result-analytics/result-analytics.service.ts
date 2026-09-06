@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StudentSubjectService } from '../student-subject/student-subject.service';
+import { gradeForScore } from '../ecz-eligibility/ecz-eligibility.util';
 
 @Injectable()
 export class ResultAnalyticsService {
@@ -299,14 +300,15 @@ export class ResultAnalyticsService {
       return [];
     }
 
-    // Failing grade depends on the class grading system: Forms 1-4 (5 point)
-    // fail at grade 5, senior Grades 10-12 (9 point) fail at grade 8/9.
+    // At-risk boundary follows the class grading system: a subject is flagged
+    // at or below the School Certificate cut — Forms 1-4 (5 point) grade 4+
+    // (< 50%), senior Grades 10-12 (9 point) grade 8+ (< 45%).
     const klass = await this.prisma.class.findUnique({
       where: { id: classId },
       select: { name: true, levelType: { select: { name: true } } },
     });
     const isForms = /form\s*[1-4]\b/i.test(klass?.levelType?.name || klass?.name || '');
-    const failPointThreshold = isForms ? 5 : 8;
+    const failPointThreshold = isForms ? 4 : 8;
 
     const studentPerformance = computedResults.reduce((acc, result) => {
       if (!acc[result.studentId]) {
@@ -329,10 +331,16 @@ export class ResultAnalyticsService {
     const atRisk = Object.values(studentPerformance)
       .map((student: any) => {
         const failingSubjects = student.subjects.filter((s: any) => {
-          if (s.points !== null && s.points !== undefined) {
-            return s.points >= failPointThreshold;
+          // Trust stored points when present; otherwise derive the ECZ grade from the score
+          // (computed results frequently store NULL points for imported/legacy rows).
+          let points: number | null = s.points;
+          if (points == null || points < 1 || points > 9) {
+            const pct = s.percentage ?? s.score ?? null;
+            if (pct != null && Number.isFinite(pct)) {
+              points = gradeForScore(pct, isForms ? 'FORMS' : 'SECONDARY').points;
+            }
           }
-          return (s.percentage ?? 0) < 40;
+          return points != null ? points >= failPointThreshold : (s.percentage ?? 0) < 40;
         });
         const avgPercentage = student.subjects.reduce((sum: number, s: any) => sum + (s.percentage ?? 0), 0) / student.subjects.length;
 

@@ -827,6 +827,15 @@ export class ReportEngineService {
         universityEligible: computedEligibility?.universityEligible ?? false,
         certificateEligible: computedEligibility?.certificateAwarded ?? false,
         certificateName: computedEligibility?.certificateName ?? 'School Certificate',
+        sciencePassed: computedEligibility?.sciencePassed ?? false,
+        scienceSubject: computedEligibility?.scienceSubject
+          ? {
+              name: computedEligibility.scienceSubject.name,
+              score: computedEligibility.scienceSubject.score,
+              grade: computedEligibility.scienceSubject.grade,
+              points: computedEligibility.scienceSubject.points,
+            }
+          : null,
         eligibilityDisplay: eligibilityStatus === 'UNIVERSITY'
           ? 'Eligible for University'
           : eligibilityStatus === 'CERTIFICATE'

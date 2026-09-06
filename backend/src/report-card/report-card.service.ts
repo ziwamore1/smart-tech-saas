@@ -411,6 +411,15 @@ export class ReportCardService {
         maxBestSixPoints: ECZ_MAX_BEST_SIX_POINTS[eligibility.gradingSystem],
         englishPassed: eligibility.englishPassed,
         mathPassed: eligibility.mathPassed,
+        sciencePassed: eligibility.sciencePassed,
+        scienceSubject: eligibility.scienceSubject
+          ? {
+              name: eligibility.scienceSubject.name,
+              score: eligibility.scienceSubject.score,
+              grade: eligibility.scienceSubject.grade,
+              points: eligibility.scienceSubject.points,
+            }
+          : null,
         bestSix: eligibility.bestSix.map((s) => ({
           subject: s.name,
           score: s.score,
