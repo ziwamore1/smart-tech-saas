@@ -1,19 +1,23 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { homeworkApi, termApi } from '@/lib/api';
-import { useAuth } from '@/lib/auth-context';
+import { homeworkApi, studentApi } from '@/lib/api';
 
 export default function StudentHomework() {
-  const { user } = useAuth();
+  const { data: profileRes } = useQuery({
+    queryKey: ['my-profile-homework'],
+    queryFn: () => studentApi.getById('me').then(r => r.data),
+    retry: false,
+  });
+  const studentId = profileRes?.data?.id || profileRes?.id || '';
 
   const { data: homework } = useQuery({
-    queryKey: ['my-homework', user?.id],
+    queryKey: ['my-homework', studentId],
     queryFn: async () => {
-      const res = await homeworkApi.getByStudent(String(user?.id));
+      const res = await homeworkApi.getByStudent(String(studentId));
       return res.data?.data || res.data || [];
     },
-    enabled: !!user?.id,
+    enabled: !!studentId,
   });
 
   const homeworkList = Array.isArray(homework) ? homework : [];

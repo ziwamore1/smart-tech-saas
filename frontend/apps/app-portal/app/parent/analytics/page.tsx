@@ -42,6 +42,18 @@ function scoreColor(score: number): string {
   return '#ef4444';
 }
 
+function trendBadge(trend?: string) {
+  if (trend === 'improving') return { label: '📈 Improving', className: 'bg-emerald-100 text-emerald-700' };
+  if (trend === 'declining') return { label: '📉 Declining', className: 'bg-red-100 text-red-700' };
+  return { label: '➖ Stable', className: 'bg-gray-100 text-gray-600' };
+}
+
+function weaknessColor(score: number): string {
+  if (score < 40) return 'text-red-600 bg-red-50 border-red-200';
+  if (score < 50) return 'text-amber-600 bg-amber-50 border-amber-200';
+  return 'text-yellow-700 bg-yellow-50 border-yellow-200';
+}
+
 export default function ParentAnalytics() {
   const [selectedChildId, setSelectedChildId] = useState<string>('');
 
@@ -93,6 +105,55 @@ export default function ParentAnalytics() {
     enabled: !!activeChildId && !!currentTermId,
     retry: false,
   });
+
+  const { data: competencyDiag } = useQuery({
+    queryKey: ['parent-competency-diag', activeChildId, currentTermId],
+    queryFn: () => (activeChildId && currentTermId)
+      ? intelligenceApi.getCompetencyDiagnosis(activeChildId, currentTermId).then(r => r.data?.data || r.data)
+      : Promise.resolve(null),
+    enabled: !!activeChildId && !!currentTermId,
+    retry: false,
+  });
+
+  const { data: weaknessProfile } = useQuery({
+    queryKey: ['parent-weaknesses', activeChildId],
+    queryFn: () => activeChildId
+      ? intelligenceApi.getStudentWeaknesses(activeChildId).then(r => r.data?.data || r.data)
+      : Promise.resolve(null),
+    enabled: !!activeChildId,
+    retry: false,
+  });
+
+  const { data: aiStats } = useQuery({
+    queryKey: ['parent-ai-stats', activeChildId],
+    queryFn: () => activeChildId
+      ? intelligenceApi.getStudentStats(activeChildId).then(r => r.data?.data || r.data)
+      : Promise.resolve(null),
+    enabled: !!activeChildId,
+    retry: false,
+  });
+
+  const aiWeaknesses = useMemo(() => {
+    if (weaknessProfile && Array.isArray(weaknessProfile.weaknesses)) return weaknessProfile.weaknesses;
+    if (competencyDiag && !competencyDiag.error && Array.isArray(competencyDiag.weakestAreas)) {
+      return competencyDiag.weakestAreas.map((a: any) => ({
+        learningArea: a.area,
+        subject: a.subject,
+        currentScore: a.score,
+        recommendation: a.status === 'CRITICAL'
+          ? `Critical weakness in ${a.area}. This area needs urgent attention in ${a.subject}.`
+          : `Below expectations in ${a.area}. Recommend focused practice and support in ${a.subject}.`,
+      }));
+    }
+    return [];
+  }, [weaknessProfile, competencyDiag]);
+
+  const aiStrengths = useMemo(() => {
+    if (competencyDiag && !competencyDiag.error && Array.isArray(competencyDiag.strongestAreas)) {
+      return competencyDiag.strongestAreas;
+    }
+    return [];
+  }, [competencyDiag]);
 
   const currentTermResults = useMemo(() => {
     if (!currentTermId || !activeChildId) return [];
@@ -422,6 +483,81 @@ export default function ParentAnalytics() {
               </div>
             </div>
           </div>
+
+          {(activeChild && (aiWeaknesses.length > 0 || aiStrengths.length > 0 || aiStats?.comparativeStats)) && (
+            <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-purple-50 to-white shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-indigo-100 flex items-start justify-between flex-wrap gap-2">
+                <div>
+                  <h2 className="font-semibold text-gray-900">🤖 AI Performance Analysis</h2>
+                  <p className="text-sm text-gray-500">Smart diagnosis for {activeChild.firstName} {activeChild.lastName}</p>
+                </div>
+                {aiStats?.comparativeStats && (
+                  <span className="text-xs font-medium px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700">
+                    Percentile: {aiStats.comparativeStats.percentile != null ? `#${Math.round(aiStats.comparativeStats.percentile)}` : '—'} · Z-score: {aiStats.comparativeStats.zScore != null ? aiStats.comparativeStats.zScore.toFixed(2) : '—'}
+                  </span>
+                )}
+              </div>
+
+              <div className="p-5 space-y-5">
+                {aiStats?.comparativeStats?.interpretation && (
+                  <div className="p-4 rounded-xl bg-white border border-gray-100">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Relative standing</p>
+                    <p className="text-sm text-gray-700 mt-1">{aiStats.comparativeStats.interpretation}</p>
+                  </div>
+                )}
+
+                {aiStrengths.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-emerald-700 mb-2">💪 Where {activeChild.firstName} shines</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {aiStrengths.map((s: any, i: number) => (
+                        <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 text-sm font-medium text-emerald-700">
+                          {s.subject && <span className="text-xs text-emerald-500">{s.subject}</span>}
+                          {s.area || s.learningArea}
+                          {s.score != null && <span className="text-xs text-emerald-500">{s.score}%</span>}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {aiWeaknesses.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-red-700 mb-2">🎯 Areas needing support</h3>
+                    <div className="space-y-2">
+                      {aiWeaknesses.map((w: any, i: number) => {
+                        const tb = trendBadge(w.trend);
+                        const wc = weaknessColor(w.currentScore ?? 0);
+                        return (
+                          <div key={i} className={`p-4 rounded-xl border ${wc}`}>
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-semibold">{w.subject || 'Subject'}</span>
+                                {w.learningArea && <span className="text-xs px-2 py-0.5 rounded-full bg-white/70">{w.learningArea}</span>}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold">{w.currentScore != null ? `${w.currentScore}%` : '—'}</span>
+                                {w.trend && <span className={`text-xs px-2 py-0.5 rounded-full ${tb.className}`}>{tb.label}</span>}
+                              </div>
+                            </div>
+                            {(w.recommendation || w.diagnosis) && (
+                              <p className="text-sm text-gray-700 mt-2 leading-relaxed">
+                                <span className="font-semibold">How to help: </span>{w.recommendation || w.diagnosis}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {competencyDiag?.diagnosis && (
+                  <p className="text-sm text-gray-600 italic border-l-4 border-indigo-200 pl-3">{competencyDiag.diagnosis}</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {allResults.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

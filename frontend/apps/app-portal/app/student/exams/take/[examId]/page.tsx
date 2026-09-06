@@ -3,14 +3,19 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
-import { examApi } from '@/lib/api';
-import { useAuth } from '@/lib/auth-context';
+import { examApi, studentApi } from '@/lib/api';
 
 export default function TakeExam() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
   const examId = params?.examId as string;
+
+  const { data: profileRes } = useQuery({
+    queryKey: ['my-profile-take'],
+    queryFn: () => studentApi.getById('me').then(r => r.data),
+    retry: false,
+  });
+  const studentId = profileRes?.data?.id || profileRes?.id || '';
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -38,7 +43,7 @@ export default function TakeExam() {
 
   const startAttempt = useMutation({
     mutationFn: async () => {
-      const res = await examApi.startAttempt(examId, String(user?.id));
+      const res = await examApi.startAttempt(examId, String(studentId));
       return res.data?.data || res.data;
     },
     onSuccess: (data) => {
@@ -63,10 +68,10 @@ export default function TakeExam() {
   });
 
   useEffect(() => {
-    if (examData && !attemptId && user?.id) {
+    if (examData && !attemptId && studentId) {
       startAttempt.mutate();
     }
-  }, [examData, user?.id]);
+  }, [examData, studentId]);
 
   useEffect(() => {
     if (examData?.duration) {

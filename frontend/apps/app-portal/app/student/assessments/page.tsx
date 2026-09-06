@@ -1,11 +1,15 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { assessmentApi, termApi } from '@/lib/api';
-import { useAuth } from '@/lib/auth-context';
+import { assessmentApi, termApi, studentApi } from '@/lib/api';
 
 export default function StudentAssessments() {
-  const { user } = useAuth();
+  const { data: profileRes } = useQuery({
+    queryKey: ['my-profile-assessments'],
+    queryFn: () => studentApi.getById('me').then(r => r.data),
+    retry: false,
+  });
+  const studentId = profileRes?.data?.id || profileRes?.id || '';
 
   const { data: termRes } = useQuery({
     queryKey: ['current-term'],
@@ -16,12 +20,12 @@ export default function StudentAssessments() {
   const termId = termRes?.data?.id;
 
   const { data: assessments, isLoading } = useQuery({
-    queryKey: ['my-assessments', termId],
+    queryKey: ['my-assessments', studentId, termId],
     queryFn: async () => {
-      const res = await assessmentApi.getStudentAssessments(String(user?.id), termId || '');
+      const res = await assessmentApi.getStudentAssessments(String(studentId), termId || '');
       return res.data?.data || res.data || [];
     },
-    enabled: !!user?.id && !!termId,
+    enabled: !!studentId && !!termId,
   });
 
   const assessmentList = Array.isArray(assessments) ? assessments : [];
@@ -31,6 +35,18 @@ export default function StudentAssessments() {
     if (pct >= 75) return 'bg-green-100 text-green-800';
     if (pct >= 50) return 'bg-yellow-100 text-yellow-800';
     return 'bg-red-100 text-red-800';
+  };
+
+  const groupBySubject = () => {
+    const groups = new Map<string, any[]>();
+    assessmentList.forEach((a: any) => {
+      const at = a.assessmentType || {};
+      const key = at.name || 'Assessment';
+      const arr = groups.get(key) || [];
+      arr.push({ score: a.score, at });
+      groups.set(key, arr);
+    });
+    return Array.from(groups.entries());
   };
 
   return (
@@ -49,27 +65,28 @@ export default function StudentAssessments() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {assessmentList.map((item: any, i: number) => {
-            const subjectName = item.subjectName || item.subject?.name || 'Subject';
-            const pct = item.percentage ?? (item.rawScore != null && item.maxScore ? (item.rawScore / item.maxScore) * 100 : null);
+          {groupBySubject().map(([name, items]: [string, any[]], i: number) => {
+            const at = items[0]?.at;
+            const maxScore = at?.maxScore;
+            const pct = maxScore ? (items.reduce((s, it) => s + (it.score || 0), 0) / (maxScore * items.length)) * 100 : null;
+            const best = items.reduce((b, it) => Math.max(b, it.score || 0), 0);
             return (
-              <div key={item.id || i} className="bg-white rounded-xl p-6 shadow-sm">
+              <div key={`${name}-${i}`} className="bg-white rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
                   <div>
-                    <h3 className="font-semibold text-gray-900">{subjectName}</h3>
-                    <p className="text-sm text-gray-500">{item.assessmentName || item.type || 'Assessment'}</p>
+                    <h3 className="font-semibold text-gray-900">{name}</h3>
+                    <p className="text-sm text-gray-500">{items.length} scored assessment{items.length === 1 ? '' : 's'}</p>
                   </div>
                   <div className="text-right">
                     <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getScoreColor(pct)}`}>
                       {pct != null ? `${Math.round(pct)}%` : '—'}
                     </span>
-                    {item.grade && <p className="text-xs text-gray-400 mt-1">Grade: {item.grade}</p>}
+                    {at?.weight != null && <p className="text-xs text-gray-400 mt-1">Weight: {at.weight}%</p>}
                   </div>
                 </div>
-                {item.rawScore != null && item.maxScore && (
-                  <p className="text-xs text-gray-400">Score: {item.rawScore}/{item.maxScore}</p>
+                {maxScore != null && (
+                  <p className="text-xs text-gray-400">Best score: {best}/{maxScore}</p>
                 )}
-                {item.remark && <p className="text-sm text-gray-500 mt-2 italic">{item.remark}</p>}
               </div>
             );
           })}

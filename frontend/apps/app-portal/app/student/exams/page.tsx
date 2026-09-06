@@ -2,12 +2,17 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { examApi, termApi } from '@/lib/api';
-import { useAuth } from '@/lib/auth-context';
+import { examApi, termApi, studentApi } from '@/lib/api';
 
 export default function StudentExams() {
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'available' | 'taken'>('available');
+
+  const { data: profileRes } = useQuery({
+    queryKey: ['my-profile-exams'],
+    queryFn: () => studentApi.getById('me').then(r => r.data),
+    retry: false,
+  });
+  const studentId = profileRes?.data?.id || profileRes?.id || '';
 
   const { data: termRes } = useQuery({
     queryKey: ['current-term'],
@@ -27,12 +32,12 @@ export default function StudentExams() {
   });
 
   const { data: myResults } = useQuery({
-    queryKey: ['student-exam-results'],
+    queryKey: ['student-exam-results', studentId],
     queryFn: async () => {
-      const res = await examApi.getStudentResults({ studentId: user?.id || '' });
+      const res = await examApi.getStudentResults({ studentId });
       return res.data?.data || res.data || [];
     },
-    enabled: !!user?.id,
+    enabled: !!studentId,
   });
 
   const availableExams = Array.isArray(exams) ? exams.filter((e: any) => e.isPublished && e.status !== 'ARCHIVED') : [];
@@ -74,7 +79,7 @@ export default function StudentExams() {
                     </div>
                   </div>
                   <button
-                    onClick={() => window.open(`/student/exams/take/${exam.id}`, '_blank')}
+                    onClick={() => window.open(`/student/exams/take/${exam.id}?studentId=${studentId}`, '_blank')}
                     className={`px-4 py-2 rounded-lg text-sm font-medium ${taken ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                     disabled={taken}
                   >

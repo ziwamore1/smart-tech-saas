@@ -667,6 +667,9 @@ export default function ParentDashboard() {
             <Link href="/parent/analytics" className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 active:scale-[0.98] transition-all">
               📈 Analytics
             </Link>
+            <Link href="/parent/ai-tutor" className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg text-sm font-medium hover:opacity-95 active:scale-[0.98] transition-all">
+              🤖 AI Tutor
+            </Link>
             <Link href="/parent/messages" className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 active:scale-[0.98] transition-all">
               💬 Messages {unreadMsgs ? `(${unreadMsgs})` : ''}
             </Link>

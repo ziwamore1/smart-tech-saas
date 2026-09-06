@@ -44,6 +44,7 @@ export default function ParentLayout({
     { href: '/parent/assessments', label: "Assessments", icon: '📊' },
     { href: '/parent/attendance', label: "Attendance", icon: '✅' },
     { href: '/parent/analytics', label: "Analytics", icon: '📈' },
+    { href: '/parent/ai-tutor', label: 'AI Tutor', icon: '🤖' },
     { href: '/parent/messages', label: "Messages", icon: '💬', badge: unreadMsgs || 0 },
     { href: '/parent/notifications', label: "Notifications", icon: '🔔', badge: unreadNotifs || 0 },
     { href: '/parent/profile', label: 'Profile', icon: '👤' },
