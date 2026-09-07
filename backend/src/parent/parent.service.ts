@@ -261,6 +261,40 @@ export class ParentService {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Class position = rank by average performance, consistent with report cards.
+    // Results may span multiple terms, so rank within each term represented.
+    const termIds = [...new Set(results.map(r => r.termId))].filter(Boolean) as string[];
+    const rankByTerm = new Map<string, number>();
+    if (termIds.length > 0) {
+      const peersByTerm = await this.prisma.computedResult.groupBy({
+        by: ['termId', 'studentId'],
+        where: {
+          termId: { in: termIds },
+          status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+          student: { status: 'ACTIVE' },
+        },
+        _avg: { finalPercentage: true },
+      });
+      for (const tid of termIds) {
+        const ranked = peersByTerm
+          .filter(p => p.termId === tid && p._avg.finalPercentage != null)
+          .map(p => ({ studentId: p.studentId, average: p._avg.finalPercentage as number }))
+          .sort((a, b) => b.average - a.average);
+        let lastRank = 0;
+        let lastAvg: number | null = null;
+        for (let i = 0; i < ranked.length; i++) {
+          if (lastAvg === null || Math.abs(ranked[i].average - lastAvg) > 0.001) {
+            lastRank = i + 1;
+            lastAvg = ranked[i].average;
+          }
+          if (ranked[i].studentId === studentId) {
+            rankByTerm.set(tid, lastRank);
+            break;
+          }
+        }
+      }
+    }
+
     return results.map((r) => ({
       id: r.id,
       subject: r.subject.name,
@@ -271,7 +305,7 @@ export class ParentService {
       remark: r.finalRemark,
       points: r.points,
       gpa: r.gpa,
-      classRank: r.classRank,
+      classRank: rankByTerm.get(r.termId) ?? r.classRank,
       subjectRank: r.subjectRank,
       totalRawScore: r.totalRawScore,
       totalWeightedScore: r.totalWeightedScore,

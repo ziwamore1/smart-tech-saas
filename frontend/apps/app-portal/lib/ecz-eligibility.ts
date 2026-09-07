@@ -69,6 +69,10 @@ const UNIVERSITY_CUT = { FORMS: 3, SECONDARY: 6 } as const;
 // Certificate: best 6 all within these grades (grades 1-4 on Forms -> School Certificate; 5 = no award).
 const CERTIFICATE_CUT = { FORMS: 4, SECONDARY: 8 } as const;
 const MAX_BEST_SIX_POINTS = { FORMS: 30, SECONDARY: 54 } as const;
+// Candidates who write fewer than 6 subjects must never be rewarded with an
+// artificially low aggregate. Six grade-1s is the minimum a full candidate can
+// score, so the best-six total can never go below 6 points.
+const MIN_BEST_SIX_POINTS = 6;
 
 export function scoreToEczGrade(score: number): { grade: string; points: number; remark: string } {
   for (const s of SECONDARY_SCALE) {
@@ -181,7 +185,8 @@ export function checkEczEligibility(
     .sort((a, b) => a.points - b.points || a.name.localeCompare(b.name))
     .slice(0, 6);
 
-  const bestSixTotal = bestSix.reduce((sum, s) => sum + s.points, 0);
+  const rawBestSixTotal = bestSix.reduce((sum, s) => sum + s.points, 0);
+  const bestSixTotal = bestSix.length > 0 ? Math.max(MIN_BEST_SIX_POINTS, rawBestSixTotal) : 0;
 
   const english = resolved.find((s) => isEnglish(s.name));
   const math = resolved.find((s) => isMath(s.name));

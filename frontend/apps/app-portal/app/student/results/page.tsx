@@ -72,16 +72,26 @@ export default function StudentResultsPage() {
 
   const calculateTotalPoints = () => {
     if (results.length === 0) return 0;
-    return results.reduce((sum: number, r: any) => {
-      const points = getGrade(r).letter;
-      const pointValues: Record<string, number> = { 'A': 4, 'B+': 3.5, 'B': 3, 'B-': 2.75, 'C+': 2.5, 'C': 2, 'D': 1, 'E': 0.5, 'F': 0 };
-      return sum + (pointValues[points] || 0);
-    }, 0);
+    const eczSubjects = results.map((r: any) => ({
+      name: r.subject?.name || 'Subject',
+      score: r.score,
+      grade: r.grade,
+      points: r.points,
+    }));
+    const ecz = checkEczEligibility(eczSubjects, {
+      gradingSystem: detectEczGradingSystem(student?.class?.name),
+    });
+    return ecz.bestSixTotal;
   };
 
   const getGPA = () => {
     if (results.length === 0) return 0;
-    return (calculateTotalPoints() / results.length).toFixed(2);
+    const pointValues: Record<string, number> = { 'A': 4, 'B+': 3.5, 'B': 3, 'B-': 2.75, 'C+': 2.5, 'C': 2, 'D': 1, 'E': 0.5, 'F': 0 };
+    const total = results.reduce((sum: number, r: any) => {
+      const letter = getGrade(r).letter;
+      return sum + (pointValues[letter] || 0);
+    }, 0);
+    return (total / results.length).toFixed(2);
   };
 
   const getPosition = () => {

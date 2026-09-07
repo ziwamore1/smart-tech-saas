@@ -231,6 +231,46 @@ export class ResultService {
       orderBy: { subject: { name: 'asc' } },
     });
 
+    // Class position is the student's rank by average performance in the class,
+    // matching report cards and analytics. Compute on the fly so it is always
+    // correct even when stored classRank has not been populated yet.
+    let classRank: number | null = null;
+    const first = results[0];
+    if (first?.classId) {
+      const peers = await this.prisma.computedResult.findMany({
+        where: {
+          classId: first.classId,
+          termId,
+          status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
+          student: { status: 'ACTIVE' },
+        },
+        select: { studentId: true, finalPercentage: true },
+      });
+      const avgMap = new Map<string, { total: number; count: number }>();
+      for (const p of peers) {
+        if (p.finalPercentage == null) continue;
+        const existing = avgMap.get(p.studentId) ?? { total: 0, count: 0 };
+        existing.total += p.finalPercentage;
+        existing.count += 1;
+        avgMap.set(p.studentId, existing);
+      }
+      const ranked = Array.from(avgMap.entries())
+        .map(([sid, d]) => ({ studentId: sid, average: d.count > 0 ? d.total / d.count : 0 }))
+        .sort((a, b) => b.average - a.average);
+      let lastRank = 0;
+      let lastAvg: number | null = null;
+      for (let i = 0; i < ranked.length; i++) {
+        if (lastAvg === null || Math.abs(ranked[i].average - lastAvg) > 0.001) {
+          lastRank = i + 1;
+          lastAvg = ranked[i].average;
+        }
+        if (ranked[i].studentId === studentId) {
+          classRank = lastRank;
+          break;
+        }
+      }
+    }
+
     return results.map(r => ({
       id: r.id,
       studentId: r.studentId,
@@ -245,7 +285,7 @@ export class ResultService {
       points: r.points,
       gradePoints: r.points,
       gpa: r.gpa,
-      classRank: r.classRank,
+      classRank: classRank ?? r.classRank,
       subjectRank: r.subjectRank,
       isAbsent: r.isAbsent,
     }));

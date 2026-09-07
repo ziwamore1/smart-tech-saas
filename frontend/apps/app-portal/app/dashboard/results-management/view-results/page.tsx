@@ -157,7 +157,7 @@ export default function ViewResultsPage() {
         });
       const sortedPoints = [...subjectPoints].sort((a, b) => a - b);
       const bestSix = sortedPoints.slice(0, 6);
-      const totalPoints = bestSix.length > 0 ? bestSix.reduce((sum, p) => sum + p, 0) : 0;
+      const totalPoints = bestSix.length > 0 ? Math.max(6, bestSix.reduce((sum, p) => sum + p, 0)) : 0;
       return {
         firstName: s.firstName,
         lastName: s.lastName,

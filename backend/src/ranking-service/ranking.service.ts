@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ECZ_MIN_BEST_SIX_POINTS } from '../ecz-eligibility/ecz-eligibility.util';
 
 @Injectable()
 export class RankingService {
@@ -115,7 +116,8 @@ export class RankingService {
       const avg = s.subjectCount > 0 ? s.totalPercentage / s.subjectCount : 0;
       const sortedPoints = [...s.points].sort((a, b) => a - b);
       const bestSix = sortedPoints.slice(0, 6);
-      const totalPoints = bestSix.length > 0 ? bestSix.reduce((sum, p) => sum + p, 0) : 0;
+      const rawTotalPoints = bestSix.length > 0 ? bestSix.reduce((sum, p) => sum + p, 0) : 0;
+      const totalPoints = bestSix.length > 0 ? Math.max(ECZ_MIN_BEST_SIX_POINTS, rawTotalPoints) : 0;
       let grade = 'E';
       if (avg >= 75) grade = 'A';
       else if (avg >= 65) grade = 'B';
@@ -136,19 +138,39 @@ export class RankingService {
       };
     });
 
-    studentList.sort((a, b) => {
-      if (a.totalPoints !== b.totalPoints) return a.totalPoints - b.totalPoints;
-      return b.average - a.average;
+    // Class position is determined by average performance (matches report cards
+    // and analytics "Rank"). Equal averages share the same rank within a small
+    // tolerance, identical to report-card-engine's computedClassRank.
+    studentList.sort((a, b) => b.average - a.average);
+
+    let lastRank = 0;
+    let lastRankAvg: number | null = null;
+    const rankedList = studentList.map((s, index) => {
+      if (lastRankAvg === null || Math.abs(s.average - lastRankAvg) > 0.001) {
+        lastRank = index + 1;
+        lastRankAvg = s.average;
+      }
+      return { ...s, rank: lastRank };
     });
 
-    const rankings = studentList.map((s, index) => ({
-      ...s,
-      rank: index + 1,
-    }));
+    // Persist the class rank so student/parent/mobile surfaces can read it back
+    // from computedResult rows without recomputing the whole class.
+    await this.prisma.$transaction(
+      rankedList.map(ranking =>
+        this.prisma.computedResult.updateMany({
+          where: {
+            studentId: ranking.studentId,
+            classId,
+            termId,
+          },
+          data: { classRank: ranking.rank },
+        }),
+      ),
+    );
 
-    this.logger.log(`Computed rankings for ${rankings.length} students in class ${classId}, term ${termId}`);
+    this.logger.log(`Computed rankings for ${rankedList.length} students in class ${classId}, term ${termId}`);
 
-    return rankings;
+    return rankedList;
   }
 
   async computeSubjectRankings(subjectId: string, termId: string, classId: string, schoolId: string) {

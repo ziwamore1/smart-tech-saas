@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StudentSubjectService } from '../student-subject/student-subject.service';
 import { Decimal } from 'decimal.js';
 import { mapBounded } from '../common/utils/concurrency.util';
+import { ECZ_MIN_BEST_SIX_POINTS } from '../ecz-eligibility/ecz-eligibility.util';
 
 export interface GradeResult {
   grade: string;
@@ -506,7 +507,15 @@ export class GradingEngineService {
       ? filteredResults.reduce((sum, r) => sum + (r.gpa ?? 0), 0) / filteredResults.filter(r => r.gpa !== null).length
       : null;
 
-    const totalPoints = filteredResults.reduce((sum, r) => sum + (r.points ?? 0), 0);
+    // Aggregate points = best 6 subject points (never below the ECZ floor of 6),
+    // consistent with report cards and rankings.
+    const sortedPoints = filteredResults
+      .map(r => r.points ?? 0)
+      .filter(p => p > 0)
+      .sort((a, b) => a - b);
+    const totalPoints = sortedPoints.length > 0
+      ? Math.max(ECZ_MIN_BEST_SIX_POINTS, sortedPoints.slice(0, 6).reduce((sum, p) => sum + p, 0))
+      : 0;
 
     return {
       studentId,

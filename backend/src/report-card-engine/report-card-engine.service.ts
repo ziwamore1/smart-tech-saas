@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { StudentSubjectService } from '../student-subject/student-subject.service';
-import { checkEczEligibility, detectEczGradingSystem, ECZ_MAX_BEST_SIX_POINTS } from '../ecz-eligibility/ecz-eligibility.util';
+import { checkEczEligibility, detectEczGradingSystem, ECZ_MAX_BEST_SIX_POINTS, ECZ_MIN_BEST_SIX_POINTS } from '../ecz-eligibility/ecz-eligibility.util';
 
 @Injectable()
 export class ReportCardEngineService {
@@ -486,7 +486,8 @@ let resultSheet = examType
 
     const bestSubjects = [...compulsory, ...remaining].slice(0, bestCount);
 
-    const totalPoints = bestSubjects.reduce((sum, s) => sum + (s.points ?? 0), 0);
+    const rawTotalPoints = bestSubjects.reduce((sum, s) => sum + (s.points ?? 0), 0);
+    const totalPoints = bestSubjects.length > 0 ? Math.max(ECZ_MIN_BEST_SIX_POINTS, rawTotalPoints) : 0;
 
     // ECZ university / school-certificate eligibility over all graded subjects
     const eligibility = checkEczEligibility(
