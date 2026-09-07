@@ -32,17 +32,17 @@ describe('ecz-eligibility util', () => {
   });
 
   describe('gradeForScore', () => {
-    it('maps Forms 5-point bands', () => {
-      expect(gradeForScore(72, 'FORMS')).toEqual({ grade: '1', points: 1, remark: 'Star' });
-      expect(gradeForScore(70, 'FORMS')).toEqual({ grade: '1', points: 1, remark: 'Star' });
-      expect(gradeForScore(69, 'FORMS').points).toBe(2);
-      expect(gradeForScore(60, 'FORMS').points).toBe(2);
-      expect(gradeForScore(59, 'FORMS').points).toBe(3);
-      expect(gradeForScore(50, 'FORMS').points).toBe(3);
-      expect(gradeForScore(49, 'FORMS').points).toBe(4);
-      expect(gradeForScore(40, 'FORMS').points).toBe(4);
-      expect(gradeForScore(39, 'FORMS').points).toBe(5);
-      expect(gradeForScore(0, 'FORMS').points).toBe(5);
+    it('maps Forms 5-point competency bands', () => {
+      expect(gradeForScore(72, 'FORMS')).toEqual({ grade: '1', points: 1, remark: 'Outstanding' });
+      expect(gradeForScore(70, 'FORMS')).toEqual({ grade: '1', points: 1, remark: 'Outstanding' });
+      expect(gradeForScore(69, 'FORMS')).toEqual({ grade: '2', points: 2, remark: 'Advanced' });
+      expect(gradeForScore(60, 'FORMS')).toEqual({ grade: '2', points: 2, remark: 'Advanced' });
+      expect(gradeForScore(59, 'FORMS')).toEqual({ grade: '3', points: 3, remark: 'Basic' });
+      expect(gradeForScore(50, 'FORMS')).toEqual({ grade: '3', points: 3, remark: 'Basic' });
+      expect(gradeForScore(49, 'FORMS')).toEqual({ grade: '4', points: 4, remark: 'Satisfactory' });
+      expect(gradeForScore(40, 'FORMS')).toEqual({ grade: '4', points: 4, remark: 'Satisfactory' });
+      expect(gradeForScore(39, 'FORMS')).toEqual({ grade: '5', points: 5, remark: 'Unsatisfactory' });
+      expect(gradeForScore(0, 'FORMS')).toEqual({ grade: '5', points: 5, remark: 'Unsatisfactory' });
     });
 
     it('maps secondary 9-point via score', () => {
@@ -169,19 +169,85 @@ describe('ecz-eligibility util', () => {
       if (r.mathSubject) expect(r.mathSubject.points).toBeGreaterThan(ECZ_WORST_GRADE.FORMS === 5 ? 3 : 6);
     });
 
-    it('requires at least 6 subjects', () => {
+    it('awards CBC certificate condition (a): 6 Satisfactory incl English with at least 1 Basic', () => {
+      const r = checkEczEligibility(
+        [
+          { name: 'English', score: 45 },
+          { name: 'Mathematics I', score: 42 },
+          { name: 'Science', score: 52 },
+          { name: 'History', score: 41 },
+          { name: 'Geography', score: 43 },
+          { name: 'Civics', score: 44 },
+          { name: 'Business Studies', score: 58 },
+        ],
+        'FORMS',
+      );
+      expect(r.certificateAwarded).toBe(true);
+      expect(r.status).toBe('CERTIFICATE');
+      expect(r.certificateName).toBe('Certificate of Secondary Education');
+    });
+
+    it('awards CBC certificate condition (b): 5 Satisfactory incl English with at least 2 Basic', () => {
+      const r = checkEczEligibility(
+        [
+          { name: 'English', score: 45 },
+          { name: 'Mathematics I', score: 52 },
+          { name: 'Science', score: 55 },
+          { name: 'History', score: 41 },
+          { name: 'Geography', score: 44 },
+        ],
+        'FORMS',
+      );
+      expect(r.certificateAwarded).toBe(true);
+      expect(r.status).toBe('CERTIFICATE');
+      expect(r.universityEligible).toBe(false);
+    });
+
+    it('does NOT award certificate with only 5 Satisfactory incl English and a single Basic (unclassified)', () => {
+      const r = checkEczEligibility(
+        [
+          { name: 'English', score: 45 },
+          { name: 'Mathematics I', score: 52 },
+          { name: 'Science', score: 43 },
+          { name: 'History', score: 41 },
+          { name: 'Geography', score: 44 },
+        ],
+        'FORMS',
+      );
+      expect(r.certificateAwarded).toBe(false);
+      expect(r.status).toBe('NONE');
+      expect(r.details).toContain('Unclassified');
+    });
+
+    it('does NOT award certificate with 6 Satisfactory incl English and zero Basic (unclassified)', () => {
+      const r = checkEczEligibility(
+        [
+          { name: 'English', score: 45 },
+          { name: 'Mathematics I', score: 42 },
+          { name: 'Science', score: 43 },
+          { name: 'History', score: 41 },
+          { name: 'Geography', score: 44 },
+          { name: 'Civics', score: 40 },
+        ],
+        'FORMS',
+      );
+      expect(r.certificateAwarded).toBe(false);
+      expect(r.status).toBe('NONE');
+      expect(r.details).toContain('Unclassified');
+    });
+
+    it('requires at least 5 subjects for a CBC certificate', () => {
       const r = checkEczEligibility(
         [
           { name: 'English', score: 80 },
           { name: 'Mathematics I', score: 80 },
           { name: 'Science', score: 80 },
-          { name: 'History', score: 80 },
           { name: 'Geography', score: 80 },
         ],
         'FORMS',
       );
       expect(r.status).toBe('NONE');
-      expect(r.details).toContain('Minimum 6');
+      expect(r.details).toContain('Unclassified');
     });
   });
 

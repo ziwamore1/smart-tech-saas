@@ -839,7 +839,7 @@ export class ReportEngineService {
         eligibilityDisplay: eligibilityStatus === 'UNIVERSITY'
           ? 'Eligible for University'
           : eligibilityStatus === 'CERTIFICATE'
-            ? 'School Certificate Only'
+            ? `${computedEligibility?.certificateName ?? 'School Certificate'} Only`
             : 'Not Eligible',
       },
       teacherComment: termSummary.teacherRemarks || '',

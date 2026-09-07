@@ -53,21 +53,29 @@ const SECONDARY_SCALE: { min: number; grade: string; points: number; remark: str
   { min: 0, grade: '9', points: 9, remark: 'Unsatisfactory' },
 ];
 
-// ECZ Competency Based (Forms 1-4) — 5 point scale. 0-39=5, 40-49=4, 50-59=3, 60-69=2, 70-100=1.
+// ECZ Competence Based Curriculum (Forms 1-4) — 5 point competency scale.
+// Score ranges and descriptors per official ECSEOL Chapter 30 (Grading and Certification):
+//   70-100=1 Outstanding, 60-69=2 Advanced, 50-59=3 Basic, 40-49=4 Satisfactory, 0-39=5 Unsatisfactory.
 const FORMS_SCALE: { min: number; grade: string; points: number; remark: string }[] = [
-  { min: 70, grade: '1', points: 1, remark: 'Star' },
-  { min: 60, grade: '2', points: 2, remark: 'Merit' },
-  { min: 50, grade: '3', points: 3, remark: 'Credit' },
+  { min: 70, grade: '1', points: 1, remark: 'Outstanding' },
+  { min: 60, grade: '2', points: 2, remark: 'Advanced' },
+  { min: 50, grade: '3', points: 3, remark: 'Basic' },
   { min: 40, grade: '4', points: 4, remark: 'Satisfactory' },
-  { min: 0, grade: '5', points: 5, remark: 'Not achieved' },
+  { min: 0, grade: '5', points: 5, remark: 'Unsatisfactory' },
 ];
 
 // Lower is better. Points equal the grade number on both systems.
 const WORST_GRADE = { FORMS: 5, SECONDARY: 9 } as const;
 // University entry: best 6 must all be within these grades (incl. English & Math I/II).
 const UNIVERSITY_CUT = { FORMS: 3, SECONDARY: 6 } as const;
-// Certificate: best 6 all within these grades (grades 1-4 on Forms -> School Certificate; 5 = no award).
+// Certificate: Satisfactory (grade 1-4 on Forms) counts as a pass; 5 = no award on secondary.
 const CERTIFICATE_CUT = { FORMS: 4, SECONDARY: 8 } as const;
+// CBC certificate thresholds:
+//  "Satisfactory" (grade <= 4) is the pass-counting level; "Basic" (grade <= 3) is the higher qualifier.
+//  Condition (a): Satisfactory in >= 6 subjects incl. English with Basic in >= 1.
+//  Condition (b): Satisfactory in >= 5 subjects incl. English with Basic in >= 2.
+const CBC_SATISFACTORY_CUT = { FORMS: 4, SECONDARY: 8 } as const;
+const CBC_BASIC_CUT = { FORMS: 3, SECONDARY: 6 } as const;
 const MAX_BEST_SIX_POINTS = { FORMS: 30, SECONDARY: 54 } as const;
 // Candidates who write fewer than 6 subjects must never be rewarded with an
 // artificially low aggregate. Six grade-1s is the minimum a full candidate can
@@ -87,7 +95,7 @@ export function gradeForScore(score: number, system: EczGradingSystem): { grade:
     if (score >= s.min) return { grade: s.grade, points: s.points, remark: s.remark };
   }
   const grade = String(WORST_GRADE[system]);
-  return { grade, points: WORST_GRADE[system], remark: 'Not achieved' };
+  return { grade, points: WORST_GRADE[system], remark: 'Unsatisfactory' };
 }
 
 // Forms 1-4 (new 2023 curriculum, 5 point competency grading) vs Grades 10-12 / senior Forms 5-6 (9 point).
@@ -179,7 +187,7 @@ export function checkEczEligibility(
       : options?.gradingSystem ?? detectEczGradingSystem(options?.levelTypeName);
 
   const resolved = subjects.filter((s) => !(s.isAbsent ?? false)).map((s) => resolveSubject(s, gradingSystem));
-  const certificateName = 'School Certificate';
+  const certificateName = gradingSystem === 'FORMS' ? 'Certificate of Secondary Education' : 'School Certificate';
 
   const bestSix = [...resolved]
     .sort((a, b) => a.points - b.points || a.name.localeCompare(b.name))
@@ -205,8 +213,18 @@ export function checkEczEligibility(
   const bestSixUniOk = bestSix.length === 6 && bestSix.every((s) => s.points <= uniCut);
   const bestSixCertOk = bestSix.length === 6 && bestSix.every((s) => s.points <= certCut);
 
+  // CBC (Forms) certification — ECSEOL 2.2:
+  //  (a) Satisfactory (grade <=4) in at least 6 subjects incl. English with Basic (grade <=3) in >=1; or
+  //  (b) Satisfactory in 5 subjects incl. English with Basic in >=2.
+  // A candidate who fulfils neither condition is unclassified.
+  const certGradeCount = resolved.filter((s) => s.points <= CBC_SATISFACTORY_CUT[gradingSystem]).length;
+  const basicGradeCount = resolved.filter((s) => s.points <= CBC_BASIC_CUT[gradingSystem]).length;
+  const cbcCertificateAwarded =
+    englishOkCert && ((certGradeCount >= 6 && basicGradeCount >= 1) || (certGradeCount >= 5 && basicGradeCount >= 2));
+
   const universityEligible = hasSix && bestSixUniOk && englishOkUni && mathOkUni && scienceOkUni;
-  const certificateAwarded = hasSix && bestSixCertOk && englishOkCert;
+  const certificateAwarded =
+    gradingSystem === 'FORMS' ? cbcCertificateAwarded : hasSix && bestSixCertOk && englishOkCert;
 
   const status: EczEligibilityStatus = universityEligible
     ? 'UNIVERSITY'
@@ -214,9 +232,22 @@ export function checkEczEligibility(
       ? 'CERTIFICATE'
       : 'NONE';
 
+  const unclassifiedDetails =
+    gradingSystem === 'FORMS'
+      ? !englishOkCert
+        ? `Unclassified — does not meet ${certificateName}: English not at Satisfactory or better (Grade ${english?.grade ?? 'N/A'}; requires 4 or better)`
+        : certGradeCount < 5
+          ? `Unclassified — does not meet ${certificateName}: only ${certGradeCount} subject(s) at Satisfactory or better (minimum 5 required incl. English)`
+          : `Unclassified — does not meet ${certificateName}: ${certGradeCount} subject(s) at Satisfactory or better incl. English but only ${basicGradeCount} at Basic or better (need 6 with 1 at Basic, or 5 with 2 at Basic)`
+      : `Does not meet ${certificateName} requirements — failing: ${failsCertificate
+          .map((s) => `${s.name} (Grade ${s.grade})`)
+          .join(', ')}`;
+
   let details: string;
-  if (!hasSix) {
-    details = `Minimum 6 subjects required (${resolved.length} enrolled)`;
+  if (gradingSystem === 'FORMS' && !universityEligible && !certificateAwarded) {
+    details = unclassifiedDetails;
+  } else if (gradingSystem === 'FORMS' && !hasSix) {
+    details = `Achieves the ${certificateName} (${certGradeCount} subjects at Satisfactory or better incl. English, ${basicGradeCount} at Basic or better) but not university grade (minimum 6 subjects required for university)`;
   } else if (universityEligible) {
     details = `University eligible — best 6 in grades 1-${uniCut} including English, Mathematics and a science subject`;
   } else if (!englishOkUni) {
@@ -228,11 +259,12 @@ export function checkEczEligibility(
   } else if (!bestSixUniOk) {
     details = `Best 6 (${bestSixTotal} pts, max ${MAX_BEST_SIX_POINTS[gradingSystem]}) contains grades above ${uniCut}`;
   } else if (certificateAwarded) {
-    details = `Achieves the ${certificateName} (best 6 within grades 1-${certCut}) but not university grade`;
+    details =
+      gradingSystem === 'FORMS'
+        ? `Achieves the ${certificateName} (${certGradeCount} subjects at Satisfactory or better incl. English, ${basicGradeCount} at Basic or better) but not university grade`
+        : `Achieves the ${certificateName} (best 6 within grades 1-${certCut}) but not university grade`;
   } else {
-    details = `Does not meet ${certificateName} requirements — failing: ${failsCertificate
-      .map((s) => `${s.name} (Grade ${s.grade})`)
-      .join(', ')}`;
+    details = unclassifiedDetails;
   }
 
   return {

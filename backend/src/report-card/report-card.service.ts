@@ -507,7 +507,7 @@ export class ReportCardService {
           ?? (report.summary.eligibleForUniversity ? 'UNIVERSITY' : 'NONE'),
         eligibilityDisplay: report.summary.eligibilityDisplay
           ?? (report.summary.eligibilityStatus === 'CERTIFICATE'
-            ? 'School Certificate Only'
+            ? `${report.summary.certificateName ?? 'School Certificate'} Only`
             : (report.summary.eligibleForUniversity ? 'Eligible for University' : 'Not Eligible')),
       },
 
@@ -646,7 +646,7 @@ export class ReportCardService {
             ?? (report.summary.eligibleForUniversity ? 'UNIVERSITY' : 'NONE'),
           eligibilityDisplay: report.summary.eligibilityDisplay
             ?? (report.summary.eligibilityStatus === 'CERTIFICATE'
-              ? 'School Certificate Only'
+              ? `${report.summary.certificateName ?? 'School Certificate'} Only`
               : (report.summary.eligibleForUniversity ? 'Eligible for University' : 'Not Eligible')),
         },
 
