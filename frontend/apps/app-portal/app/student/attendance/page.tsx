@@ -19,6 +19,7 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
 
 export default function StudentAttendance() {
   const { user } = useAuth();
+  const [selectedTermId, setSelectedTermId] = useState<string>('');
 
   const { data: studentRes } = useQuery({
     queryKey: ['my-profile'],
@@ -32,13 +33,21 @@ export default function StudentAttendance() {
     retry: false,
   });
 
+  const { data: termsData } = useQuery({
+    queryKey: ['terms-attendance'],
+    queryFn: () => termApi.getAll().then(r => r.data?.data || r.data || []),
+    retry: false,
+  });
+
   const studentData = studentRes?.data || studentRes;
   const studentId = studentData?.id || user?.studentId || user?.id || 'me';
-  const termId = currentTerm?.data?.id;
+  const termsList: any[] = Array.isArray(termsData) ? termsData : [];
+  const termId = selectedTermId || currentTerm?.id || termsList.find((t: any) => t.isCurrent)?.id || '';
+  const activeTermName = termsList.find((t: any) => t.id === termId)?.name || currentTerm?.name;
 
   const { data: raw, isLoading } = useQuery({
     queryKey: ['my-attendance', termId],
-    queryFn: () => attendanceApi.getStudentSummary(studentId, { termId }).then(r => r.data),
+    queryFn: () => attendanceApi.getStudentSummary(studentId, termId ? { termId } : undefined).then(r => r.data),
     enabled: !!studentId,
     retry: false,
   });
@@ -70,9 +79,25 @@ export default function StudentAttendance() {
           </div>
           <h1 className="text-3xl font-bold text-gray-900">My Attendance</h1>
           <p className="text-gray-600 mt-1">
-            Track your attendance record for {currentTerm?.data?.name || 'the current term'}
+            Track your attendance record for {activeTermName || 'the current term'}
           </p>
         </div>
+
+        {termsList.length > 1 && (
+          <div className="flex gap-2 flex-wrap mb-6">
+            {termsList.map((t: any) => (
+              <button
+                key={t.id}
+                onClick={() => setSelectedTermId(t.id)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  termId === t.id ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {t.name}{t.isCurrent ? ' · Current' : ''}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="bg-white rounded-xl p-6 shadow-sm text-center mb-6">
           <p className={`text-5xl font-bold ${rateColor}`}>{rate}%</p>

@@ -104,6 +104,7 @@ function subjectStatus(score: number) {
 
 export default function ParentAnalytics() {
   const [selectedChildId, setSelectedChildId] = useState<string>('');
+  const [selectedTermId, setSelectedTermId] = useState<string>('');
 
   const { data: childrenData } = useQuery({
     queryKey: ['parent-children'],
@@ -119,9 +120,20 @@ export default function ParentAnalytics() {
     queryFn: () => termApi.getCurrent().then(r => r.data),
     retry: false,
   });
-  const currentTermId = termData?.id;
-  const currentTermName = termData?.name;
-  const currentYearName = termData?.academicYear?.name;
+
+  const { data: allTermsData } = useQuery({
+    queryKey: ['parent-terms-analytics'],
+    queryFn: () => termApi.getAll().then(r => r.data?.data || r.data || []),
+    retry: false,
+  });
+  const allTermsList = (Array.isArray(allTermsData) ? allTermsData : []) as any[];
+  const currentTermId = selectedTermId || termData?.id || '';
+  const activeTerm = allTermsList.find((t: any) => t.id === currentTermId)
+    || (termData && termData.id === currentTermId ? termData : null);
+  const currentTermName = activeTerm?.name;
+  const currentYearName = activeTerm?.academicYear?.name;
+  const isCurrentTerm = currentTermId === termData?.id
+    || currentTermId === allTermsList.find((t: any) => t.isCurrent)?.id;
 
   const { data: allResults = [] } = useQuery<ParentResult[]>({
     queryKey: ['parent-child-analytics-results', activeChildId],
@@ -267,13 +279,20 @@ export default function ParentAnalytics() {
 
   const childrenComparison = useMemo(() => {
     const childData = (allChildrenResults?.children || []) as any[];
-    return childData.map((cd: any) => ({
-      name: `${cd.child.firstName} ${cd.child.lastName}`.trim(),
-      avg: cd.results.length > 0
-        ? cd.results.reduce((s: number, r: any) => s + r.score, 0) / cd.results.length
-        : 0,
-    }));
-  }, [allChildrenResults]);
+    return childData.map((cd: any) => {
+      const termResults = cd.results.filter((r: any) =>
+        r.term === currentTermName &&
+        (!currentYearName || !r.academicYear || r.academicYear === currentYearName),
+      );
+      return {
+        name: `${cd.child.firstName} ${cd.child.lastName}`.trim(),
+        avg: termResults.length > 0
+          ? termResults.reduce((s: number, r: any) => s + r.score, 0) / termResults.length
+          : 0,
+        hasData: termResults.length > 0,
+      };
+    });
+  }, [allChildrenResults, currentTermName, currentYearName]);
 
   const comparisonOption = {
     grid: { left: '8%', right: '8%', bottom: '18%', top: '14%' },
@@ -450,6 +469,30 @@ export default function ParentAnalytics() {
         </div>
       )}
 
+      {allTermsList.length > 1 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <p className="text-sm font-medium text-gray-600 mb-3">Select a term</p>
+          <div className="flex gap-2 flex-wrap sm:flex-nowrap sm:overflow-x-auto">
+            {allTermsList.map((t: any) => (
+              <button
+                key={t.id}
+                onClick={() => setSelectedTermId(t.id)}
+                className={`flex-1 min-w-[130px] px-4 py-3 rounded-xl text-left transition-all border-2 ${
+                  currentTermId === t.id
+                    ? 'bg-indigo-50 border-indigo-500'
+                    : 'bg-gray-50 border-transparent hover:border-gray-300 hover:bg-gray-100'
+                }`}
+              >
+                <p className={`font-semibold text-sm ${currentTermId === t.id ? 'text-indigo-700' : 'text-gray-800'}`}>
+                  {t.name}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">{t.isCurrent ? 'Current term' : t.academicYear?.name || 'Past term'}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {childrenComparison.length === 0 && !hasCurrentData && !hasAi ? (
         <div className="text-center py-20 bg-white rounded-2xl shadow-sm border border-gray-100">
           <span className="text-5xl">📊</span>
@@ -463,7 +506,7 @@ export default function ParentAnalytics() {
               <p className={`text-3xl font-bold ${avgUsed >= 75 ? 'text-emerald-600' : avgUsed >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
                 {avgUsed ? avgUsed.toFixed(1) : '0.0'}%
               </p>
-              <p className="text-xs text-gray-500 mt-1">Current Term Average{currentTermName ? ` · ${currentTermName}` : ''}</p>
+              <p className="text-xs text-gray-500 mt-1">{isCurrentTerm ? 'Current Term' : 'Selected Term'} Average{currentTermName ? ` · ${currentTermName}` : ''}</p>
             </div>
             <div className="rounded-2xl bg-white shadow-sm border border-gray-100 p-5 text-center">
               <p className="text-3xl font-bold text-indigo-600">{hasCurrentData ? currentTermResults.length : allResults.length}</p>
@@ -483,7 +526,7 @@ export default function ParentAnalytics() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100">
                 <h2 className="font-semibold text-gray-900">Children Comparison</h2>
-                <p className="text-sm text-gray-500">Overall average per child</p>
+                <p className="text-sm text-gray-500">Average per child{currentTermName ? ` · ${currentTermName}` : ''}</p>
               </div>
               <div className="p-5">
                 <ReactECharts option={comparisonOption} style={{ height: 320 }} notMerge lazyUpdate />
@@ -495,7 +538,7 @@ export default function ParentAnalytics() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100">
                 <h2 className="font-semibold text-gray-900">Subject Performance</h2>
-                <p className="text-sm text-gray-500">{hasCurrentData ? `${activeChild?.firstName} ${activeChild?.lastName} · ${currentTermName || 'This term'}` : 'No published results for the current term yet'}</p>
+                <p className="text-sm text-gray-500">{hasCurrentData ? `${activeChild?.firstName} ${activeChild?.lastName} · ${currentTermName || 'This term'}` : `No published results for ${currentTermName || 'this term'} yet`}</p>
               </div>
               <div className="p-5">
                 {hasCurrentData ? (

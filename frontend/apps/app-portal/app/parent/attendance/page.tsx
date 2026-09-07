@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import ReactECharts from 'echarts-for-react';
-import { parentApi } from '@/lib/api';
+import { parentApi, termApi } from '@/lib/api';
 
 interface AttendanceSummary {
   total: number;
@@ -33,6 +33,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function ParentAttendance() {
   const [selectedChildId, setSelectedChildId] = useState<string>('');
+  const [selectedTermId, setSelectedTermId] = useState<string>('');
 
   const { data: childrenData } = useQuery({
     queryKey: ['parent-children'],
@@ -42,9 +43,18 @@ export default function ParentAttendance() {
   const childrenList: any[] = Array.isArray(childrenData) ? childrenData : [];
   const activeChildId = selectedChildId || childrenList[0]?.id || '';
 
+  const { data: termsData } = useQuery({
+    queryKey: ['parent-terms'],
+    queryFn: () => termApi.getAll().then(r => r.data?.data || r.data || []),
+    retry: false,
+  });
+  const termsList: any[] = Array.isArray(termsData) ? termsData : [];
+  const activeTermId = selectedTermId || termsList.find((t: any) => t.isCurrent)?.id || termsList[0]?.id || '';
+  const activeTermName = termsList.find((t: any) => t.id === activeTermId)?.name;
+
   const { data: attendanceData, isLoading } = useQuery<AttendanceSummary>({
-    queryKey: ['parent-attendance', activeChildId],
-    queryFn: () => parentApi.getChildAttendance(activeChildId).then(r => {
+    queryKey: ['parent-attendance', activeChildId, activeTermId],
+    queryFn: () => parentApi.getChildAttendance(activeChildId, activeTermId).then(r => {
       const d = r.data?.data || r.data;
       if (Array.isArray(d)) {
         const recs = d as any[];
@@ -132,6 +142,28 @@ export default function ParentAttendance() {
         </div>
       )}
 
+      {termsList.length > 1 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+          <p className="text-sm font-medium text-gray-600 mb-3">Select a term</p>
+          <div className="flex gap-2 flex-wrap sm:flex-nowrap sm:overflow-x-auto">
+            {termsList.map((t: any) => (
+              <button
+                key={t.id}
+                onClick={() => setSelectedTermId(t.id)}
+                className={`flex-1 min-w-[120px] px-4 py-3 rounded-xl text-left transition-all border-2 ${
+                  activeTermId === t.id
+                    ? 'bg-emerald-50 border-emerald-500'
+                    : 'bg-gray-50 border-transparent hover:border-gray-300 hover:bg-gray-100'
+                }`}
+              >
+                <p className={`font-semibold text-sm ${activeTermId === t.id ? 'text-emerald-700' : 'text-gray-800'}`}>{t.name}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{t.isCurrent ? 'Current term' : t.academicYear?.name || 'Past term'}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="text-center py-20 text-gray-500">Loading attendance...</div>
       ) : !activeChildId ? (
@@ -183,7 +215,7 @@ export default function ParentAttendance() {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900">Attendance Records</h3>
-              <p className="text-sm text-gray-500">Recent attendance for {childrenList.find((c: any) => c.id === activeChildId)?.firstName} {childrenList.find((c: any) => c.id === activeChildId)?.lastName}</p>
+              <p className="text-sm text-gray-500">Recent attendance for {childrenList.find((c: any) => c.id === activeChildId)?.firstName} {childrenList.find((c: any) => c.id === activeChildId)?.lastName}{activeTermName ? ` · ${activeTermName}` : ''}</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">

@@ -17,7 +17,7 @@ export default function StudentReportCards() {
     retry: false,
   });
 
-  const currentTerm = termRes?.data;
+  const currentTerm = termRes;
   const defaultTermId = selectedTermId || currentTerm?.id || '';
 
   const { data: termsData } = useQuery({

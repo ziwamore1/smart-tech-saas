@@ -1926,8 +1926,8 @@ export const parentApi = {
 
   getAllChildrenResults: () => api.get('/parent/children/results'),
 
-  getChildAttendance: (studentId: string) =>
-    api.get(`/parent/children/${studentId}/attendance`),
+  getChildAttendance: (studentId: string, termId?: string) =>
+    api.get(`/parent/children/${studentId}/attendance`, { params: termId ? { termId } : undefined }),
 
   getChildHomework: (studentId: string) =>
     api.get(`/parent/children/${studentId}/homework`),

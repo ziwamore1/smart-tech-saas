@@ -278,17 +278,18 @@ export class ParentService {
     }));
   }
 
-  async getChildAttendance(studentId: string) {
-    const currentTerm = await this.prisma.term.findFirst({
-      where: {
-        isCurrent: true,
-        academicYear: { isCurrent: true },
-      },
-    });
+  async getChildAttendance(studentId: string, schoolId?: string, termId?: string) {
+    const termWhere: any = termId
+      ? { id: termId }
+      : { isCurrent: true, academicYear: { isCurrent: true } };
+    if (schoolId) {
+      termWhere.academicYear = { ...(termWhere.academicYear || {}), schoolId };
+    }
+    const term = await this.prisma.term.findFirst({ where: termWhere });
 
     const where: any = { studentId };
-    if (currentTerm) {
-      where.date = { gte: currentTerm.startDate, lte: currentTerm.endDate };
+    if (term) {
+      where.date = { gte: term.startDate, lte: term.endDate };
     }
 
     const attendance = await this.prisma.attendance.findMany({

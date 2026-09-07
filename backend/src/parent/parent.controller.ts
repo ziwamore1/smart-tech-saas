@@ -30,8 +30,8 @@ export class ParentController {
 
   @Get('children/:studentId/attendance')
   @UseGuards(JwtAuthGuard)
-  getChildAttendance(@Param('studentId') studentId: string) {
-    return this.service.getChildAttendance(studentId);
+  getChildAttendance(@Param('studentId') studentId: string, @Query('termId') termId: string, @Req() req: any) {
+    return this.service.getChildAttendance(studentId, req.user.schoolId, termId);
   }
 
   @Get('children/:studentId/homework')
