@@ -77,6 +77,11 @@ const GRADE_COLORS: Record<string, string> = {
   F: '#ef4444',
 };
 
+function filterResultsByTerm(results: any[], termName?: string, year?: string) {
+  if (!termName) return results;
+  return results.filter(r => r.term === termName && (!year || !r.academicYear || r.academicYear === year));
+}
+
 function getGrade(score: number): string {
   if (score >= 75) return 'A';
   if (score >= 60) return 'B';
@@ -130,12 +135,20 @@ function SectionCard({ title, subtitle, children, action }: {
 export default function ParentDashboard() {
   const { user } = useAuth();
   const [selectedChild, setSelectedChild] = useState<string>('');
+  const [selectedTermId, setSelectedTermId] = useState<string>('');
 
   const { data: termData } = useQuery({
     queryKey: ['current-term'],
     queryFn: () => termApi.getCurrent().then(r => r.data),
     retry: false,
   });
+
+  const { data: allTermsData } = useQuery({
+    queryKey: ['parent-terms-dashboard'],
+    queryFn: () => termApi.getAll().then(r => r.data?.data || r.data || []),
+    retry: false,
+  });
+  const allTerms = (Array.isArray(allTermsData) ? allTermsData : []) as any[];
 
   const { data: allData, isLoading: allLoading } = useQuery<AllChildrenResults>({
     queryKey: ['parent-all-children-results'],
@@ -169,7 +182,10 @@ export default function ParentDashboard() {
 
   const children = (Array.isArray(childrenData) ? childrenData : []) as ChildInfo[];
   const resultsChildren = allData?.children || [];
-  const termName = termData?.data?.name || allData?.term || 'Current Term';
+  const activeTermId = selectedTermId || termData?.id || allTerms.find((t: any) => t.isCurrent)?.id || '';
+  const activeTerm = allTerms.find((t: any) => t.id === activeTermId) || termData || null;
+  const termName = activeTerm?.name || allData?.term || 'Current Term';
+  const termYear = activeTerm?.academicYear?.name;
   const currentChild = children.find(c => c.id === selectedChild) || children[0];
   const activeChildId = currentChild?.id || '';
   const institutionType = school?.institutionType?.name || school?.institutionType?.code || null;
@@ -183,21 +199,26 @@ export default function ParentDashboard() {
     retry: false,
   });
 
+  const termFilteredChildren = useMemo(
+    () => resultsChildren.map(cd => ({ ...cd, results: filterResultsByTerm(cd.results, termName, termYear) })),
+    [resultsChildren, termName, termYear],
+  );
+
   const currentChildResults = useMemo(() => {
-    const childData = resultsChildren.find(c => c.child.id === activeChildId);
+    const childData = termFilteredChildren.find(c => c.child.id === activeChildId);
     return childData?.results || [];
-  }, [resultsChildren, activeChildId]);
+  }, [termFilteredChildren, activeChildId]);
 
   const allSubjectNames = useMemo(
-    () => [...new Set(resultsChildren.flatMap(c => c.results.map(r => r.subject)))],
-    [resultsChildren],
+    () => [...new Set(termFilteredChildren.flatMap(c => c.results.map(r => r.subject)))],
+    [termFilteredChildren],
   );
 
   const overallAverage = useMemo(() => {
-    const all = resultsChildren.flatMap(c => c.results);
+    const all = termFilteredChildren.flatMap(c => c.results);
     if (all.length === 0) return 0;
     return all.reduce((s, r) => s + r.score, 0) / all.length;
-  }, [resultsChildren]);
+  }, [termFilteredChildren]);
 
   const avgAttendance = useMemo(() => {
     if (children.length === 0) return 0;
@@ -205,13 +226,13 @@ export default function ParentDashboard() {
   }, [children]);
 
   const childAverages = useMemo(
-    () => resultsChildren.map(cd => ({
+    () => termFilteredChildren.map(cd => ({
       name: `${cd.child.firstName} ${cd.child.lastName}`.trim(),
       avg: cd.results.length > 0
         ? cd.results.reduce((s, r) => s + r.score, 0) / cd.results.length
         : 0,
     })),
-    [resultsChildren],
+    [termFilteredChildren],
   );
 
   const subjectScores = useMemo(
@@ -435,9 +456,9 @@ export default function ParentDashboard() {
           )}
         </div>
 
-        {(allData?.academicYear || allData?.term) && (
+        {(termName || termYear) && (
           <p className="text-sm text-gray-500 mt-2">
-            Results shown for {allData?.term || 'current term'}{allData?.academicYear ? ` · Academic Year: ${allData.academicYear}` : ''}
+            Results shown for {termName}{termYear ? ` · Academic Year: ${termYear}` : ''}
           </p>
         )}
       </div>
@@ -454,7 +475,7 @@ export default function ParentDashboard() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <StatCard label="Children" value={String(children.length)} gradient="from-indigo-500 to-purple-600" icon="👨‍👩‍👧" />
-            <StatCard label="Approved Subjects" value={resultsChildren.flatMap(c => c.results).length === 0 ? '0' : String(new Set(resultsChildren.flatMap(c => c.results.map(r => r.subject))).size)} gradient="from-sky-500 to-blue-600" icon="📖" />
+            <StatCard label="Approved Subjects" value={termFilteredChildren.flatMap(c => c.results).length === 0 ? '0' : String(new Set(termFilteredChildren.flatMap(c => c.results.map(r => r.subject))).size)} gradient="from-sky-500 to-blue-600" icon="📖" />
             <StatCard label="Overall Average" value={`${overallAverage.toFixed(1)}%`} gradient="from-emerald-500 to-green-600" icon="🎯" />
             <StatCard label="Attendance Rate" value={`${avgAttendance}%`} gradient="from-amber-500 to-orange-600" icon="✅" />
           </div>
@@ -486,8 +507,33 @@ export default function ParentDashboard() {
             </div>
           )}
 
+          {allTerms.length > 1 && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+              <p className="text-sm font-medium text-gray-600 mb-3">Select a term to view</p>
+              <div className="flex gap-2 flex-wrap sm:flex-nowrap sm:overflow-x-auto">
+                {allTerms.map(t => {
+                  const active = t.id === activeTermId;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setSelectedTermId(t.id)}
+                      className={`flex-1 min-w-[130px] px-4 py-3 rounded-xl text-left transition-all duration-150 border-2 ${
+                        active
+                          ? 'bg-indigo-50 border-indigo-500 shadow-sm scale-[1.02]'
+                          : 'bg-gray-50 border-transparent hover:border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      <p className={`font-semibold text-sm ${active ? 'text-indigo-700' : 'text-gray-800'}`}>{t.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{t.isCurrent ? 'Current term' : t.academicYear?.name || 'Past term'}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <SectionCard title="Children Comparison" subtitle="Overall average per child (current term)">
+            <SectionCard title="Children Comparison" subtitle={`Average per child · ${termName}`}>
               {childAverages.length > 0 ? (
                 <ReactECharts option={comparisonOption} style={{ height: 320 }} notMerge lazyUpdate />
               ) : (
@@ -548,7 +594,7 @@ export default function ParentDashboard() {
                   <thead>
                     <tr className="border-b border-gray-100">
                       <th className="text-left py-3 pr-4 font-semibold text-gray-700 text-sm">Subject</th>
-                      {resultsChildren.map(cd => (
+                      {termFilteredChildren.map(cd => (
                         <th key={cd.child.id} className="text-center py-3 px-3 font-semibold text-gray-700 text-sm min-w-[120px]">
                           <div>{cd.child.firstName}</div>
                           <span className="inline-block mt-0.5 px-2 py-0.5 rounded text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200">
@@ -562,7 +608,7 @@ export default function ParentDashboard() {
                     {allSubjectNames.map((subject, idx) => (
                       <tr key={subject} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
                         <td className="py-3 pr-4 font-medium text-gray-800 whitespace-nowrap">{subject}</td>
-                        {resultsChildren.map(cd => {
+                        {termFilteredChildren.map(cd => {
                           const result = cd.results.find(r => r.subject === subject);
                           return (
                             <td key={cd.child.id} className="py-3 px-3 text-center">

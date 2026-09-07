@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import ReactECharts from 'echarts-for-react';
 import { studentApi, resultApi, termApi, homeworkApi, assessmentApi, attendanceApi, examApi, notificationsApi } from '@/lib/api';
@@ -86,6 +86,7 @@ function SectionCard({ title, subtitle, children, action }: {
 export default function StudentDashboard() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [selectedTermId, setSelectedTermId] = useState<string>('');
 
   useSchoolSocket({
     'results:published': () => {
@@ -112,8 +113,17 @@ export default function StudentDashboard() {
     queryFn: () => termApi.getCurrent().then(r => r.data),
     retry: false,
   });
-  const currentTerm = currentTermRes?.data;
-  const termId = currentTerm?.id;
+  const currentTerm = currentTermRes;
+
+  const { data: allTermsData } = useQuery({
+    queryKey: ['my-terms'],
+    queryFn: () => termApi.getAll().then(r => r.data?.data || r.data || []),
+    retry: false,
+  });
+  const allTerms = (Array.isArray(allTermsData) ? allTermsData : []) as any[];
+  const termId = selectedTermId || currentTerm?.id || allTerms.find((t: any) => t.isCurrent)?.id || '';
+  const activeTerm = allTerms.find((t: any) => t.id === termId) || currentTerm || null;
+  const activeTermName = activeTerm?.name;
 
   const { data: resultsRes } = useQuery({
     queryKey: ['my-results', termId],
@@ -123,11 +133,24 @@ export default function StudentDashboard() {
   });
   const currentResults = Array.isArray(resultsRes) ? resultsRes : [];
 
+  const termResultsQueries = useQueries({
+    queries: allTerms.map((t: any) => ({
+      queryKey: ['my-results-term', t.id],
+      queryFn: () => resultApi.getByStudent(studentId || 'me', t.id).then(r => r.data?.data || r.data || []),
+      enabled: !!studentId && !!t.id,
+      retry: false,
+    })),
+  });
+
   const allTermResults = useMemo(() => {
     const map = new Map<string, any[]>();
-    if (currentResults.length > 0) map.set(currentTerm?.name || 'Current Term', currentResults);
+    if (currentResults.length > 0) map.set(activeTermName || 'Current Term', currentResults);
+    termResultsQueries.forEach((q, i) => {
+      const data = Array.isArray(q.data) ? q.data : [];
+      if (data.length > 0 && allTerms[i]) map.set(allTerms[i].name, data);
+    });
     return map;
-  }, [currentResults, currentTerm]);
+  }, [currentResults, activeTermName, termResultsQueries, allTerms]);
 
   const { data: attendanceRes } = useQuery({
     queryKey: ['my-attendance-dash', termId],
@@ -322,7 +345,7 @@ export default function StudentDashboard() {
               Welcome, {student?.firstName || user?.firstName || 'Student'}! 👋
             </h1>
             <p className="text-gray-600 mt-1">
-              {student?.class?.name || 'Student'} · {currentTerm?.name || 'Current Term'}
+              {student?.class?.name || 'Student'} · {activeTermName || 'Current Term'}
             </p>
           </div>
           {student?.photoUrl ? (
@@ -333,15 +356,31 @@ export default function StudentDashboard() {
         </div>
       </div>
 
+      {allTerms.length > 1 && (
+        <div className="flex gap-2 flex-wrap mb-6">
+          {allTerms.map((t: any) => (
+            <button
+              key={t.id}
+              onClick={() => setSelectedTermId(t.id)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                termId === t.id ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {t.name}{t.isCurrent ? ' · Current' : ''}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Average Score" value={average ? `${average.toFixed(1)}%` : '0%'} gradient="from-indigo-500 to-purple-600" icon="🎯" sub={currentTerm?.name || 'Current Term'} />
+        <StatCard label="Average Score" value={average ? `${average.toFixed(1)}%` : '0%'} gradient="from-indigo-500 to-purple-600" icon="🎯" sub={activeTermName || 'Current Term'} />
         <StatCard label="Subjects" value={String(new Set(subjectScores.map(s => s.subject)).size)} gradient="from-sky-500 to-blue-600" icon="📖" />
         <StatCard label="Attendance" value={`${attendanceRate}%`} gradient="from-emerald-500 to-green-600" icon="✅" sub="This term" />
         <StatCard label="Pending" value={String(upcomingHomework.length + exams.length)} gradient="from-amber-500 to-orange-600" icon="⏳" sub={`${upcomingHomework.length} homework · ${exams.length} exams`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <SectionCard title="Subject Performance" subtitle={currentTerm?.name || 'Current term'}>
+        <SectionCard title="Subject Performance" subtitle={activeTermName || 'Current term'}>
           {subjectOption ? (
             <ReactECharts option={subjectOption} style={{ height: 320 }} notMerge lazyUpdate />
           ) : (
@@ -349,7 +388,7 @@ export default function StudentDashboard() {
           )}
         </SectionCard>
 
-        <SectionCard title="Grade Distribution" subtitle="Current term grades">
+        <SectionCard title="Grade Distribution" subtitle={`${activeTermName || 'Current term'} grades`}>
           {gradeDistribution.length > 0 ? (
             <ReactECharts option={gradeDistOption} style={{ height: 320 }} notMerge lazyUpdate />
           ) : (
@@ -357,7 +396,7 @@ export default function StudentDashboard() {
           )}
         </SectionCard>
 
-        <SectionCard title="Attendance Overview" subtitle="This term">
+        <SectionCard title="Attendance Overview" subtitle={activeTermName || 'This term'}>
           <div className="flex justify-center gap-6 mt-2 flex-wrap">
             {attendanceStat('present', 'Present', 'text-green-600')}
             {attendanceStat('late', 'Late', 'text-yellow-600')}
