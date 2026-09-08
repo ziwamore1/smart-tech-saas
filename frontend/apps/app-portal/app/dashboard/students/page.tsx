@@ -230,6 +230,8 @@ export default function StudentsPage() {
     parentEmail: '',
   });
 
+  const [editStatus, setEditStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const [formMessage, setFormMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Post-registration confirmation shown next to the Register button. The
@@ -351,13 +353,11 @@ export default function StudentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
-      setShowEditModal(false);
-      setMessage({ type: 'success', text: 'Student updated successfully!' });
-      setTimeout(() => setMessage(null), 3000);
+      setEditStatus({ type: 'success', text: 'Student updated successfully!' });
+      setTimeout(() => setShowEditModal(false), 1600);
     },
     onError: (error: any) => {
-      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to update student.' });
-      setTimeout(() => setMessage(null), 5000);
+      setEditStatus({ type: 'error', text: error?.response?.data?.message || 'Failed to update student.' });
     },
   });
 
@@ -536,7 +536,7 @@ export default function StudentsPage() {
           <td className="py-4 px-6 border border-gray-200">
             <div className="flex items-center justify-end gap-2">
               <button onClick={() => { setSelectedStudent(student); setShowViewModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">👁️ View</button>
-              <button onClick={() => { setSelectedStudent(student); const parent = student.parents?.[0]?.parent; setEditForm({ firstName: student.firstName || '', lastName: student.lastName || '', admissionNumber: student.admissionNumber || '', dateOfBirth: student.dateOfBirth ? student.dateOfBirth.split('T')[0] : '', gender: student.gender || '', email: student.email || '', phone: student.phone || '', address: student.address || '', parentName: parent ? `${parent.firstName || ''} ${parent.lastName || ''}`.trim() : '', parentPhone: parent?.phone || '', parentEmail: parent?.email || '', }); setShowEditModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors">✏️ Edit</button>
+              <button onClick={() => { setSelectedStudent(student); setEditStatus(null); const parent = student.parents?.[0]?.parent; setEditForm({ firstName: student.firstName || '', lastName: student.lastName || '', admissionNumber: student.admissionNumber || '', dateOfBirth: student.dateOfBirth ? student.dateOfBirth.split('T')[0] : '', gender: student.gender || '', email: student.email || '', phone: student.phone || '', address: student.address || '', parentName: parent ? `${parent.firstName || ''} ${parent.lastName || ''}`.trim() : '', parentPhone: parent?.phone || '', parentEmail: parent?.email || '', }); setShowEditModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors">✏️ Edit</button>
               <button onClick={() => { setSelectedStudent(student); setShowEnrollmentModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-50 text-green-600 hover:bg-green-100 transition-colors">📚 Enroll</button>
               <button onClick={() => { setSelectedStudent(student); setShowLinkParentModal(true); setSelectedParentId(''); setLinkParentSearch(''); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-pink-50 text-pink-600 hover:bg-pink-100 transition-colors">👪 Parent</button>
               <button onClick={() => { setStatusModalStudent(student); setNewStatus(student.status || 'ACTIVE'); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors">🔁 Status</button>
@@ -1396,6 +1396,18 @@ export default function StudentsPage() {
               Edit Student: {selectedStudent.firstName} {selectedStudent.lastName}
             </h2>
 
+            {editStatus && (
+              <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${
+                editStatus.type === 'success'
+                  ? 'bg-green-50 text-green-800 border border-green-200'
+                  : 'bg-red-50 text-red-800 border-2 border-red-300'
+              }`}>
+                <span className="font-semibold">
+                  {editStatus.type === 'success' ? '✓ ' : '✕ '}{editStatus.text}
+                </span>
+              </div>
+            )}
+
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1405,8 +1417,8 @@ export default function StudentsPage() {
                   <input
                     type="text"
                     ref={firstNameInputRef}
-                    value={studentForm.firstName}
-                    onChange={(e) => setStudentForm({ ...studentForm, firstName: e.target.value })}
+                    value={editForm.firstName}
+                    onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg"
                     required
                   />
@@ -1544,8 +1556,9 @@ export default function StudentsPage() {
               </div>
 
               <div className="flex gap-3 justify-end pt-4">
-                <button
+<button
                   onClick={() => {
+                    setEditStatus(null);
                     setShowEditModal(false);
                     setSelectedStudent(null);
                     setEditForm({
@@ -1568,6 +1581,7 @@ export default function StudentsPage() {
                 </button>
                 <button
                   onClick={() => {
+                             setEditStatus(null);
                              const cleanData = {
                               firstName: editForm.firstName,
                               lastName: editForm.lastName,

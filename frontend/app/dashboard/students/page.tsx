@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { studentApi, classApi, termApi, enrollmentApi, academicYearApi, parentApi, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { ReadOnlyBanner } from '@/components/permissions/ReadOnlyBanner';
 
 const gradBlue = 'linear-gradient(135deg, #3b82f6, #2563eb)';
 const gradGreen = 'linear-gradient(135deg, #10b981, #059669)';
@@ -82,7 +83,11 @@ export default function StudentsPage() {
     staleTime: 10000,
     placeholderData: (previousData: any) => previousData,
     queryFn: async () => {
-      const res = await api.get('/student');
+      const params: any = {};
+      if (includeInactive) params.includeInactive = 'true';
+      if (filterStatus) params.status = filterStatus;
+      if (filterClass) params.classId = filterClass;
+      const res = await api.get('/student', { params });
       console.log('Students API response:', res.data);
       console.log('Response status:', res.status);
       let data = res.data?.data || res.data?.students || res.data;
@@ -168,6 +173,7 @@ export default function StudentsPage() {
   });
 
   const [admissionPreview, setAdmissionPreview] = useState('');
+  const [previewNonce, setPreviewNonce] = useState(0);
 
   useEffect(() => {
     if (currentAcademicYear?.id && !studentForm.academicYearId) {
@@ -189,7 +195,7 @@ export default function StudentsPage() {
       };
       fetchPreview();
     }
-  }, [showAddModal, currentAcademicYear, studentForm.classId]);
+  }, [showAddModal, currentAcademicYear, studentForm.classId, previewNonce]);
 
   const [enrollmentForm, setEnrollmentForm] = useState({
     classId: '',
@@ -224,41 +230,121 @@ export default function StudentsPage() {
     parentEmail: '',
   });
 
+  const [editStatus, setEditStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const [formMessage, setFormMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Post-registration confirmation shown next to the Register button. The
+  // teacher must acknowledge it ("Confirmed — Register Next Student") to reset
+  // the form; it also auto-resets after 3 minutes as a safety net.
+  const SUCCESS_DISPLAY_MS = 3 * 60 * 1000;
+  const [registrationSuccess, setRegistrationSuccess] = useState<{
+    name: string;
+    className: string;
+    admissionNumber: string;
+    username?: string;
+    password?: string;
+  } | null>(null);
+  const [successRemainingSec, setSuccessRemainingSec] = useState(0);
+  const bannerRef = useRef<HTMLDivElement | null>(null);
+  const firstNameInputRef = useRef<HTMLInputElement | null>(null);
+
+  const resetForNextStudent = () => {
+    setRegistrationSuccess(null);
+    setSuccessRemainingSec(0);
+    setFormMessage(null);
+    // Keep the selected class (and academic year) so the next student
+    // registers straight into the same class.
+    setStudentForm((prev: any) => ({
+      ...prev,
+      firstName: '',
+      lastName: '',
+      admissionNumber: '',
+      dateOfBirth: '',
+      gender: '',
+      email: '',
+      phone: '',
+      address: '',
+      parentName: '',
+      parentPhone: '',
+      parentEmail: '',
+      manualOverride: false,
+    }));
+    setPreviewNonce((n) => n + 1);
+    setTimeout(() => firstNameInputRef.current?.focus(), 50);
+  };
+
+  const finishRegistrationSession = () => {
+    setRegistrationSuccess(null);
+    setSuccessRemainingSec(0);
+    setFormMessage(null);
+    setShowAddModal(false);
+    setStudentForm({
+      firstName: '',
+      lastName: '',
+      admissionNumber: '',
+      dateOfBirth: '',
+      gender: '',
+      email: '',
+      phone: '',
+      address: '',
+      parentName: '',
+      parentPhone: '',
+      parentEmail: '',
+      academicYearId: currentAcademicYear?.id || '',
+      classId: '',
+      manualOverride: false,
+    });
+  };
+
+  useEffect(() => {
+    if (!registrationSuccess) return;
+    const expiry = Date.now() + SUCCESS_DISPLAY_MS;
+    setSuccessRemainingSec(Math.round(SUCCESS_DISPLAY_MS / 1000));
+    const tick = setInterval(() => {
+      setSuccessRemainingSec(Math.max(0, Math.round((expiry - Date.now()) / 1000)));
+    }, 1000);
+    const autoReset = setTimeout(() => resetForNextStudent(), SUCCESS_DISPLAY_MS);
+    return () => {
+      clearInterval(tick);
+      clearTimeout(autoReset);
+    };
+  }, [registrationSuccess]);
+
   const createStudentMutation = useMutation({
     mutationFn: (data: any) => studentApi.create(data),
     onSuccess: (res) => {
-      const createdName = `${studentForm.firstName} ${studentForm.lastName}`;
-      const credentialsInfo = res?.data?.credentials
-        ? ` Username: ${res.data.credentials.username || ''}`
-        : '';
+      const created = res?.data || {};
+      const className =
+        created.enrolledClass?.name ||
+        classes.find((c: any) => c.id === studentForm.classId)?.name ||
+        '';
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
-      setShowAddModal(false);
-      setMessage({ type: 'success', text: `${createdName} registered successfully! Login credentials have been sent.${credentialsInfo}` });
-      setTimeout(() => setMessage(null), 6000);
-      setStudentForm({
-        firstName: '',
-        lastName: '',
-        admissionNumber: '',
-        dateOfBirth: '',
-        gender: '',
-        email: '',
-        phone: '',
-        address: '',
-        parentName: '',
-        parentPhone: '',
-        parentEmail: '',
-        academicYearId: currentAcademicYear?.id || '',
-        classId: '',
-        manualOverride: false,
+
+      // Keep the form exactly as submitted and show the confirmation next to
+      // the Register button, where the teacher is already looking. The form
+      // resets only when the teacher confirms it (or after 3 minutes).
+      setRegistrationSuccess({
+        name: `${created.firstName || studentForm.firstName} ${created.lastName || studentForm.lastName}`.trim(),
+        className,
+        admissionNumber: created.admissionNumber || '',
+        username: created.credentials?.student?.username,
+        password: created.credentials?.student?.password,
       });
-      setAdmissionPreview('');
       setFormMessage(null);
+      setTimeout(() => bannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
     },
     onError: (error: any) => {
       console.error('Failed to create student:', error);
-      setFormMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to register student. Please try again.' });
-      setTimeout(() => setFormMessage(null), 6000);
+      setFormMessage({
+        type: 'error',
+        text:
+          error?.response?.status === 409
+            ? `DUPLICATE PREVENTED: ${error?.response?.data?.message || 'This student appears to be already registered.'}`
+            : error?.response?.data?.message || 'Failed to register student. Please try again.',
+      });
+      setTimeout(() => setFormMessage(null), 12000);
     },
   });
 
@@ -267,13 +353,11 @@ export default function StudentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
-      setShowEditModal(false);
-      setMessage({ type: 'success', text: 'Student updated successfully!' });
-      setTimeout(() => setMessage(null), 3000);
+      setEditStatus({ type: 'success', text: 'Student updated successfully!' });
+      setTimeout(() => setShowEditModal(false), 1600);
     },
     onError: (error: any) => {
-      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to update student.' });
-      setTimeout(() => setMessage(null), 5000);
+      setEditStatus({ type: 'error', text: error?.response?.data?.message || 'Failed to update student.' });
     },
   });
 
@@ -355,7 +439,6 @@ export default function StudentsPage() {
   });
 
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [formMessage, setFormMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     if (message) {
@@ -375,10 +458,8 @@ export default function StudentsPage() {
       student.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.admissionNumber?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesClass = filterClass === '' || student.enrollments?.some((e: any) => e.classId === filterClass && e.status?.toUpperCase() === 'ACTIVE');
+    const matchesClass = filterClass === '' || student.enrollments?.some((e: any) => e.classId === filterClass && (includeInactive || e.status?.toUpperCase() === 'ACTIVE'));
     const matchesStatus = filterStatus === '' || student.status === filterStatus;
-    
     return matchesSearch && matchesClass && matchesStatus;
   });
 
@@ -398,7 +479,12 @@ export default function StudentsPage() {
   );
 
   sortedClassGroups.forEach(([, group]) => {
-    group.sort((a: any, b: any) => (a.admissionNumber || '').localeCompare(b.admissionNumber || ''));
+    group.sort((a: any, b: any) => {
+      const aSequence = a.sequenceNumber ?? a.enrollments?.[0]?.sequenceNumber;
+      const bSequence = b.sequenceNumber ?? b.enrollments?.[0]?.sequenceNumber;
+      if (aSequence != null && bSequence != null && aSequence !== bSequence) return aSequence - bSequence;
+      return (a.admissionNumber || '').localeCompare(b.admissionNumber || '', undefined, { numeric: true });
+    });
   });
 
   const tableRows: any[] = [];
@@ -450,7 +536,7 @@ export default function StudentsPage() {
           <td className="py-4 px-6 border border-gray-200">
             <div className="flex items-center justify-end gap-2">
               <button onClick={() => { setSelectedStudent(student); setShowViewModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">👁️ View</button>
-              <button onClick={() => { setSelectedStudent(student); const parent = student.parents?.[0]?.parent; setEditForm({ firstName: student.firstName || '', lastName: student.lastName || '', admissionNumber: student.admissionNumber || '', dateOfBirth: student.dateOfBirth ? student.dateOfBirth.split('T')[0] : '', gender: student.gender || '', email: student.email || '', phone: student.phone || '', address: student.address || '', parentName: parent ? `${parent.firstName || ''} ${parent.lastName || ''}`.trim() : '', parentPhone: parent?.phone || '', parentEmail: parent?.email || '', }); setShowEditModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors">✏️ Edit</button>
+              <button onClick={() => { setSelectedStudent(student); setEditStatus(null); const parent = student.parents?.[0]?.parent; setEditForm({ firstName: student.firstName || '', lastName: student.lastName || '', admissionNumber: student.admissionNumber || '', dateOfBirth: student.dateOfBirth ? student.dateOfBirth.split('T')[0] : '', gender: student.gender || '', email: student.email || '', phone: student.phone || '', address: student.address || '', parentName: parent ? `${parent.firstName || ''} ${parent.lastName || ''}`.trim() : '', parentPhone: parent?.phone || '', parentEmail: parent?.email || '', }); setShowEditModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors">✏️ Edit</button>
               <button onClick={() => { setSelectedStudent(student); setShowEnrollmentModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-50 text-green-600 hover:bg-green-100 transition-colors">📚 Enroll</button>
               <button onClick={() => { setSelectedStudent(student); setShowLinkParentModal(true); setSelectedParentId(''); setLinkParentSearch(''); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-pink-50 text-pink-600 hover:bg-pink-100 transition-colors">👪 Parent</button>
               <button onClick={() => { setStatusModalStudent(student); setNewStatus(student.status || 'ACTIVE'); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors">🔁 Status</button>
@@ -497,6 +583,7 @@ export default function StudentsPage() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyBanner managePermission="students.manage" />
       {message && (
         <div className={`fixed top-4 right-4 z-[100] px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 min-w-[320px] ${
           message.type === 'success' 
@@ -673,18 +760,8 @@ export default function StudentsPage() {
           <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-6">Add New Student</h2>
 
-            {formMessage && (
-              <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${
-                formMessage.type === 'success'
-                  ? 'bg-green-50 text-green-800 border border-green-200'
-                  : 'bg-red-50 text-red-800 border border-red-200'
-              }`}>
-                {formMessage.text}
-              </div>
-            )}
-            
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${registrationSuccess ? 'opacity-60 pointer-events-none select-none' : ''}`}>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     First Name *
@@ -695,6 +772,7 @@ export default function StudentsPage() {
                     onChange={(e) => setStudentForm({ ...studentForm, firstName: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg"
                     required
+                    autoFocus
                   />
                 </div>
 
@@ -742,12 +820,12 @@ export default function StudentsPage() {
                   </div>
                   {!studentForm.manualOverride && admissionPreview && (
                     <p className="text-xs text-green-600 mt-1">
-                      Auto-generated: {admissionPreview}
+                      ✓ Auto-generated: {admissionPreview}
                     </p>
                   )}
                   {studentForm.manualOverride && (
                     <p className="text-xs text-amber-600 mt-1">
-                      Manual override: enter a unique admission number
+                      ⚠ Manual override: enter a unique admission number
                     </p>
                   )}
                 </div>
@@ -816,7 +894,7 @@ export default function StudentsPage() {
                 </div>
               </div>
 
-              <div className="border-t pt-6">
+              <div className={`border-t pt-6 ${registrationSuccess ? 'opacity-60 pointer-events-none select-none' : ''}`}>
                 <h3 className="text-lg font-semibold mb-4">Enrollment Details</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -855,7 +933,7 @@ export default function StudentsPage() {
               </div>
 
               <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4">Parent/Guardian Information <span className="text-sm font-normal text-gray-400">(optional &mdash; can be added later)</span></h3>
+                <h3 className="text-lg font-semibold mb-4">Parent/Guardian Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -895,19 +973,85 @@ export default function StudentsPage() {
                 </div>
               </div>
 
+              {formMessage && (
+                <div className={`px-4 py-3 rounded-lg text-sm font-medium ${
+                  formMessage.type === 'success'
+                    ? 'bg-green-50 text-green-800 border border-green-200'
+                    : 'bg-red-50 text-red-800 border-2 border-red-300'
+                }`}>
+                  <span className="font-semibold">{formMessage.text}</span>
+                </div>
+              )}
+
+              {registrationSuccess && (
+                <div
+                  ref={bannerRef}
+                  className="px-4 py-4 rounded-lg bg-green-50 border-2 border-green-400 shadow-sm"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-green-600 text-2xl font-bold leading-none mt-0.5">✓</span>
+                    <div className="flex-1 text-sm text-green-900">
+                      <p className="font-bold text-base">
+                        {registrationSuccess.name} successfully registered
+                        {registrationSuccess.className
+                          ? ` and enrolled in ${registrationSuccess.className}`
+                          : ''}
+                        .
+                      </p>
+                      {registrationSuccess.admissionNumber && (
+                        <p className="mt-1">
+                          Admission No:{' '}
+                          <span className="font-mono font-semibold">{registrationSuccess.admissionNumber}</span>
+                        </p>
+                      )}
+                      {(registrationSuccess.username || registrationSuccess.password) && (
+                        <p className="mt-1">
+                          Student login — Username:{' '}
+                          <span className="font-mono font-semibold">{registrationSuccess.username}</span>
+                          {' · '}Password:{' '}
+                          <span className="font-mono font-semibold">{registrationSuccess.password}</span>
+                        </p>
+                      )}
+                      <p className="mt-2 font-medium">
+                        Is the student correctly enrolled? Confirm to continue with the next student.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 pl-9">
+                    <button
+                      onClick={resetForNextStudent}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
+                    >
+                      ✓ Confirmed — Register Next Student
+                    </button>
+                    <button
+                      onClick={finishRegistrationSession}
+                      className="px-4 py-2 border border-green-600 text-green-700 rounded-lg hover:bg-green-100 font-medium"
+                    >
+                      Done for now
+                    </button>
+                    <span className="ml-auto text-xs text-green-700">
+                      Form resets automatically in{' '}
+                      {Math.floor(successRemainingSec / 60)}:
+                      {String(successRemainingSec % 60).padStart(2, '0')}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-3 justify-end pt-4">
                 <button
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => (registrationSuccess ? finishRegistrationSession() : setShowAddModal(false))}
                   className="px-4 py-2 border rounded-lg hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => createStudentMutation.mutate(studentForm)}
-                  disabled={!studentForm.firstName || !studentForm.lastName || (studentForm.manualOverride && !studentForm.admissionNumber)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+                  disabled={createStudentMutation.isPending || !studentForm.firstName || !studentForm.lastName || (studentForm.manualOverride && !studentForm.admissionNumber)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  {createStudentMutation.isPending ? 'Creating...' : 'Create Student'}
+                  {createStudentMutation.isPending ? 'Registering…' : 'Register & Enroll Student'}
                 </button>
               </div>
             </div>
@@ -1252,6 +1396,18 @@ export default function StudentsPage() {
               Edit Student: {selectedStudent.firstName} {selectedStudent.lastName}
             </h2>
 
+            {editStatus && (
+              <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${
+                editStatus.type === 'success'
+                  ? 'bg-green-50 text-green-800 border border-green-200'
+                  : 'bg-red-50 text-red-800 border-2 border-red-300'
+              }`}>
+                <span className="font-semibold">
+                  {editStatus.type === 'success' ? '✓ ' : '✕ '}{editStatus.text}
+                </span>
+              </div>
+            )}
+
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1260,6 +1416,7 @@ export default function StudentsPage() {
                   </label>
                   <input
                     type="text"
+                    ref={firstNameInputRef}
                     value={editForm.firstName}
                     onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg"
@@ -1399,8 +1556,9 @@ export default function StudentsPage() {
               </div>
 
               <div className="flex gap-3 justify-end pt-4">
-                <button
+<button
                   onClick={() => {
+                    setEditStatus(null);
                     setShowEditModal(false);
                     setSelectedStudent(null);
                     setEditForm({
@@ -1423,6 +1581,7 @@ export default function StudentsPage() {
                 </button>
                 <button
                   onClick={() => {
+                             setEditStatus(null);
                              const cleanData = {
                               firstName: editForm.firstName,
                               lastName: editForm.lastName,

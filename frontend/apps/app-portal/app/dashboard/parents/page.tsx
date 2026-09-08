@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { parentApi, studentApi, api } from '@/lib/api';
+import { parentApi, studentApi, classApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
 export default function ParentsPage() {
@@ -19,7 +19,8 @@ export default function ParentsPage() {
     firstName: '', lastName: '', email: '', phone: '', password: '',
   });
 
-  const [linkForm, setLinkForm] = useState({ studentId: '' });
+  const [linkForm, setLinkForm] = useState({ studentId: '', classId: '' });
+  const [linkSearch, setLinkSearch] = useState('');
 
   const { data: parentsData, isLoading } = useQuery({
     queryKey: ['parents', searchTerm],
@@ -38,14 +39,27 @@ export default function ParentsPage() {
     },
   });
 
-  const { data: studentsData } = useQuery({
-    queryKey: ['students'],
+  const classes = useQuery({
+    queryKey: ['classes'],
     queryFn: async () => {
-      const res = await api.get('/student');
-      let data = res.data?.data || res.data?.students || res.data;
+      const res = await classApi.getAll();
+      let data = res.data?.data || res.data?.classes || res.data || [];
       if (!Array.isArray(data)) data = [];
       return data;
     },
+  });
+
+  const { data: studentsData, isLoading: studentsLoading } = useQuery({
+    queryKey: ['students', linkForm.classId],
+    queryFn: async () => {
+      if (!linkForm.classId) return [];
+      const res = await studentApi.getAll({ classId: linkForm.classId });
+      let data = res.data?.data || res.data?.students || res.data;
+      if (!Array.isArray(data) && data?.data) data = data.data;
+      if (!Array.isArray(data)) data = [];
+      return data;
+    },
+    enabled: !!linkForm.classId,
   });
 
   const createParentMutation = useMutation({
@@ -71,7 +85,8 @@ export default function ParentsPage() {
       queryClient.invalidateQueries({ queryKey: ['parents'] });
       queryClient.invalidateQueries({ queryKey: ['parent-stats'] });
       setShowLinkModal(false);
-      setLinkForm({ studentId: '' });
+      setLinkForm({ studentId: '', classId: '' });
+      setLinkSearch('');
       setMessage({ type: 'success', text: 'Student linked to parent!' });
       setTimeout(() => setMessage(null), 3000);
     },
@@ -84,8 +99,10 @@ export default function ParentsPage() {
   const unlinkChildMutation = useMutation({
     mutationFn: ({ parentId, studentId }: { parentId: string; studentId: string }) =>
       parentApi.unlinkChild(parentId, studentId),
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['parents'] });
+      queryClient.invalidateQueries({ queryKey: ['parent-stats'] });
+      setSelectedParent(prev => prev ? { ...prev, children: (prev.children || []).filter((pc: any) => pc.studentId !== vars.studentId) } : prev);
       setMessage({ type: 'success', text: 'Student unlinked from parent.' });
       setTimeout(() => setMessage(null), 3000);
     },
@@ -97,6 +114,19 @@ export default function ParentsPage() {
 
   const parents = Array.isArray(parentsData) ? parentsData : [];
   const students = Array.isArray(studentsData) ? studentsData : [];
+
+  const linkedStudentIds = useMemo(
+    () => new Set((selectedParent?.children || []).map((pc: any) => pc.studentId)),
+    [selectedParent],
+  );
+
+  const scopedStudents = useMemo(() => {
+    const q = linkSearch.trim().toLowerCase();
+    return students
+      .filter((s: any) => !linkedStudentIds.has(s.id))
+      .filter((s: any) => !q || `${s.firstName} ${s.lastName} ${s.admissionNumber || ''}`.toLowerCase().includes(q))
+      .sort((a: any, b: any) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
+  }, [students, linkedStudentIds, linkSearch]);
 
   return (
     <div className="space-y-6">
@@ -345,35 +375,85 @@ export default function ParentsPage() {
 
       {showLinkModal && selectedParent && (
         <div className="fixed inset-0 bg-gray-600 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-2">Link Child to Parent</h2>
             <p className="text-gray-600 mb-6">{selectedParent.firstName} {selectedParent.lastName}</p>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Select Student *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Class *</label>
                 <select
-                  value={linkForm.studentId}
-                  onChange={(e) => setLinkForm({ studentId: e.target.value })}
+                  value={linkForm.classId}
+                  onChange={(e) => { setLinkForm({ classId: e.target.value, studentId: '' }); setLinkSearch(''); }}
                   className="w-full px-3 py-2 border rounded-lg"
                 >
-                  <option value="">Select Student</option>
-                  {students
-                    .filter((s: any) => !selectedParent.children?.some((pc: any) => pc.studentId === s.id))
-                    .map((student: any) => (
+                  <option value="">Select Class</option>
+                  {classes.data?.length > 0 ? classes.data.map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  )) : null}
+                </select>
+              </div>
+
+              {linkForm.classId && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Student *</label>
+                  <input
+                    type="text"
+                    value={linkSearch}
+                    onChange={(e) => setLinkSearch(e.target.value)}
+                    placeholder="Search by name or admission number..."
+                    className="w-full px-3 py-2 border rounded-lg mb-2"
+                  />
+                  <select
+                    value={linkForm.studentId}
+                    onChange={(e) => setLinkForm({ classId: linkForm.classId, studentId: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value="">Select Student</option>
+                    {studentsLoading ? (
+                      <option value="" disabled>Loading students...</option>
+                    ) : scopedStudents.map((student: any) => (
                       <option key={student.id} value={student.id}>
                         {student.firstName} {student.lastName} ({student.admissionNumber})
                       </option>
                     ))}
-                </select>
-                {students.filter((s: any) => !selectedParent.children?.some((pc: any) => pc.studentId === s.id)).length === 0 && (
-                  <p className="text-sm text-amber-600 mt-2">All students are already linked to this parent.</p>
-                )}
-              </div>
+                  </select>
+                  {!studentsLoading && scopedStudents.length === 0 && (
+                    <p className="text-sm text-amber-600 mt-2">No unlinked students found{linkSearch ? ' for your search' : ' in this class'}.</p>
+                  )}
+                </div>
+              )}
+
+              {selectedParent.children?.length > 0 && (
+                <div className="border-t pt-4">
+                  <h4 className="font-semibold text-sm text-gray-500 mb-2">Already Linked ({selectedParent.children.length})</h4>
+                  <div className="space-y-2">
+                    {selectedParent.children.map((pc: any) => (
+                      <div key={pc.studentId} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                        <div className="min-w-0">
+                          <span className="font-medium">{pc.student?.firstName} {pc.student?.lastName}</span>
+                          <span className="text-gray-500 text-sm ml-2">{pc.student?.admissionNumber}</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (confirm('Unlink this student from the parent?')) {
+                              unlinkChildMutation.mutate({ parentId: selectedParent.id, studentId: pc.studentId });
+                            }
+                          }}
+                          className="shrink-0 text-red-500 hover:text-red-700 text-sm font-medium"
+                        >
+                          Unlink
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex gap-3 justify-end pt-6">
-              <button onClick={() => { setShowLinkModal(false); setLinkForm({ studentId: '' }); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
+              <button onClick={() => { setShowLinkModal(false); setLinkForm({ studentId: '', classId: '' }); setLinkSearch(''); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
               <button
                 onClick={() => {
+                  if (!linkForm.classId) { setMessage({ type: 'error', text: 'Select a class first' }); return; }
                   if (!linkForm.studentId) { setMessage({ type: 'error', text: 'Select a student' }); return; }
                   linkChildMutation.mutate({ parentId: selectedParent.id, studentId: linkForm.studentId });
                 }}
