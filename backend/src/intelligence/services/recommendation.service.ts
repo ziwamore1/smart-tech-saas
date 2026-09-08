@@ -6,10 +6,34 @@ export class RecommendationService {
   constructor(private prisma: PrismaService) {}
 
   async getStudentRecommendations(schoolId: string, studentId: string, termId: string) {
-    const results = await this.prisma.result.findMany({
+    let results = await this.prisma.result.findMany({
       where: { studentId, termId, schoolId },
       include: { subject: true },
     });
+
+    // Fall back to computed results (final percentages) when the raw Result
+    // table is empty — e.g. schools that enter scores via the assessment
+    // engine. This mirrors how report cards derive their AI insights.
+    if (results.length === 0) {
+      const computed = await this.prisma.computedResult.findMany({
+        where: {
+          studentId, termId, schoolId,
+          finalPercentage: { not: null },
+          status: { in: ['PUBLISHED', 'LOCKED', 'COMPUTED', 'VERIFIED'] },
+        },
+        include: { subject: true },
+      });
+      results = computed.map(c => ({
+        id: c.id,
+        score: c.finalPercentage as number,
+        subjectId: c.subjectId,
+        termId: c.termId,
+        schoolId: c.schoolId,
+        subject: c.subject,
+        teacherId: '',
+        createdAt: c.createdAt,
+      })) as any;
+    }
 
     if (!results.length) return { error: 'No results to base recommendations on' };
 

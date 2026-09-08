@@ -212,9 +212,12 @@ export default function StudentDashboard() {
   );
 
   const gradeDistribution = useMemo(() => {
-    const counts: Record<string, number> = { A: 0, 'B+': 0, B: 0, 'B-': 0, 'C+': 0, C: 0, D: 0, E: 0, F: 0 };
-    currentResults.forEach((r: any) => { const g = r.grade || getGrade(r.score || 0); if (counts[g] != null) counts[g]++; });
-    return Object.entries(counts).filter(([, c]) => c > 0);
+    const counts: Record<string, number> = {};
+    currentResults.forEach((r: any) => {
+      const g = r.grade || getGrade(r.score || 0);
+      counts[g] = (counts[g] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, [currentResults]);
 
   const upcomingHomework = useMemo(

@@ -10,11 +10,32 @@ export class TrendAnalysisService {
   }
 
   async getStudentGrowthTrajectory(schoolId: string, studentId: string) {
-    const results = await this.prisma.result.findMany({
+    let results = await this.prisma.result.findMany({
       where: { studentId, schoolId },
       include: { term: { include: { academicYear: true } }, subject: true },
       orderBy: [{ term: { academicYear: { startDate: 'asc' } } }, { term: { startDate: 'asc' } }],
     });
+
+    // Fall back to computed results (final percentages) when the raw Result
+    // table is empty — e.g. schools that enter scores via the assessment
+    // engine rather than the manual result entry path.
+    if (results.length === 0) {
+      const computed = await this.prisma.computedResult.findMany({
+        where: {
+          studentId, schoolId,
+          finalPercentage: { not: null },
+          status: { in: ['PUBLISHED', 'LOCKED', 'COMPUTED', 'VERIFIED'] },
+        },
+        include: { term: { include: { academicYear: true } }, subject: true },
+        orderBy: [{ term: { academicYear: { startDate: 'asc' } } }, { term: { startDate: 'asc' } }],
+      });
+      results = computed.map(c => ({
+        id: c.id,
+        score: c.finalPercentage as number,
+        term: c.term,
+        subject: c.subject,
+      })) as any;
+    }
 
     if (!results.length) return { error: 'No results found' };
 

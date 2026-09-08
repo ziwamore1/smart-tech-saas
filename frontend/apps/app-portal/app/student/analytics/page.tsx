@@ -94,9 +94,12 @@ export default function StudentAnalytics() {
   });
 
   const activeGradeCounts = useMemo(() => {
-    const counts: Record<string, number> = { A: 0, 'B+': 0, B: 0, 'B-': 0, 'C+': 0, C: 0, D: 0, E: 0, F: 0 };
-    activeResults.forEach((r: any) => { const g = r.grade || getGrade(r.score); if (counts[g] != null) counts[g]++; });
-    return Object.entries(counts).filter(([, c]) => c > 0);
+    const counts: Record<string, number> = {};
+    activeResults.forEach((r: any) => {
+      const g = r.grade || getGrade(r.score);
+      counts[g] = (counts[g] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, [activeResults]);
 
   const overallAverage = useMemo(
@@ -141,9 +144,9 @@ export default function StudentAnalytics() {
   }), [activeGradeCounts]);
 
   const growthOption = useMemo(() => {
-    const seriesData = growth?.series || growth?.trend || growth?.data || [];
-    const labels = seriesData.map((p: any) => p.label || p.term || p.period || '');
-    const values = seriesData.map((p: any) => p.value ?? p.score ?? p.avg ?? 0);
+    const seriesData = growth?.trajectory || [];
+    const labels = seriesData.map((p: any) => p.termName || p.label || p.term || '');
+    const values = seriesData.map((p: any) => p.average ?? p.value ?? p.score ?? p.avg ?? 0);
     return {
       grid: { left: '8%', right: '8%', bottom: '15%', top: '12%' },
       xAxis: { type: 'category', data: labels, axisLabel: { fontSize: 11, interval: 0 } },
@@ -162,11 +165,11 @@ export default function StudentAnalytics() {
     };
   }, [growth]);
 
-  const attendanceSeriesLabel = (attendanceTrend && (attendanceTrend.terms || attendanceTrend.series || attendanceTrend.data)) ? 'Attendance' : '';
+  const attendanceSeriesLabel = (attendanceTrend?.trend?.length ?? 0) > 0 ? 'Monthly attendance rate' : '';
 
   const attendanceOption = useMemo(() => {
-    const data = attendanceTrend?.terms || attendanceTrend?.series || attendanceTrend?.data || [];
-    const labels = data.map((p: any) => p.label || p.term || p.period || '');
+    const data = attendanceTrend?.trend || [];
+    const labels = data.map((p: any) => p.month || p.label || p.period || '');
     const values = data.map((p: any) => p.rate ?? p.percentage ?? p.value ?? 0);
     return {
       grid: { left: '8%', right: '8%', bottom: '15%', top: '12%' },
@@ -246,7 +249,7 @@ export default function StudentAnalytics() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
           <h2 className="font-semibold text-gray-900 mb-1">Growth Trajectory</h2>
           <p className="text-sm text-gray-500 mb-4">AI-generated performance trend</p>
-          {growth && (growth.series || growth.trend || growth.data) ? <ReactECharts option={growthOption} style={{ height: 280 }} notMerge lazyUpdate /> : <p className="text-center py-14 text-gray-400">No growth data available yet</p>}
+          {growth?.trajectory?.length > 0 ? <ReactECharts option={growthOption} style={{ height: 280 }} notMerge lazyUpdate /> : <p className="text-center py-14 text-gray-400">No growth data available yet</p>}
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
           <h2 className="font-semibold text-gray-900 mb-1">Attendance Trend</h2>
@@ -271,7 +274,7 @@ export default function StudentAnalytics() {
           <div className="grid gap-3 md:grid-cols-2">
             {recList.map((r: any, i: number) => (
               <div key={i} className="p-4 rounded-xl bg-gray-50/70 border border-gray-100">
-                <p className="text-sm font-medium text-gray-800">{r.title || `Recommendation ${i + 1}`}</p>
+                <p className="text-sm font-medium text-gray-800">{r.title || r.issue || r.category || `Recommendation ${i + 1}`}</p>
                 <p className="text-sm text-gray-600 mt-1">{r.description || r.recommendation || r.message || r.text}</p>
                 {r.priority && <span className="inline-block mt-2 text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">{r.priority}</span>}
               </div>
