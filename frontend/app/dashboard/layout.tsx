@@ -221,6 +221,14 @@ const regularNav: NavItem[] = [
     typeRoles: ROLE_MAP.admin,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
+  {
+    name: 'My Teaching Analysis',
+    href: '/dashboard/teacher-analysis',
+    icon: 'fa-user-graduate',
+    color: '#db2777',
+    typeRoles: ROLE_MAP.teaching,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
+  },
   { 
     name: 'Report Cards', 
     href: '/dashboard/report-cards', 

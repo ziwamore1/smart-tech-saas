@@ -10,6 +10,7 @@ import { GradingEngineModule } from '../grading-engine/grading-engine.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { CommonModule } from '../common/common.module';
 import { ResultsManagementModule } from '../results-management/results-management.module';
+import { TeacherAnalyticsModule } from '../teacher-analytics/teacher-analytics.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ResultsManagementModule } from '../results-management/results-managemen
     GradingEngineModule,
     CloudinaryModule,
     ResultsManagementModule,
+    TeacherAnalyticsModule,
   ],
   controllers: [ReportEngineController],
   providers: [ReportEngineService],

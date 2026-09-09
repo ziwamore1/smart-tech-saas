@@ -2651,3 +2651,30 @@ export const activityApi = {
   heartbeat: (data: { schoolId: string; userId: string; userName: string; userRole: string; page?: string }) =>
     api.post('/school-activity/presence/heartbeat', data),
 };
+
+export const teacherAnalyticsApi = {
+  getOverview: (opts?: { termId?: string }) =>
+    api.get('/teacher-analytics/me', { params: opts }),
+  getSummary: (opts?: { termId?: string }) =>
+    api.get('/teacher-analytics/me/summary', { params: opts }),
+  getAssignments: (opts?: { termId?: string }) =>
+    api.get('/teacher-analytics/me/assignments', { params: opts }),
+  getClasses: (opts?: { termId?: string }) =>
+    api.get('/teacher-analytics/me/classes', { params: opts }),
+  getSubjects: (opts?: { termId?: string }) =>
+    api.get('/teacher-analytics/me/subjects', { params: opts }),
+  getCompetencies: (opts?: { termId?: string }) =>
+    api.get('/teacher-analytics/me/competencies', { params: opts }),
+  getStudentsAtRisk: (opts?: { termId?: string }) =>
+    api.get('/teacher-analytics/me/students-at-risk', { params: opts }),
+  getTrends: (opts?: { termId?: string }) =>
+    api.get('/teacher-analytics/me/trends', { params: opts }),
+  getAttendanceCorrelation: (opts?: { termId?: string }) =>
+    api.get('/teacher-analytics/me/attendance-correlation', { params: opts }),
+  getTeachingLoad: (opts?: { termId?: string }) =>
+    api.get('/teacher-analytics/me/teaching-load', { params: opts }),
+  getInsights: (opts?: { termId?: string }) =>
+    api.get('/teacher-analytics/me/insights', { params: opts }),
+  getReportData: (opts?: { termId?: string; examType?: string }) =>
+    api.get('/teacher-analytics/me/report-data', { params: opts }),
+};

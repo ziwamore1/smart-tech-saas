@@ -12,6 +12,8 @@ import { CertificateTemplateService } from '../report-template-builder/certifica
 import { CertificateCommentService } from '../report-template-builder/certificate-comment.service';
 import { ReportTemplateBuilderService } from '../report-template-builder/report-template-builder.service';
 import { ResultsManagementService } from '../results-management/results-management.service';
+import { TeacherAnalyticsService } from '../teacher-analytics/teacher-analytics.service';
+import { TeacherAnalyticsAiService } from '../teacher-analytics/teacher-analytics-ai.service';
 import { normalizeExamType } from '../common/utils/exam-type.util';
 import { checkEczEligibility, detectEczGradingSystem } from '../ecz-eligibility/ecz-eligibility.util';
 import * as crypto from 'crypto';
@@ -25,13 +27,15 @@ export enum ReportType {
   ANALYTICS_SUMMARY = 'ANALYTICS_SUMMARY',
   MARK_SCHEDULE = 'MARK_SCHEDULE',
   PERFORMANCE_REPORT = 'PERFORMANCE_REPORT',
-  RANKING_REPORT = 'RANKING_REPORT',
+RANKING_REPORT = 'RANKING_REPORT',
   RESULTS_ANALYSIS = 'RESULTS_ANALYSIS',
+  TEACHER_ANALYSIS = 'TEACHER_ANALYSIS',
 }
 
 export interface ReportGenerationRequest {
   type: ReportType;
   schoolId: string;
+  userId?: string;
   studentId?: string;
   classId?: string;
   termId?: string;
@@ -136,12 +140,20 @@ const REPORT_TYPE_CONFIG: Record<ReportType, {
     optionalFields: [],
     supportsBulk: true,
   },
-  [ReportType.RESULTS_ANALYSIS]: {
+[ReportType.RESULTS_ANALYSIS]: {
     label: 'Results Analysis Report',
     description: 'Advanced class-based Quality and Quantity results analysis',
     icon: '📊',
     requiredFields: ['classId', 'termId'],
     optionalFields: [],
+    supportsBulk: false,
+  },
+  [ReportType.TEACHER_ANALYSIS]: {
+    label: 'Teacher Analysis and Intelligence Report',
+    description: 'Individual teacher teaching analysis and intelligence report',
+    icon: '👩‍🏫',
+    requiredFields: ['termId'],
+    optionalFields: ['examType'],
     supportsBulk: false,
   },
 };
@@ -162,8 +174,10 @@ export class ReportEngineService {
     private cloudinary: CloudinaryService,
     private certificateTemplateService: CertificateTemplateService,
     private certificateCommentService: CertificateCommentService,
-    private reportTemplateBuilder: ReportTemplateBuilderService,
+private reportTemplateBuilder: ReportTemplateBuilderService,
     private resultsManagement: ResultsManagementService,
+    private teacherAnalytics: TeacherAnalyticsService,
+    private teacherAnalyticsAi: TeacherAnalyticsAiService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
   ) {}
 
@@ -357,9 +371,14 @@ export class ReportEngineService {
         fileName = `ranking-report-${request.classId}-${request.termId}.pdf`;
         break;
 
-      case ReportType.RESULTS_ANALYSIS:
+case ReportType.RESULTS_ANALYSIS:
         result = await this.generateResultsAnalysisReport(request);
         fileName = `results-analysis-${request.classId}-${request.termId}.pdf`;
+        break;
+
+      case ReportType.TEACHER_ANALYSIS:
+        result = await this.generateTeacherAnalysisReport(request);
+        fileName = `teacher-analysis-${request.userId || request.options?.userId || 'teacher'}-${request.termId}.pdf`;
         break;
 
       default:
@@ -2030,10 +2049,174 @@ export class ReportEngineService {
       ]) + content,
       orientation: 'landscape',
     });
-    const buffer = await this.renderHtmlToPdf(html, request.schoolId);
+const buffer = await this.renderHtmlToPdf(html, request.schoolId);
     const result = await this.cloudinary.uploadBuffer(buffer, {
       folder: `${FOLDERS.system}/reports`,
       publicId: `results-analysis-${request.classId}-${request.termId}-${Date.now()}`,
+      resourceType: 'raw',
+    });
+    return { buffer, url: result.secureUrl, publicId: result.publicId };
+  }
+
+  private async generateTeacherAnalysisReport(request: ReportGenerationRequest) {
+    const userId = request.userId || request.options?.userId;
+    if (!userId) throw new BadRequestException('Teacher userId is required to generate this report');
+
+    const term = await this.prisma.term.findUnique({
+      where: { id: request.termId },
+      include: { academicYear: true },
+    });
+    if (!term) throw new BadRequestException('Term not found');
+
+    const teacherUser = { id: userId, schoolId: request.schoolId, roles: [] };
+    const report = await this.teacherAnalytics.getReportData(teacherUser, {
+      termId: request.termId,
+      examType: request.examType,
+    });
+    const overview = await this.teacherAnalytics.getOverview(teacherUser, request.termId).catch(() => null);
+    const insights = overview ? await this.teacherAnalyticsAi.generateInsights(overview) : null;
+    const summary = report.summary;
+
+    const pct = (v: number | null | undefined): string =>
+      v == null ? '—' : `${Number(v).toFixed(1)}%`;
+    const dash = (v: any): string => (v == null || v === '' ? '—' : String(v));
+
+    // Summary cards
+    const summaryCards = `
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-value">${summary.classesCount}</div><div class="summary-label">Classes</div></div>
+        <div class="summary-card"><div class="summary-value">${summary.subjectsCount}</div><div class="summary-label">Subjects</div></div>
+        <div class="summary-card"><div class="summary-value">${summary.totalStudentsTaught}</div><div class="summary-label">Students</div></div>
+        <div class="summary-card"><div class="summary-value">${summary.assessmentsAnalysed}</div><div class="summary-label">Assessments Analysed</div></div>
+        <div class="summary-card" style="border-top-color:#2563eb"><div class="summary-value" style="color:#2563eb">${pct(summary.overallAverage)}</div><div class="summary-label">Overall Average</div></div>
+        <div class="summary-card" style="border-top-color:#059669"><div class="summary-value" style="color:${summary.overallPassRate != null && summary.overallPassRate >= 60 ? '#059669' : '#dc2626'}">${pct(summary.overallPassRate)}</div><div class="summary-label">Pass Rate</div></div>
+        <div class="summary-card"><div class="summary-value fail">${summary.studentsAtRisk}</div><div class="summary-label">At Risk (&lt;40%)</div></div>
+        <div class="summary-card"><div class="summary-value" style="color:#7c3aed">${summary.studentsRequiringIntervention}</div><div class="summary-label">Require Support</div></div>
+      </div>`;
+
+    // Assignment performance table
+    const assignmentRows = (report.assignments || [])
+      .map((a: any) => `
+        <tr>
+          <td style="font-weight:600">${dash(a.className)}</td>
+          <td>${dash(a.subjectName)}</td>
+          <td class="text-center">${dash(a.stats?.count ?? 0)}</td>
+          <td class="text-center font-bold" style="color:${this.scoreColor(a.stats?.average ?? 0)}">${pct(a.stats?.average)}</td>
+          <td class="text-center">${pct(a.stats?.highest)}</td>
+          <td class="text-center">${pct(a.stats?.lowest)}</td>
+          <td class="text-center">${pct(a.stats?.passRate)}</td>
+          <td class="text-center">${pct(a.participationRate)}</td>
+          <td class="text-center">${dash(a.trend)}</td>
+        </tr>`)
+      .join('');
+
+    // Gender analysis rows
+    const genderRows = (report.assignments || [])
+      .filter((a: any) => a.gender?.available)
+      .map((a: any) => `
+        <tr>
+          <td style="font-weight:600">${dash(a.className)}</td>
+          <td>${dash(a.subjectName)}</td>
+          <td class="text-center">${pct(a.gender.female?.average)}</td>
+          <td class="text-center">${pct(a.gender.male?.average)}</td>
+          <td class="text-center font-bold">${a.gender.gap?.averageGap != null ? Math.abs(a.gender.gap.averageGap).toFixed(1) : '—'}</td>
+          <td class="text-center">${dash(a.gender.gap?.classification)}</td>
+        </tr>`)
+      .join('');
+
+    // Competency rows
+    const competencyBody = (report.competency?.classCompetency?.length || 0) > 0
+      ? report.competency.classCompetency
+          .slice(0, 20)
+          .map((c: any) => `
+            <tr>
+              <td>${dash(c.className)}</td>
+              <td>${dash(c.subjectName)}</td>
+              <td style="font-weight:600">${dash(c.competencyName)}</td>
+              <td class="text-center font-bold">${pct(c.averageMastery)}</td>
+              <td class="text-center"><span class="grade-badge" style="color:${this.gradeColor(c.status === 'MASTERED' ? 'A' : c.status === 'DEVELOPING' ? 'C' : 'E').text};background:${this.gradeColor(c.status === 'MASTERED' ? 'A' : c.status === 'DEVELOPING' ? 'C' : 'E').bg}">${dash(c.status)}</span></td>
+            </tr>`)
+          .join('')
+      : `<tr><td colspan="5" class="text-center">${dash(report.competency?.dataRequired || 'No competency data available.')}</td></tr>`;
+
+    // At-risk rows
+    const atRiskBody = (report.atRisk || []).length > 0
+      ? report.atRisk.slice(0, 30).map((s: any) => `
+          <tr>
+            <td style="font-weight:600">${dash(s.studentName)}</td>
+            <td>${dash(s.className)}</td>
+            <td class="text-center font-bold" style="color:${this.scoreColor(s.currentAverage ?? 0)}">${pct(s.currentAverage)}</td>
+            <td class="text-center">${dash(s.trend)}</td>
+            <td class="text-center"><span class="grade-badge" style="color:#fff;background:${s.riskLevel === 'HIGH' ? '#dc2626' : s.riskLevel === 'MODERATE' ? '#d97706' : '#16a34a'}">${dash(s.riskLevel)}</span></td>
+            <td>${(s.flags || []).slice(0, 3).join('; ') || '—'}</td>
+          </tr>`)
+        .join('')
+      : '<tr><td colspan="6" class="text-center">No learners currently require intervention.</td></tr>';
+
+    // Action plan rows
+    const actionPlan = (insights?.actionPlan || []).map((a: any) => `
+        <tr>
+          <td style="font-weight:600">${dash(a.problem)}</td>
+          <td>${dash(a.evidence)}</td>
+          <td>${dash(a.intervention)}</td>
+          <td class="text-center">${dash(a.duration)}</td>
+          <td>${dash(a.successIndicator)}</td>
+          <td>${dash(a.followUp)}</td>
+        </tr>`).join('');
+
+    const insightsBlock = insights ? `
+      <div class="section-title">Intelligence Summary</div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;margin-bottom:14px;line-height:1.7;">
+        <p style="margin:0 0 8px"><strong>What is happening:</strong> ${dash(insights.whatIsHappening)}</p>
+        ${insights.howSerious?.text ? `<p style="margin:0 0 8px"><strong>Seriousness:</strong> ${dash(insights.howSerious.text)}</p>` : ''}
+        <p style="margin:0"><strong>Where the problem sits:</strong> ${dash(insights.whereIsTheProblem)}</p>
+      </div>
+      <div class="section-title">Contributing Factors (hypotheses, not proven causes)</div>
+      <ul style="margin:0 0 16px 20px;line-height:1.7;">${(insights.whatMayBeContributing || []).map((c: string) => `<li>${c}</li>`).join('') || '<li>No consistent contributing factor detected.</li>'}</ul>
+      <div class="section-title">Strengths</div>
+      <ul style="margin:0 0 16px 20px;line-height:1.7;">${(insights.strengths || []).map((s: string) => `<li>${s}</li>`).join('') || '<li>Baseline data available.</li>'}</ul>
+      <div class="section-title">Action Plan</div>
+      <table><thead><tr><th>Problem</th><th>Evidence</th><th>Intervention</th><th class="text-center">Duration</th><th>Success Indicator</th><th>Follow-up</th></tr></thead>
+        <tbody>${actionPlan || '<tr><td colspan="6" class="text-center">No action plan yet.</td></tr>'}</tbody>
+      </table>
+      <div class="section-title">Evidence &amp; Fact Check</div>
+      <ul style="margin:0 0 16px 20px;line-height:1.7;">${(insights.factCheck || []).map((f: any) => `<li><strong>${dash(f.type)}:</strong> ${dash(f.text)} <em style="color:#64748b">(${dash(f.evidence)})</em></li>`).join('') || '<li>No fact-check records.</li>'}</ul>`
+      : '';
+
+    const content = `${this.buildMetaBar([
+        { label: 'Teacher', value: report.header.teacherName },
+        { label: 'Department', value: report.header.department || '' },
+        { label: 'Term', value: `${term.name} (${term.academicYear?.name || ''})` },
+        { label: 'Exam Type', value: report.header.examType },
+        { label: 'Generated', value: new Date(report.header.generatedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) },
+      ])}
+      ${summaryCards}
+      ${insightsBlock}
+      <div class="section-title">Class &amp; Subject Performance (Authoritative Results)</div>
+      <table><thead><tr><th>Class</th><th>Subject</th><th class="text-center">Assessed</th><th class="text-center">Average</th><th class="text-center">Highest</th><th class="text-center">Lowest</th><th class="text-center">Pass %</th><th class="text-center">Participation %</th><th class="text-center">Trend</th></tr></thead>
+        <tbody>${assignmentRows || '<tr><td colspan="9" class="text-center">No class/subject data available.</td></tr>'}</tbody>
+      </table>
+      ${(genderRows ? `<div class="section-title">Gender Analysis</div>
+      <table><thead><tr><th>Class</th><th>Subject</th><th class="text-center">Female Avg</th><th class="text-center">Male Avg</th><th class="text-center">Gap (pts)</th><th class="text-center">Classification</th></tr></thead>
+        <tbody>${genderRows}</tbody></table>` : '')}
+      <div class="section-title">Competency / Topic Mastery</div>
+      <table><thead><tr><th>Class</th><th>Subject</th><th>Competency</th><th class="text-center">Mastery</th><th class="text-center">Status</th></tr></thead>
+        <tbody>${competencyBody}</tbody></table>
+      <div class="section-title">Learners Requiring Support</div>
+      <table><thead><tr><th>Student</th><th>Class</th><th class="text-center">Average</th><th class="text-center">Trend</th><th class="text-center">Risk</th><th>Flags</th></tr></thead>
+        <tbody>${atRiskBody}</tbody></table>`;
+
+    const html = this.buildEnhancedReportShell({
+      schoolName: report.header.schoolName,
+      subtitle: `${report.header.title} — ${report.header.teacherName} — ${term.name} (${term.academicYear?.name || ''})`,
+      title: 'Teacher Analysis and Intelligence Report',
+      content,
+      orientation: 'landscape',
+    });
+    const buffer = await this.renderHtmlToPdf(html, request.schoolId);
+    const result = await this.cloudinary.uploadBuffer(buffer, {
+      folder: `${FOLDERS.system}/reports`,
+      publicId: `teacher-analysis-${userId}-${request.termId}-${Date.now()}`,
       resourceType: 'raw',
     });
     return { buffer, url: result.secureUrl, publicId: result.publicId };

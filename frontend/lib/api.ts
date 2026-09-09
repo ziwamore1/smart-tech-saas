@@ -1992,11 +1992,11 @@ export const classTeacherAssignmentApi = {
 
 export const reportEngineApi = {
   getTypes: () => api.get('/report-engine/types'),
-  validate: (data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string }) =>
+  validate: (data: { type: string; studentId?: string; classId?: string; termId?: string; examType?: string; templateId?: string }) =>
     api.post('/report-engine/validate', data),
-  generate: (data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string; options?: any }) =>
+  generate: (data: { type: string; studentId?: string; classId?: string; termId?: string; examType?: string; templateId?: string; options?: any }) =>
     api.post('/report-engine/generate', data),
-  generatePdf: (data: { type: string; studentId?: string; classId?: string; termId?: string; templateId?: string }) =>
+  generatePdf: (data: { type: string; studentId?: string; classId?: string; termId?: string; examType?: string; templateId?: string }) =>
     api.post('/report-engine/generate-pdf', data, { responseType: 'blob', timeout: 120000 }),
   previewReportCard: (data: { studentId: string; termId: string; templateId?: string }) =>
     api.post('/report-engine/report-card-html', data, { timeout: 120000 }),
@@ -2007,6 +2007,21 @@ export const reportEngineApi = {
   getReport: (id: string) => api.get(`/report-engine/reports/${id}`),
   deleteReport: (id: string) => api.delete(`/report-engine/reports/${id}`),
   downloadReport: (id: string) => api.get(`/report-engine/download/${id}`, { responseType: 'blob' }),
+};
+
+export const teacherAnalyticsApi = {
+  getOverview: (opts?: { termId?: string }) => api.get('/teacher-analytics/me', { params: opts }),
+  getSummary: (opts?: { termId?: string }) => api.get('/teacher-analytics/me/summary', { params: opts }),
+  getAssignments: (opts?: { termId?: string }) => api.get('/teacher-analytics/me/assignments', { params: opts }),
+  getClasses: (opts?: { termId?: string }) => api.get('/teacher-analytics/me/classes', { params: opts }),
+  getSubjects: (opts?: { termId?: string }) => api.get('/teacher-analytics/me/subjects', { params: opts }),
+  getCompetencies: (opts?: { termId?: string }) => api.get('/teacher-analytics/me/competencies', { params: opts }),
+  getStudentsAtRisk: (opts?: { termId?: string }) => api.get('/teacher-analytics/me/students-at-risk', { params: opts }),
+  getTrends: (opts?: { termId?: string }) => api.get('/teacher-analytics/me/trends', { params: opts }),
+  getAttendanceCorrelation: (opts?: { termId?: string }) => api.get('/teacher-analytics/me/attendance-correlation', { params: opts }),
+  getTeachingLoad: (opts?: { termId?: string }) => api.get('/teacher-analytics/me/teaching-load', { params: opts }),
+  getInsights: (opts?: { termId?: string }) => api.get('/teacher-analytics/me/insights', { params: opts }),
+  getReportData: (opts?: { termId?: string; examType?: string }) => api.get('/teacher-analytics/me/report-data', { params: opts }),
 };
 
 /**
