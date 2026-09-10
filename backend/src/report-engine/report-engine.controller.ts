@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { OwnershipService } from '../common/services/ownership.service';
+import { TeacherAnalyticsService } from '../teacher-analytics/teacher-analytics.service';
 
 @Controller('report-engine')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -13,6 +14,7 @@ export class ReportEngineController {
   constructor(
     private readonly reportEngine: ReportEngineService,
     private readonly ownership: OwnershipService,
+    private readonly teacherAnalytics: TeacherAnalyticsService,
   ) {}
 
   @Get('types')
@@ -79,6 +81,7 @@ export class ReportEngineController {
       termId?: string;
       examType?: string;
       templateId?: string;
+      teacherUserId?: string;
       options?: Record<string, any>;
     },
   ) {
@@ -94,7 +97,7 @@ export class ReportEngineController {
   }
 
   @Post('generate-pdf')
-  @Roles('Director', 'Class Teacher', 'Parent', 'Student')
+  @Roles('Director', 'Head Teacher', 'HeadTeacher', 'Deputy Head', 'Deputy Head Teacher', 'DeputyHeadTeacher', 'Deputy', 'HOD', 'Class Teacher', 'Teacher', 'Parent', 'Student')
   async generateAndDownloadPdf(
     @Req() req,
     @Body() body: {
@@ -104,6 +107,7 @@ export class ReportEngineController {
       termId?: string;
       examType?: string;
       templateId?: string;
+      teacherUserId?: string;
       options?: Record<string, any>;
     },
     @Res() res: ExpressResponse,
@@ -111,7 +115,7 @@ export class ReportEngineController {
     try {
       const roles = (req.user.roles || []).map((r: string) => String(r).toUpperCase());
       const isStaff = roles.some(r =>
-        ['DIRECTOR', 'DEPUTY DIRECTOR', 'HEAD TEACHER', 'DEPUTY HEAD', 'DEPUTY', 'HOD', 'TEACHER', 'CLASS TEACHER'].includes(r),
+        ['DIRECTOR', 'DEPUTY DIRECTOR', 'HEAD TEACHER', 'HEADTEACHER', 'DEPUTY HEAD', 'DEPUTY HEAD TEACHER', 'DEPUTYHEADTEACHER', 'DEPUTY', 'HOD', 'TEACHER', 'CLASS TEACHER'].includes(r),
       );
       if (!isStaff) {
         if (body.type !== ReportType.REPORT_CARD && body.type !== ReportType.PERFORMANCE_REPORT) {
@@ -157,12 +161,15 @@ export class ReportEngineController {
         }
       }
 
+      const targetTeacherId = body.type === ReportType.TEACHER_ANALYSIS && body.teacherUserId
+        ? (await this.teacherAnalytics.assertTeacherAccessible(req.user, body.teacherUserId, body.termId), body.teacherUserId)
+        : req.user.id;
       const report = await this.reportEngine.generateReport({
         ...body,
         schoolId: req.user.schoolId,
         options: {
           ...body.options,
-          userId: req.user.id,
+          userId: targetTeacherId,
           userName: req.user.name || req.user.firstName,
         },
       });

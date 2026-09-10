@@ -1,11 +1,12 @@
-import { Controller, Get, Query, UseGuards, Request, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Request, NotFoundException, Param } from '@nestjs/common';
 import { TeacherAnalyticsService } from './teacher-analytics.service';
 import { TeacherAnalyticsAiService } from './teacher-analytics-ai.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
-const TEACHER_ROLES = ['Teacher', 'Class Teacher', 'Director', 'HOD', 'Deputy'];
+const TEACHER_ROLES = ['Teacher', 'Class Teacher', 'Director', 'HOD', 'Deputy', 'Head Teacher', 'Deputy Head'];
+const ANALYTICS_LEADER_ROLES = ['Director', 'Head Teacher', 'HeadTeacher', 'Deputy Head', 'Deputy Head Teacher', 'DeputyHeadTeacher', 'Deputy'];
 
 @Controller('teacher-analytics')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -25,6 +26,20 @@ export class TeacherAnalyticsController {
   @Roles(...TEACHER_ROLES)
   async getOverview(@Request() req, @Query('termId') termId?: string) {
     const overview = await this.service.getOverview(req.user, termId);
+    const insights = overview.summary ? await this.ai.generateInsights(overview) : null;
+    return { ...overview, insights };
+  }
+
+  @Get('available-teachers')
+  @Roles(...ANALYTICS_LEADER_ROLES)
+  async getAvailableTeachers(@Request() req, @Query('termId') termId?: string) {
+    return this.service.getAvailableTeachers(req.user, termId);
+  }
+
+  @Get('teacher/:teacherId')
+  @Roles(...ANALYTICS_LEADER_ROLES)
+  async getTeacherOverview(@Request() req, @Param('teacherId') teacherId: string, @Query('termId') termId?: string) {
+    const overview = await this.service.getOverviewForTeacher(req.user, teacherId, termId);
     const insights = overview.summary ? await this.ai.generateInsights(overview) : null;
     return { ...overview, insights };
   }

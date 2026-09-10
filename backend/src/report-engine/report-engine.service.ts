@@ -2213,7 +2213,7 @@ const buffer = await this.renderHtmlToPdf(html, request.schoolId);
       content,
       orientation: 'landscape',
     });
-    const buffer = await this.renderHtmlToPdf(html, request.schoolId);
+    const buffer = await this.renderHtmlToPdf(html, request.schoolId, true);
     const result = await this.cloudinary.uploadBuffer(buffer, {
       folder: `${FOLDERS.system}/reports`,
       publicId: `teacher-analysis-${userId}-${request.termId}-${Date.now()}`,
@@ -2267,7 +2267,7 @@ const buffer = await this.renderHtmlToPdf(html, request.schoolId);
     return { buffer, url: result.secureUrl, publicId: result.publicId };
   }
 
-  private async renderHtmlToPdf(html: string, schoolId: string): Promise<Buffer> {
+  private async renderHtmlToPdf(html: string, schoolId: string, includeDefaultSignature = false): Promise<Buffer> {
     const puppeteer = await import('puppeteer');
     const os = await import('os');
     const crypto = await import('crypto');
@@ -2284,8 +2284,14 @@ const buffer = await this.renderHtmlToPdf(html, request.schoolId);
 
     const page = await browser.newPage();
     page.setDefaultTimeout(60000);
-    const stampedHtml = await this.templateRenderer.applyDefaultStamp(schoolId, html);
-    await page.setContent(this.enforceMinimumFontSize(stampedHtml), { waitUntil: 'networkidle0' as any });
+    let stampedHtml = await this.templateRenderer.applyDefaultStamp(schoolId, html);
+    if (stampedHtml === html) {
+      stampedHtml = await this.attachLegacyDefaultStamp(schoolId, html);
+    }
+    const reportHtml = includeDefaultSignature
+      ? await this.attachDefaultSignature(schoolId, stampedHtml)
+      : stampedHtml;
+    await page.setContent(this.enforceMinimumFontSize(reportHtml), { waitUntil: 'networkidle0' as any });
 
     const pdf = await page.pdf({
       format: 'A4',
@@ -2294,6 +2300,59 @@ const buffer = await this.renderHtmlToPdf(html, request.schoolId);
 
     await browser.close();
     return Buffer.from(pdf);
+  }
+
+  private async attachDefaultSignature(schoolId: string, html: string): Promise<string> {
+    try {
+      const signature = await this.prisma.digitalSignature.findFirst({
+        where: { schoolId, isDefault: true, status: 'ACTIVE' },
+        orderBy: { updatedAt: 'desc' },
+        select: { imageUrl: true, signatureData: true, transparentImageUrl: true, processedImageUrl: true },
+      });
+      const source = signature?.transparentImageUrl || signature?.processedImageUrl || signature?.imageUrl || signature?.signatureData;
+      if (!source) {
+        this.logger.warn(`Teacher analysis signature skipped: no active default signature for school ${schoolId}`);
+        return html;
+      }
+      if (!/^https:\/\/|^data:image\/(png|jpe?g|webp);base64,/i.test(source)) {
+        if (/^<svg[\s>]/i.test(source) && !/<script\b/i.test(source)) {
+          const svgSource = `data:image/svg+xml;base64,${Buffer.from(source, 'utf8').toString('base64')}`;
+          const svgBlock = `<div style="page-break-inside:avoid;margin-top:26px;display:flex;justify-content:flex-end;"><div style="width:220px;text-align:center;color:#475569;font-size:11px;"><img src="${svgSource}" alt="Digital signature" style="display:block;max-width:190px;max-height:70px;margin:0 auto 6px;object-fit:contain;" /><div style="border-top:1px solid #64748b;padding-top:5px;">Digitally signed</div></div></div>`;
+          return html.includes('</body>') ? html.replace('</body>', `${svgBlock}</body>`) : `${html}${svgBlock}`;
+        }
+        this.logger.warn(`Teacher analysis signature skipped: unsupported signature asset for school ${schoolId}`);
+        return html;
+      }
+      const block = `<div style="page-break-inside:avoid;margin-top:26px;display:flex;justify-content:flex-end;"><div style="width:220px;text-align:center;color:#475569;font-size:11px;"><img src="${source}" alt="Digital signature" style="display:block;max-width:190px;max-height:70px;margin:0 auto 6px;object-fit:contain;" /><div style="border-top:1px solid #64748b;padding-top:5px;">Digitally signed</div></div></div>`;
+      return html.includes('</body>') ? html.replace('</body>', `${block}</body>`) : `${html}${block}`;
+    } catch (error: any) {
+      this.logger.warn(`Teacher analysis signature rendering failed: ${error?.message || error}`);
+      return html;
+    }
+  }
+
+  private async attachLegacyDefaultStamp(schoolId: string, html: string): Promise<string> {
+    try {
+      const stamp = await this.prisma.digitalStamp.findFirst({
+        where: { schoolId, isDefault: true, isActive: true, status: 'ACTIVE' },
+        orderBy: { updatedAt: 'desc' },
+        select: { imageUrl: true, svgContent: true, width: true, height: true, opacity: true },
+      });
+      if (!stamp) return html;
+      const svg = stamp.svgContent?.trim();
+      const image = stamp.imageUrl?.trim();
+      const visual = svg && /^<svg[\s>]/i.test(svg) && !/<script\b/i.test(svg)
+        ? svg
+        : image && /^https:\/\//i.test(image)
+          ? `<img src="${image}" alt="Digital stamp" style="width:100%;height:100%;object-fit:contain;opacity:${stamp.opacity ?? 1};" />`
+          : '';
+      if (!visual) return html;
+      const overlay = `<div style="position:fixed;right:18mm;bottom:18mm;width:${stamp.width || 150}px;height:${stamp.height || 150}px;z-index:9999;pointer-events:none;">${visual}</div>`;
+      return html.includes('</body>') ? html.replace('</body>', `${overlay}</body>`) : `${html}${overlay}`;
+    } catch (error: any) {
+      this.logger.warn(`Legacy default stamp rendering failed: ${error?.message || error}`);
+      return html;
+    }
   }
 
   private enforceMinimumFontSize(html: string): string {

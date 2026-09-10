@@ -61,16 +61,21 @@ function SeverityBadge({ level }: { level: string }) {
 }
 
 export default function TeacherAnalysisPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const router = useRouter();
 
   const [terms, setTerms] = useState<any[]>([]);
   const [selectedTermId, setSelectedTermId] = useState<string>('');
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'classes' | 'subjects' | 'at-risk' | 'trends' | 'competency' | 'ai'>('overview');
   const [generating, setGenerating] = useState(false);
+
+  const userRoles = ((user as any)?.allRoles || user?.roles || []).map((role: string) => String(role).toUpperCase());
+  const canSelectTeacher = userRoles.some((role: string) => ['DIRECTOR', 'HEAD TEACHER', 'HEADTEACHER', 'DEPUTY HEAD', 'DEPUTY HEAD TEACHER', 'DEPUTYHEADTEACHER', 'DEPUTY'].includes(role));
 
   useEffect(() => {
     termApi.getAll().then((res: any) => {
@@ -82,11 +87,25 @@ export default function TeacherAnalysisPage() {
     }).catch(() => {});
   }, []);
 
-  const fetchData = useCallback(async (termId?: string) => {
+  useEffect(() => {
+    if (!isAuthenticated || !canSelectTeacher) return;
+    teacherAnalyticsApi.getAvailableTeachers(selectedTermId ? { termId: selectedTermId } : undefined)
+      .then((res: any) => {
+        const raw = res?.data?.data || res?.data || res || [];
+        const list = Array.isArray(raw) ? raw : [];
+        setTeachers(list);
+        setSelectedTeacherId((current) => current && list.some((teacher: any) => teacher.id === current) ? current : (list[0]?.id || ''));
+      })
+      .catch(() => setTeachers([]));
+  }, [isAuthenticated, canSelectTeacher, selectedTermId]);
+
+  const fetchData = useCallback(async (termId?: string, teacherId?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await teacherAnalyticsApi.getOverview(termId ? { termId } : undefined);
+      const res = teacherId
+        ? await teacherAnalyticsApi.getTeacherOverview(teacherId, termId ? { termId } : undefined)
+        : await teacherAnalyticsApi.getOverview(termId ? { termId } : undefined);
       setData(res?.data?.data || res?.data || res);
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Failed to load data');
@@ -100,18 +119,19 @@ export default function TeacherAnalysisPage() {
       router.push('/login?redirect=/dashboard/teacher-analysis');
       return;
     }
-    if (isAuthenticated && !authLoading) fetchData(selectedTermId || undefined);
-  }, [isAuthenticated, authLoading, selectedTermId, fetchData, router]);
+    if (isAuthenticated && !authLoading) fetchData(selectedTermId || undefined, selectedTeacherId || undefined);
+  }, [isAuthenticated, authLoading, selectedTermId, selectedTeacherId, fetchData, router]);
 
   const downloadReport = async () => {
     if (!data?.summary?.term) return;
     setGenerating(true);
     try {
-      const res = await reportEngineApi.generatePdf({
-        type: 'TEACHER_ANALYSIS',
-        termId: data.summary.term.id,
-        examType: data.summary.examType || undefined,
-      });
+        const res = await reportEngineApi.generatePdf({
+          type: 'TEACHER_ANALYSIS',
+          termId: data.summary.term.id,
+          examType: data.summary.examType || undefined,
+          teacherUserId: selectedTeacherId || undefined,
+        });
       const blob = res.data;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -164,9 +184,9 @@ export default function TeacherAnalysisPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
             <i className="fas fa-user-graduate text-pink-500" />
-            My Teaching Analysis
+             {selectedTeacherId ? `${context?.teacherName || 'Teacher'}'s Teaching Analysis` : 'My Teaching Analysis'}
           </h1>
-          <p className="text-gray-500 mt-1">Your classes, subjects, learner outcomes, competencies and AI-driven coaching</p>
+          <p className="text-gray-500 mt-1">{selectedTeacherId ? 'Full teaching, learner-outcome, competency and AI analysis for the selected teacher' : 'Your classes, subjects, learner outcomes, competencies and AI-driven coaching'}</p>
         </div>
         <div className="flex items-center gap-3">
           <select
@@ -179,8 +199,22 @@ export default function TeacherAnalysisPage() {
               <option key={t.id} value={t.id}>{t.name} {t.isCurrent ? '(Current)' : ''}</option>
             ))}
           </select>
+          {canSelectTeacher && (
+            <select
+              value={selectedTeacherId}
+              onChange={(e) => setSelectedTeacherId(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 focus:ring-2 focus:ring-pink-500 min-w-[220px]"
+            >
+              <option value="">My analysis</option>
+              {teachers.map((teacher: any) => (
+                <option key={teacher.id} value={teacher.id}>
+                  {teacher.name} ({teacher.assignmentCount} assignments)
+                </option>
+              ))}
+            </select>
+          )}
           <button
-            onClick={() => fetchData(selectedTermId || undefined)}
+            onClick={() => fetchData(selectedTermId || undefined, selectedTeacherId || undefined)}
             className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
           >
             ↻ Refresh

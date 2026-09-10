@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { ComputedResultStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StudentSubjectService } from '../student-subject/student-subject.service';
@@ -61,9 +61,22 @@ export class TeacherAnalyticsService {
   // Context & academic cycle resolution
   // -------------------------------------------------------------------------
 
-  async resolveContext(reqUser: any): Promise<TeacherContext> {
+  private isAnalyticsLeader(reqUser: any): boolean {
+    const roles = Array.isArray(reqUser.roles) ? reqUser.roles : [];
+    return roles.some((role: string) =>
+      ['DIRECTOR', 'HEAD TEACHER', 'HEADTEACHER', 'DEPUTY HEAD', 'DEPUTY HEAD TEACHER', 'DEPUTYHEADTEACHER', 'DEPUTY'].includes(String(role).toUpperCase()),
+    );
+  }
+
+  private assertAnalyticsLeader(reqUser: any) {
+    if (!this.isAnalyticsLeader(reqUser)) {
+      throw new ForbiddenException('Only Directors, Head Teachers, and Deputy Head Teachers can view other teachers.');
+    }
+  }
+
+  async resolveContext(reqUser: any, targetUserId = reqUser.id): Promise<TeacherContext> {
     const teacher = await this.prisma.teacher.findUnique({
-      where: { userId: reqUser.id },
+      where: { userId: targetUserId },
       include: {
         user: { select: { firstName: true, lastName: true, photoUrl: true } },
         departmentRel: { select: { name: true } },
@@ -72,6 +85,12 @@ export class TeacherAnalyticsService {
     if (!teacher) {
       throw new NotFoundException('Teacher profile not found for the current user');
     }
+    if (targetUserId !== reqUser.id) {
+      this.assertAnalyticsLeader(reqUser);
+      if (reqUser.schoolId && teacher.schoolId !== reqUser.schoolId) {
+        throw new ForbiddenException('You can only view teachers in your school.');
+      }
+    }
     const roles = Array.isArray(reqUser.roles) ? reqUser.roles : [];
     const isDirector = roles.some((r: string) =>
       ['DIRECTOR', 'HEAD TEACHER', 'DEPUTY', 'DEPUTY DIRECTOR', 'SUPERADMIN'].includes(
@@ -79,7 +98,7 @@ export class TeacherAnalyticsService {
       ),
     );
     return {
-      userId: reqUser.id,
+      userId: targetUserId,
       schoolId: teacher.schoolId,
       teacherRecordId: teacher.id,
       teacherName: [teacher.user?.firstName, teacher.user?.lastName].filter(Boolean).join(' ').trim() || 'Teacher',
@@ -88,6 +107,57 @@ export class TeacherAnalyticsService {
       roles,
       isDirector,
     };
+  }
+
+  async assertTeacherAccessible(reqUser: any, targetUserId: string, termId?: string) {
+    this.assertAnalyticsLeader(reqUser);
+    const context = await this.resolveContext(reqUser, targetUserId);
+    const cycle = await this.resolveAcademicCycle(context.schoolId, termId);
+    const assignments = cycle.year?.id
+      ? await this.getAssignments(targetUserId, context.schoolId, cycle.year.id)
+      : [];
+    if (assignments.length === 0) {
+      throw new ForbiddenException('The selected teacher has no teaching assignments for this academic year.');
+    }
+    return context;
+  }
+
+  async getAvailableTeachers(reqUser: any, termId?: string) {
+    this.assertAnalyticsLeader(reqUser);
+    if (!reqUser.schoolId) return [];
+    const cycle = await this.resolveAcademicCycle(reqUser.schoolId, termId);
+    if (!cycle.year?.id) return [];
+
+    const assignments = await this.prisma.teachingAssignment.findMany({
+      where: { schoolId: reqUser.schoolId, academicYearId: cycle.year.id },
+      select: { teacherId: true },
+      distinct: ['teacherId'],
+    });
+    const teacherIds = assignments.map((assignment) => assignment.teacherId);
+    if (teacherIds.length === 0) return [];
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: teacherIds } },
+      select: { id: true, firstName: true, lastName: true, email: true },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
+    const counts = await this.prisma.teachingAssignment.groupBy({
+      by: ['teacherId'],
+      where: { schoolId: reqUser.schoolId, academicYearId: cycle.year.id },
+      _count: { _all: true },
+    });
+    const countByTeacher = new Map(counts.map((row) => [row.teacherId, row._count._all]));
+    return users.map((user) => ({
+      id: user.id,
+      name: [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.email,
+      email: user.email,
+      assignmentCount: countByTeacher.get(user.id) || 0,
+    }));
+  }
+
+  async getOverviewForTeacher(reqUser: any, targetUserId: string, termId?: string) {
+    await this.assertTeacherAccessible(reqUser, targetUserId, termId);
+    return this.getOverview({ ...reqUser, id: targetUserId }, termId);
   }
 
   async resolveAcademicCycle(schoolId: string, termId?: string) {

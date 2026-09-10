@@ -2507,7 +2507,7 @@ export const reportEngineApi = {
     api.post('/report-engine/validate', data),
   generate: (data: { type: string; studentId?: string; classId?: string; termId?: string; examType?: string; templateId?: string; options?: any }) =>
     api.post('/report-engine/generate', data),
-  generatePdf: (data: { type: string; studentId?: string; classId?: string; termId?: string; examType?: string; templateId?: string }) =>
+  generatePdf: (data: { type: string; studentId?: string; classId?: string; termId?: string; examType?: string; templateId?: string; teacherUserId?: string }) =>
     api.post('/report-engine/generate-pdf', data, { responseType: 'blob', timeout: 300000 }),
   previewReportCard: (data: { studentId: string; termId: string; examType?: string; templateId?: string }) =>
     api.post('/report-engine/report-card-html', data, { timeout: 120000 }),
@@ -2673,6 +2673,10 @@ export const activityApi = {
 export const teacherAnalyticsApi = {
   getOverview: (opts?: { termId?: string }) =>
     api.get('/teacher-analytics/me', { params: opts }),
+  getAvailableTeachers: (opts?: { termId?: string }) =>
+    api.get('/teacher-analytics/available-teachers', { params: opts }),
+  getTeacherOverview: (teacherId: string, opts?: { termId?: string }) =>
+    api.get(`/teacher-analytics/teacher/${teacherId}`, { params: opts }),
   getSummary: (opts?: { termId?: string }) =>
     api.get('/teacher-analytics/me/summary', { params: opts }),
   getAssignments: (opts?: { termId?: string }) =>

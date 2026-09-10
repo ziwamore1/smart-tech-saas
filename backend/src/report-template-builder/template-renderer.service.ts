@@ -521,17 +521,16 @@ export class TemplateRendererService {
 
       case 'SIGNATURE':
         const sigUrl = content.signatureUrl || data?.signatureUrl;
-        const safeSigUrl = typeof sigUrl === 'string' && (/^https:\/\//i.test(sigUrl) || /^data:image\/(png|jpe?g|webp);base64,/i.test(sigUrl))
-          ? this.escapeHtml(sigUrl)
-          : '';
+        const safeSigUrl = this.safeImageSource(sigUrl);
         return safeSigUrl
           ? `<img src="${safeSigUrl}" alt="Signature" style="${styleStr}" />`
           : `<div style="${styleStr};border-top:1px solid #000;width:150px;margin-top:20px;"></div>`;
 
       case 'STAMP':
         const stampUrl = content.stampUrl || data?.stampUrl;
-        return stampUrl
-          ? `<img src="${stampUrl}" alt="Stamp" style="${styleStr}" />`
+        const safeStampUrl = this.safeImageSource(stampUrl);
+        return safeStampUrl
+          ? `<img src="${safeStampUrl}" alt="Stamp" style="${styleStr}" />`
           : '';
 
       case 'QR_CODE':
@@ -600,6 +599,18 @@ export class TemplateRendererService {
       default:
         return `<!-- Unknown component type: ${component.type} -->`;
     }
+  }
+
+  private safeImageSource(value: unknown): string {
+    if (typeof value !== 'string' || !value.trim()) return '';
+    const source = value.trim();
+    if (/^https:\/\//i.test(source) || /^data:image\/(png|jpe?g|webp|svg\+xml);base64,/i.test(source)) {
+      return this.escapeHtml(source);
+    }
+    if (/^<svg[\s>]/i.test(source) && !/<script\b/i.test(source)) {
+      return `data:image/svg+xml;base64,${Buffer.from(source, 'utf8').toString('base64')}`;
+    }
+    return '';
   }
 
   private renderStudentProfileCard(component: any, data: any, school?: any): string {
@@ -1179,7 +1190,8 @@ export class TemplateRendererService {
       });
       const overlay = `<div style="position:fixed;right:18mm;bottom:18mm;width:42mm;height:42mm;z-index:9999;pointer-events:none;">${svg}</div>`;
       return html.includes('</body>') ? html.replace('</body>', `${overlay}</body>`) : `${html}${overlay}`;
-    } catch {
+    } catch (error: any) {
+      this.logger.warn(`Default stamp rendering skipped for school ${schoolId}: ${error?.message || error}`);
       return html;
     }
   }
