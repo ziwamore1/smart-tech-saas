@@ -68,6 +68,8 @@ export default function TeacherAnalysisPage() {
   const [selectedTermId, setSelectedTermId] = useState<string>('');
   const [teachers, setTeachers] = useState<any[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
+  const [teachersLoaded, setTeachersLoaded] = useState(false);
+  const [termsLoaded, setTermsLoaded] = useState(false);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,11 +86,12 @@ export default function TeacherAnalysisPage() {
       setTerms(list);
       const current = list.find((t: any) => t.isCurrent);
       if (current) setSelectedTermId(current.id);
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setTermsLoaded(true));
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || !canSelectTeacher) return;
+    if (!isAuthenticated || !canSelectTeacher || !termsLoaded) return;
+    setTeachersLoaded(false);
     teacherAnalyticsApi.getAvailableTeachers(selectedTermId ? { termId: selectedTermId } : undefined)
       .then((res: any) => {
         const raw = res?.data?.data || res?.data || res || [];
@@ -96,8 +99,9 @@ export default function TeacherAnalysisPage() {
         setTeachers(list);
         setSelectedTeacherId((current) => current && list.some((teacher: any) => teacher.id === current) ? current : (list[0]?.id || ''));
       })
-      .catch(() => setTeachers([]));
-  }, [isAuthenticated, canSelectTeacher, selectedTermId]);
+      .catch(() => setTeachers([]))
+      .finally(() => setTeachersLoaded(true));
+  }, [isAuthenticated, canSelectTeacher, termsLoaded, selectedTermId]);
 
   const fetchData = useCallback(async (termId?: string, teacherId?: string) => {
     setLoading(true);
@@ -119,8 +123,10 @@ export default function TeacherAnalysisPage() {
       router.push('/login?redirect=/dashboard/teacher-analysis');
       return;
     }
-    if (isAuthenticated && !authLoading) fetchData(selectedTermId || undefined, selectedTeacherId || undefined);
-  }, [isAuthenticated, authLoading, selectedTermId, selectedTeacherId, fetchData, router]);
+    if (!isAuthenticated || authLoading) return;
+    if (canSelectTeacher && (!teachersLoaded || !selectedTeacherId)) return;
+    fetchData(selectedTermId || undefined, selectedTeacherId || undefined);
+  }, [isAuthenticated, authLoading, canSelectTeacher, teachersLoaded, selectedTermId, selectedTeacherId, fetchData, router]);
 
   const downloadReport = async () => {
     if (!data?.summary?.term) return;

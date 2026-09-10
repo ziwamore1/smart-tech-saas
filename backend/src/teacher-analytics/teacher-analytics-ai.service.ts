@@ -25,7 +25,7 @@ export class TeacherAnalyticsAiService {
   constructor(private config: ConfigService) {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (apiKey) {
-      this.openai = new OpenAI({ apiKey });
+      this.openai = new OpenAI({ apiKey, timeout: 8000, maxRetries: 0 });
       this.logger.log('OpenAI initialized for teacher-analytics insights.');
     } else {
       this.logger.warn('OPENAI_API_KEY not configured. Teacher analytics AI will use rule-based insights.');
