@@ -60,6 +60,77 @@ function SeverityBadge({ level }: { level: string }) {
   );
 }
 
+const GRADE_COLORS: Record<string, string> = {
+  '1': '#059669', '2': '#10b981', '3': '#2563eb', '4': '#3b82f6',
+  '5': '#d97706', '6': '#f59e0b', '7': '#dc2626', '8': '#b91c1c', '9': '#7f1d1d',
+  'A+': '#059669', 'A': '#10b981', 'B+': '#2563eb', 'B': '#3b82f6',
+  'C+': '#d97706', 'C': '#f59e0b', 'D': '#dc2626', 'E': '#b91c1c', 'F': '#7f1d1d',
+};
+function gradeColor(g: string) {
+  return GRADE_COLORS[g] || '#9ca3af';
+}
+
+function GradeDistributionPanel({
+  distribution,
+  profile,
+  totalAssessed,
+}: {
+  distribution: any[];
+  profile?: any;
+  totalAssessed?: number;
+}) {
+  const rows = distribution || [];
+  const maxCount = Math.max(1, ...rows.map((d) => d.count ?? 0));
+  const total = totalAssessed ?? rows.reduce((s, d) => s + (d.count ?? 0), 0);
+  if (rows.length === 0) return null;
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">
+            Grade Distribution {profile?.systemName ? `— ${profile.systemName}` : ''}
+          </h3>
+          {profile?.qualityBands && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              Quality (pass): {profile.qualityBands.description} · Quantity (pass): {profile.quantityBands?.description}
+            </p>
+          )}
+        </div>
+        <span className="text-xs text-gray-500">{total} graded learners</span>
+      </div>
+      <div className="space-y-2">
+        {rows.map((d) => (
+          <div key={d.grade} className="flex items-center gap-3">
+            <span className="w-7 text-center font-bold text-sm" style={{ color: gradeColor(d.grade) }}>{d.grade}</span>
+            <div className="flex-1 bg-gray-100 rounded h-5 overflow-hidden">
+              <div className="h-full rounded" style={{ width: `${Math.max(((d.count ?? 0) / maxCount) * 100, d.count ? 6 : 0)}%`, background: gradeColor(d.grade) }} />
+            </div>
+            <span className="w-28 text-right text-sm font-medium whitespace-nowrap">
+              {d.count ?? 0} <span className="text-gray-400 text-xs">({pct(d.percentage)})</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GradeLegend({ distribution }: { distribution: any[] }) {
+  if (!distribution || distribution.length === 0) return null;
+  const items = distribution.filter((d) => (d.count ?? 0) > 0);
+  if (items.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {items.map((d) => (
+        <span key={d.grade} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-gray-200 text-xs font-medium text-gray-700">
+          <span className="w-3 h-3 rounded-full" style={{ background: gradeColor(d.grade) }} />
+          Grade {d.grade}: {d.count}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function TeacherAnalysisPage() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const router = useRouter();
@@ -75,6 +146,9 @@ export default function TeacherAnalysisPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'classes' | 'subjects' | 'at-risk' | 'trends' | 'competency' | 'ai'>('overview');
   const [generating, setGenerating] = useState(false);
+  const [viewReport, setViewReport] = useState(false);
+  const [reportHtml, setReportHtml] = useState<string | null>(null);
+  const [viewingReport, setViewingReport] = useState(false);
 
   const userRoles = ((user as any)?.allRoles || user?.roles || []).map((role: string) => String(role).toUpperCase());
   const canSelectTeacher = userRoles.some((role: string) => ['DIRECTOR', 'HEAD TEACHER', 'HEADTEACHER', 'DEPUTY HEAD', 'DEPUTY HEAD TEACHER', 'DEPUTYHEADTEACHER', 'DEPUTY'].includes(role));
@@ -152,6 +226,25 @@ export default function TeacherAnalysisPage() {
     }
   };
 
+  const openReport = async () => {
+    if (!summary?.term) return;
+    setViewingReport(true);
+    setReportHtml(null);
+    try {
+      const res = await reportEngineApi.previewTeacherAnalysis({
+        termId: summary.term.id,
+        examType: summary.examType || undefined,
+        teacherUserId: selectedTeacherId || undefined,
+      });
+      setReportHtml(res?.data?.html || res?.data?.data?.html || null);
+      setViewReport(true);
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Failed to load report preview');
+    } finally {
+      setViewingReport(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -224,6 +317,13 @@ export default function TeacherAnalysisPage() {
             className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
           >
             ↻ Refresh
+          </button>
+          <button
+            onClick={openReport}
+            disabled={viewingReport || !summary?.term}
+            className="px-4 py-2 bg-white border border-pink-300 text-pink-600 rounded-lg hover:bg-pink-50 text-sm font-medium disabled:opacity-50"
+          >
+            {viewingReport ? 'Loading…' : '👁 View Report'}
           </button>
           <button
             onClick={downloadReport}
@@ -306,10 +406,12 @@ export default function TeacherAnalysisPage() {
           {/* ======= OVERVIEW ======= */}
           {activeTab === 'overview' && (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-10 gap-4 mb-6">
                 {[
                   { label: 'Avg Score', value: pct(summary.overallAverage), color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
                   { label: 'Pass Rate', value: pct(summary.overallPassRate), color: 'bg-green-50 text-green-700 border-green-200' },
+                  { label: 'Quality Pass', value: pct(summary.overallQualityPassRate), color: 'bg-purple-50 text-purple-700 border-purple-200', title: summary.gradingProfiles?.[0]?.qualityBands?.description },
+                  { label: 'Quantity Pass', value: pct(summary.overallQuantityPassRate), color: 'bg-teal-50 text-teal-700 border-teal-200', title: summary.gradingProfiles?.[0]?.quantityBands?.description },
                   { label: 'Learners', value: summary.totalStudentsTaught ?? '—', color: 'bg-blue-50 text-blue-700 border-blue-200' },
                   { label: 'Classes', value: summary.classesCount ?? '—', color: 'bg-teal-50 text-teal-700 border-teal-200' },
                   { label: 'Subjects', value: summary.subjectsCount ?? '—', color: 'bg-purple-50 text-purple-700 border-purple-200' },
@@ -320,6 +422,7 @@ export default function TeacherAnalysisPage() {
                   <div key={stat.label} className={`${stat.color} border rounded-xl p-4`}>
                     <p className="text-2xl font-bold">{stat.value}</p>
                     <p className="text-xs mt-1 opacity-80">{stat.label}</p>
+                    {stat.title && <p className="text-[10px] mt-0.5 opacity-60 truncate">{stat.title}</p>}
                   </div>
                 ))}
               </div>
@@ -367,6 +470,8 @@ export default function TeacherAnalysisPage() {
                           <th className="text-left py-2 px-4 font-semibold text-gray-700">Class</th>
                           <th className="text-center py-2 px-4 font-semibold text-gray-700">Avg</th>
                           <th className="text-center py-2 px-4 font-semibold text-gray-700">Pass</th>
+                          <th className="text-center py-2 px-4 font-semibold text-gray-700">Quality</th>
+                          <th className="text-center py-2 px-4 font-semibold text-gray-700">Quantity</th>
                           <th className="text-center py-2 px-4 font-semibold text-gray-700">Learners</th>
                         </tr>
                       </thead>
@@ -376,10 +481,12 @@ export default function TeacherAnalysisPage() {
                             <td className="py-2 px-4 font-medium text-gray-900">{c.className}</td>
                             <td className="py-2 px-4 text-center font-medium">{pct(c.average)}</td>
                             <td className="py-2 px-4 text-center font-medium">{pct(c.passRate)}</td>
+                            <td className="py-2 px-4 text-center font-medium text-purple-600">{pct(c.qualityPassRate)}</td>
+                            <td className="py-2 px-4 text-center font-medium text-teal-600">{pct(c.quantityPassRate)}</td>
                             <td className="py-2 px-4 text-center">{c.studentCount}</td>
                           </tr>
                         ))}
-                        {classes.length === 0 && <tr><td colSpan={4} className="py-4 text-center text-gray-500">No class data</td></tr>}
+                        {classes.length === 0 && <tr><td colSpan={6} className="py-4 text-center text-gray-500">No class data</td></tr>}
                       </tbody>
                     </table>
                   </div>
@@ -415,6 +522,18 @@ export default function TeacherAnalysisPage() {
                   </div>
                 </div>
               </div>
+
+              {summary?.gradeDistribution?.length > 0 && (
+                <div className="mt-4">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-2">Grade Distribution</h2>
+                  <GradeDistributionPanel
+                    distribution={summary.gradeDistribution}
+                    profile={summary.gradingProfiles?.[0]}
+                    totalAssessed={summary.assessedForGrading}
+                  />
+                  <div className="mt-3"><GradeLegend distribution={summary.gradeDistribution} /></div>
+                </div>
+              )}
 
               {attendance && (
                 <div className="mt-4 bg-white border border-gray-200 rounded-xl p-4">
@@ -476,6 +595,8 @@ export default function TeacherAnalysisPage() {
                       <th className="text-center py-3 px-4 font-semibold text-gray-700">Learners</th>
                       <th className="text-center py-3 px-4 font-semibold text-gray-700">Avg</th>
                       <th className="text-center py-3 px-4 font-semibold text-gray-700">Pass</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Quality</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Quantity</th>
                       <th className="text-center py-3 px-4 font-semibold text-gray-700">Trend</th>
                       <th className="text-center py-3 px-4 font-semibold text-gray-700">Gender Gap</th>
                     </tr>
@@ -488,6 +609,8 @@ export default function TeacherAnalysisPage() {
                         <td className="py-3 px-4 text-center">{c.studentCount}</td>
                         <td className="py-3 px-4 text-center font-medium">{pct(c.average)}</td>
                         <td className="py-3 px-4 text-center font-medium">{pct(c.passRate)}</td>
+                        <td className="py-3 px-4 text-center font-medium text-purple-600">{pct(c.qualityPassRate)}</td>
+                        <td className="py-3 px-4 text-center font-medium text-teal-600">{pct(c.quantityPassRate)}</td>
                         <td className="py-3 px-4 text-center">
                           <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${TREND_COLOR[c.trend] || 'bg-gray-100 text-gray-500'}`}>
                             {trendLabel(c.trend)}
@@ -497,11 +620,19 @@ export default function TeacherAnalysisPage() {
                       </tr>
                     ))}
                     {classes.length === 0 && (
-                      <tr><td colSpan={7} className="py-8 text-center text-gray-500">No class-level data for this term.</td></tr>
+                      <tr><td colSpan={9} className="py-8 text-center text-gray-500">No class-level data for this term.</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
+
+              {classes.filter((c: any) => c.gradeDistribution?.length).length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 border-t border-gray-200">
+                  {classes.filter((c: any) => c.gradeDistribution?.length).map((c: any) => (
+                    <GradeDistributionPanel key={c.classId} distribution={c.gradeDistribution} profile={c.gradingProfile} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -575,7 +706,7 @@ export default function TeacherAnalysisPage() {
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                 <div className="p-4 border-b border-gray-200">
                   <h2 className="text-lg font-semibold text-gray-900">Learners Requiring Support</h2>
-                  <p className="text-sm text-gray-500">Ranked by risk; click a row to view recommended intervention</p>
+                  <p className="text-sm text-gray-500">Ranked by risk; subject-specific interventions per learner</p>
                 </div>
                 {atRisk.length > 0 ? (
                   <div className="overflow-x-auto">
@@ -584,16 +715,19 @@ export default function TeacherAnalysisPage() {
                         <tr className="bg-gray-50 border-b border-gray-200">
                           <th className="text-left py-3 px-4 font-semibold text-gray-700">Learner</th>
                           <th className="text-left py-3 px-4 font-semibold text-gray-700">Class</th>
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">Subject</th>
+                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Grade</th>
+                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Points</th>
                           <th className="text-center py-3 px-4 font-semibold text-gray-700">Avg</th>
                           <th className="text-center py-3 px-4 font-semibold text-gray-700">Status</th>
-                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Trend</th>
                           <th className="text-center py-3 px-4 font-semibold text-gray-700">Risk</th>
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">Flags</th>
                           <th className="text-left py-3 px-4 font-semibold text-gray-700">Intervention</th>
                         </tr>
                       </thead>
                       <tbody>
                         {atRisk.map((s: any, i: number) => (
-                          <tr key={s.studentId} className={`border-b border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                          <tr key={s.studentId} className={`border-b border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} align-top`}>
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2">
                                 {s.photoUrl ? (
@@ -610,6 +744,16 @@ export default function TeacherAnalysisPage() {
                               </div>
                             </td>
                             <td className="py-3 px-4 text-gray-600">{s.className}</td>
+                            <td className="py-3 px-4 text-gray-700">{s.subjectName || '—'}</td>
+                            <td className="py-3 px-4 text-center">
+                              {s.grade != null && (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <span className="w-3 h-3 rounded-full" style={{ background: gradeColor(s.grade) }} />
+                                  <span className="font-bold" style={{ color: gradeColor(s.grade) }}>{s.grade}</span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-center font-medium">{s.points ?? '—'}</td>
                             <td className="py-3 px-4 text-center font-medium">{pct(s.currentAverage)}</td>
                             <td className="py-3 px-4 text-center">
                               <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
@@ -619,16 +763,32 @@ export default function TeacherAnalysisPage() {
                               </span>
                             </td>
                             <td className="py-3 px-4 text-center">
-                              <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${TREND_COLOR[s.trend] || 'bg-gray-100 text-gray-500'}`}>
-                                {trendLabel(s.trend)}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-center">
                               <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${RISK_COLOR[s.riskLevel] || 'bg-gray-100 text-gray-500'}`}>
                                 {s.riskLevel}
                               </span>
                             </td>
-                            <td className="py-3 px-4 text-gray-700">{s.recommendedIntervention}</td>
+                            <td className="py-3 px-4">
+                              <div className="flex flex-wrap gap-1">
+                                {s.flags?.map((f: string, fi: number) => (
+                                  <span key={fi} className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-50 text-orange-700 border border-orange-200">{f}</span>
+                                ))}
+                                {(s.qualityPassed === false || s.quantityPassed === false) && (
+                                  <>
+                                    {s.qualityPassed === false && <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">Below quality band</span>}
+                                    {s.quantityPassed === false && <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200">Below quantity band</span>}
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <p className="text-gray-800">{s.recommendedIntervention || '—'}</p>
+                              {s.interventionRationale && <p className="text-xs text-gray-400 mt-1">Why: {s.interventionRationale}</p>}
+                              {s.interventionAiUsed && (
+                                <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-pink-50 text-pink-600 border border-pink-200">
+                                  AI-personalised
+                                </span>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -938,6 +1098,41 @@ export default function TeacherAnalysisPage() {
             </div>
           )}
         </>
+      )}
+
+      {viewReport && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[92vh]">
+            <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-200">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Teacher Analysis Report Preview</h2>
+                <p className="text-sm text-gray-500">Consolidated HTML report — {context?.teacherName} · {summary?.dataPeriod}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={downloadReport}
+                  disabled={generating}
+                  className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 text-sm font-medium disabled:opacity-50"
+                >
+                  {generating ? 'Generating…' : '⬇ Download PDF'}
+                </button>
+                <button
+                  onClick={() => setViewReport(false)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                >
+                  ✕ Close
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto bg-gray-100 p-4">
+              {reportHtml ? (
+                <iframe title="Teacher Analysis Report Preview" srcDoc={reportHtml} className="w-full h-full min-h-[70vh] bg-white rounded-lg border border-gray-200" />
+              ) : (
+                <div className="flex items-center justify-center h-[70vh] text-gray-500">Loading report…</div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

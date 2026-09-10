@@ -2058,7 +2058,7 @@ const buffer = await this.renderHtmlToPdf(html, request.schoolId);
     return { buffer, url: result.secureUrl, publicId: result.publicId };
   }
 
-  private async generateTeacherAnalysisReport(request: ReportGenerationRequest) {
+private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
     const userId = request.userId || request.options?.userId;
     if (!userId) throw new BadRequestException('Teacher userId is required to generate this report');
 
@@ -2075,6 +2075,105 @@ const buffer = await this.renderHtmlToPdf(html, request.schoolId);
     });
     const overview = await this.teacherAnalytics.getOverview(teacherUser, request.termId).catch(() => null);
     const insights = overview ? await this.teacherAnalyticsAi.generateInsights(overview) : null;
+    return { userId, term, report, overview, insights };
+  }
+
+  private gradePieColor(grade: string): string {
+    const map: Record<string, string> = {
+      '1': '#059669', '2': '#10b981', '3': '#2563eb', '4': '#3b82f6',
+      '5': '#d97706', '6': '#f59e0b', '7': '#dc2626', '8': '#b91c1c', '9': '#7f1d1d',
+      'A+': '#059669', 'A': '#10b981', 'B+': '#2563eb', 'B': '#3b82f6',
+      'C+': '#d97706', 'C': '#f59e0b', 'D': '#dc2626', 'E': '#b91c1c', 'F': '#7f1d1d',
+    };
+    return map[grade] || '#9ca3af';
+  }
+
+  private buildGradePie(distribution: Array<{ grade: string; count: number }>, total: number): string {
+    const slices = distribution.filter((d) => d.count > 0);
+    if (total <= 0 || slices.length === 0) {
+      return '<div style="width:190px;height:100px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px">No graded learners</div>';
+    }
+    let cumulative = 0;
+    const paths = slices.map((d) => {
+      const start = (cumulative / total) * 360;
+      cumulative += d.count;
+      const end = (cumulative / total) * 360;
+      const startRad = ((start - 90) * Math.PI) / 180;
+      const endRad = ((end - 90) * Math.PI) / 180;
+      const r = 66;
+      const x1 = 80 + r * Math.cos(startRad);
+      const y1 = 80 + r * Math.sin(startRad);
+      const x2 = 80 + r * Math.cos(endRad);
+      const y2 = 80 + r * Math.sin(endRad);
+      const largeArc = d.count / total > 0.5 ? 1 : 0;
+      const color = this.gradePieColor(d.grade);
+      return `<path d="M80,80 L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${largeArc},1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${color}" stroke="#ffffff" stroke-width="1"/>`;
+    }).join('');
+    return `<svg viewBox="0 0 160 160" width="190" height="190" style="flex-shrink:0">${paths}<text x="80" y="78" text-anchor="middle" font-size="20" font-weight="700" fill="#123b5d">${total}</text><text x="80" y="96" text-anchor="middle" font-size="10" fill="#6b7280">learners</text></svg>`;
+  }
+
+  private buildGradeDistributionHtml(assignments: any[], summary: any): string {
+    const profiles: any[] = summary?.gradingProfiles || [];
+    if (profiles.length === 0) return '';
+    const blocks = profiles.map((profile) => {
+      const rows = (assignments || []).filter((a) => a.gradingProfile?.systemId === profile.systemId);
+      const totalAssessed = rows.reduce((sum: number, r: any) => sum + (r.assessedStudents || 0), 0);
+      const gradeCounts = new Map<string, { count: number; remark: string | null }>();
+      for (const r of rows) {
+        for (const d of r.gradeScaleDistribution || []) {
+          const existing = gradeCounts.get(d.grade) || {
+            count: 0,
+            remark: (profile.gradeBreakdown || []).find((g: any) => g.grade === d.grade)?.remark || null,
+          };
+          existing.count += d.count || 0;
+          gradeCounts.set(d.grade, existing);
+        }
+      }
+      const ordered = (profile.grades || []).map((g: string) => ({
+        grade: g,
+        count: gradeCounts.get(g)?.count || 0,
+        remark: gradeCounts.get(g)?.remark || null,
+      }));
+      const legendRows = ordered.map(({ grade, count, remark }) => `
+        <tr>
+          <td class="text-center font-bold" style="color:${this.gradePieColor(grade)};font-size:13px">${grade}</td>
+          <td style="color:#6b7280;font-size:12px">${remark || '—'}</td>
+          <td class="text-center font-semibold">${count}</td>
+          <td class="text-center">${totalAssessed > 0 ? ((count / totalAssessed) * 100).toFixed(1) : '0.0'}%</td>
+          <td class="text-center"><div style="width:14px;height:14px;border-radius:3px;background:${this.gradePieColor(grade)};display:inline-block;vertical-align:middle"></div></td>
+        </tr>`).join('');
+      const distribution = ordered.map(({ grade, count }) => ({ grade, count }));
+      return `
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+            <strong style="color:#123b5d">${profile.systemName}</strong>
+            <span class="grade-badge" style="background:${profile.source === 'CLASS' ? '#d1fae5' : '#dbeafe'};color:${profile.source === 'CLASS' ? '#047857' : '#1d4ed8'};font-size:11px">${profile.source}</span>
+          </div>
+          <div style="font-size:12px;color:#64748b;margin-bottom:10px">
+            <strong>Quality</strong> (pass): ${profile.qualityBands?.description || '—'} ·
+            <strong>Quantity</strong> (pass): ${profile.quantityBands?.description || '—'}
+          </div>
+          <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+            ${this.buildGradePie(distribution, totalAssessed)}
+            <table style="width:auto;min-width:320px;font-size:13px">
+              <thead><tr><th class="text-center">Grade</th><th>Remark</th><th class="text-center">Learners</th><th class="text-center">%</th><th class="text-center">Colour</th></tr></thead>
+              <tbody>${legendRows}</tbody>
+            </table>
+          </div>
+        </div>`;
+    }).join('');
+    return `<div class="section-title">Grading Legend &amp; Grade Distribution (per grading system)</div>${blocks}`;
+  }
+
+  private buildTeacherAnalysisHtml(args: {
+    report: any;
+    overview: any;
+    insights: any;
+    term: any;
+    schoolName: string;
+    subtitle: string;
+  }): { html: string; title: string; orientation: 'landscape' } {
+    const { report, overview, insights } = args;
     const summary = report.summary;
 
     const pct = (v: number | null | undefined): string =>
@@ -2090,22 +2189,29 @@ const buffer = await this.renderHtmlToPdf(html, request.schoolId);
         <div class="summary-card"><div class="summary-value">${summary.assessmentsAnalysed}</div><div class="summary-label">Assessments Analysed</div></div>
         <div class="summary-card" style="border-top-color:#2563eb"><div class="summary-value" style="color:#2563eb">${pct(summary.overallAverage)}</div><div class="summary-label">Overall Average</div></div>
         <div class="summary-card" style="border-top-color:#059669"><div class="summary-value" style="color:${summary.overallPassRate != null && summary.overallPassRate >= 60 ? '#059669' : '#dc2626'}">${pct(summary.overallPassRate)}</div><div class="summary-label">Pass Rate</div></div>
+        <div class="summary-card" style="border-top-color:#7c3aed"><div class="summary-value" style="color:#7c3aed">${pct(summary.overallQualityPassRate)}</div><div class="summary-label">Quality Pass</div></div>
+        <div class="summary-card" style="border-top-color:#0d9488"><div class="summary-value" style="color:#0d9488">${pct(summary.overallQuantityPassRate)}</div><div class="summary-label">Quantity Pass</div></div>
+        <div class="summary-card" style="border-top-color:#f59e0b"><div class="summary-value" style="color:#d97706">${summary.assessedForGrading ?? 0}</div><div class="summary-label">Graded Learners</div></div>
         <div class="summary-card"><div class="summary-value fail">${summary.studentsAtRisk}</div><div class="summary-label">At Risk (&lt;40%)</div></div>
-        <div class="summary-card"><div class="summary-value" style="color:#7c3aed">${summary.studentsRequiringIntervention}</div><div class="summary-label">Require Support</div></div>
+        <div class="summary-card"><div class="summary-value" style="color:#dc2626">${summary.studentsRequiringIntervention}</div><div class="summary-label">Require Support</div></div>
       </div>`;
 
-    // Assignment performance table
+    const gradingBlock = this.buildGradeDistributionHtml(report.assignments || [], summary);
+
+    // Assignment performance table (now includes grading-system Quality/Quantity)
     const assignmentRows = (report.assignments || [])
       .map((a: any) => `
         <tr>
           <td style="font-weight:600">${dash(a.className)}</td>
           <td>${dash(a.subjectName)}</td>
+          <td style="color:#6b7280;font-size:11px">${dash(a.gradingProfile?.systemName)}</td>
           <td class="text-center">${dash(a.stats?.count ?? 0)}</td>
           <td class="text-center font-bold" style="color:${this.scoreColor(a.stats?.average ?? 0)}">${pct(a.stats?.average)}</td>
           <td class="text-center">${pct(a.stats?.highest)}</td>
           <td class="text-center">${pct(a.stats?.lowest)}</td>
           <td class="text-center">${pct(a.stats?.passRate)}</td>
-          <td class="text-center">${pct(a.participationRate)}</td>
+          <td class="text-center"><span class="grade-badge" style="background:${(a.qualityPassRate ?? 0) >= 60 ? '#d1fae5' : '#fee2e2'};color:${(a.qualityPassRate ?? 0) >= 60 ? '#047857' : '#dc2626'}">${pct(a.qualityPassRate)}</span></td>
+          <td class="text-center"><span class="grade-badge" style="background:${(a.quantityPassRate ?? 0) >= 60 ? '#dbeafe' : '#fee2e2'};color:${(a.quantityPassRate ?? 0) >= 60 ? '#1d4ed8' : '#dc2626'}">${pct(a.quantityPassRate)}</span></td>
           <td class="text-center">${dash(a.trend)}</td>
         </tr>`)
       .join('');
@@ -2139,19 +2245,22 @@ const buffer = await this.renderHtmlToPdf(html, request.schoolId);
           .join('')
       : `<tr><td colspan="5" class="text-center">${dash(report.competency?.dataRequired || 'No competency data available.')}</td></tr>`;
 
-    // At-risk rows
+    // At-risk rows (student-specific interventions)
     const atRiskBody = (report.atRisk || []).length > 0
       ? report.atRisk.slice(0, 30).map((s: any) => `
           <tr>
             <td style="font-weight:600">${dash(s.studentName)}</td>
             <td>${dash(s.className)}</td>
+            <td>${dash(s.subjectName)}</td>
             <td class="text-center font-bold" style="color:${this.scoreColor(s.currentAverage ?? 0)}">${pct(s.currentAverage)}</td>
+            <td class="text-center"><span class="grade-badge" style="color:${this.gradeColor(s.grade || (s.currentAverage ?? 0) >= 40 ? 'D' : 'E').text};background:${this.gradeColor(s.grade || (s.currentAverage ?? 0) >= 40 ? 'D' : 'E').bg}">${dash(s.grade)}</span></td>
             <td class="text-center">${dash(s.trend)}</td>
             <td class="text-center"><span class="grade-badge" style="color:#fff;background:${s.riskLevel === 'HIGH' ? '#dc2626' : s.riskLevel === 'MODERATE' ? '#d97706' : '#16a34a'}">${dash(s.riskLevel)}</span></td>
-            <td>${(s.flags || []).slice(0, 3).join('; ') || '—'}</td>
+            <td style="font-size:12px">${(s.flags || []).slice(0, 3).join('; ') || '—'}</td>
+            <td style="font-size:12px;line-height:1.5">${dash(s.recommendedIntervention)}</td>
           </tr>`)
         .join('')
-      : '<tr><td colspan="6" class="text-center">No learners currently require intervention.</td></tr>';
+      : '<tr><td colspan="9" class="text-center">No learners currently require intervention.</td></tr>';
 
     // Action plan rows
     const actionPlan = (insights?.actionPlan || []).map((a: any) => `
@@ -2186,15 +2295,16 @@ const buffer = await this.renderHtmlToPdf(html, request.schoolId);
     const content = `${this.buildMetaBar([
         { label: 'Teacher', value: report.header.teacherName },
         { label: 'Department', value: report.header.department || '' },
-        { label: 'Term', value: `${term.name} (${term.academicYear?.name || ''})` },
+        { label: 'Term', value: `${args.term.name} (${args.term.academicYear?.name || ''})` },
         { label: 'Exam Type', value: report.header.examType },
         { label: 'Generated', value: new Date(report.header.generatedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) },
       ])}
       ${summaryCards}
+      ${gradingBlock}
       ${insightsBlock}
-      <div class="section-title">Class &amp; Subject Performance (Authoritative Results)</div>
-      <table><thead><tr><th>Class</th><th>Subject</th><th class="text-center">Assessed</th><th class="text-center">Average</th><th class="text-center">Highest</th><th class="text-center">Lowest</th><th class="text-center">Pass %</th><th class="text-center">Participation %</th><th class="text-center">Trend</th></tr></thead>
-        <tbody>${assignmentRows || '<tr><td colspan="9" class="text-center">No class/subject data available.</td></tr>'}</tbody>
+      <div class="section-title">Class &amp; Subject Performance (with Quality/Quantity pass per grading system)</div>
+      <table><thead><tr><th>Class</th><th>Subject</th><th>Grading System</th><th class="text-center">Assessed</th><th class="text-center">Average</th><th class="text-center">Highest</th><th class="text-center">Lowest</th><th class="text-center">Pass %</th><th class="text-center">Quality %</th><th class="text-center">Quantity %</th><th class="text-center">Trend</th></tr></thead>
+        <tbody>${assignmentRows || '<tr><td colspan="11" class="text-center">No class/subject data available.</td></tr>'}</tbody>
       </table>
       ${(genderRows ? `<div class="section-title">Gender Analysis</div>
       <table><thead><tr><th>Class</th><th>Subject</th><th class="text-center">Female Avg</th><th class="text-center">Male Avg</th><th class="text-center">Gap (pts)</th><th class="text-center">Classification</th></tr></thead>
@@ -2202,17 +2312,45 @@ const buffer = await this.renderHtmlToPdf(html, request.schoolId);
       <div class="section-title">Competency / Topic Mastery</div>
       <table><thead><tr><th>Class</th><th>Subject</th><th>Competency</th><th class="text-center">Mastery</th><th class="text-center">Status</th></tr></thead>
         <tbody>${competencyBody}</tbody></table>
-      <div class="section-title">Learners Requiring Support</div>
-      <table><thead><tr><th>Student</th><th>Class</th><th class="text-center">Average</th><th class="text-center">Trend</th><th class="text-center">Risk</th><th>Flags</th></tr></thead>
+      <div class="section-title">Learners Requiring Support (specific interventions)</div>
+      <table><thead><tr><th>Student</th><th>Class</th><th>Subject</th><th class="text-center">Average</th><th class="text-center">Grade</th><th class="text-center">Trend</th><th class="text-center">Risk</th><th>Flags</th><th>Recommended Intervention</th></tr></thead>
         <tbody>${atRiskBody}</tbody></table>`;
 
     const html = this.buildEnhancedReportShell({
-      schoolName: report.header.schoolName,
-      subtitle: `${report.header.title} — ${report.header.teacherName} — ${term.name} (${term.academicYear?.name || ''})`,
+      schoolName: args.schoolName,
+      subtitle: args.subtitle,
       title: 'Teacher Analysis and Intelligence Report',
       content,
       orientation: 'landscape',
     });
+    return { html, title: 'Teacher Analysis and Intelligence Report', orientation: 'landscape' as const };
+  }
+
+  async previewTeacherAnalysisHtml(request: ReportGenerationRequest): Promise<{ html: string; data: any }> {
+    const { userId, term, report, overview, insights } = await this.prepareTeacherAnalysisData(request);
+    const { html } = this.buildTeacherAnalysisHtml({
+      report,
+      overview,
+      insights,
+      term,
+      schoolName: report.header.schoolName,
+      subtitle: `${report.header.title} — ${report.header.teacherName} — ${term.name} (${term.academicYear?.name || ''})`,
+    });
+    return { html, data: { teacherName: report.header.teacherName, term: term.name, academicYear: term.academicYear?.name || '' } };
+  }
+
+  private async generateTeacherAnalysisReport(request: ReportGenerationRequest) {
+    const { userId, term, report, overview, insights } = await this.prepareTeacherAnalysisData(request);
+
+    const { html } = this.buildTeacherAnalysisHtml({
+      report,
+      overview,
+      insights,
+      term,
+      schoolName: report.header.schoolName,
+      subtitle: `${report.header.title} — ${report.header.teacherName} — ${term.name} (${term.academicYear?.name || ''})`,
+    });
+
     const buffer = await this.renderHtmlToPdf(html, request.schoolId, true);
     const result = await this.cloudinary.uploadBuffer(buffer, {
       folder: `${FOLDERS.system}/reports`,

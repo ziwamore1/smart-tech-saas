@@ -2507,10 +2507,12 @@ export const reportEngineApi = {
     api.post('/report-engine/validate', data),
   generate: (data: { type: string; studentId?: string; classId?: string; termId?: string; examType?: string; templateId?: string; options?: any }) =>
     api.post('/report-engine/generate', data),
-  generatePdf: (data: { type: string; studentId?: string; classId?: string; termId?: string; examType?: string; templateId?: string; teacherUserId?: string }) =>
+generatePdf: (data: { type: string; studentId?: string; classId?: string; termId?: string; examType?: string; templateId?: string; teacherUserId?: string }) =>
     api.post('/report-engine/generate-pdf', data, { responseType: 'blob', timeout: 300000 }),
   previewReportCard: (data: { studentId: string; termId: string; examType?: string; templateId?: string }) =>
     api.post('/report-engine/report-card-html', data, { timeout: 120000 }),
+  previewTeacherAnalysis: (data: { termId?: string; examType?: string; teacherUserId?: string }) =>
+    api.post('/report-engine/teacher-analysis-html', data, { timeout: 120000 }),
   generateBulk: (data: { type: string; classId?: string; termId?: string; examType?: string; templateId?: string; studentIds?: string[] }) =>
     api.post('/report-engine/generate-bulk', data, { timeout: 600000 }),
   listReports: (params?: { reportType?: string; classId?: string; termId?: string; page?: number; limit?: number }) =>

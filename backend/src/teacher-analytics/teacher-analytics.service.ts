@@ -6,6 +6,7 @@ import { TeacherAnalyticsStatisticsService, TREND_SENSITIVITY } from './teacher-
 import {
   AssignmentAnalytics,
   AssignmentRef,
+  ClassGradingProfile,
   CompetencyAnalysis,
   GenderAnalysis,
   HistoricalPoint,
@@ -36,6 +37,163 @@ type ComputedResultRow = {
     status: string;
   } | null;
 };
+
+// ---------------------------------------------------------------------------
+// Grading-band helpers — mirrors results-management.service.ts behaviour so
+// Forms uses 5-grade system (quality 1-3, quantity 1-4, grade 5 = fail) and
+// Grades (secondary) uses 9-grade system (quality 1-6, quantity 1-8, 9 = fail).
+// ---------------------------------------------------------------------------
+
+type AnalysisBandLocal = { labels: string[]; points: number[]; description: string };
+
+function normaliseGrade(value: string | null | undefined): string {
+  return String(value || '').trim().toUpperCase();
+}
+
+function bandIncludes(band: AnalysisBandLocal, grade: string | null, points: number | null): boolean {
+  const normalised = normaliseGrade(grade);
+  const labelMatch = normalised && band.labels.some(l => l === normalised);
+  const pointMatch = points != null && band.points.some(p => Math.abs(p - points) < 0.01);
+  return labelMatch || pointMatch;
+}
+
+function analysisBands(systemName: string): { quality: AnalysisBandLocal; quantity: AnalysisBandLocal; grades: string[] } {
+  const name = String(systemName || '').toLowerCase();
+
+  if (/forms|competency/.test(name)) {
+    return {
+      quality: { labels: ['1', '2', '3'], points: [1, 2, 3], description: 'Grades 1 to 3 (Quality)' },
+      quantity: { labels: ['1', '2', '3', '4'], points: [1, 2, 3, 4], description: 'Grades 1 to 4 (Quantity)' },
+      grades: ['1', '2', '3', '4', '5'],
+    };
+  }
+  if (/secondary|grade\s*7|grade\s*9|ecz\s*zambia|ecz_zm/.test(name)) {
+    return {
+      quality: { labels: ['1', '2', '3', '4', '5', '6'], points: [1, 2, 3, 4, 5, 6], description: 'Grades/Points 1 to 6 (Quality)' },
+      quantity: { labels: ['1', '2', '3', '4', '5', '6', '7', '8'], points: [1, 2, 3, 4, 5, 6, 7, 8], description: 'Grades/Points 1 to 8 (Quantity)' },
+      grades: ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
+    };
+  }
+  if (/university/.test(name)) {
+    return {
+      quality: { labels: ['A+', 'A', 'B+', 'B'], points: [4.5, 4, 3.5, 3], description: 'A+ to B (CGPA quality band)' },
+      quantity: { labels: ['A+', 'A', 'B+', 'B', 'C+', 'C'], points: [4.5, 4, 3.5, 3, 2.5, 2], description: 'A+ to C (CGPA quantity band)' },
+      grades: ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F'],
+    };
+  }
+  if (/college/.test(name)) {
+    return {
+      quality: { labels: ['A', 'B'], points: [4, 3], description: 'Grades A to B' },
+      quantity: { labels: ['A', 'B', 'C'], points: [4, 3, 2], description: 'Grades A to C' },
+      grades: ['A', 'B', 'C', 'D', 'E', 'F'],
+    };
+  }
+  if (/gpa|primary/.test(name)) {
+    return {
+      quality: { labels: ['A', 'B', 'C', 'D'], points: [5, 4, 3, 2], description: 'Grades A to D' },
+      quantity: { labels: ['A', 'B', 'C', 'D', 'E'], points: [5, 4, 3, 2, 1], description: 'Grades A to E' },
+      grades: ['A', 'B', 'C', 'D', 'E', 'F'],
+    };
+  }
+  // default
+  return {
+    quality: { labels: ['A', 'B', 'C', 'D'], points: [5, 4, 3, 2], description: 'Grades A to D' },
+    quantity: { labels: ['A', 'B', 'C', 'D', 'E'], points: [5, 4, 3, 2, 1], description: 'Grades A to E' },
+    grades: ['A', 'B', 'C', 'D', 'E', 'F'],
+  };
+}
+
+function percentageScale(percentage: number | null | undefined, scales: any[]): any | null {
+  if (percentage == null) return null;
+  const normalised = normaliseGrade(String(percentage));
+  const isNumeric = !Number.isNaN(Number(normalised));
+  if (isNumeric) {
+    const val = Number(normalised);
+    for (const s of scales) {
+      if (val >= s.minScore && val <= s.maxScore) return s;
+    }
+  }
+  for (const s of scales) {
+    if (normaliseGrade(s.grade) === normalised) return s;
+  }
+  return null;
+}
+
+/**
+ * Resolves the grading profile for a class. Mirrors the resolution logic in
+ * results-management.service.ts getAnalysis() (class → school default → fallback).
+ */
+async function resolveGradingProfile(prisma: any, classId: string, schoolId: string): Promise<ClassGradingProfile> {
+  const classRecord = await prisma.class.findUnique({
+    where: { id: classId },
+    select: { gradingSystem: { select: { id: true, name: true, gradeScales: { orderBy: { minScore: 'asc' } } } } },
+  });
+  const configured = classRecord?.gradingSystem || await prisma.gradingSystem.findFirst({
+    where: { schoolId, isDefault: true },
+    select: { id: true, name: true, gradeScales: { orderBy: { minScore: 'asc' } } },
+  });
+  const systemName = configured?.name || 'Primary Grading System';
+  const scales = (configured?.gradeScales || []) as any[];
+  const bands = analysisBands(systemName);
+  const gradeBreakdown = scales.map((s: any) => ({
+    grade: String(s.grade).trim(),
+    remark: s.remark || '',
+    minScore: s.minScore,
+    maxScore: s.maxScore,
+    points: s.points,
+  }));
+  return {
+    systemId: configured?.id || null,
+    systemName,
+    source: classRecord?.gradingSystem ? 'CLASS' : configured ? 'SCHOOL_DEFAULT' : 'FALLBACK',
+    grades: gradeBreakdown.map((s) => s.grade).length ? gradeBreakdown.map((s) => s.grade) : bands.grades,
+    qualityBands: { labels: bands.quality.labels, points: bands.quality.points, description: bands.quality.description },
+    quantityBands: { labels: bands.quantity.labels, points: bands.quantity.points, description: bands.quantity.description },
+    gradeBreakdown,
+  };
+}
+
+/**
+ * Batch-resolve grading profiles for an array of class IDs (single query).
+ */
+async function resolveGradingProfiles(prisma: any, classIds: string[], schoolId: string): Promise<Map<string, ClassGradingProfile>> {
+  const map = new Map<string, ClassGradingProfile>();
+  if (classIds.length === 0) return map;
+  const defaultSystem = await prisma.gradingSystem.findFirst({
+    where: { schoolId, isDefault: true },
+    select: { id: true, name: true, gradeScales: { orderBy: { minScore: 'asc' } } },
+  }).catch(() => null) as any;
+  const defaultBands = analysisBands(defaultSystem?.name || 'Primary Grading System');
+
+  const classRecords = await prisma.class.findMany({
+    where: { id: { in: classIds } },
+    select: { id: true, gradingSystem: { select: { id: true, name: true, gradeScales: { orderBy: { minScore: 'asc' } } } } },
+  });
+
+  for (const cr of classRecords) {
+    const configured = cr.gradingSystem || defaultSystem;
+    const systemName = configured?.name || 'Primary Grading System';
+    const scales = (configured?.gradeScales || []) as any[];
+    const bands = analysisBands(systemName);
+    const gradeBreakdown = scales.map((s: any) => ({
+      grade: String(s.grade).trim(),
+      remark: s.remark || '',
+      minScore: s.minScore,
+      maxScore: s.maxScore,
+      points: s.points,
+    }));
+    map.set(cr.id, {
+      systemId: configured?.id || null,
+      systemName,
+      source: cr.gradingSystem ? 'CLASS' : configured ? 'SCHOOL_DEFAULT' : 'FALLBACK',
+      grades: gradeBreakdown.map((s) => s.grade).length ? gradeBreakdown.map((s) => s.grade) : bands.grades,
+      qualityBands: { labels: bands.quality.labels, points: bands.quality.points, description: bands.quality.description },
+      quantityBands: { labels: bands.quantity.labels, points: bands.quantity.points, description: bands.quantity.description },
+      gradeBreakdown,
+    });
+  }
+  return map;
+}
 
 /**
  * Teacher Analysis & Teaching Intelligence engine.
@@ -354,6 +512,7 @@ export class TeacherAnalyticsService {
     termStart: Date,
     academicYearName: string,
     schoolId: string,
+    gradingProfiles?: Map<string, ClassGradingProfile>,
   ): Promise<AssignmentAnalytics> {
     const results = await this.loadResultsForAssignment(assignment, termId, schoolId);
     const participated = results.filter((r) => !r.isAbsent);
@@ -361,6 +520,39 @@ export class TeacherAnalyticsService {
     const enrolledStudents = await this.prisma.enrollment.count({
       where: { classId: assignment.classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
     });
+
+    // Grading profile (quality/quantity bands for this class)
+    const profile = gradingProfiles?.get(assignment.classId) || await resolveGradingProfile(this.prisma, assignment.classId, schoolId);
+    const profileScales = profile.gradeBreakdown;
+    const totalAssessed = participated.length;
+
+    // Grade-scale-based quality/quantity + full grade distribution
+    let qualityPassed = 0;
+    let quantityPassed = 0;
+    const gradeCounts = new Map<string, number>();
+    for (const r of participated) {
+      if (r.finalPercentage == null) continue;
+      // Prefer persisted grade/points, fallback to scale lookup
+      const scale = profileScales.length
+        ? profileScales.find(
+            (s) => r.finalPercentage! >= s.minScore && r.finalPercentage! <= s.maxScore,
+          )
+        : null;
+      const grade = (scale?.grade != null ? scale.grade.trim() : r.finalGrade || null);
+      const points = scale?.points ?? r.points ?? null;
+      if (bandIncludes(profile.qualityBands, grade, points)) qualityPassed++;
+      if (bandIncludes(profile.quantityBands, grade, points)) quantityPassed++;
+      const key = grade || 'N/A';
+      gradeCounts.set(key, (gradeCounts.get(key) || 0) + 1);
+    }
+    const qualityPassRate = totalAssessed > 0 ? this.stats.round2((qualityPassed / totalAssessed) * 100) : null;
+    const quantityPassRate = totalAssessed > 0 ? this.stats.round2((quantityPassed / totalAssessed) * 100) : null;
+
+    const gradeScaleDistribution = profile.grades.map((g) => ({
+      grade: g,
+      count: gradeCounts.get(g) || 0,
+      percentage: totalAssessed > 0 ? this.stats.round2(((gradeCounts.get(g) || 0) / totalAssessed) * 100) : null,
+    }));
 
     const participationRate =
       enrolledStudents > 0 ? (participated.length / enrolledStudents) * 100 : null;
@@ -429,7 +621,7 @@ export class TeacherAnalyticsService {
       (t) => t.competencyScores && Object.keys(t.competencyScores as object).length > 0,
     );
 
-    const qualityRate = participated.length
+    const qualityQuantityScore = participated.length
       ? (scores.filter((s) => s >= 50).length / scores.length) * 100
       : null;
 
@@ -452,13 +644,19 @@ export class TeacherAnalyticsService {
         participated.map((r) => ({ score: r.finalPercentage, grade: r.finalGrade })),
       ),
       gender,
-      qualityQuantity: this.stats.qualityQuantity(participationRate, qualityRate),
+      qualityQuantity: this.stats.qualityQuantity(participationRate, qualityQuantityScore),
       improvingStudents,
       decliningStudents,
       trend,
       trendDelta: this.stats.round2(avgDelta),
       atRiskCount: scores.filter((s) => s < 50).length,
       assessmentCompletion: this.stats.round2(participationRate),
+      gradingProfile: profile,
+      qualityPassRate,
+      quantityPassRate,
+      qualityPassed,
+      quantityPassed,
+      gradeScaleDistribution,
     } as AssignmentAnalytics;
   }
 
@@ -473,6 +671,9 @@ export class TeacherAnalyticsService {
       include: { academicYear: true },
     });
     const assignments = await this.getAssignments(contextUserId, schoolId, termRecord?.academicYearId);
+    // Pre-resolve grading profiles for all classes in this assignment set
+    const classIds = [...new Set(assignments.map((a) => a.classId))];
+    const profiles = await resolveGradingProfiles(this.prisma, classIds, schoolId);
     const out = await Promise.all(
       assignments.map(async (assignment) => {
         try {
@@ -483,6 +684,7 @@ export class TeacherAnalyticsService {
             term.startDate,
             termRecord?.academicYear?.name || academicYearName,
             schoolId,
+            profiles,
           );
         } catch (err) {
           this.logger.warn(
@@ -589,6 +791,33 @@ export class TeacherAnalyticsService {
       ),
     };
 
+    // Quality/Quantity aggregation across all assignments
+    const assessedRows = assignmentAnalytics.filter((a) => a.assessedStudents > 0);
+    const totalGraded = assessedRows.reduce((sum, a) => sum + a.assessedStudents, 0);
+    const totalQualityPassed = assessedRows.reduce((sum, a) => sum + a.qualityPassed, 0);
+    const totalQuantityPassed = assessedRows.reduce((sum, a) => sum + a.quantityPassed, 0);
+    const overallQualityPassRate = totalGraded > 0 ? this.stats.round2((totalQualityPassed / totalGraded) * 100) : null;
+    const overallQuantityPassRate = totalGraded > 0 ? this.stats.round2((totalQuantityPassed / totalGraded) * 100) : null;
+
+    // Combined grade distribution across all assignments
+    const gradeCounts = new Map<string, number>();
+    for (const a of assignmentAnalytics) {
+      for (const d of a.gradeScaleDistribution) {
+        gradeCounts.set(d.grade, (gradeCounts.get(d.grade) || 0) + d.count);
+      }
+    }
+    const combinedGrades = [...new Set(assignmentAnalytics.flatMap((a) => a.gradingProfile.grades))];
+    const gradeDistribution = combinedGrades.map((g) => ({
+      grade: g,
+      count: gradeCounts.get(g) || 0,
+      percentage: totalGraded > 0 ? this.stats.round2(((gradeCounts.get(g) || 0) / totalGraded) * 100) : null,
+    }));
+
+    const uniqueProfiles = new Map<string, ClassGradingProfile>();
+    for (const a of assignmentAnalytics) {
+      if (!uniqueProfiles.has(a.gradingProfile.systemName)) uniqueProfiles.set(a.gradingProfile.systemName, a.gradingProfile);
+    }
+
     return {
       teacher: context,
       academicYear: academicYearName,
@@ -619,6 +848,13 @@ export class TeacherAnalyticsService {
       genderGap,
       genderGapClassification,
       performanceIndicators,
+      overallQualityPassRate,
+      overallQuantityPassRate,
+      qualityPassed: totalQualityPassed,
+      quantityPassed: totalQuantityPassed,
+      assessedForGrading: totalGraded,
+      gradingProfiles: Array.from(uniqueProfiles.values()),
+      gradeDistribution,
       lastUpdated: new Date().toISOString(),
       dataPeriod: term ? `${term.name} ${academicYearName || ''}`.trim() : 'No active term',
     };
@@ -644,6 +880,29 @@ export class TeacherAnalyticsService {
       const averages = rows.map((r) => r.stats.average).filter((v): v is number => v != null);
       const passRates = rows.map((r) => r.stats.passRate).filter((v): v is number => v != null);
       const gapValues = rows.map((r) => r.gender.gap.averageGap).filter((v): v is number => v != null);
+
+      // Quality/Quantity aggregation across subjects in this class
+      const assessedRows = rows.filter((r) => r.assessedStudents > 0);
+      const totalAssessed = assessedRows.reduce((sum, r) => sum + r.assessedStudents, 0);
+      const totalQualityPassed = assessedRows.reduce((sum, r) => sum + r.qualityPassed, 0);
+      const totalQuantityPassed = assessedRows.reduce((sum, r) => sum + r.quantityPassed, 0);
+      const qualityPassRate = totalAssessed > 0 ? this.stats.round2((totalQualityPassed / totalAssessed) * 100) : null;
+      const quantityPassRate = totalAssessed > 0 ? this.stats.round2((totalQuantityPassed / totalAssessed) * 100) : null;
+
+      // Grade distribution: merge across rows (same grading system within a class)
+      const gradeCounts = new Map<string, number>();
+      for (const r of rows) {
+        for (const d of r.gradeScaleDistribution) {
+          gradeCounts.set(d.grade, (gradeCounts.get(d.grade) || 0) + d.count);
+        }
+      }
+      const profile = rows[0]?.gradingProfile;
+      const gradeScaleDistribution = (profile?.grades || []).map((g) => ({
+        grade: g,
+        count: gradeCounts.get(g) || 0,
+        percentage: totalAssessed > 0 ? this.stats.round2(((gradeCounts.get(g) || 0) / totalAssessed) * 100) : null,
+      }));
+
       return {
         classId,
         className: rows[0].className,
@@ -655,6 +914,10 @@ export class TeacherAnalyticsService {
           rows.reduce((sum, r) => sum + (r.trendDelta ?? 0), 0) / (rows.length || 1),
         ),
         genderGap: gapValues.length ? this.stats.round2(this.stats.mean(gapValues)) : null,
+        qualityPassRate,
+        quantityPassRate,
+        gradingProfile: profile || null,
+        gradeScaleDistribution,
         assignmentDetails: rows,
       };
     });
@@ -847,6 +1110,10 @@ export class TeacherAnalyticsService {
     const out: StudentRiskSummary[] = [];
     const seen = new Map<string, StudentRiskSummary>();
 
+    // Pre-resolve grading profiles for all classes
+    const classIds = [...new Set(analytics.map((a) => a.classId))];
+    const profiles = await resolveGradingProfiles(this.prisma, classIds, context.schoolId);
+
     const perAssignment = await Promise.all(
       analytics.map(async (a) => {
         const ref = this.toAssignmentRef(a);
@@ -861,6 +1128,7 @@ export class TeacherAnalyticsService {
       for (const r of prev) {
         if (r.finalPercentage != null) prevMap.set(r.studentId, r.finalPercentage);
       }
+      const profile = profiles.get(a.classId);
 
       for (const r of results) {
         if (r.isAbsent || r.finalPercentage == null) continue;
@@ -869,6 +1137,21 @@ export class TeacherAnalyticsService {
         const prevScore = prevMap.get(studentId);
         const delta = prevScore != null ? score - prevScore : null;
         const priorFailed = prevScore != null && prevScore < 50;
+
+        // Grade-scale-based quality/quantity for this student's result
+        let grade: string | null = r.finalGrade || null;
+        let points: number | null = r.points;
+        if (profile) {
+          const scale = profile.gradeBreakdown.find(
+            (s) => score >= s.minScore && score <= s.maxScore,
+          );
+          if (scale) {
+            grade = scale.grade;
+            points = scale.points;
+          }
+        }
+        const qualityPassed = profile ? bandIncludes(profile.qualityBands, grade, points) : null;
+        const quantityPassed = profile ? bandIncludes(profile.quantityBands, grade, points) : null;
 
         const flags: string[] = [];
         let riskLevel: StudentRiskSummary['riskLevel'] = 'STABLE';
@@ -887,10 +1170,14 @@ export class TeacherAnalyticsService {
           riskLevel = 'HIGH';
           flags.push('repeated failure');
         }
+        if (qualityPassed === false) flags.push('below quality band');
+        if (quantityPassed === false) flags.push('below quantity band');
         if (riskLevel === 'STABLE') {
           // only report learners who actually require attention
           continue;
         }
+
+        const intervention = this.studentSpecificIntervention(a.subjectName, score, grade, points, flags, profile);
 
         const existing = seen.get(studentId);
         if (existing) {
@@ -898,10 +1185,11 @@ export class TeacherAnalyticsService {
             existing.trendDelta = this.stats.round2(delta);
             existing.trend = this.stats.trendLabel(delta);
           }
-          if (score > (existing.currentAverage ?? 0)) existing.currentAverage = this.stats.round2(score);
+          if (score < (existing.currentAverage ?? Infinity)) existing.currentAverage = this.stats.round2(score);
           for (const f of flags) if (!existing.flags.includes(f)) existing.flags.push(f);
           if (riskLevel === 'HIGH') existing.riskLevel = 'HIGH';
           else if (existing.riskLevel !== 'HIGH' && riskLevel === 'MODERATE') existing.riskLevel = 'MODERATE';
+          // keep first assigned subject/grade for the summary row
           continue;
         }
 
@@ -920,7 +1208,13 @@ export class TeacherAnalyticsService {
           attendanceRate: null,
           riskLevel,
           flags,
-          recommendedIntervention: this.recommendedInterventionFor(a.subjectName, score, flags),
+          recommendedIntervention: intervention,
+          subjectName: a.subjectName,
+          grade,
+          points: points != null ? this.stats.round2(points) : null,
+          qualityPassed,
+          quantityPassed,
+          gradingSystemName: profile?.systemName || null,
         };
         seen.set(studentId, summary);
         out.push(summary);
@@ -933,19 +1227,46 @@ export class TeacherAnalyticsService {
     );
   }
 
-  private recommendedInterventionFor(subjectName: string, score: number, flags: string[]): string {
+  private studentSpecificIntervention(
+    subjectName: string,
+    score: number,
+    grade: string | null,
+    points: number | null,
+    flags: string[],
+    profile?: ClassGradingProfile | null,
+  ): string {
     const subjectLower = subjectName.toLowerCase();
-    const base =
-      score < 40
-        ? 'small-group remedial sessions with targeted diagnostic activities'
-        : 'focused practice with worked examples and regular retrieval checks';
+    const hasDecline = flags.some((f) => f.startsWith('decline'));
+    const hasRepeated = flags.includes('repeated failure');
+    const belowQuality = flags.includes('below quality band');
+    const belowQuantity = flags.includes('below quantity band');
+
+    const scoreText = `${score.toFixed(1)}%${grade ? ` (grade ${grade})` : ''}`;
+
+    // Identify the specific failing area
+    const failingAreas: string[] = [];
+    if (score < 40) failingAreas.push('critical score');
+    else if (score < 50) failingAreas.push('below pass threshold');
+    if (belowQuality) failingAreas.push(`quality band (${profile?.qualityBands.description || 'not met'})`);
+    if (belowQuantity) failingAreas.push(`quantity band (${profile?.quantityBands.description || 'not met'})`);
+    if (hasDecline) failingAreas.push('significant decline');
+    if (hasRepeated) failingAreas.push('persistent underperformance');
+
+    const areaText = failingAreas.length > 0 ? ` due to ${failingAreas.join(' and ')}` : '';
+
     if (/math|physics|chemistry|science|biology/.test(subjectLower)) {
-      return `Provide ${base}; use diagnostic exercises and step-by-step worked examples before independent practice. Re-assess within two weeks.`;
+      const base = score < 40
+        ? `small-group diagnostic intervention for ${subjectName}: score is ${scoreText}${areaText}`
+        : `targeted support for ${subjectName}: score is ${scoreText}${areaText}`;
+      return `${base}. Assign a diagnostic pre-test to isolate weak topics, pair with a peer tutor, and re-assess within two weeks to measure improvement.`;
     }
     if (/english|language|literature/.test(subjectLower)) {
-      return `Provide ${base}; prioritise vocabulary development, reading comprehension and structured writing practice. Re-assess within two weeks.`;
+      const base = score < 40
+        ? `small-group remedial for ${subjectName}: score is ${scoreText}${areaText}`
+        : `focused practice for ${subjectName}: score is ${scoreText}${areaText}`;
+      return `${base}. Use structured writing templates, guided reading comprehension exercises and vocabulary drills; reassess within two weeks.`;
     }
-    return `Provide ${base} with concept mapping and structured revision. Re-assess within two weeks and compare against the current baseline.`;
+    return `Provide individualised support for ${subjectName}: score is ${scoreText}${areaText}. Develop a personalised improvement plan with weekly check-ins and specific learning targets; reassess within two weeks.`;
   }
 
   // -------------------------------------------------------------------------
@@ -1259,6 +1580,7 @@ export class TeacherAnalyticsService {
         actionPlan: [],
         strengths: [],
         factCheck: [],
+        studentInterventions: [],
       },
       placeholders,
       collectionPlaceholders: {

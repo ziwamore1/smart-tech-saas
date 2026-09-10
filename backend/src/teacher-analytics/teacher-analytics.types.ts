@@ -66,6 +66,43 @@ export interface GradeDistribution {
   percentage: number | null;
 }
 
+// Quality/Quantity pass-band definition — label lists reference the grading
+// system's own grade strings (Forms: 1-3 quality / 1-4 quantity, 5 = fail;
+// Grades 9-scale: 1-6 quality / 1-8 quantity, 9 = fail).
+export interface AnalysisBand {
+  labels: string[];
+  points: number[];
+  description: string;
+}
+
+export interface ClassGradingProfile {
+  systemId: string | null;
+  systemName: string;
+  source: 'CLASS' | 'SCHOOL_DEFAULT' | 'FALLBACK';
+  grades: string[];
+  qualityBands: AnalysisBand;
+  quantityBands: AnalysisBand;
+  gradeBreakdown: Array<{
+    grade: string;
+    remark: string;
+    minScore: number;
+    maxScore: number;
+    points: number;
+  }>;
+}
+
+export interface StudentIntervention {
+  studentId: string;
+  studentName: string;
+  className: string;
+  subjectName: string | null;
+  grade: string | null;
+  currentAverage: number | null;
+  riskLevel: RiskLevel;
+  intervention: string;
+  rationale: string | null;
+}
+
 export interface GenderStats extends ScoreStats {
   count: number;
   average: number | null;
@@ -119,6 +156,12 @@ export interface AssignmentAnalytics {
   trendDelta: number | null;
   atRiskCount: number;
   assessmentCompletion: number | null;
+  gradingProfile: ClassGradingProfile;
+  qualityPassRate: number | null;
+  quantityPassRate: number | null;
+  qualityPassed: number;
+  quantityPassed: number;
+  gradeScaleDistribution: GradeDistribution[];
 }
 
 export interface StudentRiskSummary {
@@ -137,6 +180,12 @@ export interface StudentRiskSummary {
   riskLevel: RiskLevel;
   flags: string[];
   recommendedIntervention: string;
+  subjectName: string | null;
+  grade: string | null;
+  points: number | null;
+  qualityPassed: boolean | null;
+  quantityPassed: boolean | null;
+  gradingSystemName: string | null;
 }
 
 export interface CompetencyAnalysis {
@@ -207,6 +256,13 @@ export interface TeacherSummary {
     highPerformers: number;
     lowPerformers: number;
   };
+  overallQualityPassRate: number | null;
+  overallQuantityPassRate: number | null;
+  qualityPassed: number;
+  quantityPassed: number;
+  assessedForGrading: number;
+  gradingProfiles: ClassGradingProfile[];
+  gradeDistribution: GradeDistribution[];
   lastUpdated: string;
   dataPeriod: string;
 }
@@ -241,6 +297,7 @@ export interface TeacherInsight {
   }>;
   strengths: string[];
   factCheck: InsightFact[];
+  studentInterventions: StudentIntervention[];
 }
 
 export interface TeacherReportData {

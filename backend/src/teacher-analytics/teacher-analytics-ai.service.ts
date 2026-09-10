@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import {
   InsightFact,
+  StudentIntervention,
   TeacherInsight,
   StudentRiskSummary,
 } from './teacher-analytics.types';
@@ -107,6 +108,17 @@ export class TeacherAnalyticsAiService {
       actionPlan: this.buildActionPlan(weakestSubject, weakestCompetency, atRisk, summary),
       strengths,
       factCheck,
+      studentInterventions: atRisk.map((s) => ({
+        studentId: s.studentId,
+        studentName: s.studentName,
+        className: s.className,
+        subjectName: s.subjectName ?? null,
+        grade: s.grade ?? null,
+        currentAverage: s.currentAverage,
+        riskLevel: s.riskLevel,
+        intervention: s.recommendedIntervention,
+        rationale: s.flags.length > 0 ? s.flags.join('; ') : null,
+      })) as StudentIntervention[],
     };
   }
 
@@ -409,10 +421,17 @@ export class TeacherAnalyticsAiService {
         : null,
       trends: (o?.trends || []).map((t: any) => ({ termName: t.termName, average: t.average, passRate: t.passRate, isCurrent: t.isCurrent })),
       atRisk: (o?.atRisk || []).map((s: StudentRiskSummary) => ({
+        studentId: s.studentId,
         studentName: s.studentName,
         className: s.className,
+        subjectName: s.subjectName,
+        grade: s.grade,
+        points: s.points,
         currentAverage: s.currentAverage,
         riskLevel: s.riskLevel,
+        qualityPassed: s.qualityPassed,
+        quantityPassed: s.quantityPassed,
+        gradingSystemName: s.gradingSystemName,
         flags: s.flags,
       })),
       attendance: o?.attendance
@@ -434,6 +453,7 @@ Return a JSON object with EXACTLY these fields:
 - "actionPlan": array of {"problem", "evidence", "affectedLearners", "intervention", "duration", "successIndicator", "followUp"}.
 - "strengths": string array.
 - "factCheck": array of {"type": "FACT"|"OBSERVATION"|"POSSIBLE_EXPLANATION"|"RECOMMENDED_ACTION", "text", "evidence"}.
+- "studentInterventions": array of {"studentId", "intervention"} — ONE PER at-risk learner from the "atRisk" list. Each intervention MUST be specific to that learner's actual failure (use their real subjectName, currentAverage, grade, qualityPassed/quantityPassed and flags). Never write the same generic intervention for every learner; each one must reference precisely what that student is failing and how to fix it.
 
 Data (JSON): ${JSON.stringify(data).slice(0, 16000)}
 
@@ -515,7 +535,34 @@ Respond with ONLY valid JSON, no markdown.`;
       ).length
         ? pickObjective(ai.factCheck, ['type', 'text', 'evidence'])
         : fallback.factCheck,
+      studentInterventions: this.mergeStudentInterventions(ai, fallback),
     };
+  }
+
+  private mergeStudentInterventions(ai: any, fallback: TeacherInsight): StudentIntervention[] {
+    const fallbackList = fallback.studentInterventions || [];
+    if (!Array.isArray(ai.studentInterventions) || ai.studentInterventions.length === 0) return fallbackList;
+    const byId = new Map<string, string>();
+    const byName = new Map<string, string>();
+    for (const entry of ai.studentInterventions) {
+      if (!entry || typeof entry !== 'object' || typeof entry.intervention !== 'string' || !entry.intervention.trim()) continue;
+      if (typeof entry.studentId === 'string' && entry.studentId.trim()) {
+        byId.set(entry.studentId.trim().toLowerCase(), entry.intervention.trim());
+      }
+      if (typeof entry.studentName === 'string' && entry.studentName.trim()) {
+        byName.set(entry.studentName.trim().toLowerCase(), entry.intervention.trim());
+      }
+    }
+    return fallbackList.map((s) => {
+      const aiText = byId.get(String(s.studentId).trim().toLowerCase()) || byName.get(String(s.studentName).trim().toLowerCase());
+      if (!aiText) return s;
+      return {
+        ...s,
+        intervention: aiText,
+        rationale: s.rationale || 'Intervention refined by AI for this learner',
+        aiUsed: true,
+      } as StudentIntervention;
+    });
   }
 
   private fmtPct(value: number | null): string {

@@ -262,6 +262,31 @@ export class ReportEngineController {
     return { html, data };
   }
 
+  @Post('teacher-analysis-html')
+  @Roles('Director', 'Head Teacher', 'HeadTeacher', 'Deputy Head', 'Deputy Head Teacher', 'DeputyHeadTeacher', 'Deputy', 'HOD', 'Class Teacher', 'Teacher')
+  async previewTeacherAnalysis(
+    @Req() req,
+    @Body() body: { termId?: string; examType?: string; teacherUserId?: string },
+  ) {
+    if (!body.termId) {
+      throw new BadRequestException('termId is required');
+    }
+    const teacherUserId = body.teacherUserId || req.user.id;
+    // Teachers may preview their own analysis; leaders may preview any staff member.
+    if (String(teacherUserId) !== String(req.user.id)) {
+      await this.teacherAnalytics.assertTeacherAccessible(req.user, teacherUserId, body.termId);
+    }
+
+    const { html, data } = await this.reportEngine.previewTeacherAnalysisHtml({
+      type: 'TEACHER_ANALYSIS',
+      schoolId: req.user.schoolId,
+      userId: teacherUserId,
+      termId: body.termId,
+      examType: body.examType || 'END_TERM',
+    });
+    return { html, data: { ...data, teacherUserId } };
+  }
+
   @Post('generate-bulk')
   @Roles('Director')
   async generateBulkReports(

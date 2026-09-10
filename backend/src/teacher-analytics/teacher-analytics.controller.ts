@@ -22,12 +22,35 @@ export class TeacherAnalyticsController {
     return { context, cycle };
   }
 
+  /**
+   * Overlays per-student intervention text produced by the AI/rule-based layer
+   * onto the at-risk learners so the dashboard and report always show the
+   * specific intervention for each learner (never a generic one).
+   */
+  private applyStudentInterventions(overview: any, insights: any) {
+    const list = insights?.studentInterventions as Array<{ studentId: string; intervention: string; rationale?: string | null; aiUsed?: boolean }> | undefined;
+    if (!overview || !Array.isArray(overview.atRisk) || !Array.isArray(list) || list.length === 0) return overview;
+    const byId = new Map<string, any>();
+    for (const item of list) byId.set(String(item.studentId).trim().toLowerCase(), item);
+    overview.atRisk = overview.atRisk.map((s: any) => {
+      const matched = byId.get(String(s.studentId).trim().toLowerCase());
+      if (!matched) return s;
+      return {
+        ...s,
+        recommendedIntervention: matched.intervention || s.recommendedIntervention,
+        interventionRationale: matched.rationale || null,
+        interventionAiUsed: matched.aiUsed ?? false,
+      };
+    });
+    return overview;
+  }
+
   @Get('me')
   @Roles(...TEACHER_ROLES)
   async getOverview(@Request() req, @Query('termId') termId?: string) {
     const overview = await this.service.getOverview(req.user, termId);
     const insights = overview.summary ? await this.ai.generateInsights(overview) : null;
-    return { ...overview, insights };
+    return { ...this.applyStudentInterventions(overview, insights), insights };
   }
 
   @Get('available-teachers')
@@ -41,7 +64,7 @@ export class TeacherAnalyticsController {
   async getTeacherOverview(@Request() req, @Param('teacherId') teacherId: string, @Query('termId') termId?: string) {
     const overview = await this.service.getOverviewForTeacher(req.user, teacherId, termId);
     const insights = overview.summary ? await this.ai.generateInsights(overview) : null;
-    return { ...overview, insights };
+    return { ...this.applyStudentInterventions(overview, insights), insights };
   }
 
   @Get('me/summary')
