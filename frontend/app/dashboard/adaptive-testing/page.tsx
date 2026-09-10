@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { intelligenceApi, classApi, subjectApi } from '@/lib/api';
+import { intelligenceApi, classApi, subjectApi, studentApi } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +16,7 @@ interface Question {
 }
 
 export default function AdaptiveTestingPage() {
+  const [selectedClass, setSelectedClass] = useState('');
   const [selectedStudent, setSelectedStudent] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -32,6 +33,16 @@ export default function AdaptiveTestingPage() {
       const d = res.data?.data || res.data?.classes || res.data?.result || res.data;
       return Array.isArray(d) ? d : [];
     },
+  });
+
+  const { data: students, isLoading: studentsLoading } = useQuery({
+    queryKey: ['class-students', selectedClass],
+    queryFn: async () => {
+      const res = await studentApi.getAll({ classId: selectedClass, limit: 500 });
+      const d = res.data?.data || res.data?.students || res.data?.result || res.data;
+      return Array.isArray(d) ? d : [];
+    },
+    enabled: !!selectedClass,
   });
 
   const { data: subjects } = useQuery({
@@ -149,14 +160,21 @@ export default function AdaptiveTestingPage() {
           <h2 className="text-xl font-semibold mb-4">Start New Assessment</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Class</label>
+              <select value={selectedClass} onChange={(e) => { setSelectedClass(e.target.value); setSelectedStudent(''); }} className="w-full px-3 py-2 border rounded-lg">
+                <option value="">Select Class</option>
+                {(classes || []).map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Student</label>
-              <select value={selectedStudent} onChange={(e) => setSelectedStudent(e.target.value)} className="w-full px-3 py-2 border rounded-lg">
-                <option value="">Select Student</option>
-                {(classes || []).flatMap((cls: any) =>
-                  cls.students?.map((s: any) => (
-                    <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({cls.name})</option>
-                  )) || []
-                )}
+              <select value={selectedStudent} onChange={(e) => setSelectedStudent(e.target.value)} disabled={!selectedClass} className="w-full px-3 py-2 border rounded-lg">
+                <option value="">{selectedClass ? (studentsLoading ? 'Loading students...' : 'Select Student') : 'Select a class first'}</option>
+                {(students || []).map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -168,15 +186,15 @@ export default function AdaptiveTestingPage() {
                 ))}
               </select>
             </div>
-            <div className="flex items-end">
-              <button
-                onClick={() => startSession.mutate()}
-                disabled={!selectedStudent || !selectedSubject || startSession.isPending}
-                className="w-full px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg font-medium hover:from-orange-600 hover:to-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-              >
-                {startSession.isPending ? 'Starting...' : 'Begin Test'}
-              </button>
-            </div>
+          </div>
+          <div className="mb-4">
+            <button
+              onClick={() => startSession.mutate()}
+              disabled={!selectedClass || !selectedStudent || !selectedSubject || startSession.isPending}
+              className="w-full px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg font-medium hover:from-orange-600 hover:to-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              {startSession.isPending ? 'Starting...' : 'Begin Test'}
+            </button>
           </div>
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
             <i className="fa fa-info-circle mr-2"></i>

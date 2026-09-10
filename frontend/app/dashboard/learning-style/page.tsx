@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { intelligenceApi, classApi } from '@/lib/api';
+import { intelligenceApi, classApi, studentApi } from '@/lib/api';
 import RadarChart from '@/components/charts-echarts/RadarChart';
 import ComparisonChart from '@/components/charts-echarts/ComparisonChart';
 
@@ -31,6 +31,16 @@ export default function LearningStylePage() {
       const d = res.data?.data || res.data?.classes || res.data?.result || res.data;
       return Array.isArray(d) ? d : [];
     },
+  });
+
+  const { data: students, isLoading: studentsLoading } = useQuery({
+    queryKey: ['class-students', selectedClass],
+    queryFn: async () => {
+      const res = await studentApi.getAll({ classId: selectedClass, limit: 500 });
+      const d = res.data?.data || res.data?.students || res.data?.result || res.data;
+      return Array.isArray(d) ? d : [];
+    },
+    enabled: !!selectedClass,
   });
 
   const { data: profile, isLoading: profileLoading } = useQuery({
@@ -86,22 +96,20 @@ export default function LearningStylePage() {
       <div className="bg-white rounded-lg shadow p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Student</label>
-            <select value={selectedStudent} onChange={(e) => setSelectedStudent(e.target.value)} className="w-full px-3 py-2 border rounded-lg">
-              <option value="">Select Student</option>
-              {(classes || []).flatMap((cls: any) =>
-                cls.students?.map((s: any) => (
-                  <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({cls.name})</option>
-                )) || []
-              )}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Class Distribution</label>
-            <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="w-full px-3 py-2 border rounded-lg">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Class</label>
+            <select value={selectedClass} onChange={(e) => { setSelectedClass(e.target.value); setSelectedStudent(''); setAssessmentComplete(false); setCurrentQuestion(0); setScores({ visual: 0, aural: 0, readWrite: 0, kinesthetic: 0 }); }} className="w-full px-3 py-2 border rounded-lg">
               <option value="">Select Class</option>
               {(classes || []).map((c: any) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Student</label>
+            <select value={selectedStudent} onChange={(e) => { setSelectedStudent(e.target.value); setAssessmentComplete(false); setCurrentQuestion(0); setScores({ visual: 0, aural: 0, readWrite: 0, kinesthetic: 0 }); }} disabled={!selectedClass} className="w-full px-3 py-2 border rounded-lg">
+              <option value="">{selectedClass ? (studentsLoading ? 'Loading students...' : 'Select Student') : 'Select a class first'}</option>
+              {(students || []).map((s: any) => (
+                <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>
               ))}
             </select>
           </div>
@@ -219,7 +227,7 @@ export default function LearningStylePage() {
       {!profile && !selectedStudent && !assessmentComplete && (
         <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
           <i className="fa fa-brain text-5xl text-gray-300 mb-4"></i>
-          <p className="text-lg">Select a student and complete the VARK assessment</p>
+          <p className="text-lg">{!selectedClass ? 'Select a class to load its students' : 'Select a student and complete the VARK assessment'}</p>
           <p className="text-sm mt-2">Discover your preferred learning style</p>
         </div>
       )}

@@ -153,19 +153,41 @@ export class AuthenticationPipelineService {
     const signatureAssetIds = (input.signatories || []).map((s) => s.signatureId);
     const primarySignatureAssetId = input.signatureId ?? signatureAssetIds[0] ?? null;
 
-    const pending = await this.prisma.documentAuthentication.create({
-      data: {
-        schoolId: input.schoolId,
-        organizationRef: input.organizationRef ?? input.schoolId,
-        documentId: input.documentId,
-        documentType: input.documentType.toUpperCase(),
-        status: 'PENDING',
-        signerId: boundSigners[0]?.signerId ?? null,
-        issuedBy: input.actor.userId,
-        pipelineTrace: { correlationId, steps: [] } as any,
-      },
+    // A document may be authenticated multiple times, but the
+    // (schoolId, documentId, documentVersion) key is unique. Retries after a failed
+    // pipeline reuse the incomplete PENDING/FAILED record; issuing again over an
+    // existing authentication mints the next version instead of crashing with a
+    // unique-constraint (P2002) violation.
+    const latest = await this.prisma.documentAuthentication.findFirst({
+      where: { schoolId: input.schoolId, documentId: input.documentId },
+      orderBy: { documentVersion: 'desc' },
+      select: { id: true, documentVersion: true, status: true },
     });
-    pushTrace('PENDING_CREATED', pending.id);
+
+    let pendingId: string;
+    let documentVersion: number;
+    if (latest && (latest.status === 'PENDING' || latest.status === 'FAILED')) {
+      pendingId = latest.id;
+      documentVersion = latest.documentVersion;
+      pushTrace('PENDING_REUSED', `v${documentVersion}`);
+    } else {
+      documentVersion = (latest?.documentVersion ?? 0) + 1;
+      const created = await this.prisma.documentAuthentication.create({
+        data: {
+          schoolId: input.schoolId,
+          organizationRef: input.organizationRef ?? input.schoolId,
+          documentId: input.documentId,
+          documentType: input.documentType.toUpperCase(),
+          documentVersion,
+          status: 'PENDING',
+          signerId: boundSigners[0]?.signerId ?? null,
+          issuedBy: input.actor.userId,
+          pipelineTrace: { correlationId, steps: [] } as any,
+        },
+      });
+      pendingId = created.id;
+      pushTrace('PENDING_CREATED', `v${created.documentVersion}`);
+    }
 
     try {
       pushTrace('STAMP_FINALIZE_BEGIN');
@@ -217,7 +239,7 @@ export class AuthenticationPipelineService {
 
       const { finalHash } = this.canonical.buildAndHash({
         documentId: input.documentId,
-        documentVersion: 1,
+        documentVersion,
         organizationId: input.organizationRef ?? input.schoolId,
         documentType: input.documentType.toUpperCase(),
         serialNumber: finalized.serialNumber,
@@ -278,7 +300,7 @@ export class AuthenticationPipelineService {
       }
 
       const auth = await this.prisma.documentAuthentication.update({
-        where: { id: pending.id },
+        where: { id: pendingId },
         data: {
           documentVerificationId: finalized.id,
           stampInstanceId: stampInstance.id,
@@ -318,7 +340,7 @@ export class AuthenticationPipelineService {
       const reason = err?.message || 'Unknown pipeline failure';
       pushTrace('PIPELINE_FAILED', reason);
       await this.prisma.documentAuthentication.update({
-        where: { id: pending.id },
+        where: { id: pendingId },
         data: { status: 'FAILED', revocationReason: reason.slice(0, 500), pipelineTrace: { correlationId, steps: trace } as any },
       }).catch(() => undefined);
       throw err;
