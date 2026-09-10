@@ -61,6 +61,18 @@ export default function SchoolsPage() {
     }
   };
 
+  const handleRequireRegistrationReview = async (id: string) => {
+    if (!window.confirm('Move this school to pending review and require the applicant to complete the registration process?')) return;
+    try {
+      const response = await superAdminApi.requireRegistrationReview(id);
+      const requestId = response.data?.id || response.data?.data?.id;
+      if (requestId) router.push(`/super-admin/registrations/${requestId}`);
+      else loadSchools(filter || undefined);
+    } catch (error: any) {
+      window.alert(error?.response?.data?.message || 'Failed to start registration review.');
+    }
+  };
+
   if (isLoading || loading) {
     return (
       <div style={{ 
@@ -368,7 +380,27 @@ export default function SchoolsPage() {
                         <i className="fa fa-eye"></i>
                         View
                       </Link>
-                      {school.subscriptionStatus === 'active' ? (
+                      {school.subscriptionStatus === 'trial' && !school.trialEndsAt ? (
+                        <button
+                          onClick={() => handleRequireRegistrationReview(school.id)}
+                          className="action-btn"
+                          style={{
+                            padding: '8px 12px',
+                            background: '#fff7ed',
+                            borderRadius: '8px',
+                            color: '#c2410c',
+                            fontSize: '13px',
+                            border: '1px solid #fed7aa',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <i className="fa fa-inbox"></i>
+                          Require Review
+                        </button>
+                      ) : school.subscriptionStatus === 'active' ? (
                         <button
                           onClick={() => handleDeactivate(school.id)}
                           className="action-btn"
