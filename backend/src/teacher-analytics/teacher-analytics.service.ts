@@ -1154,7 +1154,7 @@ export class TeacherAnalyticsService {
     return {
       context,
       summary,
-      assignments,
+      assignments: analytics,
       classes,
       subjects,
       competency,
