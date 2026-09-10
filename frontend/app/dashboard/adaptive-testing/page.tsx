@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { intelligenceApi, classApi, subjectApi, studentApi } from '@/lib/api';
+import { intelligenceApi, classApi, classSubjectApi, studentApi } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,13 +45,16 @@ export default function AdaptiveTestingPage() {
     enabled: !!selectedClass,
   });
 
-  const { data: subjects } = useQuery({
-    queryKey: ['subjects'],
+  const { data: subjects, isLoading: subjectsLoading } = useQuery({
+    queryKey: ['class-subjects', selectedClass],
     queryFn: async () => {
-      const res = await subjectApi.getAll();
-      const d = res.data?.data || res.data?.subjects || res.data;
-      return Array.isArray(d) ? d : [];
+      const res = await classSubjectApi.getByClass(selectedClass);
+      const rows = res.data?.data || res.data;
+      return Array.isArray(rows)
+        ? rows.map((cs: any) => cs.subject || cs).filter(Boolean)
+        : [];
     },
+    enabled: !!selectedClass,
   });
 
   const startSession = useMutation({
@@ -161,7 +164,7 @@ export default function AdaptiveTestingPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Class</label>
-              <select value={selectedClass} onChange={(e) => { setSelectedClass(e.target.value); setSelectedStudent(''); }} className="w-full px-3 py-2 border rounded-lg">
+              <select value={selectedClass} onChange={(e) => { setSelectedClass(e.target.value); setSelectedStudent(''); setSelectedSubject(''); }} className="w-full px-3 py-2 border rounded-lg">
                 <option value="">Select Class</option>
                 {(classes || []).map((c: any) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
@@ -179,8 +182,8 @@ export default function AdaptiveTestingPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Subject</label>
-              <select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)} className="w-full px-3 py-2 border rounded-lg">
-                <option value="">Select Subject</option>
+              <select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)} disabled={!selectedClass} className="w-full px-3 py-2 border rounded-lg">
+                <option value="">{selectedClass ? (subjectsLoading ? 'Loading subjects...' : 'Select Subject') : 'Select a class first'}</option>
                 {(subjects || []).map((s: any) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
