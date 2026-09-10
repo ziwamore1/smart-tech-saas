@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { superAdminApi, systemCommunicationsApi } from '@/lib/api';
+import { superAdminApi, systemCommunicationApi } from '@/lib/api';
 import Link from 'next/link';
 
 const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }> = {
@@ -43,7 +43,7 @@ export default function RegistrationRequestDetailPage() {
 
   const loadTemplates = async () => {
     try {
-      const response = await systemCommunicationsApi.getTemplates();
+      const response = await systemCommunicationApi.getTemplates();
       const body = Array.isArray(response.data) ? response.data : response.data?.data || [];
       setTemplates(body.filter((t: any) => t.type === 'EMAIL' && (!t.category || t.category === 'registration')));
     } catch (err) {

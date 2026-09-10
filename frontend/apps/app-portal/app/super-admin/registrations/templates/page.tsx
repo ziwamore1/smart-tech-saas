@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { systemCommunicationsApi } from '@/lib/api';
+import { systemCommunicationApi } from '@/lib/api';
 import Link from 'next/link';
 
 export default function RegistrationTemplatesPage() {
@@ -19,7 +19,7 @@ export default function RegistrationTemplatesPage() {
 
   const loadTemplates = async () => {
     try {
-      const response = await systemCommunicationsApi.getTemplates();
+      const response = await systemCommunicationApi.getTemplates();
       const body = Array.isArray(response.data) ? response.data : response.data?.data || [];
       setTemplates(body.filter((t: any) => t.type === 'EMAIL'));
     } catch (err) {
@@ -50,7 +50,7 @@ export default function RegistrationTemplatesPage() {
     setBusy(true);
     setError('');
     try {
-      await systemCommunicationsApi.createTemplate({ name: form.name, type: 'EMAIL', subject: form.subject, message: form.message, category: form.category });
+      await systemCommunicationApi.createTemplate({ name: form.name, type: 'EMAIL', subject: form.subject, message: form.message, category: form.category });
       setForm({ name: '', subject: '', message: '', category: 'registration' });
       setShowForm(false);
       await loadTemplates();
@@ -64,7 +64,7 @@ export default function RegistrationTemplatesPage() {
   const handleDelete = async (id: string, name: string) => {
     if (!window.confirm(`Delete template "${name}"?`)) return;
     try {
-      await systemCommunicationsApi.deleteTemplate(id);
+      await systemCommunicationApi.deleteTemplate(id);
       await loadTemplates();
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to delete template.');
