@@ -76,6 +76,11 @@ export class SerialNumberService {
 
   /**
    * Atomically allocate the next sequence value for (schoolId, scopeKey).
+   *
+   * When the sequence row does not exist (fresh install, DB restore, or the
+   * table was recreated) it is seeded from MAX(sequence) already issued for the
+   * same school/type/year, so allocation can never collide with historical
+   * serial numbers.
    */
   async allocate(
     schoolId: string,
@@ -90,7 +95,14 @@ export class SerialNumberService {
 
     const rows = await client.$queryRaw<SequenceRow[]>(Prisma.sql`
       INSERT INTO "SerialSequence" ("id", "schoolId", "scopeKey", "prefix", "nextValue", "updatedAt")
-      VALUES (${randomUUID()}, ${schoolId}, ${scopeKey}, ${prefix}, 2, NOW())
+      SELECT ${randomUUID()}, ${schoolId}, ${scopeKey}, ${prefix},
+             COALESCE((
+               SELECT MAX("sequence") FROM "DocumentSerial"
+               WHERE "schoolId" = ${schoolId}
+                 AND "documentType" = ${policy.documentType.toUpperCase()}
+                 AND "year" IS NOT DISTINCT FROM ${year}
+             ), 0) + 2,
+             NOW()
       ON CONFLICT ("schoolId", "scopeKey")
       DO UPDATE SET "nextValue" = "SerialSequence"."nextValue" + 1, "prefix" = ${prefix}
       RETURNING "nextValue"
