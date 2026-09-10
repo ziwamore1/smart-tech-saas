@@ -438,6 +438,9 @@ export const superAdminApi = {
   
   activateSchool: (id: string) => 
     api.post(`/super-admin/schools/${id}/activate`),
+
+  requireRegistrationReview: (id: string) =>
+    api.post(`/super-admin/schools/${id}/require-registration-review`),
   
   deactivateSchool: (id: string) => 
     api.post(`/super-admin/schools/${id}/deactivate`),

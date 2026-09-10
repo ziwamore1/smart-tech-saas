@@ -502,9 +502,9 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (user.school && (!user.school.isActive || ['pending_review', 'expired', 'suspended'].includes(user.school.subscriptionStatus))) {
+    if (user.school && (!user.school.isActive || ['pending_review', 'expired', 'suspended'].includes(user.school.subscriptionStatus) || (user.school.subscriptionStatus === 'trial' && !user.school.trialEndsAt))) {
       throw new ForbiddenException(
-        user.school.subscriptionStatus === 'pending_review'
+        user.school.subscriptionStatus === 'pending_review' || (user.school.subscriptionStatus === 'trial' && !user.school.trialEndsAt)
           ? 'This school registration is awaiting System Owner review.'
           : 'This school account is not currently active.',
       );
@@ -736,6 +736,7 @@ export class AuthService {
           school: {
             select: {
               id: true, name: true, logo: true, primaryColor: true,
+              isActive: true, subscriptionStatus: true, trialEndsAt: true,
               institutionType: { select: { code: true, name: true } },
             },
           },
@@ -806,6 +807,14 @@ export class AuthService {
     if (!isPasswordValid) {
       this.logger.warn(`Invalid password for user: ${email || username}`);
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.school && (!user.school.isActive || ['pending_review', 'expired', 'suspended'].includes(user.school.subscriptionStatus) || (user.school.subscriptionStatus === 'trial' && !user.school.trialEndsAt))) {
+      throw new ForbiddenException(
+        user.school.subscriptionStatus === 'pending_review' || (user.school.subscriptionStatus === 'trial' && !user.school.trialEndsAt)
+          ? 'This school registration is awaiting System Owner review.'
+          : 'This school account is not currently active.',
+      );
     }
 
     const roles = user.userRoles.map((ur) => ur.role.name);

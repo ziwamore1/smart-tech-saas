@@ -52,6 +52,7 @@ export default function SchoolDetailsPage() {
   const [directorSubmitting, setDirectorSubmitting] = useState(false);
   const [sendingLogin, setSendingLogin] = useState<string | null>(null);
   const [loginSent, setLoginSent] = useState<string | null>(null);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   const handleSendLogin = async (directorId: string) => {
     setSendingLogin(directorId);
@@ -65,6 +66,24 @@ export default function SchoolDetailsPage() {
       setTimeout(() => setDirectorError(''), 3000);
     } finally {
       setSendingLogin(null);
+    }
+  };
+
+  const handleRequireRegistrationReview = async () => {
+    if (!window.confirm('Move this school to pending review and require the applicant to complete the registration process?')) return;
+    setReviewSubmitting(true);
+    try {
+      const response = await superAdminApi.requireRegistrationReview(schoolId);
+      const requestId = response.data?.id || response.data?.data?.id;
+      if (requestId) {
+        router.push(`/super-admin/registrations/${requestId}`);
+      } else {
+        await loadSchool();
+      }
+    } catch (error: any) {
+      setDirectorError(error?.response?.data?.message || 'Failed to start registration review');
+    } finally {
+      setReviewSubmitting(false);
     }
   };
 
@@ -401,6 +420,16 @@ export default function SchoolDetailsPage() {
                 <i className="fa fa-credit-card" style={{ marginRight: '6px' }}></i> Change Plan
               </button>
             </div>
+            {school.subscriptionStatus === 'trial' && !school.trialEndsAt && (
+              <div style={{ marginTop: '18px', padding: '14px', borderRadius: '10px', background: '#fff7ed', border: '1px solid #fed7aa' }}>
+                <p style={{ margin: '0 0 10px', fontSize: '13px', color: '#9a3412' }}>
+                  This legacy trial has no expiry date and has not completed the registration review process. Login is blocked until review is completed.
+                </p>
+                <button onClick={handleRequireRegistrationReview} disabled={reviewSubmitting} style={{ padding: '10px 16px', background: gradOrange, borderRadius: '8px', border: 'none', color: 'white', fontSize: '13px', fontWeight: 600, cursor: reviewSubmitting ? 'not-allowed' : 'pointer', opacity: reviewSubmitting ? 0.65 : 1 }}>
+                  <i className="fa fa-inbox" style={{ marginRight: '6px' }}></i> {reviewSubmitting ? 'Starting Review...' : 'Require Registration Review'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -64,6 +64,11 @@ export class SuperAdminController {
     return this.superAdminService.getRegistrationRequest(id);
   }
 
+  @Post('schools/:id/require-registration-review')
+  async requireRegistrationReview(@Param('id') id: string) {
+    return this.superAdminService.requireRegistrationReview(id);
+  }
+
   @Post('registration-requests/:id/messages')
   async sendRegistrationMessage(
     @Param('id') id: string,

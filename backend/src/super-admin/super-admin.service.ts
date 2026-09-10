@@ -129,6 +129,59 @@ export class SuperAdminService {
     return request;
   }
 
+  async requireRegistrationReview(schoolId: string) {
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      include: {
+        institutionType: { select: { code: true } },
+        users: {
+          take: 20,
+          orderBy: { createdAt: 'asc' },
+          include: { userRoles: { include: { role: true } } },
+        },
+      },
+    });
+    if (!school) throw new NotFoundException('School not found');
+
+    const existing = await this.prisma.schoolRegistrationRequest.findUnique({ where: { schoolId } });
+    const director = school.users.find((user: any) => user.userRoles?.some((assignment: any) => assignment.role?.name === 'Director')) || school.users[0];
+    const email = director?.email || school.email;
+    if (!email) throw new BadRequestException('The school has no applicant email address. Add one before starting review.');
+
+    await this.prisma.school.update({
+      where: { id: schoolId },
+      data: { isActive: false, subscriptionStatus: 'pending_review', trialEndsAt: null },
+    });
+
+    const request = existing
+      ? await this.prisma.schoolRegistrationRequest.update({
+          where: { id: existing.id },
+          data: { status: 'PENDING_REVIEW', ownerNotes: 'Legacy school converted to the registration review process.' },
+        })
+      : await this.prisma.schoolRegistrationRequest.create({
+          data: {
+            schoolId,
+            directorUserId: director?.id,
+            schoolName: school.name,
+            directorFirstName: director?.firstName || 'School',
+            directorLastName: director?.lastName || 'Applicant',
+            email,
+            phone: director?.phone || school.phone,
+            address: school.address,
+            institutionType: school.institutionType?.code || 'SECONDARY_SCHOOL',
+            status: 'PENDING_REVIEW',
+            ownerNotes: 'Legacy school converted to the registration review process.',
+          },
+        });
+
+    await this.sendEmail(
+      email,
+      'Action required: complete your Smart Tech school registration',
+      `<p>Hello ${escapeHtml(director?.firstName || 'there')},</p><p>Your Smart Tech school registration for <strong>${escapeHtml(school.name)}</strong> is awaiting System Owner review. Please reply to this email with your registration purpose, school address, expected learners, and preferred contact method. The school trial will begin after approval.</p>`,
+    );
+    return request;
+  }
+
   async sendRegistrationMessage(id: string, data: { subject?: string; message: string }, createdById: string) {
     const request = await this.getRegistrationRequest(id);
     const message = await this.prisma.schoolRegistrationMessage.create({
@@ -308,6 +361,12 @@ export class SuperAdminService {
       isActive?: boolean;
     },
   ) {
+    if (data.subscriptionStatus === 'trial' || data.isActive === true) {
+      const request = await this.prisma.schoolRegistrationRequest.findUnique({ where: { schoolId } });
+      if (!request || request.status !== 'APPROVED') {
+        throw new BadRequestException('This school must have an approved registration request before activation.');
+      }
+    }
     return this.prisma.school.update({
       where: { id: schoolId },
       data,
@@ -315,16 +374,16 @@ export class SuperAdminService {
   }
 
   async activateSchool(schoolId: string) {
+    const request = await this.prisma.schoolRegistrationRequest.findUnique({ where: { schoolId } });
+    if (!request || request.status !== 'APPROVED') {
+      throw new BadRequestException('Start and approve the school registration review before activating this school.');
+    }
     const school = await this.prisma.school.update({
       where: { id: schoolId },
       data: { isActive: true, subscriptionStatus: 'trial', trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
     });
-    const request = await this.prisma.schoolRegistrationRequest.findUnique({ where: { schoolId } });
-    if (request) {
-      await this.prisma.schoolRegistrationRequest.update({ where: { id: request.id }, data: { status: 'APPROVED' } });
-      await this.provisioningService.provisionInstitution(schoolId, request.institutionType).catch((error) => this.logger.error(`Provisioning failed after school activation: ${error.message}`));
-      await this.sendEmail(request.email, 'Your Smart Tech school trial is approved', `<p>Hello ${request.directorFirstName},</p><p>Your Smart Tech school workspace has been approved and your 30-day trial is now active.</p>`);
-    }
+    await this.provisioningService.provisionInstitution(schoolId, request.institutionType).catch((error) => this.logger.error(`Provisioning failed after school activation: ${error.message}`));
+    await this.sendEmail(request.email, 'Your Smart Tech school trial is approved', `<p>Hello ${escapeHtml(request.directorFirstName)},</p><p>Your Smart Tech school workspace has been approved and your 30-day trial is now active.</p>`);
     return school;
   }
 
