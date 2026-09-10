@@ -121,8 +121,10 @@ export class SerialNumberService {
   }
 
   /**
-   * Allocate + persist a DocumentSerial row. Retries on the (astronomically
-   * unlikely) unique collision caused by concurrent custom-format changes.
+   * Allocate + persist a DocumentSerial row. Outside a transaction a unique
+   * collision (concurrent custom-format change) is retried with a fresh
+   * allocation; inside an interactive transaction the collision aborts the
+   * whole transaction, so it is rethrown for the caller to re-run.
    */
   async issue(
     schoolId: string,
@@ -154,7 +156,14 @@ export class SerialNumberService {
         // Prisma client versions and driver adapters).
         if (err?.code === 'P2002') {
           lastError = err;
-          continue; // collision → retry with a fresh allocation
+          if (tx) {
+            // Inside an interactive transaction the collision already aborted
+            // the whole transaction — PostgreSQL rejects every later command
+            // with P2010/25P02. Retrying here is impossible; the caller must
+            // re-run the entire transaction instead.
+            throw err;
+          }
+          continue; // autocommit → collision → retry with a fresh allocation
         }
         throw err;
       }

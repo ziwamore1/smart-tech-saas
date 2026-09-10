@@ -161,60 +161,76 @@ export class VerificationService {
       padding: input.serialPolicy?.padding ?? 6,
     };
 
-    const created = await this.prisma.$transaction(async tx => {
-      const serialRow = await this.serials.issue(
-        schoolId,
-        policy,
-        { documentRef: input.documentId, issuedById: input.actor.userId },
-        tx,
-      );
-
-      const { hash, basis } = this.hashService.hashDocument({
-        documentId: input.documentId,
-        documentType: input.documentType,
-        documentTitle: input.documentTitle,
-        issuedToLabel: input.issuedToLabel,
-        serialNumber: serialRow.serialNumber,
-        issuedAt: stampedAt.toISOString(),
-        schoolId,
-        documentData: input.documentData,
-        stampTemplateFingerprint: template
-          ? this.hashService.fingerprintConfig(template.configJson)
-          : undefined,
-      });
-
-      const verificationCode = this.generateOpaqueCode();
-
-      return tx.documentVerification.create({
-        data: {
+    const runTransaction = async () =>
+      this.prisma.$transaction(async tx => {
+        const serialRow = await this.serials.issue(
           schoolId,
+          policy,
+          { documentRef: input.documentId, issuedById: input.actor.userId },
+          tx,
+        );
+
+        const { hash, basis } = this.hashService.hashDocument({
           documentId: input.documentId,
-          documentType: input.documentType.toUpperCase(),
+          documentType: input.documentType,
           documentTitle: input.documentTitle,
           issuedToLabel: input.issuedToLabel,
           serialNumber: serialRow.serialNumber,
-          documentHash: hash,
-          algorithm: 'SHA-256',
-          hashBasis: { ...basis, contentKeys: Object.keys(input.documentData || {}) } as any,
-          stampedAt,
-          timezone: tz,
-          stampDate,
-          stampTime,
-          templateId: template?.id,
-          templateVersion: template?.version,
-          templateSnapshot: (template?.configJson as any) ?? undefined,
-          verificationCode,
-          disclaimerText: input.disclaimerText ??
-            'Digitally issued and electronically verified document.',
-          expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
-          finalizedById: input.actor.userId,
-          signatureRecordId: input.signatureRecordId,
-          metadata: {
-            approvalWorkflow: approval.configId ? approval.name : undefined,
-          } as any,
-        },
+          issuedAt: stampedAt.toISOString(),
+          schoolId,
+          documentData: input.documentData,
+          stampTemplateFingerprint: template
+            ? this.hashService.fingerprintConfig(template.configJson)
+            : undefined,
+        });
+
+        const verificationCode = this.generateOpaqueCode();
+
+        return tx.documentVerification.create({
+          data: {
+            schoolId,
+            documentId: input.documentId,
+            documentType: input.documentType.toUpperCase(),
+            documentTitle: input.documentTitle,
+            issuedToLabel: input.issuedToLabel,
+            serialNumber: serialRow.serialNumber,
+            documentHash: hash,
+            algorithm: 'SHA-256',
+            hashBasis: { ...basis, contentKeys: Object.keys(input.documentData || {}) } as any,
+            stampedAt,
+            timezone: tz,
+            stampDate,
+            stampTime,
+            templateId: template?.id,
+            templateVersion: template?.version,
+            templateSnapshot: (template?.configJson as any) ?? undefined,
+            verificationCode,
+            disclaimerText: input.disclaimerText ??
+              'Digitally issued and electronically verified document.',
+            expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+            finalizedById: input.actor.userId,
+            signatureRecordId: input.signatureRecordId,
+            metadata: {
+              approvalWorkflow: approval.configId ? approval.name : undefined,
+            } as any,
+          },
+        });
       });
-    });
+
+    // A unique-collision on DocumentSerial aborts the interactive transaction
+    // (PostgreSQL rejects every later statement with P2010/25P02), so a retry
+    // must re-run the entire transaction — never just the INSERT. Collisions are
+    // astronomically rare (concurrent custom-format changes), hence a tiny budget.
+    let created: Awaited<ReturnType<typeof runTransaction>> | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        created = await runTransaction();
+        break;
+      } catch (err: any) {
+        if (err?.code !== 'P2002' || attempt >= 2) throw err;
+      }
+    }
+    if (!created) throw new ConflictException('Unable to finalize document verification');
 
     // ── QR + rendered stamp SVG (post-transaction; URL needs the code) ──
     const verificationUrl = `${this.verificationBase}/v/${created.verificationCode}`;
