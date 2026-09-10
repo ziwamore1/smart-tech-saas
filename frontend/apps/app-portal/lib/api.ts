@@ -2672,11 +2672,11 @@ export const activityApi = {
 
 export const teacherAnalyticsApi = {
   getOverview: (opts?: { termId?: string }) =>
-    api.get('/teacher-analytics/me', { params: opts }),
+    api.get('/teacher-analytics/me', { params: opts, timeout: 120000 }),
   getAvailableTeachers: (opts?: { termId?: string }) =>
-    api.get('/teacher-analytics/available-teachers', { params: opts }),
+    api.get('/teacher-analytics/available-teachers', { params: opts, timeout: 120000 }),
   getTeacherOverview: (teacherId: string, opts?: { termId?: string }) =>
-    api.get(`/teacher-analytics/teacher/${teacherId}`, { params: opts }),
+    api.get(`/teacher-analytics/teacher/${teacherId}`, { params: opts, timeout: 120000 }),
   getSummary: (opts?: { termId?: string }) =>
     api.get('/teacher-analytics/me/summary', { params: opts }),
   getAssignments: (opts?: { termId?: string }) =>

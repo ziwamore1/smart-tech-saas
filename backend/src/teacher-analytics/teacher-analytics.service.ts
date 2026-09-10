@@ -473,26 +473,26 @@ export class TeacherAnalyticsService {
       include: { academicYear: true },
     });
     const assignments = await this.getAssignments(contextUserId, schoolId, termRecord?.academicYearId);
-    const out: AssignmentAnalytics[] = [];
-    for (const assignment of assignments) {
-      try {
-        out.push(
-          await this.buildAssignmentAnalytics(
+    const out = await Promise.all(
+      assignments.map(async (assignment) => {
+        try {
+          return await this.buildAssignmentAnalytics(
             assignment,
             term.id,
             term.name,
             term.startDate,
             termRecord?.academicYear?.name || academicYearName,
             schoolId,
-          ),
-        );
-      } catch (err) {
-        this.logger.warn(
-          `Assignment analytics failed for ${assignment.className}/${assignment.subjectName}: ${(err as Error).message}`,
-        );
-      }
-    }
-    return out;
+          );
+        } catch (err) {
+          this.logger.warn(
+            `Assignment analytics failed for ${assignment.className}/${assignment.subjectName}: ${(err as Error).message}`,
+          );
+          return null;
+        }
+      }),
+    );
+    return out.filter((a): a is AssignmentAnalytics => a != null);
   }
 
   // -------------------------------------------------------------------------
@@ -632,8 +632,9 @@ export class TeacherAnalyticsService {
     context: TeacherContext,
     term: { id: string; name: string; startDate: Date },
     academicYearName: string,
+    precomputedAnalytics?: AssignmentAnalytics[],
   ) {
-    const analytics = await this.getAssignmentsAnalytics(context.userId, context.schoolId, term, academicYearName);
+    const analytics = precomputedAnalytics ?? await this.getAssignmentsAnalytics(context.userId, context.schoolId, term, academicYearName);
     const byClass = new Map<string, AssignmentAnalytics[]>();
     for (const a of analytics) {
       if (!byClass.has(a.classId)) byClass.set(a.classId, []);
@@ -663,8 +664,9 @@ export class TeacherAnalyticsService {
     context: TeacherContext,
     term: { id: string; name: string; startDate: Date },
     academicYearName: string,
+    precomputedAnalytics?: AssignmentAnalytics[],
   ) {
-    const analytics = await this.getAssignmentsAnalytics(context.userId, context.schoolId, term, academicYearName);
+    const analytics = precomputedAnalytics ?? await this.getAssignmentsAnalytics(context.userId, context.schoolId, term, academicYearName);
     const bySubject = new Map<string, AssignmentAnalytics[]>();
     for (const a of analytics) {
       if (!bySubject.has(a.subjectId)) bySubject.set(a.subjectId, []);
@@ -750,14 +752,20 @@ export class TeacherAnalyticsService {
     context: TeacherContext,
     term: { id: string },
     academicYearName: string,
+    precomputedAnalytics?: AssignmentAnalytics[],
   ): Promise<CompetencyAnalysis> {
-    const analytics = await this.getAssignmentsAnalytics(context.userId, context.schoolId, term as any, academicYearName);
+    const analytics = precomputedAnalytics ?? await this.getAssignmentsAnalytics(context.userId, context.schoolId, term as any, academicYearName);
     const rows: CompetencyAnalysis['classCompetency'] = [];
-    for (const a of analytics) {
-      const summaries = await this.prisma.termSummary.findMany({
-        where: { termId: term.id, classId: a.classId },
-        select: { studentId: true, competencyScores: true },
-      });
+    const perClass = await Promise.all(
+      analytics.map(async (a) => {
+        const summaries = await this.prisma.termSummary.findMany({
+          where: { termId: term.id, classId: a.classId },
+          select: { studentId: true, competencyScores: true },
+        });
+        return { a, summaries };
+      }),
+    );
+    for (const { a, summaries } of perClass) {
       for (const s of summaries) {
         const data = s.competencyScores as Record<string, number> | null;
         if (!data || typeof data !== 'object') continue;
@@ -833,17 +841,24 @@ export class TeacherAnalyticsService {
     context: TeacherContext,
     term: { id: string; name: string; startDate: Date },
     academicYearName: string,
+    precomputedAnalytics?: AssignmentAnalytics[],
   ): Promise<StudentRiskSummary[]> {
-    const analytics = await this.getAssignmentsAnalytics(context.userId, context.schoolId, term, academicYearName);
+    const analytics = precomputedAnalytics ?? await this.getAssignmentsAnalytics(context.userId, context.schoolId, term, academicYearName);
     const out: StudentRiskSummary[] = [];
     const seen = new Map<string, StudentRiskSummary>();
 
-    for (const a of analytics) {
-      const ref = this.toAssignmentRef(a);
-      const results = await this.loadResultsForAssignment(ref, term.id, context.schoolId);
-      const prev = await this.loadPreviousTermResults(ref, term.id, term.startDate, context.schoolId);
+    const perAssignment = await Promise.all(
+      analytics.map(async (a) => {
+        const ref = this.toAssignmentRef(a);
+        const results = await this.loadResultsForAssignment(ref, term.id, context.schoolId);
+        const prev = await this.loadPreviousTermResults(ref, term.id, term.startDate, context.schoolId);
+        return { a, results, prev: prev.results };
+      }),
+    );
+
+    for (const { a, results, prev } of perAssignment) {
       const prevMap = new Map<string, number>();
-      for (const r of prev.results) {
+      for (const r of prev) {
         if (r.finalPercentage != null) prevMap.set(r.studentId, r.finalPercentage);
       }
 
@@ -943,34 +958,34 @@ export class TeacherAnalyticsService {
     academicYearId?: string,
   ): Promise<TeachingLoad> {
     const assignments = await this.getAssignments(context.userId, context.schoolId, academicYearId);
-    const assessmentsPerClass: TeachingLoad['assessmentsPerClass'] = [];
-    let totalStudents = 0;
-    let totalAssessments = 0;
-    for (const a of assignments) {
-      const rows = await this.prisma.computedResult.findMany({
-        where: {
-          classId: a.classId,
-          subjectId: a.subjectId,
-          termId,
-          schoolId: context.schoolId,
-          status: { in: COMPUTED_STATUSES },
-          student: { status: 'ACTIVE' },
-        },
-        select: { id: true },
-      });
-      const enrolled = await this.prisma.enrollment.count({
-        where: { classId: a.classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
-      });
-      totalStudents += enrolled;
-      totalAssessments += rows.length;
-      assessmentsPerClass.push({
-        className: a.className,
-        subjectName: a.subjectName,
-        expected: enrolled,
-        entered: rows.length,
-      });
-    }
-    const expectedTotal = assessmentsPerClass.reduce((s, p) => s + p.expected, 0);
+    const perClass = await Promise.all(
+      assignments.map(async (a) => {
+        const rows = await this.prisma.computedResult.findMany({
+          where: {
+            classId: a.classId,
+            subjectId: a.subjectId,
+            termId,
+            schoolId: context.schoolId,
+            status: { in: COMPUTED_STATUSES },
+            student: { status: 'ACTIVE' },
+          },
+          select: { id: true },
+        });
+        const enrolled = await this.prisma.enrollment.count({
+          where: { classId: a.classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+        });
+        return {
+          className: a.className,
+          subjectName: a.subjectName,
+          expected: enrolled,
+          entered: rows.length,
+        };
+      }),
+    );
+    const totalStudents = perClass.reduce((s, p) => s + p.expected, 0);
+    const totalAssessments = perClass.reduce((s, p) => s + p.entered, 0);
+    const assessmentsPerClass = perClass;
+    const expectedTotal = perClass.reduce((s, p) => s + p.expected, 0);
     return {
       subjectsTaught: [...new Set(assignments.map((a) => a.subjectName))],
       classesTaught: [...new Set(assignments.map((a) => a.className))],
@@ -991,28 +1006,33 @@ export class TeacherAnalyticsService {
   async getAttendanceCorrelation(
     context: TeacherContext,
     term: { id: string; startDate: Date; endDate?: Date | null },
+    precomputedAnalytics?: AssignmentAnalytics[],
   ) {
-    const analytics = await this.getAssignmentsAnalytics(context.userId, context.schoolId, term as any, '');
+    const analytics = precomputedAnalytics ?? await this.getAssignmentsAnalytics(context.userId, context.schoolId, term as any, '');
     const studentRates = new Map<string, { rate: number; score: number }>();
-    for (const a of analytics) {
-      const ref = this.toAssignmentRef(a);
-      const results = await this.loadResultsForAssignment(ref, term.id, context.schoolId);
-      const participants = results.filter((r) => !r.isAbsent);
-      const studentsWithScores = participants.filter((r) => r.finalPercentage != null).map((r) => r.studentId);
-      if (studentsWithScores.length === 0) continue;
-
-      const attendances = await this.prisma.attendance.findMany({
-        where: {
-          studentId: { in: studentsWithScores },
-          date: term.startDate
-            ? {
-                gte: new Date(term.startDate),
-                ...(term.endDate ? { lte: new Date(term.endDate) } : {}),
-              }
-            : undefined,
-        },
-        select: { studentId: true, status: true },
-      });
+    const perAssignment = await Promise.all(
+      analytics.map(async (a) => {
+        const ref = this.toAssignmentRef(a);
+        const results = await this.loadResultsForAssignment(ref, term.id, context.schoolId);
+        const participants = results.filter((r) => !r.isAbsent);
+        const studentsWithScores = participants.filter((r) => r.finalPercentage != null).map((r) => r.studentId);
+        if (studentsWithScores.length === 0) return { a, participants: [] as ComputedResultRow[], attendances: [] as any[] };
+        const attendances = await this.prisma.attendance.findMany({
+          where: {
+            studentId: { in: studentsWithScores },
+            date: term.startDate
+              ? {
+                  gte: new Date(term.startDate),
+                  ...(term.endDate ? { lte: new Date(term.endDate) } : {}),
+                }
+              : undefined,
+          },
+          select: { studentId: true, status: true },
+        });
+        return { a, participants, attendances };
+      }),
+    );
+    for (const { a, participants, attendances } of perAssignment) {
       const counts = new Map<string, { total: number; present: number }>();
       for (const at of attendances) {
         if (!counts.has(at.studentId)) counts.set(at.studentId, { total: 0, present: 0 });
@@ -1108,22 +1128,22 @@ export class TeacherAnalyticsService {
     }
     const term = cycle.term;
     const yearName = term.academicYear?.name || '';
-    const assignments = await this.getAssignmentsAnalytics(context.userId, context.schoolId, term, yearName);
+    const analytics = await this.getAssignmentsAnalytics(context.userId, context.schoolId, term, yearName);
     const summary = await this.buildTeacherSummary(
       context,
-      assignments,
+      analytics,
       { id: term.id, name: term.name },
       yearName,
     );
     summary.assignments = await this.getAssignments(context.userId, context.schoolId, term.academicYearId);
 
     const [classes, subjects, competency, atRisk, trends, attendance, load] = await Promise.all([
-      this.getClassAnalytics(context, term, yearName),
-      this.getSubjectAnalytics(context, term, yearName),
-      this.getCompetencyAnalysis(context, term, yearName),
-      this.getStudentsAtRisk(context, term, yearName),
+      this.getClassAnalytics(context, term, yearName, analytics),
+      this.getSubjectAnalytics(context, term, yearName, analytics),
+      this.getCompetencyAnalysis(context, term, yearName, analytics),
+      this.getStudentsAtRisk(context, term, yearName, analytics),
       this.getHistoricalPoints(context, { id: term.id }, context.schoolId),
-      this.getAttendanceCorrelation(context, term),
+      this.getAttendanceCorrelation(context, term, analytics),
       this.getTeachingLoad(context, term.id, term.academicYearId),
     ]);
     summary.strongestCompetency = competency.strongestCompetency?.name || null;
