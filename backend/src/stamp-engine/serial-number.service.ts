@@ -171,6 +171,25 @@ export class SerialNumberService {
     this.logger.error(`Serial allocation failed after ${maxAttempts} attempts: ${lastError?.message}`);
     throw new InternalServerErrorException('Unable to allocate unique serial number');
   }
+
+  /**
+   * Advance the sequence row by one, committed immediately. Used when an
+   * interactive transaction collides on a serial number: its own increment was
+   * rolled back with the aborted transaction, so re-running the transaction
+   * alone would recompute the identical (still colliding) serial. This skip
+   * makes the next allocation yield a genuinely different value.
+   */
+  async skipPastCollision(schoolId: string, policy: SerialFormatPolicy): Promise<void> {
+    const year = this.resolveYear(policy);
+    const scopeKey = this.buildScopeKey(schoolId, policy, year);
+    const prefix = (policy.prefix || 'STS').toUpperCase();
+    await this.prisma.$executeRaw(Prisma.sql`
+      INSERT INTO "SerialSequence" ("id", "schoolId", "scopeKey", "prefix", "nextValue", "updatedAt")
+      VALUES (${randomUUID()}, ${schoolId}, ${scopeKey}, ${prefix}, 2, NOW())
+      ON CONFLICT ("schoolId", "scopeKey")
+      DO UPDATE SET "nextValue" = "SerialSequence"."nextValue" + 1, "prefix" = ${prefix}, "updatedAt" = NOW()
+    `);
+  }
 }
 
 export interface DocumentSerialRecord {

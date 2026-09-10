@@ -219,15 +219,19 @@ export class VerificationService {
 
     // A unique-collision on DocumentSerial aborts the interactive transaction
     // (PostgreSQL rejects every later statement with P2010/25P02), so a retry
-    // must re-run the entire transaction — never just the INSERT. Collisions are
-    // astronomically rare (concurrent custom-format changes), hence a tiny budget.
+    // must re-run the entire transaction — never just the INSERT. The aborted
+    // transaction also rolled back its sequence increment, so before retrying
+    // we commit-skip past the colliding value; otherwise the retry would
+    // recompute the identical serial and collide forever.
     let created: Awaited<ReturnType<typeof runTransaction>> | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
       try {
         created = await runTransaction();
         break;
       } catch (err: any) {
-        if (err?.code !== 'P2002' || attempt >= 2) throw err;
+        if (err?.code !== 'P2002' || attempt >= 4) throw err;
+        this.logger.warn(`Serial collision on attempt ${attempt + 1} — skipping past it`);
+        await this.serials.skipPastCollision(schoolId, policy);
       }
     }
     if (!created) throw new ConflictException('Unable to finalize document verification');
