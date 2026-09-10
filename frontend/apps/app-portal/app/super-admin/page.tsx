@@ -660,6 +660,10 @@ export default function SuperAdminPage() {
           <Icon3D name="startup" size={50} />
           <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginTop: '8px' }}>Register School</span>
         </Link>
+        <Link href="/super-admin/registrations" className="menu-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px', borderRadius: '16px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', background: '#fefcf9', textDecoration: 'none' }}>
+          <Icon3D name="inbox" size={50} />
+          <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginTop: '8px' }}>Registration Inbox</span>
+        </Link>
         <Link href="/super-admin/model-locks" className="menu-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px', borderRadius: '16px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', background: '#fefcf9', textDecoration: 'none' }}>
           <Icon3D name="stamps" size={50} />
           <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginTop: '8px' }}>Model Locks</span>

@@ -5,8 +5,10 @@ import { InstitutionProvisioningService } from './institution-provisioning.servi
 import { InstitutionRegistrationService } from './institution-registration.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
+import { EmailModule } from '../email/email.module';
 
 @Module({
+  imports: [EmailModule],
   controllers: [InstitutionController],
   providers: [
     InstitutionTypeService,

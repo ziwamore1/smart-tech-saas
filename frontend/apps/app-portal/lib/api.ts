@@ -459,6 +459,21 @@ export const superAdminApi = {
   sendSchoolLink: (schoolId: string, directorId: string, method: 'email' | 'whatsapp' | 'both') => 
     api.post(`/super-admin/schools/${schoolId}/directors/${directorId}/send-link`, { method }),
   
+  getRegistrationRequests: (params?: { status?: string; page?: number; limit?: number }) =>
+    api.get('/super-admin/registration-requests', { params }),
+
+  getRegistrationRequest: (id: string) =>
+    api.get(`/super-admin/registration-requests/${id}`),
+
+  sendRegistrationMessage: (id: string, data: { subject?: string; message: string }) =>
+    api.post(`/super-admin/registration-requests/${id}/messages`, data),
+
+  approveRegistrationRequest: (id: string, notes?: string) =>
+    api.post(`/super-admin/registration-requests/${id}/approve`, { notes }),
+
+  rejectRegistrationRequest: (id: string, notes: string) =>
+    api.post(`/super-admin/registration-requests/${id}/reject`, { notes }),
+
   getStats: () => api.get('/super-admin/stats'),
   
   getResultsAnalytics: () => api.get('/super-admin/results-analytics'),

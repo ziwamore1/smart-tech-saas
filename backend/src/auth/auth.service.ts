@@ -502,6 +502,14 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (user.school && (!user.school.isActive || ['pending_review', 'expired', 'suspended'].includes(user.school.subscriptionStatus))) {
+      throw new ForbiddenException(
+        user.school.subscriptionStatus === 'pending_review'
+          ? 'This school registration is awaiting System Owner review.'
+          : 'This school account is not currently active.',
+      );
+    }
+
     const roles = user.userRoles.map((ur) => ur.role.name);
     const primaryRole = roles[0] || 'USER';
 
@@ -905,6 +913,11 @@ export class AuthService {
     registerDto.password = data.password;
     registerDto.phone = data.phone;
     registerDto.address = data.address;
+    (registerDto as any).registrationPurpose = data.registrationPurpose;
+    (registerDto as any).expectedLearners = data.expectedLearners;
+    (registerDto as any).contactPreference = data.contactPreference;
+    (registerDto as any).message = data.message;
+    (registerDto as any).website = data.website;
 
     return this.institutionRegistrationService.registerInstitution(registerDto);
   }

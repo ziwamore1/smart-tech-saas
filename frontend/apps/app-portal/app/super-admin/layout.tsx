@@ -32,6 +32,12 @@ const superAdminNav = [
     icon: 'fa-building',
     color: '#3b82f6'
   },
+  {
+    name: 'Registrations',
+    href: '/super-admin/registrations',
+    icon: 'fa-inbox',
+    color: '#ea6645'
+  },
   { 
     name: 'School Members', 
     href: '/dashboard/school-members', 

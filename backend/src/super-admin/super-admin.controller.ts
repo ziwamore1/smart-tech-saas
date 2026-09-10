@@ -46,6 +46,43 @@ export class SuperAdminController {
     );
   }
 
+  @Get('registration-requests')
+  async getRegistrationRequests(
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.superAdminService.getRegistrationRequests(
+      status,
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 50,
+    );
+  }
+
+  @Get('registration-requests/:id')
+  async getRegistrationRequest(@Param('id') id: string) {
+    return this.superAdminService.getRegistrationRequest(id);
+  }
+
+  @Post('registration-requests/:id/messages')
+  async sendRegistrationMessage(
+    @Param('id') id: string,
+    @Body() data: { subject?: string; message: string },
+    @Request() req: any,
+  ) {
+    return this.superAdminService.sendRegistrationMessage(id, data, req.user.id);
+  }
+
+  @Post('registration-requests/:id/approve')
+  async approveRegistrationRequest(@Param('id') id: string, @Body() data: { notes?: string }) {
+    return this.superAdminService.approveRegistrationRequest(id, data?.notes);
+  }
+
+  @Post('registration-requests/:id/reject')
+  async rejectRegistrationRequest(@Param('id') id: string, @Body() data: { notes: string }) {
+    return this.superAdminService.rejectRegistrationRequest(id, data.notes);
+  }
+
   @Post('schools')
   async createSchool(@Body() data: any) {
     return this.superAdminService.createSchool(data);

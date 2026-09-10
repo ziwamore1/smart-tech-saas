@@ -11,6 +11,15 @@ import { UnifiedMessagingService } from '../messaging/unified-messaging.service'
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 import { InstitutionProvisioningService } from '../institution/institution-provisioning.service';
+
+const escapeHtml = (value: string | undefined) =>
+  String(value || '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[character] || character));
 import { CacheService } from '../common/services/cache.service';
 import { StaffSyncEngineService } from '../shared/staff-sync-engine/staff-sync-engine.service';
 
@@ -91,6 +100,74 @@ export class SuperAdminService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async getRegistrationRequests(status?: string, page = 1, limit = 50) {
+    const where = status ? { status } : {};
+    const [requests, total] = await this.prisma.$transaction([
+      this.prisma.schoolRegistrationRequest.findMany({
+        where,
+        include: {
+          school: { select: { id: true, name: true, registrationNumber: true, isActive: true, subscriptionStatus: true, trialEndsAt: true } },
+          messages: { orderBy: { createdAt: 'asc' } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.schoolRegistrationRequest.count({ where }),
+    ]);
+    return { data: requests, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async getRegistrationRequest(id: string) {
+    const request = await this.prisma.schoolRegistrationRequest.findUnique({
+      where: { id },
+      include: { school: true, messages: { orderBy: { createdAt: 'asc' } } },
+    });
+    if (!request) throw new NotFoundException('Registration request not found');
+    return request;
+  }
+
+  async sendRegistrationMessage(id: string, data: { subject?: string; message: string }, createdById: string) {
+    const request = await this.getRegistrationRequest(id);
+    const message = await this.prisma.schoolRegistrationMessage.create({
+      data: {
+        requestId: id,
+        direction: 'OUTBOUND',
+        subject: data.subject || 'Smart Tech school registration follow-up',
+        message: data.message,
+        senderEmail: process.env.SYSTEM_OWNER_EMAIL || process.env.SUPPORT_EMAIL,
+        createdById,
+      },
+    });
+    await this.prisma.schoolRegistrationRequest.update({ where: { id }, data: { status: 'CONTACTED', lastContactedAt: new Date() } });
+    await this.sendEmail(request.email, message.subject || 'Smart Tech registration follow-up', `<p>${escapeHtml(data.message).replace(/\n/g, '<br/>')}</p>`);
+    return message;
+  }
+
+  async approveRegistrationRequest(id: string, notes?: string) {
+    const request = await this.getRegistrationRequest(id);
+    const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const school = await this.prisma.school.update({
+      where: { id: request.schoolId },
+      data: { isActive: true, subscriptionStatus: 'trial', trialEndsAt },
+    });
+    await this.prisma.schoolRegistrationRequest.update({
+      where: { id },
+      data: { status: 'APPROVED', ownerNotes: notes || undefined },
+    });
+    await this.provisioningService.provisionInstitution(school.id, request.institutionType).catch((error) => this.logger.error(`Provisioning failed after approval for ${school.id}: ${error.message}`));
+    await this.sendEmail(request.email, 'Your Smart Tech school trial is approved', `<p>Hello ${request.directorFirstName},</p><p>Your Smart Tech workspace for <strong>${request.schoolName}</strong> has been approved. Your 30-day trial is now active. Please sign in to begin setting up your school.</p>`);
+    return { school, request: await this.getRegistrationRequest(id) };
+  }
+
+  async rejectRegistrationRequest(id: string, notes: string) {
+    const request = await this.getRegistrationRequest(id);
+    await this.prisma.school.update({ where: { id: request.schoolId }, data: { isActive: false, subscriptionStatus: 'rejected' } });
+    await this.prisma.schoolRegistrationRequest.update({ where: { id }, data: { status: 'REJECTED', ownerNotes: notes } });
+    await this.sendEmail(request.email, 'Update on your Smart Tech school registration request', `<p>Hello ${escapeHtml(request.directorFirstName)},</p><p>We need more information before we can activate the Smart Tech workspace for <strong>${escapeHtml(request.schoolName)}</strong>.</p><p>${escapeHtml(notes).replace(/\n/g, '<br/>')}</p>`);
+    return this.getRegistrationRequest(id);
   }
 
   async createSchool(data: {
@@ -238,10 +315,17 @@ export class SuperAdminService {
   }
 
   async activateSchool(schoolId: string) {
-    return this.prisma.school.update({
+    const school = await this.prisma.school.update({
       where: { id: schoolId },
-      data: { isActive: true, subscriptionStatus: 'active' },
+      data: { isActive: true, subscriptionStatus: 'trial', trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
     });
+    const request = await this.prisma.schoolRegistrationRequest.findUnique({ where: { schoolId } });
+    if (request) {
+      await this.prisma.schoolRegistrationRequest.update({ where: { id: request.id }, data: { status: 'APPROVED' } });
+      await this.provisioningService.provisionInstitution(schoolId, request.institutionType).catch((error) => this.logger.error(`Provisioning failed after school activation: ${error.message}`));
+      await this.sendEmail(request.email, 'Your Smart Tech school trial is approved', `<p>Hello ${request.directorFirstName},</p><p>Your Smart Tech school workspace has been approved and your 30-day trial is now active.</p>`);
+    }
+    return school;
   }
 
   async deactivateSchool(schoolId: string) {

@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, IsInt, MaxLength, IsIn } from 'class-validator';
 
 export enum InstitutionTypeCodeEnum {
   PRIMARY_SCHOOL = 'PRIMARY_SCHOOL',
@@ -40,6 +40,29 @@ export class RegisterInstitutionDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  registrationPurpose?: string;
+
+  @IsOptional()
+  @IsInt()
+  expectedLearners?: number;
+
+  @IsOptional()
+  @IsIn(['EMAIL', 'PHONE', 'WHATSAPP'])
+  contactPreference?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  message?: string;
+
+  // Honeypot field — never shown to real users.
+  @IsOptional()
+  @IsString()
+  website?: string;
 }
 
 export class CreateInstitutionDto {

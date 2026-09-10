@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
@@ -17,7 +18,7 @@ import { google } from 'googleapis';
 import { mapBounded } from '../common/utils/concurrency.util';
 
 @Injectable()
-export class SystemCommunicationsService {
+export class SystemCommunicationsService implements OnModuleInit {
   private readonly logger = new Logger(SystemCommunicationsService.name);
 
   constructor(
@@ -30,6 +31,78 @@ export class SystemCommunicationsService {
     private notificationService: NotificationService,
     private studentFilter: StudentFilterService,
   ) {}
+
+  async onModuleInit() {
+    try {
+      const existing = await this.prisma.communicationTemplate.count({
+        where: { scope: 'system', category: 'registration' },
+      });
+      if (existing === 0) {
+        await this.prisma.communicationTemplate.createMany({
+          data: [
+            {
+              name: 'Registration Received',
+              type: 'EMAIL',
+              subject: 'We received your Smart Tech school registration request',
+              message:
+                'Hello {directorFirstName},\n\nWe received your registration request for {schoolName}. The workspace is awaiting System Owner review. Please reply to this email or contact the Smart Tech team for guidance.\n\nYour reference number is {registrationNumber}.',
+              category: 'registration',
+              schoolId: 'system',
+              scope: 'system',
+              isDefault: true,
+            },
+            {
+              name: 'Approved — Trial Started',
+              type: 'EMAIL',
+              subject: 'Your Smart Tech school trial is approved',
+              message:
+                'Hello {directorFirstName},\n\nYour Smart Tech workspace for {schoolName} has been approved. Your 30-day trial is now active. Please sign in to begin setting up your school.\n\nReference: {registrationNumber}',
+              category: 'registration',
+              schoolId: 'system',
+              scope: 'system',
+              isDefault: true,
+            },
+            {
+              name: 'Requesting More Information',
+              type: 'EMAIL',
+              subject: 'Update on your Smart Tech school registration request',
+              message:
+                'Hello {directorFirstName},\n\nWe need a little more information before we can activate the Smart Tech workspace for {schoolName}. Please reply to this email and our team will help you get started.\n\nReference: {registrationNumber}',
+              category: 'registration',
+              schoolId: 'system',
+              scope: 'system',
+              isDefault: true,
+            },
+            {
+              name: 'Trial Expiring Soon',
+              type: 'EMAIL',
+              subject: 'Your Smart Tech trial ends soon',
+              message:
+                'Hello {directorFirstName},\n\nYour 30-day trial for {schoolName} ends on {trialEndsAt}. Please subscribe to keep using Smart Tech uninterrupted.\n\nReference: {registrationNumber}',
+              category: 'registration',
+              schoolId: 'system',
+              scope: 'system',
+              isDefault: true,
+            },
+            {
+              name: 'Trial Expired — Account Deactivated',
+              type: 'EMAIL',
+              subject: 'Your Smart Tech trial has ended',
+              message:
+                'Hello {directorFirstName},\n\nYour Smart Tech trial for {schoolName} has ended and the workspace has been deactivated. Subscribe to reactivate your school with all your data intact.\n\nReference: {registrationNumber}',
+              category: 'registration',
+              schoolId: 'system',
+              scope: 'system',
+              isDefault: true,
+            },
+          ],
+        });
+        this.logger.log('Seeded default registration email templates');
+      }
+    } catch (error) {
+      this.logger.error(`Failed to seed registration templates: ${error.message}`);
+    }
+  }
 
   // ===================== DASHBOARD =====================
 

@@ -24,6 +24,11 @@ export default function RegisterPage() {
     confirmPassword: '',
     phone: '',
     address: '',
+    registrationPurpose: '',
+    expectedLearners: '',
+    contactPreference: 'EMAIL',
+    message: '',
+    website: '',
   });
   const [selectedType, setSelectedType] = useState('');
   const [error, setError] = useState('');
@@ -56,15 +61,24 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      await authApi.registerSchool({
+      const res = await authApi.registerSchool({
         schoolName: formData.schoolName,
         directorFirstName: formData.directorFirstName,
         directorLastName: formData.directorLastName,
         email: formData.email,
         password: formData.password,
+        phone: formData.phone,
+        address: formData.address,
+        registrationPurpose: formData.registrationPurpose,
+        expectedLearners: formData.expectedLearners ? Number(formData.expectedLearners) : undefined,
+        contactPreference: formData.contactPreference,
+        message: formData.message,
+        website: formData.website,
         institutionType: selectedType,
       });
-      router.push('/login?registered=true');
+      const ref = res?.data?.registrationNumber || (res?.data?.institution?.registrationNumber) || '';
+      const msg = `Registration request received${ref ? ` (reference ${ref})` : ''}. Your school is awaiting System Owner review — you will be notified by email once it is approved.`;
+      router.push(`/login?registered=true&message=${encodeURIComponent(msg)}`);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Registration failed');
     } finally {
@@ -199,6 +213,31 @@ export default function RegisterPage() {
               placeholder="+260 97 000 0000"
             />
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">What do you want to use Smart Tech for?</label>
+            <textarea name="registrationPurpose" value={formData.registrationPurpose} onChange={(e) => setFormData({ ...formData, registrationPurpose: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-lg" rows={3} placeholder="Tell us briefly about your school and what support you need" required />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Expected learners (Optional)</label>
+              <input type="number" min={1} name="expectedLearners" value={formData.expectedLearners} onChange={handleChange} className="w-full px-4 py-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Preferred contact</label>
+              <select name="contactPreference" value={formData.contactPreference} onChange={(e) => setFormData({ ...formData, contactPreference: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                <option value="EMAIL">Email</option><option value="PHONE">Phone</option><option value="WHATSAPP">WhatsApp</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Message for the System Owner (Optional)</label>
+            <textarea name="message" value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-lg" rows={3} placeholder="Ask a question or request guidance" />
+          </div>
+
+          <input aria-hidden="true" tabIndex={-1} autoComplete="off" name="website" value={formData.website} onChange={handleChange} className="hidden" />
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

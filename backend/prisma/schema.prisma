@@ -252,6 +252,7 @@ model School {
   examTemplates                ExamTemplate[]
   documentStamps               DocumentStamp[]
   approvalRequests             ApprovalRequest[]
+  registrationRequests          SchoolRegistrationRequest[]
   approvalWorkflows            ApprovalWorkflow[]
   documentSignatures           DocumentSignature[]
   ministryVerifications        MinistryVerification[]
@@ -323,6 +324,47 @@ model School {
   @@index([institutionTypeId])
   @@index([isActive])
   @@index([createdAt])
+}
+
+model SchoolRegistrationRequest {
+  id                 String                         @id @default(uuid())
+  schoolId           String                         @unique
+  school             School                         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  directorUserId     String?
+  schoolName         String
+  directorFirstName  String
+  directorLastName   String
+  email              String
+  phone              String?
+  address            String?
+  institutionType    String
+  registrationPurpose String?
+  expectedLearners   Int?
+  contactPreference  String?
+  status             String                         @default("PENDING_REVIEW")
+  ownerNotes         String?
+  lastContactedAt    DateTime?
+  createdAt          DateTime                       @default(now())
+  updatedAt          DateTime                       @updatedAt
+  messages           SchoolRegistrationMessage[]
+
+  @@index([status])
+  @@index([email])
+  @@index([createdAt])
+}
+
+model SchoolRegistrationMessage {
+  id           String                    @id @default(uuid())
+  requestId    String
+  request      SchoolRegistrationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  direction    String
+  subject      String?
+  message      String
+  senderEmail  String?
+  createdById  String?
+  createdAt    DateTime                  @default(now())
+
+  @@index([requestId, createdAt])
 }
 
 model AcademicYear {

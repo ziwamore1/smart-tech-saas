@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Req, UseGuards, Logger, Get, Inject } from '@nestjs/common';
+import { Controller, Post, Body, Req, UseGuards, Logger, Get, Inject, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterSchoolDto } from './dto/register-school.dto';
 import { LoginDto } from './dto/login.dto';
@@ -15,6 +15,7 @@ import { RegisterInstitutionDto } from '../institution/dto/institution-type.dto'
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
+  private readonly registrationAttempts = new Map<string, { count: number; resetAt: number }>();
 
   constructor(
     private authService: AuthService,
@@ -64,8 +65,9 @@ export class AuthController {
   }
 
   @Post('register-school')
-  async registerSchool(@Body() body: RegisterSchoolDto) {
-    this.logger.log(`Register school request: ${JSON.stringify(body)}`);
+  async registerSchool(@Body() body: RegisterSchoolDto, @Req() req: any) {
+    this.guardPublicRegistration(req);
+    this.logger.log(`Register school request received for ${body.email}`);
     return this.authService.registerSchool(body);
   }
 
@@ -81,8 +83,28 @@ export class AuthController {
   }
 
   @Post('register-institution')
-  async registerInstitution(@Body() body: RegisterInstitutionDto) {
+  async registerInstitution(@Body() body: RegisterInstitutionDto, @Req() req: any) {
+    this.guardPublicRegistration(req);
+    this.logger.log(`Register institution request received for ${body.email}`);
     return this.institutionRegistrationService.registerInstitution(body);
+  }
+
+  private guardPublicRegistration(req: any) {
+    const body = req.body || {};
+    if (body.website) {
+      throw new BadRequestException('Registration could not be completed.');
+    }
+
+    const key = String(req.ip || req.headers?.['x-forwarded-for'] || 'unknown').split(',')[0].trim();
+    const now = Date.now();
+    const current = this.registrationAttempts.get(key);
+    if (!current || current.resetAt <= now) {
+      this.registrationAttempts.set(key, { count: 1, resetAt: now + 60 * 60 * 1000 });
+    } else if (current.count >= 5) {
+      throw new BadRequestException('Too many registration attempts. Please try again later.');
+    } else {
+      current.count += 1;
+    }
   }
 
   @Post('login')

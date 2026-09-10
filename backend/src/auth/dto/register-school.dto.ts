@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, MinLength, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, MinLength, IsOptional, IsString, IsInt, MaxLength, IsIn } from 'class-validator';
 
 export class RegisterSchoolDto {
   @IsNotEmpty()
@@ -27,4 +27,27 @@ export class RegisterSchoolDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  registrationPurpose?: string;
+
+  @IsOptional()
+  @IsInt()
+  expectedLearners?: number;
+
+  @IsOptional()
+  @IsIn(['EMAIL', 'PHONE', 'WHATSAPP'])
+  contactPreference?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  message?: string;
+
+  // Honeypot field for simple automated submissions. Real users never see it.
+  @IsOptional()
+  @IsString()
+  website?: string;
 }

@@ -2,8 +2,19 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { InstitutionProvisioningService } from './institution-provisioning.service';
 import { RegisterInstitutionDto, InstitutionTypeCodeEnum } from './dto/institution-type.dto';
+import { EmailService } from '../email/email.service';
+
+const escapeHtml = (value: string | undefined) =>
+  String(value || '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[character] || character));
 
 @Injectable()
 export class InstitutionRegistrationService {
@@ -13,6 +24,7 @@ export class InstitutionRegistrationService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private provisioningService: InstitutionProvisioningService,
+    private emailService: EmailService,
   ) {}
 
   async registerInstitution(dto: RegisterInstitutionDto) {
@@ -35,15 +47,18 @@ export class InstitutionRegistrationService {
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const registrationNumber = await this.generateRegistrationNumber();
 
     const school = await this.prisma.school.create({
       data: {
         name: dto.institutionName,
         institutionTypeId: institutionType.id,
-        subscriptionStatus: 'trial',
+        registrationNumber,
+        subscriptionStatus: 'pending_review',
         email: normalizedEmail,
         phone: dto.phone,
         address: dto.address,
+        isActive: false,
       },
     });
 
@@ -84,8 +99,6 @@ export class InstitutionRegistrationService {
       }
     }
 
-    await this.provisioningService.provisionInstitution(school.id, dto.institutionType);
-
     // Auto-create Teacher record for Director so they appear in staff register and analytics
     const existingTeacher = await this.prisma.teacher.findUnique({ where: { userId: user.id } });
     if (!existingTeacher) {
@@ -112,6 +125,50 @@ export class InstitutionRegistrationService {
       });
     }
 
+    const registrationRequest = await this.prisma.schoolRegistrationRequest.create({
+      data: {
+        schoolId: school.id,
+        directorUserId: user.id,
+        schoolName: dto.institutionName,
+        directorFirstName: dto.directorFirstName,
+        directorLastName: dto.directorLastName,
+        email: normalizedEmail,
+        phone: dto.phone,
+        address: dto.address,
+        institutionType: dto.institutionType,
+        registrationPurpose: (dto as any).registrationPurpose,
+        expectedLearners: (dto as any).expectedLearners,
+        contactPreference: (dto as any).contactPreference,
+        messages: {
+          create: {
+            direction: 'INBOUND',
+            subject: 'Initial school registration request',
+            message: (dto as any).message || 'The applicant submitted a school registration request.',
+            senderEmail: normalizedEmail,
+          },
+        },
+      },
+    });
+
+    const ownerEmail = process.env.SYSTEM_OWNER_EMAIL || process.env.SUPPORT_EMAIL;
+    const applicantName = `${dto.directorFirstName} ${dto.directorLastName}`.trim();
+    const safeApplicantName = escapeHtml(applicantName);
+    const safeInstitutionName = escapeHtml(dto.institutionName);
+    const safeEmail = escapeHtml(normalizedEmail);
+    const safeRegistrationNumber = escapeHtml(registrationNumber);
+    if (ownerEmail) {
+      this.emailService.sendMail(
+        ownerEmail,
+        `New school registration request: ${dto.institutionName}`,
+        `<p>A new school registration request is awaiting review.</p><p><strong>School:</strong> ${safeInstitutionName}<br/><strong>Applicant:</strong> ${safeApplicantName}<br/><strong>Email:</strong> ${safeEmail}<br/><strong>Registration number:</strong> ${safeRegistrationNumber}</p>`,
+      ).catch((error) => this.logger.warn(`Registration owner notification failed: ${error.message}`));
+    }
+    this.emailService.sendMail(
+      normalizedEmail,
+      'We received your Smart Tech school registration request',
+      `<p>Hello ${safeApplicantName},</p><p>We received your request for <strong>${safeInstitutionName}</strong>. The workspace is pending System Owner review. Please reply to this email or contact the Smart Tech team for guidance. Access and the trial period will begin after approval.</p><p>Your reference number is <strong>${safeRegistrationNumber}</strong>.</p>`,
+    ).catch((error) => this.logger.warn(`Registration applicant notification failed: ${error.message}`));
+
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId: user.id },
       include: { role: true },
@@ -120,23 +177,18 @@ export class InstitutionRegistrationService {
     const roles = userRoles.map((ur) => ur.role.name);
     const primaryRole = roles[0] || 'USER';
 
-    const payload = {
-      sub: user.id,
-      schoolId: school.id,
-      institutionType: dto.institutionType,
-      roles,
-      type: 'user',
-    };
-
     this.logger.log(`Institution registered: ${school.id} (${dto.institutionName}) type: ${dto.institutionType}`);
 
     return {
-      message: 'Institution registered successfully',
-      access_token: await this.jwtService.signAsync(payload),
+      message: 'Registration request received. Your school will be activated after System Owner review.',
+      requestId: registrationRequest.id,
+      registrationNumber,
+      status: 'PENDING_REVIEW',
       institution: {
         id: school.id,
         name: school.name,
         type: dto.institutionType,
+        registrationNumber,
       },
       user: {
         id: user.id,
@@ -148,6 +200,15 @@ export class InstitutionRegistrationService {
         schoolId: school.id,
       },
     };
+  }
+
+  private async generateRegistrationNumber(): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const candidate = `ST-${new Date().getFullYear()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+      const existing = await this.prisma.school.findUnique({ where: { registrationNumber: candidate }, select: { id: true } });
+      if (!existing) return candidate;
+    }
+    throw new BadRequestException('Unable to allocate a school registration number. Please try again.');
   }
 
   async getRegistrationSteps() {
