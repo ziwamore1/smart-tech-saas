@@ -7,9 +7,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { ReportCardEngineModule } from '../report-card-engine/report-card-engine.module';
 import { CompositeSubjectModule } from '../composite-subject/composite-subject.module';
+import { ReportTemplateBuilderModule } from '../report-template-builder/report-template-builder.module';
 
 @Module({
-  imports: [AnalyticsModule, ReportCardEngineModule, CompositeSubjectModule],
+  imports: [
+    AnalyticsModule,
+    ReportCardEngineModule,
+    CompositeSubjectModule,
+    ReportTemplateBuilderModule,
+  ],
   controllers: [ReportCardController, ReportTemplateController],
   providers: [ReportCardService, ReportTemplateService, PrismaService],
   exports: [ReportCardService, ReportTemplateService],

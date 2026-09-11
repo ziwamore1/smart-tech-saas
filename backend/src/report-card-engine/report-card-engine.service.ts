@@ -164,6 +164,23 @@ let resultSheet = examType
         }
       }
 
+      // Fallback: the computed row can carry a raw score but no final
+      // percentage (e.g. marks entered for assessments that had no matching
+      // weighting config, so the compute pipeline never produced a percentage).
+      // Derive an equal-weight percentage from the assessment results — the
+      // same formula the assessment engine uses when no config exists — so a
+      // scored subject is never shown as all-dashes (%/Grade/Pts/Remark).
+      if (finalPercentage == null) {
+        const scoredAssessments = assessments.filter(a => a.rawScore != null);
+        if (scoredAssessments.length > 0) {
+          const rawTotal = scoredAssessments.reduce((sum, a) => sum + (a.rawScore ?? 0), 0);
+          const maxTotal = scoredAssessments.reduce((sum, a) => sum + (a.maxScore ?? 100), 0);
+          if (maxTotal > 0) {
+            finalPercentage = parseFloat(((rawTotal / maxTotal) * 100).toFixed(2));
+          }
+        }
+      }
+
       // Guard against a legacy data inconsistency where an overall score was
       // recorded in the Result/weighted tables but no component (assessment)
       // rows exist, leaving totalRawScore at 0 while finalPercentage is valid.
@@ -261,18 +278,38 @@ let resultSheet = examType
     );
 
     // --- Compute class rank on-the-fly from all students' average percentages ---
+    // Class-scoped: only students currently enrolled in this class count toward
+    // the rank and class size. Legacy Result rows have no classId, so without
+    // this membership filter the denominator can balloon to the WHOLE SCHOOL
+    // (e.g. "338 / 638" for a class of fewer than 80 learners).
+    const classMembers = await this.prisma.enrollment.findMany({
+      where: {
+        classId: enrollment.classId,
+        status: 'ACTIVE',
+        student: { status: 'ACTIVE' },
+      },
+      select: { studentId: true },
+    });
+    const classMemberIds = classMembers.map(m => m.studentId);
+    const classStudentIds = new Set(classMemberIds);
+
     const allStudentResults = await this.prisma.computedResult.findMany({
       where: { termId, classId: enrollment.classId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, student: { status: 'ACTIVE' } },
-      select: { studentId: true, finalPercentage: true },
+      select: { studentId: true, subjectId: true, finalPercentage: true },
     });
     // Also get Result table fallback for students with NULL finalPercentage
     const allLegacyResults = await this.prisma.result.findMany({
-      where: { termId, schoolId, student: { status: 'ACTIVE' } },
+      where: {
+        termId,
+        schoolId,
+        student: { status: 'ACTIVE' },
+        studentId: { in: classMemberIds },
+      },
       select: { studentId: true, score: true },
     });
     const allLegacyMap = new Map<string, number[]>();
     for (const lr of allLegacyResults) {
-      if (lr.score != null) {
+      if (lr.score != null && classStudentIds.has(lr.studentId)) {
         const arr = allLegacyMap.get(lr.studentId) ?? [];
         arr.push(lr.score);
         allLegacyMap.set(lr.studentId, arr);
@@ -305,6 +342,7 @@ let resultSheet = examType
         studentId: sid,
         average: data.count > 0 ? data.total / data.count : 0,
       }))
+      .filter(s => classStudentIds.has(s.studentId))
       .sort((a, b) => b.average - a.average);
 
     let computedClassRank: number | null = null;
@@ -326,6 +364,31 @@ let resultSheet = examType
     const computedPercentile = computedClassRank != null && computedClassSize > 0
       ? Math.round(((computedClassSize - computedClassRank) / computedClassSize) * 100)
       : null;
+
+    // Subject rank (tie-aware) within the class, computed on the fly so the
+    // report's Rank column is never empty when rankings haven't been persisted.
+    const subjectScoreMap = new Map<string, { studentId: string; finalPercentage: number }[]>();
+    for (const sr of allStudentResults) {
+      if (sr.finalPercentage == null) continue;
+      const rows = subjectScoreMap.get(sr.subjectId) ?? [];
+      rows.push({ studentId: sr.studentId, finalPercentage: sr.finalPercentage });
+      subjectScoreMap.set(sr.subjectId, rows);
+    }
+    const subjectRankMap = new Map<string, Map<string, number>>();
+    for (const [subjectId, rows] of subjectScoreMap) {
+      rows.sort((a, b) => b.finalPercentage - a.finalPercentage);
+      const perStudent = new Map<string, number>();
+      let lastRank = 0;
+      let lastPct: number | null = null;
+      for (let i = 0; i < rows.length; i++) {
+        if (lastPct === null || Math.abs(rows[i].finalPercentage - lastPct) > 0.001) {
+          lastRank = i + 1;
+          lastPct = rows[i].finalPercentage;
+        }
+        perStudent.set(rows[i].studentId, lastRank);
+      }
+      subjectRankMap.set(subjectId, perStudent);
+    }
 
     // Read TermSummary if available (may have additional data)
     const termSummary = await this.prisma.termSummary.findFirst({
@@ -398,6 +461,13 @@ let resultSheet = examType
         c => pct >= (c.minScore ?? 0) && (c.maxScore == null || pct <= c.maxScore),
       ) ?? effectiveCategories.find(c => c.minScore == null && c.maxScore == null);
       return { ...s, performanceCategory: cat ? { label: cat.label, color: cat.color } : null };
+    });
+
+    // Fill subject ranks computed on the fly where the stored rank is missing.
+    const breakdownWithRanks = enrichedBreakdown.map(s => {
+      if (s.subjectRank != null || s.finalPercentage == null) return s;
+      const rank = subjectRankMap.get(s.subjectId)?.get(studentId);
+      return rank != null ? { ...s, subjectRank: rank } : s;
     });
 
     // --- Real strengths/weaknesses from subject breakdown ---
@@ -543,7 +613,7 @@ let resultSheet = examType
         endDate: term.endDate,
       },
       examType: resultSheet?.examType || examType || 'END_TERM',
-      subjectBreakdown: enrichedBreakdown,
+      subjectBreakdown: breakdownWithRanks,
       bestSubjects,
       totalPoints,
       bestSix: eligibility.bestSix.map((s) => ({

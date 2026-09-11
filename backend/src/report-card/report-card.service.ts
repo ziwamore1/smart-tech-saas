@@ -3,11 +3,13 @@ import {
   ForbiddenException,
   NotFoundException,
   Optional,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as puppeteer from 'puppeteer';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { ReportCardEngineService } from '../report-card-engine/report-card-engine.service';
+import { TemplateRendererService } from '../report-template-builder/template-renderer.service';
 import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
@@ -54,12 +56,15 @@ handlebars.registerHelper('present', function(value: any) {
 
 @Injectable()
 export class ReportCardService {
+  private readonly logger = new Logger(ReportCardService.name);
+
   constructor(
     private prisma: PrismaService,
     private analyticsService: AnalyticsService,
     private reportCardEngineService: ReportCardEngineService,
     private cloudinary: CloudinaryService,
     private compositeSubjectService: CompositeSubjectService,
+    private templateRenderer: TemplateRendererService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
     @Optional() private readonly activityService?: SchoolActivityService,
   ) {}
@@ -75,6 +80,87 @@ export class ReportCardService {
     } catch {
       return { url: null, publicId: null };
     }
+  }
+
+  /**
+   * Appends the stamp-engine authenticity block (digital stamp SVG, QR,
+   * serial, verification code/URL, digital signature) to an enhanced report
+   * card when its ReportTemplate opts in via includeStamp/includeSignature.
+   * Mirrors report-engine.attachReportAuthenticity. Fail-safe: template opt-out
+   * or any stamp-engine error returns the HTML unchanged (never a fake stamp).
+   */
+  private async attachAuthenticity(
+    schoolId: string,
+    templateId: string | null | undefined,
+    html: string,
+    classContext?: {
+      classId?: string | null;
+      className?: string | null;
+      classTeacherId?: string | null;
+      classTeacherName?: string | null;
+    } | null,
+  ): Promise<string> {
+    if (!templateId) return html;
+    try {
+      const auth = await this.templateRenderer.finalizeReportAuthenticity(
+        schoolId,
+        templateId,
+        classContext ?? null,
+      );
+      if (!auth) return html;
+
+      const htmlWithPlaceholders = html
+        .replace(/\{\{\s*digital_stamp\s*\}\}/g, auth.placeholders.digital_stamp || '')
+        .replace(/\{\{\s*digital_signature\s*\}\}/g, auth.placeholders.digital_signature || '')
+        .replace(/\{\{\s*verification_qr\s*\}\}/g, auth.placeholders.verification_qr || '')
+        .replace(/\{\{\s*document_serial\s*\}\}/g, auth.placeholders.document_serial || '')
+        .replace(/\{\{\s*document_hash\s*\}\}/g, auth.placeholders.document_hash || '')
+        .replace(/\{\{\s*issued_date\s*\}\}/g, auth.placeholders.issued_date || '')
+        .replace(/\{\{\s*issued_timestamp\s*\}\}/g, auth.placeholders.issued_timestamp || '');
+
+      const stampSvg = (auth.placeholders.digital_stamp || '').replace(
+        /<svg /i,
+        '<svg style="width:100%;height:auto;display:block;" ',
+      );
+      const block = `
+      <div style="page-break-inside:avoid;margin-top:22px;padding:14px 16px;border:1px solid #d1d5db;border-radius:8px;background:#f9fafb;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="width:150px;vertical-align:middle;text-align:center;padding:0;">
+              ${stampSvg}
+            </td>
+            <td style="width:110px;vertical-align:middle;text-align:center;padding:0;">
+              ${auth.placeholders.verification_qr || ''}
+            </td>
+          </tr>
+        </table>
+        <div style="font-size:11px;line-height:1.55;color:#374151;">
+          <div style="font-weight:700;color:#111827;margin-bottom:3px;">Digitally Verified Document</div>
+          <div>Serial: <strong>${auth.placeholders.document_serial || ''}</strong></div>
+          <div>Issued: ${auth.placeholders.issued_timestamp || auth.placeholders.issued_date || ''}</div>
+          <div>Verification code: <strong>${auth.verificationCode}</strong></div>
+          <div>Verify online: <a href="${auth.verificationUrl}">${auth.verificationUrl}</a></div>
+        </div>
+      </div>
+      ${auth.placeholders.digital_signature || ''}`;
+      return htmlWithPlaceholders.includes('</body>')
+        ? htmlWithPlaceholders.replace('</body>', `${block}\n</body>`)
+        : `${htmlWithPlaceholders}\n${block}`;
+    } catch (e: any) {
+      this.logger.warn(`Report card authenticity attach skipped: ${e?.message ?? e}`);
+      return html;
+    }
+  }
+
+  private buildAuthenticityClassContext(engineData: any) {
+    return engineData?.class
+      ? {
+          classId: engineData.class.id ?? null,
+          className: engineData.class.name ?? null,
+          classTeacherId: engineData.class.classTeacherId ?? null,
+          classTeacherName: engineData.class.classTeacherName ?? null,
+        }
+      : null;
   }
 
   private async getBrowser() {
@@ -1062,8 +1148,13 @@ export class ReportCardService {
       ],
     };
 
-    const compiledTemplate = handlebars.compile(templateHtml);
-    const html = compiledTemplate(templateData);
+const compiledTemplate = handlebars.compile(templateHtml);
+    const html = await this.attachAuthenticity(
+      schoolId,
+      reportTemplate?.id,
+      compiledTemplate(templateData),
+      this.buildAuthenticityClassContext(engineData),
+    );
 
     const browser = await this.getBrowser();
     const page = await this.getPage(browser);
@@ -1349,7 +1440,13 @@ export class ReportCardService {
       };
 
       const compiledTemplate = handlebars.compile(templateHtml);
-      allHtml += `<div style="page-break-after:always">${compiledTemplate(templateData)}</div>`;
+      const studentHtml = await this.attachAuthenticity(
+        schoolId,
+        reportTemplate?.id,
+        compiledTemplate(templateData),
+        this.buildAuthenticityClassContext(engineData),
+      );
+      allHtml += `<div style="page-break-after:always">${studentHtml}</div>`;
     }
 
     const html = `<html><body>${allHtml}</body></html>`;
