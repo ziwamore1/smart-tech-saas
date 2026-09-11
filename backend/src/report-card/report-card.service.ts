@@ -580,7 +580,7 @@ const report = await this.getReportCard(schoolId, studentId, termId);
       select: { classId: true },
     });
     const classContext = enrollment
-      ? await this.getAuthenticityClassContext(schoolId, enrollment.classId, termId)
+      ? await this.getAuthenticityClassContext(schoolId, enrollment.classId)
       : null;
     const resultSheet = enrollment ? await this.prisma.resultSheet.findFirst({
       where: { schoolId, classId: enrollment.classId, termId },

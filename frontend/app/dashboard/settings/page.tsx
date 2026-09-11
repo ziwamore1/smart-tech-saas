@@ -54,6 +54,8 @@ export default function SettingsPage() {
     address: '',
     motto: '',
     website: '',
+    headTeacherName: '',
+    deputyName: '',
   });
 
   const [academicYearForm, setAcademicYearForm] = useState({
@@ -385,6 +387,8 @@ export default function SettingsPage() {
                       address: schoolData.address || '',
                       motto: schoolData.motto || '',
                       website: schoolData.website || '',
+                      headTeacherName: schoolData.headTeacherName || '',
+                      deputyName: schoolData.deputyName || '',
                     });
                   }
                   setIsEditing(true);
@@ -511,6 +515,36 @@ export default function SettingsPage() {
                   />
                 ) : (
                   <p className="text-gray-900">{schoolData?.website || '-'}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Head Teacher Name</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={schoolForm.headTeacherName}
+                    onChange={(e) => setSchoolForm({ ...schoolForm, headTeacherName: e.target.value })}
+                    placeholder="Name that signs digital reports"
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                ) : (
+                  <p className="text-gray-900">{schoolData?.headTeacherName || '-'}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Deputy Name</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={schoolForm.deputyName}
+                    onChange={(e) => setSchoolForm({ ...schoolForm, deputyName: e.target.value })}
+                    placeholder="Name of the deputy signatory"
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                ) : (
+                  <p className="text-gray-900">{schoolData?.deputyName || '-'}</p>
                 )}
               </div>
             </div>
