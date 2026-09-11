@@ -286,7 +286,7 @@ tr:nth-child(even) { background: {{secondaryColor}}; }
 <tr>
 <td>{{math @index "+" 1}}</td>
 <td class="subject-name">{{subjectName}}</td>
-<td>{{#if (present totalRawScore)}}{{totalRawScore}}{{else}}—{{/if}}</td>
+<td>{{#if (present score)}}{{score}}{{else}}—{{/if}}</td>
 <td><strong>{{#if (present finalPercentage)}}{{finalPercentage}}{{else}}—{{/if}}%</strong></td>
 <td>{{#if finalGrade}}{{finalGrade}}{{else}}—{{/if}}</td>
 <td>{{#if (present points)}}{{points}}{{else}}—{{/if}}</td>

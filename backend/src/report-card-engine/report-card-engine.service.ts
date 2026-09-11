@@ -3,7 +3,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { StudentSubjectService } from '../student-subject/student-subject.service';
-import { checkEczEligibility, detectEczGradingSystem, ECZ_MAX_BEST_SIX_POINTS, ECZ_MIN_BEST_SIX_POINTS } from '../ecz-eligibility/ecz-eligibility.util';
+import {
+  checkEczEligibility,
+  detectEczGradingSystem,
+  detectEczGradingSystemFromScales,
+  EczGradingSystem,
+  ECZ_MAX_BEST_SIX_POINTS,
+  ECZ_MIN_BEST_SIX_POINTS,
+} from '../ecz-eligibility/ecz-eligibility.util';
 
 @Injectable()
 export class ReportCardEngineService {
@@ -29,8 +36,15 @@ export class ReportCardEngineService {
           where: { status: 'ACTIVE' },
           include: {
             class: {
-              include: {
-                levelType: true,
+              select: {
+                id: true,
+                name: true,
+                gradingSystemId: true,
+                levelType: {
+                  select: { name: true },
+                },
+                includeDigitalStamp: true,
+                includeDigitalSignature: true,
                 classTeacher: {
                   select: { id: true, firstName: true, lastName: true },
                 },
@@ -218,6 +232,10 @@ let resultSheet = examType
         subjectCode: result.subject.code,
         totalRawScore,
         totalWeightedScore: result.totalWeightedScore,
+        // The visible "Score" must be the final computed score (percentage),
+        // NOT the raw component sum (e.g. Mid-Term 50 + End-of-Term 56 = 106),
+        // which is meaningless when components have different max/weight.
+        score: finalPercentage ?? totalRawScore,
         finalPercentage,
         finalGrade,
         finalRemark,
@@ -261,6 +279,7 @@ let resultSheet = examType
         subjectCode: legacy.subject.code,
         totalRawScore: legacy.score,
         totalWeightedScore: legacy.score,
+        score: legacy.score,
         finalPercentage: legacy.score,
         finalGrade: legacyGrade,
         finalRemark: legacyRemark,
@@ -559,7 +578,12 @@ let resultSheet = examType
     const rawTotalPoints = bestSubjects.reduce((sum, s) => sum + (s.points ?? 0), 0);
     const totalPoints = bestSubjects.length > 0 ? Math.max(ECZ_MIN_BEST_SIX_POINTS, rawTotalPoints) : 0;
 
-    // ECZ university / school-certificate eligibility over all graded subjects
+    // ECZ university / school-certificate eligibility over all graded subjects.
+    // Prefer the class's actual grade scale (5-point competency = Forms, 9-point = Grades)
+    // and fall back to level/class names.
+    const eczGradingSystem =
+      (await this.resolveEczGradingSystem(enrollment.class)) ??
+      (detectEczGradingSystem(enrollment.class.levelType?.name ?? enrollment.class.name ?? null) as EczGradingSystem);
     const eligibility = checkEczEligibility(
       enrichedBreakdown.map((s: any) => ({
         name: s.subjectName,
@@ -567,7 +591,7 @@ let resultSheet = examType
         grade: s.finalGrade,
         points: s.points,
       })),
-      detectEczGradingSystem(enrollment.class.levelType?.name ?? enrollment.class.name ?? null),
+      eczGradingSystem,
     );
 
     // Load division rules for classification
@@ -601,6 +625,8 @@ let resultSheet = examType
         classTeacherName: enrollment.class.classTeacher
           ? `${enrollment.class.classTeacher.firstName} ${enrollment.class.classTeacher.lastName}`.trim()
           : null,
+        includeDigitalStamp: enrollment.class.includeDigitalStamp ?? null,
+        includeDigitalSignature: enrollment.class.includeDigitalSignature ?? null,
       },
       academicYear: {
         id: enrollment.academicYearId,
@@ -694,6 +720,17 @@ let resultSheet = examType
       },
       generatedAt: new Date(),
     };
+  }
+
+  // Resolve the ECZ grading system from the class's actual grade scale (if any).
+  // Returns null when the scale is not an unambiguous ECZ 1-9 / 1-5 point scale.
+  private async resolveEczGradingSystem(cls: { id?: string; gradingSystemId?: string | null }): Promise<EczGradingSystem | null> {
+    if (!cls?.gradingSystemId) return null;
+    const gradingSystem = await this.prisma.gradingSystem.findUnique({
+      where: { id: cls.gradingSystemId },
+      select: { gradeScales: { select: { grade: true, points: true } } },
+    });
+    return detectEczGradingSystemFromScales(gradingSystem?.gradeScales);
   }
 
   async generateBulkReportCards(
@@ -827,6 +864,7 @@ let resultSheet = examType
         subjectCode: comp.composite.code,
         totalRawScore: comp.finalPercentage,
         totalWeightedScore: null,
+        score: comp.finalPercentage,
         finalPercentage: comp.finalPercentage,
         finalGrade: comp.finalGrade,
         finalRemark: null,

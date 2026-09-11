@@ -1463,8 +1463,12 @@ export class TemplateRendererService {
       classTeacherId?: string | null;
       classTeacherName?: string | null;
     },
+    forceSignature?: boolean,
   ): Promise<{ html: string; signatureRecordId: string | null; signatures: Record<string, unknown>[] }> {
-    if (!template.includeSignature || !this.signatureBridge.configured) {
+    if (forceSignature !== true && !template.includeSignature) {
+      return { html: '', signatureRecordId: null, signatures: [] };
+    }
+    if (!this.signatureBridge.configured) {
       return { html: '', signatureRecordId: null, signatures: [] };
     }
 
@@ -1484,6 +1488,7 @@ export class TemplateRendererService {
         const defaults = [
           { label: 'Class Teacher', role: 'CLASS_TEACHER', position: 0 },
           { label: 'Head Teacher', role: 'HEAD_TEACHER', position: 1 },
+          { label: 'Deputy Head Teacher', role: 'DEPUTY_HEAD_TEACHER', position: 2 },
         ];
         for (const d of defaults) {
           await this.prisma.templateSignatory.create({
@@ -1500,7 +1505,7 @@ export class TemplateRendererService {
 
       const school = await this.prisma.school.findUnique({
         where: { id: schoolId },
-        select: { name: true, headTeacherName: true },
+        select: { name: true, headTeacherName: true, deputyName: true },
       });
 
       const signed: Record<string, unknown>[] = [];
@@ -1518,9 +1523,12 @@ export class TemplateRendererService {
           signerId = context.classTeacherId || null;
           signerName = context.classTeacherName || null;
           if (context.className) signerRole = `${signerRole} — ${context.className}`;
-        } else if (/(head teacher|headteacher|principal|director|deputy)/i.test(norm)) {
+        } else if (/(head teacher|headteacher|principal|director)/i.test(norm)) {
           signerId = 'head-teacher';
           signerName = school?.headTeacherName || null;
+        } else if (/(deputy|vice head|vice principal|deputy head)/i.test(norm)) {
+          signerId = 'deputy-head-teacher';
+          signerName = school?.deputyName || null;
         }
 
         if (!signerId) {
@@ -1528,6 +1536,17 @@ export class TemplateRendererService {
             `Skipping report signatory "${label}" for template ${template.id}: no resolvable signer (school ${schoolId}).`,
           );
           continue;
+        }
+
+        // School-level signatories (Head Teacher / Deputy) are only applied when
+        // the school has named them — a signature with no name would be meaningless.
+        if (signerId === 'head-teacher' || signerId === 'deputy-head-teacher') {
+          if (!signerName || !signerName.trim()) {
+            this.logger.warn(
+              `Skipping report signatory "${label}" for template ${template.id}: ${signerId} not named in school settings (school ${schoolId}).`,
+            );
+            continue;
+          }
         }
 
         try {
@@ -1709,6 +1728,7 @@ export class TemplateRendererService {
       classTeacherId?: string | null;
       classTeacherName?: string | null;
     } | null,
+    options?: { includeStamp?: boolean; includeSignature?: boolean },
   ): Promise<{
     placeholders: Record<string, string>;
     verificationCode: string;
@@ -1719,7 +1739,14 @@ export class TemplateRendererService {
         where: { id: templateId, schoolId },
         select: { id: true, name: true, templateType: true, includeStamp: true, includeSignature: true },
       });
-      if (!template?.includeStamp && !template?.includeSignature) return null;
+      if (!template) return null;
+
+      // Per-class settings take precedence over the template-level opt-in so a
+      // school can enable certification for one class (with its own class-teacher
+      // signatory) while leaving other classes on the plain template.
+      const effectiveStamp = options?.includeStamp ?? template.includeStamp;
+      const effectiveSignature = options?.includeSignature ?? template.includeSignature;
+      if (!effectiveStamp && !effectiveSignature) return null;
 
       await this.verification.assertEntitlement(schoolId);
 
@@ -1739,7 +1766,7 @@ export class TemplateRendererService {
 
       const placeholders = this.verification.buildAuthenticityPlaceholders(finalized as any);
 
-      if (template.includeSignature) {
+      if (effectiveSignature) {
         try {
           const signed = await this.signReportCardSignatories(schoolId, template, finalized, {
             documentId: finalized.id,
@@ -1747,7 +1774,7 @@ export class TemplateRendererService {
             className: classContext?.className ?? null,
             classTeacherId: classContext?.classTeacherId ?? null,
             classTeacherName: classContext?.classTeacherName ?? null,
-          });
+          }, effectiveSignature);
           placeholders.digital_signature = signed.html;
         } catch (e: any) {
           this.logger.warn(

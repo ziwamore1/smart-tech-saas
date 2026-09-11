@@ -143,7 +143,7 @@ export class ClassService {
     });
   }
 
-  async update(id: string, data: { name?: string; capacity?: number | null; order?: number; gradingSystemId?: string | null }, schoolId: string) {
+  async update(id: string, data: { name?: string; capacity?: number | null; order?: number; gradingSystemId?: string | null; includeDigitalStamp?: boolean; includeDigitalSignature?: boolean }, schoolId: string) {
     const classEntity = await this.prisma.class.findUnique({
       where: { id },
     });
@@ -164,6 +164,8 @@ export class ClassService {
     if (data.capacity !== undefined) updateData.capacity = data.capacity;
     if (data.order !== undefined) updateData.order = data.order;
     if (data.gradingSystemId !== undefined) updateData.gradingSystemId = data.gradingSystemId;
+    if (data.includeDigitalStamp !== undefined) updateData.includeDigitalStamp = data.includeDigitalStamp;
+    if (data.includeDigitalSignature !== undefined) updateData.includeDigitalSignature = data.includeDigitalSignature;
 
     return this.prisma.class.update({
       where: { id },

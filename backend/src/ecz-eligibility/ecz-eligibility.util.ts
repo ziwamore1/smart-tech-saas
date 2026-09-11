@@ -87,6 +87,30 @@ export function scoreToEczGrade(score: number): { grade: string; points: number;
   return { grade: '9', points: 9, remark: 'Unsatisfactory' };
 }
 
+// Name-based fallback is detectEczGradingSystem below, but the most
+// reliable signal is the ACTUAL grade scale a class/school uses. ECZ scales are
+// numeric grades 1..9 (SECONDARY) or 1..5 (FORMS) whose points equal the grade.
+// Letter-grade scales (A-F, A-D, A+-F) return null so callers fall back to names.
+export function detectEczGradingSystemFromScales(
+  scales: { grade: string; points: number }[] | null | undefined,
+): EczGradingSystem | null {
+  if (!scales || scales.length === 0) return null;
+  const values = scales
+    .map((s) => {
+      const g = Number(String(s.grade).trim());
+      return { grade: g, points: s.points };
+    })
+    .filter((s) => Number.isInteger(s.grade) && s.grade >= 1 && s.grade <= 9);
+  // Any non-numeric grade (e.g. A-F) means this is not an ECZ point scale.
+  if (values.length !== scales.length) return null;
+  // ECZ scales always carry points equal to the numeric grade.
+  if (!values.every((s) => s.points === s.grade)) return null;
+  const worst = Math.max(...values.map((s) => s.grade));
+  if (worst === 9) return 'SECONDARY';
+  if (worst === 5) return 'FORMS';
+  return null;
+}
+
 export function gradeForScore(score: number, system: EczGradingSystem): { grade: string; points: number; remark: string } {
   const scale = system === 'FORMS' ? FORMS_SCALE : SECONDARY_SCALE;
   for (const s of scale) {

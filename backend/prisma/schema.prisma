@@ -178,6 +178,8 @@ model School {
   stampPublicId                String?
   directorSignature            String?
   signaturePublicId            String?
+  headTeacherName              String?
+  deputyName                   String?
   logo                         String?
   motto                        String?
   primaryColor                 String?
@@ -557,6 +559,8 @@ model Class {
   reportTemplateId        String?
   order                   Int
   classTeacherId          String?
+  includeDigitalStamp     Boolean?
+  includeDigitalSignature Boolean?
   levelType               LevelType                     @relation(fields: [levelTypeId], references: [id])
   gradingSystem           GradingSystem?                @relation(fields: [gradingSystemId], references: [id])
   reportTemplate          ReportTemplate?               @relation(fields: [reportTemplateId], references: [id], onDelete: SetNull)

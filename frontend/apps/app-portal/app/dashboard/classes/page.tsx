@@ -32,7 +32,7 @@ export default function ClassesPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSubjectsModal, setShowSubjectsModal] = useState(false);
   const [selectedClass, setSelectedClass] = useState<any>(null);
-  const [editForm, setEditForm] = useState({ name: '', capacity: '', gradingSystemId: '' });
+  const [editForm, setEditForm] = useState({ name: '', capacity: '', gradingSystemId: '', includeDigitalStamp: '', includeDigitalSignature: '' });
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [showClassTeacherModal, setShowClassTeacherModal] = useState(false);
   const [classTeacherForm, setClassTeacherForm] = useState({ teacherId: '', academicYearId: '', isPrimary: true });
@@ -583,7 +583,7 @@ export default function ClassesPage() {
                   <button 
                     onClick={() => {
                       setSelectedClass(cls);
-                      setEditForm({ name: cls.name, capacity: cls.capacity?.toString() || '', gradingSystemId: cls.gradingSystem?.id || '' });
+                      setEditForm({ name: cls.name, capacity: cls.capacity?.toString() || '', gradingSystemId: cls.gradingSystem?.id || '', includeDigitalStamp: cls.includeDigitalStamp == null ? '' : String(cls.includeDigitalStamp), includeDigitalSignature: cls.includeDigitalSignature == null ? '' : String(cls.includeDigitalSignature) });
                       setShowEditModal(true);
                     }}
                     className="px-3 py-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 text-xs font-medium transition-colors"
@@ -1054,6 +1054,44 @@ export default function ClassesPage() {
                 />
               </div>
 
+              <div className="mt-3 border-t border-gray-200 pt-4">
+                <div className="text-sm font-semibold text-gray-800 mb-1">Digital Report Certification</div>
+                <div className="text-xs text-gray-500 mb-3">
+                  Controls the digital stamp + QR + serial number and digital signatures
+                  (class teacher + school Head/Deputy) on this class&apos;s report cards.
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Digital Stamp + QR
+                    </label>
+                    <select
+                      value={editForm.includeDigitalStamp}
+                      onChange={(e) => setEditForm({ ...editForm, includeDigitalStamp: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    >
+                      <option value="">Follow template</option>
+                      <option value="true">Enabled</option>
+                      <option value="false">Disabled</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Digital Signatures
+                    </label>
+                    <select
+                      value={editForm.includeDigitalSignature}
+                      onChange={(e) => setEditForm({ ...editForm, includeDigitalSignature: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    >
+                      <option value="">Follow template</option>
+                      <option value="true">Enabled</option>
+                      <option value="false">Disabled</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-3 justify-end pt-4">
                 <button
                   onClick={() => {
@@ -1076,6 +1114,8 @@ export default function ClassesPage() {
                       data: {
                         name: editForm.name,
                         capacity: editForm.capacity ? parseInt(editForm.capacity) : null,
+                        includeDigitalStamp: editForm.includeDigitalStamp === '' ? null : editForm.includeDigitalStamp === 'true',
+                        includeDigitalSignature: editForm.includeDigitalSignature === '' ? null : editForm.includeDigitalSignature === 'true',
                       },
                     });
                   }}

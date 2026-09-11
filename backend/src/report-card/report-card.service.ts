@@ -15,7 +15,7 @@ import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 import { SchoolActivityService } from '../common/services/school-activity.service';
 import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
-import { checkEczEligibility, detectEczGradingSystem, ECZ_MAX_BEST_SIX_POINTS } from '../ecz-eligibility/ecz-eligibility.util';
+import { checkEczEligibility, detectEczGradingSystem, detectEczGradingSystemFromScales, ECZ_MAX_BEST_SIX_POINTS } from '../ecz-eligibility/ecz-eligibility.util';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as handlebars from 'handlebars';
@@ -98,14 +98,25 @@ export class ReportCardService {
       className?: string | null;
       classTeacherId?: string | null;
       classTeacherName?: string | null;
+      includeDigitalStamp?: boolean | null;
+      includeDigitalSignature?: boolean | null;
     } | null,
+    options?: { includeStamp?: boolean | null; includeSignature?: boolean | null },
   ): Promise<string> {
     if (!templateId) return html;
     try {
+      const optIn = options ?? {
+        includeStamp: classContext?.includeDigitalStamp,
+        includeSignature: classContext?.includeDigitalSignature,
+      };
       const auth = await this.templateRenderer.finalizeReportAuthenticity(
         schoolId,
         templateId,
         classContext ?? null,
+        {
+          includeStamp: optIn?.includeStamp ?? undefined,
+          includeSignature: optIn?.includeSignature ?? undefined,
+        } as any,
       );
       if (!auth) return html;
 
@@ -159,6 +170,40 @@ export class ReportCardService {
           className: engineData.class.name ?? null,
           classTeacherId: engineData.class.classTeacherId ?? null,
           classTeacherName: engineData.class.classTeacherName ?? null,
+          includeDigitalStamp: engineData.class.includeDigitalStamp ?? null,
+          includeDigitalSignature: engineData.class.includeDigitalSignature ?? null,
+        }
+      : null;
+  }
+
+  private async getAuthenticityClassContext(schoolId: string, classId: string) {
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { name: true },
+    });
+    const classInfo = await this.prisma.class.findUnique({
+      where: { id: classId },
+      select: {
+        id: true,
+        name: true,
+        includeDigitalStamp: true,
+        includeDigitalSignature: true,
+        classTeacher: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+      },
+    });
+    return classInfo
+      ? {
+          classId: classInfo.id,
+          className: classInfo.name,
+          classTeacherId: classInfo.classTeacher?.id ?? null,
+          classTeacherName: classInfo.classTeacher
+            ? `${classInfo.classTeacher.firstName} ${classInfo.classTeacher.lastName}`.trim()
+            : null,
+          includeDigitalStamp: classInfo.includeDigitalStamp ?? null,
+          includeDigitalSignature: classInfo.includeDigitalSignature ?? null,
+          _schoolName: school?.name ?? '',
         }
       : null;
   }
@@ -292,7 +337,10 @@ export class ReportCardService {
 
     const classInfo = await this.prisma.class.findUnique({
       where: { id: enrollment.classId },
-      include: { levelType: true },
+      include: {
+        levelType: true,
+        gradingSystem: { include: { gradeScales: true } },
+      },
     });
 
     const classEnrollments = await this.prisma.enrollment.findMany({
@@ -462,7 +510,8 @@ export class ReportCardService {
         points: s.points,
         remark: s.remark,
       })),
-      detectEczGradingSystem(classInfo?.levelType?.name ?? classInfo?.name ?? null),
+      detectEczGradingSystemFromScales(classInfo?.gradingSystem?.gradeScales) ??
+        detectEczGradingSystem(classInfo?.levelType?.name ?? classInfo?.name ?? null),
     );
 
     const bestSixTotal = eligibility.bestSixTotal;
@@ -525,11 +574,14 @@ export class ReportCardService {
     studentId: string,
     termId: string,
   ): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {
-    const report = await this.getReportCard(schoolId, studentId, termId);
+const report = await this.getReportCard(schoolId, studentId, termId);
     const enrollment = await this.prisma.enrollment.findFirst({
       where: { studentId, academicYear: { terms: { some: { id: termId } } }, status: 'ACTIVE' },
       select: { classId: true },
     });
+    const classContext = enrollment
+      ? await this.getAuthenticityClassContext(schoolId, enrollment.classId, termId)
+      : null;
     const resultSheet = enrollment ? await this.prisma.resultSheet.findFirst({
       where: { schoolId, classId: enrollment.classId, termId },
       orderBy: { updatedAt: 'desc' },
@@ -619,7 +671,12 @@ export class ReportCardService {
     };
 
     const compiledTemplate = handlebars.compile(templateHtml);
-    const html = compiledTemplate(templateData);
+    const html = await this.attachAuthenticity(
+      schoolId,
+      reportTemplate?.id,
+      compiledTemplate(templateData),
+      classContext,
+    );
 
     const browser = await this.getBrowser();
     const page = await this.getPage(browser);
@@ -664,6 +721,8 @@ export class ReportCardService {
     }) || await this.prisma.reportTemplate.findFirst({
       where: { schoolId },
     });
+
+    const classContext = await this.getAuthenticityClassContext(schoolId, classId);
 
     const templatePath = path.join(
       process.cwd(),
@@ -758,7 +817,14 @@ export class ReportCardService {
       };
 
       const compiledTemplate = handlebars.compile(templateHtml);
-      const studentHtml = `<div style="page-break-after:always">${compiledTemplate(templateData)}</div>`;
+      const rawHtml = compiledTemplate(templateData);
+      const certifiedHtml = await this.attachAuthenticity(
+        schoolId,
+        reportTemplate?.id,
+        rawHtml,
+        classContext,
+      );
+      const studentHtml = `<div style="page-break-after:always">${certifiedHtml}</div>`;
 
       allHtml += studentHtml;
     }
@@ -1030,10 +1096,26 @@ export class ReportCardService {
     </html>
     `;
 
+    const latestClassId = enrollments[enrollments.length - 1]?.class?.id ?? null;
+    const transcriptTemplate = await this.prisma.reportTemplate.findFirst({
+      where: { schoolId, isDefault: true },
+    }) || await this.prisma.reportTemplate.findFirst({
+      where: { schoolId },
+    });
+    const classContext = latestClassId
+      ? await this.getAuthenticityClassContext(schoolId, latestClassId)
+      : null;
+    const certifiedHtml = await this.attachAuthenticity(
+      schoolId,
+      transcriptTemplate?.id,
+      html,
+      classContext,
+    );
+
     const browser = await this.getBrowser();
     const page = await this.getPage(browser);
 
-    await page.setContent(html);
+    await page.setContent(certifiedHtml);
 
     const pdf = await page.pdf({
       format: 'A4',

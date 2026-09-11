@@ -620,6 +620,8 @@ case ReportType.RESULTS_ANALYSIS:
             className: rendered.engineData.class.name ?? null,
             classTeacherId: rendered.engineData.class.classTeacherId ?? null,
             classTeacherName: rendered.engineData.class.classTeacherName ?? null,
+            includeDigitalStamp: rendered.engineData.class.includeDigitalStamp ?? null,
+            includeDigitalSignature: rendered.engineData.class.includeDigitalSignature ?? null,
           }
         : null;
       const html = await this.attachReportAuthenticity(schoolId, rendered, classCtx);
@@ -647,10 +649,13 @@ case ReportType.RESULTS_ANALYSIS:
   private async attachReportAuthenticity(
     schoolId: string,
     rendered: { html: string; templateId: string },
-    classContext?: { classId?: string | null; className?: string | null; classTeacherId?: string | null; classTeacherName?: string | null } | null,
+    classContext?: { classId?: string | null; className?: string | null; classTeacherId?: string | null; classTeacherName?: string | null; includeDigitalStamp?: boolean | null; includeDigitalSignature?: boolean | null } | null,
   ): Promise<string> {
     try {
-      const auth = await this.templateRenderer.finalizeReportAuthenticity(schoolId, rendered.templateId, classContext);
+      const auth = await this.templateRenderer.finalizeReportAuthenticity(schoolId, rendered.templateId, classContext, {
+        includeStamp: classContext?.includeDigitalStamp ?? undefined,
+        includeSignature: classContext?.includeDigitalSignature ?? undefined,
+      } as any);
       if (!auth) return rendered.html;
 
       const html = rendered.html

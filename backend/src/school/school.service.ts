@@ -380,7 +380,7 @@ export class SchoolService {
 
   async updateProfile(
     schoolId: string,
-    data: { name?: string; email?: string; phone?: string; address?: string; institutionType?: string },
+    data: { name?: string; email?: string; phone?: string; address?: string; institutionType?: string; headTeacherName?: string; deputyName?: string },
   ) {
     if (!schoolId) {
       throw new Error('School ID is required');

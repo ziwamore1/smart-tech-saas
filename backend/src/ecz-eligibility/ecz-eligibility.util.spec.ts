@@ -1,6 +1,7 @@
 import {
   checkEczEligibility,
   detectEczGradingSystem,
+  detectEczGradingSystemFromScales,
   gradeForScore,
   scoreToEczGrade,
   ECZ_MAX_BEST_SIX_POINTS,
@@ -74,6 +75,79 @@ describe('ecz-eligibility util', () => {
       expect(detectEczGradingSystem('Form 10')).toBe('SECONDARY');
       expect(detectEczGradingSystem('')).toBe('SECONDARY');
       expect(detectEczGradingSystem('Primary 7')).toBe('SECONDARY');
+    });
+  });
+
+  describe('detectEczGradingSystemFromScales', () => {
+    it('detects FORMS from a 5-point competency scale (worst-6 = 30)', () => {
+      const scales = [
+        { grade: '1', points: 1 },
+        { grade: '2', points: 2 },
+        { grade: '3', points: 3 },
+        { grade: '4', points: 4 },
+        { grade: '5', points: 5 },
+      ];
+      expect(detectEczGradingSystemFromScales(scales)).toBe('FORMS');
+    });
+
+    it('detects SECONDARY from a 9-point scale (worst-6 = 54)', () => {
+      const scales = Array.from({ length: 9 }, (_, i) => ({
+        grade: String(i + 1),
+        points: i + 1,
+      }));
+      expect(detectEczGradingSystemFromScales(scales)).toBe('SECONDARY');
+    });
+
+    it('returns null for letter-grade scales (A-F, A-D, A+-F)', () => {
+      expect(detectEczGradingSystemFromScales([
+        { grade: 'A', points: 5 },
+        { grade: 'B', points: 4 },
+        { grade: 'C', points: 3 },
+        { grade: 'D', points: 2 },
+        { grade: 'E', points: 1 },
+        { grade: 'F', points: 0 },
+      ])).toBeNull();
+      expect(detectEczGradingSystemFromScales([
+        { grade: 'A', points: 4 },
+        { grade: 'B', points: 3 },
+        { grade: 'C', points: 2 },
+        { grade: 'D', points: 1 },
+        { grade: 'F', points: 0 },
+      ])).toBeNull();
+    });
+
+    it('returns null for word-grade scales and empty/null input', () => {
+      expect(detectEczGradingSystemFromScales([
+        { grade: 'One', points: 1 },
+        { grade: 'Two', points: 2 },
+        { grade: 'Three', points: 3 },
+        { grade: 'Four', points: 4 },
+        { grade: 'Five', points: 5 },
+      ])).toBeNull();
+      expect(detectEczGradingSystemFromScales([])).toBeNull();
+      expect(detectEczGradingSystemFromScales(undefined)).toBeNull();
+      expect(detectEczGradingSystemFromScales(null)).toBeNull();
+    });
+
+    it('returns null when numeric grades do not carry equal points', () => {
+      expect(detectEczGradingSystemFromScales([
+        { grade: '1', points: 1 },
+        { grade: '2', points: 2 },
+        { grade: '3', points: 3 },
+        { grade: '4', points: 4 },
+        { grade: '5', points: 0 },
+      ])).toBeNull();
+    });
+
+    it('returns null for unconventionally-sized numeric scales', () => {
+      expect(detectEczGradingSystemFromScales([
+        { grade: '1', points: 1 },
+        { grade: '2', points: 2 },
+        { grade: '3', points: 3 },
+        { grade: '4', points: 4 },
+        { grade: '5', points: 5 },
+        { grade: '6', points: 6 },
+      ])).toBeNull();
     });
   });
 

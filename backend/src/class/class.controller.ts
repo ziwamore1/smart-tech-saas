@@ -53,7 +53,7 @@ export class ClassController {
   @Roles('Director')
   update(
     @Param('id') id: string,
-    @Body() body: { name?: string; capacity?: number | null; order?: number; gradingSystemId?: string | null },
+    @Body() body: { name?: string; capacity?: number | null; order?: number; gradingSystemId?: string | null; includeDigitalStamp?: boolean; includeDigitalSignature?: boolean },
     @Req() req: any,
   ) {
     return this.service.update(id, body, req.user.schoolId);
