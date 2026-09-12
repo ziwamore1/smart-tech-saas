@@ -753,6 +753,7 @@ export class AuthService {
             school: {
               select: {
                 id: true, name: true, logo: true, primaryColor: true,
+                isActive: true, subscriptionStatus: true, trialEndsAt: true,
                 institutionType: { select: { code: true, name: true } },
               },
             },
@@ -769,6 +770,7 @@ export class AuthService {
             school: {
               select: {
                 id: true, name: true, logo: true, primaryColor: true,
+                isActive: true, subscriptionStatus: true, trialEndsAt: true,
                 institutionType: { select: { code: true, name: true } },
               },
             },
@@ -786,6 +788,7 @@ export class AuthService {
           school: {
             select: {
               id: true, name: true, logo: true, primaryColor: true,
+              isActive: true, subscriptionStatus: true, trialEndsAt: true,
               institutionType: { select: { code: true, name: true } },
             },
           },
