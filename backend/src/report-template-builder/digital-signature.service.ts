@@ -5,10 +5,11 @@ import * as crypto from 'crypto';
 import sharp from 'sharp';
 
 export interface SignatureProcessingOptions {
-  threshold?: number;
+  threshold?: number | 'auto';
   contrast?: number;
   rotation?: number;
   crop?: { left: number; top: number; width: number; height: number };
+  feather?: number;
 }
 
 @Injectable()
@@ -234,8 +235,8 @@ export class DigitalSignatureService {
         processedAssetId: assets.processedAssetId,
         thumbnailAssetId: assets.thumbnailAssetId,
         width: assets.width, height: assets.height, aspectRatio: assets.aspectRatio,
-        processingVersion: 'v2',
-        processingMetadata: { background: 'near-white', threshold: data.processing?.threshold ?? 245, contrast: data.processing?.contrast ?? 1, rotation: data.processing?.rotation ?? 0, crop: data.processing?.crop || null, sourceMime: assets.sourceMime },
+        processingVersion: 'v3',
+        processingMetadata: { background: 'auto-soft', threshold: data.processing?.threshold ?? 'auto', feather: data.processing?.feather ?? null, contrast: data.processing?.contrast ?? 1, rotation: data.processing?.rotation ?? 0, crop: data.processing?.crop || null, sourceMime: assets.sourceMime },
         isDefault: data.isDefault || false,
         certificate: crypto.randomBytes(32).toString('hex'),
       },
@@ -294,7 +295,6 @@ export class DigitalSignatureService {
         throw new BadRequestException('Signature image dimensions must not exceed 4000 by 4000 pixels');
       }
 
-      const threshold = Math.max(180, Math.min(254, Math.round(options.threshold ?? 245)));
       const rotation = Math.max(-180, Math.min(180, Number(options.rotation || 0)));
       if (options.crop) {
         const crop = options.crop;
@@ -308,14 +308,29 @@ export class DigitalSignatureService {
       const { data: pixels, info } = await image
         .rotate(rotation)
         .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
-        .greyscale()
+        .toColourspace('srgb')
         .linear(contrast, 128 * (1 - contrast))
         .ensureAlpha()
         .raw()
         .toBuffer({ resolveWithObject: true });
-      for (let i = 0; i < pixels.length; i += info.channels) {
-        // Remove only near-white paper; coloured or anti-aliased ink remains.
-        if (pixels[i] > threshold && pixels[i + 1] > threshold && pixels[i + 2] > threshold) pixels[i + 3] = 0;
+      if (info.channels !== 4) throw new BadRequestException('Unable to normalise signature image channels');
+      const channels = info.channels;
+      const params = this.autoRemoveParams(pixels, channels, options.threshold);
+      const fullOpaque = this.isFullyOpaque(pixels, channels);
+      for (let i = 0; i < pixels.length; i += channels) {
+        const grey = this.luma(pixels, i);
+        const alphaIn = pixels[i + 3];
+        let alpha: number;
+        if (grey <= params.cut) alpha = 255;
+        else if (grey >= params.cut + params.band) alpha = 0;
+        else alpha = Math.round(255 - ((grey - params.cut) / params.band) * 255);
+        const out = Math.round((alpha * alphaIn) / 255);
+        pixels[i + 3] = out < 10 ? 0 : out;
+        if (fullOpaque && out > 0) {
+          pixels[i] = 0;
+          pixels[i + 1] = 0;
+          pixels[i + 2] = 0;
+        }
       }
       const output = await sharp(pixels, { raw: info })
         .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
@@ -328,10 +343,57 @@ export class DigitalSignatureService {
     }
   }
 
+  private autoRemoveParams(pixels: Buffer, channels: number, requested?: number | 'auto'): { cut: number; band: number } {
+    if (requested !== undefined && requested !== 'auto') {
+      const cut = Math.max(180, Math.min(254, Math.round(Number(requested))));
+      return { cut, band: Math.max(8, Math.min(48, Math.round((255 - cut) * 0.2))) };
+    }
+    const hist = new Int32Array(256);
+    let total = 0;
+    for (let i = 0; i < pixels.length; i += channels) {
+      if (pixels[i + 3] > 0) {
+        hist[this.luma(pixels, i)]++;
+        total++;
+      }
+    }
+    if (total <= 0) return { cut: 200, band: 48 };
+    // Paper colour is the weighted mean of the bright half of the histogram —
+    // robust to pale-grey scans, light creases, shadows and single bright specks.
+    let half = 0;
+    let mid = 255;
+    for (let v = 0; v < 256; v++) {
+      half += hist[v];
+      if (half * 2 >= total) {
+        mid = v;
+        break;
+      }
+    }
+    let brightCount = 0;
+    let brightSum = 0;
+    for (let v = mid; v < 256; v++) {
+      brightCount += hist[v];
+      brightSum += v * hist[v];
+    }
+    const paper = brightCount > 0 ? Math.round(brightSum / brightCount) : 255;
+    const cut = Math.max(150, Math.min(235, paper - 96));
+    return { cut, band: Math.max(8, paper - cut) };
+  }
+
+  private isFullyOpaque(pixels: Buffer, channels: number): boolean {
+    for (let i = 0; i < pixels.length; i += channels) {
+      if (pixels[i + 3] !== 255) return false;
+    }
+    return true;
+  }
+
+  private luma(pixels: Buffer, i: number) {
+    return Math.round((pixels[i] * 299 + pixels[i + 1] * 587 + pixels[i + 2] * 114) / 1000);
+  }
+
   async previewSignature(value: string, options?: SignatureProcessingOptions) {
     const processed = await this.normalizeVisual(value, options);
     const metadata = await this.getImageMetadata(processed);
-    return { processedImage: processed, transparentImage: processed, ...metadata, processingVersion: 'v2', options: options || {} };
+    return { processedImage: processed, transparentImage: processed, ...metadata, processingVersion: 'v3', options: options || {} };
   }
 
   private async getImageMetadata(value: string) {

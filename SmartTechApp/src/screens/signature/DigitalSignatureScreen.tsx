@@ -147,7 +147,7 @@ export function DigitalSignatureScreen({ navigation }: any) {
   const [signatureData, setSignatureData] = useState('');
   const [processedPreview, setProcessedPreview] = useState('');
   const [extractionError, setExtractionError] = useState('');
-  const [threshold, setThreshold] = useState(245);
+  const [threshold, setThreshold] = useState<number | 'auto'>('auto');
   const [contrast, setContrast] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -188,7 +188,7 @@ export function DigitalSignatureScreen({ navigation }: any) {
     setSignatureData('');
     setProcessedPreview('');
     setExtractionError('');
-    setThreshold(245);
+    setThreshold('auto');
     setContrast(1);
     setRotation(0);
   };
@@ -241,7 +241,7 @@ export function DigitalSignatureScreen({ navigation }: any) {
     setSignatureMethod('upload');
   };
 
-  const reprocessPreview = async (next: { threshold?: number; contrast?: number; rotation?: number } = {}) => {
+  const reprocessPreview = async (next: { threshold?: number | 'auto'; contrast?: number; rotation?: number } = {}) => {
     if (!signatureImageUrl) return;
     const options = { threshold: next.threshold ?? threshold, contrast: next.contrast ?? contrast, rotation: next.rotation ?? rotation };
     try {
@@ -508,8 +508,12 @@ export function DigitalSignatureScreen({ navigation }: any) {
                     {extractionError ? <Text style={styles.extractionError}>{extractionError}</Text> : null}
                   <Text style={styles.adjustLabel}>Adjust extraction</Text>
                   <View style={styles.adjustRow}>
-                    <TouchableOpacity style={styles.adjustBtn} onPress={() => { const value = Math.max(180, threshold - 10); setThreshold(value); void reprocessPreview({ threshold: value }); }}><Text style={styles.adjustBtnText}>Less background</Text></TouchableOpacity>
-                    <TouchableOpacity style={styles.adjustBtn} onPress={() => { const value = Math.min(254, threshold + 10); setThreshold(value); void reprocessPreview({ threshold: value }); }}><Text style={styles.adjustBtnText}>More ink</Text></TouchableOpacity>
+                    <TouchableOpacity style={styles.adjustBtn} onPress={() => { const base = threshold === 'auto' ? 220 : threshold; const value = Math.max(180, base - 10); setThreshold(value); void reprocessPreview({ threshold: value }); }}><Text style={styles.adjustBtnText}>Less background</Text></TouchableOpacity>
+                    <TouchableOpacity style={styles.adjustBtn} onPress={() => { const base = threshold === 'auto' ? 220 : threshold; const value = Math.min(254, base + 10); setThreshold(value); void reprocessPreview({ threshold: value }); }}><Text style={styles.adjustBtnText}>More ink</Text></TouchableOpacity>
+                  </View>
+                  <View style={styles.adjustRow}>
+                    <TouchableOpacity style={styles.adjustBtn} onPress={() => { setThreshold('auto'); void reprocessPreview({ threshold: 'auto' }); }}><Text style={styles.adjustBtnText}>Reset to Auto{threshold === 'auto' ? ' (active)' : ''}</Text></TouchableOpacity>
+                    <Text style={styles.adjustBtnText}>{threshold === 'auto' ? 'Background: auto-detected' : `Background: ${threshold}`}</Text>
                   </View>
                   <View style={styles.adjustRow}>
                     <TouchableOpacity style={styles.adjustBtn} onPress={() => { const value = Math.max(0.5, contrast - 0.1); setContrast(value); void reprocessPreview({ contrast: value }); }}><Text style={styles.adjustBtnText}>Lower contrast</Text></TouchableOpacity>

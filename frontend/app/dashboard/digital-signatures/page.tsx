@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
 import { api } from '@/lib/api';
 
-type Processing = { threshold: number; contrast: number; rotation: number; crop?: { left: number; top: number; width: number; height: number } };
+type Processing = { threshold: number | 'auto'; contrast: number; rotation: number; crop?: { left: number; top: number; width: number; height: number } };
 
 const PREVIEW_EDGE = 1600;
 
@@ -24,7 +24,7 @@ async function prepareForUpload(dataUrl: string): Promise<string> {
   const ctx = canvas.getContext('2d');
   if (!ctx) return dataUrl;
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/jpeg', 0.9);
+  return canvas.toDataURL('image/png');
 }
 
 export default function DigitalSignaturesPage() {
@@ -33,7 +33,7 @@ export default function DigitalSignaturesPage() {
   const [prepared, setPrepared] = useState('');
   const [processed, setProcessed] = useState('');
   const [name, setName] = useState('');
-  const [processing, setProcessing] = useState<Processing>({ threshold: 245, contrast: 1, rotation: 0 });
+  const [processing, setProcessing] = useState<Processing>({ threshold: 'auto', contrast: 1, rotation: 0 });
   const [sourceSize, setSourceSize] = useState({ width: 0, height: 0 });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -108,7 +108,16 @@ export default function DigitalSignaturesPage() {
            <button disabled={!original || busy} onClick={() => void process()} className="w-full rounded-lg border border-cyan-400 text-cyan-200 py-2.5 font-semibold disabled:opacity-50">{busy ? 'Extracting handwriting…' : 'Extract Signature'}</button>
            <h2 className="font-medium pt-2">2. Adjust extraction</h2>
           {original && sourceSize.width > 0 && <div className="text-xs text-slate-400">Drag over the original preview to crop. <button onClick={() => adjust({ crop: undefined })} className="text-cyan-300">Reset crop</button></div>}
-          <label className="block text-xs text-slate-400">Background threshold: {processing.threshold}<input className="w-full" type="range" min="180" max="254" value={processing.threshold} onChange={e => adjust({ threshold: Number(e.target.value) })} /></label>
+          <label className="block text-xs text-slate-400">Background threshold: {processing.threshold === 'auto' ? 'Auto' : processing.threshold}
+              {processing.threshold === 'auto' ? (
+                <button onClick={() => adjust({ threshold: 245 })} className="ml-2 text-cyan-300" type="button">Set manually</button>
+              ) : (
+                <>
+                  <input className="w-full" type="range" min="180" max="254" value={processing.threshold} onChange={e => adjust({ threshold: Number(e.target.value) })} />
+                  <button onClick={() => adjust({ threshold: 'auto' })} className="text-cyan-300" type="button">Reset to auto</button>
+                </>
+              )}
+            </label>
           <label className="block text-xs text-slate-400">Contrast: {processing.contrast.toFixed(1)}<input className="w-full" type="range" min="0.5" max="2" step="0.1" value={processing.contrast} onChange={e => adjust({ contrast: Number(e.target.value) })} /></label>
           <label className="block text-xs text-slate-400">Rotation: {processing.rotation}°<input className="w-full" type="range" min="-15" max="15" value={processing.rotation} onChange={e => adjust({ rotation: Number(e.target.value) })} /></label>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Signature name" className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm" />

@@ -21,7 +21,7 @@ async function prepareForUpload(dataUrl: string): Promise<string> {
   const ctx = canvas.getContext('2d');
   if (!ctx) return dataUrl;
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/jpeg', 0.9);
+  return canvas.toDataURL('image/png');
 }
 
 export default function SuperAdminSignatureDesignerPage() {
@@ -30,7 +30,7 @@ export default function SuperAdminSignatureDesignerPage() {
   const [prepared, setPrepared] = useState('');
   const [result, setResult] = useState('');
   const [name, setName] = useState('');
-  const [threshold, setThreshold] = useState(245);
+  const [threshold, setThreshold] = useState<number | 'auto'>('auto');
   const [contrast, setContrast] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -118,9 +118,13 @@ export default function SuperAdminSignatureDesignerPage() {
     finally { setBusy(false); }
   };
 
-  const update = (key: 'threshold' | 'contrast' | 'rotation', value: number) => {
-    const next = { threshold, contrast, rotation, [key]: value };
-    if (key === 'threshold') setThreshold(value); if (key === 'contrast') setContrast(value); if (key === 'rotation') setRotation(value);
+  const update = (key: 'threshold' | 'contrast' | 'rotation', value: number | 'auto') => {
+    const next: { threshold: number | 'auto'; contrast: number; rotation: number } = key === 'threshold'
+      ? { threshold: value, contrast, rotation }
+      : key === 'contrast'
+        ? { threshold, contrast: value as number, rotation }
+        : { threshold, contrast, rotation: value as number };
+    if (key === 'threshold') setThreshold(value); if (key === 'contrast') setContrast(value as number); if (key === 'rotation') setRotation(value as number);
     void process(prepared || source, next);
   };
 
@@ -135,7 +139,16 @@ export default function SuperAdminSignatureDesignerPage() {
         <h2 className="font-semibold">Upload and adjust</h2>
         <div onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); choose(e.dataTransfer.files[0]); }} onClick={() => fileRef.current?.click()} className="border border-dashed border-cyan-400 rounded-xl p-6 text-center cursor-pointer hover:bg-cyan-50"><input ref={fileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={e => choose(e.target.files?.[0])} /><span className="text-cyan-700 text-sm font-medium">Drop image or browse</span><span className="block text-xs text-gray-400 mt-1">PNG, JPG, WebP up to 5 MB</span></div>
         <button disabled={!source || busy} onClick={() => void process()} className="w-full rounded-lg border border-cyan-700 text-cyan-800 py-2.5 font-semibold disabled:opacity-50">{busy ? 'Extracting handwriting…' : 'Extract Signature'}</button>
-        <label className="block text-xs text-gray-600">Background threshold: {threshold}<input className="w-full" type="range" min="180" max="254" value={threshold} onChange={e => update('threshold', Number(e.target.value))} /></label>
+        <label className="block text-xs text-gray-600">Background threshold: {threshold === 'auto' ? 'Auto' : threshold}
+          {threshold === 'auto' ? (
+            <button onClick={() => update('threshold', 245)} className="ml-2 text-cyan-700 underline" type="button">Set manually</button>
+          ) : (
+            <>
+              <input className="w-full" type="range" min="180" max="254" value={threshold} onChange={e => update('threshold', Number(e.target.value))} />
+              <button onClick={() => update('threshold', 'auto')} className="text-cyan-700 underline" type="button">Reset to auto</button>
+            </>
+          )}
+        </label>
         <label className="block text-xs text-gray-600">Contrast: {contrast.toFixed(1)}<input className="w-full" type="range" min="0.5" max="2" step="0.1" value={contrast} onChange={e => update('contrast', Number(e.target.value))} /></label>
         <label className="block text-xs text-gray-600">Rotation: {rotation}°<input className="w-full" type="range" min="-15" max="15" value={rotation} onChange={e => update('rotation', Number(e.target.value))} /></label>
         <input value={name} onChange={e => setName(e.target.value)} placeholder="Signature name" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />

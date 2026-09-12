@@ -189,7 +189,7 @@ export class ReportTemplateBuilderController {
 
   @Post('signatures/preview')
   @Roles('Director', 'Head Teacher', 'Deputy Head', 'Deputy')
-  async previewSignature(@Req() req, @Body() body: { image: string; threshold?: number; contrast?: number; rotation?: number; crop?: { left: number; top: number; width: number; height: number } }) {
+  async previewSignature(@Req() req, @Body() body: { image: string; threshold?: number | 'auto'; contrast?: number; rotation?: number; feather?: number; crop?: { left: number; top: number; width: number; height: number } }) {
     const image = body?.image;
     if (!image) return { message: 'image is required', statusCode: 400 };
     const t0 = Date.now();
