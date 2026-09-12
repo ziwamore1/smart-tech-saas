@@ -302,34 +302,72 @@ export class DigitalSignatureService {
             crop.left + crop.width > metadata.width || crop.top + crop.height > metadata.height) {
           throw new BadRequestException('Crop rectangle is outside the uploaded image');
         }
-        image.extract(crop);
       }
       const contrast = Math.max(0.5, Math.min(2, Number(options.contrast ?? 1)));
-      const { data: pixels, info } = await image
-        .rotate(rotation)
-        .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
-        .toColourspace('srgb')
-        .linear(contrast, 128 * (1 - contrast))
-        .ensureAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
+      const buildBase = () => {
+        let base = sharp(input, { limitInputPixels: 16_000_000 });
+        if (options.crop) base = base.extract(options.crop);
+        return base
+          .rotate(rotation)
+          .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
+          .toColourspace('srgb')
+          .linear(contrast, 128 * (1 - contrast));
+      };
+      const { data: pixels, info } = await buildBase().ensureAlpha().raw().toBuffer({ resolveWithObject: true });
       if (info.channels !== 4) throw new BadRequestException('Unable to normalise signature image channels');
       const channels = info.channels;
-      const params = this.autoRemoveParams(pixels, channels, options.threshold);
       const fullOpaque = this.isFullyOpaque(pixels, channels);
-      for (let i = 0; i < pixels.length; i += channels) {
-        const grey = this.luma(pixels, i);
-        const alphaIn = pixels[i + 3];
-        let alpha: number;
-        if (grey <= params.cut) alpha = 255;
-        else if (grey >= params.cut + params.band) alpha = 0;
-        else alpha = Math.round(255 - ((grey - params.cut) / params.band) * 255);
-        const out = Math.round((alpha * alphaIn) / 255);
-        pixels[i + 3] = out < 10 ? 0 : out;
-        if (fullOpaque && out > 0) {
-          pixels[i] = 0;
-          pixels[i + 1] = 0;
-          pixels[i + 2] = 0;
+      const manual = options.threshold !== undefined && options.threshold !== 'auto';
+
+      // Local adaptive background removal for fully opaque scans: compare each
+      // pixel to a heavily blurred copy (the local "paper" colour), so smooth
+      // edge shadows and shading are removed while ink (darker than its
+      // surroundings) is kept. Drawn/transparent signatures keep the global
+      // luminance ramp, and a manual threshold keeps the old explicit cut.
+      let background: Buffer | null = null;
+      if (!manual && fullOpaque) {
+        const bg = await buildBase()
+          .blur(Math.max(20, Math.round(Math.max(info.width, info.height) * 0.04)))
+          .ensureAlpha()
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        background = bg.data;
+      }
+      const params = this.autoRemoveParams(pixels, channels, options.threshold);
+      if (background) {
+        const margin = 30;
+        const band = 46;
+        for (let i = 0; i < pixels.length; i += channels) {
+          const grey = this.luma(pixels, i);
+          const alphaIn = pixels[i + 3];
+          const diff = Math.max(0, this.luma(background, i) - grey);
+          let alpha: number;
+          if (diff <= margin) alpha = 0;
+          else if (diff >= margin + band) alpha = 255;
+          else alpha = Math.round(((diff - margin) / band) * 255);
+          const out = Math.round((alpha * alphaIn) / 255);
+          pixels[i + 3] = out < 10 ? 0 : out;
+          if (out > 0) {
+            pixels[i] = 0;
+            pixels[i + 1] = 0;
+            pixels[i + 2] = 0;
+          }
+        }
+      } else {
+        for (let i = 0; i < pixels.length; i += channels) {
+          const grey = this.luma(pixels, i);
+          const alphaIn = pixels[i + 3];
+          let alpha: number;
+          if (grey <= params.cut) alpha = 255;
+          else if (grey >= params.cut + params.band) alpha = 0;
+          else alpha = Math.round(255 - ((grey - params.cut) / params.band) * 255);
+          const out = Math.round((alpha * alphaIn) / 255);
+          pixels[i + 3] = out < 10 ? 0 : out;
+          if (fullOpaque && out > 0) {
+            pixels[i] = 0;
+            pixels[i + 1] = 0;
+            pixels[i + 2] = 0;
+          }
         }
       }
       const output = await sharp(pixels, { raw: info })
