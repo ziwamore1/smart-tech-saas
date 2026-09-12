@@ -203,19 +203,48 @@ async function bootstrap() {
   productionLogger.log(`Version: ${process.env.npm_package_version || '2.0.0'}`);
 }
 
-const STARTUP_TIMEOUT = 120_000;
-const startupTimer = setTimeout(() => {
-  console.error(`[bootstrap] TIMEOUT after ${STARTUP_TIMEOUT}ms — app failed to start`);
-  process.exit(1);
-}, STARTUP_TIMEOUT);
+const MAX_BOOT_ATTEMPTS = 20;
+const BOOT_RETRY_BASE_MS = 15_000;
+const BOOT_RETRY_CAP_MS = 60_000;
 
-bootstrap()
-  .then(() => clearTimeout(startupTimer))
-  .catch((err) => {
-    clearTimeout(startupTimer);
-    console.error('BOOTSTRAP FAILED:', err);
-    process.exit(1);
-  });
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function start() {
+  for (let attempt = 1; attempt <= MAX_BOOT_ATTEMPTS; attempt++) {
+    try {
+      if (attempt > 1) {
+        console.error(
+          `[bootstrap] start attempt ${attempt}/${MAX_BOOT_ATTEMPTS} (retry window)`,
+        );
+      }
+      await bootstrap();
+      return;
+    } catch (err: any) {
+      const backoff = Math.min(
+        BOOT_RETRY_BASE_MS * attempt,
+        BOOT_RETRY_CAP_MS,
+      );
+      const reason = err?.message || String(err);
+      console.error(
+        `[bootstrap] attempt ${attempt}/${MAX_BOOT_ATTEMPTS} failed: ${reason}`,
+      );
+      if (attempt === MAX_BOOT_ATTEMPTS) {
+        console.error(
+          `[bootstrap] gave up after ${MAX_BOOT_ATTEMPTS} attempts — exiting`,
+        );
+        process.exit(1);
+      }
+      console.error(
+        `[bootstrap] waiting ${Math.round(backoff / 1000)}s before retrying (kept in-process, no new container spawned)`,
+      );
+      await sleep(backoff);
+    }
+  }
+}
+
+start();
 
 process.on('unhandledRejection', (reason) => {
   console.error('UNHANDLED REJECTION:', reason);
