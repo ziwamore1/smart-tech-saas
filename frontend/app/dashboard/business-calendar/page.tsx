@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { businessCalendarApi } from '@/lib/api';
 
-type Activity = { id: string; title: string; description?: string; startDate: string; endDate: string; startTime?: string; endTime?: string; status: string; priority: string; category?: { name: string; color?: string }; venue?: string; notes?: string };
+type Activity = { id: string; title: string; description?: string; startDate: string; endDate: string; startTime?: string; endTime?: string; deadline?: string; status: string; priority: string; category?: { name: string; color?: string }; venue?: string; notes?: string };
 
 const date = (value?: string) => value ? new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value)) : 'TBC';
 const dateRange = (item: Activity) => date(item.startDate) === date(item.endDate) ? date(item.startDate) : `${date(item.startDate)} - ${date(item.endDate)}`;
