@@ -13,6 +13,19 @@ export const api = axios.create({
   },
 });
 
+export const businessCalendarApi = {
+  list: (current = false) => api.get('/business-calendar', { params: current ? { current: true } : undefined }),
+  activities: (calendarId: string) => api.get(`/business-calendar/${calendarId}/activities`),
+  categories: () => api.get('/business-calendar/categories/list'),
+  create: (data: any) => api.post('/business-calendar', data),
+  createActivity: (calendarId: string, data: any) => api.post(`/business-calendar/${calendarId}/activities`, data),
+  updateActivity: (id: string, data: any) => api.patch(`/business-calendar/activities/${id}`, data),
+  deleteActivity: (id: string) => api.delete(`/business-calendar/activities/${id}`),
+  publish: (id: string) => api.post(`/business-calendar/${id}/publish`),
+  templateUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/template.xlsx`,
+  exportUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/export.xlsx`,
+};
+
 api.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {

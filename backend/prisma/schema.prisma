@@ -254,7 +254,7 @@ model School {
   examTemplates                ExamTemplate[]
   documentStamps               DocumentStamp[]
   approvalRequests             ApprovalRequest[]
-  registrationRequests          SchoolRegistrationRequest[]
+  registrationRequests         SchoolRegistrationRequest[]
   approvalWorkflows            ApprovalWorkflow[]
   documentSignatures           DocumentSignature[]
   ministryVerifications        MinistryVerification[]
@@ -322,6 +322,12 @@ model School {
   documentAuditLogs            DocumentAuditLog[]
   approvalWorkflowConfigs      ApprovalWorkflowConfig[]
   stampInstances               StampInstance[]
+  businessCalendars            SchoolBusinessCalendar[]
+  calendarActivities           CalendarActivity[]
+  calendarCategories           CalendarCategory[]
+  calendarColumnConfigs        CalendarColumnConfig[]
+  calendarAuditEvents          CalendarAuditEvent[]
+  calendarImports              CalendarImport[]
 
   @@index([institutionTypeId])
   @@index([isActive])
@@ -329,26 +335,26 @@ model School {
 }
 
 model SchoolRegistrationRequest {
-  id                 String                         @id @default(uuid())
-  schoolId           String                         @unique
-  school             School                         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  directorUserId     String?
-  schoolName         String
-  directorFirstName  String
-  directorLastName   String
-  email              String
-  phone              String?
-  address            String?
-  institutionType    String
+  id                  String                      @id @default(uuid())
+  schoolId            String                      @unique
+  school              School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  directorUserId      String?
+  schoolName          String
+  directorFirstName   String
+  directorLastName    String
+  email               String
+  phone               String?
+  address             String?
+  institutionType     String
   registrationPurpose String?
-  expectedLearners   Int?
-  contactPreference  String?
-  status             String                         @default("PENDING_REVIEW")
-  ownerNotes         String?
-  lastContactedAt    DateTime?
-  createdAt          DateTime                       @default(now())
-  updatedAt          DateTime                       @updatedAt
-  messages           SchoolRegistrationMessage[]
+  expectedLearners    Int?
+  contactPreference   String?
+  status              String                      @default("PENDING_REVIEW")
+  ownerNotes          String?
+  lastContactedAt     DateTime?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  messages            SchoolRegistrationMessage[]
 
   @@index([status])
   @@index([email])
@@ -356,15 +362,15 @@ model SchoolRegistrationRequest {
 }
 
 model SchoolRegistrationMessage {
-  id           String                    @id @default(uuid())
-  requestId    String
-  request      SchoolRegistrationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  direction    String
-  subject      String?
-  message      String
-  senderEmail  String?
-  createdById  String?
-  createdAt    DateTime                  @default(now())
+  id          String                    @id @default(uuid())
+  requestId   String
+  request     SchoolRegistrationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  direction   String
+  subject     String?
+  message     String
+  senderEmail String?
+  createdById String?
+  createdAt   DateTime                  @default(now())
 
   @@index([requestId, createdAt])
 }
@@ -388,6 +394,8 @@ model AcademicYear {
   classTeacherAssignments ClassTeacherAssignment[]
   studentSubjects         StudentSubject[]
   resultEntryPermissions  ResultEntryPermission[]
+  businessCalendars       SchoolBusinessCalendar[]
+  calendarActivities      CalendarActivity[]
 
   @@index([schoolId])
   @@index([isCurrent])
@@ -395,34 +403,36 @@ model AcademicYear {
 }
 
 model Term {
-  id                   String                        @id @default(uuid())
-  name                 String
-  startDate            DateTime
-  endDate              DateTime
-  isCurrent            Boolean                       @default(false)
-  academicYearId       String
-  resultsFinalized     Boolean                       @default(false)
-  resultsLocked        Boolean                       @default(false)
-  assessments          AssessmentType[]
-  competencyScores     CompetencyScore[]
-  exams                Exam[]
-  results              Result[]
-  publications         ResultPublication[]
-  studentGrowthRecords StudentGrowthRecord[]
-  academicYear         AcademicYear                  @relation(fields: [academicYearId], references: [id])
-  timetables           Timetable[]
-  uploadedExams        UploadedExam[]
-  assessmentConfigs    TermAssessmentConfiguration[]
-  assessmentResults    StudentAssessmentResult[]
-  assessmentBatches    AssessmentBatch[]
-  computedResults      ComputedResult[]
-  termSummaries        TermSummary[]
-  classGradingPolicies ClassGradingPolicy[]
-  longitudinalRecords  LongitudinalRecord[]
-  grade7Results        Grade7Result[]
-  resultSheets         ResultSheet[]
-  SbaTask              SbaTask[]
-  CurriculumLessonPlan CurriculumLessonPlan[]
+  id                     String                        @id @default(uuid())
+  name                   String
+  startDate              DateTime
+  endDate                DateTime
+  isCurrent              Boolean                       @default(false)
+  academicYearId         String
+  resultsFinalized       Boolean                       @default(false)
+  resultsLocked          Boolean                       @default(false)
+  assessments            AssessmentType[]
+  competencyScores       CompetencyScore[]
+  exams                  Exam[]
+  results                Result[]
+  publications           ResultPublication[]
+  studentGrowthRecords   StudentGrowthRecord[]
+  academicYear           AcademicYear                  @relation(fields: [academicYearId], references: [id])
+  timetables             Timetable[]
+  uploadedExams          UploadedExam[]
+  assessmentConfigs      TermAssessmentConfiguration[]
+  assessmentResults      StudentAssessmentResult[]
+  assessmentBatches      AssessmentBatch[]
+  computedResults        ComputedResult[]
+  termSummaries          TermSummary[]
+  classGradingPolicies   ClassGradingPolicy[]
+  longitudinalRecords    LongitudinalRecord[]
+  grade7Results          Grade7Result[]
+  resultSheets           ResultSheet[]
+  SbaTask                SbaTask[]
+  CurriculumLessonPlan   CurriculumLessonPlan[]
+  calendarActivities     CalendarActivity[]
+  SchoolBusinessCalendar SchoolBusinessCalendar[]
 
   @@index([academicYearId])
   @@index([isCurrent])
@@ -447,30 +457,30 @@ model Holiday {
 }
 
 model User {
-  id                          String                   @id @default(uuid())
+  id                          String                     @id @default(uuid())
   firstName                   String
   lastName                    String
-  email                       String                   @unique
+  email                       String                     @unique
   phone                       String?
-  username                    String?                  @unique
+  username                    String?                    @unique
   password                    String
   photoUrl                    String?
   photoPublicId               String?
-  isActive                    Boolean                  @default(true)
-  accountStatus               String                   @default("ACTIVE")
-  mustChangePassword          Boolean                  @default(false)
-  failedAttempts              Int                      @default(0)
-  mfaEnabled                  Boolean                  @default(false)
+  isActive                    Boolean                    @default(true)
+  accountStatus               String                     @default("ACTIVE")
+  mustChangePassword          Boolean                    @default(false)
+  failedAttempts              Int                        @default(0)
+  mfaEnabled                  Boolean                    @default(false)
   mfaSecret                   String?
   lastLogin                   DateTime?
   lastPasswordChange          DateTime?
   resetToken                  String?
   resetTokenExpiry            DateTime?
   lockoutUntil                DateTime?
-  createdAt                   DateTime                 @default(now())
-  updatedAt                   DateTime?                @updatedAt
+  createdAt                   DateTime                   @default(now())
+  updatedAt                   DateTime?                  @updatedAt
   schoolId                    String?
-  studentId                   String?                  @unique
+  studentId                   String?                    @unique
   auditLogs                   AuditLog[]
   communications              Communication[]
   deviceTokens                DeviceToken[]
@@ -484,37 +494,43 @@ model User {
   NoticeBoard                 NoticeBoard[]
   notifications               Notification[]
   readingSessions             ReadingSession[]
-  results                     Result[]                 @relation("TeacherResults")
+  results                     Result[]                   @relation("TeacherResults")
   schoolUsers                 SchoolUser[]
   teacher                     Teacher?
   teachingAssignments         TeachingAssignment[]
-  school                      School?                  @relation(fields: [schoolId], references: [id])
-  student                     Student?                 @relation(fields: [studentId], references: [id])
+  school                      School?                    @relation(fields: [schoolId], references: [id])
+  student                     Student?                   @relation(fields: [studentId], references: [id])
   studentPhotos               StudentPhoto[]
   userRoles                   UserRole[]
   aiTutorSessions             AiTutorSession[]
-  appliedStamps               DocumentStamp[]          @relation("DocumentStampAppliedBy")
-  requestedApprovals          ApprovalRequest[]        @relation("ApprovalRequestRequestedBy")
-  approvedRequests            ApprovalRequest[]        @relation("ApprovalRequestApprover")
-  createdWorkflows            ApprovalWorkflow[]       @relation("ApprovalWorkflowCreatedBy")
-  auditTrailLogs              ApprovalAuditLog[]       @relation("ApprovalAuditLogUser")
-  userCredentials             UserCredential[]         @relation("UserCredentials")
-  passwordHistory             PasswordHistory[]        @relation("UserPasswordHistory")
-  securityLogs                AccountSecurityLog[]     @relation("AccountSecurityLogs")
+  appliedStamps               DocumentStamp[]            @relation("DocumentStampAppliedBy")
+  requestedApprovals          ApprovalRequest[]          @relation("ApprovalRequestRequestedBy")
+  approvedRequests            ApprovalRequest[]          @relation("ApprovalRequestApprover")
+  createdWorkflows            ApprovalWorkflow[]         @relation("ApprovalWorkflowCreatedBy")
+  auditTrailLogs              ApprovalAuditLog[]         @relation("ApprovalAuditLogUser")
+  userCredentials             UserCredential[]           @relation("UserCredentials")
+  passwordHistory             PasswordHistory[]          @relation("UserPasswordHistory")
+  securityLogs                AccountSecurityLog[]       @relation("AccountSecurityLogs")
   loginSessions               LoginSession[]
   otpVerifications            OtpVerification[]
   deviceSessions              DeviceSession[]
-  credentialDeliveries        CredentialDeliveryLog[]  @relation("CredentialDeliveries")
-  permissionOverridesGiven    UserPermissionOverride[] @relation("PermissionOverrideAssigner")
-  resultEntryPermissionsGiven ResultEntryPermission[]  @relation("ResultEntryPermissionAssigner")
-  generatedCredentials        UserCredential[]         @relation("GeneratedByUser")
+  credentialDeliveries        CredentialDeliveryLog[]    @relation("CredentialDeliveries")
+  permissionOverridesGiven    UserPermissionOverride[]   @relation("PermissionOverrideAssigner")
+  resultEntryPermissionsGiven ResultEntryPermission[]    @relation("ResultEntryPermissionAssigner")
+  generatedCredentials        UserCredential[]           @relation("GeneratedByUser")
   classTeacherOf              Class[]
   platformRoleAssignments     PlatformRoleAssignment[]
-  schoolRoleAssignments       SchoolRoleAssignment[]   @relation("SchoolRoleUser")
+  schoolRoleAssignments       SchoolRoleAssignment[]     @relation("SchoolRoleUser")
   classTeacherAssignments     ClassTeacherAssignment[]
   departmentAssignments       DepartmentAssignment[]
   clubAssignments             ClubAssignment[]
   committeeAssignments        CommitteeAssignment[]
+  calendarActivitiesCreated   CalendarActivity[]         @relation("CalendarActivityCreatedBy")
+  calendarActivitiesUpdated   CalendarActivity[]         @relation("CalendarActivityUpdatedBy")
+  calendarAudits              CalendarAuditEvent[]
+  calendarAudienceEntries     CalendarActivityAudience[] @relation("CalendarAudienceUser")
+  calendarImportsUploaded     CalendarImport[]           @relation("CalendarImportUploader")
+  calendarActivitiesOfficer   CalendarActivity[]         @relation("CalendarActivityOfficer")
 
   @@index([schoolId])
   @@index([isActive])
@@ -586,6 +602,7 @@ model Class {
   termSummaries           TermSummary[]
   longitudinalRecords     LongitudinalRecord[]
   CurriculumLessonPlan    CurriculumLessonPlan[]
+  businessCalendars       SchoolBusinessCalendar[]
   CurriculumCoverage      CurriculumCoverage[]
   classTeacherAssignments ClassTeacherAssignment[]
   studentSubjects         StudentSubject[]
@@ -702,29 +719,31 @@ model TeachingAssignment {
 }
 
 model Teacher {
-  id                   String                 @id @default(uuid())
+  id                   String                   @id @default(uuid())
   employeeNo           String?
   photoUrl             String?
   photoPublicId        String?
   hireDate             DateTime?
-  userId               String                 @unique
+  userId               String                   @unique
   schoolId             String
   department           String?
   departmentId         String?
   gender               String?
-  staffType            String?                @default("TEACHING")
+  staffType            String?                  @default("TEACHING")
   qualification        String?
   specialization       String?
   yearsOfExperience    Int?
   emergencyContact     String?
   emergencyPhone       String?
   lessonRequirements   LessonRequirement[]
-  school               School                 @relation(fields: [schoolId], references: [id])
-  user                 User                   @relation(fields: [userId], references: [id])
-  departmentRel        Department?            @relation(fields: [departmentId], references: [id])
+  school               School                   @relation(fields: [schoolId], references: [id])
+  user                 User                     @relation(fields: [userId], references: [id])
+  departmentRel        Department?              @relation(fields: [departmentId], references: [id])
   actingPositions      ActingPosition[]
   timetableSlots       TimetableSlot[]
   CurriculumLessonPlan CurriculumLessonPlan[]
+  businessCalendars    SchoolBusinessCalendar[]
+  calendarActivities   CalendarActivity[]
   CurriculumCoverage   CurriculumCoverage[]
 
   @@index([department])
@@ -743,14 +762,311 @@ model Department {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  school                School                 @relation(fields: [schoolId], references: [id])
+  school                School                     @relation(fields: [schoolId], references: [id])
   teachers              Teacher[]
   positions             ActingPosition[]
   departmentAssignments DepartmentAssignment[]
+  calendarAudiences     CalendarActivityAudience[]
+  calendarActivities    CalendarActivity[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
   @@index([category])
+}
+
+enum CalendarStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CalendarActivityStatus {
+  PLANNED
+  COMPLETED
+  CANCELLED
+}
+
+enum CalendarActivityPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum CalendarRecurrenceRule {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+  CUSTOM
+}
+
+enum CalendarAudienceType {
+  SCHOOL
+  STAFF
+  STUDENTS
+  PARENTS
+  DEPARTMENT
+  USER
+}
+
+enum CalendarImportMode {
+  UPDATE_EXISTING
+  FULL_SYNC
+}
+
+enum CalendarImportStatus {
+  VALIDATING
+  VALID
+  INVALID
+  COMMITTED
+  FAILED
+}
+
+enum CalendarImportRowStatus {
+  VALID
+  WARNING
+  ERROR
+  COMMITTED
+}
+
+enum CalendarImportChangeType {
+  CREATE
+  UPDATE
+  UNCHANGED
+  CONFLICT
+  CANCEL
+}
+
+model SchoolBusinessCalendar {
+  id             String         @id @default(uuid())
+  schoolId       String
+  academicYearId String
+  termId         String?
+  name           String
+  description    String?
+  status         CalendarStatus @default(DRAFT)
+  version        Int            @default(1)
+  startDate      DateTime
+  endDate        DateTime
+  timezone       String?        @default("UTC")
+  publishedAt    DateTime?
+  archivedAt     DateTime?
+  createdById    String?
+  updatedById    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  school       School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear           @relation(fields: [academicYearId], references: [id])
+  term         Term?                  @relation(fields: [termId], references: [id])
+  activities   CalendarActivity[]
+  categories   CalendarCategory[]
+  columns      CalendarColumnConfig[]
+  auditEvents  CalendarAuditEvent[]
+  imports      CalendarImport[]
+  Class        Class?                 @relation(fields: [classId], references: [id])
+  classId      String?
+  Teacher      Teacher?               @relation(fields: [teacherId], references: [id])
+  teacherId    String?
+
+  @@index([schoolId, status])
+  @@index([academicYearId, startDate, endDate])
+}
+
+model CalendarCategory {
+  id          String   @id @default(uuid())
+  schoolId    String
+  calendarId  String?
+  name        String
+  color       String?
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  calendar   SchoolBusinessCalendar? @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  school     School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  activities CalendarActivity[]
+
+  @@index([schoolId, isActive])
+}
+
+model CalendarActivity {
+  id               String                   @id @default(uuid())
+  schoolId         String
+  calendarId       String
+  termId           String?
+  categoryId       String?
+  parentId         String?
+  activityCode     String?
+  departmentId     String?
+  officerId        String?
+  title            String
+  description      String?
+  startDate        DateTime
+  endDate          DateTime
+  startTime        String?
+  endTime          String?
+  deadline         DateTime?
+  allDay           Boolean                  @default(true)
+  recurrenceRule   CalendarRecurrenceRule   @default(NONE)
+  recurrenceConfig Json?
+  status           CalendarActivityStatus   @default(PLANNED)
+  priority         CalendarActivityPriority @default(NORMAL)
+  reminderMinutes  Json?
+  attachments      Json?
+  notes            String?
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  school         School                     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  calendar       SchoolBusinessCalendar     @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  term           Term?                      @relation(fields: [termId], references: [id])
+  category       CalendarCategory?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  parent         CalendarActivity?          @relation("CalendarActivityParent", fields: [parentId], references: [id], onDelete: SetNull)
+  children       CalendarActivity[]         @relation("CalendarActivityParent")
+  importRows     CalendarImportRow[]        @relation("CalendarImportExistingActivity")
+  subItems       CalendarActivitySubItem[]
+  audiences      CalendarActivityAudience[]
+  createdBy      User?                      @relation("CalendarActivityCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy      User?                      @relation("CalendarActivityUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  department     Department?                @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  officer        User?                      @relation("CalendarActivityOfficer", fields: [officerId], references: [id], onDelete: SetNull)
+  AcademicYear   AcademicYear?              @relation(fields: [academicYearId], references: [id])
+  academicYearId String?
+  Teacher        Teacher?                   @relation(fields: [teacherId], references: [id])
+  teacherId      String?
+
+  @@unique([calendarId, activityCode])
+  @@index([schoolId, calendarId, startDate])
+  @@index([parentId])
+}
+
+model CalendarActivityAudience {
+  id           String               @id @default(uuid())
+  activityId   String
+  type         CalendarAudienceType
+  userId       String?
+  departmentId String?
+  label        String?
+  createdAt    DateTime             @default(now())
+
+  activity   CalendarActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user       User?            @relation("CalendarAudienceUser", fields: [userId], references: [id], onDelete: Cascade)
+  department Department?      @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@index([activityId])
+  @@index([userId, departmentId])
+}
+
+model CalendarActivitySubItem {
+  id         String    @id @default(uuid())
+  activityId String
+  title      String
+  notes      String?
+  dueDate    DateTime?
+  isComplete Boolean   @default(false)
+  sortOrder  Int       @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  activity CalendarActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([activityId, sortOrder])
+}
+
+model CalendarColumnConfig {
+  id         String   @id @default(uuid())
+  schoolId   String
+  calendarId String
+  key        String
+  label      String
+  dataType   String   @default("text")
+  isVisible  Boolean  @default(true)
+  isRequired Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  config     Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  calendar SchoolBusinessCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  school   School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarId, key])
+  @@index([schoolId, calendarId])
+}
+
+model CalendarAuditEvent {
+  id         String   @id @default(uuid())
+  schoolId   String
+  calendarId String?
+  userId     String?
+  action     String
+  changes    Json?
+  createdAt  DateTime @default(now())
+
+  school   School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  calendar SchoolBusinessCalendar? @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  user     User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, createdAt])
+  @@index([calendarId, createdAt])
+}
+
+model CalendarImport {
+  id              String               @id @default(uuid())
+  schoolId        String
+  calendarId      String
+  uploadedById    String?
+  filename        String
+  templateVersion String
+  schemaVersion   String
+  mode            CalendarImportMode   @default(UPDATE_EXISTING)
+  status          CalendarImportStatus @default(VALIDATING)
+  totalRows       Int                  @default(0)
+  validRows       Int                  @default(0)
+  warningRows     Int                  @default(0)
+  errorRows       Int                  @default(0)
+  createdCount    Int                  @default(0)
+  updatedCount    Int                  @default(0)
+  unchangedCount  Int                  @default(0)
+  conflictCount   Int                  @default(0)
+  errorSummary    Json?
+  committedAt     DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  school     School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  calendar   SchoolBusinessCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  uploadedBy User?                  @relation("CalendarImportUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  rows       CalendarImportRow[]
+
+  @@index([schoolId, calendarId, createdAt])
+  @@index([uploadedById])
+}
+
+model CalendarImportRow {
+  id                 String                    @id @default(uuid())
+  importId           String
+  rowNumber          Int
+  rawData            Json
+  normalizedData     Json?
+  status             CalendarImportRowStatus   @default(ERROR)
+  errors             Json?
+  changeType         CalendarImportChangeType?
+  existingActivityId String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  import           CalendarImport    @relation(fields: [importId], references: [id], onDelete: Cascade)
+  existingActivity CalendarActivity? @relation("CalendarImportExistingActivity", fields: [existingActivityId], references: [id], onDelete: SetNull)
+
+  @@unique([importId, rowNumber])
+  @@index([existingActivityId])
 }
 
 enum PositionSection {
@@ -2555,18 +2871,18 @@ model SchoolUser {
 }
 
 model SchoolActivityEvent {
-  id        String   @id @default(uuid())
-  type      String
-  category  String
-  severity  String
-  schoolId  String
-  userId    String?
-  userName  String?
-  userRole  String?
-  title     String
+  id          String   @id @default(uuid())
+  type        String
+  category    String
+  severity    String
+  schoolId    String
+  userId      String?
+  userName    String?
+  userRole    String?
+  title       String
   description String
-  metadata  Json?
-  timestamp DateTime @default(now())
+  metadata    Json?
+  timestamp   DateTime @default(now())
 
   @@index([schoolId, timestamp])
   @@index([schoolId, category, timestamp])
@@ -3679,38 +3995,38 @@ model BrandPreset {
 }
 
 model DigitalSignature {
-  id            String   @id @default(uuid())
-  schoolId      String?
-  userId        String?
-  name          String
-  title         String?
-  email         String?
-  imageUrl      String?
-  signatureData String?
-  originalImageUrl    String?
-  processedImageUrl   String?
-  transparentImageUrl String?
-  thumbnailUrl        String?
-  originalAssetId     String?
-  processedAssetId    String?
-  thumbnailAssetId    String?
-  width               Int?
-  height              Int?
-  aspectRatio        Float?
-  processingVersion  String?
-  processingMetadata Json?
-  status             String   @default("ACTIVE")
-  scope              String   @default("SCHOOL")
-  revokedReason      String?
-  revokedAt          DateTime?
-  revokedBy          String?
-  certificate   String?
-  isDefault     Boolean  @default(false)
-  passcode      String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  school        School?  @relation(fields: [schoolId], references: [id])
-  signatorySlots TemplateSignatory[] @relation("ReportTemplateSignatories")
+  id                       String                   @id @default(uuid())
+  schoolId                 String?
+  userId                   String?
+  name                     String
+  title                    String?
+  email                    String?
+  imageUrl                 String?
+  signatureData            String?
+  originalImageUrl         String?
+  processedImageUrl        String?
+  transparentImageUrl      String?
+  thumbnailUrl             String?
+  originalAssetId          String?
+  processedAssetId         String?
+  thumbnailAssetId         String?
+  width                    Int?
+  height                   Int?
+  aspectRatio              Float?
+  processingVersion        String?
+  processingMetadata       Json?
+  status                   String                   @default("ACTIVE")
+  scope                    String                   @default("SCHOOL")
+  revokedReason            String?
+  revokedAt                DateTime?
+  revokedBy                String?
+  certificate              String?
+  isDefault                Boolean                  @default(false)
+  passcode                 String?
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  school                   School?                  @relation(fields: [schoolId], references: [id])
+  signatorySlots           TemplateSignatory[]      @relation("ReportTemplateSignatories")
   stampTemplateSignatories StampTemplateSignatory[] @relation("StampTemplateSignatories")
 
   @@index([schoolId])
@@ -3844,16 +4160,16 @@ model TemplateStamp {
 }
 
 model TemplateSignatory {
-  id          String           @id @default(uuid())
+  id          String            @id @default(uuid())
   templateId  String
   label       String
   role        String?
-  position    Int              @default(0)
-  isRequired  Boolean          @default(true)
+  position    Int               @default(0)
+  isRequired  Boolean           @default(true)
   signatureId String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  template    ReportTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  template    ReportTemplate    @relation(fields: [templateId], references: [id], onDelete: Cascade)
   signature   DigitalSignature? @relation("ReportTemplateSignatories", fields: [signatureId], references: [id], onDelete: SetNull)
 
   @@index([templateId])
@@ -6138,27 +6454,27 @@ enum StampAssetKind {
 }
 
 model StampTemplate {
-  id           String                 @id @default(uuid())
-  schoolId     String?
-  scope        String                 @default("SCHOOL")
-  name         String
-  description  String?
-  type         StampType              @default(CUSTOM)
-  status       StampTemplateStatus    @default(DRAFT)
-  version      Int                    @default(1)
-  isActive     Boolean                @default(true)
-  isDefault    Boolean                @default(false)
-  configJson   Json
-  thumbnailUrl String?
-  publishedAt  DateTime?
-  createdBy    String?
-  updatedBy    String?
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-  school       School?                @relation(fields: [schoolId], references: [id])
-  versions     StampTemplateVersion[]
-  signatories  StampTemplateSignatory[]
-  marketplace  StampMarketplace?
+  id                       String                    @id @default(uuid())
+  schoolId                 String?
+  scope                    String                    @default("SCHOOL")
+  name                     String
+  description              String?
+  type                     StampType                 @default(CUSTOM)
+  status                   StampTemplateStatus       @default(DRAFT)
+  version                  Int                       @default(1)
+  isActive                 Boolean                   @default(true)
+  isDefault                Boolean                   @default(false)
+  configJson               Json
+  thumbnailUrl             String?
+  publishedAt              DateTime?
+  createdBy                String?
+  updatedBy                String?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  school                   School?                   @relation(fields: [schoolId], references: [id])
+  versions                 StampTemplateVersion[]
+  signatories              StampTemplateSignatory[]
+  marketplace              StampMarketplace?
   stampMarketplaceInstalls StampMarketplaceInstall[] @relation("StampMarketplaceInstalls")
 
   @@index([schoolId])
@@ -6171,22 +6487,22 @@ model StampTemplate {
 /// "Installing / publishing" copies its snapshot into each target school's own
 /// StampTemplate (schoolId set → school gets an editable copy).
 model StampMarketplace {
-  id           String                  @id @default(uuid())
-  templateId   String                  @unique
+  id           String                    @id @default(uuid())
+  templateId   String                    @unique
   name         String
   description  String?
   category     String?
   tags         String[]
   thumbnailUrl String?
-  minTier      SubscriptionTier        @default(STANDARD)
-  status       String                  @default("DRAFT")
-  version      Int                     @default(1)
-  installCount Int                     @default(0)
+  minTier      SubscriptionTier          @default(STANDARD)
+  status       String                    @default("DRAFT")
+  version      Int                       @default(1)
+  installCount Int                       @default(0)
   createdBy    String?
   publishedAt  DateTime?
-  createdAt    DateTime                @default(now())
-  updatedAt    DateTime                @updatedAt
-  template     StampTemplate           @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+  template     StampTemplate             @relation(fields: [templateId], references: [id], onDelete: Cascade)
   installs     StampMarketplaceInstall[]
 
   @@unique([name])
@@ -6197,15 +6513,15 @@ model StampMarketplace {
 /// A record of a marketplace stamp having been installed into a school's stamp
 /// library. `templateId` points at the school's own (editable) StampTemplate copy.
 model StampMarketplaceInstall {
-  id            String            @id @default(uuid())
+  id            String           @id @default(uuid())
   marketplaceId String
   schoolId      String
   templateId    String
   installedBy   String?
-  createdAt     DateTime          @default(now())
-  marketplace   StampMarketplace  @relation(fields: [marketplaceId], references: [id], onDelete: Cascade)
-  school        School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  template      StampTemplate     @relation("StampMarketplaceInstalls", fields: [templateId], references: [id])
+  createdAt     DateTime         @default(now())
+  marketplace   StampMarketplace @relation(fields: [marketplaceId], references: [id], onDelete: Cascade)
+  school        School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  template      StampTemplate    @relation("StampMarketplaceInstalls", fields: [templateId], references: [id])
 
   @@unique([marketplaceId, schoolId])
   @@index([schoolId])
@@ -6214,16 +6530,16 @@ model StampMarketplaceInstall {
 
 /// Required signatory positions declared on a stamp/document template.
 model StampTemplateSignatory {
-  id          String         @id @default(uuid())
+  id          String            @id @default(uuid())
   templateId  String
   label       String
   role        String?
-  position    Int            @default(0)
-  isRequired  Boolean        @default(true)
+  position    Int               @default(0)
+  isRequired  Boolean           @default(true)
   signatureId String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  template    StampTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  template    StampTemplate     @relation(fields: [templateId], references: [id], onDelete: Cascade)
   signature   DigitalSignature? @relation("StampTemplateSignatories", fields: [signatureId], references: [id], onDelete: SetNull)
 
   @@index([templateId])

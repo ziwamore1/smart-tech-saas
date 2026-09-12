@@ -99,6 +99,7 @@ import { ReportEngineModule } from './report-engine/report-engine.module';
 import { StudentSubjectModule } from './student-subject/student-subject.module';
 import { StampEngineModule } from './stamp-engine/stamp-engine.module';
 import { TeacherAnalyticsModule } from './teacher-analytics/teacher-analytics.module';
+import { BusinessCalendarModule } from './business-calendar/business-calendar.module';
 import { getRedisConnectionOptions } from './queues/redis.config';
 
 @Module({
@@ -201,6 +202,7 @@ import { getRedisConnectionOptions } from './queues/redis.config';
     StudentSubjectModule,
     StampEngineModule,
     TeacherAnalyticsModule,
+    BusinessCalendarModule,
   ],
   providers: [ProductionLogger],
 })
