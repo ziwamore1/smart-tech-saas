@@ -236,7 +236,7 @@ export class DigitalSignatureService {
         thumbnailAssetId: assets.thumbnailAssetId,
         width: assets.width, height: assets.height, aspectRatio: assets.aspectRatio,
         processingVersion: 'v3',
-        processingMetadata: { background: 'auto-soft', threshold: data.processing?.threshold ?? 'auto', feather: data.processing?.feather ?? null, contrast: data.processing?.contrast ?? 1, rotation: data.processing?.rotation ?? 0, crop: data.processing?.crop || null, sourceMime: assets.sourceMime },
+        processingMetadata: { background: 'local-adaptive', threshold: data.processing?.threshold ?? 'auto', feather: data.processing?.feather ?? null, contrast: data.processing?.contrast ?? 1, rotation: data.processing?.rotation ?? 0, crop: data.processing?.crop || null, sourceMime: assets.sourceMime },
         isDefault: data.isDefault || false,
         certificate: crypto.randomBytes(32).toString('hex'),
       },
