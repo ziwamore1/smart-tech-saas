@@ -3,11 +3,12 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BusinessCalendarService } from './business-calendar.service';
+import { BusinessCalendarReportService } from './business-calendar-report.service';
 
 @Controller('business-calendar')
 @UseGuards(JwtAuthGuard)
 export class BusinessCalendarController {
-  constructor(private readonly service: BusinessCalendarService) {}
+  constructor(private readonly service: BusinessCalendarService, private readonly reports: BusinessCalendarReportService) {}
   private school(req: any, body?: any, query?: any) { return req.user.schoolId || (req.user.isSuperAdmin ? body?.schoolId || query?.schoolId : undefined); }
 
   @Get() list(@Req() req: any, @Query('current') current?: string, @Query('schoolId') schoolId?: string) { return this.service.list(req.user, this.school(req, undefined, { schoolId }), current === 'true'); }
@@ -42,4 +43,6 @@ export class BusinessCalendarController {
   @Get('import/:importId/errors') importErrors(@Req() req: any, @Param('importId') importId: string) { return this.service.importDetails(req.user, importId, true); }
   @Get('import/:importId/changes') importChanges(@Req() req: any, @Param('importId') importId: string) { return this.service.importDetails(req.user, importId); }
   @Post(':id/import.csv') importCsv(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.service.importCsv(req.user, id, body.csv || '', this.school(req, body)); }
+  @Get(':id/report.html') async reportHtml(@Req() req: any, @Param('id') id: string, @Res() response: Response) { response.type('text/html').setHeader('Content-Disposition', `attachment; filename="calendar-${id}.html"`); response.send(await this.reports.html(id, this.school(req))); }
+  @Get(':id/report.pdf') async reportPdf(@Req() req: any, @Param('id') id: string, @Res() response: Response) { response.type('application/pdf').setHeader('Content-Disposition', `attachment; filename="calendar-${id}.pdf"`); response.send(await this.reports.pdf(id, this.school(req))); }
 }

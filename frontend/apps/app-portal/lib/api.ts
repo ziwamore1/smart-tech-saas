@@ -15,8 +15,15 @@ export const businessCalendarApi = {
   activities: (calendarId: string) => api.get(`/business-calendar/${calendarId}/activities`),
   categories: () => api.get('/business-calendar/categories/list'),
   createActivity: (calendarId: string, data: any) => api.post(`/business-calendar/${calendarId}/activities`, data),
+  publish: (id: string) => api.post(`/business-calendar/${id}/publish`),
+  unpublish: (id: string) => api.post(`/business-calendar/${id}/unpublish`),
+  deleteActivity: (id: string) => api.delete(`/business-calendar/activities/${id}`),
+  validateImport: (id: string, file: File, mode: string) => { const form = new FormData(); form.append('file', file); form.append('mode', mode); return api.post(`/business-calendar/${id}/import/validate`, form, { headers: { 'Content-Type': 'multipart/form-data' } }); },
+  commitImport: (id: string, importId: string) => api.post(`/business-calendar/${id}/import/commit`, { importId, confirmed: true }),
   templateUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/template.xlsx`,
   exportUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/export.xlsx`,
+  reportHtmlUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/report.html`,
+  reportPdfUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/report.pdf`,
 };
 
 api.interceptors.request.use(
