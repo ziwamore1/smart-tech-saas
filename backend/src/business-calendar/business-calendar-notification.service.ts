@@ -62,10 +62,30 @@ export class BusinessCalendarNotificationService {
     }
   }
 
+  private readonly broadcastRoles = ['DIRECTOR', 'DEPUTY DIRECTOR', 'HEAD TEACHER', 'DEPUTY HEAD', 'DEPUTY', 'HOD', 'TEACHER', 'CLASS TEACHER'];
+
   private async recipients(activity: any) {
     const audience = activity.audiences || [];
     const userIds = audience.filter((item: any) => item.type === 'USER' && item.userId).map((item: any) => item.userId);
     const departmentIds = audience.filter((item: any) => item.type === 'DEPARTMENT' && item.departmentId).map((item: any) => item.departmentId);
-    return this.prisma.user.findMany({ where: { schoolId: activity.schoolId, isActive: true, phone: { not: null }, ...(userIds.length ? { id: { in: userIds } } : departmentIds.length ? { departmentAssignments: { some: { departmentId: { in: departmentIds }, isActive: true } } } : {}) }, select: { id: true, phone: true, email: true } });
+    const restrictedTypes = audience.filter((item: any) => item.type === 'STUDENTS' || item.type === 'PARENTS').map((item: any) => item.type);
+    if (restrictedTypes.length) {
+      this.logger.warn(`Calendar alert for activity ${activity.id} targets non-staff audience (${restrictedTypes.join(',')}); skipped by broadcast policy`);
+      return [];
+    }
+    const where: any = {
+      schoolId: activity.schoolId,
+      isActive: true,
+      OR: [{ phone: { not: null } }, { email: { not: '' } }],
+    };
+    if (userIds.length) {
+      where.id = { in: userIds };
+    } else if (departmentIds.length) {
+      where.departmentAssignments = { some: { departmentId: { in: departmentIds }, isActive: true } };
+      where.userRoles = { some: { role: { name: { in: this.broadcastRoles, mode: 'insensitive' } } } };
+    } else {
+      where.userRoles = { some: { role: { name: { in: this.broadcastRoles, mode: 'insensitive' } } } };
+    }
+    return this.prisma.user.findMany({ where, select: { id: true, phone: true, email: true } });
   }
 }

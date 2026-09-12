@@ -291,7 +291,7 @@ export class BusinessCalendarService {
       await tx.schoolBusinessCalendar.update({ where: { id: calendarId }, data: { version: { increment: 1 }, updatedById: actor.isSuperAdmin ? undefined : actor.id } });
       await tx.calendarAuditEvent.create({ data: { schoolId, calendarId, userId: actor.isSuperAdmin ? undefined : actor.id, action: 'CALENDAR_IMPORT_COMMITTED', changes: { importId: staged.id, created, updated, unchanged, mode: staged.mode } } });
       return { created, updated, unchanged, conflicts: 0, warnings: staged.warningRows, errors: 0 };
-    });
+    }, { timeout: 120000, maxWait: 60000 });
     this.cache.invalidatePattern(`calendar.*${calendarId}`); this.events.emitToSchool(schoolId, 'calendar:updated', { calendarId, importId });
     return result;
   }

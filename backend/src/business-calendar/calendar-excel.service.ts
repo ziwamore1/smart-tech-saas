@@ -162,7 +162,7 @@ export class CalendarExcelService {
       schoolId, calendarId, uploadedById, filename,
       templateVersion: parsed.metadata.get('templateVersion') || CALENDAR_TEMPLATE_VERSION,
       schemaVersion: parsed.metadata.get('schemaVersion') || CALENDAR_SCHEMA_VERSION,
-      mode, status: parsed.counts.errors ? 'FAILED' : 'READY',
+      mode, status: parsed.counts.errors ? 'FAILED' : 'VALIDATING',
       totalRows: parsed.counts.total, validRows: parsed.counts.valid, warningRows: parsed.counts.warnings, errorRows: parsed.counts.errors,
       errorSummary: parsed.counts.errors ? { errors: parsed.rows.filter((row) => row.status === 'ERROR').map((row) => ({ rowNumber: row.rowNumber, errors: row.errors })) } : undefined,
       rows: { create: parsed.rows.map((row) => ({ rowNumber: row.rowNumber, rawData: row.rawData, normalizedData: row.normalizedData, status: row.status, errors: row.errors, changeType: row.changeType, existingActivityId: row.existingActivityId })) },
