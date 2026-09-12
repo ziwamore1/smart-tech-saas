@@ -10,6 +10,7 @@ import { PERMISSIONS } from '../common/access/permission-registry';
 import { CalendarExcelService } from './calendar-excel.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { CacheService } from '../common/services/cache.service';
+import { BusinessCalendarNotificationService } from './business-calendar-notification.service';
 
 type Actor = { id: string; schoolId?: string | null; isSuperAdmin?: boolean; roles?: string[] };
 
@@ -21,6 +22,7 @@ export class BusinessCalendarService {
     private readonly excel: CalendarExcelService,
     private readonly events: SchoolEventsGateway,
     private readonly cache: CacheService,
+    private readonly notifications: BusinessCalendarNotificationService,
   ) {}
 
   private schoolId(actor: Actor, requested?: string) {
@@ -166,6 +168,8 @@ export class BusinessCalendarService {
     this.validateRange(startDate, endDate);
     const activity = await this.prisma.calendarActivity.update({ where: { id }, data: { ...data, startDate, endDate, deadline: data.deadline ? this.date(data.deadline, 'deadline') : undefined, calendarId: undefined, schoolId: undefined, updatedById: actor.isSuperAdmin ? undefined : actor.id } });
     await this.audit(actor, schoolId, 'CALENDAR_ACTIVITY_UPDATED', 'CalendarActivity', id, data);
+    if (data.status === 'CANCELLED') await this.notifications.notifyChange(id, 'CANCELLED');
+    else if (['startDate', 'endDate', 'startTime', 'endTime', 'venue'].some((field) => data[field] !== undefined)) await this.notifications.notifyChange(id, 'UPDATED');
     return activity;
   }
 
