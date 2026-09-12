@@ -8,6 +8,7 @@ import { DirectorDashboardScreen } from '../screens/director/DashboardScreen';
 import { DirectorStaffScreen } from '../screens/director/StaffScreen';
 import { MonitoringDashboardScreen } from '../screens/monitoring/MonitoringDashboardScreen';
 import ActivityCenterScreen from '../screens/monitoring/ActivityCenterScreen';
+import { BusinessCalendarScreen } from '../screens/common/BusinessCalendarScreen';
 import { DirectorReportsScreen } from '../screens/director/ReportsScreen';
 import { ReportCardsScreen } from '../screens/director/ReportCardsScreen';
 import { DirectorSettingsScreen } from '../screens/director/SettingsScreen';
@@ -66,6 +67,7 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'DirectorSubscription', label: 'Subscription', icon: '💳', component: SchoolSubscriptionScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorMonitoring', label: 'Departments', icon: '🏛️', component: MonitoringDashboardScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorActivityCenter', label: 'Activity Center', icon: '⚡', component: ActivityCenterScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
+  { name: 'DirectorBusinessCalendar', label: 'Business Calendar', icon: '🗓️', component: BusinessCalendarScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
   { name: 'DirectorLibrary', label: 'Library', icon: '📚', component: DirectorLibraryScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorTimetable', label: 'Timetable', icon: '📅', component: DirectorTimetableScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
   { name: 'DirectorCommunication', label: 'Communication', icon: '💬', component: DirectorCommunicationScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },

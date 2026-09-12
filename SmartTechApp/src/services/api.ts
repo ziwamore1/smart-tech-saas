@@ -3115,6 +3115,16 @@ class ApiService {
     const response = await this.client.post('/school-activity/presence/heartbeat', data);
     return response.data;
   }
+
+  async getBusinessCalendars(current = false) {
+    const response = await this.client.get('/business-calendar', { params: current ? { current: true } : undefined });
+    return response.data;
+  }
+
+  async getBusinessCalendarActivities(calendarId: string) {
+    const response = await this.client.get(`/business-calendar/${calendarId}/activities`);
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

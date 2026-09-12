@@ -58,6 +58,7 @@ import { ApprovalWorkflowScreen } from '../screens/stamps/ApprovalWorkflowScreen
 import { DepartmentTeachersScreen } from '../screens/monitoring/DepartmentTeachersScreen';
 import { TeacherAssessmentDetailScreen } from '../screens/monitoring/TeacherAssessmentDetailScreen';
 import ActivityCenterScreen from '../screens/monitoring/ActivityCenterScreen';
+import { BusinessCalendarScreen } from '../screens/common/BusinessCalendarScreen';
 import HODMonitoringWrapper from '../screens/monitoring/HODMonitoringWrapper';
 import { AssessmentEntryScreen } from '../screens/assessment/AssessmentEntryScreen';
 import { AssessmentConfigScreen } from '../screens/assessment/AssessmentConfigScreen';
@@ -187,6 +188,7 @@ export function AppNavigator() {
             )}
 
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen name="BusinessCalendar" component={BusinessCalendarScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="UserGuide" component={UserGuideScreen} />
             <Stack.Screen name="LearningStyle" component={LearningStyleScreen} />
