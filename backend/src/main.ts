@@ -28,9 +28,16 @@ const ALLOWED_ORIGINS = [
   'https://smart-tech-saas-production.up.railway.app',
 ];
 
+function safeDbUrl(url?: string): string {
+  if (!url) return '(unset)';
+  return url.replace(/\/\/[^@]+@/, '//');
+}
+
 async function bootstrap() {
   const t0 = Date.now();
   console.log('[bootstrap] starting');
+  console.log(`[bootstrap] DATABASE_URL = ${safeDbUrl(process.env.DATABASE_URL)}`);
+  console.log(`[bootstrap] DIRECT_URL   = ${safeDbUrl(process.env.DIRECT_URL)}`);
 
   if (isSentryEnabled()) {
     Sentry.init(getSentryConfig());
