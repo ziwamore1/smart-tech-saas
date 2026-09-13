@@ -920,6 +920,7 @@ model CalendarActivity {
   reminderMinutes  Json?
   attachments      Json?
   notes            String?
+  venue            String?
   createdById      String?
   updatedById      String?
   createdAt        DateTime                 @default(now())
@@ -3878,6 +3879,33 @@ enum PaymentMethod {
   MOBILE_MONEY
   BANK_TRANSFER
   USSD
+}
+
+enum PlanSchoolType {
+  PRIMARY
+  SECONDARY
+}
+
+enum PlanBillingInterval {
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+model PlanPricing {
+  id          String              @id @default(uuid())
+  schoolType  PlanSchoolType      @default(SECONDARY)
+  tier        SubscriptionTier    @default(BASIC)
+  interval    PlanBillingInterval @default(MONTHLY)
+  priceUsd    Float               @default(0)
+  priceZwK    Float               @default(0)
+  features    Json                @default("[]")
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([schoolType, tier, interval])
+  @@index([schoolType, tier])
 }
 
 enum CommunicationType {

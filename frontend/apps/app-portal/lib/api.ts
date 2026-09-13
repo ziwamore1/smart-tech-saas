@@ -258,6 +258,24 @@ export const subscriptionApi = {
   getReceipt: (id: string) => api.get(`/subscription/receipt/${id}`),
 };
 
+export const pricingApi = {
+  getCatalog: () => api.get('/public/pricing/catalog'),
+  list: () => api.get('/pricing/plans'),
+  upsert: (data: {
+    schoolType: 'PRIMARY' | 'SECONDARY';
+    tier: 'BASIC' | 'STANDARD' | 'PREMIUM';
+    interval: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+    priceUsd?: number;
+    priceZwK?: number;
+    features?: string[];
+    isActive?: boolean;
+  }) => api.post('/pricing/plans', data),
+  update: (id: string, data: { priceUsd?: number; priceZwK?: number; features?: string[]; isActive?: boolean }) =>
+    api.patch(`/pricing/plans/${id}`, data),
+  remove: (id: string) => api.delete(`/pricing/plans/${id}`),
+  seed: () => api.post('/pricing/plans/seed'),
+};
+
 export const studentApi = {
   getAll: (params?: { page?: number; limit?: number; search?: string; classId?: string }) =>
     api.get('/student', { params }),

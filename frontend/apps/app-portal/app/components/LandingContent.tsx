@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { galleryApi } from '@/lib/api';
+import { galleryApi, pricingApi } from '@/lib/api';
 import PhoneMockup from './PhoneMockup';
 import '@/app/landing/landing.css';
 
@@ -45,6 +45,19 @@ const LANGUAGES: Record<Language, { label: string; flag: string }> = {
   es: { label: 'Español', flag: '🇪🇸' },
 };
 
+const PRICING_TIERS: PricingTier[] = ['BASIC', 'STANDARD', 'PREMIUM'];
+const PRICING_INTERVALS: PricingInterval[] = ['MONTHLY', 'QUARTERLY', 'ANNUAL'];
+const PRICING_INTERVAL_LABELS: Record<PricingInterval, string> = {
+  MONTHLY: 'Monthly',
+  QUARTERLY: 'Quarterly',
+  ANNUAL: 'Annual',
+};
+const PRICING_TIER_META: Record<PricingTier, { label: string; icon: string; color: string; border: string; bg: string }> = {
+  BASIC: { label: 'Basic', icon: '🌱', color: '#6b7280', border: '#e8ddd0', bg: '#f3f4f6' },
+  STANDARD: { label: 'Standard', icon: '⭐', color: '#3b82f6', border: '#bfdbfe', bg: '#eff6ff' },
+  PREMIUM: { label: 'Premium', icon: '💎', color: '#a855f7', border: '#e9d5ff', bg: '#faf5ff' },
+};
+
 interface GalleryEvent {
   id: string;
   title: string;
@@ -52,6 +65,20 @@ interface GalleryEvent {
   eventDate: string | null;
   photos: { id: string; url: string; caption: string | null }[];
 }
+
+type PricingInterval = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+type PricingTier = 'BASIC' | 'STANDARD' | 'PREMIUM';
+
+interface PricingEntry {
+  id: string;
+  priceUsd: number;
+  priceZwK: number;
+  features: string[];
+}
+
+type PricingGroup = 'secondary' | 'primary';
+type PricingTierMap = Partial<Record<PricingTier, Partial<Record<PricingInterval, PricingEntry>>>>;
+type PricingCatalog = Record<PricingGroup, PricingTierMap>;
 
 const FALLBACK_EVENTS = [
   {
@@ -106,6 +133,9 @@ export default function LandingContent() {
   const [galleryEvents, setGalleryEvents] = useState<GalleryEvent[]>(FALLBACK_EVENTS);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [mockups, setMockups] = useState<MockupImage[]>([]);
+  const [pricing, setPricing] = useState<PricingCatalog | null>(null);
+  const [pricingGroup, setPricingGroup] = useState<PricingGroup>('secondary');
+  const [pricingCurrency, setPricingCurrency] = useState<'usd' | 'zwk'>('usd');
   const trackRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -133,6 +163,12 @@ export default function LandingContent() {
 
   useEffect(() => {
     fetchMockups().then(setMockups);
+    pricingApi
+      .getCatalog()
+      .then((res) => {
+        setPricing(res.data?.data || res.data || null);
+      })
+      .catch(() => setPricing(null));
   }, []);
 
   const scrollEvents = (dir: 'left' | 'right') => {
@@ -227,6 +263,9 @@ export default function LandingContent() {
                 </li>
                 <li className="landing-nav-item">
                   <Link href="#" className="landing-nav-link">Contact</Link>
+                </li>
+                <li className="landing-nav-item">
+                  <Link href="#pricing" className="landing-nav-link">Pricing</Link>
                 </li>
               </ul>
             </nav>
@@ -361,6 +400,107 @@ export default function LandingContent() {
         </div>
       </main>
 
+      <section className="landing-pricing" id="pricing">
+        <div className="landing-pricing-header">
+          <h2 className="landing-section-title">Transparent Pricing</h2>
+          <p className="landing-section-subtitle">
+            Flexible plans for Secondary and Primary schools, priced in USD and Zambian Kwacha (ZWK).
+          </p>
+          <div className="landing-pricing-controls">
+            <div className="landing-pricing-toggle">
+              <button
+                className={`${pricingGroup === 'secondary' ? 'active' : ''}`}
+                onClick={() => setPricingGroup('secondary')}
+              >
+                <i className="fa fa-school" style={{ fontSize: '12px', marginRight: '6px' }}></i>
+                Secondary
+              </button>
+              <button
+                className={`${pricingGroup === 'primary' ? 'active' : ''}`}
+                onClick={() => setPricingGroup('primary')}
+              >
+                <i className="fa fa-user-graduate" style={{ fontSize: '12px', marginRight: '6px' }}></i>
+                Primary
+              </button>
+            </div>
+            <div className="landing-pricing-toggle">
+              <button
+                className={`${pricingCurrency === 'usd' ? 'active' : ''}`}
+                onClick={() => setPricingCurrency('usd')}
+              >
+                USD $
+              </button>
+              <button
+                className={`${pricingCurrency === 'zwk' ? 'active' : ''}`}
+                onClick={() => setPricingCurrency('zwk')}
+              >
+                ZWK
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {pricing ? (
+          <div className="landing-pricing-grid">
+            {PRICING_TIERS.map((tier) => {
+              const meta = PRICING_TIER_META[tier];
+              const tierPlans = pricing[pricingGroup]?.[tier] || {};
+              const activeInterval = PRICING_INTERVALS.find((i) => tierPlans[i]);
+              const features = activeInterval ? tierPlans[activeInterval]?.features || [] : [];
+              return (
+                <div
+                  key={tier}
+                  className={`landing-pricing-card${tier === 'PREMIUM' ? ' popular' : ''}`}
+                  style={{ borderColor: meta.border }}
+                >
+                  {tier === 'PREMIUM' && <div className="landing-pricing-badge">Popular</div>}
+                  <div className="landing-pricing-card-top">
+                    <span className="landing-pricing-icon">{meta.icon}</span>
+                    <span className="landing-pricing-tier" style={{ background: meta.bg, color: meta.color }}>
+                      {meta.label}
+                    </span>
+                  </div>
+                  <div className="landing-pricing-prices">
+                    {PRICING_INTERVALS.map((interval) => {
+                      const entry = tierPlans[interval];
+                      const amount = entry
+                        ? pricingCurrency === 'usd'
+                          ? `$${Number(entry.priceUsd).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                          : `K${Number(entry.priceZwK).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                        : null;
+                      return (
+                        <div key={interval} className="landing-price-row">
+                          <span className="landing-price-interval">{PRICING_INTERVAL_LABELS[interval]}</span>
+                          <span className="landing-price-amount">{amount ?? '—'}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <ul className="landing-pricing-features">
+                    {features.slice(0, 5).map((f, i) => (
+                      <li key={i}>
+                        <i className="fa fa-check" style={{ color: '#059669', fontSize: '12px' }}></i>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href="/register" className="landing-btn-primary landing-pricing-cta">
+                    Get Started
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="landing-pricing-fallback">
+            <p>Our pricing plans are being prepared. Contact our sales team for details.</p>
+            <Link href="/register" className="landing-btn-primary">
+              Contact Sales
+            </Link>
+          </div>
+        )}
+      </section>
+
       <div className="landing-events">
         <div className="landing-events-header">
           <div>
@@ -443,7 +583,7 @@ export default function LandingContent() {
                 <li><Link href="/login">Login</Link></li>
                 <li><Link href="/register">Register School</Link></li>
                 <li><Link href="#">Features</Link></li>
-                <li><Link href="#">Pricing</Link></li>
+                <li><Link href="#pricing">Pricing</Link></li>
                 <li><Link href="#">Contact</Link></li>
               </ul>
             </div>
@@ -595,6 +735,155 @@ export default function LandingContent() {
         }
         .modal-option h3 { font-size: 18px; color: #1f2937; margin-bottom: 4px; }
         .modal-option p { font-size: 14px; color: #6b7280; margin: 0; }
+      `}</style>
+
+      <style jsx global>{`
+        .landing-pricing {
+          padding: 64px 24px;
+          background: linear-gradient(180deg, #f5efe8 0%, #fff 100%);
+          scroll-margin-top: 90px;
+        }
+        .landing-pricing-header {
+          max-width: 720px;
+          margin: 0 auto 36px;
+          text-align: center;
+        }
+        .landing-pricing-controls {
+          display: flex;
+          justify-content: center;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin-top: 24px;
+        }
+        .landing-pricing-toggle {
+          display: inline-flex;
+          background: #fff;
+          border: 1px solid #e8ddd0;
+          border-radius: 24px;
+          padding: 4px;
+          gap: 4px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .landing-pricing-toggle button {
+          border: none;
+          background: transparent;
+          padding: 8px 18px;
+          border-radius: 20px;
+          font-size: 14px;
+          font-weight: 600;
+          color: #6b7280;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .landing-pricing-toggle button.active {
+          background: linear-gradient(135deg, #0d9488, #0f766e);
+          color: #fff;
+        }
+        .landing-pricing-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 320px));
+          gap: 24px;
+          justify-content: center;
+          max-width: 1080px;
+          margin: 0 auto;
+        }
+        .landing-pricing-card {
+          background: #fefcf9;
+          border: 1px solid #e8ddd0;
+          border-radius: 20px;
+          padding: 28px;
+          position: relative;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+          display: flex;
+          flex-direction: column;
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .landing-pricing-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+        }
+        .landing-pricing-card.popular {
+          border-width: 2px;
+          box-shadow: 0 8px 24px rgba(147, 51, 234, 0.12);
+        }
+        .landing-pricing-badge {
+          position: absolute;
+          top: 16px;
+          right: -26px;
+          background: linear-gradient(135deg, #9333ea, #7c3aed);
+          color: white;
+          padding: 4px 34px;
+          font-size: 11px;
+          font-weight: 700;
+          transform: rotate(45deg);
+          text-transform: uppercase;
+        }
+        .landing-pricing-card-top {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 18px;
+        }
+        .landing-pricing-icon { font-size: 24px; }
+        .landing-pricing-tier {
+          padding: 4px 12px;
+          font-size: 12px;
+          font-weight: 700;
+          border-radius: 20px;
+        }
+        .landing-pricing-prices {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          margin-bottom: 20px;
+          padding-bottom: 20px;
+          border-bottom: 1px solid #f3f4f6;
+        }
+        .landing-price-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
+        }
+        .landing-price-interval {
+          font-size: 14px;
+          color: #6b7280;
+        }
+        .landing-price-amount {
+          font-size: 20px;
+          font-weight: 700;
+          color: #1f2937;
+        }
+        .landing-pricing-features {
+          list-style: none;
+          margin: 0 0 24px;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .landing-pricing-features li {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          font-size: 14px;
+          color: #374151;
+          line-height: 1.4;
+        }
+        .landing-pricing-cta {
+          margin-top: auto;
+          text-align: center;
+          text-decoration: none;
+        }
+        .landing-pricing-fallback {
+          max-width: 520px;
+          margin: 0 auto;
+          text-align: center;
+          padding: 24px;
+          background: #fefcf9;
+          border: 1px solid #e8ddd0;
+          border-radius: 16px;
+          color: #6b7280;
+        }
       `}</style>
     </div>
   );

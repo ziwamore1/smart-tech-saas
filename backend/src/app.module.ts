@@ -100,6 +100,7 @@ import { StudentSubjectModule } from './student-subject/student-subject.module';
 import { StampEngineModule } from './stamp-engine/stamp-engine.module';
 import { TeacherAnalyticsModule } from './teacher-analytics/teacher-analytics.module';
 import { BusinessCalendarModule } from './business-calendar/business-calendar.module';
+import { PricingModule } from './pricing/pricing.module';
 import { getRedisConnectionOptions } from './queues/redis.config';
 
 @Module({
@@ -203,6 +204,7 @@ import { getRedisConnectionOptions } from './queues/redis.config';
     StampEngineModule,
     TeacherAnalyticsModule,
     BusinessCalendarModule,
+    PricingModule,
   ],
   providers: [ProductionLogger],
 })
