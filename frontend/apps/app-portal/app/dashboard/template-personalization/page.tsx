@@ -104,6 +104,27 @@ export default function TemplatePersonalizationPage() {
           footerText: preset.footerText || prev.footerText,
         }));
       }
+
+      // Reflect the school's report card template layout flags so the toggles
+      // show the ACTUAL stored values instead of hardcoded defaults.
+      const reportTemplates = (Array.isArray(tplData) ? tplData : []).filter(
+        (t: any) => (t.templateType || 'REPORT_CARD') === 'REPORT_CARD'
+      );
+      const targetTemplate = reportTemplates.find((t: any) => t.isDefault) || reportTemplates[0];
+      if (targetTemplate) {
+        setSettings(prev => ({
+          ...prev,
+          includeLogo: targetTemplate.includeLogo !== false,
+          includeStamp: Boolean(targetTemplate.includeStamp),
+          includeSignature: Boolean(targetTemplate.includeSignature),
+          includeRankings: targetTemplate.includeRankings !== false,
+          includeComments: targetTemplate.includeComments !== false,
+          includeGrading: targetTemplate.includeGrading !== false,
+          remarksEnabled: targetTemplate.remarksEnabled !== false,
+          headerText: targetTemplate.headerText || prev.headerText,
+          footerText: targetTemplate.footerText || prev.footerText,
+        }));
+      }
     } catch (err) {
       console.error('Failed to load data:', err);
     } finally {
@@ -126,6 +147,36 @@ export default function TemplatePersonalizationPage() {
       alert('Settings saved successfully!');
     } catch (err) {
       console.error('Save failed:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveLayout = async () => {
+    try {
+      setSaving(true);
+      const target = reportCardTemplates.find((t: any) => t.isDefault) || reportCardTemplates[0];
+      if (!target) {
+        alert('No report card template found. Create one from the Marketplace or Template Builder first.');
+        return;
+      }
+      await api.patch(`/template-builder/${target.id}`, {
+        includeLogo: settings.includeLogo,
+        includeStamp: settings.includeStamp,
+        includeSignature: settings.includeSignature,
+        includeRankings: settings.includeRankings,
+        includeComments: settings.includeComments,
+        includeGrading: settings.includeGrading,
+        remarksEnabled: settings.remarksEnabled,
+        headerText: settings.headerText,
+        footerText: settings.footerText,
+      });
+      alert(`Layout settings saved to "${target.name}"!`);
+      await reloadTemplatesAndClasses();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to save layout settings';
+      alert(`Failed to save layout settings: ${msg}`);
+      console.error('handleSaveLayout error:', err);
     } finally {
       setSaving(false);
     }
@@ -392,6 +443,10 @@ export default function TemplatePersonalizationPage() {
               </label>
             ))}
           </div>
+          <button onClick={handleSaveLayout} disabled={saving} style={{ marginTop: '20px', padding: '12px 32px', background: gradOrange, color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', opacity: saving ? 0.7 : 1 }}>
+            <i className={`fa ${saving ? 'fa-spinner fa-spin' : 'fa-save'}`}></i>
+            {saving ? 'Saving...' : 'Save Layout Settings'}
+          </button>
         </div>
       )}
 
