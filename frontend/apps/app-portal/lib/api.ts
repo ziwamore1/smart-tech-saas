@@ -12,6 +12,7 @@ export const api = axios.create({
 
 export const businessCalendarApi = {
   list: (current = false) => api.get('/business-calendar', { params: current ? { current: true } : undefined }),
+  create: (data: any) => api.post('/business-calendar', data),
   activities: (calendarId: string) => api.get(`/business-calendar/${calendarId}/activities`),
   categories: () => api.get('/business-calendar/categories/list'),
   createActivity: (calendarId: string, data: any) => api.post(`/business-calendar/${calendarId}/activities`, data),
@@ -22,6 +23,8 @@ export const businessCalendarApi = {
   commitImport: (id: string, importId: string) => api.post(`/business-calendar/${id}/import/commit`, { importId, confirmed: true }),
   templateUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/template.xlsx`,
   exportUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/export.xlsx`,
+  templateBlob: (id: string) => api.get(`/business-calendar/${id}/template.xlsx`, { responseType: 'blob' }),
+  exportBlob: (id: string) => api.get(`/business-calendar/${id}/export.xlsx`, { responseType: 'blob' }),
   reportHtmlUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/report.html`,
   reportPdfUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/report.pdf`,
 };

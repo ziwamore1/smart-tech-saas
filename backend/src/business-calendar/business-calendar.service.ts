@@ -14,6 +14,15 @@ import { BusinessCalendarNotificationService } from './business-calendar-notific
 
 type Actor = { id: string; schoolId?: string | null; isSuperAdmin?: boolean; roles?: string[] };
 
+const DEFAULT_CATEGORIES = [
+  { name: 'Meeting', color: '#2563eb', description: 'Staff, departmental and board meetings' },
+  { name: 'CPD / Training', color: '#7c3aed', description: 'Professional development and training sessions' },
+  { name: 'Monitoring', color: '#059669', description: 'Internal inspections, lesson observations and school monitoring' },
+  { name: 'Assessment / Examination', color: '#ea580c', description: 'Tests, exams, marking and results deadlines' },
+  { name: 'Deadline', color: '#dc2626', description: 'Administrative and academic deadlines' },
+  { name: 'School Event', color: '#0891b2', description: 'Sports, ceremonies, prize giving and co-curricular events' },
+];
+
 @Injectable()
 export class BusinessCalendarService {
   constructor(
@@ -90,7 +99,7 @@ export class BusinessCalendarService {
       where.startDate = { lte: now };
       where.endDate = { gte: now };
     }
-    return this.prisma.schoolBusinessCalendar.findMany({ where, include: { categories: true, columns: { orderBy: { sortOrder: 'asc' } } }, orderBy: { startDate: 'desc' } });
+    return this.prisma.schoolBusinessCalendar.findMany({ where, include: { academicYear: true, term: true, categories: true, columns: { orderBy: { sortOrder: 'asc' } } }, orderBy: { startDate: 'desc' } });
   }
 
   async create(actor: Actor, data: any, requestedSchoolId?: string) {
@@ -101,6 +110,7 @@ export class BusinessCalendarService {
     this.validateRange(startDate, endDate);
     await this.schoolReferences(schoolId, data);
     const calendar = await this.prisma.schoolBusinessCalendar.create({ data: { schoolId, academicYearId: data.academicYearId, termId: data.termId, name: data.name, description: data.description, startDate, endDate, timezone: data.timezone, createdById: actor.isSuperAdmin ? undefined : actor.id } });
+    await this.ensureDefaultCategories(schoolId);
     await this.audit(actor, schoolId, 'CALENDAR_CREATED', 'SchoolBusinessCalendar', calendar.id, { name: calendar.name });
     return calendar;
   }
@@ -202,7 +212,13 @@ export class BusinessCalendarService {
     await this.prisma.calendarActivityAudience.delete({ where: { id } }); return { id, deleted: true };
   }
 
-  async categories(actor: Actor, requestedSchoolId?: string) { const schoolId = this.schoolId(actor, requestedSchoolId); await this.assertPermission(actor, PERMISSIONS.CALENDAR_VIEW); return this.prisma.calendarCategory.findMany({ where: { schoolId, isActive: true }, orderBy: { name: 'asc' } }); }
+  private async ensureDefaultCategories(schoolId: string) {
+    const count = await this.prisma.calendarCategory.count({ where: { schoolId } });
+    if (count > 0) return;
+    await this.prisma.calendarCategory.createMany({ data: DEFAULT_CATEGORIES.map((item) => ({ ...item, schoolId })) });
+  }
+
+  async categories(actor: Actor, requestedSchoolId?: string) { const schoolId = this.schoolId(actor, requestedSchoolId); await this.assertPermission(actor, PERMISSIONS.CALENDAR_VIEW); await this.ensureDefaultCategories(schoolId); return this.prisma.calendarCategory.findMany({ where: { schoolId, isActive: true }, orderBy: { name: 'asc' } }); }
   async saveCategory(actor: Actor, data: any, requestedSchoolId?: string) { const schoolId = this.schoolId(actor, requestedSchoolId); await this.assertPermission(actor, PERMISSIONS.CALENDAR_MANAGE); return this.prisma.calendarCategory.create({ data: { schoolId, calendarId: data.calendarId, name: data.name, color: data.color, description: data.description } }); }
   async columns(actor: Actor, calendarId: string, requestedSchoolId?: string) { const schoolId = this.schoolId(actor, requestedSchoolId); await this.calendar(calendarId, schoolId); await this.assertPermission(actor, PERMISSIONS.CALENDAR_VIEW); return this.prisma.calendarColumnConfig.findMany({ where: { calendarId, schoolId }, orderBy: { sortOrder: 'asc' } }); }
   async saveColumns(actor: Actor, calendarId: string, columns: any[], requestedSchoolId?: string) { const schoolId = this.schoolId(actor, requestedSchoolId); await this.assertPermission(actor, PERMISSIONS.CALENDAR_MANAGE); await this.calendar(calendarId, schoolId); return this.prisma.$transaction(columns.map((column) => this.prisma.calendarColumnConfig.upsert({ where: { calendarId_key: { calendarId, key: column.key } }, create: { ...column, calendarId, schoolId }, update: { ...column, schoolId } }))); }
