@@ -408,6 +408,14 @@ const regularNav: NavItem[] = [
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
   { 
+    name: 'Business Calendar', 
+    href: '/dashboard/business-calendar', 
+    icon: 'fa-calendar-alt',
+    color: '#06b6d4',
+    typeRoles: ROLE_MAP.admin,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
+  },
+  { 
     name: 'Report Cards', 
     href: '/dashboard/report-cards', 
     icon: 'fa-file-text',
