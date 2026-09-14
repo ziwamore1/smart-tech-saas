@@ -10,6 +10,12 @@ export const api = axios.create({
   timeout: 30000,
 });
 
+const authedUrl = (path: string) => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  const separator = token ? (path.includes('?') ? '&' : '?') : '';
+  return `${API_BASE_URL}${path}${separator}${token ? `token=${encodeURIComponent(token)}` : ''}`;
+};
+
 export const businessCalendarApi = {
   list: (current = false) => api.get('/business-calendar', { params: current ? { current: true } : undefined }),
   create: (data: any) => api.post('/business-calendar', data),
@@ -23,20 +29,20 @@ export const businessCalendarApi = {
   deleteActivity: (id: string) => api.delete(`/business-calendar/activities/${id}`),
   validateImport: (id: string, file: File, mode: string) => { const form = new FormData(); form.append('file', file); form.append('mode', mode); return api.post(`/business-calendar/${id}/import/validate`, form, { headers: { 'Content-Type': 'multipart/form-data' } }); },
   commitImport: (id: string, importId: string) => api.post(`/business-calendar/${id}/import/commit`, { importId, confirmed: true }),
-  templateUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/template.xlsx`,
-  exportUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/export.xlsx`,
+  templateUrl: (id: string) => authedUrl(`/business-calendar/${id}/template.xlsx`),
+  exportUrl: (id: string) => authedUrl(`/business-calendar/${id}/export.xlsx`),
   templateBlob: (id: string) => api.get(`/business-calendar/${id}/template.xlsx`, { responseType: 'blob' }),
   exportBlob: (id: string) => api.get(`/business-calendar/${id}/export.xlsx`, { responseType: 'blob' }),
-  reportHtmlUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/report.html`,
-  reportPdfUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/report.pdf`,
-  reportPdfViewUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/report.pdf/view`,
+  reportHtmlUrl: (id: string) => authedUrl(`/business-calendar/${id}/report.html`),
+  reportPdfUrl: (id: string) => authedUrl(`/business-calendar/${id}/report.pdf`),
+  reportPdfViewUrl: (id: string) => authedUrl(`/business-calendar/${id}/report.pdf/view`),
   analytics: (id: string, params: Record<string, string> = {}) => api.get(`/business-calendar/${id}/analytics`, { params }),
   goals: (id: string) => api.get(`/business-calendar/${id}/goals`),
   createGoal: (id: string, data: any) => api.post(`/business-calendar/${id}/goals`, data),
   updateGoal: (goalId: string, data: any) => api.patch(`/business-calendar/goals/${goalId}`, data),
   removeGoal: (goalId: string) => api.delete(`/business-calendar/goals/${goalId}`),
   activityTimeline: (activityId: string) => api.get(`/business-calendar/activities/${activityId}/timeline`),
-  exportAnalyticsUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/export-analytics.xlsx`,
+  exportAnalyticsUrl: (id: string) => authedUrl(`/business-calendar/${id}/export-analytics.xlsx`),
   exportAnalyticsBlob: (id: string) => api.get(`/business-calendar/${id}/export-analytics.xlsx`, { responseType: 'blob' }),
 };
 

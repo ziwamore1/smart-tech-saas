@@ -1,13 +1,13 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UseGuards, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { BusinessCalendarAuthGuard } from './business-calendar-auth.guard';
 import { BusinessCalendarService } from './business-calendar.service';
 import { BusinessCalendarReportService } from './business-calendar-report.service';
 import { CalendarExcelService } from './calendar-excel.service';
 
 @Controller('business-calendar')
-@UseGuards(JwtAuthGuard)
+@UseGuards(BusinessCalendarAuthGuard)
 export class BusinessCalendarController {
   constructor(private readonly service: BusinessCalendarService, private readonly reports: BusinessCalendarReportService, private readonly excel: CalendarExcelService) {}
   private school(req: any, body?: any, query?: any) { return req.user.schoolId || (req.user.isSuperAdmin ? body?.schoolId || query?.schoolId : undefined); }

@@ -13,6 +13,12 @@ export const api = axios.create({
   },
 });
 
+const authedUrl = (path: string) => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  const separator = token ? (path.includes('?') ? '&' : '?') : '';
+  return `${API_BASE_URL}${path}${separator}${token ? `token=${encodeURIComponent(token)}` : ''}`;
+};
+
 export const businessCalendarApi = {
   list: (current = false) => api.get('/business-calendar', { params: current ? { current: true } : undefined }),
   activities: (calendarId: string) => api.get(`/business-calendar/${calendarId}/activities`),
@@ -22,8 +28,8 @@ export const businessCalendarApi = {
   updateActivity: (id: string, data: any) => api.patch(`/business-calendar/activities/${id}`, data),
   deleteActivity: (id: string) => api.delete(`/business-calendar/activities/${id}`),
   publish: (id: string) => api.post(`/business-calendar/${id}/publish`),
-  templateUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/template.xlsx`,
-  exportUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/export.xlsx`,
+  templateUrl: (id: string) => authedUrl(`/business-calendar/${id}/template.xlsx`),
+  exportUrl: (id: string) => authedUrl(`/business-calendar/${id}/export.xlsx`),
 };
 
 api.interceptors.request.use(
