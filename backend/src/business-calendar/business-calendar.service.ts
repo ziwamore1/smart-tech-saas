@@ -151,7 +151,7 @@ export class BusinessCalendarService {
     await this.assertPermission(actor, PERMISSIONS.CALENDAR_VIEW);
     const calendar = await this.calendar(calendarId, schoolId);
     if (!actor.isSuperAdmin && calendar.status !== 'PUBLISHED' && !(await this.access.getPermissions(actor)).includes(PERMISSIONS.CALENDAR_MANAGE)) throw new ForbiddenException('Calendar is not published');
-    return this.prisma.calendarActivity.findMany({ where: { calendarId, schoolId }, include: { subItems: { orderBy: { sortOrder: 'asc' } }, audiences: true, category: true, children: true }, orderBy: [{ startDate: 'asc' }, { startTime: 'asc' }] });
+    return this.prisma.calendarActivity.findMany({ where: { calendarId, schoolId }, include: { subItems: { orderBy: { sortOrder: 'asc' } }, audiences: true, category: true, department: true, children: true }, orderBy: [{ startDate: 'asc' }, { startTime: 'asc' }] });
   }
 
   async createActivity(actor: Actor, calendarId: string, data: any, requestedSchoolId?: string) {
@@ -164,7 +164,8 @@ export class BusinessCalendarService {
     if (data.termId) await this.schoolReferences(schoolId, { academicYearId: calendar.academicYearId, termId: data.termId });
     if (data.parentId) { const parent = await this.activity(data.parentId, schoolId); if (parent.calendarId !== calendarId) throw new BadRequestException('Parent activity must be in this calendar'); }
     if (data.categoryId) { const category = await this.prisma.calendarCategory.findFirst({ where: { id: data.categoryId, schoolId, OR: [{ calendarId }, { calendarId: null }] } }); if (!category) throw new BadRequestException('Invalid calendar category'); }
-    const activity = await this.prisma.calendarActivity.create({ data: { ...data, schoolId, calendarId, startDate, endDate, deadline: data.deadline ? this.date(data.deadline, 'deadline') : undefined, createdById: actor.isSuperAdmin ? undefined : actor.id } });
+    const payload = this.relationalIds(data);
+    const activity = await this.prisma.calendarActivity.create({ data: { ...payload, schoolId, calendarId, startDate, endDate, deadline: data.deadline ? this.date(data.deadline, 'deadline') : undefined, createdById: actor.isSuperAdmin ? undefined : actor.id } });
     await this.audit(actor, schoolId, 'CALENDAR_ACTIVITY_CREATED', 'CalendarActivity', activity.id, { calendarId });
     return activity;
   }
@@ -176,7 +177,8 @@ export class BusinessCalendarService {
     const startDate = data.startDate ? this.date(data.startDate, 'startDate') : existing.startDate;
     const endDate = data.endDate ? this.date(data.endDate, 'endDate') : existing.endDate;
     this.validateRange(startDate, endDate);
-    const activity = await this.prisma.calendarActivity.update({ where: { id }, data: { ...data, startDate, endDate, deadline: data.deadline ? this.date(data.deadline, 'deadline') : undefined, calendarId: undefined, schoolId: undefined, updatedById: actor.isSuperAdmin ? undefined : actor.id } });
+    const payload = this.relationalIds({ ...data, calendarId: undefined, schoolId: undefined });
+    const activity = await this.prisma.calendarActivity.update({ where: { id }, data: { ...payload, startDate, endDate, deadline: data.deadline ? this.date(data.deadline, 'deadline') : undefined, updatedById: actor.isSuperAdmin ? undefined : actor.id } });
     await this.audit(actor, schoolId, 'CALENDAR_ACTIVITY_UPDATED', 'CalendarActivity', id, data);
     if (data.status === 'CANCELLED') await this.notifications.notifyChange(id, 'CANCELLED');
     else if (['startDate', 'endDate', 'startTime', 'endTime', 'venue'].some((field) => data[field] !== undefined)) await this.notifications.notifyChange(id, 'UPDATED');
@@ -186,6 +188,11 @@ export class BusinessCalendarService {
   async removeActivity(actor: Actor, id: string, requestedSchoolId?: string) {
     const schoolId = this.schoolId(actor, requestedSchoolId); await this.assertPermission(actor, PERMISSIONS.CALENDAR_MANAGE); await this.activity(id, schoolId);
     await this.prisma.calendarActivity.delete({ where: { id } }); await this.audit(actor, schoolId, 'CALENDAR_ACTIVITY_DELETED', 'CalendarActivity', id); return { id, deleted: true };
+  }
+
+  private relationalIds(data: any) {
+    const ids = ['categoryId', 'departmentId', 'officerId', 'parentId', 'termId', 'academicYearId'];
+    return Object.fromEntries(Object.entries(data).map(([key, value]) => (ids.includes(key) && (value === '' || value === undefined) ? [key, undefined] : [key, value])));
   }
 
   async subItem(actor: Actor, activityId: string, data: any, requestedSchoolId?: string) {

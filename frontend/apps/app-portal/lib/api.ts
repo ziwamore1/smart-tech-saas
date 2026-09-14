@@ -16,6 +16,7 @@ export const businessCalendarApi = {
   activities: (calendarId: string) => api.get(`/business-calendar/${calendarId}/activities`),
   categories: () => api.get('/business-calendar/categories/list'),
   createActivity: (calendarId: string, data: any) => api.post(`/business-calendar/${calendarId}/activities`, data),
+  updateActivity: (activityId: string, data: any) => api.patch(`/business-calendar/activities/${activityId}`, data),
   publish: (id: string) => api.post(`/business-calendar/${id}/publish`),
   unpublish: (id: string) => api.post(`/business-calendar/${id}/unpublish`),
   deleteActivity: (id: string) => api.delete(`/business-calendar/activities/${id}`),
@@ -83,6 +84,7 @@ api.interceptors.response.use(
         '/auth/',
         '/public/',
         '/feature-locks',
+        '/staff-positions',
       ];
       const isSilent = silentUrls.some(url => error.config.url?.includes(url));
       if (!isSilent) {

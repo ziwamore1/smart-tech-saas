@@ -20,10 +20,10 @@ export class BusinessCalendarController {
   @Post(':id/unpublish') unpublish(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.service.setStatus(req.user, id, 'DRAFT', this.school(req, body)); }
   @Post(':id/archive') archive(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.service.setStatus(req.user, id, 'ARCHIVED', this.school(req, body)); }
 
-  @Get(':id/activities') activities(@Req() req: any, @Param('id') id: string) { return this.service.activities(req.user, id, this.school(req)); }
+  @Get(':id/activities') activities(@Req() req: any, @Param('id') id: string, @Query('schoolId') schoolId?: string) { return this.service.activities(req.user, id, this.school(req, undefined, { schoolId })); }
   @Post(':id/activities') createActivity(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.service.createActivity(req.user, id, body, this.school(req, body)); }
   @Patch('activities/:activityId') updateActivity(@Req() req: any, @Param('activityId') id: string, @Body() body: any) { return this.service.updateActivity(req.user, id, body, this.school(req, body)); }
-  @Delete('activities/:activityId') removeActivity(@Req() req: any, @Param('activityId') id: string) { return this.service.removeActivity(req.user, id, this.school(req)); }
+  @Delete('activities/:activityId') removeActivity(@Req() req: any, @Param('activityId') id: string, @Query('schoolId') schoolId?: string) { return this.service.removeActivity(req.user, id, this.school(req, undefined, { schoolId })); }
   @Post('activities/:activityId/subitems') addSubItem(@Req() req: any, @Param('activityId') id: string, @Body() body: any) { return this.service.subItem(req.user, id, body, this.school(req, body)); }
   @Delete('subitems/:id') removeSubItem(@Req() req: any, @Param('id') id: string) { return this.service.removeSubItem(req.user, id, this.school(req)); }
   @Post('activities/:activityId/audiences') addAudience(@Req() req: any, @Param('activityId') id: string, @Body() body: any) { return this.service.audience(req.user, id, body, this.school(req, body)); }
@@ -43,6 +43,6 @@ export class BusinessCalendarController {
   @Get('import/:importId/errors') importErrors(@Req() req: any, @Param('importId') importId: string) { return this.service.importDetails(req.user, importId, true); }
   @Get('import/:importId/changes') importChanges(@Req() req: any, @Param('importId') importId: string) { return this.service.importDetails(req.user, importId); }
   @Post(':id/import.csv') importCsv(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.service.importCsv(req.user, id, body.csv || '', this.school(req, body)); }
-  @Get(':id/report.html') async reportHtml(@Req() req: any, @Param('id') id: string, @Res() response: Response) { response.type('text/html').setHeader('Content-Disposition', `attachment; filename="calendar-${id}.html"`); response.send(await this.reports.html(id, this.school(req))); }
+  @Get(':id/report.html') async reportHtml(@Req() req: any, @Param('id') id: string, @Res() response: Response) { response.type('text/html').setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline'"); response.send(await this.reports.html(id, this.school(req))); }
   @Get(':id/report.pdf') async reportPdf(@Req() req: any, @Param('id') id: string, @Res() response: Response) { response.type('application/pdf').setHeader('Content-Disposition', `attachment; filename="calendar-${id}.pdf"`); response.send(await this.reports.pdf(id, this.school(req))); }
 }
