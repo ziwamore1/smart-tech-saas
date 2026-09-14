@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { academicYearApi, businessCalendarApi, staffPositionApi, termApi } from '@/lib/api';
+import { academicYearApi, businessCalendarApi, schoolMembershipApi, staffPositionApi, termApi } from '@/lib/api';
 
 const fmt = (value?: string) =>
   value ? new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value)) : 'TBC';
@@ -57,7 +57,7 @@ export default function BusinessCalendarPage() {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'UPCOMING' | 'COMPLETED' | 'OVERDUE'>('ALL');
   const [customCategory, setCustomCategory] = useState('');
   const [tab, setTab] = useState<'overview' | 'departments' | 'overdue' | 'upcoming' | 'goals'>('overview');
-  const emptyForm = { title: '', startDate: '', endDate: '', startTime: '', categoryId: '', departmentId: '', venue: '', notes: '', status: 'PLANNED', completionPercentage: 0, target: '', targetUnit: '', expectedOutcome: '', actualOutcome: '', delayReason: '', failureReason: '', remarks: '' };
+  const emptyForm = { title: '', startDate: '', endDate: '', startTime: '', categoryId: '', departmentId: '', officerId: '', venue: '', notes: '', status: 'PLANNED', completionPercentage: 0, target: '', targetUnit: '', expectedOutcome: '', actualOutcome: '', delayReason: '', failureReason: '', remarks: '' };
   const [form, setForm] = useState({ ...emptyForm });
   const emptyGoal = { title: '', description: '', targetPercentage: 90, category: 'OVERALL', departmentId: '', deadline: '' };
   const [goalForm, setGoalForm] = useState({ ...emptyGoal });
@@ -69,6 +69,7 @@ export default function BusinessCalendarPage() {
   const analytics = useQuery({ queryKey: ['business-calendar-analytics', id], queryFn: () => businessCalendarApi.analytics(id).then((r) => r.data), enabled: Boolean(id) });
   const categories = useQuery({ queryKey: ['business-calendar-categories'], queryFn: () => businessCalendarApi.categories().then((r) => r.data) });
   const departments = useQuery({ queryKey: ['departments'], queryFn: () => staffPositionApi.getDepartments().then((r) => r.data).catch(() => []) });
+  const officers = useQuery({ queryKey: ['school-members'], queryFn: () => schoolMembershipApi.getMembers().then((r) => r.data).catch(() => []) });
   const years = useQuery({ queryKey: ['academic-year'], queryFn: () => academicYearApi.getAll().then((r) => r.data) });
   const terms = useQuery({ queryKey: ['term'], queryFn: () => termApi.getAll().then((r) => r.data) });
   const goals = useQuery({ queryKey: ['business-calendar-goals', id], queryFn: () => businessCalendarApi.goals(id).then((r) => r.data), enabled: Boolean(id) });
@@ -82,7 +83,7 @@ export default function BusinessCalendarPage() {
     onSuccess: () => { refresh(); closeForm(); },
   });
   const update = useMutation({
-    mutationFn: () => businessCalendarApi.updateActivity(editing.id, { ...form, target: form.target ? Number(form.target) : null, completionPercentage: Number(form.completionPercentage) }),
+    mutationFn: () => businessCalendarApi.updateActivity(editing.id, { ...form, categoryId: form.categoryId || null, departmentId: form.departmentId || null, officerId: form.officerId || null, target: form.target ? Number(form.target) : null, completionPercentage: Number(form.completionPercentage) }),
     onSuccess: () => { refresh(); closeForm(); },
   });
   const createCategory = useMutation({
@@ -110,13 +111,14 @@ export default function BusinessCalendarPage() {
   const downloadPdf = async () => { if (!id) return; try { const response = await businessCalendarApi.exportAnalyticsBlob(id); const url = URL.createObjectURL(response.data); window.open(`${businessCalendarApi.reportPdfViewUrl(id)}`, '_blank'); } catch { window.open(businessCalendarApi.reportPdfUrl(id), '_blank'); } };
 
   const rows = activities.data || [];
+  const officerList = (officers.data || []).map((item: any) => { const user = item.user || {}; const name = [user.firstName, user.lastName].filter(Boolean).join(' '); return { id: user.id || item.id, name: name || user.email || '' }; });
   const a = analytics.data;
   const visibleRows = statusFilter === 'ALL' ? rows : statusFilter === 'COMPLETED' ? rows.filter((r: any) => r.status === 'COMPLETED') : statusFilter === 'UPCOMING' ? (a?.upcoming?.today || []).concat(a?.upcoming?.within7 || [], a?.upcoming?.within14 || []) : (a?.overdue || []);
 
   const openAdd = () => { setEditing(null); setForm({ ...emptyForm }); setShowForm(true); };
   const openEdit = (row: any) => {
     setEditing(row);
-    setForm({ title: row.title, startDate: toInput(row.startDate), endDate: toInput(row.endDate), startTime: row.startTime || '', categoryId: row.departmentId || '', departmentId: row.departmentId || '', venue: row.venue || '', notes: row.notes || '', status: row.status || 'PLANNED', completionPercentage: row.completionPercentage || 0, target: row.target?.toString() || '', targetUnit: row.targetUnit || '', expectedOutcome: row.expectedOutcome || '', actualOutcome: row.actualOutcome || '', delayReason: row.delayReason || '', failureReason: row.failureReason || '', remarks: row.remarks || '' });
+    setForm({ title: row.title, startDate: toInput(row.startDate), endDate: toInput(row.endDate), startTime: row.startTime || '', categoryId: row.categoryId || row.category?.id || '', departmentId: row.departmentId || '', officerId: row.officerId || '', venue: row.venue || '', notes: row.notes || '', status: row.status || 'PLANNED', completionPercentage: row.completionPercentage || 0, target: row.target?.toString() || '', targetUnit: row.targetUnit || '', expectedOutcome: row.expectedOutcome || '', actualOutcome: row.actualOutcome || '', delayReason: row.delayReason || '', failureReason: row.failureReason || '', remarks: row.remarks || '' });
     setShowForm(true);
   };
   const openAddGoal = () => { setEditingGoal(null); setGoalForm({ ...emptyGoal }); setShowGoalForm(true); };
@@ -340,6 +342,13 @@ export default function BusinessCalendarPage() {
               <select className={INPUT_CLS} value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })}>
                 <option value="">All school (no department)</option>
                 {(departments.data || []).map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className={LABEL_CLS}>Officer in charge</span>
+              <select className={INPUT_CLS} value={form.officerId} onChange={(e) => setForm({ ...form, officerId: e.target.value })}>
+                <option value="">Not assigned</option>
+                {officerList.map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </select>
             </label>
             <label>
