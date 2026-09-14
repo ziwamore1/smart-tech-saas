@@ -519,12 +519,43 @@ export class TemplateRendererService {
       case 'STRENGTHS_WEAKNESSES':
         return this.renderStrengthsWeaknesses(component, data, styleStr);
 
-      case 'SIGNATURE':
-        const sigUrl = content.signatureUrl || data?.signatureUrl;
-        const safeSigUrl = this.safeImageSource(sigUrl);
-        return safeSigUrl
-          ? `<img src="${safeSigUrl}" alt="Signature" style="${styleStr}" />`
-          : `<div style="${styleStr};border-top:1px solid #000;width:150px;margin-top:20px;"></div>`;
+case 'SIGNATURE': {
+        const role = String(content.role || '').toUpperCase();
+        const roleUrl =
+          role === 'CLASS_TEACHER'
+            ? (content.signatureUrl || data?.classTeacherSignatureUrl || data?.signatureUrl)
+            : role === 'HEAD_TEACHER'
+              ? (content.signatureUrl || data?.headTeacherSignatureUrl || data?.signatureUrl)
+              : role === 'DEPUTY_HEAD_TEACHER'
+                ? (content.signatureUrl || data?.deputySignatureUrl || data?.signatureUrl)
+                : (content.signatureUrl || data?.signatureUrl);
+        const roleLabel = content.label || (
+          role === 'CLASS_TEACHER'
+            ? 'Class Teacher'
+            : role === 'DEPUTY_HEAD_TEACHER'
+              ? 'Deputy Head Teacher'
+              : role === 'HEAD_TEACHER'
+                ? 'Head Teacher'
+                : 'Signature'
+        );
+        const roleName = content.name || (
+          role === 'CLASS_TEACHER'
+            ? (data?.class?.classTeacherName || '')
+            : role === 'DEPUTY_HEAD_TEACHER'
+              ? (data?.deputyName || '')
+              : role === 'HEAD_TEACHER'
+                ? (data?.headTeacherName || data?.directorName || '')
+                : ''
+        );
+        const safeSigUrl = this.safeImageSource(roleUrl);
+        return `<div style="${styleStr};text-align:center;">
+          ${safeSigUrl
+            ? `<img src="${safeSigUrl}" alt="${roleLabel}" style="max-height:50px;max-width:140px;object-fit:contain;display:block;margin:0 auto;" />`
+            : `<div style="border-top:1px solid #000;width:150px;margin:16px auto 0;"></div>`}
+          <div style="font-size:11px;font-weight:700;margin-top:3px;">${roleName || roleLabel}</div>
+          ${roleLabel !== roleName && roleName ? `<div style="font-size:10px;color:#555;">${roleLabel}</div>` : ''}
+        </div>`;
+      }
 
       case 'STAMP':
         const stampUrl = content.stampUrl || data?.stampUrl;
@@ -894,6 +925,8 @@ export class TemplateRendererService {
       'student_photo': data?.student?.photoUrl || '',
       'student_admission': data?.student?.admissionNumber || '',
       'class_name': data?.class?.name || '',
+      'class_teacher_name': data?.class?.classTeacherName || '',
+      'class_teacher_signature': data?.classTeacherSignatureUrl || '',
       'school_name': data?.schoolName || '',
       'school_logo': data?.schoolLogo || '',
       'attendance_percentage': data?.attendancePercentage ?? '',
@@ -1016,6 +1049,49 @@ export class TemplateRendererService {
       });
       if (signature) {
         defaultData.signatureUrl = signature.transparentImageUrl || signature.processedImageUrl || signature.imageUrl || signature.signatureData || undefined;
+      }
+    }
+
+    // Resolve per-role signature images (Class Teacher / Head Teacher / Deputy)
+    // from TemplateSignatory bindings so each role renders its own bound artwork,
+    // falling back to the school default `signatureUrl` at the template layer.
+    if (schoolId) {
+      try {
+        const signatorySlots = await this.prisma.templateSignatory.findMany({
+          where: { templateId: template.id },
+          select: {
+            role: true,
+            signature: {
+              select: { transparentImageUrl: true, processedImageUrl: true, imageUrl: true, signatureData: true },
+            },
+          },
+        });
+        for (const slot of signatorySlots) {
+          const role = (slot.role || '').toUpperCase();
+          const url = slot.signature
+            ? slot.signature.transparentImageUrl || slot.signature.processedImageUrl || slot.signature.imageUrl || slot.signature.signatureData || null
+            : null;
+          if (!url) continue;
+          if (role === 'CLASS_TEACHER' && !defaultData.classTeacherSignatureUrl) {
+            defaultData.classTeacherSignatureUrl = url;
+          } else if (role === 'HEAD_TEACHER' && !defaultData.headTeacherSignatureUrl) {
+            defaultData.headTeacherSignatureUrl = url;
+          } else if (role === 'DEPUTY_HEAD_TEACHER' && !defaultData.deputySignatureUrl) {
+            defaultData.deputySignatureUrl = url;
+          }
+        }
+        if (!defaultData.classTeacherSignatureUrl && defaultData.class?.classTeacherId && schoolId) {
+          const teacherSig = await this.prisma.digitalSignature.findFirst({
+            where: { schoolId, userId: defaultData.class.classTeacherId, status: 'ACTIVE' },
+            orderBy: { isDefault: 'desc' },
+            select: { transparentImageUrl: true, processedImageUrl: true, imageUrl: true, signatureData: true },
+          });
+          if (teacherSig) {
+            defaultData.classTeacherSignatureUrl = teacherSig.transparentImageUrl || teacherSig.processedImageUrl || teacherSig.imageUrl || teacherSig.signatureData || null;
+          }
+        }
+      } catch {
+        // Fail-safe: per-role URLs stay unset; templates fall back to generic signatureUrl.
       }
     }
 

@@ -328,12 +328,16 @@ Student Report Card
 
 <div class="signature-section">
 {{#if includeSignature}}
+{{#if classTeacherSignatureUrl}}
+<img src="{{classTeacherSignatureUrl}}" class="stamp-image" style="max-height:60px; margin-bottom:5px"/>
+{{else}}
 {{#if signatureUrl}}
 <img src="{{signatureUrl}}" class="stamp-image" style="max-height:60px; margin-bottom:5px"/>
 {{/if}}
 {{/if}}
+{{/if}}
 <div class="signature-line"></div>
-Class Teacher
+{{#if class.classTeacherName}}{{class.classTeacherName}}{{else}}Class Teacher{{/if}}
 </div>
 
 <div class="stamp-section">
@@ -346,8 +350,12 @@ Class Teacher
 
 <div class="signature-section">
 {{#if includeSignature}}
+{{#if headTeacherSignatureUrl}}
+<img src="{{headTeacherSignatureUrl}}" class="stamp-image" style="max-height:60px; margin-bottom:5px"/>
+{{else}}
 {{#if signatureUrl}}
 <img src="{{signatureUrl}}" class="stamp-image" style="max-height:60px; margin-bottom:5px"/>
+{{/if}}
 {{/if}}
 {{/if}}
 <div class="signature-line"></div>

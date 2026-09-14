@@ -88,7 +88,8 @@ export const StudentResultsScreen: React.FC = () => {
                   subject: { name: comp.composite?.name, code: comp.composite?.code },
                   score: comp.finalPercentage,
                   grade: comp.finalGrade,
-                  remark: null,
+                  remark: comp.finalRemark ?? null,
+                  points: comp.points ?? null,
                   isComposite: true,
                 });
               }

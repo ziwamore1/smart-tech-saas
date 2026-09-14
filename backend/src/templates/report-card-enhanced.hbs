@@ -556,15 +556,15 @@ Curriculum: {{curriculum.version}}{{#if curriculum.bestSubjectRule.name}} • Be
 <!-- Footer -->
 <div class="footer avoid-break">
 <div class="signature-section">
-{{#if includeSignature}}{{#if signatureUrl}}<img src="{{signatureUrl}}" class="stamp-image" style="max-height:35px; margin-bottom:2px"/>{{/if}}{{/if}}
+{{#if includeSignature}}{{#if classTeacherSignatureUrl}}<img src="{{classTeacherSignatureUrl}}" class="stamp-image" style="max-height:35px; margin-bottom:2px"/>{{else}}{{#if signatureUrl}}<img src="{{signatureUrl}}" class="stamp-image" style="max-height:35px; margin-bottom:2px"/>{{/if}}{{/if}}{{/if}}
 <div class="signature-line"></div>
-<div style="font-size:10px; margin-top:3px; font-weight:600">Class Teacher</div>
+<div style="font-size:10px; margin-top:3px; font-weight:600">{{#if class.classTeacherName}}{{class.classTeacherName}}{{else}}Class Teacher{{/if}}</div>
 </div>
 <div class="stamp-section">
 {{#if includeStamp}}{{#if stampUrl}}<img src="{{stampUrl}}" class="stamp-image"/>{{/if}}{{/if}}
 </div>
 <div class="signature-section">
-{{#if includeSignature}}{{#if signatureUrl}}<img src="{{signatureUrl}}" class="stamp-image" style="max-height:35px; margin-bottom:2px"/>{{/if}}{{/if}}
+{{#if includeSignature}}{{#if headTeacherSignatureUrl}}<img src="{{headTeacherSignatureUrl}}" class="stamp-image" style="max-height:35px; margin-bottom:2px"/>{{else}}{{#if signatureUrl}}<img src="{{signatureUrl}}" class="stamp-image" style="max-height:35px; margin-bottom:2px"/>{{/if}}{{/if}}{{/if}}
 <div class="signature-line"></div>
 <div style="font-size:10px; margin-top:3px; font-weight:600">{{#if directorName}}{{directorName}}{{else}}Head Teacher{{/if}}</div>
 </div>

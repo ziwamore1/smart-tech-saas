@@ -75,8 +75,6 @@ export class ReportTemplateBuilderService {
   }
 
   async ensureEnhancedProfessionalTemplate(schoolId: string) {
-    const school = await this.prisma.school.findUnique({ where: { id: schoolId }, select: { subscriptionTier: true } });
-    const isPremium = String(school?.subscriptionTier || '').toUpperCase() === 'PREMIUM';
     const existing = await this.prisma.reportTemplate.findFirst({
       where: { schoolId, name: 'Enhanced Professional Report Card' },
       include: { _count: { select: { components: true } } },
@@ -85,7 +83,7 @@ export class ReportTemplateBuilderService {
       if (existing._count.components === 0) {
         await this.seedEnhancedProfessionalComponents(existing.id);
       }
-      if (isPremium && (!existing.includeStamp || !existing.includeSignature)) {
+      if (!existing.includeStamp || !existing.includeSignature) {
         await this.prisma.reportTemplate.update({
           where: { id: existing.id },
           data: { includeStamp: true, includeSignature: true },
@@ -93,25 +91,23 @@ export class ReportTemplateBuilderService {
       }
       return existing;
     }
-    if (isPremium) {
-      await this.prisma.reportTemplate.updateMany({
-        where: { schoolId, templateType: 'REPORT_CARD', isDefault: true },
-        data: { isDefault: false },
-      });
-    }
+    await this.prisma.reportTemplate.updateMany({
+      where: { schoolId, templateType: 'REPORT_CARD', isDefault: true },
+      data: { isDefault: false },
+    });
     const created = await this.prisma.reportTemplate.create({
       data: {
         schoolId,
         name: 'Enhanced Professional Report Card',
-        description: 'Premium professional report card with charts, rankings, attendance, summaries, and narrative insights.',
+        description: 'Professional report card with charts, rankings, attendance, summaries, and narrative insights.',
         templateType: 'REPORT_CARD',
         status: 'PUBLISHED',
-        isDefault: isPremium,
-        includeStamp: isPremium,
+        isDefault: true,
+        includeStamp: true,
         includeSignature: true,
         primaryColor: '#1e3a8a',
         secondaryColor: '#eff6ff',
-        metadata: { enhancedProfessional: true, premiumOnly: true },
+        metadata: { enhancedProfessional: true },
       },
     });
     await this.seedEnhancedProfessionalComponents(created.id);
@@ -164,15 +160,9 @@ export class ReportTemplateBuilderService {
     return this.prisma.reportTemplate.update({ where: { id: templateId }, data: { isDefault } });
   }
 
-  private async assertEnhancedTemplateAccess(schoolId: string, template: { metadata: any }) {
-    if ((template.metadata as any)?.enhancedProfessional) {
-      const school = await this.prisma.school.findUnique({ where: { id: schoolId }, select: { subscriptionTier: true } });
-      if (String(school?.subscriptionTier || '').toUpperCase() !== 'PREMIUM') {
-        throw new BadRequestException('Enhanced report templates require a Premium subscription');
-      }
-      const access = await this.featureLock.checkAccess(schoolId, 'results.enhancedReportTemplate');
-      if (!access.hasAccess) throw new BadRequestException(access.reason || 'Enhanced report templates require a Premium subscription');
-    }
+  private async assertEnhancedTemplateAccess(_schoolId: string, _template: { metadata: any }) {
+    // The enhanced professional template (with digital stamps and signatures) is
+    // a standard capability available to every school, so no tier gate applies.
   }
 
   async getTemplate(id: string, schoolId?: string) {

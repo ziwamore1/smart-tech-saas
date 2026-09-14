@@ -6,6 +6,7 @@ import { getSubjectShortcut } from '../common/subject-shortcuts';
 import { ClassAccessService } from '../common/access/class-access.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
+import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { SchoolActivityService } from '../common/services/school-activity.service';
 import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
 import { mapBounded } from '../common/utils/concurrency.util';
@@ -18,6 +19,7 @@ export class ResultService {
     private prisma: PrismaService,
     private classAccess: ClassAccessService,
     private compositeSubjectService: CompositeSubjectService,
+    private gradingEngine: GradingEngineService,
     private schoolEvents?: SchoolEventsGateway,
     @Optional() private readonly activityService?: SchoolActivityService,
   ) {}
@@ -176,14 +178,28 @@ export class ResultService {
         if (!base) continue;
 
         studentResult = studentResult.filter((r: any) => !componentIds.has(r.subjectId));
+        let compositePoints: number | null = computed.points ?? null;
+        let compositeRemark: string | null = computed.finalRemark ?? null;
+        if ((compositePoints == null || compositeRemark == null) && computed.finalPercentage != null) {
+          try {
+            const gradeResult = await this.gradingEngine.computeGradeFull(
+              computed.finalPercentage, classId, candidate.id, termId, schoolId,
+            );
+            if (compositePoints == null) compositePoints = gradeResult.points ?? null;
+            if (compositeRemark == null) compositeRemark = gradeResult.remark ?? null;
+          } catch {
+            compositePoints = compositePoints ?? null;
+            compositeRemark = compositeRemark ?? null;
+          }
+        }
         studentResult.push({
           ...base,
           subjectId: candidate.id,
           subject: { id: candidate.id, name: candidate.name, code: candidate.code },
           finalPercentage: computed.finalPercentage,
           finalGrade: computed.finalGrade ?? null,
-          finalRemark: null,
-          points: null,
+          finalRemark: compositeRemark,
+          points: compositePoints,
           isComposite: true,
           isAbsent: false,
         });

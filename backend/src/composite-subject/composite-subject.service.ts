@@ -255,16 +255,19 @@ export class CompositeSubjectService {
     }
 
     if (totalWeight === 0) {
-      return { composite, finalPercentage: null, finalGrade: null, components: componentResults };
+      return { composite, finalPercentage: null, finalGrade: null, finalRemark: null, points: null, gpa: null, components: componentResults };
     }
 
     const finalPct = parseFloat((totalWeighted / totalWeight).toFixed(2));
-    const finalGrade = await this.computeGrade(finalPct, classId, compositeSubjectId, termId, schoolId, gradeCache);
+    const gradeDetails = await this.computeGradeDetails(finalPct, classId, compositeSubjectId, termId, schoolId, gradeCache);
 
     return {
       composite: { id: composite.id, name: composite.name, code: composite.code },
       finalPercentage: finalPct,
-      finalGrade,
+      finalGrade: gradeDetails.grade,
+      finalRemark: gradeDetails.remark,
+      points: gradeDetails.points,
+      gpa: gradeDetails.gpa,
       components: componentResults,
     };
   }
@@ -465,14 +468,15 @@ export class CompositeSubjectService {
     return results;
   }
 
-  private async computeGrade(
+  private async computeGradeDetails(
     percentage: number,
     classId: string,
     subjectId: string,
     termId: string,
     schoolId: string,
     gradeCache?: Map<string, any>,
-  ): Promise<string | null> {
+  ): Promise<{ grade: string | null; remark: string | null; points: number | null; gpa: number | null }> {
+    const fallback = { grade: null as string | null, remark: null as string | null, points: null as number | null, gpa: null as number | null };
     try {
       // 1. Class-specific grading system (highest priority)
       if (classId) {
@@ -488,7 +492,7 @@ export class CompositeSubjectService {
           const scale = cls.gradingSystem.gradeScales.find(
             s => percentage >= s.minScore && percentage < s.maxScore + 1,
           );
-          if (scale) return scale.grade;
+          if (scale) return { grade: scale.grade, remark: scale.remark ?? null, points: scale.points ?? null, gpa: null };
         }
       }
 
@@ -501,7 +505,7 @@ export class CompositeSubjectService {
         const scale = defaultSystem.gradeScales.find(
           s => percentage >= s.minScore && percentage < s.maxScore + 1,
         );
-        if (scale) return scale.grade;
+        if (scale) return { grade: scale.grade, remark: scale.remark ?? null, points: scale.points ?? null, gpa: null };
       }
 
       // 3. Any grading system for the school
@@ -513,12 +517,12 @@ export class CompositeSubjectService {
         const scale = anySystem.gradeScales.find(
           s => percentage >= s.minScore && percentage < s.maxScore + 1,
         );
-        if (scale) return scale.grade;
+        if (scale) return { grade: scale.grade, remark: scale.remark ?? null, points: scale.points ?? null, gpa: null };
       }
 
-      return null;
+      return fallback;
     } catch {
-      return null;
+      return fallback;
     }
   }
 

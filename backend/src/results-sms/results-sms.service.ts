@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SmsProviderFactory } from '../communications-cloud/providers/sms/sms-provider.factory';
 import { SmsProvider } from '../communications-cloud/interfaces/provider.interface';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
+import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { mapBounded } from '../common/utils/concurrency.util';
 import { normalizeZambianPhone } from '../common/utils/phone.util';
 import { QueuesService } from '../queues/queues.service';
@@ -36,6 +37,7 @@ export class ResultsSmsService {
     private prisma: PrismaService,
     private smsProviderFactory: SmsProviderFactory,
     private compositeSubjectService: CompositeSubjectService,
+    private gradingEngine: GradingEngineService,
     private queuesService: QueuesService,
   ) {}
 
@@ -190,13 +192,27 @@ export class ResultsSmsService {
           return !matchingRow || !componentIds.has(matchingRow.subjectId);
         });
         for (const comp of composites) {
+          let compositeRemark: string | null = comp.finalRemark ?? null;
+          let compositePoints: number | null = comp.points ?? null;
+          if ((compositePoints == null || compositeRemark == null) && comp.finalPercentage != null) {
+            try {
+              const gradeResult = await this.gradingEngine.computeGradeFull(
+                comp.finalPercentage, classId, comp.composite.id, termId, schoolId,
+              );
+              if (compositePoints == null) compositePoints = gradeResult.points ?? null;
+              if (compositeRemark == null) compositeRemark = gradeResult.remark ?? null;
+            } catch {
+              compositeRemark = compositeRemark ?? null;
+              compositePoints = compositePoints ?? null;
+            }
+          }
           filtered.push({
             name: comp.composite.name,
             code: comp.composite.code,
             mark: comp.finalPercentage,
             grade: comp.finalGrade,
-            remark: null,
-            points: null,
+            remark: compositeRemark,
+            points: compositePoints,
             absent: comp.finalPercentage == null,
           });
         }

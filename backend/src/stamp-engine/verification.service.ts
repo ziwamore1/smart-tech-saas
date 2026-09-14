@@ -257,7 +257,7 @@ export class VerificationService {
           timezoneLabel: TIMEZONE_LABELS[tz] || '',
           assets: assetMap,
         })
-      : '';
+      : await this.renderDefaultStampSvg(schoolId, created.serialNumber || '', stampDate);
 
     const withQr = await this.prisma.documentVerification.update({
       where: { id: created.id },
@@ -538,6 +538,57 @@ export class VerificationService {
     const bytes = randomBytes(10);
     for (let i = 0; i < 10; i++) code += alphabet[bytes[i] % alphabet.length];
     return code;
+  }
+
+  private escapeXml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  /**
+   * Fallback official school stamp rendered whenever the school has not
+   * configured a PUBLISHED Stamp-Designer template. Guarantees the stamp image
+   * is never blank on generated report cards regardless of subscription tier.
+   */
+  private async renderDefaultStampSvg(schoolId: string, serialNumber: string, stampDate: string): Promise<string> {
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { name: true },
+    }).catch(() => null);
+    const schoolName = school?.name || 'SCHOOL';
+    const width = 200;
+    const height = 200;
+    const cx = width / 2;
+    const cy = height / 2;
+    const outerR = Math.min(cx, cy) - 4;
+    const innerR = outerR - 18;
+    const fontSize = Math.max(8, Math.floor(outerR / 5));
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs>
+    <path id="schoolTopArc" d="M ${cx - innerR + 6},${cy} A ${innerR - 6},${innerR - 6} 0 0,1 ${cx + innerR - 6},${cy}" fill="none"/>
+    <path id="schoolBottomArc" d="M ${cx - innerR + 10},${cy} A ${innerR - 10},${innerR - 10} 0 0,0 ${cx + innerR - 10},${cy}" fill="none"/>
+  </defs>
+  <circle cx="${cx}" cy="${cy}" r="${outerR}" fill="none" stroke="#1a365d" stroke-width="3"/>
+  <circle cx="${cx}" cy="${cy}" r="${outerR - 6}" fill="none" stroke="#c0a030" stroke-width="1.5"/>
+  <circle cx="${cx}" cy="${cy}" r="${outerR - 9}" fill="none" stroke="#1a365d" stroke-width="1"/>
+  <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" stroke="#c0a030" stroke-width="1.5"/>
+  <circle cx="${cx}" cy="${cy}" r="${innerR - 3}" fill="none" stroke="#1a365d" stroke-width="0.8" stroke-dasharray="2.5,2.5"/>
+  <text font-size="${fontSize}" font-family="Georgia, 'Times New Roman', serif" fill="#1a365d" font-weight="bold" text-anchor="middle" letter-spacing="3">
+    <textPath href="#schoolTopArc" startOffset="50%">${this.escapeXml(schoolName)}</textPath>
+  </text>
+  <text font-size="${Math.max(6, fontSize - 4)}" font-family="Arial, sans-serif" fill="#c0a030" font-weight="bold" text-anchor="middle" letter-spacing="1.5">
+    <textPath href="#schoolBottomArc" startOffset="50%">OFFICIAL SCHOOL STAMP</textPath>
+  </text>
+  <polygon points="${cx - 18},${cy + 2} ${cx},${cy - 16} ${cx + 18},${cy + 2} ${cx + 10},${cy + 2} ${cx + 10},${cy + 14} ${cx - 10},${cy + 14} ${cx - 10},${cy + 2} ${cx - 18},${cy + 2}" fill="#1a365d" opacity="0.95"/>
+  <circle cx="${cx}" cy="${cy - 5}" r="3" fill="#c0a030"/>
+  <text x="${cx}" y="${cy + 28}" font-size="${Math.max(6, fontSize - 5)}" font-family="Arial, sans-serif" fill="#666" text-anchor="middle">${this.escapeXml(stampDate)}</text>
+  <text x="${cx}" y="${height - 8}" font-size="8" font-family="Arial, sans-serif" fill="#999" text-anchor="middle">${this.escapeXml(serialNumber)}</text>
+</svg>`;
   }
 
   private async buildQrDataUrl(url: string): Promise<string> {

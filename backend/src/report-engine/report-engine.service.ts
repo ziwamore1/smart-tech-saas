@@ -715,10 +715,10 @@ case ReportType.RESULTS_ANALYSIS:
     const termId = request.termId!;
     const schoolId = request.schoolId;
 
-    const schoolAccess = await this.prisma.school.findUnique({ where: { id: schoolId }, select: { subscriptionTier: true } });
-    if (String(schoolAccess?.subscriptionTier || '').toUpperCase() === 'PREMIUM') {
-      await this.reportTemplateBuilder.ensureEnhancedProfessionalTemplate(schoolId);
-    }
+    // Stamps/signatures are a standard report-card capability for every school
+    // (Primary and Secondary alike), not a PREMIUM-only add-on. Always ensure
+    // the professional template exists so every institution can render stamps.
+    await this.reportTemplateBuilder.ensureEnhancedProfessionalTemplate(schoolId);
 
     if (!request.templateId) {
       const enrollment = await this.prisma.enrollment.findFirst({

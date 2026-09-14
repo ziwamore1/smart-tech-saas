@@ -162,15 +162,15 @@ tr:nth-child(even) { background: {{secondaryColor}}; }
 
 <div class="footer">
 <div class="signature-section">
-{{#if includeSignature}}{{#if signatureUrl}}<img src="{{signatureUrl}}" class="stamp-image" style="max-height:50px; margin-bottom:3px"/>{{/if}}{{/if}}
+{{#if includeSignature}}{{#if classTeacherSignatureUrl}}<img src="{{classTeacherSignatureUrl}}" class="stamp-image" style="max-height:50px; margin-bottom:3px"/>{{else}}{{#if signatureUrl}}<img src="{{signatureUrl}}" class="stamp-image" style="max-height:50px; margin-bottom:3px"/>{{/if}}{{/if}}{{/if}}
 <div class="signature-line"></div>
-Class Teacher
+{{#if class.classTeacherName}}{{class.classTeacherName}}{{else}}Class Teacher{{/if}}
 </div>
 <div class="stamp-section">
 {{#if includeStamp}}{{#if stampUrl}}<img src="{{stampUrl}}" class="stamp-image"/>{{/if}}{{/if}}
 </div>
 <div class="signature-section">
-{{#if includeSignature}}{{#if signatureUrl}}<img src="{{signatureUrl}}" class="stamp-image" style="max-height:50px; margin-bottom:3px"/>{{/if}}{{/if}}
+{{#if includeSignature}}{{#if headTeacherSignatureUrl}}<img src="{{headTeacherSignatureUrl}}" class="stamp-image" style="max-height:50px; margin-bottom:3px"/>{{else}}{{#if signatureUrl}}<img src="{{signatureUrl}}" class="stamp-image" style="max-height:50px; margin-bottom:3px"/>{{/if}}{{/if}}{{/if}}
 <div class="signature-line"></div>
 {{#if directorName}}{{directorName}}{{else}}Head Teacher{{/if}}
 </div>

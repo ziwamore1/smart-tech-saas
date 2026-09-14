@@ -208,6 +208,96 @@ export class ReportCardService {
       : null;
   }
 
+  private async resolveSignatoryImageUrls(
+    schoolId: string,
+    templateId: string | null | undefined,
+    classId: string | null | undefined,
+  ): Promise<{
+    classTeacherSignatureUrl: string | null;
+    headTeacherSignatureUrl: string | null;
+    deputySignatureUrl: string | null;
+    classTeacherName: string | null;
+  }> {
+    const result = {
+      classTeacherSignatureUrl: null as string | null,
+      headTeacherSignatureUrl: null as string | null,
+      deputySignatureUrl: null as string | null,
+      classTeacherName: null as string | null,
+    };
+
+    try {
+      // 1. Resolve class teacher name + personal DigitalSignature from Class relation
+      if (classId) {
+        const cls = await this.prisma.class.findUnique({
+          where: { id: classId },
+          select: {
+            classTeacherId: true,
+            classTeacher: {
+              select: { firstName: true, lastName: true },
+            },
+          },
+        });
+        if (cls?.classTeacher) {
+          result.classTeacherName =
+            `${cls.classTeacher.firstName} ${cls.classTeacher.lastName}`.trim();
+        }
+        if (cls?.classTeacherId) {
+          const sig = await this.prisma.digitalSignature.findFirst({
+            where: { schoolId, userId: cls.classTeacherId, status: 'ACTIVE' },
+            orderBy: { isDefault: 'desc' },
+            select: {
+              transparentImageUrl: true,
+              processedImageUrl: true,
+              imageUrl: true,
+              signatureData: true,
+            },
+          });
+          if (sig) {
+            result.classTeacherSignatureUrl =
+              sig.transparentImageUrl || sig.processedImageUrl || sig.imageUrl || sig.signatureData || null;
+          }
+        }
+      }
+
+      // 2. Resolve per-role image URLs from TemplateSignatory bindings
+      if (templateId) {
+        const signatories = await this.prisma.templateSignatory.findMany({
+          where: { templateId },
+          include: {
+            signature: {
+              select: {
+                transparentImageUrl: true,
+                processedImageUrl: true,
+                imageUrl: true,
+                signatureData: true,
+              },
+            },
+          },
+        });
+
+        const pickUrl = (s: typeof signatories[number]) =>
+          s.signature
+            ? s.signature.transparentImageUrl || s.signature.processedImageUrl || s.signature.imageUrl || s.signature.signatureData || null
+            : null;
+
+        for (const s of signatories) {
+          const role = (s.role || '').toUpperCase();
+          if (role === 'CLASS_TEACHER' && !result.classTeacherSignatureUrl) {
+            result.classTeacherSignatureUrl = pickUrl(s);
+          } else if (role === 'HEAD_TEACHER' && !result.headTeacherSignatureUrl) {
+            result.headTeacherSignatureUrl = pickUrl(s);
+          } else if (role === 'DEPUTY_HEAD_TEACHER' && !result.deputySignatureUrl) {
+            result.deputySignatureUrl = pickUrl(s);
+          }
+        }
+      }
+    } catch {
+      // Fail-safe: keep null URLs; HBS templates fall back to generic signatureUrl
+    }
+
+    return result;
+  }
+
   private async getBrowser() {
     const userDataDir = path.join(os.tmpdir(), `puppeteer_${crypto.randomBytes(8).toString('hex')}`);
     return puppeteer.launch({
@@ -463,8 +553,8 @@ export class ReportCardService {
           subject: { id: comp.composite.id, name: comp.composite.name, code: comp.composite.code },
           finalPercentage: comp.finalPercentage,
           finalGrade: comp.finalGrade,
-          finalRemark: null,
-          points: null,
+          finalRemark: comp.finalRemark ?? null,
+          points: comp.points ?? null,
           totalRawScore: comp.finalPercentage,
           isComposite: true,
         } as any);
@@ -623,6 +713,12 @@ const report = await this.getReportCard(schoolId, studentId, termId);
     const teacherComment = commentData.teacherComment;
     const headComment = commentData.headComment;
 
+    const signatoryUrls = await this.resolveSignatoryImageUrls(
+      schoolId,
+      reportTemplate?.id,
+      enrollment?.classId,
+    );
+
     const templateData = {
       schoolName: school.name,
       schoolLogo: reportTemplate?.includeLogo !== false ? (school.logoUrl || school.logo) : undefined,
@@ -632,6 +728,13 @@ const report = await this.getReportCard(schoolId, studentId, termId);
       examType: resultSheet?.examType || 'END_TERM',
 
       student: report.student,
+
+      class: {
+        id: enrollment?.classId ?? null,
+        name: classContext?.className ?? '',
+        classTeacherId: classContext?.classTeacherId ?? null,
+        classTeacherName: signatoryUrls.classTeacherName ?? classContext?.classTeacherName ?? null,
+      },
 
       subjects: report.subjects,
 
@@ -656,6 +759,9 @@ const report = await this.getReportCard(schoolId, studentId, termId);
       includeSignature: reportTemplate?.includeSignature || false,
       stampUrl: reportTemplate?.stampUrl,
       signatureUrl: reportTemplate?.signatureUrl,
+      classTeacherSignatureUrl: signatoryUrls.classTeacherSignatureUrl,
+      headTeacherSignatureUrl: signatoryUrls.headTeacherSignatureUrl,
+      deputySignatureUrl: signatoryUrls.deputySignatureUrl,
       directorName: reportTemplate?.directorName || '',
       headerText: reportTemplate?.headerText || '',
       footerText: reportTemplate?.footerText || '',
@@ -755,6 +861,12 @@ const report = await this.getReportCard(schoolId, studentId, termId);
       select: { examType: true },
     });
 
+    const signatoryUrls = await this.resolveSignatoryImageUrls(
+      schoolId,
+      reportTemplate?.id,
+      classId,
+    );
+
     let allHtml = '';
 
     for (const e of enrollments) {
@@ -779,6 +891,13 @@ const report = await this.getReportCard(schoolId, studentId, termId);
 
         student: report.student,
 
+        class: {
+          id: classId,
+          name: classContext?.className ?? '',
+          classTeacherId: classContext?.classTeacherId ?? null,
+          classTeacherName: signatoryUrls.classTeacherName ?? classContext?.classTeacherName ?? null,
+        },
+
         subjects: report.subjects,
 
         summary: {
@@ -802,6 +921,9 @@ const report = await this.getReportCard(schoolId, studentId, termId);
         includeSignature: reportTemplate?.includeSignature || false,
         stampUrl: reportTemplate?.stampUrl,
         signatureUrl: reportTemplate?.signatureUrl,
+        classTeacherSignatureUrl: signatoryUrls.classTeacherSignatureUrl,
+        headTeacherSignatureUrl: signatoryUrls.headTeacherSignatureUrl,
+        deputySignatureUrl: signatoryUrls.deputySignatureUrl,
         directorName: reportTemplate?.directorName || '',
         headerText: reportTemplate?.headerText || '',
         footerText: reportTemplate?.footerText || '',
@@ -962,8 +1084,8 @@ const report = await this.getReportCard(schoolId, studentId, termId);
               subject: { id: comp.composite.id, name: comp.composite.name, code: comp.composite.code },
               finalPercentage: comp.finalPercentage,
               finalGrade: comp.finalGrade,
-              finalRemark: null,
-              points: null,
+              finalRemark: comp.finalRemark ?? null,
+              points: comp.points ?? null,
               isComposite: true,
             } as any);
           }
@@ -1175,6 +1297,12 @@ const report = await this.getReportCard(schoolId, studentId, termId);
     const now = new Date();
     const generatedAtFormatted = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
+    const signatoryUrls = await this.resolveSignatoryImageUrls(
+      schoolId,
+      reportTemplate?.id,
+      engineData.class?.id,
+    );
+
     const templateData = {
       schoolName: school.name,
       schoolLogo: reportTemplate?.includeLogo !== false ? (school.logoUrl || school.logo) : undefined,
@@ -1184,7 +1312,10 @@ const report = await this.getReportCard(schoolId, studentId, termId);
       termName: engineData.term?.name || '',
       examType: engineData.examType || examType || 'END_TERM',
       student: engineData.student,
-      class: engineData.class,
+      class: {
+        ...engineData.class,
+        classTeacherName: signatoryUrls.classTeacherName ?? engineData.class?.classTeacherName ?? null,
+      },
       subjectBreakdown: engineData.subjectBreakdown || [],
       bestSubjects: engineData.bestSubjects || [],
       totalPoints: engineData.totalPoints ?? 0,
@@ -1206,6 +1337,9 @@ const report = await this.getReportCard(schoolId, studentId, termId);
       includeSignature: reportTemplate?.includeSignature || false,
       stampUrl: reportTemplate?.stampUrl,
       signatureUrl: reportTemplate?.signatureUrl,
+      classTeacherSignatureUrl: signatoryUrls.classTeacherSignatureUrl,
+      headTeacherSignatureUrl: signatoryUrls.headTeacherSignatureUrl,
+      deputySignatureUrl: signatoryUrls.deputySignatureUrl,
       directorName: reportTemplate?.directorName || '',
       headerText: reportTemplate?.headerText || '',
       footerText: reportTemplate?.footerText || '',
@@ -1286,6 +1420,11 @@ const compiledTemplate = handlebars.compile(templateHtml);
 
     const now = new Date();
     const generatedAtFormatted = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const signatoryUrls = await this.resolveSignatoryImageUrls(
+      schoolId,
+      reportTemplate?.id,
+      engineData.class?.id,
+    );
     const templateData = {
       schoolName: school.name,
       schoolLogo: reportTemplate?.includeLogo !== false ? (school.logoUrl || school.logo) : undefined,
@@ -1295,7 +1434,10 @@ const compiledTemplate = handlebars.compile(templateHtml);
       termName: engineData.term?.name || '',
       examType: engineData.examType || examType || 'END_TERM',
       student: engineData.student,
-      class: engineData.class,
+      class: {
+        ...engineData.class,
+        classTeacherName: signatoryUrls.classTeacherName ?? engineData.class?.classTeacherName ?? null,
+      },
 subjectBreakdown: engineData.subjectBreakdown || [],
       bestSubjects: engineData.bestSubjects || [],
       totalPoints: engineData.totalPoints ?? 0,
@@ -1317,6 +1459,9 @@ subjectBreakdown: engineData.subjectBreakdown || [],
       includeSignature: reportTemplate?.includeSignature || false,
       stampUrl: reportTemplate?.stampUrl,
       signatureUrl: reportTemplate?.signatureUrl,
+      classTeacherSignatureUrl: signatoryUrls.classTeacherSignatureUrl,
+      headTeacherSignatureUrl: signatoryUrls.headTeacherSignatureUrl,
+      deputySignatureUrl: signatoryUrls.deputySignatureUrl,
       directorName: reportTemplate?.directorName || '',
       headerText: reportTemplate?.headerText || '',
       footerText: reportTemplate?.footerText || '',
@@ -1463,6 +1608,12 @@ subjectBreakdown: engineData.subjectBreakdown || [],
     const now = new Date();
     const generatedAtFormatted = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
+    const signatoryUrls = await this.resolveSignatoryImageUrls(
+      schoolId,
+      reportTemplate?.id,
+      classId,
+    );
+
     let allHtml = '';
 
     for (const e of enrollments) {
@@ -1487,7 +1638,10 @@ subjectBreakdown: engineData.subjectBreakdown || [],
         termName: engineData.term?.name || '',
         examType: engineData.examType || examType || 'END_TERM',
         student: engineData.student,
-        class: engineData.class,
+        class: {
+          ...engineData.class,
+          classTeacherName: signatoryUrls.classTeacherName ?? engineData.class?.classTeacherName ?? null,
+        },
         subjectBreakdown: engineData.subjectBreakdown || [],
         bestSubjects: engineData.bestSubjects || [],
         totalPoints: engineData.totalPoints ?? 0,
@@ -1503,6 +1657,9 @@ subjectBreakdown: engineData.subjectBreakdown || [],
         includeSignature: reportTemplate?.includeSignature || false,
         stampUrl: reportTemplate?.stampUrl,
         signatureUrl: reportTemplate?.signatureUrl,
+        classTeacherSignatureUrl: signatoryUrls.classTeacherSignatureUrl,
+        headTeacherSignatureUrl: signatoryUrls.headTeacherSignatureUrl,
+        deputySignatureUrl: signatoryUrls.deputySignatureUrl,
         directorName: reportTemplate?.directorName || '',
         headerText: reportTemplate?.headerText || '',
         footerText: reportTemplate?.footerText || '',

@@ -409,6 +409,16 @@ let resultSheet = examType
       subjectRankMap.set(subjectId, perStudent);
     }
 
+    // Composite subjects never appear in computedResult rows, so ranks for them
+    // must be derived from their component scores across the whole class. This
+    // keeps the Rank column populated for every composite subject in every class.
+    const compositeRankMap = await this.computeCompositeRankMap(
+      termId, enrollment.classId, schoolId, classStudentIds, allStudentResults,
+    );
+    for (const [compositeId, perStudent] of compositeRankMap) {
+      subjectRankMap.set(compositeId, perStudent);
+    }
+
     // Read TermSummary if available (may have additional data)
     const termSummary = await this.prisma.termSummary.findFirst({
       where: { studentId, termId },
@@ -858,6 +868,29 @@ let resultSheet = examType
     const filtered = breakdown.filter(s => !componentSubjectIds.has(s.subjectId));
 
     for (const comp of composites) {
+      let points: number | null = comp.points ?? null;
+      let finalRemark: string | null = comp.finalRemark ?? null;
+      let gpa: number | null = null;
+
+      if ((points == null || finalRemark == null) && comp.finalPercentage != null) {
+        try {
+          const gradeResult = await this.gradingEngine.computeGradeFull(
+            comp.finalPercentage, classId, comp.composite.id, termId, schoolId,
+          );
+          if (points == null) points = gradeResult.points ?? null;
+          if (finalRemark == null) finalRemark = gradeResult.remark ?? null;
+          gpa = gradeResult.gpa ?? null;
+        } catch {
+          // fallback: use component grades if available
+          const componentGrades = comp.components
+            .filter((c: any) => c.grade != null)
+            .map((c: any) => c.grade);
+          if (componentGrades.length > 0 && finalRemark == null) {
+            finalRemark = componentGrades[0];
+          }
+        }
+      }
+
       filtered.push({
         subjectId: comp.composite.id,
         subjectName: comp.composite.name,
@@ -867,9 +900,9 @@ let resultSheet = examType
         score: comp.finalPercentage,
         finalPercentage: comp.finalPercentage,
         finalGrade: comp.finalGrade,
-        finalRemark: null,
-        points: null,
-        gpa: null,
+        finalRemark,
+        points,
+        gpa,
         classRank: null,
         subjectRank: null,
         assessments: [],
@@ -882,8 +915,86 @@ let resultSheet = examType
   }
 
   /**
-   * Get mid-term / previous term comparison data for a student
+   * Compute subject-rank maps for composite subjects across the whole class.
+   * Component results are read from the already-loaded class result set, so this
+   * performs no extra per-student database queries and mirrors the tie-aware
+   * ranking used for regular subjects. The map is keyed by composite subject ID.
    */
+  private async computeCompositeRankMap(
+    termId: string,
+    classId: string,
+    schoolId: string,
+    classStudentIds: Set<string>,
+    allStudentResults: { studentId: string; subjectId: string; finalPercentage: number }[],
+  ): Promise<Map<string, Map<string, number>>> {
+    const rankMap = new Map<string, Map<string, number>>();
+    let candidates: any[];
+    try {
+      candidates = await this.compositeSubjectService.getCompositeCandidatesForClass(classId, termId, schoolId);
+    } catch {
+      return rankMap;
+    }
+    if (candidates.length === 0) return rankMap;
+
+    const candidateComponents = candidates.filter((c) => (c.components?.length ?? 0) > 0);
+    if (candidateComponents.length === 0) return rankMap;
+
+    // Build component subject → composite mappings once (a component can belong
+    // to multiple composites).
+    const compositePerComponent = new Map<string, any[]>();
+    for (const composite of candidateComponents) {
+      for (const component of composite.components) {
+        const list = compositePerComponent.get(component.subjectId) ?? [];
+        list.push(composite);
+        compositePerComponent.set(component.subjectId, list);
+      }
+    }
+
+    // Per student: subjectId → finalPercentage from the class result set.
+    const studentScores = new Map<string, Map<string, number>>();
+    for (const sr of allStudentResults) {
+      if (sr.finalPercentage == null || !classStudentIds.has(sr.studentId)) continue;
+      let map = studentScores.get(sr.studentId);
+      if (!map) { map = new Map(); studentScores.set(sr.studentId, map); }
+      map.set(sr.subjectId, sr.finalPercentage);
+    }
+
+    const compositeScores = new Map<string, { studentId: string; percentage: number }[]>();
+    for (const [studentId, subjectMap] of studentScores) {
+      for (const composite of candidateComponents) {
+        let totalWeighted = 0;
+        let totalWeight = 0;
+        for (const component of composite.components) {
+          const pct = subjectMap.get(component.subjectId);
+          if (pct == null) continue;
+          totalWeighted += pct * (component.weight ?? 1);
+          totalWeight += component.weight ?? 1;
+        }
+        if (totalWeight === 0) continue;
+        const percentage = Math.round((totalWeighted / totalWeight) * 100) / 100;
+        const rows = compositeScores.get(composite.id) ?? [];
+        rows.push({ studentId, percentage });
+        compositeScores.set(composite.id, rows);
+      }
+    }
+
+    for (const [compositeId, rows] of compositeScores) {
+      rows.sort((a, b) => b.percentage - a.percentage);
+      const perStudent = new Map<string, number>();
+      let lastRank = 0;
+      let lastPct: number | null = null;
+      for (let i = 0; i < rows.length; i++) {
+        if (lastPct === null || Math.abs(rows[i].percentage - lastPct) > 0.001) {
+          lastRank = i + 1;
+          lastPct = rows[i].percentage;
+        }
+        perStudent.set(rows[i].studentId, lastRank);
+      }
+      rankMap.set(compositeId, perStudent);
+    }
+
+    return rankMap;
+  }
   async getMidTermComparison(studentId: string, currentTermId: string, schoolId: string) {
     const currentTerm = await this.prisma.term.findUnique({
       where: { id: currentTermId },
