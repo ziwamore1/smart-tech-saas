@@ -11,6 +11,7 @@ import { CalendarExcelService } from './calendar-excel.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { CacheService } from '../common/services/cache.service';
 import { BusinessCalendarNotificationService } from './business-calendar-notification.service';
+import { BusinessCalendarAnalyticsService } from './business-calendar-analytics.service';
 
 type Actor = { id: string; schoolId?: string | null; isSuperAdmin?: boolean; roles?: string[] };
 
@@ -33,6 +34,7 @@ export class BusinessCalendarService {
     private readonly events: SchoolEventsGateway,
     private readonly cache: CacheService,
     private readonly notifications: BusinessCalendarNotificationService,
+    private readonly analyticsService: BusinessCalendarAnalyticsService,
   ) {}
 
   private schoolId(actor: Actor, requested?: string) {
@@ -57,9 +59,8 @@ export class BusinessCalendarService {
     if (end < start) throw new BadRequestException('endDate must be on or after startDate');
   }
 
-  private effectiveStatus(activity: any, now = new Date()) {
-    if (activity.status !== 'PLANNED') return activity.status;
-    return activity.endDate < now ? 'COMPLETED' : 'PLANNED';
+  private effectiveStatus(activity: any) {
+    return activity.status as string;
   }
 
   private async schoolReferences(schoolId: string, data: any) {
@@ -172,7 +173,7 @@ export class BusinessCalendarService {
     if (data.parentId) { const parent = await this.activity(data.parentId, schoolId); if (parent.calendarId !== calendarId) throw new BadRequestException('Parent activity must be in this calendar'); }
     if (data.categoryId) { const category = await this.prisma.calendarCategory.findFirst({ where: { id: data.categoryId, schoolId, OR: [{ calendarId }, { calendarId: null }] } }); if (!category) throw new BadRequestException('Invalid calendar category'); }
     const payload = this.relationalIds(data);
-    const activity = await this.prisma.calendarActivity.create({ data: { ...payload, schoolId, calendarId, startDate, endDate, deadline: data.deadline ? this.date(data.deadline, 'deadline') : undefined, createdById: actor.isSuperAdmin ? undefined : actor.id } });
+    const activity = await this.prisma.calendarActivity.create({ data: { ...payload, schoolId, calendarId, startDate, endDate, completionPercentage: data.completionPercentage !== undefined ? Number(data.completionPercentage) : data.status === 'COMPLETED' ? 100 : 0, target: data.target !== undefined ? Number(data.target) : undefined, targetUnit: data.targetUnit, expectedOutcome: data.expectedOutcome, actualOutcome: data.actualOutcome, actualCompletionDate: data.actualCompletionDate ? this.date(data.actualCompletionDate, 'actualCompletionDate') : undefined, delayReason: data.delayReason, failureReason: data.failureReason, remarks: data.remarks, responsibleRole: data.responsibleRole, deadline: data.deadline ? this.date(data.deadline, 'deadline') : undefined, createdById: actor.isSuperAdmin ? undefined : actor.id } });
     await this.audit(actor, schoolId, 'CALENDAR_ACTIVITY_CREATED', 'CalendarActivity', activity.id, { calendarId });
     return activity;
   }
@@ -184,9 +185,18 @@ export class BusinessCalendarService {
     const startDate = data.startDate ? this.date(data.startDate, 'startDate') : existing.startDate;
     const endDate = data.endDate ? this.date(data.endDate, 'endDate') : existing.endDate;
     this.validateRange(startDate, endDate);
-    const payload = this.relationalIds({ ...data, calendarId: undefined, schoolId: undefined });
-    const activity = await this.prisma.calendarActivity.update({ where: { id }, data: { ...payload, startDate, endDate, deadline: data.deadline ? this.date(data.deadline, 'deadline') : undefined, updatedById: actor.isSuperAdmin ? undefined : actor.id } });
+    const payload: any = this.relationalIds({ ...data, calendarId: undefined, schoolId: undefined });
+    if (data.completionPercentage !== undefined) payload.completionPercentage = Number(data.completionPercentage);
+    if (data.target !== undefined) payload.target = data.target === null || data.target === '' ? null : Number(data.target);
+    if (payload.status === 'COMPLETED' && existing.status !== 'COMPLETED' && data.completionPercentage === undefined) payload.completionPercentage = 100;
+    if (payload.status === 'COMPLETED' && !data.actualCompletionDate) payload.actualCompletionDate = new Date();
+    if (data.actualCompletionDate !== undefined) payload.actualCompletionDate = data.actualCompletionDate ? this.date(data.actualCompletionDate, 'actualCompletionDate') : null;
+    if (data.deadline !== undefined) payload.deadline = data.deadline ? this.date(data.deadline, 'deadline') : null;
+    const activity = await this.prisma.calendarActivity.update({ where: { id }, data: { ...payload, startDate, endDate, updatedById: actor.isSuperAdmin ? undefined : actor.id } });
     await this.audit(actor, schoolId, 'CALENDAR_ACTIVITY_UPDATED', 'CalendarActivity', id, data);
+    if (data.status && data.status !== existing.status) {
+      await this.prisma.calendarActivityTimeline.create({ data: { activityId: id, schoolId, userId: actor.isSuperAdmin ? undefined : actor.id, previousStatus: existing.status, newStatus: data.status, previousPercentage: existing.completionPercentage, newPercentage: Number(payload.completionPercentage ?? existing.completionPercentage), notes: data.remarks || null } });
+    }
     if (data.status === 'CANCELLED') await this.notifications.notifyChange(id, 'CANCELLED');
     else if (['startDate', 'endDate', 'startTime', 'endTime', 'venue'].some((field) => data[field] !== undefined)) await this.notifications.notifyChange(id, 'UPDATED');
     return activity;
@@ -240,6 +250,59 @@ export class BusinessCalendarService {
   async saveCategory(actor: Actor, data: any, requestedSchoolId?: string) { const schoolId = this.schoolId(actor, requestedSchoolId); await this.assertPermission(actor, PERMISSIONS.CALENDAR_MANAGE); if (!String(data.name || '').trim()) throw new BadRequestException('Category name is required'); return this.prisma.calendarCategory.create({ data: { schoolId, calendarId: data.calendarId || undefined, name: String(data.name).trim(), color: data.color || '#64748b', description: data.description } }); }
   async columns(actor: Actor, calendarId: string, requestedSchoolId?: string) { const schoolId = this.schoolId(actor, requestedSchoolId); await this.calendar(calendarId, schoolId); await this.assertPermission(actor, PERMISSIONS.CALENDAR_VIEW); return this.prisma.calendarColumnConfig.findMany({ where: { calendarId, schoolId }, orderBy: { sortOrder: 'asc' } }); }
   async saveColumns(actor: Actor, calendarId: string, columns: any[], requestedSchoolId?: string) { const schoolId = this.schoolId(actor, requestedSchoolId); await this.assertPermission(actor, PERMISSIONS.CALENDAR_MANAGE); await this.calendar(calendarId, schoolId); return this.prisma.$transaction(columns.map((column) => this.prisma.calendarColumnConfig.upsert({ where: { calendarId_key: { calendarId, key: column.key } }, create: { ...column, calendarId, schoolId }, update: { ...column, schoolId } }))); }
+
+  async goals(actor: Actor, calendarId: string, requestedSchoolId?: string) {
+    const schoolId = this.schoolId(actor, requestedSchoolId);
+    await this.assertPermission(actor, PERMISSIONS.CALENDAR_VIEW);
+    await this.calendar(calendarId, schoolId);
+    return this.prisma.calendarGoal.findMany({ where: { schoolId, calendarId }, include: { department: true, responsible: { select: { id: true, firstName: true, lastName: true, email: true } } }, orderBy: { createdAt: 'asc' } });
+  }
+
+  async createGoal(actor: Actor, calendarId: string, data: any, requestedSchoolId?: string) {
+    const schoolId = this.schoolId(actor, requestedSchoolId);
+    await this.assertPermission(actor, PERMISSIONS.CALENDAR_MANAGE);
+    await this.calendar(calendarId, schoolId);
+    const goal = await this.prisma.calendarGoal.create({ data: { schoolId, calendarId, termId: data.termId || undefined, title: data.title, description: data.description, targetPercentage: Number(data.targetPercentage ?? 90), category: data.category || 'OVERALL', departmentId: data.departmentId || undefined, responsibleId: data.responsibleId || undefined, deadline: data.deadline ? this.date(data.deadline, 'deadline') : undefined, currentProgress: Number(data.currentProgress ?? 0) } });
+    await this.audit(actor, schoolId, 'CALENDAR_GOAL_CREATED', 'CalendarGoal', goal.id, { calendarId });
+    return goal;
+  }
+
+  async updateGoal(actor: Actor, id: string, data: any, requestedSchoolId?: string) {
+    const schoolId = this.schoolId(actor, requestedSchoolId);
+    await this.assertPermission(actor, PERMISSIONS.CALENDAR_MANAGE);
+    const goal = await this.prisma.calendarGoal.findFirst({ where: { id, schoolId } });
+    if (!goal) throw new NotFoundException('Calendar goal not found');
+    const updated = await this.prisma.calendarGoal.update({ where: { id }, data: { ...data, targetPercentage: data.targetPercentage !== undefined ? Number(data.targetPercentage) : undefined, currentProgress: data.currentProgress !== undefined ? Number(data.currentProgress) : undefined, deadline: data.deadline ? this.date(data.deadline, 'deadline') : data.deadline === null ? null : undefined } });
+    await this.audit(actor, schoolId, 'CALENDAR_GOAL_UPDATED', 'CalendarGoal', id, data);
+    return updated;
+  }
+
+  async removeGoal(actor: Actor, id: string, requestedSchoolId?: string) {
+    const schoolId = this.schoolId(actor, requestedSchoolId);
+    await this.assertPermission(actor, PERMISSIONS.CALENDAR_MANAGE);
+    const goal = await this.prisma.calendarGoal.findFirst({ where: { id, schoolId } });
+    if (!goal) throw new NotFoundException('Calendar goal not found');
+    await this.prisma.calendarGoal.delete({ where: { id } });
+    await this.audit(actor, schoolId, 'CALENDAR_GOAL_DELETED', 'CalendarGoal', id);
+    return { id, deleted: true };
+  }
+
+  async analytics(actor: Actor, calendarId: string, query: any = {}, requestedSchoolId?: string) {
+    const schoolId = this.schoolId(actor, requestedSchoolId);
+    await this.assertPermission(actor, PERMISSIONS.CALENDAR_VIEW);
+    await this.calendar(calendarId, schoolId);
+    return this.analyticsService.analyse(schoolId, calendarId, {
+      termId: query.termId, departmentId: query.departmentId, categoryId: query.categoryId, officerId: query.officerId, status: query.status, priority: query.priority,
+      start: query.start ? this.date(query.start, 'start') : undefined, end: query.end ? this.date(query.end, 'end') : undefined,
+    });
+  }
+
+  async activityTimeline(actor: Actor, activityId: string, requestedSchoolId?: string) {
+    const schoolId = this.schoolId(actor, requestedSchoolId);
+    await this.assertPermission(actor, PERMISSIONS.CALENDAR_VIEW);
+    await this.activity(activityId, schoolId);
+    return this.prisma.calendarActivityTimeline.findMany({ where: { activityId, schoolId }, include: { user: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } });
+  }
 
   async exportCsv(actor: Actor, calendarId: string, requestedSchoolId?: string) {
     await this.assertPermission(actor, PERMISSIONS.CALENDAR_EXPORT);

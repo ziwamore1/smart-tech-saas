@@ -29,6 +29,15 @@ export const businessCalendarApi = {
   exportBlob: (id: string) => api.get(`/business-calendar/${id}/export.xlsx`, { responseType: 'blob' }),
   reportHtmlUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/report.html`,
   reportPdfUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/report.pdf`,
+  reportPdfViewUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/report.pdf/view`,
+  analytics: (id: string, params: Record<string, string> = {}) => api.get(`/business-calendar/${id}/analytics`, { params }),
+  goals: (id: string) => api.get(`/business-calendar/${id}/goals`),
+  createGoal: (id: string, data: any) => api.post(`/business-calendar/${id}/goals`, data),
+  updateGoal: (goalId: string, data: any) => api.patch(`/business-calendar/goals/${goalId}`, data),
+  removeGoal: (goalId: string) => api.delete(`/business-calendar/goals/${goalId}`),
+  activityTimeline: (activityId: string) => api.get(`/business-calendar/activities/${activityId}/timeline`),
+  exportAnalyticsUrl: (id: string) => `${API_BASE_URL}/business-calendar/${id}/export-analytics.xlsx`,
+  exportAnalyticsBlob: (id: string) => api.get(`/business-calendar/${id}/export-analytics.xlsx`, { responseType: 'blob' }),
 };
 
 api.interceptors.request.use(

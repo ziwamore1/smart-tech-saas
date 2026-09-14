@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import { PrismaService } from '../prisma/prisma.service';
+import { CalendarAnalytics } from './business-calendar-analytics.service';
 
 export const CALENDAR_TEMPLATE_VERSION = '1.0';
 export const CALENDAR_SCHEMA_VERSION = '1.0';
@@ -172,5 +173,100 @@ export class CalendarExcelService {
 
   async getImport(id: string, schoolId: string) {
     return this.prisma.calendarImport.findFirst({ where: { id, schoolId }, include: { rows: { orderBy: { rowNumber: 'asc' } } } });
+  }
+
+  async createAnalyticsWorkbook(a: CalendarAnalytics) {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Smart Tech SaaS';
+    workbook.properties.date1904 = false;
+    const blue = '17365D';
+    const headerFont = { bold: true, color: { argb: 'FFFFFFFF' } } as const;
+
+    const setupSheet = (sheet: ExcelJS.Worksheet, title: string, columns: string[]) => {
+      sheet.mergeCells(1, 1, 1, Math.max(columns.length, 4));
+      sheet.getCell(1, 1).value = `${a.school.name} | ${title}`;
+      sheet.getCell(1, 1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 15 };
+      sheet.getCell(1, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: blue } };
+      sheet.getRow(3).values = columns;
+      sheet.getRow(3).font = headerFont;
+      sheet.getRow(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: blue } };
+      sheet.getRow(3).alignment = { wrapText: true };
+      sheet.views = [{ state: 'frozen', ySplit: 3 }];
+      sheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+      columns.forEach((col, i) => { sheet.getColumn(i + 1).width = Math.max(13, Math.min(34, col.length + 6)); });
+    };
+
+    const m = a.metrics;
+    const summarySheet = workbook.addWorksheet('Executive Summary');
+    setupSheet(summarySheet, 'Executive Summary', ['Metric', 'Value']);
+    summarySheet.getColumn(2).width = 24;
+    [
+      ['Report Period', a.reportPeriod], ['Calendar', a.calendar?.name || 'All'], ['Academic Year', a.calendar?.academicYear || '—'], ['Term', a.calendar?.term || '—'], ['Version', String(a.calendar?.version || 1)],
+      ['Total Activities', m.total], ['Completed', m.completed], ['In Progress', m.inProgress], ['Delayed', m.delayed], ['Partially Completed', m.partiallyCompleted], ['Cancelled', m.cancelled], ['Postponed / Rescheduled', m.postponed], ['Not Completed', m.notCompleted],
+      ['Overdue', m.overdue], ['Due Today', m.dueToday], ['Due ≤7 days', m.dueSoon7], ['Due ≤14 days', m.dueSoon14],
+      ['Completion Rate %', m.completionRate], ['On-Time Rate %', m.onTimeCompletionRate], ['Target Achievement %', m.targetAchievementRate ?? '—'], ['Partial Completion %', m.partialCompletionRate], ['Failure Rate %', m.failureRate], ['Avg Completion %', m.averageCompletionPercentage], ['Weighted Score %', m.weightedCompletionScore],
+    ].forEach(([label, value]) => summarySheet.addRow([label, value]));
+
+    const deptSheet = workbook.addWorksheet('Department Analysis');
+    setupSheet(deptSheet, 'Department Analysis', ['#', 'Department', 'Planned', 'Completed', 'Completion Rate %', 'Delayed', 'Not Completed', 'Target Achievement %', 'Avg Completion %', 'Overdue']);
+    a.departments.forEach((d, i) => deptSheet.addRow([i + 1, d.departmentName, d.planned, d.completed, d.completionRate, d.delayed, d.notCompleted, d.targetAchievement, d.averageCompletion, d.overdue]));
+
+    const catSheet = workbook.addWorksheet('Category Analysis');
+    setupSheet(catSheet, 'Category Analysis', ['#', 'Category', 'Planned', 'Completed', 'Completion Rate %', 'Delayed', 'Target Achievement %']);
+    a.categories.forEach((c, i) => catSheet.addRow([i + 1, c.categoryName, c.planned, c.completed, c.completionRate, c.delayed, c.targetAchievement]));
+
+    const respSheet = workbook.addWorksheet('Responsibility Tracking');
+    setupSheet(respSheet, 'Responsibility Tracking', ['#', 'Officer', 'Assigned', 'Completed', 'Delayed', 'Overdue', 'Completion Rate %', 'Target Achievement %']);
+    a.responsibilities.forEach((r, i) => respSheet.addRow([i + 1, r.officerName, r.assigned, r.completed, r.delayed, r.overdue, r.completionRate, r.targetAchievement]));
+
+    const overdueSheet = workbook.addWorksheet('Overdue Activities');
+    setupSheet(overdueSheet, 'Overdue Activities', ['#', 'Activity', 'Department', 'Officer', 'Due Date', 'Status', 'Completion %', 'Target', 'Unit', 'Actual', 'Achievement %', 'Days Overdue', 'Recommended Action']);
+    a.overdue.forEach((r, i) => {
+      const row = overdueSheet.addRow([i + 1, r.title, r.departmentName || '—', r.officerName || '—', r.plannedDate, r.status, r.completionPercentage, r.target ?? '—', r.targetUnit ?? '—', r.actual ?? '—', r.achievement ?? '—', r.daysOverdue, r.recommendedAction]);
+      if (r.daysOverdue > 14) row.eachCell((cell) => { (cell as any).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEF2F2' } }; });
+    });
+    overdueSheet.getColumn(12).numFmt = 'dd/mm/yyyy';
+
+    const goalSheet = workbook.addWorksheet('Term Goals');
+    setupSheet(goalSheet, 'Term Goals', ['#', 'Goal', 'Description', 'Target %', 'Progress %', 'Gap', 'Status', 'Department', 'Deadline', 'Recommended Action']);
+    a.goals.forEach((g, i) => goalSheet.addRow([i + 1, g.title, g.description || '—', g.targetPercentage, g.currentProgress, g.gap, g.status, g.department || '—', g.deadline ? new Date(g.deadline) : '—', g.recommendedAction]));
+    goalSheet.getColumn(9).numFmt = 'dd/mm/yyyy';
+
+    const trendSheet = workbook.addWorksheet('Monthly Trend');
+    setupSheet(trendSheet, 'Monthly Trend', ['Month', 'Planned', 'Completed', 'Completion %']);
+    a.monthlyTrend.forEach((t) => trendSheet.addRow([t.month, t.planned, t.completed, t.planned ? Math.round((t.completed / t.planned) * 1000) / 10 : 0]));
+
+    const failureSheet = workbook.addWorksheet('Failure Analysis');
+    setupSheet(failureSheet, 'Failure Analysis', ['#', 'Reason', 'Count']);
+    a.failureReasons.forEach((r, i) => failureSheet.addRow([i + 1, r.reason, r.count]));
+
+    const upcomingSheet = workbook.addWorksheet('Upcoming Activities');
+    setupSheet(upcomingSheet, 'Upcoming Activities', ['#', 'Activity', 'Department', 'Officer', 'Date', 'Status', 'Priority', 'Bucket', 'Completion %']);
+    [...a.upcoming.today, ...a.upcoming.within7, ...a.upcoming.within14, ...a.upcoming.later].forEach((r, i) => upcomingSheet.addRow([i + 1, r.title, r.departmentName || '—', r.officerName || '—', r.plannedDate, r.status, r.priority, r.bucket, r.completionPercentage]));
+    upcomingSheet.getColumn(5).numFmt = 'dd/mm/yyyy';
+
+    const registerSheet = workbook.addWorksheet('Activity Register');
+    setupSheet(registerSheet, 'Activity Register', ['#', 'Activity Code', 'Title', 'Department', 'Category', 'Start Date', 'End Date', 'Status', 'Priority', 'Completion %', 'Target', 'Unit', 'Expected Outcome', 'Actual Outcome', 'Achievement %', 'Delay Reason', 'Failure Reason']);
+    a.activities.forEach((r: any, i) => registerSheet.addRow([i + 1, r.activityCode || '—', r.title, r.department?.name || '—', r.category?.name || '—', r.startDate, r.endDate, r.status, r.priority, r.completionPercentage ?? 0, r.target ?? '—', r.targetUnit ?? '—', r.expectedOutcome ?? '—', r.actualOutcome ?? '—', r.achievement ?? '—', r.delayReason ?? '—', r.failureReason ?? '—']));
+    registerSheet.getColumn(6).numFmt = 'dd/mm/yyyy';
+    registerSheet.getColumn(7).numFmt = 'dd/mm/yyyy';
+
+    const overviewSheet = workbook.addWorksheet('AI Insights');
+    setupSheet(overviewSheet, 'AI Insights & Recommendations', ['Type', 'Content']);
+    overviewSheet.getColumn(1).width = 18;
+    overviewSheet.getColumn(2).width = 110;
+    a.aiInsights.forEach((ins) => overviewSheet.addRow(['Insight', ins]));
+    a.aiRecommendations.forEach((rec) => overviewSheet.addRow(['Recommendation', rec]));
+    if (a.aiInsights.length === 0 && a.aiRecommendations.length === 0) overviewSheet.addRow(['Info', 'No automated insights available for this dataset.']);
+
+    if (a.school.logo) {
+      try {
+        const image = await fetch(a.school.logo).then((r) => r.arrayBuffer());
+        const imageId = workbook.addImage({ buffer: Buffer.from(image), extension: 'png' });
+        summarySheet.addImage(imageId, { tl: { col: 2, row: 0 }, ext: { width: 100, height: 50 } });
+      } catch { /* logo not available — text brand remains visible */ }
+    }
+
+    return Buffer.from(await workbook.xlsx.writeBuffer());
   }
 }

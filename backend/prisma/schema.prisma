@@ -329,6 +329,8 @@ model School {
   calendarAuditEvents            CalendarAuditEvent[]
   calendarImports                CalendarImport[]
   calendarNotificationDeliveries CalendarNotificationDelivery[]
+  calendarGoals                  CalendarGoal[]
+  calendarActivityTimelines      CalendarActivityTimeline[]
 
   @@index([institutionTypeId])
   @@index([isActive])
@@ -432,7 +434,8 @@ model Term {
   resultSheets           ResultSheet[]
   SbaTask                SbaTask[]
   CurriculumLessonPlan   CurriculumLessonPlan[]
-  calendarActivities     CalendarActivity[]
+  calendarActivities    CalendarActivity[]
+  calendarGoals         CalendarGoal[]
   SchoolBusinessCalendar SchoolBusinessCalendar[]
 
   @@index([academicYearId])
@@ -533,6 +536,8 @@ model User {
   calendarImportsUploaded        CalendarImport[]               @relation("CalendarImportUploader")
   calendarActivitiesOfficer      CalendarActivity[]             @relation("CalendarActivityOfficer")
   calendarNotificationRecipients CalendarNotificationDelivery[]
+  calendarGoalsResponsible       CalendarGoal[]
+  calendarActivityTimelines      CalendarActivityTimeline[]
 
   @@index([schoolId])
   @@index([isActive])
@@ -770,6 +775,7 @@ model Department {
   departmentAssignments DepartmentAssignment[]
   calendarAudiences     CalendarActivityAudience[]
   calendarActivities    CalendarActivity[]
+  calendarGoals         CalendarGoal[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -784,9 +790,15 @@ enum CalendarStatus {
 
 enum CalendarActivityStatus {
   PLANNED
+  SCHEDULED
+  IN_PROGRESS
   COMPLETED
-  RESCHEDULED
+  PARTIALLY_COMPLETED
+  DELAYED
+  POSTPONED
   CANCELLED
+  NOT_COMPLETED
+  RESCHEDULED
 }
 
 enum CalendarActivityPriority {
@@ -865,6 +877,7 @@ model SchoolBusinessCalendar {
   academicYear AcademicYear           @relation(fields: [academicYearId], references: [id])
   term         Term?                  @relation(fields: [termId], references: [id])
   activities   CalendarActivity[]
+  goals        CalendarGoal[]
   categories   CalendarCategory[]
   columns      CalendarColumnConfig[]
   auditEvents  CalendarAuditEvent[]
@@ -916,12 +929,22 @@ model CalendarActivity {
   allDay           Boolean                  @default(true)
   recurrenceRule   CalendarRecurrenceRule   @default(NONE)
   recurrenceConfig Json?
-  status           CalendarActivityStatus   @default(PLANNED)
-  priority         CalendarActivityPriority @default(NORMAL)
-  reminderMinutes  Json?
-  attachments      Json?
-  notes            String?
-  venue            String?
+  status                CalendarActivityStatus   @default(PLANNED)
+  priority              CalendarActivityPriority @default(NORMAL)
+  completionPercentage  Float                    @default(0)
+  target                Float?
+  targetUnit            String?
+  expectedOutcome       String?
+  actualOutcome         String?
+  actualCompletionDate  DateTime?
+  delayReason           String?
+  failureReason         String?
+  remarks               String?
+  responsibleRole       String?
+  reminderMinutes       Json?
+  attachments           Json?
+  notes                 String?
+  venue                 String?
   createdById      String?
   updatedById      String?
   createdAt        DateTime                 @default(now())
@@ -941,6 +964,7 @@ model CalendarActivity {
   department             Department?                    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   officer                User?                          @relation("CalendarActivityOfficer", fields: [officerId], references: [id], onDelete: SetNull)
   notificationDeliveries CalendarNotificationDelivery[]
+  timeline               CalendarActivityTimeline[]
   AcademicYear           AcademicYear?                  @relation(fields: [academicYearId], references: [id])
   academicYearId         String?
   Teacher                Teacher?                       @relation(fields: [teacherId], references: [id])
@@ -1020,6 +1044,53 @@ model CalendarAuditEvent {
 
   @@index([schoolId, createdAt])
   @@index([calendarId, createdAt])
+}
+
+model CalendarGoal {
+  id               String                   @id @default(uuid())
+  schoolId         String
+  calendarId       String
+  termId           String?
+  title            String
+  description      String?
+  targetPercentage Float                    @default(90)
+  category         String                   @default("OVERALL")
+  departmentId     String?
+  responsibleId    String?
+  deadline         DateTime?
+  status           CalendarActivityStatus   @default(PLANNED)
+  currentProgress  Float                    @default(0)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  school     School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  calendar   SchoolBusinessCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  term       Term?                  @relation(fields: [termId], references: [id])
+  department Department?            @relation(fields: [departmentId], references: [id])
+  responsible User?                 @relation(fields: [responsibleId], references: [id])
+
+  @@index([schoolId, calendarId])
+  @@index([termId])
+}
+
+model CalendarActivityTimeline {
+  id              String   @id @default(uuid())
+  activityId      String
+  schoolId        String
+  userId          String?
+  previousStatus  String?
+  newStatus       String
+  previousPercentage Float?
+  newPercentage   Float?
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  activity CalendarActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  school   School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user     User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([activityId, createdAt])
+  @@index([schoolId, createdAt])
 }
 
 model CalendarImport {
