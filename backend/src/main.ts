@@ -98,10 +98,13 @@ async function bootstrap() {
 
     // All other paths require JWT authentication
     const auth = req.headers.authorization;
-    if (!auth || !auth.startsWith('Bearer ')) {
+    const queryToken = typeof req.query?.token === 'string' ? req.query.token : undefined;
+    const token =
+      (auth && auth.startsWith('Bearer ') ? auth.slice(7) : undefined) ||
+      (req.method === 'GET' && /(\.html|\.pdf(\/view)?|\.xlsx|\.csv)$/i.test(req.path) ? queryToken : undefined);
+    if (!token) {
       return res.status(401).json({ statusCode: 401, message: 'Unauthorized', timestamp: new Date().toISOString() });
     }
-    const token = auth.slice(7);
     try {
       const payload = jwtService.verify(token);
       (req as any).user = {
