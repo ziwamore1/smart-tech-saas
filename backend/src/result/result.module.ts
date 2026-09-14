@@ -3,9 +3,10 @@ import { ResultController } from './result.controller';
 import { ResultService } from './result.service';
 import { StudentSubjectModule } from '../student-subject/student-subject.module';
 import { CompositeSubjectModule } from '../composite-subject/composite-subject.module';
+import { GradingEngineModule } from '../grading-engine/grading-engine.module';
 
 @Module({
-  imports: [StudentSubjectModule, CompositeSubjectModule],
+  imports: [StudentSubjectModule, CompositeSubjectModule, GradingEngineModule],
   controllers: [ResultController],
   providers: [ResultService],
 })

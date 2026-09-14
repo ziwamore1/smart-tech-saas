@@ -8,9 +8,10 @@ import { SmsProviderFactory } from '../communications-cloud/providers/sms/sms-pr
 import { CommunicationsCloudModule } from '../communications-cloud/communications-cloud.module';
 import { CompositeSubjectModule } from '../composite-subject/composite-subject.module';
 import { ResultsSmsWorker } from './results-sms.worker';
+import { GradingEngineModule } from '../grading-engine/grading-engine.module';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), CommunicationsCloudModule, CompositeSubjectModule],
+  imports: [ScheduleModule.forRoot(), CommunicationsCloudModule, CompositeSubjectModule, GradingEngineModule],
   controllers: [ResultsSmsController],
   providers: [ResultsSmsService, PrismaService, ResultsSmsWorker, ResultsSmsMonitor],
   exports: [ResultsSmsService],
