@@ -41,7 +41,6 @@ export class CommunicationsCloudService {
   ) {}
 
   async sendSms(options: SendSmsDto): Promise<CommunicationResponseDto> {
-    console.error('[commService] sendSms called', JSON.stringify({ recipient: options.recipient?.slice(0,4) }));
     return this.send(CommCloudChannel.SMS, {
       recipient: options.recipient,
       body: options.message,
@@ -375,8 +374,10 @@ export class CommunicationsCloudService {
   }
 
   private async send(channel: CommCloudChannel, data: any): Promise<CommunicationResponseDto> {
-    console.error('[commService] send called', channel, data.recipient?.slice(0,4));
     try {
+    if (!data.recipient) {
+      throw new BadRequestException(`${channel} message requires a recipient`);
+    }
     const message = await this.prisma.commCloudMessage.create({
       data: {
         channel,
