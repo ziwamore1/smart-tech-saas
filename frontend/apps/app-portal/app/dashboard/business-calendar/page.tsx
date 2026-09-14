@@ -24,6 +24,7 @@ const BTN_GHOST =
 const STATUS_STYLE: Record<string, string> = {
   PLANNED: 'bg-blue-100 text-blue-800 ring-blue-200',
   COMPLETED: 'bg-emerald-100 text-emerald-800 ring-emerald-200',
+  RESCHEDULED: 'bg-amber-100 text-amber-800 ring-amber-200',
   CANCELLED: 'bg-rose-100 text-rose-700 ring-rose-200',
 };
 const CAT_COLORS = [
@@ -48,7 +49,9 @@ export default function BusinessCalendarPage() {
   const [showNewCalendar, setShowNewCalendar] = useState(false);
   const [importId, setImportId] = useState('');
   const [summary, setSummary] = useState<any>(null);
-  const emptyForm = { title: '', startDate: '', endDate: '', startTime: '', categoryId: '', departmentId: '', venue: '', notes: '' };
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'UPCOMING' | 'COMPLETED'>('ALL');
+  const [customCategory, setCustomCategory] = useState('');
+  const emptyForm = { title: '', startDate: '', endDate: '', startTime: '', categoryId: '', departmentId: '', venue: '', notes: '', status: 'PLANNED' };
   const [form, setForm] = useState({ ...emptyForm });
 
   const calendars = useQuery({ queryKey: ['business-calendar'], queryFn: () => businessCalendarApi.list().then((r) => r.data) });
@@ -67,12 +70,16 @@ export default function BusinessCalendarPage() {
   const closeForm = () => { setShowForm(false); setEditing(null); setForm({ ...emptyForm }); };
 
   const create = useMutation({
-    mutationFn: () => businessCalendarApi.createActivity(id, { ...form, endDate: form.endDate || form.startDate, allDay: !form.startTime, status: 'PLANNED', priority: 'NORMAL' }),
+    mutationFn: () => businessCalendarApi.createActivity(id, { ...form, endDate: form.endDate || form.startDate, allDay: !form.startTime, priority: 'NORMAL' }),
     onSuccess: () => { refresh(); closeForm(); },
   });
   const update = useMutation({
     mutationFn: () => businessCalendarApi.updateActivity(editing.id, form),
     onSuccess: () => { refresh(); closeForm(); },
+  });
+  const createCategory = useMutation({
+    mutationFn: () => businessCalendarApi.createCategory({ name: customCategory, calendarId: id }),
+    onSuccess: (response) => { qc.invalidateQueries({ queryKey: ['business-calendar-categories'] }); setForm({ ...form, categoryId: response.data.id }); setCustomCategory(''); },
   });
   const remove = useMutation({
     mutationFn: (activityId: string) => businessCalendarApi.deleteActivity(activityId),
@@ -104,10 +111,12 @@ export default function BusinessCalendarPage() {
     document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url);
   };
   const rows = activities.data || [];
+  const isUpcoming = (row: any) => ['PLANNED', 'RESCHEDULED'].includes(row.status) && new Date(row.endDate).getTime() >= Date.now();
+  const visibleRows = rows.filter((row: any) => statusFilter === 'ALL' || (statusFilter === 'UPCOMING' ? isUpcoming(row) : row.status === 'COMPLETED'));
   const openAdd = () => { setEditing(null); setForm({ ...emptyForm }); setShowForm(true); };
   const openEdit = (row: any) => {
     setEditing(row);
-    setForm({ title: row.title, startDate: toInput(row.startDate), endDate: toInput(row.endDate), startTime: row.startTime || '', categoryId: row.categoryId || '', departmentId: row.departmentId || '', venue: row.venue || '', notes: row.notes || '' });
+    setForm({ title: row.title, startDate: toInput(row.startDate), endDate: toInput(row.endDate), startTime: row.startTime || '', categoryId: row.categoryId || '', departmentId: row.departmentId || '', venue: row.venue || '', notes: row.notes || '', status: row.status || 'PLANNED' });
     setShowForm(true);
   };
   const removeRow = (row: any) => { if (window.confirm(`Delete activity "${row.title}"? This cannot be undone.`)) remove.mutate(row.id); };
@@ -136,7 +145,7 @@ export default function BusinessCalendarPage() {
 
         <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Metric label="Activities" value={rows.length} color="text-cyan-700" />
-          <Metric label="Upcoming" value={rows.filter((r: any) => r.status === 'PLANNED').length} color="text-blue-700" />
+           <Metric label="Upcoming" value={rows.filter(isUpcoming).length} color="text-blue-700" />
           <Metric label="Meetings" value={rows.filter((r: any) => r.category?.name?.toLowerCase().includes('meeting')).length} color="text-indigo-700" />
           <Metric label="Completed" value={rows.filter((r: any) => r.status === 'COMPLETED').length} color="text-emerald-700" />
         </section>
@@ -146,9 +155,13 @@ export default function BusinessCalendarPage() {
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[.18em] text-cyan-700">Authoritative term dataset</p>
               <h2 className="mt-1 text-xl font-black text-[#123047]">{current?.name || 'Select a calendar'}</h2>
-              <p className="text-sm text-slate-500">{current?.academicYear?.name || ''}{current?.term?.name ? ` · ${current.term.name}` : ''} · Version {current?.version || '-'}</p>
+               <p className="text-sm text-slate-500">{current?.academicYear?.name || ''}{current?.term?.name ? ` · ${current.term.name}` : ''} · Version {current?.version || '-'}</p>
+               <p className="mt-1 text-xs font-medium text-slate-500">Past planned activities are automatically shown as completed. Mark an activity Rescheduled when it did not happen and provide its new date.</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+             <div className="flex flex-wrap items-center gap-2">
+               <div className="flex rounded-lg border border-slate-300 p-1 text-sm">
+                 {(['ALL', 'UPCOMING', 'COMPLETED'] as const).map((filter) => <button key={filter} onClick={() => setStatusFilter(filter)} className={`rounded px-3 py-1.5 font-semibold ${statusFilter === filter ? 'bg-[#123047] text-white' : 'text-slate-600'}`}>{filter === 'ALL' ? 'All activities' : filter === 'UPCOMING' ? 'Upcoming' : 'Completed'}</button>)}
+               </div>
               <select className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-200" value={id} onChange={(e) => setCalendarId(e.target.value)}>
                 <option value="">Choose calendar</option>
                 {(calendars.data || []).map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -181,7 +194,7 @@ export default function BusinessCalendarPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {rows.map((row: any, index: number) => (
+                 {visibleRows.map((row: any, index: number) => (
                   <tr key={row.id} className="transition hover:bg-cyan-50/50 odd:bg-white even:bg-slate-50/70">
                     <td className="px-4 py-4 text-center font-black text-slate-400">{String(index + 1).padStart(2, '0')}</td>
                     <td className="px-4 py-4">
@@ -222,10 +235,12 @@ export default function BusinessCalendarPage() {
             <Field label="Start time" type="time" value={form.startTime} onChange={(v) => setForm({ ...form, startTime: v })} />
             <label>
               <span className={LABEL_CLS}>Category</span>
-              <select required className={INPUT_CLS} value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
-                <option value="">Choose category</option>
-                {(categories.data || []).map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select>
+               <select required className={INPUT_CLS} value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
+                 <option value="">Choose category</option>
+                 {(categories.data || []).map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                 <option value="__custom">Add custom category...</option>
+               </select>
+               {form.categoryId === '__custom' && <div className="mt-2 flex gap-2"><input className={INPUT_CLS.replace('mt-1 ', '')} placeholder="Category name" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} /><button type="button" className="rounded-lg bg-slate-700 px-3 text-xs font-bold text-white disabled:opacity-40" disabled={!customCategory.trim() || createCategory.isPending} onClick={() => createCategory.mutate()}>Add</button></div>}
             </label>
             <label>
               <span className={LABEL_CLS}>Department</span>
@@ -235,7 +250,8 @@ export default function BusinessCalendarPage() {
               </select>
             </label>
             <Field label="Venue" value={form.venue} onChange={(v) => setForm({ ...form, venue: v })} wide />
-            <Field label="Notes" value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} wide />
+             <Field label="Notes" value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} wide />
+             <label><span className={LABEL_CLS}>Activity status</span><select className={INPUT_CLS} value={(form as any).status || 'PLANNED'} onChange={(e) => setForm({ ...form, status: e.target.value } as any)}><option value="PLANNED">Planned</option><option value="COMPLETED">Completed</option><option value="RESCHEDULED">Rescheduled</option><option value="CANCELLED">Cancelled</option></select></label>
             <button className={`${BTN} sm:col-span-2`} disabled={create.isPending || update.isPending}>
               {create.isPending || update.isPending ? 'Saving...' : editing ? 'Update activity' : 'Save activity'}
             </button>

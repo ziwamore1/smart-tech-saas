@@ -1,0 +1,1 @@
+ALTER TYPE "CalendarActivityStatus" ADD VALUE 'RESCHEDULED';

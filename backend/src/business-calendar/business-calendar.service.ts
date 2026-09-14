@@ -21,6 +21,7 @@ const DEFAULT_CATEGORIES = [
   { name: 'Assessment / Examination', color: '#ea580c', description: 'Tests, exams, marking and results deadlines' },
   { name: 'Deadline', color: '#dc2626', description: 'Administrative and academic deadlines' },
   { name: 'School Event', color: '#0891b2', description: 'Sports, ceremonies, prize giving and co-curricular events' },
+  { name: 'Custom', color: '#64748b', description: 'Other school activity' },
 ];
 
 @Injectable()
@@ -54,6 +55,11 @@ export class BusinessCalendarService {
 
   private validateRange(start: Date, end: Date) {
     if (end < start) throw new BadRequestException('endDate must be on or after startDate');
+  }
+
+  private effectiveStatus(activity: any, now = new Date()) {
+    if (activity.status !== 'PLANNED') return activity.status;
+    return activity.endDate < now ? 'COMPLETED' : 'PLANNED';
   }
 
   private async schoolReferences(schoolId: string, data: any) {
@@ -151,7 +157,8 @@ export class BusinessCalendarService {
     await this.assertPermission(actor, PERMISSIONS.CALENDAR_VIEW);
     const calendar = await this.calendar(calendarId, schoolId);
     if (!actor.isSuperAdmin && calendar.status !== 'PUBLISHED' && !(await this.access.getPermissions(actor)).includes(PERMISSIONS.CALENDAR_MANAGE)) throw new ForbiddenException('Calendar is not published');
-    return this.prisma.calendarActivity.findMany({ where: { calendarId, schoolId }, include: { subItems: { orderBy: { sortOrder: 'asc' } }, audiences: true, category: true, department: true, children: true }, orderBy: [{ startDate: 'asc' }, { startTime: 'asc' }] });
+    const rows = await this.prisma.calendarActivity.findMany({ where: { calendarId, schoolId }, include: { subItems: { orderBy: { sortOrder: 'asc' } }, audiences: true, category: true, department: true, children: true }, orderBy: [{ startDate: 'asc' }, { startTime: 'asc' }] });
+    return rows.map((row) => ({ ...row, status: this.effectiveStatus(row) }));
   }
 
   async createActivity(actor: Actor, calendarId: string, data: any, requestedSchoolId?: string) {
@@ -221,12 +228,16 @@ export class BusinessCalendarService {
 
   private async ensureDefaultCategories(schoolId: string) {
     const count = await this.prisma.calendarCategory.count({ where: { schoolId } });
-    if (count > 0) return;
-    await this.prisma.calendarCategory.createMany({ data: DEFAULT_CATEGORIES.map((item) => ({ ...item, schoolId })) });
+    if (count === 0) {
+      await this.prisma.calendarCategory.createMany({ data: DEFAULT_CATEGORIES.map((item) => ({ ...item, schoolId })) });
+      return;
+    }
+    const custom = await this.prisma.calendarCategory.findFirst({ where: { schoolId, name: 'Custom' } });
+    if (!custom) await this.prisma.calendarCategory.create({ data: { ...DEFAULT_CATEGORIES[DEFAULT_CATEGORIES.length - 1], schoolId } });
   }
 
   async categories(actor: Actor, requestedSchoolId?: string) { const schoolId = this.schoolId(actor, requestedSchoolId); await this.assertPermission(actor, PERMISSIONS.CALENDAR_VIEW); await this.ensureDefaultCategories(schoolId); return this.prisma.calendarCategory.findMany({ where: { schoolId, isActive: true }, orderBy: { name: 'asc' } }); }
-  async saveCategory(actor: Actor, data: any, requestedSchoolId?: string) { const schoolId = this.schoolId(actor, requestedSchoolId); await this.assertPermission(actor, PERMISSIONS.CALENDAR_MANAGE); return this.prisma.calendarCategory.create({ data: { schoolId, calendarId: data.calendarId, name: data.name, color: data.color, description: data.description } }); }
+  async saveCategory(actor: Actor, data: any, requestedSchoolId?: string) { const schoolId = this.schoolId(actor, requestedSchoolId); await this.assertPermission(actor, PERMISSIONS.CALENDAR_MANAGE); if (!String(data.name || '').trim()) throw new BadRequestException('Category name is required'); return this.prisma.calendarCategory.create({ data: { schoolId, calendarId: data.calendarId || undefined, name: String(data.name).trim(), color: data.color || '#64748b', description: data.description } }); }
   async columns(actor: Actor, calendarId: string, requestedSchoolId?: string) { const schoolId = this.schoolId(actor, requestedSchoolId); await this.calendar(calendarId, schoolId); await this.assertPermission(actor, PERMISSIONS.CALENDAR_VIEW); return this.prisma.calendarColumnConfig.findMany({ where: { calendarId, schoolId }, orderBy: { sortOrder: 'asc' } }); }
   async saveColumns(actor: Actor, calendarId: string, columns: any[], requestedSchoolId?: string) { const schoolId = this.schoolId(actor, requestedSchoolId); await this.assertPermission(actor, PERMISSIONS.CALENDAR_MANAGE); await this.calendar(calendarId, schoolId); return this.prisma.$transaction(columns.map((column) => this.prisma.calendarColumnConfig.upsert({ where: { calendarId_key: { calendarId, key: column.key } }, create: { ...column, calendarId, schoolId }, update: { ...column, schoolId } }))); }
 

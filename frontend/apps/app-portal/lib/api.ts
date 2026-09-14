@@ -15,6 +15,7 @@ export const businessCalendarApi = {
   create: (data: any) => api.post('/business-calendar', data),
   activities: (calendarId: string) => api.get(`/business-calendar/${calendarId}/activities`),
   categories: () => api.get('/business-calendar/categories/list'),
+  createCategory: (data: any) => api.post('/business-calendar/categories', data),
   createActivity: (calendarId: string, data: any) => api.post(`/business-calendar/${calendarId}/activities`, data),
   updateActivity: (activityId: string, data: any) => api.patch(`/business-calendar/activities/${activityId}`, data),
   publish: (id: string) => api.post(`/business-calendar/${id}/publish`),

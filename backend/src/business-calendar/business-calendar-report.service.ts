@@ -12,15 +12,16 @@ export class BusinessCalendarReportService {
     const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
     const fmt = (value: Date | string) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value));
     const statusChip = (status: string) => {
-      const variant = ({ PLANNED: ['#1e40af', '#dbeafe'], COMPLETED: ['#047857', '#d1fae5'], CANCELLED: ['#b91c1c', '#fee2e2'] } as Record<string, [string, string]>)[status] || ['#0e7490', '#cffafe'];
+      const variant = ({ PLANNED: ['#1e40af', '#dbeafe'], COMPLETED: ['#047857', '#d1fae5'], RESCHEDULED: ['#a16207', '#fef3c7'], CANCELLED: ['#b91c1c', '#fee2e2'] } as Record<string, [string, string]>)[status] || ['#0e7490', '#cffafe'];
       return `<span class="chip" style="color:${variant[0]};background:${variant[1]}">${esc(status)}</span>`;
     };
-    const rows = calendar.activities.map((item: any, index) => `<tr><td class="num">${index + 1}</td><td><strong class="title">${esc(item.title)}</strong>${item.description ? `<span class="desc">${esc(item.description)}</span>` : ''}${item.subItems?.length ? `<div class="subs"><strong>Milestones:</strong><ul>${item.subItems.map((sub: any) => `<li>${esc(sub.title)}${sub.dueDate ? ` <em>(${fmt(sub.dueDate)})</em>` : ''}</li>`).join('')}</ul></div>` : ''}</td><td><span class="pcat">${esc(item.category?.name || 'Other')}</span></td><td>${fmt(item.startDate)}${item.endDate && new Date(item.endDate).getTime() !== new Date(item.startDate).getTime() ? `<span class="dash"> → </span>${fmt(item.endDate)}` : ''}</td><td>${esc(item.startTime || 'All day')}${item.endTime ? ` — ${esc(item.endTime)}` : ''}</td><td>${esc(item.venue || '—')}</td><td>${esc(item.department?.name || 'All school')}</td><td>${esc(item.officer ? `${item.officer.firstName} ${item.officer.lastName}` : '—')}</td><td>${statusChip(item.status)}</td></tr>`).join('');
+     const effectiveStatus = (item: any) => item.status === 'PLANNED' && new Date(item.endDate) < new Date() ? 'COMPLETED' : item.status;
+     const rows = calendar.activities.map((item: any, index) => `<tr><td class="num">${index + 1}</td><td><strong class="title">${esc(item.title)}</strong>${item.description ? `<span class="desc">${esc(item.description)}</span>` : ''}${item.subItems?.length ? `<div class="subs"><strong>Milestones:</strong><ul>${item.subItems.map((sub: any) => `<li>${esc(sub.title)}${sub.dueDate ? ` <em>(${fmt(sub.dueDate)})</em>` : ''}</li>`).join('')}</ul></div>` : ''}</td><td><span class="pcat">${esc(item.category?.name || 'Other')}</span></td><td>${fmt(item.startDate)}${item.endDate && new Date(item.endDate).getTime() !== new Date(item.startDate).getTime() ? `<span class="dash"> → </span>${fmt(item.endDate)}` : ''}</td><td>${esc(item.startTime || 'All day')}${item.endTime ? ` — ${esc(item.endTime)}` : ''}</td><td>${esc(item.venue || '—')}</td><td>${esc(item.department?.name || 'All school')}</td><td>${esc(item.officer ? `${item.officer.firstName} ${item.officer.lastName}` : '—')}</td><td>${statusChip(effectiveStatus(item))}</td></tr>`).join('');
     const firstDate = calendar.activities[0]?.startDate ? fmt(calendar.activities[0].startDate) : '—';
     const lastDate = calendar.activities[calendar.activities.length - 1]?.startDate ? fmt(calendar.activities[calendar.activities.length - 1].startDate) : '—';
     const total = calendar.activities.length;
-    const planned = calendar.activities.filter((item: any) => item.status === 'PLANNED').length;
-    const completed = calendar.activities.filter((item: any) => item.status === 'COMPLETED').length;
+     const planned = calendar.activities.filter((item: any) => effectiveStatus(item) === 'PLANNED').length;
+     const completed = calendar.activities.filter((item: any) => effectiveStatus(item) === 'COMPLETED').length;
     return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(calendar.name)} — School Business Calendar</title><style>
       @page{size:A4 landscape;margin:12mm 12mm 18mm 12mm}
       *{box-sizing:border-box}

@@ -785,6 +785,7 @@ enum CalendarStatus {
 enum CalendarActivityStatus {
   PLANNED
   COMPLETED
+  RESCHEDULED
   CANCELLED
 }
 
