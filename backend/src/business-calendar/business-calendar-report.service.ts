@@ -26,11 +26,11 @@ const GOAL_COLOUR: Record<string, [string, string]> = {
   ACHIEVED:  ['#0e7490', '#cffafe'],
 };
 
-const chip = (text: string, fg: string, bg: string) => `<span style="display:inline-block;border-radius:999px;padding:2px 9px;font-size:8px;font-weight:700;color:${fg};background:${bg};letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">${esc(text)}</span>`;
+const chip = (text: string, fg: string, bg: string) => `<span style="display:inline-block;border-radius:999px;padding:3px 10px;font-size:10px;font-weight:700;color:${fg};background:${bg};letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">${esc(text)}</span>`;
 const num = (v: number, suffix = '') => v == null ? '—' : `${Math.round(v * 10) / 10}${suffix}`;
 
 const sectionStyle = `page-break-before:always;padding-top:6px;`;
-const sectionHeaderStyle = `border-bottom:2px solid #0e7490;padding-bottom:5px;margin:0 0 12px;color:#0e7490;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase`;
+const sectionHeaderStyle = `border-bottom:2px solid #0e7490;padding-bottom:5px;margin:0 0 14px;color:#0e7490;font-size:15px;font-weight:800;letter-spacing:.06em;text-transform:uppercase`;
 
 function statusChip(status: string) {
   const [fg, bg] = STATUS_COLOUR[status] || ['#475569', '#f1f5f9'];
@@ -57,43 +57,43 @@ export class BusinessCalendarReportService {
     const logoTag = a.school.logo ? `<img src="${esc(a.school.logo)}" alt="School logo" style="height:56px;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc">` : `<div style="width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,#0e7490,#123047);color:#fff;font-weight:900;font-size:22px;display:flex;align-items:center;justify-content:center">${esc(a.school.name?.charAt(0) || 'S')}</div>`;
 
     const metricsTable = (m: { label: string; value: string | number; highlight?: boolean }[]) =>
-      `<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px"><tbody><tr>${m.map((item) => `<td style="padding:5px 7px;text-align:center;border:1px solid #e2e8f0;background:${item.highlight ? '#f0fdfa' : '#f8fafc'}"><div style="font-size:15px;font-weight:800;color:#123047">${item.value}</div><div style="font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-top:1px">${item.label}</div></td>`).join('')}</tr></tbody></table>`;
+      `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px"><tbody><tr>${m.map((item) => `<td style="padding:7px 8px;text-align:center;border:1px solid #e2e8f0;background:${item.highlight ? '#f0fdfa' : '#f8fafc'}"><div style="font-size:18px;font-weight:800;color:#123047">${item.value}</div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-top:2px">${item.label}</div></td>`).join('')}</tr></tbody></table>`;
 
     const deptRows = a.departments.map((d, i) => `<tr><td class="num">${i + 1}</td><td>${esc(d.departmentName)}</td><td>${d.planned}</td><td>${d.completed}</td><td>${num(d.completionRate, '%')}</td><td>${d.delayed}</td><td>${d.notCompleted}</td><td>${num(d.targetAchievement, '%')}</td><td>${d.overdue}</td></tr>`).join('');
     const catRows = a.categories.map((c, i) => `<tr><td class="num">${i + 1}</td><td>${esc(c.categoryName)}</td><td>${c.planned}</td><td>${c.completed}</td><td>${num(c.completionRate, '%')}</td><td>${c.delayed}</td><td>${num(c.targetAchievement, '%')}</td></tr>`).join('');
     const offRows = a.responsibilities.map((r, i) => `<tr><td class="num">${i + 1}</td><td>${esc(r.officerName)}</td><td>${r.assigned}</td><td>${r.completed}</td><td>${r.delayed}</td><td>${r.overdue}</td><td>${num(r.completionRate, '%')}</td><td>${num(r.targetAchievement, '%')}</td></tr>`).join('');
-    const overdueRows = a.overdue.slice(0, 25).map((r, i) => `<tr><td class="num">${i + 1}</td><td>${esc(r.title)}</td><td>${esc(r.departmentName || '—')}</td><td>${esc(r.officerName || '—')}</td><td>${fmt(r.plannedDate)}</td><td>${statusChip(r.status)}</td><td>${num(r.completionPercentage, '%')}</td><td>${r.daysOverdue}d</td><td style="font-size:8px">${esc(r.recommendedAction)}</td></tr>`).join('');
+    const overdueRows = a.overdue.slice(0, 25).map((r, i) => `<tr><td class="num">${i + 1}</td><td>${esc(r.title)}</td><td>${esc(r.departmentName || '—')}</td><td>${esc(r.officerName || '—')}</td><td>${fmt(r.plannedDate)}</td><td>${statusChip(r.status)}</td><td>${num(r.completionPercentage, '%')}</td><td>${r.daysOverdue}d</td><td style="font-size:10px">${esc(r.recommendedAction)}</td></tr>`).join('');
     const upcomingRows = [...a.upcoming.today, ...a.upcoming.within7, ...a.upcoming.within14].slice(0, 30).map((r, i) => {
       const bucket = r.bucket === 'today' ? '🔴 Today' : r.bucket === 'within7' ? '🟡 ≤7 days' : '🟢 ≤14 days';
       return `<tr><td class="num">${i + 1}</td><td>${esc(r.title)}</td><td>${esc(r.departmentName || '—')}</td><td>${esc(r.officerName || '—')}</td><td>${fmt(r.plannedDate)}</td><td>${statusChip(r.status)}</td><td>${chip(r.bucket.toUpperCase(), '#0e7490', '#cffafe')}</td></tr>`;
     }).join('');
-    const goalRows = a.goals.map((g, i) => `<tr><td class="num">${i + 1}</td><td><strong>${esc(g.title)}</strong>${g.description ? `<span style="display:block;color:#64748b;margin-top:1px">${esc(g.description)}</span>` : ''}</td><td>${num(g.currentProgress, '%')}</td><td>${num(g.targetPercentage, '%')}</td><td>${num(g.gap)}</td><td>${goalChip(g.status)}</td><td style="font-size:8px">${esc(g.recommendedAction)}</td></tr>`).join('');
+    const goalRows = a.goals.map((g, i) => `<tr><td class="num">${i + 1}</td><td><strong>${esc(g.title)}</strong>${g.description ? `<span style="display:block;color:#64748b;margin-top:1px">${esc(g.description)}</span>` : ''}</td><td>${num(g.currentProgress, '%')}</td><td>${num(g.targetPercentage, '%')}</td><td>${num(g.gap)}</td><td>${goalChip(g.status)}</td><td style="font-size:10px">${esc(g.recommendedAction)}</td></tr>`).join('');
     const trendRows = a.monthlyTrend.slice(-12).map((t, i) => `<tr><td>${esc(t.month)}</td><td>${t.planned}</td><td>${t.completed}</td><td>${num(t.planned ? (t.completed / t.planned) * 100 : 0, '%')}</td></tr>`).join('');
     const failureRows = a.failureReasons.slice(0, 10).map((r, i) => `<tr><td class="num">${i + 1}</td><td>${esc(r.reason)}</td><td>${r.count}</td></tr>`).join('');
-    const actRows = a.activities.slice(0, 80).map((r: any, i) => `<tr><td class="num">${i + 1}</td><td style="font-size:8px">${esc(r.title)}</td><td>${esc(r.department?.name || '—')}</td><td>${fmt(r.startDate)}<span style="color:#94a3b8"> → </span>${fmt(r.endDate)}</td><td>${statusChip(r.status)}</td><td>${num(r.completionPercentage, '%')}</td><td>${r.target ? `${num(r.target)} ${esc(r.targetUnit || '')}` : '—'}</td><td>${r.actualOutcome ? esc(r.actualOutcome) : '—'}</td><td>${r.achievement != null ? num(r.achievement, '%') : '—'}</td></tr>`).join('');
+    const actRows = a.activities.slice(0, 80).map((r: any, i) => `<tr><td class="num">${i + 1}</td><td style="font-size:10px">${esc(r.title)}</td><td>${esc(r.department?.name || '—')}</td><td>${fmt(r.startDate)}<span style="color:#94a3b8"> → </span>${fmt(r.endDate)}</td><td>${statusChip(r.status)}</td><td>${num(r.completionPercentage, '%')}</td><td>${r.target ? `${num(r.target)} ${esc(r.targetUnit || '')}` : '—'}</td><td>${r.actualOutcome ? esc(r.actualOutcome) : '—'}</td><td>${r.achievement != null ? num(r.achievement, '%') : '—'}</td></tr>`).join('');
 
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(a.school.name)} — Business Calendar Intelligence Report</title><style>
-@page{size:A4 portrait;margin:18mm 16mm 20mm 16mm}
+@page{size:A4 portrait;margin:20mm 18mm 22mm 18mm}
 *{box-sizing:border-box}
-body{font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:#0f1e2d;font-size:9.5px;margin:0;background:#eef2f6;-webkit-print-color-adjust:exact;print-color-adjust:exact;line-height:1.45}
+body{font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:#0f1e2d;font-size:12px;margin:0;background:#eef2f6;-webkit-print-color-adjust:exact;print-color-adjust:exact;line-height:1.45}
 .sheet{max-width:900px;margin:0 auto;background:#fff;padding:28px 30px;box-shadow:0 2px 18px rgba(15,30,45,.12)}
-.brand-bar{display:flex;align-items:center;gap:12px;border-bottom:3px solid #123047;padding-bottom:12px;margin-bottom:18px}
-.brand-bar .title{font-size:20px;font-weight:800;color:#123047;letter-spacing:.03em}
-.brand-bar .sub{font-size:10px;color:#64748b;margin-top:1px}
-.page-header{margin-bottom:14px}
-.page-header h1{margin:0;font-size:17px;color:#123047;letter-spacing:.06em;text-transform:uppercase}
-.page-header .meta{color:#64748b;font-size:9px;margin-top:3px}
+.brand-bar{display:flex;align-items:center;gap:12px;border-bottom:3px solid #123047;padding-bottom:14px;margin-bottom:20px}
+.brand-bar .title{font-size:24px;font-weight:800;color:#123047;letter-spacing:.03em}
+.brand-bar .sub{font-size:12px;color:#64748b;margin-top:2px}
+.page-header{margin-bottom:16px}
+.page-header h1{margin:0;font-size:19px;color:#123047;letter-spacing:.06em;text-transform:uppercase}
+.page-header .meta{color:#64748b;font-size:11px;margin-top:4px}
 h2{${sectionHeaderStyle}}
-table{width:100%;border-collapse:collapse;font-size:8.5px;margin-bottom:10px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden}
-thead th{background:linear-gradient(180deg,#123047,#0d2637);color:#fff;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:.08em;padding:6px 7px;white-space:nowrap}
-tbody td{border-top:1px solid #f1f5f9;padding:5px 7px;vertical-align:top}
+table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:11px;margin-bottom:12px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden}
+thead th{background:linear-gradient(180deg,#123047,#0d2637);color:#fff;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:7px 8px;white-space:normal;word-wrap:break-word}
+tbody td{border-top:1px solid #f1f5f9;padding:6px 8px;vertical-align:top;word-wrap:break-word}
 tbody tr:nth-child(even){background:#f8fafc}
 tbody tr:hover{background:#f0fdfa}
-td.num{text-align:center;font-weight:800;color:#94a3b8;width:26px;font-size:8px}
-.table-foot{margin-top:3px;text-align:right;font-size:8px;color:#94a3b8}
-.footer{border-top:2px solid #e2e8f0;margin-top:16px;padding-top:10px;font-size:8px;color:#94a3b8;display:flex;justify-content:space-between}
-.insight-box{background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:8px 12px;margin:8px 0;font-size:9px;line-height:1.5}
-.recommendation-box{background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin:8px 0;font-size:9px;line-height:1.5}
+td.num{text-align:center;font-weight:800;color:#94a3b8;width:26px;font-size:10px}
+.table-foot{margin-top:4px;text-align:right;font-size:10px;color:#94a3b8}
+.footer{border-top:2px solid #e2e8f0;margin-top:18px;padding-top:12px;font-size:10px;color:#94a3b8;display:flex;justify-content:space-between}
+.insight-box{background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:9px 13px;margin:8px 0;font-size:11px;line-height:1.55}
+.recommendation-box{background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:9px 13px;margin:8px 0;font-size:11px;line-height:1.55}
 .page-break{page-break-before:always}
 .no-break{page-break-inside:avoid}
 .page-header-print{display:none}
@@ -103,7 +103,7 @@ td.num{text-align:center;font-weight:800;color:#94a3b8;width:26px;font-size:8px}
   .page-header-print{display:block}
 }
 @media print{.sheet{box-shadow:none;padding:0}}
-@page{size:${a.school.motto?.includes('landscape') ? 'landscape' : 'portrait'};margin:18mm 16mm 20mm 16mm}
+@page{size:${a.school.motto?.includes('landscape') ? 'landscape' : 'portrait'};margin:20mm 18mm 22mm 18mm}
 </style></head><body><div class="sheet">
 
 <div class="brand-bar">
@@ -126,11 +126,11 @@ td.num{text-align:center;font-weight:800;color:#94a3b8;width:26px;font-size:8px}
   </div>
 </div>
 
-${a.school.motto ? `<p style="text-align:center;font-style:italic;color:#0e7490;font-size:10px;margin:0 0 16px">"${esc(a.school.motto)}"</p>` : ''}
+${a.school.motto ? `<p style="text-align:center;font-style:italic;color:#0e7490;font-size:12px;margin:0 0 18px">"${esc(a.school.motto)}"</p>` : ''}
 
 <h2>1. Executive Summary</h2>
 <div class="no-break">
-  <p style="font-size:10px;margin:0 0 10px;line-height:1.6">
+  <p style="font-size:12px;margin:0 0 10px;line-height:1.6">
     ${a.aiInsights.map((ins) => `&bull; ${esc(ins)}`).join('<br>')}
   </p>
 </div>
@@ -234,8 +234,8 @@ ${a.failureReasons.length > 0 ? `
 
 <h2>12. AI Insights & Recommendations</h2>
 <div class="no-break">
-${a.aiInsights.length > 0 ? `<p style="font-size:9.5px;font-weight:700;color:#123047;margin:0 0 4px">Observations:</p>${a.aiInsights.map((ins) => `<div class="insight-box">${esc(ins)}</div>`).join('')}` : ''}
-${a.aiRecommendations.length > 0 ? `<p style="font-size:9.5px;font-weight:700;color:#123047;margin:10px 0 4px">Recommendations:</p>${a.aiRecommendations.map((rec) => `<div class="recommendation-box">${esc(rec)}</div>`).join('')}` : ''}
+${a.aiInsights.length > 0 ? `<p style="font-size:11.5px;font-weight:700;color:#123047;margin:0 0 4px">Observations:</p>${a.aiInsights.map((ins) => `<div class="insight-box">${esc(ins)}</div>`).join('')}` : ''}
+${a.aiRecommendations.length > 0 ? `<p style="font-size:11.5px;font-weight:700;color:#123047;margin:12px 0 4px">Recommendations:</p>${a.aiRecommendations.map((rec) => `<div class="recommendation-box">${esc(rec)}</div>`).join('')}` : ''}
 ${a.aiInsights.length === 0 && a.aiRecommendations.length === 0 ? '<div class="insight-box">No automated insights available for this dataset. Insights are generated automatically from activity completion, target tracking, and failure analysis data.</div>' : ''}
 </div>
 
@@ -265,9 +265,9 @@ ${a.activities.length > 80 ? `<div class="table-foot">Showing 80 of ${a.activiti
         landscape: false,
         printBackground: true,
         displayHeaderFooter: true,
-        headerTemplate: `<div style="font-size:7px;width:100%;padding:4px 16mm 0;color:#94a3b8;display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0"><span>School Business Calendar · Intelligence Report</span><span class="date"></span></div>`,
-        footerTemplate: `<div style="font-size:7px;width:100%;padding:0 16mm 4px;color:#94a3b8;display:flex;justify-content:space-between;border-top:1px solid #e2e8f0"><span>Confidential — for school leadership use only</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`,
-        margin: { top: '18mm', bottom: '18mm', left: '16mm', right: '16mm' },
+        headerTemplate: `<div style="font-size:8px;width:100%;padding:4px 18mm 0;color:#94a3b8;display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0"><span>School Business Calendar · Intelligence Report</span><span class="date"></span></div>`,
+        footerTemplate: `<div style="font-size:8px;width:100%;padding:0 18mm 4px;color:#94a3b8;display:flex;justify-content:space-between;border-top:1px solid #e2e8f0"><span>Confidential — for school leadership use only</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`,
+        margin: { top: '20mm', bottom: '22mm', left: '18mm', right: '18mm' },
       }));
     } finally {
       await browser.close();
