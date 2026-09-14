@@ -306,7 +306,7 @@ function Metric({ label, value, color }: { label: string; value: number; color: 
   return <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p><p className={`mt-2 text-3xl font-black ${color}`}>{value}</p></div>;
 }
 function Modal({ title, close, children }: { title: string; close: () => void; children: ReactNode }) {
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"><div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl"><div className="flex justify-between"><h2 className="text-xl font-bold">{title}</h2><button onClick={close} className="text-2xl text-slate-400">×</button></div><div className="mt-5">{children}</div></div></div>;
+  return <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4"><div className="max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto overflow-x-hidden rounded-2xl bg-white p-6 shadow-2xl"><div className="flex justify-between"><h2 className="text-xl font-bold">{title}</h2><button onClick={close} className="text-2xl text-slate-400">×</button></div><div className="mt-5">{children}</div></div></div>;
 }
 function Field({ label, value, onChange, type = 'text', required = false, wide = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean; wide?: boolean }) {
   return <label className={wide ? 'sm:col-span-2' : ''}><span className={LABEL_CLS}>{label}</span><input required={required} type={type} className={INPUT_CLS} value={value} onChange={(e) => onChange(e.target.value)} /></label>;

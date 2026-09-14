@@ -639,7 +639,7 @@ export default function StampDesignerPage() {
   };
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto">
+    <div className="min-h-screen overflow-auto p-6 max-w-[1600px] mx-auto">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Digital Stamp Designer</h1>
@@ -659,9 +659,9 @@ export default function StampDesignerPage() {
         <div className={`mb-4 px-4 py-2 rounded-lg text-sm ${toast.kind === 'ok' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>{toast.text}</div>
       )}
 
-      <div className="flex gap-6 items-start">
+      <div className="flex min-w-[1180px] gap-6 items-start overflow-visible pb-6">
         {/* ── Left: Controls ── */}
-        <div className="w-[340px] shrink-0 space-y-4">
+        <div className="w-[340px] max-h-[calc(100vh-8rem)] shrink-0 space-y-4 overflow-x-auto overflow-y-auto overscroll-contain pr-1">
           <section className="bg-white rounded-xl border p-4 space-y-3">
             <h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Identity</h2>
             <label className="block text-xs font-medium text-gray-600">Template name
@@ -863,7 +863,7 @@ export default function StampDesignerPage() {
             ))}
           </section>
 
-          <section className="bg-white rounded-xl border p-4">
+          <section className="max-h-[28rem] overflow-x-auto overflow-y-auto overscroll-contain bg-white rounded-xl border p-4">
             <div className="flex items-center justify-between mb-2">
               <h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Layers</h2>
               <div className="relative group">
@@ -1058,7 +1058,7 @@ export default function StampDesignerPage() {
             <div className="flex items-start gap-3">
               <div
                 ref={scrollBoxRef}
-                className="flex-1 min-w-0 overflow-auto max-h-[75vh] rounded-lg"
+                className="flex-1 min-w-0 overflow-x-auto overflow-y-auto overscroll-contain max-h-[75vh] rounded-lg"
                 onWheel={e => {
                   if (!e.ctrlKey && !e.metaKey) return;
                   e.preventDefault();
@@ -1160,7 +1160,7 @@ export default function StampDesignerPage() {
         </div>
 
         {/* ── Right: Templates + Security note ── */}
-        <div className="w-[280px] shrink-0 space-y-3">
+        <div className="w-[280px] max-h-[calc(100vh-8rem)] shrink-0 space-y-3 overflow-x-auto overflow-y-auto overscroll-contain pr-1">
           <section className="bg-white rounded-xl border p-4">
             <h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-2">Templates</h2>
             {templates.length === 0 && <p className="text-xs text-gray-400">No templates yet — save your first draft.</p>}
