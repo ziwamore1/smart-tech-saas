@@ -9,6 +9,7 @@ import {
   ClassGradingProfile,
   CompetencyAnalysis,
   GenderAnalysis,
+  GradeDistribution,
   HistoricalPoint,
   StudentRiskSummary,
   TeacherContext,
@@ -505,6 +506,49 @@ export class TeacherAnalyticsService {
   // Per-assignment analytics
   // -------------------------------------------------------------------------
 
+  /**
+   * Builds the grade-scale distribution rows for a grading profile, merging the
+   * configured score ranges (minScore–maxScore) and the counts observed in this
+   * class/assignment. Includes any grades actually assigned that are not part of
+   * the profile (e.g. legacy "N/A") so counts always reconcile to totals.
+   */
+  private buildGradeScaleDistribution(
+    profile: ClassGradingProfile | null | undefined,
+    gradeCounts: Map<string, number>,
+    totalAssessed: number,
+  ): GradeDistribution[] {
+    const scaleByGrade = new Map<string, { minScore: number; maxScore: number; points: number | null; remark: string }>();
+    for (const s of profile?.gradeBreakdown || []) {
+      scaleByGrade.set(s.grade, s);
+    }
+    const orderedGrades: string[] = [];
+    const seen = new Set<string>();
+    for (const g of profile?.grades || []) {
+      if (!seen.has(g)) {
+        seen.add(g);
+        orderedGrades.push(g);
+      }
+    }
+    const leftovers = Array.from(gradeCounts.keys()).filter((g) => !seen.has(g));
+    for (const g of leftovers.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))) {
+      orderedGrades.push(g);
+    }
+    return orderedGrades.map((g) => {
+      const scale = scaleByGrade.get(g);
+      return {
+        grade: g,
+        count: gradeCounts.get(g) || 0,
+        percentage: totalAssessed > 0 ? this.stats.round2(((gradeCounts.get(g) || 0) / totalAssessed) * 100) : null,
+        range:
+          scale && scale.minScore != null && scale.maxScore != null
+            ? `${scale.minScore}-${scale.maxScore}`
+            : null,
+        points: scale?.points ?? null,
+        remark: scale?.remark || null,
+      };
+    });
+  }
+
   async buildAssignmentAnalytics(
     assignment: AssignmentRef,
     termId: string,
@@ -548,11 +592,7 @@ export class TeacherAnalyticsService {
     const qualityPassRate = totalAssessed > 0 ? this.stats.round2((qualityPassed / totalAssessed) * 100) : null;
     const quantityPassRate = totalAssessed > 0 ? this.stats.round2((quantityPassed / totalAssessed) * 100) : null;
 
-    const gradeScaleDistribution = profile.grades.map((g) => ({
-      grade: g,
-      count: gradeCounts.get(g) || 0,
-      percentage: totalAssessed > 0 ? this.stats.round2(((gradeCounts.get(g) || 0) / totalAssessed) * 100) : null,
-    }));
+    const gradeScaleDistribution = this.buildGradeScaleDistribution(profile, gradeCounts, totalAssessed);
 
     const participationRate =
       enrolledStudents > 0 ? (participated.length / enrolledStudents) * 100 : null;
@@ -799,24 +839,55 @@ export class TeacherAnalyticsService {
     const overallQualityPassRate = totalGraded > 0 ? this.stats.round2((totalQualityPassed / totalGraded) * 100) : null;
     const overallQuantityPassRate = totalGraded > 0 ? this.stats.round2((totalQuantityPassed / totalGraded) * 100) : null;
 
-    // Combined grade distribution across all assignments
-    const gradeCounts = new Map<string, number>();
-    for (const a of assignmentAnalytics) {
-      for (const d of a.gradeScaleDistribution) {
-        gradeCounts.set(d.grade, (gradeCounts.get(d.grade) || 0) + d.count);
-      }
-    }
-    const combinedGrades = [...new Set(assignmentAnalytics.flatMap((a) => a.gradingProfile.grades))];
-    const gradeDistribution = combinedGrades.map((g) => ({
-      grade: g,
-      count: gradeCounts.get(g) || 0,
-      percentage: totalGraded > 0 ? this.stats.round2(((gradeCounts.get(g) || 0) / totalGraded) * 100) : null,
-    }));
-
+    // Combined grade distribution across all assignments (consolidated view)
     const uniqueProfiles = new Map<string, ClassGradingProfile>();
     for (const a of assignmentAnalytics) {
       if (!uniqueProfiles.has(a.gradingProfile.systemName)) uniqueProfiles.set(a.gradingProfile.systemName, a.gradingProfile);
     }
+    const combinedGradeCounts = new Map<string, number>();
+    for (const a of assignmentAnalytics) {
+      for (const d of a.gradeScaleDistribution) {
+        combinedGradeCounts.set(d.grade, (combinedGradeCounts.get(d.grade) || 0) + d.count);
+      }
+    }
+    const combinedProfileList = Array.from(uniqueProfiles.values());
+    const scaleByGrade = new Map<string, { minScore: number; maxScore: number; points: number | null; remark: string }>();
+    const rangeByGrade = new Map<string, string | null>();
+    for (const p of combinedProfileList) {
+      for (const s of p.gradeBreakdown) {
+        if (!scaleByGrade.has(s.grade)) scaleByGrade.set(s.grade, s);
+        const rng =
+          s.minScore != null && s.maxScore != null ? `${s.minScore}-${s.maxScore}` : null;
+        if (!rangeByGrade.has(s.grade)) rangeByGrade.set(s.grade, rng);
+        else if (rangeByGrade.get(s.grade) !== rng) rangeByGrade.set(s.grade, null);
+      }
+    }
+    const orderedCombinedGrades: string[] = [];
+    const seenCombined = new Set<string>();
+    for (const p of combinedProfileList) {
+      for (const g of p.grades) {
+        if (!seenCombined.has(g)) {
+          seenCombined.add(g);
+          orderedCombinedGrades.push(g);
+        }
+      }
+    }
+    for (const g of Array.from(combinedGradeCounts.keys())
+      .filter((g) => !seenCombined.has(g))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))) {
+      orderedCombinedGrades.push(g);
+    }
+    const gradeDistribution: GradeDistribution[] = orderedCombinedGrades.map((g) => {
+      const scale = scaleByGrade.get(g);
+      return {
+        grade: g,
+        count: combinedGradeCounts.get(g) || 0,
+        percentage: totalGraded > 0 ? this.stats.round2(((combinedGradeCounts.get(g) || 0) / totalGraded) * 100) : null,
+        range: rangeByGrade.get(g) ?? null,
+        points: scale?.points ?? null,
+        remark: scale?.remark || null,
+      };
+    });
 
     return {
       teacher: context,
@@ -889,6 +960,15 @@ export class TeacherAnalyticsService {
       const qualityPassRate = totalAssessed > 0 ? this.stats.round2((totalQualityPassed / totalAssessed) * 100) : null;
       const quantityPassRate = totalAssessed > 0 ? this.stats.round2((totalQuantityPassed / totalAssessed) * 100) : null;
 
+      // Fail % for this class: re-weight failed assessments across all subjects
+      const assessedCount = rows.reduce((sum, r) => sum + (r.stats?.count || 0), 0);
+      const failedCount = rows.reduce(
+        (sum, r) => sum + ((r.stats?.count || 0) * (r.stats?.failRate ?? 0)) / 100,
+        0,
+      );
+      const failRate = assessedCount > 0 ? this.stats.round2((failedCount / assessedCount) * 100) : null;
+      const atRiskCount = rows.reduce((sum, r) => sum + (r.atRiskCount || 0), 0);
+
       // Grade distribution: merge across rows (same grading system within a class)
       const gradeCounts = new Map<string, number>();
       for (const r of rows) {
@@ -897,19 +977,18 @@ export class TeacherAnalyticsService {
         }
       }
       const profile = rows[0]?.gradingProfile;
-      const gradeScaleDistribution = (profile?.grades || []).map((g) => ({
-        grade: g,
-        count: gradeCounts.get(g) || 0,
-        percentage: totalAssessed > 0 ? this.stats.round2(((gradeCounts.get(g) || 0) / totalAssessed) * 100) : null,
-      }));
+      const gradeScaleDistribution = this.buildGradeScaleDistribution(profile, gradeCounts, totalAssessed);
 
       return {
         classId,
         className: rows[0].className,
         subjects: rows.map((r) => r.subjectName),
         studentCount: rows.reduce((sum, r) => sum + r.enrolledStudents, 0),
+        assessedCount,
         average: averages.length ? this.stats.round2(this.stats.mean(averages)) : null,
         passRate: passRates.length ? this.stats.round2(this.stats.mean(passRates)) : null,
+        failRate,
+        atRiskCount,
         trend: this.stats.trendLabel(
           rows.reduce((sum, r) => sum + (r.trendDelta ?? 0), 0) / (rows.length || 1),
         ),

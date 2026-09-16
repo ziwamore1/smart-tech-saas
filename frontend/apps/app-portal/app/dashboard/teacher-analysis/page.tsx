@@ -70,6 +70,13 @@ function gradeColor(g: string) {
   return GRADE_COLORS[g] || '#9ca3af';
 }
 
+function gradeRange(d: any, profile?: any) {
+  if (d.range) return d.range;
+  const scale = profile?.gradeBreakdown?.find((s: any) => String(s.grade) === String(d.grade));
+  if (scale && scale.minScore != null && scale.maxScore != null) return `${scale.minScore}-${scale.maxScore}`;
+  return null;
+}
+
 function GradeDistributionPanel({
   distribution,
   profile,
@@ -99,34 +106,147 @@ function GradeDistributionPanel({
         <span className="text-xs text-gray-500">{total} graded learners</span>
       </div>
       <div className="space-y-2">
-        {rows.map((d) => (
-          <div key={d.grade} className="flex items-center gap-3">
-            <span className="w-7 text-center font-bold text-sm" style={{ color: gradeColor(d.grade) }}>{d.grade}</span>
-            <div className="flex-1 bg-gray-100 rounded h-5 overflow-hidden">
-              <div className="h-full rounded" style={{ width: `${Math.max(((d.count ?? 0) / maxCount) * 100, d.count ? 6 : 0)}%`, background: gradeColor(d.grade) }} />
+        {rows.map((d) => {
+          const range = gradeRange(d, profile);
+          return (
+            <div key={d.grade} className="flex items-center gap-3">
+              <div className="w-8 text-center">
+                <span className="block font-bold text-sm" style={{ color: gradeColor(d.grade) }}>{d.grade}</span>
+                {range && <span className="block text-[9px] leading-tight text-gray-400">{range}%</span>}
+              </div>
+              <div className="flex-1 bg-gray-100 rounded h-5 overflow-hidden">
+                <div className="h-full rounded" style={{ width: `${Math.max(((d.count ?? 0) / maxCount) * 100, d.count ? 6 : 0)}%`, background: gradeColor(d.grade) }} />
+              </div>
+              <span className="w-28 text-right text-sm font-medium whitespace-nowrap">
+                {d.count ?? 0} <span className="text-gray-400 text-xs">({pct(d.percentage)})</span>
+              </span>
             </div>
-            <span className="w-28 text-right text-sm font-medium whitespace-nowrap">
-              {d.count ?? 0} <span className="text-gray-400 text-xs">({pct(d.percentage)})</span>
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function GradeLegend({ distribution }: { distribution: any[] }) {
+function GradeLegend({ distribution, profile }: { distribution: any[]; profile?: any }) {
   if (!distribution || distribution.length === 0) return null;
   const items = distribution.filter((d) => (d.count ?? 0) > 0);
   if (items.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-2">
-      {items.map((d) => (
-        <span key={d.grade} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-gray-200 text-xs font-medium text-gray-700">
-          <span className="w-3 h-3 rounded-full" style={{ background: gradeColor(d.grade) }} />
-          Grade {d.grade}: {d.count}
-        </span>
-      ))}
+      {items.map((d) => {
+        const range = gradeRange(d, profile);
+        return (
+          <span key={d.grade} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-gray-200 text-xs font-medium text-gray-700">
+            <span className="w-3 h-3 rounded-full" style={{ background: gradeColor(d.grade) }} />
+            Grade {d.grade}: {d.count} pupil{d.count === 1 ? '' : 's'}
+            {range ? <span className="text-gray-400"> (score {range}%)</span> : null}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function ClassAnalysisCard({ cls }: { cls: any }) {
+  const profile = cls?.gradingProfile;
+  const details = cls?.assignmentDetails || [];
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="p-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            {cls.className}
+            <span className="text-xs font-normal text-gray-500">{cls.subjects?.join(', ')}</span>
+          </h3>
+          <p className="text-xs text-gray-500 mt-1">Independent analysis of this assigned class</p>
+        </div>
+        {profile && (
+          <div className="text-right">
+            <span className="inline-block px-2 py-1 rounded-lg text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+              {profile.systemName}
+            </span>
+            {profile.systemId && (
+              <p className="text-[10px] text-gray-400 mt-1">
+                Quality (pass): {profile.qualityBands?.description} · Quantity (pass): {profile.quantityBands?.description}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-4">
+        {[
+          { label: 'Learners', value: cls.studentCount ?? '—' },
+          { label: 'Assessed', value: cls.assessedCount ?? '—' },
+          { label: 'Average', value: pct(cls.average) },
+          { label: 'Pass Rate', value: pct(cls.passRate) },
+          { label: 'Fail Rate', value: pct(cls.failRate), color: 'text-red-600' },
+          { label: 'Quality Pass', value: pct(cls.qualityPassRate), color: 'text-purple-600' },
+          { label: 'Quantity Pass', value: pct(cls.quantityPassRate), color: 'text-teal-600' },
+          { label: 'At Risk', value: cls.atRiskCount ?? 0, color: 'text-red-600' },
+          { label: 'Gender Gap', value: cls.genderGap != null ? `${cls.genderGap} pts` : '—' },
+          { label: 'Trend', value: trendLabel(cls.trend) },
+        ].map((s) => (
+          <div key={s.label} className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+            <p className={`text-lg font-bold ${s.color || 'text-gray-900'}`}>{s.value}</p>
+            <p className="text-[11px] text-gray-500">{s.label}</p>
+          </div>
+        ))}
+      </div>
+      <div className="p-4 pt-0 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div>
+          <GradeDistributionPanel
+            distribution={cls.gradeScaleDistribution || []}
+            profile={profile}
+            totalAssessed={cls.assessedCount}
+          />
+          <div className="mt-2">
+            <GradeLegend distribution={cls.gradeScaleDistribution || []} profile={profile} />
+          </div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden self-start">
+          <div className="p-3 border-b border-gray-200">
+            <h4 className="text-sm font-semibold text-gray-900">By Subject</h4>
+            <p className="text-xs text-gray-500">Per-subject performance in this class</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left py-2 px-3 font-semibold text-gray-700">Subject</th>
+                  <th className="text-center py-2 px-3 font-semibold text-gray-700">Assessed</th>
+                  <th className="text-center py-2 px-3 font-semibold text-gray-700">Pass</th>
+                  <th className="text-center py-2 px-3 font-semibold text-gray-700">Fail</th>
+                  <th className="text-center py-2 px-3 font-semibold text-gray-700">Quality</th>
+                  <th className="text-center py-2 px-3 font-semibold text-gray-700">Quantity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {details.map((d: any) => (
+                  <tr key={d.subjectId} className="border-b border-gray-100 align-top">
+                    <td className="py-2 px-3 font-medium text-gray-900">{d.subjectName}</td>
+                    <td className="py-2 px-3 text-center">{d.stats?.count ?? 0}</td>
+                    <td className="py-2 px-3 text-center">{pct(d.stats?.passRate)}</td>
+                    <td className="py-2 px-3 text-center text-red-600">{pct(d.stats?.failRate)}</td>
+                    <td className="py-2 px-3 text-center text-purple-600">{pct(d.qualityPassRate)}</td>
+                    <td className="py-2 px-3 text-center text-teal-600">{pct(d.quantityPassRate)}</td>
+                  </tr>
+                ))}
+                {details.length === 0 && (
+                  <tr><td colSpan={6} className="py-4 text-center text-gray-500">No subject data for this class.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {details.map((d: any) => (
+            <div key={`${d.subjectId}-dist`} className="border-t border-gray-200 p-4">
+              <h5 className="text-xs font-semibold text-gray-700 mb-2">{d.subjectName} — Grade Distribution</h5>
+              <GradeDistributionPanel distribution={d.gradeScaleDistribution || []} profile={d.gradingProfile || profile} />
+              <div className="mt-2"><GradeLegend distribution={d.gradeScaleDistribution || []} profile={d.gradingProfile || profile} /></div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -470,6 +590,7 @@ export default function TeacherAnalysisPage() {
                           <th className="text-left py-2 px-4 font-semibold text-gray-700">Class</th>
                           <th className="text-center py-2 px-4 font-semibold text-gray-700">Avg</th>
                           <th className="text-center py-2 px-4 font-semibold text-gray-700">Pass</th>
+                          <th className="text-center py-2 px-4 font-semibold text-gray-700">Fail</th>
                           <th className="text-center py-2 px-4 font-semibold text-gray-700">Quality</th>
                           <th className="text-center py-2 px-4 font-semibold text-gray-700">Quantity</th>
                           <th className="text-center py-2 px-4 font-semibold text-gray-700">Learners</th>
@@ -481,12 +602,13 @@ export default function TeacherAnalysisPage() {
                             <td className="py-2 px-4 font-medium text-gray-900">{c.className}</td>
                             <td className="py-2 px-4 text-center font-medium">{pct(c.average)}</td>
                             <td className="py-2 px-4 text-center font-medium">{pct(c.passRate)}</td>
+                            <td className="py-2 px-4 text-center font-medium text-red-600">{pct(c.failRate)}</td>
                             <td className="py-2 px-4 text-center font-medium text-purple-600">{pct(c.qualityPassRate)}</td>
                             <td className="py-2 px-4 text-center font-medium text-teal-600">{pct(c.quantityPassRate)}</td>
                             <td className="py-2 px-4 text-center">{c.studentCount}</td>
                           </tr>
                         ))}
-                        {classes.length === 0 && <tr><td colSpan={6} className="py-4 text-center text-gray-500">No class data</td></tr>}
+                        {classes.length === 0 && <tr><td colSpan={7} className="py-4 text-center text-gray-500">No class data</td></tr>}
                       </tbody>
                     </table>
                   </div>
@@ -531,7 +653,7 @@ export default function TeacherAnalysisPage() {
                     profile={summary.gradingProfiles?.[0]}
                     totalAssessed={summary.assessedForGrading}
                   />
-                  <div className="mt-3"><GradeLegend distribution={summary.gradeDistribution} /></div>
+                  <div className="mt-3"><GradeLegend distribution={summary.gradeDistribution} profile={summary.gradingProfiles?.[0]} /></div>
                 </div>
               )}
 
@@ -581,58 +703,58 @@ export default function TeacherAnalysisPage() {
 
           {/* ======= BY CLASS ======= */}
           {activeTab === 'classes' && (
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className="p-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Class Breakdown</h2>
-                <p className="text-sm text-gray-500">Performance per class you teach</p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Class</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Subjects</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Learners</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Avg</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Pass</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Quality</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Quantity</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Trend</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Gender Gap</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {classes.map((c: any, i: number) => (
-                      <tr key={c.classId} className={`border-b border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                        <td className="py-3 px-4 font-medium text-gray-900">{c.className}</td>
-                        <td className="py-3 px-4 text-gray-600">{c.subjects?.join(', ')}</td>
-                        <td className="py-3 px-4 text-center">{c.studentCount}</td>
-                        <td className="py-3 px-4 text-center font-medium">{pct(c.average)}</td>
-                        <td className="py-3 px-4 text-center font-medium">{pct(c.passRate)}</td>
-                        <td className="py-3 px-4 text-center font-medium text-purple-600">{pct(c.qualityPassRate)}</td>
-                        <td className="py-3 px-4 text-center font-medium text-teal-600">{pct(c.quantityPassRate)}</td>
-                        <td className="py-3 px-4 text-center">
-                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${TREND_COLOR[c.trend] || 'bg-gray-100 text-gray-500'}`}>
-                            {trendLabel(c.trend)}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center font-medium">{c.genderGap != null ? `${c.genderGap} pts` : '—'}</td>
+            <div className="space-y-6">
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div className="p-4 border-b border-gray-200">
+                  <h2 className="text-lg font-semibold text-gray-900">Class Breakdown</h2>
+                  <p className="text-sm text-gray-500">Performance per class you teach</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Class</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Subjects</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Learners</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Avg</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Pass</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Fail</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Quality</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Quantity</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Trend</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Gender Gap</th>
                       </tr>
-                    ))}
-                    {classes.length === 0 && (
-                      <tr><td colSpan={9} className="py-8 text-center text-gray-500">No class-level data for this term.</td></tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {classes.map((c: any, i: number) => (
+                        <tr key={c.classId} className={`border-b border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                          <td className="py-3 px-4 font-medium text-gray-900">{c.className}</td>
+                          <td className="py-3 px-4 text-gray-600">{c.subjects?.join(', ')}</td>
+                          <td className="py-3 px-4 text-center">{c.studentCount}</td>
+                          <td className="py-3 px-4 text-center font-medium">{pct(c.average)}</td>
+                          <td className="py-3 px-4 text-center font-medium">{pct(c.passRate)}</td>
+                          <td className="py-3 px-4 text-center font-medium text-red-600">{pct(c.failRate)}</td>
+                          <td className="py-3 px-4 text-center font-medium text-purple-600">{pct(c.qualityPassRate)}</td>
+                          <td className="py-3 px-4 text-center font-medium text-teal-600">{pct(c.quantityPassRate)}</td>
+                          <td className="py-3 px-4 text-center">
+                            <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${TREND_COLOR[c.trend] || 'bg-gray-100 text-gray-500'}`}>
+                              {trendLabel(c.trend)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center font-medium">{c.genderGap != null ? `${c.genderGap} pts` : '—'}</td>
+                        </tr>
+                      ))}
+                      {classes.length === 0 && (
+                        <tr><td colSpan={10} className="py-8 text-center text-gray-500">No class-level data for this term.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-              {classes.filter((c: any) => c.gradeDistribution?.length).length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 border-t border-gray-200">
-                  {classes.filter((c: any) => c.gradeDistribution?.length).map((c: any) => (
-                    <GradeDistributionPanel key={c.classId} distribution={c.gradeDistribution} profile={c.gradingProfile} />
-                  ))}
-                </div>
-              )}
+              {classes.map((c: any) => (
+                <ClassAnalysisCard key={c.classId} cls={c} />
+              ))}
             </div>
           )}
 

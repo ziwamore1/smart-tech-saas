@@ -331,6 +331,7 @@ model School {
   calendarNotificationDeliveries CalendarNotificationDelivery[]
   calendarGoals                  CalendarGoal[]
   calendarActivityTimelines      CalendarActivityTimeline[]
+  financialCustomers             FinancialCustomer[]
 
   @@index([institutionTypeId])
   @@index([isActive])
@@ -6899,4 +6900,607 @@ model AuthVerificationEvent {
 
   @@index([code, createdAt])
   @@index([authenticationId])
+}
+
+// ==================================================
+// FINANCIAL DOCUMENT MANAGEMENT SYSTEM
+// (Quotation / Invoice / Payment Receipt)
+// SuperAdmin-owned, configurable, auditable, PDF-rendered.
+// ==================================================
+
+enum FinancialDocumentType {
+  QUOTATION
+  INVOICE
+  PAYMENT_RECEIPT
+}
+
+enum QuotationStatus {
+  DRAFT
+  ISSUED
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
+  CONVERTED_TO_INVOICE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+  VOID
+}
+
+enum FinancialPaymentStatus {
+  PENDING
+  SUBMITTED
+  UNDER_REVIEW
+  CONFIRMED
+  REJECTED
+  REVERSED
+}
+
+enum FinancialPaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MOBILE_MONEY
+  CARD
+  CHEQUE
+  USSD
+  OTHER
+}
+
+enum FinancialReceiptStatus {
+  ISSUED
+  VOID
+}
+
+enum FinancialTaxPricingMode {
+  INCLUSIVE
+  EXCLUSIVE
+}
+
+enum FinancialSequenceResetPolicy {
+  NEVER
+  ANNUAL
+  MANUAL
+}
+
+enum FinancialCustomerType {
+  SCHOOL
+  GOVERNMENT
+  NGO
+  CORPORATE
+  INDIVIDUAL
+  OTHER
+}
+
+// ------------------------------------------------------------------
+// CENTRALIZED SMART_TECH COMPANY / BUSINESS IDENTITY (singleton)
+// ------------------------------------------------------------------
+model CompanyProfile {
+  id                              String   @id @default("company")
+  legalName                       String
+  tradingName                     String?
+  logoUrl                         String?
+  logoPublicId                    String?
+  companyRegistrationNumber       String? // PACRA registration / identity number
+  tpin                            String? // ZRA Taxpayer Identification Number
+  zraIdentityNumber               String?
+  physicalAddress                 String?
+  postalAddress                   String?
+  city                            String?
+  province                        String?
+  country                         String   @default("Zambia")
+  phone                           String?
+  email                           String?
+  website                         String?
+  businessDescription             String?
+  registrationInformation         Json?
+  authorizedContactName           String?
+  authorizedContactRole           String?
+  authorizedContactEmail          String?
+  authorizedContactPhone          String?
+  authorizedSignatoryName         String?
+  authorizedSignatoryRole         String?
+  signatureUrl                    String?
+  signaturePublicId               String?
+  stampUrl                        String?
+  stampPublicId                   String?
+  primaryColor                    String   @default("#1e3a5f")
+  secondaryColor                  String   @default("#c0a030")
+  headerLayout                    String   @default("logo-left")
+  footerLayout                    String   @default("standard")
+  watermarkText                   String?
+  defaultTerms                    String?
+  defaultPaymentTerms             String?
+  defaultNotes                    String?
+  defaultTaxConfigurationId      String?                @unique
+  isActive                        Boolean  @default(true)
+  createdById                     String?
+  updatedById                     String?
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+
+  defaultTaxConfiguration TaxConfiguration? @relation("CompanyDefaultTax", fields: [defaultTaxConfigurationId], references: [id])
+
+  @@index([createdAt])
+}
+
+// ------------------------------------------------------------------
+// CUSTOMERS / INSTITUTIONS
+// ------------------------------------------------------------------
+model FinancialCustomer {
+  id              String                @id @default(uuid())
+  schoolId        String?
+  customerType    FinancialCustomerType @default(SCHOOL)
+  name            String
+  legalName       String?
+  address         String?
+  postalAddress   String?
+  city            String?
+  province        String?
+  country         String?
+  contactPerson   String?
+  billingContact  String?
+  email           String?
+  phone           String?
+  customerReference String?
+  taxInformation  String?
+  notes           String?
+  isActive        Boolean               @default(true)
+  createdById     String?
+  updatedById     String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  school     School?     @relation(fields: [schoolId], references: [id])
+  quotations Quotation[] @relation("CustomerQuotations")
+  invoices   Invoice[]   @relation("CustomerInvoices")
+  payments   FinancialPayment[] @relation("CustomerPayments")
+  receipts   FinancialReceipt[] @relation("CustomerReceipts")
+
+  @@index([schoolId])
+  @@index([name])
+  @@index([isActive])
+}
+
+// ------------------------------------------------------------------
+// BANK ACCOUNTS (config-driven, never hardcoded into templates)
+// ------------------------------------------------------------------
+model BankAccount {
+  id              String   @id @default(uuid())
+  bankName        String
+  accountName     String
+  accountNumber   String
+  branch          String?
+  branchCode      String?
+  swiftCode       String?
+  currency        String   @default("ZMW")
+  accountType     String?
+  isActive        Boolean  @default(true)
+  isDefault       Boolean  @default(false)
+  displayOrder    Int      @default(0)
+  notes           String?
+  createdById     String?
+  updatedById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  quotations Quotation[] @relation("QuotationBankAccount")
+  invoices   Invoice[]   @relation("InvoiceBankAccount")
+
+  @@unique([bankName, accountNumber])
+  @@index([currency])
+  @@index([isActive])
+}
+
+// ------------------------------------------------------------------
+// TAX / ZRA CONFIGURATION
+// ------------------------------------------------------------------
+model TaxConfiguration {
+  id               String                   @id @default(uuid())
+  name             String
+  taxRate          Float                    @default(0)
+  registrationNumber String?
+  description      String?
+  pricingMode      FinancialTaxPricingMode  @default(EXCLUSIVE)
+  isActive         Boolean                  @default(true)
+  isDefault        Boolean                  @default(false)
+  effectiveFrom    DateTime?
+  effectiveTo      DateTime?
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  companyDefault CompanyProfile? @relation("CompanyDefaultTax")
+  quotations    Quotation[]      @relation("QuotationTaxConfig")
+  invoices      Invoice[]        @relation("InvoiceTaxConfig")
+
+  @@index([isActive])
+  @@index([isDefault])
+}
+
+// ------------------------------------------------------------------
+// NUMBERING ENGINE CONFIGURATION + ATOMIC COUNTERS
+// ------------------------------------------------------------------
+model FinancialDocumentSequence {
+  id             String                       @id @default(uuid())
+  documentType   FinancialDocumentType
+  prefix         String                       @default("QT")
+  year           Int
+  sequence       Int                          @default(0)
+  sequenceLength Int                          @default(5)
+  separator      String                       @default("-")
+  startNumber    Int                          @default(1)
+  pattern        String                       @default("{PREFIX}{SEPARATOR}{YEAR}{SEPARATOR}{SEQ}")
+  resetPolicy    FinancialSequenceResetPolicy @default(NEVER)
+  updatedAt      DateTime                     @updatedAt
+
+  @@unique([documentType, prefix, year])
+  @@index([documentType])
+}
+
+// ------------------------------------------------------------------
+// QUOTATION
+// ------------------------------------------------------------------
+model Quotation {
+  id               String          @id @default(uuid())
+  quotationNumber  String          @unique
+  status           QuotationStatus @default(DRAFT)
+  quotationDate    DateTime
+  validUntil       DateTime?
+  issueDate        DateTime?
+  sentAt           DateTime?
+  acceptedAt       DateTime?
+  rejectedAt       DateTime?
+  expiredAt        DateTime?
+  cancelledAt      DateTime?
+  cancelledBy      String?
+  cancellationReason String?
+  convertedAt      DateTime?
+  customerId       String
+  currency         String          @default("ZMW")
+  reference        String?
+  customerReference String?
+  subtotal         Float           @default(0)
+  discount         Float           @default(0)
+  taxableAmount    Float           @default(0)
+  taxAmount        Float           @default(0)
+  taxRate          Float?
+  totalAmount      Float           @default(0)
+  amountInWords    String?
+  taxConfigurationId String?
+  bankAccountId    String?
+  quotationValidity String?
+  paymentTerms     String?
+  deliveryTerms    String?
+  notes            String?
+  specialConditions String?
+  templateId       String?
+  templateVersion  Int?
+  pdfUrl           String?
+  pdfPublicId      String?
+  verificationCode String?
+  documentHash     String?
+  verificationUrl  String?
+  createdById      String?
+  issuedById       String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  customer     FinancialCustomer @relation("CustomerQuotations", fields: [customerId], references: [id])
+  taxConfig    TaxConfiguration? @relation("QuotationTaxConfig", fields: [taxConfigurationId], references: [id])
+  bankAccount  BankAccount?      @relation("QuotationBankAccount", fields: [bankAccountId], references: [id])
+  items        QuotationItem[]
+  invoice      Invoice?          @relation("InvoiceFromQuotation")
+  payments     FinancialPayment[] @relation("QuotationPayments")
+  receipts     FinancialReceipt[]
+
+  @@index([status])
+  @@index([customerId])
+  @@index([quotationDate])
+  @@index([createdAt])
+}
+
+model QuotationItem {
+  id          String  @id @default(uuid())
+  quotationId String
+  itemName    String?
+  description String
+  quantity    Float   @default(1)
+  unit        String?
+  unitPrice   Float   @default(0)
+  discount    Float   @default(0)
+  taxRate     Float?
+  taxAmount   Float   @default(0)
+  subtotal    Float   @default(0)
+  lineTotal   Float   @default(0)
+  sortOrder   Int     @default(0)
+
+  quotation Quotation @relation(fields: [quotationId], references: [id])
+
+  @@index([quotationId])
+}
+
+// ------------------------------------------------------------------
+// INVOICE
+// ------------------------------------------------------------------
+model Invoice {
+  id                 String        @id @default(uuid())
+  invoiceNumber      String        @unique
+  status             InvoiceStatus @default(DRAFT)
+  invoiceDate        DateTime
+  dueDate            DateTime?
+  issueDate          DateTime?
+  sentAt             DateTime?
+  paidAt             DateTime?
+  quotationId        String?       @unique
+  orderReference     String?
+  purchaseReference  String?
+  customerId         String
+  currency           String        @default("ZMW")
+  subtotal           Float         @default(0)
+  discount           Float         @default(0)
+  taxableAmount      Float         @default(0)
+  taxAmount          Float         @default(0)
+  taxRate            Float?
+  totalAmount        Float         @default(0)
+  amountPaid         Float         @default(0)
+  balanceDue         Float         @default(0)
+  amountInWords      String?
+  taxConfigurationId String?
+  bankAccountId      String?
+  paymentTerms       String?
+  serviceTerms       String?
+  notes              String?
+  templateId         String?
+  templateVersion    Int?
+  pdfUrl             String?
+  pdfPublicId        String?
+  verificationCode   String?
+  documentHash       String?
+  verificationUrl    String?
+  createdById        String?
+  issuedById         String?
+  voidedAt           DateTime?
+  voidedBy           String?
+  voidReason         String?
+  cancelledAt        DateTime?
+  cancelledBy        String?
+  cancellationReason String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  customer    FinancialCustomer @relation("CustomerInvoices", fields: [customerId], references: [id])
+  quotation   Quotation?        @relation("InvoiceFromQuotation", fields: [quotationId], references: [id])
+  taxConfig   TaxConfiguration? @relation("InvoiceTaxConfig", fields: [taxConfigurationId], references: [id])
+  bankAccount BankAccount?      @relation("InvoiceBankAccount", fields: [bankAccountId], references: [id])
+  items       InvoiceItem[]
+  payments    FinancialPayment[] @relation("InvoicePayments")
+  receipts    FinancialReceipt[] @relation("InvoiceReceipts")
+  allocations PaymentAllocation[]
+
+  @@index([status])
+  @@index([customerId])
+  @@index([invoiceDate])
+  @@index([dueDate])
+  @@index([createdAt])
+}
+
+model InvoiceItem {
+  id        String  @id @default(uuid())
+  invoiceId String
+  itemName  String?
+  description String
+  quantity  Float   @default(1)
+  unit      String?
+  unitPrice Float   @default(0)
+  discount  Float   @default(0)
+  taxRate   Float?
+  taxAmount Float   @default(0)
+  subtotal  Float   @default(0)
+  lineTotal Float   @default(0)
+  sortOrder Int     @default(0)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+}
+
+// ------------------------------------------------------------------
+// PAYMENTS (recorded against invoices, confirmed/reconciled by SuperAdmin)
+// ------------------------------------------------------------------
+model FinancialPayment {
+  id                   String                 @id @default(uuid())
+  paymentNumber        String                 @unique
+  invoiceId            String
+  quotationId          String?
+  customerId           String
+  paymentDate          DateTime
+  amount               Float
+  currency             String                 @default("ZMW")
+  method               FinancialPaymentMethod @default(BANK_TRANSFER)
+  transactionReference String?
+  bankReference        String?
+  receivedById         String?
+  confirmedById        String?
+  confirmedAt          DateTime?
+  rejectionReason      String?
+  reversalReason       String?
+  reversedAt           DateTime?
+  reversedById         String?
+  notes                String?
+  attachmentUrl        String?
+  attachmentPublicId   String?
+  status               FinancialPaymentStatus @default(PENDING)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  invoice     Invoice             @relation("InvoicePayments", fields: [invoiceId], references: [id])
+  quotation   Quotation?          @relation("QuotationPayments", fields: [quotationId], references: [id])
+  customer    FinancialCustomer   @relation("CustomerPayments", fields: [customerId], references: [id])
+  allocations PaymentAllocation[]
+  receipts    FinancialReceipt[] @relation("PaymentReceipts")
+
+  @@index([invoiceId])
+  @@index([quotationId])
+  @@index([customerId])
+  @@index([status])
+  @@index([paymentDate])
+}
+
+model PaymentAllocation {
+  id        String  @id @default(uuid())
+  paymentId String
+  invoiceId String
+  amount    Float
+  createdAt DateTime @default(now())
+
+  payment FinancialPayment @relation(fields: [paymentId], references: [id])
+  invoice Invoice         @relation(fields: [invoiceId], references: [id])
+
+  @@index([paymentId])
+  @@index([invoiceId])
+}
+
+// ------------------------------------------------------------------
+// PAYMENT RECEIPTS (only ever issued against a CONFIRMED payment)
+// ------------------------------------------------------------------
+model FinancialReceipt {
+  id                String                 @id @default(uuid())
+  receiptNumber     String                 @unique
+  paymentId         String                 @unique
+  invoiceId         String
+  quotationId       String?
+  customerId        String
+  receiptDate       DateTime               @default(now())
+  paymentDate       DateTime?
+  amountReceived    Float
+  currency          String                 @default("ZMW")
+  amountInWords     String?
+  paymentMethod     FinancialPaymentMethod
+  transactionReference String?
+  bankName          String?
+  accountName       String?
+  accountLast4      String?
+  description       String?
+  notes             String?
+  status            FinancialReceiptStatus @default(ISSUED)
+  issuedById        String?
+  issuedAt          DateTime?
+  voidedAt          DateTime?
+  voidedById        String?
+  voidReason        String?
+  pdfUrl            String?
+  pdfPublicId       String?
+  verificationCode  String?
+  documentHash      String?
+  verificationUrl   String?
+  templateId        String?
+  templateVersion   Int?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  payment  FinancialPayment  @relation("PaymentReceipts", fields: [paymentId], references: [id])
+  invoice  Invoice           @relation("InvoiceReceipts", fields: [invoiceId], references: [id])
+  quotation Quotation?        @relation(fields: [quotationId], references: [id])
+  customer FinancialCustomer  @relation("CustomerReceipts", fields: [customerId], references: [id])
+
+  @@index([invoiceId])
+  @@index([quotationId])
+  @@index([receiptDate])
+}
+
+// ------------------------------------------------------------------
+// DOCUMENT VERSIONS (immutable snapshots of issued documents/PDFs)
+// ------------------------------------------------------------------
+model FinancialDocumentVersion {
+  id               String   @id @default(uuid())
+  documentType     FinancialDocumentType
+  documentId       String
+  documentNumber   String
+  version          Int
+  pdfUrl           String?
+  htmlSnapshot     String?
+  dataSnapshot     Json?
+  templateId       String?
+  templateVersion  Int?
+  templateSnapshot Json?
+  generatedById    String?
+  generatedAt      DateTime @default(now())
+  sourceFile       String?
+
+  @@unique([documentType, documentId, version])
+  @@index([documentType])
+  @@index([documentId])
+}
+
+// ------------------------------------------------------------------
+// AUDIT TRAIL (all important financial actions)
+// ------------------------------------------------------------------
+model FinancialDocumentAudit {
+  id             String    @id @default(uuid())
+  documentType   FinancialDocumentType?
+  documentId     String?
+  documentNumber String?
+  action         String
+  entity         String
+  entityId       String?
+  userId         String?
+  userEmail      String?
+  oldValues      Json?
+  newValues      Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime  @default(now())
+
+  @@index([documentType])
+  @@index([documentId])
+  @@index([documentNumber])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ------------------------------------------------------------------
+// FINANCIAL DOCUMENT SETTINGS (key/value configuration)
+// ------------------------------------------------------------------
+model FinancialDocumentSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json?
+  updatedById String?
+  updatedAt DateTime @updatedAt
+}
+
+// ------------------------------------------------------------------
+// FINANCIAL DOCUMENT TEMPLATES (dedicated, non-academic templates)
+// ------------------------------------------------------------------
+model FinancialDocumentTemplate {
+  id             String                @id @default(uuid())
+  docType        FinancialDocumentType
+  name           String
+  description    String?
+  theme          Json? // primaryColor / secondaryColor / typography / layout
+  headerLayout   String?
+  footerLayout   String?
+  watermarkText  String?
+  components     Json? // reusable blocks: company_header, customer_block, ...
+  legalFooter    String?
+  termsAndConditions String?
+  isActive       Boolean               @default(true)
+  isDefault      Boolean               @default(false)
+  version        Int                   @default(1)
+  createdById    String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([docType])
+  @@index([isDefault])
 }

@@ -2134,14 +2134,20 @@ private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
           gradeCounts.set(d.grade, existing);
         }
       }
-      const ordered = (profile.grades || []).map((g: string) => ({
-        grade: g,
-        count: gradeCounts.get(g)?.count || 0,
-        remark: gradeCounts.get(g)?.remark || null,
-      }));
-      const legendRows = ordered.map(({ grade, count, remark }) => `
+      const scaleByGrade = new Map<string, any>((profile.gradeBreakdown || []).map((g: any) => [g.grade, g]));
+      const ordered = (profile.grades || []).map((g: string) => {
+        const scale = scaleByGrade.get(g);
+        return {
+          grade: g,
+          count: gradeCounts.get(g)?.count || 0,
+          remark: gradeCounts.get(g)?.remark || scale?.remark || null,
+          range: scale?.minScore != null && scale?.maxScore != null ? `${scale.minScore}-${scale.maxScore}` : null,
+        };
+      });
+      const legendRows = ordered.map(({ grade, count, remark, range }) => `
         <tr>
           <td class="text-center font-bold" style="color:${this.gradePieColor(grade)};font-size:13px">${grade}</td>
+          <td style="color:#64748b;font-size:12px">${range || '—'}</td>
           <td style="color:#6b7280;font-size:12px">${remark || '—'}</td>
           <td class="text-center font-semibold">${count}</td>
           <td class="text-center">${totalAssessed > 0 ? ((count / totalAssessed) * 100).toFixed(1) : '0.0'}%</td>
@@ -2161,7 +2167,7 @@ private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
           <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
             ${this.buildGradePie(distribution, totalAssessed)}
             <table style="width:auto;min-width:320px;font-size:13px">
-              <thead><tr><th class="text-center">Grade</th><th>Remark</th><th class="text-center">Learners</th><th class="text-center">%</th><th class="text-center">Colour</th></tr></thead>
+              <thead><tr><th class="text-center">Grade</th><th class="text-center">Score Range</th><th>Remark</th><th class="text-center">Learners</th><th class="text-center">%</th><th class="text-center">Colour</th></tr></thead>
               <tbody>${legendRows}</tbody>
             </table>
           </div>
@@ -2185,6 +2191,14 @@ private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
       v == null ? '—' : `${Number(v).toFixed(1)}%`;
     const dash = (v: any): string => (v == null || v === '' ? '—' : String(v));
 
+    // Consolidated fail rate (re-weighted across assignment row counts)
+    const assessedTotal = (report.assignments || []).reduce((s, a) => s + (a.stats?.count || 0), 0);
+    const failedTotal = (report.assignments || []).reduce(
+      (s, a) => s + ((a.stats?.count || 0) * (a.stats?.failRate ?? 0)) / 100,
+      0,
+    );
+    const overallFailRate = assessedTotal > 0 ? (failedTotal / assessedTotal) * 100 : null;
+
     // Summary cards
     const summaryCards = `
       <div class="summary-grid">
@@ -2194,6 +2208,7 @@ private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
         <div class="summary-card"><div class="summary-value">${summary.assessmentsAnalysed}</div><div class="summary-label">Assessments Analysed</div></div>
         <div class="summary-card" style="border-top-color:#2563eb"><div class="summary-value" style="color:#2563eb">${pct(summary.overallAverage)}</div><div class="summary-label">Overall Average</div></div>
         <div class="summary-card" style="border-top-color:#059669"><div class="summary-value" style="color:${summary.overallPassRate != null && summary.overallPassRate >= 60 ? '#059669' : '#dc2626'}">${pct(summary.overallPassRate)}</div><div class="summary-label">Pass Rate</div></div>
+        <div class="summary-card" style="border-top-color:#dc2626"><div class="summary-value fail">${pct(overallFailRate)}</div><div class="summary-label">Fail Rate</div></div>
         <div class="summary-card" style="border-top-color:#7c3aed"><div class="summary-value" style="color:#7c3aed">${pct(summary.overallQualityPassRate)}</div><div class="summary-label">Quality Pass</div></div>
         <div class="summary-card" style="border-top-color:#0d9488"><div class="summary-value" style="color:#0d9488">${pct(summary.overallQuantityPassRate)}</div><div class="summary-label">Quantity Pass</div></div>
         <div class="summary-card" style="border-top-color:#f59e0b"><div class="summary-value" style="color:#d97706">${summary.assessedForGrading ?? 0}</div><div class="summary-label">Graded Learners</div></div>
@@ -2202,6 +2217,109 @@ private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
       </div>`;
 
     const gradingBlock = this.buildGradeDistributionHtml(report.assignments || [], summary);
+
+    // Per-class independent analysis sections (each assigned class, then consolidated)
+    const byClass = new Map<string, any[]>();
+    for (const a of report.assignments || []) {
+      if (!byClass.has(a.classId)) byClass.set(a.classId, []);
+      byClass.get(a.classId)!.push(a);
+    }
+    const perClassSections = Array.from(byClass.entries()).map(([classId, rows]) => {
+      const first = rows[0];
+      const profile = first?.gradingProfile;
+      const totalEnrolled = rows.reduce((s, r) => s + (r.enrolledStudents || 0), 0);
+      const totalAssessed = rows.reduce((s, r) => s + (r.assessedStudents || 0), 0);
+      const averages = rows.map((r) => r.stats?.average).filter((v): v is number => v != null);
+      const passRates = rows.map((r) => r.stats?.passRate).filter((v): v is number => v != null);
+      const gapValues = rows.map((r) => r.gender?.gap?.averageGap).filter((v): v is number => v != null);
+      const classAverage = averages.length ? averages.reduce((s, v) => s + v, 0) / averages.length : null;
+      const classPassRate = passRates.length ? passRates.reduce((s, v) => s + v, 0) / passRates.length : null;
+      const assessCount = rows.reduce((s, r) => s + (r.stats?.count || 0), 0);
+      const failCount = rows.reduce(
+        (s, r) => s + ((r.stats?.count || 0) * (r.stats?.failRate ?? 0)) / 100,
+        0,
+      );
+      const classFailRate = assessCount > 0 ? (failCount / assessCount) * 100 : null;
+      const gradedRows = rows.filter((r) => r.assessedStudents > 0);
+      const gradedTotal = gradedRows.reduce((s, r) => s + r.assessedStudents, 0);
+      const qualityPassed = gradedRows.reduce((s, r) => s + (r.qualityPassed || 0), 0);
+      const quantityPassed = gradedRows.reduce((s, r) => s + (r.quantityPassed || 0), 0);
+      const classQualityRate = gradedTotal > 0 ? (qualityPassed / gradedTotal) * 100 : null;
+      const classQuantityRate = gradedTotal > 0 ? (quantityPassed / gradedTotal) * 100 : null;
+      const atRisk = rows.reduce((s, r) => s + (r.atRiskCount || 0), 0);
+      const classGap = gapValues.length ? gapValues.reduce((s, v) => s + v, 0) / gapValues.length : null;
+      const trendDelta = rows.reduce((s, r) => s + (r.trendDelta ?? 0), 0) / (rows.length || 1);
+
+      const gradeCounts = new Map<string, number>();
+      for (const r of rows) {
+        for (const d of r.gradeScaleDistribution || []) {
+          gradeCounts.set(d.grade, (gradeCounts.get(d.grade) || 0) + (d.count || 0));
+        }
+      }
+      const scaleByGrade = new Map<string, any>((profile?.gradeBreakdown || []).map((s: any) => [s.grade, s]));
+      const orderedGrades: string[] = [...(profile?.grades || [])];
+      for (const g of Array.from(gradeCounts.keys())) {
+        if (!orderedGrades.includes(g)) orderedGrades.push(g);
+      }
+      const maxCount = Math.max(1, ...Array.from(gradeCounts.values()));
+      const legendRows = orderedGrades.map((g) => {
+        const scale = scaleByGrade.get(g);
+        const count = gradeCounts.get(g) || 0;
+        const range = scale?.minScore != null && scale?.maxScore != null ? `${scale.minScore}-${scale.maxScore}` : null;
+        const pctVal = gradedTotal > 0 ? ((count / gradedTotal) * 100).toFixed(1) : '0.0';
+        return `
+          <tr>
+            <td class="text-center font-bold" style="color:${this.gradePieColor(g)};font-size:13px">${g}</td>
+            <td style="color:#64748b;font-size:12px">${range || '—'}</td>
+            <td style="color:#6b7280;font-size:12px">${scale?.remark || '—'}</td>
+            <td class="text-center"><div style="display:flex;align-items:center;gap:6px"><div style="height:11px;width:${Math.max((count / maxCount) * 100, count ? 3 : 0)}%;max-width:150px;background:${this.gradePieColor(g)};border-radius:3px"></div><span style="font-size:12px">${count}</span></div></td>
+            <td class="text-center">${pctVal}%</td>
+          </tr>`;
+      }).join('');
+
+      const subjectRows = rows.map((a: any) => `
+        <tr>
+          <td style="font-weight:600">${dash(a.subjectName)}</td>
+          <td class="text-center">${dash(a.stats?.count ?? 0)}</td>
+          <td class="text-center font-bold" style="color:${this.scoreColor(a.stats?.average ?? 0)}">${pct(a.stats?.average)}</td>
+          <td class="text-center">${pct(a.stats?.passRate)}</td>
+          <td class="text-center" style="color:#dc2626">${pct(a.stats?.failRate)}</td>
+          <td class="text-center">${pct(a.qualityPassRate)}</td>
+          <td class="text-center">${pct(a.quantityPassRate)}</td>
+        </tr>`).join('');
+
+      return `
+        <div class="section-title">Independent Analysis — ${dash(first?.className)}${profile?.systemName ? ` (${profile.systemName})` : ''}</div>
+        <div class="summary-grid">
+          <div class="summary-card"><div class="summary-value">${totalEnrolled}</div><div class="summary-label">Enrolled</div></div>
+          <div class="summary-card"><div class="summary-value">${totalAssessed}</div><div class="summary-label">Assessed</div></div>
+          <div class="summary-card"><div class="summary-value" style="color:#2563eb">${classAverage != null ? classAverage.toFixed(1) : '—'}${classAverage != null ? '%' : ''}</div><div class="summary-label">Average</div></div>
+          <div class="summary-card"><div class="summary-value pass">${classPassRate != null ? classPassRate.toFixed(1) : '—'}${classPassRate != null ? '%' : ''}</div><div class="summary-label">Pass Rate</div></div>
+          <div class="summary-card"><div class="summary-value fail">${classFailRate != null ? classFailRate.toFixed(1) : '—'}${classFailRate != null ? '%' : ''}</div><div class="summary-label">Fail Rate</div></div>
+          <div class="summary-card" style="border-top-color:#7c3aed"><div class="summary-value" style="color:#7c3aed">${classQualityRate != null ? classQualityRate.toFixed(1) : '—'}${classQualityRate != null ? '%' : ''}</div><div class="summary-label">Quality Pass</div></div>
+          <div class="summary-card" style="border-top-color:#0d9488"><div class="summary-value" style="color:#0d9488">${classQuantityRate != null ? classQuantityRate.toFixed(1) : '—'}${classQuantityRate != null ? '%' : ''}</div><div class="summary-label">Quantity Pass</div></div>
+          <div class="summary-card"><div class="summary-value fail">${atRisk}</div><div class="summary-label">At Risk</div></div>
+          <div class="summary-card"><div class="summary-value">${classGap != null ? Math.abs(classGap).toFixed(1) : '—'}</div><div class="summary-label">Gender Gap (pts)</div></div>
+          <div class="summary-card"><div class="summary-value">${trendDelta > 3 ? 'Improving' : trendDelta < -3 ? 'Declining' : trendDelta == null ? '—' : 'Stable'}</div><div class="summary-label">Trend</div></div>
+        </div>
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:14px">
+          <div style="font-size:12px;color:#64748b;margin-bottom:8px">
+            <strong>Grading Legend &amp; Distribution</strong> (${dash(profile?.systemName)}) —
+            <strong>Quality</strong> (pass): ${dash(profile?.qualityBands?.description)} ·
+            <strong>Quantity</strong> (pass): ${dash(profile?.quantityBands?.description)}
+          </div>
+          <table>
+            <thead><tr><th class="text-center">Grade</th><th class="text-center">Score Range</th><th>Remark</th><th class="text-center">Learners</th><th class="text-center">%</th></tr></thead>
+            <tbody>${legendRows || '<tr><td colspan="5" class="text-center">No graded learners.</td></tr>'}</tbody>
+          </table>
+        </div>
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:6px 10px;margin-bottom:14px">
+          <table>
+            <thead><tr><th>Subject</th><th class="text-center">Assessed</th><th class="text-center">Average</th><th class="text-center">Pass %</th><th class="text-center">Fail %</th><th class="text-center">Quality %</th><th class="text-center">Quantity %</th></tr></thead>
+            <tbody>${subjectRows}</tbody>
+          </table>
+        </div>`;
+    }).join('');
 
     // Assignment performance table (now includes grading-system Quality/Quantity)
     const assignmentRows = (report.assignments || [])
@@ -2215,6 +2333,7 @@ private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
           <td class="text-center">${pct(a.stats?.highest)}</td>
           <td class="text-center">${pct(a.stats?.lowest)}</td>
           <td class="text-center">${pct(a.stats?.passRate)}</td>
+          <td class="text-center" style="color:#dc2626">${pct(a.stats?.failRate)}</td>
           <td class="text-center"><span class="grade-badge" style="background:${(a.qualityPassRate ?? 0) >= 60 ? '#d1fae5' : '#fee2e2'};color:${(a.qualityPassRate ?? 0) >= 60 ? '#047857' : '#dc2626'}">${pct(a.qualityPassRate)}</span></td>
           <td class="text-center"><span class="grade-badge" style="background:${(a.quantityPassRate ?? 0) >= 60 ? '#dbeafe' : '#fee2e2'};color:${(a.quantityPassRate ?? 0) >= 60 ? '#1d4ed8' : '#dc2626'}">${pct(a.quantityPassRate)}</span></td>
           <td class="text-center">${dash(a.trend)}</td>
@@ -2305,11 +2424,13 @@ private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
         { label: 'Generated', value: new Date(report.header.generatedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) },
       ])}
       ${summaryCards}
+      ${perClassSections}
+      <div class="section-title">Consolidated Analysis — Grading Legend &amp; Grade Distribution (per grading system)</div>
       ${gradingBlock}
       ${insightsBlock}
-      <div class="section-title">Class &amp; Subject Performance (with Quality/Quantity pass per grading system)</div>
-      <table><thead><tr><th>Class</th><th>Subject</th><th>Grading System</th><th class="text-center">Assessed</th><th class="text-center">Average</th><th class="text-center">Highest</th><th class="text-center">Lowest</th><th class="text-center">Pass %</th><th class="text-center">Quality %</th><th class="text-center">Quantity %</th><th class="text-center">Trend</th></tr></thead>
-        <tbody>${assignmentRows || '<tr><td colspan="11" class="text-center">No class/subject data available.</td></tr>'}</tbody>
+      <div class="section-title">Consolidated Class &amp; Subject Performance (with Quality/Quantity pass per grading system)</div>
+      <table><thead><tr><th>Class</th><th>Subject</th><th>Grading System</th><th class="text-center">Assessed</th><th class="text-center">Average</th><th class="text-center">Highest</th><th class="text-center">Lowest</th><th class="text-center">Pass %</th><th class="text-center">Fail %</th><th class="text-center">Quality %</th><th class="text-center">Quantity %</th><th class="text-center">Trend</th></tr></thead>
+        <tbody>${assignmentRows || '<tr><td colspan="12" class="text-center">No class/subject data available.</td></tr>'}</tbody>
       </table>
       ${(genderRows ? `<div class="section-title">Gender Analysis</div>
       <table><thead><tr><th>Class</th><th>Subject</th><th class="text-center">Female Avg</th><th class="text-center">Male Avg</th><th class="text-center">Gap (pts)</th><th class="text-center">Classification</th></tr></thead>

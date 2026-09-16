@@ -64,6 +64,10 @@ export interface GradeDistribution {
   grade: string;
   count: number;
   percentage: number | null;
+  // Score range / mark-scheme metadata for the configured grading system
+  range?: string | null;
+  points?: number | null;
+  remark?: string | null;
 }
 
 // Quality/Quantity pass-band definition — label lists reference the grading
