@@ -85,6 +85,7 @@ export default function MarkSchedulesPage() {
         score: sr.finalPercentage ?? null,
         grade: sr.finalGrade || null,
         remark: sr.finalRemark || null,
+        isAbsent: sr.isAbsent === true,
       }));
       return {
         firstName: s.student?.firstName || s.firstName || '',

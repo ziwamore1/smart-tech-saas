@@ -82,7 +82,7 @@ export interface ReportStudent {
   lastName: string;
   admissionNumber?: string;
   gender?: string;
-  results: { subject: string; score: number | null; grade?: string | null; remark?: string | null; maxScore?: number }[];
+  results: { subject: string; score: number | null; grade?: string | null; remark?: string | null; maxScore?: number; isAbsent?: boolean }[];
   average?: number | null;
   grade?: string | null;
   rank?: number | number;
@@ -141,6 +141,7 @@ export function generateMarkScheduleReport(students: ReportStudent[], meta: Repo
     const cells = s.results.map(r => {
       const pct = r.score;
       const gc = getGradeColor(r.grade);
+      if (r.isAbsent) return `<td class="text-center" style="background:#fef3c7"><span style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:11px;font-weight:600;background:#fef3c7;color:#92400e">ABSENT</span></td>`;
       if (pct == null) return `<td class="text-center" style="background:#fffbeb"><span style="color:#d1d5db">-</span></td>`;
       const color = scoreColor(pct);
       return `<td class="text-center" style="background:${pct < 50 ? '#fef2f2' : 'transparent'}">

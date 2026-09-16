@@ -131,6 +131,7 @@ export default function ViewResultsPage() {
         remark: r.remark || null,
         maxScore: r.maxScore || 100,
         points: r.points ?? null,
+        isAbsent: r.isAbsent === true || r.status === 'absent',
       }));
       const validScores = results.filter((r: any) => r.score != null);
       const avg = validScores.length > 0
@@ -462,7 +463,7 @@ export default function ViewResultsPage() {
                       <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: '12px', borderBottom: '1px solid #e8ddd0', background: '#fdfaf7', position: 'sticky', left: '220px' }}>{s.admissionNumber || '-'}</td>
                       {subjects.map((subj) => {
                         const r = resultBySubject[subj];
-                        const isAbsent = r != null && r.score == null;
+                        const isAbsent = r != null && (r.isAbsent === true || r.score == null);
                         const sc = r?.score != null ? getScoreColorLocal(r.score) : undefined;
                         const gc = r?.grade ? getGradeColorLocal(r.grade) : null;
                         return (

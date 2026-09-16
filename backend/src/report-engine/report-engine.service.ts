@@ -1833,6 +1833,9 @@ case ReportType.RESULTS_ANALYSIS:
         const pct = result?.finalPercentage;
         const grade = result?.finalGrade || null;
         const remark = result?.finalRemark || null;
+        if (result?.isAbsent) {
+          return `<td class="text-center" style="background:#fef3c7"><span style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:11px;font-weight:600;background:#fef3c7;color:#92400e">ABSENT</span></td>`;
+        }
         if (pct == null) {
           return `<td class="text-center" style="background:#fffbeb"><span style="color:#d1d5db">-</span></td>`;
         }
