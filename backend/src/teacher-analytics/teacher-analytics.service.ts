@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { ComputedResultStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StudentSubjectService } from '../student-subject/student-subject.service';
@@ -20,6 +20,12 @@ import {
 } from './teacher-analytics.types';
 
 const COMPUTED_STATUSES: ComputedResultStatus[] = ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'];
+
+interface GradeCountBucket {
+  count: number;
+  males: number;
+  females: number;
+}
 
 type ComputedResultRow = {
   studentId: string;
@@ -514,7 +520,7 @@ export class TeacherAnalyticsService {
    */
   private buildGradeScaleDistribution(
     profile: ClassGradingProfile | null | undefined,
-    gradeCounts: Map<string, number>,
+    gradeCounts: Map<string, GradeCountBucket>,
     totalAssessed: number,
   ): GradeDistribution[] {
     const scaleByGrade = new Map<string, { minScore: number; maxScore: number; points: number | null; remark: string }>();
@@ -535,10 +541,14 @@ export class TeacherAnalyticsService {
     }
     return orderedGrades.map((g) => {
       const scale = scaleByGrade.get(g);
+      const bucket = gradeCounts.get(g);
+      const count = bucket?.count || 0;
       return {
         grade: g,
-        count: gradeCounts.get(g) || 0,
-        percentage: totalAssessed > 0 ? this.stats.round2(((gradeCounts.get(g) || 0) / totalAssessed) * 100) : null,
+        count,
+        percentage: totalAssessed > 0 ? this.stats.round2((count / totalAssessed) * 100) : null,
+        males: bucket?.males || 0,
+        females: bucket?.females || 0,
         range:
           scale && scale.minScore != null && scale.maxScore != null
             ? `${scale.minScore}-${scale.maxScore}`
@@ -573,7 +583,7 @@ export class TeacherAnalyticsService {
     // Grade-scale-based quality/quantity + full grade distribution
     let qualityPassed = 0;
     let quantityPassed = 0;
-    const gradeCounts = new Map<string, number>();
+    const gradeCounts = new Map<string, GradeCountBucket>();
     for (const r of participated) {
       if (r.finalPercentage == null) continue;
       // Prefer persisted grade/points, fallback to scale lookup
@@ -587,7 +597,12 @@ export class TeacherAnalyticsService {
       if (bandIncludes(profile.qualityBands, grade, points)) qualityPassed++;
       if (bandIncludes(profile.quantityBands, grade, points)) quantityPassed++;
       const key = grade || 'N/A';
-      gradeCounts.set(key, (gradeCounts.get(key) || 0) + 1);
+      const bucket = gradeCounts.get(key) || { count: 0, males: 0, females: 0 };
+      bucket.count++;
+      const gender = r.student?.gender?.toLowerCase();
+      if (gender === 'male') bucket.males++;
+      else if (gender === 'female') bucket.females++;
+      gradeCounts.set(key, bucket);
     }
     const qualityPassRate = totalAssessed > 0 ? this.stats.round2((qualityPassed / totalAssessed) * 100) : null;
     const quantityPassRate = totalAssessed > 0 ? this.stats.round2((quantityPassed / totalAssessed) * 100) : null;
@@ -844,10 +859,14 @@ export class TeacherAnalyticsService {
     for (const a of assignmentAnalytics) {
       if (!uniqueProfiles.has(a.gradingProfile.systemName)) uniqueProfiles.set(a.gradingProfile.systemName, a.gradingProfile);
     }
-    const combinedGradeCounts = new Map<string, number>();
+    const combinedGradeCounts = new Map<string, GradeCountBucket>();
     for (const a of assignmentAnalytics) {
       for (const d of a.gradeScaleDistribution) {
-        combinedGradeCounts.set(d.grade, (combinedGradeCounts.get(d.grade) || 0) + d.count);
+        const bucket = combinedGradeCounts.get(d.grade) || { count: 0, males: 0, females: 0 };
+        bucket.count += d.count || 0;
+        bucket.males += d.males || 0;
+        bucket.females += d.females || 0;
+        combinedGradeCounts.set(d.grade, bucket);
       }
     }
     const combinedProfileList = Array.from(uniqueProfiles.values());
@@ -879,10 +898,14 @@ export class TeacherAnalyticsService {
     }
     const gradeDistribution: GradeDistribution[] = orderedCombinedGrades.map((g) => {
       const scale = scaleByGrade.get(g);
+      const bucket = combinedGradeCounts.get(g);
+      const count = bucket?.count || 0;
       return {
         grade: g,
-        count: combinedGradeCounts.get(g) || 0,
-        percentage: totalGraded > 0 ? this.stats.round2(((combinedGradeCounts.get(g) || 0) / totalGraded) * 100) : null,
+        count,
+        percentage: totalGraded > 0 ? this.stats.round2((count / totalGraded) * 100) : null,
+        males: bucket?.males || 0,
+        females: bucket?.females || 0,
         range: rangeByGrade.get(g) ?? null,
         points: scale?.points ?? null,
         remark: scale?.remark || null,
@@ -897,6 +920,8 @@ export class TeacherAnalyticsService {
       assignments: [],
       classesCount: new Set(assignmentAnalytics.map((a) => a.classId)).size,
       subjectsCount: new Set(assignmentAnalytics.map((a) => a.subjectId)).size,
+      classesWithData: new Set(assignmentAnalytics.filter((a) => (a.stats?.count ?? 0) > 0).map((a) => a.classId)).size,
+      subjectsWithData: new Set(assignmentAnalytics.filter((a) => (a.stats?.count ?? 0) > 0).map((a) => a.subjectId)).size,
       totalStudentsTaught: assignmentAnalytics.reduce((sum, a) => sum + a.enrolledStudents, 0),
       assessmentsAnalysed: assignmentAnalytics.reduce((sum, a) => sum + a.stats.count, 0),
       overallAverage: weightedAverage,
@@ -970,10 +995,14 @@ export class TeacherAnalyticsService {
       const atRiskCount = rows.reduce((sum, r) => sum + (r.atRiskCount || 0), 0);
 
       // Grade distribution: merge across rows (same grading system within a class)
-      const gradeCounts = new Map<string, number>();
+      const gradeCounts = new Map<string, GradeCountBucket>();
       for (const r of rows) {
         for (const d of r.gradeScaleDistribution) {
-          gradeCounts.set(d.grade, (gradeCounts.get(d.grade) || 0) + d.count);
+          const bucket = gradeCounts.get(d.grade) || { count: 0, males: 0, females: 0 };
+          bucket.count += d.count || 0;
+          bucket.males += d.males || 0;
+          bucket.females += d.females || 0;
+          gradeCounts.set(d.grade, bucket);
         }
       }
       const profile = rows[0]?.gradingProfile;
@@ -1528,10 +1557,13 @@ export class TeacherAnalyticsService {
     }
     const term = cycle.term;
     const yearName = term.academicYear?.name || '';
-    const analytics = await this.getAssignmentsAnalytics(context.userId, context.schoolId, term, yearName);
+    const allAnalytics = await this.getAssignmentsAnalytics(context.userId, context.schoolId, term, yearName);
+    // Only classes/subjects with entered and published (computed) results are presented.
+    // Assigned class/subject counts remain available via summary.classesCount/subjectsCount.
+    const analytics = allAnalytics.filter((a) => (a.stats?.count ?? 0) > 0);
     const summary = await this.buildTeacherSummary(
       context,
-      analytics,
+      allAnalytics,
       { id: term.id, name: term.name },
       yearName,
     );
@@ -1578,7 +1610,7 @@ export class TeacherAnalyticsService {
 
     const overview = term ? await this.getOverview(reqUser, term.id) : null;
     const assignments = term
-      ? await this.getAssignmentsAnalytics(context.userId, context.schoolId, term as any, term.academicYear?.name || '')
+      ? (await this.getAssignmentsAnalytics(context.userId, context.schoolId, term as any, term.academicYear?.name || '')).filter((a) => (a.stats?.count ?? 0) > 0)
       : [];
 
     const schoolName = school?.name || 'School';
@@ -1668,6 +1700,206 @@ export class TeacherAnalyticsService {
         competencies: overview?.competency?.classCompetency || [],
         students: overview?.atRisk || [],
       },
+    };
+  }
+
+  /**
+   * Dedicated teacher mark schedule — one schedule per assigned class + subject
+   * (never combined). Each schedule lists the weighted assessment components
+   * (e.g. Test 1 10%, Mid-Term 30%, End of Term 60%) with per-student raw/%
+   * entries, the weighted final percentage, grade, points and rank. Records come
+   * directly from TermAssessmentConfiguration / StudentAssessmentResult /
+   * ComputedResult so they exactly match the Class Teacher's mark schedule and
+   * the result tables. Only assignments with computed (entered/published) records
+   * are returned.
+   */
+  async getTeacherMarkSchedules(
+    reqUser: any,
+    opts?: { termId?: string; examType?: string },
+  ) {
+    const context = await this.resolveContext(reqUser);
+    const cycle = await this.resolveAcademicCycle(context.schoolId, opts?.termId);
+    const term = cycle.term;
+    if (!term) {
+      throw new BadRequestException(
+        'No active term found — set a current academic year and term before generating a mark schedule',
+      );
+    }
+    const examType = opts?.examType || 'END_TERM';
+    const school = await this.prisma.school.findUnique({
+      where: { id: context.schoolId },
+      select: { name: true, address: true, phone: true, email: true, logoUrl: true, logo: true },
+    });
+
+    const assignments = await this.getAssignments(context.userId, context.schoolId, term.academicYearId);
+
+    const schedules: any[] = [];
+    for (const assignment of assignments) {
+      const { classId, subjectId } = assignment;
+
+      // Weighted component configuration for this class + subject + term
+      const configs = await this.prisma.termAssessmentConfiguration.findMany({
+        where: { classId, subjectId, termId: term.id },
+        include: {
+          assessmentDef: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              category: true,
+              contributesToFinal: true,
+              sortOrder: true,
+            },
+          },
+        },
+        orderBy: [{ sequenceOrder: 'asc' }, { assessmentDef: { sortOrder: 'asc' } }],
+      });
+      const activeConfigs = configs.filter((c) => c.assessmentDef.contributesToFinal !== false);
+      if (activeConfigs.length === 0) continue;
+
+      const enrolled = await this.prisma.enrollment.findMany({
+        where: { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+        select: {
+          student: {
+            select: { id: true, firstName: true, lastName: true, admissionNumber: true, gender: true },
+          },
+        },
+        orderBy: { student: { lastName: 'asc' } },
+      });
+      const studentIds = enrolled.map((e) => e.student.id);
+      if (studentIds.length === 0) continue;
+
+      const componentResults = await this.prisma.studentAssessmentResult.findMany({
+        where: { classId, subjectId, termId: term.id, studentId: { in: studentIds } },
+        select: {
+          studentId: true,
+          assessmentDefId: true,
+          rawScore: true,
+          maxScore: true,
+          weightedScore: true,
+          percentage: true,
+          isAbsent: true,
+          status: true,
+        },
+      });
+
+      const computed = await this.prisma.computedResult.findMany({
+        where: {
+          classId,
+          subjectId,
+          termId: term.id,
+          schoolId: context.schoolId,
+          studentId: { in: studentIds },
+        },
+        select: {
+          studentId: true,
+          finalPercentage: true,
+          finalGrade: true,
+          points: true,
+          isAbsent: true,
+          classRank: true,
+          status: true,
+        },
+      });
+      const hasAnyComputed = computed.some((c) => c.finalPercentage != null || c.isAbsent);
+      if (!hasAnyComputed) continue; // skip assignments without entered/computed results
+
+      const computedByStudent = new Map(computed.map((c) => [c.studentId, c]));
+      const rows = enrolled.map((e) => {
+        const student = e.student;
+        const cr = computedByStudent.get(student.id);
+        const components = activeConfigs.map((cfg) => {
+          const sr = componentResults.find(
+            (r) => r.assessmentDefId === cfg.assessmentDefId && r.studentId === student.id,
+          );
+          const isAbsent = sr?.isAbsent ?? false;
+          const maxScore = sr?.maxScore ?? cfg.maxScore ?? 100;
+          const rawScore = sr?.rawScore ?? null;
+          const percentage =
+            sr?.percentage ?? (rawScore != null ? this.stats.round2((rawScore / maxScore) * 100) : null);
+          return {
+            name: cfg.assessmentDef.name,
+            code: cfg.assessmentDef.code,
+            weightPercentage: cfg.weightPercentage,
+            maxScore,
+            rawScore,
+            percentage,
+            weightedScore:
+              sr?.weightedScore ??
+              (rawScore != null ? this.stats.round2(percentage! * (cfg.weightPercentage / 100)) : null),
+            isAbsent,
+          };
+        });
+        return {
+          student: {
+            id: student.id,
+            firstName: student.firstName,
+            lastName: student.lastName,
+            admissionNumber: student.admissionNumber,
+            gender: student.gender,
+          },
+          components,
+          finalPercentage: cr?.finalPercentage ?? null,
+          finalGrade: cr?.finalGrade ?? null,
+          points: cr?.points ?? null,
+          isAbsent: cr?.isAbsent ?? false,
+          classRank: cr?.classRank ?? null,
+          status: cr?.status ?? null,
+        };
+      });
+
+      // Rank within this class+subject among scored, non-absent learners
+      const ranked = rows
+        .filter((r) => r.finalPercentage != null && !r.isAbsent)
+        .sort((a, b) => b.finalPercentage! - a.finalPercentage!);
+      const rankByStudent = new Map<string, number>();
+      ranked.forEach((r, idx) => rankByStudent.set(r.student.id, idx + 1));
+
+      schedules.push({
+        classId,
+        className: assignment.className,
+        subjectId,
+        subjectName: assignment.subjectName,
+        subjectCode: assignment.subjectCode,
+        termId: term.id,
+        termName: term.name,
+        academicYear: term.academicYear?.name || '',
+        examType,
+        components: activeConfigs.map((cfg) => ({
+          name: cfg.assessmentDef.name,
+          code: cfg.assessmentDef.code,
+          weightPercentage: cfg.weightPercentage,
+          maxScore: cfg.maxScore,
+        })),
+        students: rows.map((r) => ({
+          ...r,
+          rank: r.finalPercentage != null && !r.isAbsent ? rankByStudent.get(r.student.id) ?? null : null,
+        })),
+      });
+    }
+
+    schedules.sort(
+      (a, b) =>
+        a.className.localeCompare(b.className) || a.subjectName.localeCompare(b.subjectName),
+    );
+
+    return {
+      header: {
+        schoolName: school?.name || '',
+        schoolAddress: school?.address || '',
+        schoolPhone: school?.phone || '',
+        schoolEmail: school?.email || '',
+        schoolLogo: school?.logoUrl || school?.logo || null,
+      },
+      teacher: {
+        id: context.userId,
+        name: context.teacherName,
+        department: context.department,
+      },
+      term: { id: term.id, name: term.name, academicYear: term.academicYear?.name || '' },
+      examType,
+      schedules,
+      generatedAt: new Date().toISOString(),
     };
   }
 }

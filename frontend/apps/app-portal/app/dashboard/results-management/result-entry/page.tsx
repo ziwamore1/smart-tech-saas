@@ -3,11 +3,12 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, classApi, termApi, gradingSystemApi, teacherApi, assessmentEngineApi, bulkSaveResults, bulkSaveAssessmentScores, accessApi } from '@/lib/api';
+import { api, classApi, termApi, gradingSystemApi, teacherApi, assessmentEngineApi, bulkSaveResults, bulkSaveAssessmentScores, accessApi, teacherAnalyticsApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import { EXAM_TYPE_OPTIONS, examTypeLabel } from '@/lib/exam-types';
 import { socket } from '@/lib/socket';
+import { openTeacherMarkSchedulesReport } from '@/lib/report-utils';
 
 const PASS_THRESHOLD = 50;
 
@@ -138,6 +139,7 @@ export default function ResultEntryPage() {
   const [componentScores, setComponentScores] = useState<Record<string, Record<string, { rawScore: number | null; isAbsent: boolean }>>>({});
   const [dirtyComponentCells, setDirtyComponentCells] = useState<Set<string>>(new Set());
   const [savingComponents, setSavingComponents] = useState(false);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(true);
   const [sheetId, setSheetId] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
@@ -772,6 +774,19 @@ export default function ResultEntryPage() {
   const saveCount = componentMode ? dirtyComponentCells.size : dirtyCells.size;
   const saving = componentMode ? savingComponents : (bulkSaving || bulkSaveMutation.isPending);
 
+  const openMySchedule = async () => {
+    if (!selectedTerm) return;
+    setScheduleLoading(true);
+    try {
+      const res = await teacherAnalyticsApi.getMarkSchedules({ termId: selectedTerm });
+      openTeacherMarkSchedulesReport(res?.data);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to load mark schedule');
+    } finally {
+      setScheduleLoading(false);
+    }
+  };
+
   if (!classesLoading && (classesError || (classesData && classes.length === 0))) {
     return (
       <div style={{ maxWidth: '640px', margin: '64px auto', padding: '32px', textAlign: 'center', border: '1px solid #fecaca', borderRadius: '16px', background: '#fff7f7' }}>
@@ -1162,6 +1177,18 @@ export default function ResultEntryPage() {
             >
               <i className={`fa ${saving ? 'fa-spinner fa-spin' : 'fa-pen'}`}></i>
               {saving ? 'Updating...' : componentMode ? `Update Scores (${saveCount})` : `Update Scores (${saveCount})`}
+            </button>
+            <button
+              onClick={openMySchedule}
+              disabled={!selectedTerm || scheduleLoading}
+              style={{
+                padding: '10px 16px', fontSize: '13px', fontWeight: 600, color: '#5b21b6',
+                background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: '8px',
+                cursor: !selectedTerm ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+              }}
+            >
+              <i className={`fa ${scheduleLoading ? 'fa-spinner fa-spin' : 'fa-table'}`}></i>
+              {scheduleLoading ? 'Loading...' : 'My Mark Schedule'}
             </button>
           </div>
         </div>

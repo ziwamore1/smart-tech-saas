@@ -2,11 +2,11 @@
 
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api, classApi, termApi } from '@/lib/api';
+import { api, classApi, termApi, teacherAnalyticsApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import { EXAM_TYPE_OPTIONS, examTypeLabel } from '@/lib/exam-types';
-import { openMarkScheduleReport, ReportStudent, ReportMeta } from '@/lib/report-utils';
+import { openMarkScheduleReport, ReportStudent, ReportMeta, openTeacherMarkSchedulesReport } from '@/lib/report-utils';
 
 export default function MarkSchedulesPage() {
   const { user } = useAuth();
@@ -15,6 +15,7 @@ export default function MarkSchedulesPage() {
   const [selectedExamType, setSelectedExamType] = useState('Exam');
   const [schedule, setSchedule] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [myScheduleLoading, setMyScheduleLoading] = useState(false);
   const scheduleRef = useRef<HTMLDivElement>(null);
 
   const { data: classesData } = useQuery({
@@ -73,6 +74,22 @@ export default function MarkSchedulesPage() {
       setLoading(false);
     }
   }, [selectedClass, selectedTerm, selectedExamType]);
+
+  const openMySchedule = useCallback(async () => {
+    if (!selectedTerm) {
+      toast.error('Please select a term');
+      return;
+    }
+    setMyScheduleLoading(true);
+    try {
+      const r = await teacherAnalyticsApi.getMarkSchedules({ termId: selectedTerm, examType: selectedExamType });
+      openTeacherMarkSchedulesReport(r?.data);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to load your mark schedule');
+    } finally {
+      setMyScheduleLoading(false);
+    }
+  }, [selectedTerm, selectedExamType]);
 
   const handlePrint = () => {
     if (!schedule?.students?.length) {
@@ -214,6 +231,18 @@ export default function MarkSchedulesPage() {
               </button>
             </>
           )}
+          <button
+            onClick={openMySchedule}
+            disabled={!selectedTerm || myScheduleLoading}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '10px 20px', fontSize: '14px', fontWeight: 600, color: '#5b21b6',
+              background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: '8px',
+              cursor: !selectedTerm ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {myScheduleLoading ? <><i className="fa fa-spinner fa-spin"></i> Loading...</> : <><i className="fa fa-user"></i> My Mark Schedule</>}
+          </button>
         </div>
       </div>
 

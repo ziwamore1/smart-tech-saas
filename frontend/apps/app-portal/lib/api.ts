@@ -2756,4 +2756,8 @@ export const teacherAnalyticsApi = {
     api.get('/teacher-analytics/me/insights', { params: opts }),
   getReportData: (opts?: { termId?: string; examType?: string }) =>
     api.get('/teacher-analytics/me/report-data', { params: opts }),
+  getMarkSchedules: (opts?: { termId?: string; examType?: string }) =>
+    api.get('/teacher-analytics/me/mark-schedules', { params: opts, timeout: 120000 }),
+  getTeacherMarkSchedules: (teacherId: string, opts?: { termId?: string; examType?: string }) =>
+    api.get(`/teacher-analytics/teacher/${teacherId}/mark-schedules`, { params: opts, timeout: 120000 }),
 };

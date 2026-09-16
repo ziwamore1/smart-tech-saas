@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { teacherAnalyticsApi, reportEngineApi, termApi } from '@/lib/api';
+import { openTeacherMarkSchedulesReport } from '@/lib/report-utils';
 import TrendChart from '@/components/charts-echarts/TrendChart';
 
 const RISK_COLOR: Record<string, string> = {
@@ -119,6 +120,11 @@ function GradeDistributionPanel({
               </div>
               <span className="w-28 text-right text-sm font-medium whitespace-nowrap">
                 {d.count ?? 0} <span className="text-gray-400 text-xs">({pct(d.percentage)})</span>
+                {((d.males ?? 0) + (d.females ?? 0)) > 0 && (
+                  <span className="block text-[10px] text-gray-400 whitespace-nowrap">
+                    M: {d.males ?? 0} · F: {d.females ?? 0}
+                  </span>
+                )}
               </span>
             </div>
           );
@@ -140,6 +146,9 @@ function GradeLegend({ distribution, profile }: { distribution: any[]; profile?:
           <span key={d.grade} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-gray-200 text-xs font-medium text-gray-700">
             <span className="w-3 h-3 rounded-full" style={{ background: gradeColor(d.grade) }} />
             Grade {d.grade}: {d.count} pupil{d.count === 1 ? '' : 's'}
+            {((d.males ?? 0) + (d.females ?? 0)) > 0 && (
+              <span className="text-gray-400"> (M: {d.males ?? 0} · F: {d.females ?? 0})</span>
+            )}
             {range ? <span className="text-gray-400"> (score {range}%)</span> : null}
           </span>
         );
@@ -269,6 +278,7 @@ export default function TeacherAnalysisPage() {
   const [viewReport, setViewReport] = useState(false);
   const [reportHtml, setReportHtml] = useState<string | null>(null);
   const [viewingReport, setViewingReport] = useState(false);
+  const [generatingSchedule, setGeneratingSchedule] = useState(false);
 
   const userRoles = ((user as any)?.allRoles || user?.roles || []).map((role: string) => String(role).toUpperCase());
   const canSelectTeacher = userRoles.some((role: string) => ['DIRECTOR', 'HEAD TEACHER', 'HEADTEACHER', 'DEPUTY HEAD', 'DEPUTY HEAD TEACHER', 'DEPUTYHEADTEACHER', 'DEPUTY'].includes(role));
@@ -365,6 +375,22 @@ export default function TeacherAnalysisPage() {
     }
   };
 
+  const openMarkSchedule = async () => {
+    if (!summary?.term) return;
+    setGeneratingSchedule(true);
+    setError(null);
+    try {
+      const res = selectedTeacherId
+        ? await teacherAnalyticsApi.getTeacherMarkSchedules(selectedTeacherId, { termId: summary.term.id })
+        : await teacherAnalyticsApi.getMarkSchedules({ termId: summary.term.id });
+      openTeacherMarkSchedulesReport(res?.data);
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Failed to load mark schedule');
+    } finally {
+      setGeneratingSchedule(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -444,6 +470,13 @@ export default function TeacherAnalysisPage() {
             className="px-4 py-2 bg-white border border-pink-300 text-pink-600 rounded-lg hover:bg-pink-50 text-sm font-medium disabled:opacity-50"
           >
             {viewingReport ? 'Loading…' : '👁 View Report'}
+          </button>
+          <button
+            onClick={openMarkSchedule}
+            disabled={generatingSchedule || !summary?.term}
+            className="px-4 py-2 bg-white border border-purple-300 text-purple-600 rounded-lg hover:bg-purple-50 text-sm font-medium disabled:opacity-50"
+          >
+            {generatingSchedule ? 'Loading…' : '📋 Mark Schedule'}
           </button>
           <button
             onClick={downloadReport}
@@ -533,8 +566,8 @@ export default function TeacherAnalysisPage() {
                   { label: 'Quality Pass', value: pct(summary.overallQualityPassRate), color: 'bg-purple-50 text-purple-700 border-purple-200', title: summary.gradingProfiles?.[0]?.qualityBands?.description },
                   { label: 'Quantity Pass', value: pct(summary.overallQuantityPassRate), color: 'bg-teal-50 text-teal-700 border-teal-200', title: summary.gradingProfiles?.[0]?.quantityBands?.description },
                   { label: 'Learners', value: summary.totalStudentsTaught ?? '—', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-                  { label: 'Classes', value: summary.classesCount ?? '—', color: 'bg-teal-50 text-teal-700 border-teal-200' },
-                  { label: 'Subjects', value: summary.subjectsCount ?? '—', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+                  { label: 'Classes', value: summary.classesCount ?? '—', color: 'bg-teal-50 text-teal-700 border-teal-200', title: summary.classesWithData != null ? `${summary.classesWithData} with published results` : undefined },
+                  { label: 'Subjects', value: summary.subjectsCount ?? '—', color: 'bg-purple-50 text-purple-700 border-purple-200', title: summary.subjectsWithData != null ? `${summary.subjectsWithData} with published results` : undefined },
                   { label: 'Assessments', value: summary.assessmentsAnalysed ?? '—', color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
                   { label: 'At Risk', value: summary.studentsAtRisk ?? 0, color: 'bg-red-50 text-red-700 border-red-200' },
                   { label: 'Need Help', value: summary.studentsRequiringIntervention ?? 0, color: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -707,7 +740,7 @@ export default function TeacherAnalysisPage() {
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                 <div className="p-4 border-b border-gray-200">
                   <h2 className="text-lg font-semibold text-gray-900">Class Breakdown</h2>
-                  <p className="text-sm text-gray-500">Performance per class you teach</p>
+                  <p className="text-sm text-gray-500">Assigned classes with entered and published results only ({summary.classesWithData ?? classes.length} of {summary.classesCount ?? classes.length} assigned)</p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -763,7 +796,7 @@ export default function TeacherAnalysisPage() {
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
               <div className="p-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900">Subject Breakdown</h2>
-                <p className="text-sm text-gray-500">Performance per subject across your classes</p>
+                <p className="text-sm text-gray-500">Assigned subjects with entered and published results only ({summary.subjectsWithData ?? subjects.length} of {summary.subjectsCount ?? subjects.length} assigned)</p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

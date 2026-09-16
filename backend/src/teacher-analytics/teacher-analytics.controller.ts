@@ -193,4 +193,26 @@ export class TeacherAnalyticsController {
   ) {
     return this.service.getReportData(req.user, { termId, examType });
   }
+
+  @Get('me/mark-schedules')
+  @Roles(...TEACHER_ROLES)
+  async getMarkSchedules(
+    @Request() req,
+    @Query('termId') termId?: string,
+    @Query('examType') examType?: string,
+  ) {
+    return this.service.getTeacherMarkSchedules(req.user, { termId, examType });
+  }
+
+  @Get('teacher/:teacherId/mark-schedules')
+  @Roles(...ANALYTICS_LEADER_ROLES)
+  async getTeacherMarkSchedules(
+    @Request() req,
+    @Param('teacherId') teacherId: string,
+    @Query('termId') termId?: string,
+    @Query('examType') examType?: string,
+  ) {
+    await this.service.assertTeacherAccessible(req.user, teacherId, termId);
+    return this.service.getTeacherMarkSchedules({ ...req.user, id: teacherId }, { termId, examType });
+  }
 }

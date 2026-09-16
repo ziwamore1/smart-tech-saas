@@ -2,9 +2,10 @@
 
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, resultApi, classApi, termApi, assessmentEngineApi, bulkSaveResults, reportEngineApi } from '@/lib/api';
+import { api, resultApi, classApi, termApi, assessmentEngineApi, bulkSaveResults, reportEngineApi, teacherAnalyticsApi } from '@/lib/api';
 import { getSubjectShortcut } from '@/config/subjectColors';
 import { EXAM_TYPE_OPTIONS, examTypeLabel } from '@/lib/exam-types';
+import { openTeacherMarkSchedulesReport } from '@/lib/report-utils';
 
 async function downloadTemplateFile(termId: string, classId: string | undefined) {
   const response = await resultApi.getTemplate(termId, { classId: classId || undefined });
@@ -1154,6 +1155,19 @@ function ReportsTab({ selectedClass, selectedTerm, sheetData, onMessage }: Repor
     }
   };
 
+  const handleMyMarkSchedule = async () => {
+    if (!selectedTerm) return;
+    setLoading('teacher-mark-schedule');
+    try {
+      const response = await teacherAnalyticsApi.getMarkSchedules({ termId: selectedTerm });
+      openTeacherMarkSchedulesReport(response?.data);
+    } catch (error: any) {
+      onMessage({ type: 'error', text: error.response?.data?.message || 'Failed to generate teacher mark schedule' });
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const handleViewAnalytics = () => {
     window.location.href = `/dashboard/result-analytics?classId=${selectedClass}&termId=${selectedTerm}`;
   };
@@ -1191,6 +1205,20 @@ function ReportsTab({ selectedClass, selectedTerm, sheetData, onMessage }: Repor
             className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
           >
             {loading === 'mark-schedule' ? 'Generating...' : 'Download Mark Schedule PDF'}
+          </button>
+        </div>
+
+        <div className="border rounded-lg p-4">
+          <h3 className="font-medium mb-2">My Teaching Mark Schedule</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Per class and per subject mark schedules for your assigned teaching load, with weighted component entries, final %, grade, points and rank.
+          </p>
+          <button
+            onClick={handleMyMarkSchedule}
+            disabled={!selectedTerm || loading === 'teacher-mark-schedule'}
+            className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+          >
+            {loading === 'teacher-mark-schedule' ? 'Generating...' : 'Open My Mark Schedule'}
           </button>
         </div>
 

@@ -68,6 +68,9 @@ export interface GradeDistribution {
   range?: string | null;
   points?: number | null;
   remark?: string | null;
+  // Gender split within the range — Males / Females / Total
+  males?: number;
+  females?: number;
 }
 
 // Quality/Quantity pass-band definition — label lists reference the grading
@@ -240,6 +243,8 @@ export interface TeacherSummary {
   assignments: AssignmentRef[];
   classesCount: number;
   subjectsCount: number;
+  classesWithData: number;
+  subjectsWithData: number;
   totalStudentsTaught: number;
   assessmentsAnalysed: number;
   overallAverage: number | null;

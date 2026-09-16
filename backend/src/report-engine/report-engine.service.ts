@@ -2126,32 +2126,41 @@ private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
     const blocks = profiles.map((profile) => {
       const rows = (assignments || []).filter((a) => a.gradingProfile?.systemId === profile.systemId);
       const totalAssessed = rows.reduce((sum: number, r: any) => sum + (r.assessedStudents || 0), 0);
-      const gradeCounts = new Map<string, { count: number; remark: string | null }>();
+      const gradeCounts = new Map<string, { count: number; males: number; females: number; remark: string | null }>();
       for (const r of rows) {
         for (const d of r.gradeScaleDistribution || []) {
           const existing = gradeCounts.get(d.grade) || {
             count: 0,
+            males: 0,
+            females: 0,
             remark: (profile.gradeBreakdown || []).find((g: any) => g.grade === d.grade)?.remark || null,
           };
           existing.count += d.count || 0;
+          existing.males += d.males || 0;
+          existing.females += d.females || 0;
           gradeCounts.set(d.grade, existing);
         }
       }
       const scaleByGrade = new Map<string, any>((profile.gradeBreakdown || []).map((g: any) => [g.grade, g]));
       const ordered = (profile.grades || []).map((g: string) => {
         const scale = scaleByGrade.get(g);
+        const b = gradeCounts.get(g);
         return {
           grade: g,
-          count: gradeCounts.get(g)?.count || 0,
-          remark: gradeCounts.get(g)?.remark || scale?.remark || null,
+          count: b?.count || 0,
+          males: b?.males || 0,
+          females: b?.females || 0,
+          remark: b?.remark || scale?.remark || null,
           range: scale?.minScore != null && scale?.maxScore != null ? `${scale.minScore}-${scale.maxScore}` : null,
         };
       });
-      const legendRows = ordered.map(({ grade, count, remark, range }) => `
+      const legendRows = ordered.map(({ grade, count, males, females, remark, range }) => `
         <tr>
           <td class="text-center font-bold" style="color:${this.gradePieColor(grade)};font-size:13px">${grade}</td>
           <td style="color:#64748b;font-size:12px">${range || '—'}</td>
           <td style="color:#6b7280;font-size:12px">${remark || '—'}</td>
+          <td class="text-center">${males}</td>
+          <td class="text-center">${females}</td>
           <td class="text-center font-semibold">${count}</td>
           <td class="text-center">${totalAssessed > 0 ? ((count / totalAssessed) * 100).toFixed(1) : '0.0'}%</td>
           <td class="text-center"><div style="width:14px;height:14px;border-radius:3px;background:${this.gradePieColor(grade)};display:inline-block;vertical-align:middle"></div></td>
@@ -2170,7 +2179,7 @@ private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
           <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
             ${this.buildGradePie(distribution, totalAssessed)}
             <table style="width:auto;min-width:320px;font-size:13px">
-              <thead><tr><th class="text-center">Grade</th><th class="text-center">Score Range</th><th>Remark</th><th class="text-center">Learners</th><th class="text-center">%</th><th class="text-center">Colour</th></tr></thead>
+              <thead><tr><th class="text-center">Grade</th><th class="text-center">Score Range</th><th>Remark</th><th class="text-center">M</th><th class="text-center">F</th><th class="text-center">Total</th><th class="text-center">%</th><th class="text-center">Colour</th></tr></thead>
               <tbody>${legendRows}</tbody>
             </table>
           </div>
@@ -2254,9 +2263,13 @@ private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
       const trendDelta = rows.reduce((s, r) => s + (r.trendDelta ?? 0), 0) / (rows.length || 1);
 
       const gradeCounts = new Map<string, number>();
+      const gradeMales = new Map<string, number>();
+      const gradeFemales = new Map<string, number>();
       for (const r of rows) {
         for (const d of r.gradeScaleDistribution || []) {
           gradeCounts.set(d.grade, (gradeCounts.get(d.grade) || 0) + (d.count || 0));
+          gradeMales.set(d.grade, (gradeMales.get(d.grade) || 0) + (d.males || 0));
+          gradeFemales.set(d.grade, (gradeFemales.get(d.grade) || 0) + (d.females || 0));
         }
       }
       const scaleByGrade = new Map<string, any>((profile?.gradeBreakdown || []).map((s: any) => [s.grade, s]));
@@ -2268,6 +2281,8 @@ private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
       const legendRows = orderedGrades.map((g) => {
         const scale = scaleByGrade.get(g);
         const count = gradeCounts.get(g) || 0;
+        const males = gradeMales.get(g) || 0;
+        const females = gradeFemales.get(g) || 0;
         const range = scale?.minScore != null && scale?.maxScore != null ? `${scale.minScore}-${scale.maxScore}` : null;
         const pctVal = gradedTotal > 0 ? ((count / gradedTotal) * 100).toFixed(1) : '0.0';
         return `
@@ -2275,6 +2290,8 @@ private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
             <td class="text-center font-bold" style="color:${this.gradePieColor(g)};font-size:13px">${g}</td>
             <td style="color:#64748b;font-size:12px">${range || '—'}</td>
             <td style="color:#6b7280;font-size:12px">${scale?.remark || '—'}</td>
+            <td class="text-center">${males}</td>
+            <td class="text-center">${females}</td>
             <td class="text-center"><div style="display:flex;align-items:center;gap:6px"><div style="height:11px;width:${Math.max((count / maxCount) * 100, count ? 3 : 0)}%;max-width:150px;background:${this.gradePieColor(g)};border-radius:3px"></div><span style="font-size:12px">${count}</span></div></td>
             <td class="text-center">${pctVal}%</td>
           </tr>`;
@@ -2312,8 +2329,8 @@ private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
             <strong>Quantity</strong> (pass): ${dash(profile?.quantityBands?.description)}
           </div>
           <table>
-            <thead><tr><th class="text-center">Grade</th><th class="text-center">Score Range</th><th>Remark</th><th class="text-center">Learners</th><th class="text-center">%</th></tr></thead>
-            <tbody>${legendRows || '<tr><td colspan="5" class="text-center">No graded learners.</td></tr>'}</tbody>
+            <thead><tr><th class="text-center">Grade</th><th class="text-center">Score Range</th><th>Remark</th><th class="text-center">M</th><th class="text-center">F</th><th class="text-center">Learners</th><th class="text-center">%</th></tr></thead>
+            <tbody>${legendRows || '<tr><td colspan="7" class="text-center">No graded learners.</td></tr>'}</tbody>
           </table>
         </div>
         <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:6px 10px;margin-bottom:14px">
@@ -2372,22 +2389,68 @@ private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
           .join('')
       : `<tr><td colspan="5" class="text-center">${dash(report.competency?.dataRequired || 'No competency data available.')}</td></tr>`;
 
-    // At-risk rows (student-specific interventions)
-    const atRiskBody = (report.atRisk || []).length > 0
-      ? report.atRisk.slice(0, 30).map((s: any) => `
+    // At-risk summary (concise for print — full per-learner details stay in the dashboard)
+    const atRiskRowsData = report.atRisk || [];
+    const riskLevelCounts = atRiskRowsData.reduce((m: Record<string, number>, s: any) => {
+      m[s.riskLevel] = (m[s.riskLevel] || 0) + 1;
+      return m;
+    }, {} as Record<string, number>);
+    const highCount = riskLevelCounts.HIGH || 0;
+    const moderateCount = riskLevelCounts.MODERATE || 0;
+    const otherRiskCount = Math.max(0, atRiskRowsData.length - highCount - moderateCount);
+    const classesAffected = new Set(atRiskRowsData.map((s) => s.className)).size;
+    const subjectsAffected = new Set(atRiskRowsData.map((s) => s.subjectName)).size;
+    const atRiskAverages = atRiskRowsData.map((s) => s.currentAverage).filter((v): v is number => v != null);
+    const avgAtRisk = atRiskAverages.length ? atRiskAverages.reduce((a, b) => a + b, 0) / atRiskAverages.length : null;
+    const focusLearners = [...atRiskRowsData]
+      .sort(
+        (a, b) =>
+          (b.riskLevel === 'HIGH' ? 1 : 0) - (a.riskLevel === 'HIGH' ? 1 : 0) ||
+          (a.currentAverage ?? 101) - (b.currentAverage ?? 101),
+      )
+      .slice(0, 12);
+    const focusRows = focusLearners
+      .map(
+        (s: any) => `
           <tr>
             <td style="font-weight:600">${dash(s.studentName)}</td>
             <td>${dash(s.className)}</td>
             <td>${dash(s.subjectName)}</td>
             <td class="text-center font-bold" style="color:${this.scoreColor(s.currentAverage ?? 0)}">${pct(s.currentAverage)}</td>
-            <td class="text-center"><span class="grade-badge" style="color:${this.gradeColor(s.grade || (s.currentAverage ?? 0) >= 40 ? 'D' : 'E').text};background:${this.gradeColor(s.grade || (s.currentAverage ?? 0) >= 40 ? 'D' : 'E').bg}">${dash(s.grade)}</span></td>
+            <td class="text-center"><span class="grade-badge" style="color:${this.gradeColor(s.grade || 'F').text};background:${this.gradeColor(s.grade || 'F').bg}">${dash(s.grade)}</span></td>
             <td class="text-center">${dash(s.trend)}</td>
             <td class="text-center"><span class="grade-badge" style="color:#fff;background:${s.riskLevel === 'HIGH' ? '#dc2626' : s.riskLevel === 'MODERATE' ? '#d97706' : '#16a34a'}">${dash(s.riskLevel)}</span></td>
-            <td style="font-size:12px">${(s.flags || []).slice(0, 3).join('; ') || '—'}</td>
-            <td style="font-size:12px;line-height:1.5">${dash(s.recommendedIntervention)}</td>
-          </tr>`)
-        .join('')
-      : '<tr><td colspan="9" class="text-center">No learners currently require intervention.</td></tr>';
+          </tr>`,
+      )
+      .join('');
+    const uniqueActions = [...new Set(atRiskRowsData.map((s) => s.recommendedIntervention).filter(Boolean))].slice(0, 8);
+    const actionItems = uniqueActions
+      .map((a) => `<li>${a}</li>`)
+      .join('') || '<li>No recommended actions recorded yet.</li>';
+
+    const atRiskSummary = `
+      <div class="section-title">Learners Requiring Support — Summary</div>
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-value fail">${atRiskRowsData.length}</div><div class="summary-label">Learners Flagged</div></div>
+        <div class="summary-card"><div class="summary-value" style="color:#dc2626">${highCount}</div><div class="summary-label">HIGH Risk</div></div>
+        <div class="summary-card"><div class="summary-value" style="color:#d97706">${moderateCount}</div><div class="summary-label">Moderate Risk</div></div>
+        <div class="summary-card"><div class="summary-value">${otherRiskCount}</div><div class="summary-label">Watch List</div></div>
+        <div class="summary-card"><div class="summary-value">${classesAffected}</div><div class="summary-label">Classes Affected</div></div>
+        <div class="summary-card"><div class="summary-value">${subjectsAffected}</div><div class="summary-label">Subjects Affected</div></div>
+        <div class="summary-card"><div class="summary-value fail">${pct(avgAtRisk)}</div><div class="summary-label">Avg. Score (flagged)</div></div>
+      </div>
+      <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:14px">
+        <div style="font-weight:600;color:#123b5d;margin-bottom:8px">Focus Learners (highest risk)</div>
+        <table>
+          <thead><tr><th>Student</th><th>Class</th><th>Subject</th><th class="text-center">Average</th><th class="text-center">Grade</th><th class="text-center">Trend</th><th class="text-center">Risk</th></tr></thead>
+          <tbody>${focusRows || '<tr><td colspan="7" class="text-center">No learners currently require support.</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:14px">
+        <div style="font-weight:600;color:#123b5d;margin-bottom:8px">Recommended Actions</div>
+        <ul style="margin:0 0 8px 20px;line-height:1.7;color:#374151">${actionItems}</ul>
+        <p style="margin:0;font-size:11px;color:#94a3b8">Full per-learner details, flags and personalised interventions are available in the My Teaching Analysis dashboard.</p>
+      </div>`;
 
     // Action plan rows
     const actionPlan = (insights?.actionPlan || []).map((a: any) => `
@@ -2441,9 +2504,7 @@ private async prepareTeacherAnalysisData(request: ReportGenerationRequest) {
       <div class="section-title">Competency / Topic Mastery</div>
       <table><thead><tr><th>Class</th><th>Subject</th><th>Competency</th><th class="text-center">Mastery</th><th class="text-center">Status</th></tr></thead>
         <tbody>${competencyBody}</tbody></table>
-      <div class="section-title">Learners Requiring Support (specific interventions)</div>
-      <table><thead><tr><th>Student</th><th>Class</th><th>Subject</th><th class="text-center">Average</th><th class="text-center">Grade</th><th class="text-center">Trend</th><th class="text-center">Risk</th><th>Flags</th><th>Recommended Intervention</th></tr></thead>
-        <tbody>${atRiskBody}</tbody></table>`;
+      ${atRiskSummary}`;
 
     const html = this.buildEnhancedReportShell({
       schoolName: args.schoolName,
