@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { teacherAnalyticsApi, reportEngineApi, termApi } from '@/lib/api';
-import { openTeacherMarkSchedulesReport } from '@/lib/report-utils';
+import { openTeacherMarkSchedulesReport, writeReportWindow } from '@/lib/report-utils';
 import TrendChart from '@/components/charts-echarts/TrendChart';
 
 const RISK_COLOR: Record<string, string> = {
@@ -275,9 +275,9 @@ export default function TeacherAnalysisPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'classes' | 'subjects' | 'at-risk' | 'trends' | 'competency' | 'ai'>('overview');
   const [generating, setGenerating] = useState(false);
-  const [viewReport, setViewReport] = useState(false);
-  const [reportHtml, setReportHtml] = useState<string | null>(null);
   const [viewingReport, setViewingReport] = useState(false);
+  const [reportHtml, setReportHtml] = useState<string | null>(null);
+  const [reportContext, setReportContext] = useState('');
   const [generatingSchedule, setGeneratingSchedule] = useState(false);
 
   const userRoles = ((user as any)?.allRoles || user?.roles || []).map((role: string) => String(role).toUpperCase());
@@ -332,47 +332,53 @@ export default function TeacherAnalysisPage() {
     fetchData(selectedTermId || undefined, selectedTeacherId || undefined);
   }, [isAuthenticated, authLoading, canSelectTeacher, teachersLoaded, selectedTermId, selectedTeacherId, fetchData, router]);
 
-  const downloadReport = async () => {
-    if (!data?.summary?.term) return;
-    setGenerating(true);
-    try {
-        const res = await reportEngineApi.generatePdf({
-          type: 'TEACHER_ANALYSIS',
-          termId: data.summary.term.id,
-          examType: data.summary.examType || undefined,
-          teacherUserId: selectedTeacherId || undefined,
-        });
-      const blob = res.data;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `teacher-analysis-${new Date().toISOString().split('T')[0]}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e: any) {
-      setError(e?.response?.data?.message || 'Failed to generate PDF report');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const openReport = async () => {
-    if (!summary?.term) return;
+  const ensureReportHtml = async (): Promise<string | null> => {
+    if (!summary?.term) return null;
+    const ctx = `${summary.term.id}|${summary.examType || ''}|${selectedTeacherId || 'me'}`;
+    if (reportHtml && reportContext === ctx) return reportHtml;
     setViewingReport(true);
-    setReportHtml(null);
+    setError(null);
     try {
       const res = await reportEngineApi.previewTeacherAnalysis({
         termId: summary.term.id,
         examType: summary.examType || undefined,
         teacherUserId: selectedTeacherId || undefined,
       });
-      setReportHtml(res?.data?.html || res?.data?.data?.html || null);
-      setViewReport(true);
+      const html = res?.data?.html || res?.data?.data?.html || null;
+      setReportHtml(html);
+      setReportContext(ctx);
+      return html;
     } catch (e: any) {
       setError(e?.response?.data?.message || 'Failed to load report preview');
+      return null;
     } finally {
       setViewingReport(false);
     }
+  };
+
+  const downloadReport = async () => {
+    if (!summary?.term) return;
+    const win = window.open('', '_blank');
+    setGenerating(true);
+    const html = await ensureReportHtml();
+    if (!html) {
+      setGenerating(false);
+      win?.close();
+      return;
+    }
+    writeReportWindow(win, html, 'Teacher Analysis Report', true);
+    setGenerating(false);
+  };
+
+  const openReport = async () => {
+    if (!summary?.term) return;
+    const win = window.open('', '_blank');
+    const html = await ensureReportHtml();
+    if (!html) {
+      win?.close();
+      return;
+    }
+    writeReportWindow(win, html, 'Teacher Analysis Report', false);
   };
 
   const openMarkSchedule = async () => {
@@ -1255,40 +1261,6 @@ export default function TeacherAnalysisPage() {
         </>
       )}
 
-      {viewReport && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[92vh]">
-            <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-200">
-              <div>
-                <h2 className="text-lg font-bold text-gray-900">Teacher Analysis Report Preview</h2>
-                <p className="text-sm text-gray-500">Consolidated HTML report — {context?.teacherName} · {summary?.dataPeriod}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={downloadReport}
-                  disabled={generating}
-                  className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 text-sm font-medium disabled:opacity-50"
-                >
-                  {generating ? 'Generating…' : '⬇ Download PDF'}
-                </button>
-                <button
-                  onClick={() => setViewReport(false)}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
-                >
-                  ✕ Close
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-auto bg-gray-100 p-4">
-              {reportHtml ? (
-                <iframe title="Teacher Analysis Report Preview" srcDoc={reportHtml} className="w-full h-full min-h-[70vh] bg-white rounded-lg border border-gray-200" />
-              ) : (
-                <div className="flex items-center justify-center h-[70vh] text-gray-500">Loading report…</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      </div>
   );
 }

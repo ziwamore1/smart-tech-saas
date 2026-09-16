@@ -77,6 +77,39 @@ function openReport(html: string, title: string) {
   }
 }
 
+function prepareReportDocument(html: string, autoPrint: boolean): string {
+  let doc = html;
+  if (!/class="print-btn"/i.test(doc)) {
+    doc = doc.replace(
+      /<body([^>]*)>/i,
+      (m, attrs: string) =>
+        `<body${attrs}><button class="print-btn" onclick="window.print()" style="position:fixed;top:16px;right:16px;z-index:99999;padding:10px 20px;background:#123b5d;color:#fff;border:none;border-radius:8px;cursor:pointer;font:600 13px system-ui,Arial,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.25)">Print / Save as PDF</button>`,
+    );
+  }
+  if (autoPrint) {
+    const auto = '<scr' + 'ipt>(function(){setTimeout(function(){try{window.focus();window.print();}catch(e){}},450);})();</scr' + 'ipt>';
+    doc = doc.replace(/<\/body>/i, auto + '</body>');
+  }
+  return doc;
+}
+
+export function writeReportWindow(win: Window | null, html: string, title: string, autoPrint = false) {
+  if (!win) return;
+  const doc = prepareReportDocument(html, autoPrint);
+  win.document.open();
+  win.document.write(doc);
+  win.document.close();
+  try { win.document.title = title; } catch {}
+  try { win.focus(); } catch {}
+}
+
+export function openReportWindow(html: string, title: string, autoPrint = false): boolean {
+  const w = window.open('', '_blank');
+  if (!w) return false;
+  writeReportWindow(w, html, title, autoPrint);
+  return true;
+}
+
 export interface ReportStudent {
   firstName: string;
   lastName: string;
