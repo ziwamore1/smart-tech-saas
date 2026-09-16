@@ -23,9 +23,10 @@ const COMPUTED_STATUSES: ComputedResultStatus[] = ['COMPUTED', 'VERIFIED', 'PUBL
 
 /** Normalize a stored gender value to a canonical kind, mirroring the rest of the codebase. */
 function genderKind(g?: string | null): 'male' | 'female' | null {
-  const v = (g || '').trim().toUpperCase();
-  if (v === 'MALE' || v === 'M') return 'male';
-  if (v === 'FEMALE' || v === 'F') return 'female';
+  if (!g) return null;
+  const v = String(g).replace(/[\s\u00A0\u200B\u200C\u200D]+/g, '').toUpperCase();
+  if (v === 'M' || v === 'M.' || v === 'MALE' || v === 'MAN' || v === 'BOY') return 'male';
+  if (v === 'F' || v === 'F.' || v === 'FEMALE' || v === 'WOMAN' || v === 'GIRL') return 'female';
   return null;
 }
 
@@ -33,6 +34,7 @@ interface GradeCountBucket {
   count: number;
   males: number;
   females: number;
+  unknown: number;
 }
 
 type ComputedResultRow = {
@@ -557,6 +559,7 @@ export class TeacherAnalyticsService {
         percentage: totalAssessed > 0 ? this.stats.round2((count / totalAssessed) * 100) : null,
         males: bucket?.males || 0,
         females: bucket?.females || 0,
+        unknown: bucket?.unknown || 0,
         range:
           scale && scale.minScore != null && scale.maxScore != null
             ? `${scale.minScore}-${scale.maxScore}`
@@ -605,11 +608,12 @@ export class TeacherAnalyticsService {
       if (bandIncludes(profile.qualityBands, grade, points)) qualityPassed++;
       if (bandIncludes(profile.quantityBands, grade, points)) quantityPassed++;
       const key = grade || 'N/A';
-      const bucket = gradeCounts.get(key) || { count: 0, males: 0, females: 0 };
+      const bucket = gradeCounts.get(key) || { count: 0, males: 0, females: 0, unknown: 0 };
       bucket.count++;
       const kind = genderKind(r.student?.gender);
       if (kind === 'male') bucket.males++;
       else if (kind === 'female') bucket.females++;
+      else bucket.unknown++;
       gradeCounts.set(key, bucket);
     }
     const qualityPassRate = totalAssessed > 0 ? this.stats.round2((qualityPassed / totalAssessed) * 100) : null;
@@ -866,10 +870,11 @@ export class TeacherAnalyticsService {
     const combinedGradeCounts = new Map<string, GradeCountBucket>();
     for (const a of assignmentAnalytics) {
       for (const d of a.gradeScaleDistribution) {
-        const bucket = combinedGradeCounts.get(d.grade) || { count: 0, males: 0, females: 0 };
+        const bucket = combinedGradeCounts.get(d.grade) || { count: 0, males: 0, females: 0, unknown: 0 };
         bucket.count += d.count || 0;
         bucket.males += d.males || 0;
         bucket.females += d.females || 0;
+        bucket.unknown += d.unknown || 0;
         combinedGradeCounts.set(d.grade, bucket);
       }
     }
@@ -910,6 +915,7 @@ export class TeacherAnalyticsService {
         percentage: totalGraded > 0 ? this.stats.round2((count / totalGraded) * 100) : null,
         males: bucket?.males || 0,
         females: bucket?.females || 0,
+        unknown: bucket?.unknown || 0,
         range: rangeByGrade.get(g) ?? null,
         points: scale?.points ?? null,
         remark: scale?.remark || null,
@@ -1002,10 +1008,11 @@ export class TeacherAnalyticsService {
       const gradeCounts = new Map<string, GradeCountBucket>();
       for (const r of rows) {
         for (const d of r.gradeScaleDistribution) {
-          const bucket = gradeCounts.get(d.grade) || { count: 0, males: 0, females: 0 };
+          const bucket = gradeCounts.get(d.grade) || { count: 0, males: 0, females: 0, unknown: 0 };
           bucket.count += d.count || 0;
           bucket.males += d.males || 0;
           bucket.females += d.females || 0;
+          bucket.unknown += d.unknown || 0;
           gradeCounts.set(d.grade, bucket);
         }
       }

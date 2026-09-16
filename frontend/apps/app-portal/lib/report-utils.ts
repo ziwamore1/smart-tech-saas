@@ -190,7 +190,7 @@ ${content}
 export function generateMarkScheduleReport(students: ReportStudent[], meta: ReportMeta): string {
   const subjects = students.length > 0 ? students[0].results.map(r => r.subject) : [];
 
-  const subjectHeaders = subjects.map(s => `<th class="text-center">${s}</th>`).join('');
+  const subjectHeaders = subjects.map(s => `<th class="text-center" style="width:92px">${s}</th>`).join('');
 
   const rows = students.map((s, i) => {
     const cells = s.results.map(r => {
@@ -591,7 +591,7 @@ export function generateTeacherMarkSchedulesReport(data: TeacherMarkScheduleData
 
   const blocks = (data.schedules || []).map((sched) => {
     const compHeaders = (sched.components || [])
-      .map(c => `<th class="text-center" data-label="${esc(c.name)}">${esc(c.name)}<br>(${c.weightPercentage}%)</th>`)
+      .map(c => `<th class="text-center" style="width:92px" data-label="${esc(c.name)}">${esc(c.name)}<br>(${c.weightPercentage}%)</th>`)
       .join('');
 
     const rows = (sched.students || []).map((s, i) => {
@@ -635,14 +635,14 @@ export function generateTeacherMarkSchedulesReport(data: TeacherMarkScheduleData
         <table>
           <thead><tr>
             <th class="text-center" style="width:28px">#</th>
-            <th style="width:140px">Student Name</th>
-            <th style="width:78px">Admission No.</th>
-            <th class="text-center" style="width:44px">Gender</th>
+            <th style="width:170px">Student Name</th>
+            <th style="width:80px">Admission No.</th>
+            <th class="text-center" style="width:60px">Gender</th>
             ${compHeaders}
-            <th class="text-center" style="width:52px">Final %</th>
-            <th class="text-center" style="width:44px">Grade</th>
-            <th class="text-center" style="width:40px">Points</th>
-            <th class="text-center" style="width:40px">Rank</th>
+            <th class="text-center" style="width:76px">Final %</th>
+            <th class="text-center" style="width:60px">Grade</th>
+            <th class="text-center" style="width:48px">Points</th>
+            <th class="text-center" style="width:46px">Rank</th>
           </tr></thead>
           <tbody>${rows || `<tr><td colspan="${colSpan}" class="text-center">No student records for this class and subject.</td></tr>`}</tbody>
         </table>

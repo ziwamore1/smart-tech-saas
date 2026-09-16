@@ -68,9 +68,10 @@ export interface GradeDistribution {
   range?: string | null;
   points?: number | null;
   remark?: string | null;
-  // Gender split within the range — Males / Females / Total
+  // Gender split within the range — Males / Females / Unspecified (M + F + U = count)
   males?: number;
   females?: number;
+  unknown?: number;
 }
 
 // Quality/Quantity pass-band definition — label lists reference the grading

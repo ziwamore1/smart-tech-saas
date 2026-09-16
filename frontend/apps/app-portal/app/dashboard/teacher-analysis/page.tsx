@@ -120,9 +120,10 @@ function GradeDistributionPanel({
               </div>
               <span className="w-28 text-right text-sm font-medium whitespace-nowrap">
                 {d.count ?? 0} <span className="text-gray-400 text-xs">({pct(d.percentage)})</span>
-                {((d.males ?? 0) + (d.females ?? 0)) > 0 && (
+                {((d.males ?? 0) + (d.females ?? 0) + (d.unknown ?? 0)) > 0 && (
                   <span className="block text-[10px] text-gray-400 whitespace-nowrap">
                     M: {d.males ?? 0} · F: {d.females ?? 0}
+                    {(d.unknown ?? 0) > 0 && ` · U: ${d.unknown}`}
                   </span>
                 )}
               </span>
@@ -146,8 +147,8 @@ function GradeLegend({ distribution, profile }: { distribution: any[]; profile?:
           <span key={d.grade} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-gray-200 text-xs font-medium text-gray-700">
             <span className="w-3 h-3 rounded-full" style={{ background: gradeColor(d.grade) }} />
             Grade {d.grade}: {d.count} pupil{d.count === 1 ? '' : 's'}
-            {((d.males ?? 0) + (d.females ?? 0)) > 0 && (
-              <span className="text-gray-400"> (M: {d.males ?? 0} · F: {d.females ?? 0})</span>
+            {((d.males ?? 0) + (d.females ?? 0) + (d.unknown ?? 0)) > 0 && (
+              <span className="text-gray-400"> (M: {d.males ?? 0} · F: {d.females ?? 0}{(d.unknown ?? 0) > 0 ? ` · U: ${d.unknown}` : ''})</span>
             )}
             {range ? <span className="text-gray-400"> (score {range}%)</span> : null}
           </span>
