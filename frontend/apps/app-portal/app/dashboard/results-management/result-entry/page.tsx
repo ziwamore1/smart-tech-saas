@@ -776,10 +776,21 @@ export default function ResultEntryPage() {
 
   const openMySchedule = async () => {
     if (!selectedTerm) return;
+    if (!selectedClass) {
+      toast.error('Please select a class');
+      return;
+    }
     setScheduleLoading(true);
     try {
       const res = await teacherAnalyticsApi.getMarkSchedules({ termId: selectedTerm });
-      openTeacherMarkSchedulesReport(res?.data);
+      const schedules = Array.isArray(res?.data?.schedules)
+        ? res.data.schedules.filter((s: any) => s.classId === selectedClass)
+        : [];
+      if (schedules.length === 0) {
+        toast.error('No mark schedule found for the selected class. Enter and compute results first.');
+        return;
+      }
+      openTeacherMarkSchedulesReport({ ...res.data, schedules });
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to load mark schedule');
     } finally {
@@ -1180,7 +1191,7 @@ export default function ResultEntryPage() {
             </button>
             <button
               onClick={openMySchedule}
-              disabled={!selectedTerm || scheduleLoading}
+              disabled={!selectedTerm || !selectedClass || scheduleLoading}
               style={{
                 padding: '10px 16px', fontSize: '13px', fontWeight: 600, color: '#5b21b6',
                 background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: '8px',

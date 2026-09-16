@@ -1157,10 +1157,21 @@ function ReportsTab({ selectedClass, selectedTerm, sheetData, onMessage }: Repor
 
   const handleMyMarkSchedule = async () => {
     if (!selectedTerm) return;
+    if (!selectedClass) {
+      onMessage({ type: 'error', text: 'Please select a class' });
+      return;
+    }
     setLoading('teacher-mark-schedule');
     try {
       const response = await teacherAnalyticsApi.getMarkSchedules({ termId: selectedTerm });
-      openTeacherMarkSchedulesReport(response?.data);
+      const schedules = Array.isArray(response?.data?.schedules)
+        ? response.data.schedules.filter((s: any) => s.classId === selectedClass)
+        : [];
+      if (schedules.length === 0) {
+        onMessage({ type: 'error', text: 'No mark schedule found for the selected class. Enter and compute results first.' });
+        return;
+      }
+      openTeacherMarkSchedulesReport({ ...response.data, schedules });
     } catch (error: any) {
       onMessage({ type: 'error', text: error.response?.data?.message || 'Failed to generate teacher mark schedule' });
     } finally {
@@ -1211,11 +1222,11 @@ function ReportsTab({ selectedClass, selectedTerm, sheetData, onMessage }: Repor
         <div className="border rounded-lg p-4">
           <h3 className="font-medium mb-2">My Teaching Mark Schedule</h3>
           <p className="text-sm text-gray-600 mb-4">
-            Per class and per subject mark schedules for your assigned teaching load, with weighted component entries, final %, grade, points and rank.
+            Per-subject mark schedule for the selected class and your assigned teaching load, with weighted component entries, final %, grade, points and rank.
           </p>
           <button
             onClick={handleMyMarkSchedule}
-            disabled={!selectedTerm || loading === 'teacher-mark-schedule'}
+            disabled={!selectedTerm || !selectedClass || loading === 'teacher-mark-schedule'}
             className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
           >
             {loading === 'teacher-mark-schedule' ? 'Generating...' : 'Open My Mark Schedule'}

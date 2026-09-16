@@ -67,6 +67,28 @@ const REPORT_STYLES = `
   .chart-bar { height: 20px; border-radius: 4px; transition: width 0.3s; }
 `;
 
+const MARK_SCHEDULE_EXTRA_STYLES = `
+  @page { margin: 15mm; size: A4 landscape; }
+  body { font-size: 13px; }
+  .report-header { margin-bottom: 20px; padding: 14px 20px; }
+  .school-name { font-size: 26px; }
+  .report-title { font-size: 18px; }
+  .report-meta { font-size: 14px; padding: 12px 16px; }
+  table { table-layout: fixed; width: 100%; font-size: 12px; }
+  th { font-size: 11px; padding: 8px 8px; }
+  td { padding: 7px 8px; word-wrap: break-word; overflow-wrap: break-word; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  .grade-badge { font-size: 12px; padding: 3px 10px; }
+  .sig-line { font-size: 13px; color: #374151; }
+  .footer { font-size: 11px; color: #6b7280; }
+  @media print {
+    tr, td, th { break-inside: avoid; page-break-inside: avoid; }
+    .print-btn { display: none; }
+    body { padding: 0; }
+  }
+`;
+
 function openReport(html: string, title: string) {
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
@@ -174,12 +196,12 @@ export function generateMarkScheduleReport(students: ReportStudent[], meta: Repo
     const cells = s.results.map(r => {
       const pct = r.score;
       const gc = getGradeColor(r.grade);
-      if (r.isAbsent) return `<td class="text-center" style="background:#fef3c7"><span style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:11px;font-weight:600;background:#fef3c7;color:#92400e">ABSENT</span></td>`;
-      if (pct == null) return `<td class="text-center" style="background:#fffbeb"><span style="color:#d1d5db">-</span></td>`;
+      if (r.isAbsent) return `<td class="text-center" style="background:#fef3c7"><span style="display:inline-block;padding:2px 10px;border-radius:8px;font-size:12px;font-weight:700;background:#fef3c7;color:#92400e">ABSENT</span></td>`;
+      if (pct == null) return `<td class="text-center" style="background:#fffbeb"><span style="color:#6b7280;font-size:12px;font-style:italic">—</span></td>`;
       const color = scoreColor(pct);
       return `<td class="text-center" style="background:${pct < 50 ? '#fef2f2' : 'transparent'}">
-        <div style="font-weight:600;font-size:12px;color:${color}">${pct.toFixed(1)}%</div>
-        <div style="font-size:10px;color:#6b7280">${r.grade || '-'}${r.remark ? ` (${r.remark})` : ''}</div>
+        <div style="font-weight:700;font-size:13px;color:${color}">${pct.toFixed(1)}%</div>
+        <div style="font-size:11px;color:#374151">${r.grade || '-'}${r.remark ? ` (${r.remark})` : ''}</div>
       </td>`;
     }).join('');
 
@@ -189,10 +211,10 @@ export function generateMarkScheduleReport(students: ReportStudent[], meta: Repo
     const grade = s.grade || (avg != null ? (avg >= 75 ? 'A' : avg >= 65 ? 'B' : avg >= 50 ? 'C' : avg >= 40 ? 'D' : 'E') : '-');
 
     return `<tr>
-      <td class="text-center" style="color:#6b7280;width:30px">${i + 1}</td>
-      <td style="font-weight:600">${s.firstName} ${s.lastName}</td>
-      <td style="color:#6b7280;font-size:11px">${s.admissionNumber || '-'}</td>
-      <td class="text-center" style="color:#6b7280">${s.gender || '-'}</td>
+      <td class="text-center" style="color:#374151;width:28px">${i + 1}</td>
+      <td style="font-weight:600;font-size:13px">${s.firstName} ${s.lastName}</td>
+      <td style="color:#374151;font-size:12px">${s.admissionNumber || '-'}</td>
+      <td class="text-center" style="color:#374151;font-size:12px">${s.gender || '-'}</td>
       ${cells}
       <td class="text-center font-bold" style="color:${avgColor}">${avg != null ? avg.toFixed(1) + '%' : '-'}</td>
       <td class="text-center font-semibold" style="color:#059669">${s.totalPoints != null ? s.totalPoints : '-'}</td>
@@ -206,14 +228,14 @@ export function generateMarkScheduleReport(students: ReportStudent[], meta: Repo
   const content = `
     <table>
       <thead><tr>
-        <th class="text-center" style="width:30px">#</th>
-        <th style="min-width:150px">Student Name</th>
-        <th style="min-width:90px">Admission No.</th>
-        <th class="text-center" style="width:50px">Gender</th>
+        <th class="text-center" style="width:28px">#</th>
+        <th style="width:140px">Student Name</th>
+        <th style="width:78px">Admission No.</th>
+        <th class="text-center" style="width:44px">Gender</th>
         ${subjectHeaders}
-        <th class="text-center" style="min-width:60px">Average</th>
-        <th class="text-center" style="width:50px">Points</th>
-        <th class="text-center" style="width:50px">Grade</th>
+        <th class="text-center" style="width:52px">Average</th>
+        <th class="text-center" style="width:44px">Points</th>
+        <th class="text-center" style="width:44px">Grade</th>
         <th class="text-center" style="width:40px">Rank</th>
       </tr></thead>
       <tbody>${rows}</tbody>
@@ -224,7 +246,7 @@ export function generateMarkScheduleReport(students: ReportStudent[], meta: Repo
       <div class="sig"><div class="sig-line">Director / Principal: ${meta.director || '________________'}</div></div>
     </div>`;
 
-  return buildReportShell(meta, `Mark Schedule - ${meta.examType}`, content);
+  return buildReportShell(meta, `Mark Schedule - ${meta.examType}`, content, MARK_SCHEDULE_EXTRA_STYLES);
 }
 
 export interface AnalysisData {
@@ -569,35 +591,35 @@ export function generateTeacherMarkSchedulesReport(data: TeacherMarkScheduleData
 
   const blocks = (data.schedules || []).map((sched) => {
     const compHeaders = (sched.components || [])
-      .map(c => `<th class="text-center">${esc(c.name)} (${c.weightPercentage}%)</th>`)
+      .map(c => `<th class="text-center" data-label="${esc(c.name)}">${esc(c.name)}<br>(${c.weightPercentage}%)</th>`)
       .join('');
 
     const rows = (sched.students || []).map((s, i) => {
       const compCells = (s.components || []).map(comp => {
         if (comp.isAbsent) {
-          return `<td class="text-center" style="background:#fef3c7"><span style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;font-weight:600;background:#fef3c7;color:#92400e">ABSENT</span></td>`;
+          return `<td class="text-center" style="background:#fef3c7"><span style="display:inline-block;padding:2px 10px;border-radius:8px;font-size:12px;font-weight:700;background:#fef3c7;color:#92400e">ABSENT</span></td>`;
         }
         if (comp.percentage == null) {
-          return `<td class="text-center" style="background:#fffbeb"><span style="color:#d1d5db">-</span></td>`;
+          return `<td class="text-center" style="background:#fffbeb"><span style="color:#6b7280;font-size:12px;font-style:italic">—</span></td>`;
         }
         const col = scoreColor(comp.percentage);
         return `<td class="text-center">` +
-          `<div style="font-weight:600;font-size:11px;color:${col}">${comp.percentage.toFixed(1)}%</div>` +
-          (comp.rawScore != null ? `<div style="font-size:9px;color:#6b7280">${comp.rawScore} / ${comp.maxScore}</div>` : '') +
+          `<div style="font-weight:700;font-size:13px;color:${col}">${comp.percentage.toFixed(1)}%</div>` +
+          (comp.rawScore != null ? `<div style="font-size:11px;color:#374151">${comp.rawScore} / ${comp.maxScore}</div>` : '') +
           `</td>`;
       }).join('');
 
       const final = s.finalPercentage;
       const gc = getGradeColor(s.finalGrade);
       const finalCell = s.isAbsent
-        ? `<td class="text-center" style="background:#fef3c7"><span style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;font-weight:600;background:#fef3c7;color:#92400e">ABSENT</span></td>`
-        : `<td class="text-center font-bold" style="color:${scoreColor(final)};min-width:60px">${final != null ? final.toFixed(1) + '%' : '-'}</td>`;
+        ? `<td class="text-center" style="background:#fef3c7"><span style="display:inline-block;padding:2px 10px;border-radius:8px;font-size:12px;font-weight:700;background:#fef3c7;color:#92400e">ABSENT</span></td>`
+        : `<td class="text-center font-bold" style="color:${scoreColor(final)};min-width:52px">${final != null ? final.toFixed(1) + '%' : '-'}</td>`;
 
       return `<tr>
-        <td class="text-center" style="color:#6b7280;width:30px">${i + 1}</td>
-        <td style="font-weight:600">${esc(s.student.firstName)} ${esc(s.student.lastName)}</td>
-        <td style="color:#6b7280;font-size:11px">${esc(s.student.admissionNumber || '-')}</td>
-        <td class="text-center" style="color:#6b7280">${esc(s.student.gender || '-')}</td>
+        <td class="text-center" style="color:#374151;width:28px">${i + 1}</td>
+        <td style="font-weight:600;font-size:13px">${esc(s.student.firstName)} ${esc(s.student.lastName)}</td>
+        <td style="color:#374151;font-size:12px">${esc(s.student.admissionNumber || '-')}</td>
+        <td class="text-center" style="color:#374151;font-size:12px">${esc(s.student.gender || '-')}</td>
         ${compCells}
         ${finalCell}
         <td class="text-center"><span class="grade-badge" style="background:${gc.bg};color:${gc.text}">${s.finalGrade || '-'}</span></td>
@@ -612,20 +634,20 @@ export function generateTeacherMarkSchedulesReport(data: TeacherMarkScheduleData
         <div class="schedule-title">${esc(sched.className)} — ${esc(sched.subjectName)}${sched.subjectCode ? ` (${esc(sched.subjectCode)})` : ''}</div>
         <table>
           <thead><tr>
-            <th class="text-center" style="width:30px">#</th>
-            <th style="min-width:150px">Student Name</th>
-            <th style="min-width:90px">Admission No.</th>
-            <th class="text-center" style="width:50px">Gender</th>
+            <th class="text-center" style="width:28px">#</th>
+            <th style="width:140px">Student Name</th>
+            <th style="width:78px">Admission No.</th>
+            <th class="text-center" style="width:44px">Gender</th>
             ${compHeaders}
-            <th class="text-center" style="min-width:60px">Final %</th>
-            <th class="text-center" style="width:50px">Grade</th>
+            <th class="text-center" style="width:52px">Final %</th>
+            <th class="text-center" style="width:44px">Grade</th>
             <th class="text-center" style="width:40px">Points</th>
             <th class="text-center" style="width:40px">Rank</th>
           </tr></thead>
           <tbody>${rows || `<tr><td colspan="${colSpan}" class="text-center">No student records for this class and subject.</td></tr>`}</tbody>
         </table>
       </div>`;
-  }).join('') || '<p style="color:#9ca3af;text-align:center">No mark schedules found for the selected term. Enter and compute results for your assigned classes and subjects first.</p>';
+  }).join('') || '<p style="color:#6b7280;text-align:center;font-size:14px">No mark schedules found for the selected term. Enter and compute results for your assigned classes and subjects first.</p>';
 
   const dateLabel = data.term.academicYear
     ? `${data.term.name} (${data.term.academicYear})`
@@ -637,9 +659,10 @@ export function generateTeacherMarkSchedulesReport(data: TeacherMarkScheduleData
 <meta charset="UTF-8">
 <title>Teacher Mark Schedule - ${data.header.schoolName}</title>
 <style>${REPORT_STYLES}
-  .schedule-block { break-inside: avoid; page-break-inside: avoid; margin-bottom: 26px; }
-  .schedule-title { background: linear-gradient(135deg, #5f4b3a 0%, #7a6b5a 100%); color: white; border-radius: 8px; padding: 10px 16px; margin-bottom: 10px; font-size: 14px; font-weight: 700; letter-spacing: 0.3px; }
-  @media print { .schedule-block { break-inside: avoid; page-break-inside: avoid; } }
+  ${MARK_SCHEDULE_EXTRA_STYLES}
+  .schedule-block { margin-bottom: 26px; }
+  .schedule-title { background: linear-gradient(135deg, #5f4b3a 0%, #7a6b5a 100%); color: white; border-radius: 8px; padding: 10px 16px; margin-bottom: 10px; font-size: 16px; font-weight: 700; letter-spacing: 0.3px; }
+  .schedule-block > .schedule-title { break-inside: avoid; page-break-inside: avoid; }
 </style>
 </head>
 <body>

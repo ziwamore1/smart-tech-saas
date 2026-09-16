@@ -21,6 +21,14 @@ import {
 
 const COMPUTED_STATUSES: ComputedResultStatus[] = ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'];
 
+/** Normalize a stored gender value to a canonical kind, mirroring the rest of the codebase. */
+function genderKind(g?: string | null): 'male' | 'female' | null {
+  const v = (g || '').trim().toUpperCase();
+  if (v === 'MALE' || v === 'M') return 'male';
+  if (v === 'FEMALE' || v === 'F') return 'female';
+  return null;
+}
+
 interface GradeCountBucket {
   count: number;
   males: number;
@@ -599,26 +607,26 @@ export class TeacherAnalyticsService {
       const key = grade || 'N/A';
       const bucket = gradeCounts.get(key) || { count: 0, males: 0, females: 0 };
       bucket.count++;
-      const gender = r.student?.gender?.toLowerCase();
-      if (gender === 'male') bucket.males++;
-      else if (gender === 'female') bucket.females++;
+      const kind = genderKind(r.student?.gender);
+      if (kind === 'male') bucket.males++;
+      else if (kind === 'female') bucket.females++;
       gradeCounts.set(key, bucket);
     }
     const qualityPassRate = totalAssessed > 0 ? this.stats.round2((qualityPassed / totalAssessed) * 100) : null;
     const quantityPassRate = totalAssessed > 0 ? this.stats.round2((quantityPassed / totalAssessed) * 100) : null;
 
-    const gradeScaleDistribution = this.buildGradeScaleDistribution(profile, gradeCounts, totalAssessed);
+    const gradeScaleDistribution = this.buildGradeScaleDistribution(profile, gradeCounts, scores.length);
 
     const participationRate =
       enrolledStudents > 0 ? (participated.length / enrolledStudents) * 100 : null;
 
     // Gender breakdown
     const femaleScores = participated
-      .filter((r) => r.student?.gender?.toLowerCase() === 'female')
+      .filter((r) => genderKind(r.student?.gender) === 'female')
       .map((r) => r.finalPercentage)
       .filter((p): p is number => p != null);
     const maleScores = participated
-      .filter((r) => r.student?.gender?.toLowerCase() === 'male')
+      .filter((r) => genderKind(r.student?.gender) === 'male')
       .map((r) => r.finalPercentage)
       .filter((p): p is number => p != null);
     const gender: GenderAnalysis = {
@@ -626,11 +634,7 @@ export class TeacherAnalyticsService {
       female: { ...this.stats.scoreStats(femaleScores), count: femaleScores.length },
       male: { ...this.stats.scoreStats(maleScores), count: maleScores.length },
       unknown: {
-        count: participated.filter(
-          (r) =>
-            !r.student?.gender ||
-            (r.student?.gender?.toLowerCase() !== 'female' && r.student?.gender?.toLowerCase() !== 'male'),
-        ).length,
+        count: participated.filter((r) => genderKind(r.student?.gender) == null).length,
       },
       gap: this.stats.genderGap(
         this.stats.mean(femaleScores),
@@ -847,8 +851,8 @@ export class TeacherAnalyticsService {
     };
 
     // Quality/Quantity aggregation across all assignments
-    const assessedRows = assignmentAnalytics.filter((a) => a.assessedStudents > 0);
-    const totalGraded = assessedRows.reduce((sum, a) => sum + a.assessedStudents, 0);
+    const assessedRows = assignmentAnalytics.filter((a) => a.stats.count > 0);
+    const totalGraded = assessedRows.reduce((sum, a) => sum + a.stats.count, 0);
     const totalQualityPassed = assessedRows.reduce((sum, a) => sum + a.qualityPassed, 0);
     const totalQuantityPassed = assessedRows.reduce((sum, a) => sum + a.quantityPassed, 0);
     const overallQualityPassRate = totalGraded > 0 ? this.stats.round2((totalQualityPassed / totalGraded) * 100) : null;
@@ -978,8 +982,8 @@ export class TeacherAnalyticsService {
       const gapValues = rows.map((r) => r.gender.gap.averageGap).filter((v): v is number => v != null);
 
       // Quality/Quantity aggregation across subjects in this class
-      const assessedRows = rows.filter((r) => r.assessedStudents > 0);
-      const totalAssessed = assessedRows.reduce((sum, r) => sum + r.assessedStudents, 0);
+      const assessedRows = rows.filter((r) => r.stats.count > 0);
+      const totalAssessed = assessedRows.reduce((sum, r) => sum + (r.stats?.count || 0), 0);
       const totalQualityPassed = assessedRows.reduce((sum, r) => sum + r.qualityPassed, 0);
       const totalQuantityPassed = assessedRows.reduce((sum, r) => sum + r.quantityPassed, 0);
       const qualityPassRate = totalAssessed > 0 ? this.stats.round2((totalQualityPassed / totalAssessed) * 100) : null;

@@ -279,6 +279,7 @@ export default function TeacherAnalysisPage() {
   const [reportHtml, setReportHtml] = useState<string | null>(null);
   const [reportContext, setReportContext] = useState('');
   const [generatingSchedule, setGeneratingSchedule] = useState(false);
+  const [scheduleClassId, setScheduleClassId] = useState<string>('');
 
   const userRoles = ((user as any)?.allRoles || user?.roles || []).map((role: string) => String(role).toUpperCase());
   const canSelectTeacher = userRoles.some((role: string) => ['DIRECTOR', 'HEAD TEACHER', 'HEADTEACHER', 'DEPUTY HEAD', 'DEPUTY HEAD TEACHER', 'DEPUTYHEADTEACHER', 'DEPUTY'].includes(role));
@@ -383,13 +384,24 @@ export default function TeacherAnalysisPage() {
 
   const openMarkSchedule = async () => {
     if (!summary?.term) return;
+    if (!scheduleClassId) {
+      setError('Select a class to generate the mark schedule for that class only.');
+      return;
+    }
     setGeneratingSchedule(true);
     setError(null);
     try {
       const res = selectedTeacherId
         ? await teacherAnalyticsApi.getTeacherMarkSchedules(selectedTeacherId, { termId: summary.term.id })
         : await teacherAnalyticsApi.getMarkSchedules({ termId: summary.term.id });
-      openTeacherMarkSchedulesReport(res?.data);
+      const schedules = Array.isArray(res?.data?.schedules)
+        ? res.data.schedules.filter((s: any) => s.classId === scheduleClassId)
+        : [];
+      if (schedules.length === 0) {
+        setError('No mark schedule found for the selected class in this term. Enter and compute results first.');
+        return;
+      }
+      openTeacherMarkSchedulesReport({ ...res.data, schedules });
     } catch (e: any) {
       setError(e?.response?.data?.message || 'Failed to load mark schedule');
     } finally {
@@ -477,9 +489,19 @@ export default function TeacherAnalysisPage() {
           >
             {viewingReport ? 'Loading…' : '👁 View Report'}
           </button>
+          <select
+            value={scheduleClassId}
+            onChange={(e) => setScheduleClassId(e.target.value)}
+            className="px-3 py-2 border border-purple-300 rounded-lg text-sm bg-white text-gray-700 focus:ring-2 focus:ring-purple-500"
+          >
+            <option value="">Mark Schedule: Select Class</option>
+            {classes.map((c: any) => (
+              <option key={c.classId} value={c.classId}>{c.className}</option>
+            ))}
+          </select>
           <button
             onClick={openMarkSchedule}
-            disabled={generatingSchedule || !summary?.term}
+            disabled={generatingSchedule || !summary?.term || !scheduleClassId}
             className="px-4 py-2 bg-white border border-purple-300 text-purple-600 rounded-lg hover:bg-purple-50 text-sm font-medium disabled:opacity-50"
           >
             {generatingSchedule ? 'Loading…' : '📋 Mark Schedule'}

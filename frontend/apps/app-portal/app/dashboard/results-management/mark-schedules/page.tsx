@@ -80,16 +80,27 @@ export default function MarkSchedulesPage() {
       toast.error('Please select a term');
       return;
     }
+    if (!selectedClass) {
+      toast.error('Please select a class');
+      return;
+    }
     setMyScheduleLoading(true);
     try {
       const r = await teacherAnalyticsApi.getMarkSchedules({ termId: selectedTerm, examType: selectedExamType });
-      openTeacherMarkSchedulesReport(r?.data);
+      const schedules = Array.isArray(r?.data?.schedules)
+        ? r.data.schedules.filter((s: any) => s.classId === selectedClass)
+        : [];
+      if (schedules.length === 0) {
+        toast.error('No mark schedule found for the selected class. Enter and compute results first.');
+        return;
+      }
+      openTeacherMarkSchedulesReport({ ...r.data, schedules });
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to load your mark schedule');
     } finally {
       setMyScheduleLoading(false);
     }
-  }, [selectedTerm, selectedExamType]);
+  }, [selectedTerm, selectedExamType, selectedClass]);
 
   const handlePrint = () => {
     if (!schedule?.students?.length) {
@@ -233,12 +244,12 @@ export default function MarkSchedulesPage() {
           )}
           <button
             onClick={openMySchedule}
-            disabled={!selectedTerm || myScheduleLoading}
+            disabled={!selectedTerm || !selectedClass || myScheduleLoading}
             style={{
               display: 'flex', alignItems: 'center', gap: '8px',
               padding: '10px 20px', fontSize: '14px', fontWeight: 600, color: '#5b21b6',
               background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: '8px',
-              cursor: !selectedTerm ? 'not-allowed' : 'pointer'
+              cursor: !selectedTerm || !selectedClass ? 'not-allowed' : 'pointer'
             }}
           >
             {myScheduleLoading ? <><i className="fa fa-spinner fa-spin"></i> Loading...</> : <><i className="fa fa-user"></i> My Mark Schedule</>}
