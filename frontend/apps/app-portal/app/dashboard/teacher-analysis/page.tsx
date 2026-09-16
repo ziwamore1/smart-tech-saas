@@ -395,11 +395,16 @@ export default function TeacherAnalysisPage() {
       const res = selectedTeacherId
         ? await teacherAnalyticsApi.getTeacherMarkSchedules(selectedTeacherId, { termId: summary.term.id })
         : await teacherAnalyticsApi.getMarkSchedules({ termId: summary.term.id });
+      const selClass = classes.find((c: any) => c.classId === scheduleClassId);
+      const selName = String(selClass?.className || '').toLowerCase();
       const schedules = Array.isArray(res?.data?.schedules)
-        ? res.data.schedules.filter((s: any) => s.classId === scheduleClassId)
+        ? res.data.schedules.filter((s: any) =>
+            s.classId === scheduleClassId || String(s.className || '').toLowerCase() === selName)
         : [];
       if (schedules.length === 0) {
-        setError('No mark schedule found for the selected class in this term. Enter and compute results first.');
+        setError(
+          `No mark schedule found for ${selClass?.className || 'the selected class'} in this term. Confirm the class has assessment components configured and results computed/published for ${summary.term.name}.`,
+        );
         return;
       }
       openTeacherMarkSchedulesReport({ ...res.data, schedules });

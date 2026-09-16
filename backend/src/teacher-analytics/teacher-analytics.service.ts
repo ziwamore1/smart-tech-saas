@@ -1766,7 +1766,6 @@ export class TeacherAnalyticsService {
         orderBy: [{ sequenceOrder: 'asc' }, { assessmentDef: { sortOrder: 'asc' } }],
       });
       const activeConfigs = configs.filter((c) => c.assessmentDef.contributesToFinal !== false);
-      if (activeConfigs.length === 0) continue;
 
       const enrolled = await this.prisma.enrollment.findMany({
         where: { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
