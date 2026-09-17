@@ -811,32 +811,57 @@ export class StudentService {
     }
 
     if (dto.parentName || dto.parentPhone || dto.parentEmail) {
-      const parentNameParts = (dto.parentName || '').trim().split(/\s+/);
+      const parentNameParts = (dto.parentName || '').trim().split(/\s+/).filter(Boolean);
       const parentFirstName = parentNameParts[0] || '';
-      const parentLastName = parentNameParts.slice(1).join(' ') || '';
+      const parentLastName = parentNameParts.slice(1).join(' ');
+      const parentPhone = normalizeZambianPhone(dto.parentPhone);
 
-      if (parentFirstName) {
-        const existingParents = await this.prisma.parentStudent.findMany({
-          where: { studentId: id },
-          include: { parent: true },
-        });
-        const existingParent = existingParents.length > 0 ? existingParents[0].parent : null;
+      const existingParents = await this.prisma.parentStudent.findMany({
+        where: { studentId: id },
+        include: { parent: true },
+      });
+      const existingParent = existingParents.length > 0 ? existingParents[0].parent : null;
 
-        if (existingParent) {
-          const parentUpdateData: any = {};
-          if (parentFirstName) parentUpdateData.firstName = parentFirstName;
-          if (parentLastName) parentUpdateData.lastName = parentLastName;
-          if (dto.parentPhone) parentUpdateData.phone = normalizeZambianPhone(dto.parentPhone);
-          if (dto.parentEmail) parentUpdateData.email = dto.parentEmail;
-          await this.prisma.parent.update({ where: { id: existingParent.id }, data: parentUpdateData });
+      if (existingParent) {
+        const parentUpdateData: any = {};
+        if (parentFirstName) parentUpdateData.firstName = parentFirstName;
+        if (parentLastName) parentUpdateData.lastName = parentLastName;
+        if (dto.parentPhone) parentUpdateData.phone = parentPhone;
+        if (dto.parentEmail) parentUpdateData.email = dto.parentEmail;
+        await this.prisma.parent.update({ where: { id: existingParent.id }, data: parentUpdateData });
+      } else {
+        const parentEmail = dto.parentEmail || `parent-${id}@placeholder.local`;
+
+        // A guardian record may already exist under the supplied email (e.g. a
+        // sibling's parent). Link to it instead of creating a duplicate, which
+        // would violate Parent.email's unique constraint.
+        const emailOwner = await this.prisma.parent.findUnique({ where: { email: parentEmail } });
+
+        if (emailOwner) {
+          await this.prisma.parent.update({
+            where: { id: emailOwner.id },
+            data: {
+              ...(parentFirstName ? { firstName: parentFirstName } : {}),
+              ...(parentLastName ? { lastName: parentLastName } : {}),
+              ...(dto.parentPhone ? { phone: parentPhone } : {}),
+            },
+          });
+          await this.prisma.parentStudent.upsert({
+            where: { parentId_studentId: { parentId: emailOwner.id, studentId: id } },
+            create: { parentId: emailOwner.id, studentId: id },
+            update: {},
+          });
         } else {
-          const parentEmail = dto.parentEmail || `parent-${id}@placeholder.local`;
+          // Parent.password is required by the schema even when no login
+          // account is provisioned for this guardian.
+          const parentPassword = this.passwordGenService.generateRoleBasedPassword('Parent');
           const newParent = await this.prisma.parent.create({
             data: {
-              firstName: parentFirstName,
+              firstName: parentFirstName || `${student.firstName}'s Parent`,
               lastName: parentLastName,
-              phone: normalizeZambianPhone(dto.parentPhone),
+              phone: parentPhone,
               email: parentEmail,
+              password: await bcrypt.hash(parentPassword.password, 10),
               schoolId: student.schoolId,
             },
           });
