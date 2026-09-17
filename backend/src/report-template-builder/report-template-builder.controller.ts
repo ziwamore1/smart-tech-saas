@@ -418,6 +418,7 @@ export class ReportTemplateBuilderController {
         signature2Name: cert?.signature2Name,
         signature2Label: cert?.signature2Label,
         awardText: cert?.awardText,
+        certificateType: cert?.certificateType,
         borderStyle: cert?.borderStyle || 'classic',
         borderColor: cert?.borderColor || '#1a365d',
         showQrCode: cert?.showQrCode !== false,

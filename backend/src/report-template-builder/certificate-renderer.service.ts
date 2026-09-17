@@ -22,19 +22,26 @@ export class CertificateRendererService {
     }
   }
 
-  generateStampOverlayHtml(stamps: any[]): string {
+  generateStampOverlayHtml(stamps: any[], canvasWidth = 760, canvasHeight = 760): string {
     if (!stamps || stamps.length === 0) return '';
 
+    // Share the border layer's viewBox so template stamp coordinates map onto
+    // the same design canvas (and letterbox identically when scaled to the
+    // page). Stamps are clamped inside the certificate margin so they can
+    // never bleed past the border.
+    const margin = 20;
     const parts = stamps.map((s) => {
       const svgContent = s.stamp?.svgContent || s.svgContent || '';
       if (!svgContent) return '';
 
       const opacity = s.opacity ?? s.stamp?.opacity ?? 1;
       const rotation = s.rotation ?? 0;
-      const x = s.positionX ?? 0;
-      const y = s.positionY ?? 0;
-      const w = s.width ?? s.stamp?.width ?? 150;
-      const h = s.height ?? s.stamp?.height ?? 150;
+      const w = Math.min(s.width ?? s.stamp?.width ?? 150, canvasWidth - 2 * margin);
+      const h = Math.min(s.height ?? s.stamp?.height ?? 150, canvasHeight - 2 * margin);
+      const maxX = Math.max(margin, canvasWidth - margin - w);
+      const maxY = Math.max(margin, canvasHeight - margin - h);
+      const x = Math.min(Math.max(s.positionX ?? margin, margin), maxX);
+      const y = Math.min(Math.max(s.positionY ?? margin, margin), maxY);
 
       const innerSvg = svgContent
         .replace(/<svg[^>]*>/i, '')
@@ -43,13 +50,60 @@ export class CertificateRendererService {
       return `<g transform="translate(${x},${y}) rotate(${rotation},${w / 2},${h / 2})" opacity="${opacity}">
   ${innerSvg}
 </g>`;
-    });
+    }).filter(Boolean);
 
     if (parts.length === 0) return '';
 
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" style="position:absolute;top:0;left:0;pointer-events:none;z-index:10;">
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${canvasWidth} ${canvasHeight}" preserveAspectRatio="xMidYMid meet" width="100%" height="100%" style="position:absolute;top:0;left:0;pointer-events:none;z-index:10;">
 ${parts.join('\n')}
 </svg>`;
+  }
+
+  getCertificateTypeCopy(certificateType?: string): { title: string; subtitle: string; description: string } {
+    switch (certificateType) {
+      case 'SPORTS_AWARD':
+        return {
+          title: 'Certificate of Athletic Achievement',
+          subtitle: 'Official Sports Award Document',
+          description: 'In recognition of outstanding athletic achievement and sportsmanship',
+        };
+      case 'LEADERSHIP_AWARD':
+        return {
+          title: 'Certificate of Leadership',
+          subtitle: 'Official Leadership Award Document',
+          description: 'In recognition of exceptional leadership, integrity, and service to the school community',
+        };
+      case 'ATTENDANCE':
+        return {
+          title: 'Certificate of Attendance',
+          subtitle: 'Official Attendance Document',
+          description: 'In recognition of exemplary attendance and punctuality',
+        };
+      case 'MERIT_AWARD':
+        return {
+          title: 'Certificate of Merit',
+          subtitle: 'Official Merit Award Document',
+          description: 'In recognition of outstanding merit, dedication, and service',
+        };
+      case 'GRADUATION':
+        return {
+          title: 'Diploma of Graduation',
+          subtitle: 'Official Graduation Document',
+          description: 'In recognition of successful completion of academic requirements',
+        };
+      case 'PARTICIPATION':
+        return {
+          title: 'Certificate of Participation',
+          subtitle: 'Official Participation Document',
+          description: 'In recognition of active participation and commitment',
+        };
+      default:
+        return {
+          title: 'Certificate of Academic Excellence',
+          subtitle: 'Official Academic Document',
+          description: 'In recognition of outstanding academic performance and demonstrated excellence',
+        };
+    }
   }
   async generateQrCodeDataUrl(data: string): Promise<string> {
     try {
@@ -512,6 +566,7 @@ ${parts.join('\n')}
       signature2Name?: string;
       signature2Label?: string;
       awardText?: string;
+      certificateType?: string;
       borderStyle?: string;
       borderColor?: string;
       showQrCode?: boolean;
@@ -533,10 +588,13 @@ ${parts.join('\n')}
       qrSvg = await this.generateQrSvg(data.verificationUrl);
     }
 
-    const stampOverlay = data.stamps ? this.generateStampOverlayHtml(data.stamps) : '';
+    const canvasWidth = 760;
+    const canvasHeight = isLandscape ? 520 : 760;
+    const stampOverlay = data.stamps ? this.generateStampOverlayHtml(data.stamps, canvasWidth, canvasHeight) : '';
     const certificateComment = this.escapeHtml(data.certificateComment || '');
+    const typeCopy = this.getCertificateTypeCopy(data.certificateType);
 
-    const borderSvg = this.generateBorderSvg(760, isLandscape ? 520 : 760, data.borderStyle, data.borderColor);
+    const borderSvg = this.generateBorderSvg(canvasWidth, canvasHeight, data.borderStyle, data.borderColor);
     const badgeSvg = data.showBadge ? this.generateBadgeSvg(data.badgeStyle, data.borderColor) : '';
     const sealImage = this.getSmartTechSealDataUrl();
     const sealSvg = this.generateSealSvg('#0f766e', 'SMART TECH');
@@ -672,13 +730,13 @@ ${parts.join('\n')}
        ${data.schoolLogo ? `<div class="logo-area"><img src="${data.schoolLogo}" alt="School Logo"/></div>` : ''}
       <div class="ribbon-area">${ribbonSvg}</div>
       <div class="school-name">${data.schoolName}</div>
-      <div class="school-subtitle">Official Academic Document</div>
+      <div class="school-subtitle">${typeCopy.subtitle}</div>
       <div class="divider"></div>
-      <div class="cert-title">Certificate of Achievement</div>
+      <div class="cert-title">${typeCopy.title}</div>
       <div class="award-text"><em>${data.awardText || 'This certificate is proudly awarded to'}</em></div>
       <div class="student-name">${data.studentName}</div>
       ${data.studentPhoto ? `<div class="photo-area"><img src="${data.studentPhoto}" alt="Student"/></div>` : ''}
-       <div class="detail-text">In recognition of outstanding academic performance and demonstrated excellence</div>
+       <div class="detail-text">${typeCopy.description}</div>
        <div class="detail-text">${data.className ? `Class: ${data.className}` : ''}${data.className && data.termName ? ' &middot; ' : ''}${data.termName} ${data.academicYear}${data.examType ? ` &middot; Exam: ${data.examType}` : ''}</div>
        ${certificateComment ? `<div class="comment-box">${certificateComment}</div>` : ''}
       ${badgeSvg ? `<div class="badge-area">${badgeSvg}</div>` : ''}
