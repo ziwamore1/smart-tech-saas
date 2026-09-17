@@ -26,8 +26,8 @@ export class StampMarketplaceController {
   // ── Super-admin platform authoring (advanced designer) ──
 
   @Get('admin/platform')
-  listPlatform(@Req() req: any) {
-    return { templates: this.service.listPlatform(this.actor(req)) };
+  async listPlatform(@Req() req: any) {
+    return { templates: await this.service.listPlatform(this.actor(req)) };
   }
 
   @Get('admin/platform/:id')
@@ -72,13 +72,13 @@ export class StampMarketplaceController {
   // ── School-facing marketplace ──
 
   @Get('browse')
-  browse(@Req() req: any, @Query('category') category?: string) {
-    return { entries: this.service.browse(this.actor(req), category) };
+  async browse(@Req() req: any, @Query('category') category?: string) {
+    return { entries: await this.service.browse(this.actor(req), category) };
   }
 
   @Get('installed')
-  installed(@Req() req: any) {
-    return { entries: this.service.myInstalled(this.actor(req)) };
+  async installed(@Req() req: any) {
+    return { entries: await this.service.myInstalled(this.actor(req)) };
   }
 
   @Post('install/:marketplaceId')

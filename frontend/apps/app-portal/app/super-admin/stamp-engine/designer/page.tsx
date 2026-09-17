@@ -75,6 +75,7 @@ export default function SuperAdminStampDesignerPage() {
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
 
   const [templates, setTemplates] = useState<any[]>([]);
+  const [listError, setListError] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -136,8 +137,13 @@ export default function SuperAdminStampDesignerPage() {
   const load = useCallback(async () => {
     try {
       const res = await stampMarketplaceApi.adminPlatformList();
-      setTemplates(res.data?.templates || []);
-    } catch { /* ignore */ }
+      const list = res.data?.templates;
+      setTemplates(Array.isArray(list) ? list : []);
+      setListError(Array.isArray(list) ? '' : 'Unexpected response from the marketplace service.');
+    } catch (err: any) {
+      setTemplates([]);
+      setListError(err?.response?.data?.message || 'Could not load saved platform stamps.');
+    }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
@@ -369,6 +375,7 @@ export default function SuperAdminStampDesignerPage() {
           </section>
           <section className="bg-white rounded-xl border border-gray-200 p-4">
             <h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Saved platform stamps</h2>
+            {listError && <p className="mt-2 text-[11px] text-red-600">{listError}</p>}
             <ul className="mt-2 divide-y divide-gray-100">
               {templates.length === 0 && <li className="py-2 text-xs text-gray-400">None yet. Save your first stamp above.</li>}
               {templates.map(t => (
