@@ -97,7 +97,7 @@ export class ReportEngineController {
   }
 
   @Post('generate-pdf')
-  @Roles('Director', 'Head Teacher', 'HeadTeacher', 'Deputy Head', 'Deputy Head Teacher', 'DeputyHeadTeacher', 'Deputy', 'HOD', 'Class Teacher', 'Teacher', 'Parent', 'Student')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'HeadTeacher', 'Deputy Head', 'Deputy Head Teacher', 'DeputyHeadTeacher', 'Deputy', 'HOD', 'Class Teacher', 'Teacher', 'Parent', 'Student')
   async generateAndDownloadPdf(
     @Req() req,
     @Body() body: {
@@ -263,7 +263,7 @@ export class ReportEngineController {
   }
 
   @Post('teacher-analysis-html')
-  @Roles('Director', 'Head Teacher', 'HeadTeacher', 'Deputy Head', 'Deputy Head Teacher', 'DeputyHeadTeacher', 'Deputy', 'HOD', 'Class Teacher', 'Teacher')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'HeadTeacher', 'Deputy Head', 'Deputy Head Teacher', 'DeputyHeadTeacher', 'Deputy', 'HOD', 'Class Teacher', 'Teacher')
   async previewTeacherAnalysis(
     @Req() req,
     @Body() body: { termId?: string; examType?: string; teacherUserId?: string },

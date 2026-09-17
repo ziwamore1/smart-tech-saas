@@ -5,8 +5,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
-const TEACHER_ROLES = ['Teacher', 'Class Teacher', 'Director', 'HOD', 'Deputy', 'Head Teacher', 'Deputy Head'];
-const ANALYTICS_LEADER_ROLES = ['Director', 'Head Teacher', 'HeadTeacher', 'Deputy Head', 'Deputy Head Teacher', 'DeputyHeadTeacher', 'Deputy'];
+const TEACHER_ROLES = ['Teacher', 'Class Teacher', 'Director', 'Deputy Director', 'HOD', 'Deputy', 'Head Teacher', 'Deputy Head'];
+const ANALYTICS_LEADER_ROLES = ['Director', 'Deputy Director', 'Head Teacher', 'HeadTeacher', 'Deputy Head', 'Deputy Head Teacher', 'DeputyHeadTeacher', 'Deputy'];
 
 @Controller('teacher-analytics')
 @UseGuards(JwtAuthGuard, RolesGuard)

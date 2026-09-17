@@ -283,7 +283,7 @@ export default function TeacherAnalysisPage() {
   const [scheduleClassId, setScheduleClassId] = useState<string>('');
 
   const userRoles = ((user as any)?.allRoles || user?.roles || []).map((role: string) => String(role).toUpperCase());
-  const canSelectTeacher = userRoles.some((role: string) => ['DIRECTOR', 'HEAD TEACHER', 'HEADTEACHER', 'DEPUTY HEAD', 'DEPUTY HEAD TEACHER', 'DEPUTYHEADTEACHER', 'DEPUTY'].includes(role));
+  const canSelectTeacher = userRoles.some((role: string) => ['DIRECTOR', 'DEPUTY DIRECTOR', 'HEAD TEACHER', 'HEADTEACHER', 'DEPUTY HEAD', 'DEPUTY HEAD TEACHER', 'DEPUTYHEADTEACHER', 'DEPUTY'].includes(role));
 
   useEffect(() => {
     termApi.getAll().then((res: any) => {

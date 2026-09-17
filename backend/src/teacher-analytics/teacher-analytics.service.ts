@@ -240,7 +240,7 @@ export class TeacherAnalyticsService {
   private isAnalyticsLeader(reqUser: any): boolean {
     const roles = Array.isArray(reqUser.roles) ? reqUser.roles : [];
     return roles.some((role: string) =>
-      ['DIRECTOR', 'HEAD TEACHER', 'HEADTEACHER', 'DEPUTY HEAD', 'DEPUTY HEAD TEACHER', 'DEPUTYHEADTEACHER', 'DEPUTY'].includes(String(role).toUpperCase()),
+      ['DIRECTOR', 'DEPUTY DIRECTOR', 'HEAD TEACHER', 'HEADTEACHER', 'DEPUTY HEAD', 'DEPUTY HEAD TEACHER', 'DEPUTYHEADTEACHER', 'DEPUTY'].includes(String(role).toUpperCase()),
     );
   }
 
