@@ -1,14 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { stampEngineApi, templateBuilderApi } from '@/lib/api';
+import { reportTemplateApi, stampEngineApi, templateBuilderApi } from '@/lib/api';
 
 interface Template {
   id: string;
   name: string;
   templateType?: string;
   status?: string;
+  isDefault?: boolean;
 }
+
+type TemplateSource = 'REPORT' | 'STAMP';
 
 interface SignatureOption { id: string; name: string; title?: string; scope?: string; status?: string; }
 interface SignatoryRow {
@@ -25,6 +28,7 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const COMMON_ROLES = ['Class Teacher', 'Head Teacher', 'Deputy Head', 'Director', 'Registrar', 'Principal', 'Examination Officer', 'HOD', 'Secretary'];
 
 export default function TemplateSignatoriesPage() {
+  const [templateSource, setTemplateSource] = useState<TemplateSource>('REPORT');
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [rows, setRows] = useState<SignatoryRow[]>([]);
@@ -43,13 +47,25 @@ export default function TemplateSignatoriesPage() {
   useEffect(() => { void loadSignatures(); }, [loadSignatures]);
 
   useEffect(() => {
-    stampEngineApi.listTemplates()
-      .then(r => {
-        const data = r.data?.templates || r.data || [];
-        setTemplates(Array.isArray(data) ? data.filter((t: any) => t.id && t.name && (t.status || 'DRAFT') === 'PUBLISHED') : []);
-      })
-      .catch(() => undefined);
-  }, []);
+    setSelectedId('');
+    setRows([]);
+    setMessage('');
+    if (templateSource === 'REPORT') {
+      reportTemplateApi.getAll()
+        .then(r => {
+          const data = r.data?.data || r.data || [];
+          setTemplates(Array.isArray(data) ? data.filter((t: any) => t.id && t.name) : []);
+        })
+        .catch(() => setTemplates([]));
+    } else {
+      stampEngineApi.listTemplates()
+        .then(r => {
+          const data = r.data?.templates || r.data || [];
+          setTemplates(Array.isArray(data) ? data.filter((t: any) => t.id && t.name && (t.status || 'DRAFT') === 'PUBLISHED') : []);
+        })
+        .catch(() => setTemplates([]));
+    }
+  }, [templateSource]);
 
   const selectTemplate = async (id: string) => {
     setSelectedId(id);
@@ -57,7 +73,9 @@ export default function TemplateSignatoriesPage() {
     if (!id) { setRows([]); return; }
     setBusy(true);
     try {
-      const response = await templateBuilderApi.getStampTemplateSignatories(id);
+      const response = templateSource === 'REPORT'
+        ? await templateBuilderApi.getTemplateSignatories(id)
+        : await templateBuilderApi.getStampTemplateSignatories(id);
       const data = response.data?.data || response.data || [];
       const list = Array.isArray(data) ? data : [];
       setRows(list.map((s: any, i: number) => ({
@@ -90,10 +108,17 @@ export default function TemplateSignatoriesPage() {
     if (!labelsOk) { setMessage('Every position needs a label (e.g. "Class Teacher").'); return; }
     setBusy(true);
     try {
-      await templateBuilderApi.saveStampTemplateSignatories(selectedId, rows.map((r, i) => ({
+      const payload = rows.map((r, i) => ({
         id: r.id, label: r.label.trim(), role: r.role.trim() || null, position: i, isRequired: r.isRequired, signatureId: r.signatureId || null,
-      })));
-      setMessage('Signatory positions saved for this document type.');
+      }));
+      if (templateSource === 'REPORT') {
+        await templateBuilderApi.saveTemplateSignatories(selectedId, payload);
+      } else {
+        await templateBuilderApi.saveStampTemplateSignatories(selectedId, payload);
+      }
+      setMessage(templateSource === 'REPORT'
+        ? 'Signatory positions saved. Bound signatures now appear on this report card/transcript template.'
+        : 'Signatory positions saved for this document type.');
       void selectTemplate(selectedId);
     } catch (error: any) { setMessage(error?.response?.data?.message || 'Could not save signatories'); }
     finally { setBusy(false); }
@@ -104,22 +129,37 @@ export default function TemplateSignatoriesPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Document Type Signatories</h1>
-        <p className="text-sm text-gray-500 mt-1">Each stamp/document template declares the signature positions it requires. At issuance, every position is bound to a staff member and their saved signature — so a document can need both a Class Teacher and a Head Teacher.</p>
+        <h1 className="text-2xl font-bold text-gray-900">Signatory Positions</h1>
+        <p className="text-sm text-gray-500 mt-1">Declare where signatures belong. Bind a saved signature to each position and it will render on every generated document of that type — report cards, transcripts, and issued stamp documents.</p>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-        <label className="block text-xs font-medium text-gray-600">Document template
+        <div>
+          <span className="block text-xs font-medium text-gray-600 mb-1">Template type</span>
+          <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
+            <button type="button" onClick={() => setTemplateSource('REPORT')} className={`px-3 py-1.5 text-xs font-semibold rounded-md ${templateSource === 'REPORT' ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}>
+              Report cards &amp; transcripts
+            </button>
+            <button type="button" onClick={() => setTemplateSource('STAMP')} className={`px-3 py-1.5 text-xs font-semibold rounded-md ${templateSource === 'STAMP' ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}>
+              Document / stamp templates
+            </button>
+          </div>
+        </div>
+
+        <label className="block text-xs font-medium text-gray-600">Template
           <select value={selectedId} onChange={e => void selectTemplate(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
-            <option value="">Select a published template…</option>
-            {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            <option value="">{templateSource === 'REPORT' ? 'Select a report card/transcript template…' : 'Select a published template…'}</option>
+            {templates.map(t => <option key={t.id} value={t.id}>{t.name}{t.isDefault ? ' (default)' : ''}</option>)}
           </select>
         </label>
 
         {selectedTemplate && (
           <div className="text-xs bg-blue-50 text-blue-900 rounded-lg px-3 py-2">
             <i className="fa fa-file-text-o" style={{ marginRight: '6px' }}></i>
-            {selectedTemplate.name}{selectedTemplate.type ? ` · ${String(selectedTemplate.type).replace(/_/g, ' ')}` : ''}
+            {selectedTemplate.name}{selectedTemplate.templateType ? ` · ${String(selectedTemplate.templateType).replace(/_/g, ' ')}` : ''}
+            {templateSource === 'REPORT' && !selectedTemplate.isDefault && (
+              <span className="block mt-1 text-amber-700">Report cards and transcripts are generated with the default template — bind signatures on that one to see them on issued PDFs.</span>
+            )}
           </div>
         )}
 
@@ -133,7 +173,7 @@ export default function TemplateSignatoriesPage() {
             </div>
 
             {rows.length === 0 && (
-              <p className="text-sm text-gray-400">No signatory positions declared yet. Add the first one (e.g. "Class Teacher" then "Head Teacher") and it will be required when this document type is issued.</p>
+              <p className="text-sm text-gray-400">No signatory positions declared yet. Add the first one (e.g. "Class Teacher" then "Head Teacher"), bind a saved signature to it, and it will render on this document.</p>
             )}
 
             {rows.map((row, index) => (
@@ -150,9 +190,9 @@ export default function TemplateSignatoriesPage() {
                     <datalist id="common-roles">{COMMON_ROLES.map(r => <option key={r} value={r} />)}</datalist>
                   </div>
                   <div className="flex-1 min-w-[180px]">
-                    <label className="block text-xs font-medium text-gray-600">Default bound signature (optional)</label>
+                    <label className="block text-xs font-medium text-gray-600">Signature to render</label>
                     <select value={row.signatureId} onChange={e => patch(row.key, { signatureId: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-1.5 text-sm">
-                      <option value="">Choose at issuance</option>
+                      <option value="">No signature image</option>
                       {signatures.map(s => <option key={s.id} value={s.id}>{s.name}{s.title ? ` — ${s.title}` : ''}{s.scope === 'PLATFORM' ? ' (platform)' : ''}</option>)}
                     </select>
                   </div>

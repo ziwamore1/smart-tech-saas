@@ -10,6 +10,7 @@ import * as puppeteer from 'puppeteer';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { ReportCardEngineService } from '../report-card-engine/report-card-engine.service';
 import { TemplateRendererService } from '../report-template-builder/template-renderer.service';
+import { canonicalSignatoryRole } from '../report-template-builder/signatory-role.util';
 import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
@@ -281,14 +282,37 @@ export class ReportCardService {
             : null;
 
         for (const s of signatories) {
-          const role = (s.role || '').toUpperCase();
+          const role = canonicalSignatoryRole(s.role, s.label);
+          const url = pickUrl(s);
+          if (!url) continue;
           if (role === 'CLASS_TEACHER' && !result.classTeacherSignatureUrl) {
-            result.classTeacherSignatureUrl = pickUrl(s);
+            result.classTeacherSignatureUrl = url;
           } else if (role === 'HEAD_TEACHER' && !result.headTeacherSignatureUrl) {
-            result.headTeacherSignatureUrl = pickUrl(s);
+            result.headTeacherSignatureUrl = url;
           } else if (role === 'DEPUTY_HEAD_TEACHER' && !result.deputySignatureUrl) {
-            result.deputySignatureUrl = pickUrl(s);
+            result.deputySignatureUrl = url;
           }
+        }
+      }
+
+      // 3. Fall back to the school's default DigitalSignature for the head
+      // teacher slot. A school that uploaded/selected a default signature but
+      // never explicitly bound it to a template position should still get a
+      // signature on the document instead of an empty line.
+      if (!result.headTeacherSignatureUrl) {
+        const defaultSig = await this.prisma.digitalSignature.findFirst({
+          where: { schoolId, status: 'ACTIVE', isDefault: true },
+          orderBy: { updatedAt: 'desc' },
+          select: {
+            transparentImageUrl: true,
+            processedImageUrl: true,
+            imageUrl: true,
+            signatureData: true,
+          },
+        });
+        if (defaultSig) {
+          result.headTeacherSignatureUrl =
+            defaultSig.transparentImageUrl || defaultSig.processedImageUrl || defaultSig.imageUrl || defaultSig.signatureData || null;
         }
       }
     } catch {
@@ -1138,6 +1162,33 @@ const report = await this.getReportCard(schoolId, studentId, termId);
       return `<div class="chart-row"><span class="chart-label">${grade}</span><div class="chart-track"><div class="chart-fill" style="width:${width}%;background:${color}"></div></div><strong>${count}</strong></div>`;
     }).join('');
 
+    const latestClassId = enrollments[enrollments.length - 1]?.class?.id ?? null;
+    const transcriptTemplate = await this.prisma.reportTemplate.findFirst({
+      where: { schoolId, isDefault: true },
+    }) || await this.prisma.reportTemplate.findFirst({
+      where: { schoolId },
+    });
+    const signatoryUrls = await this.resolveSignatoryImageUrls(
+      schoolId,
+      transcriptTemplate?.id,
+      latestClassId,
+    );
+    const transcriptSignatureBlock = `
+    <div class="signatures">
+      <div class="sig">
+        ${signatoryUrls.classTeacherSignatureUrl ? `<img src="${signatoryUrls.classTeacherSignatureUrl}" style="max-height:50px;margin-bottom:4px" alt="Class Teacher signature" />` : ''}
+        <div class="sig-line">${signatoryUrls.classTeacherName || 'Class Teacher'}</div>
+      </div>
+      <div class="sig">
+        ${signatoryUrls.headTeacherSignatureUrl ? `<img src="${signatoryUrls.headTeacherSignatureUrl}" style="max-height:50px;margin-bottom:4px" alt="Head Teacher signature" />` : ''}
+        <div class="sig-line">${transcriptTemplate?.directorName || 'Head Teacher'}</div>
+      </div>
+      <div class="sig">
+        ${transcriptTemplate?.stampUrl ? `<img src="${transcriptTemplate.stampUrl}" style="max-height:60px;margin-bottom:4px" alt="School stamp" />` : ''}
+        <div class="sig-line">School Stamp</div>
+      </div>
+    </div>`;
+
     const html = `
     <html>
     <head>
@@ -1208,22 +1259,12 @@ const report = await this.getReportCard(schoolId, studentId, termId);
       ${transcriptRows}
       </tbody>
     </table>
-    <div class="signatures">
-      <div class="sig"><div class="sig-line">Head Teacher</div></div>
-      <div class="sig"><div class="sig-line">Director of Studies</div></div>
-      <div class="sig"><div class="sig-line">School Stamp</div></div>
-    </div>
+    ${transcriptSignatureBlock}
     <div class="footer">Smart Tech SaaS - Results Management System | Confidential</div>
     </body>
     </html>
     `;
 
-    const latestClassId = enrollments[enrollments.length - 1]?.class?.id ?? null;
-    const transcriptTemplate = await this.prisma.reportTemplate.findFirst({
-      where: { schoolId, isDefault: true },
-    }) || await this.prisma.reportTemplate.findFirst({
-      where: { schoolId },
-    });
     const classContext = latestClassId
       ? await this.getAuthenticityClassContext(schoolId, latestClassId)
       : null;
@@ -1232,6 +1273,10 @@ const report = await this.getReportCard(schoolId, studentId, termId);
       transcriptTemplate?.id,
       html,
       classContext,
+      {
+        includeStamp: transcriptTemplate?.includeStamp,
+        includeSignature: transcriptTemplate?.includeSignature,
+      },
     );
 
     const browser = await this.getBrowser();

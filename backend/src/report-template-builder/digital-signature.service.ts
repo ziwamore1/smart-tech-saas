@@ -120,6 +120,15 @@ export class DigitalSignatureService {
       }
     }
 
+    // Declaring a bound signature position is an explicit opt-in: flip the
+    // template's signature flag on so the binding actually renders on the PDF.
+    if (list.some((s) => s.signatureId)) {
+      await this.prisma.reportTemplate.update({
+        where: { id: templateId },
+        data: { includeSignature: true },
+      });
+    }
+
     return this.getTemplateSignatories(templateId, schoolId);
   }
 

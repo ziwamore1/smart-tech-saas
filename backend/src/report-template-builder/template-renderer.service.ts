@@ -8,6 +8,7 @@ import { StampTemplateService } from '../stamp-engine/stamp-template.service';
 import { StampRendererService } from '../stamp-engine/stamp-renderer.service';
 import { StampAssetService } from '../stamp-engine/stamp-asset.service';
 import { SignatureBridgeService } from '../stamp-engine/signature-bridge.service';
+import { canonicalSignatoryRole } from './signatory-role.util';
 import * as puppeteer from 'puppeteer';
 import * as handlebars from 'handlebars';
 import * as fs from 'fs';
@@ -1591,20 +1592,20 @@ case 'SIGNATURE': {
 
       for (const slot of slots) {
         const label = (slot.label || '').trim();
-        const norm = (slot.role || label || '').toLowerCase();
+        const role = canonicalSignatoryRole(slot.role, label);
 
         let signerId: string | null = null;
         let signerName: string | null = null;
         let signerRole = label;
 
-        if (/(class teacher|form mistress|form master|class mistress|class master)/i.test(norm)) {
+        if (role === 'CLASS_TEACHER') {
           signerId = context.classTeacherId || null;
           signerName = context.classTeacherName || null;
           if (context.className) signerRole = `${signerRole} — ${context.className}`;
-        } else if (/(head teacher|headteacher|principal|director)/i.test(norm)) {
+        } else if (role === 'HEAD_TEACHER') {
           signerId = 'head-teacher';
           signerName = school?.headTeacherName || null;
-        } else if (/(deputy|vice head|vice principal|deputy head)/i.test(norm)) {
+        } else if (role === 'DEPUTY_HEAD_TEACHER') {
           signerId = 'deputy-head-teacher';
           signerName = school?.deputyName || null;
         }
