@@ -437,6 +437,22 @@ export default function TeacherAnalysisPage() {
   const competency = data?.competency || null;
   const insights = data?.insights || null;
 
+  const gradeSystemBlocks: any[] =
+    summary?.gradeDistributions?.length > 0
+      ? summary.gradeDistributions
+      : summary?.gradeDistribution?.length > 0
+        ? [
+            {
+              systemId: summary.gradingProfiles?.[0]?.systemId ?? null,
+              systemName: summary.gradingProfiles?.[0]?.systemName || 'Grading System',
+              qualityBands: summary.gradingProfiles?.[0]?.qualityBands,
+              quantityBands: summary.gradingProfiles?.[0]?.quantityBands,
+              distribution: summary.gradeDistribution,
+              totalAssessed: summary.assessedForGrading,
+            },
+          ]
+        : [];
+
   const tabs = [
     { key: 'overview', label: 'Overview' },
     { key: 'classes', label: 'By Class' },
@@ -712,15 +728,34 @@ export default function TeacherAnalysisPage() {
                 </div>
               </div>
 
-              {summary?.gradeDistribution?.length > 0 && (
+              {gradeSystemBlocks.length > 0 && (
                 <div className="mt-4">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">Grade Distribution</h2>
-                  <GradeDistributionPanel
-                    distribution={summary.gradeDistribution}
-                    profile={summary.gradingProfiles?.[0]}
-                    totalAssessed={summary.assessedForGrading}
-                  />
-                  <div className="mt-3"><GradeLegend distribution={summary.gradeDistribution} profile={summary.gradingProfiles?.[0]} /></div>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                    Grade Distribution
+                    {gradeSystemBlocks.length > 1 && (
+                      <span className="ml-2 text-xs font-normal text-gray-500">by grading system</span>
+                    )}
+                  </h2>
+                  {gradeSystemBlocks.map((block, i) => {
+                    const blockProfile = {
+                      systemName: block.systemName,
+                      qualityBands: block.qualityBands,
+                      quantityBands: block.quantityBands,
+                      gradeBreakdown: block.gradeBreakdown,
+                    };
+                    return (
+                      <div key={block.systemId || block.systemName || i} className={i > 0 ? 'mt-6' : undefined}>
+                        <GradeDistributionPanel
+                          distribution={block.distribution || []}
+                          profile={blockProfile}
+                          totalAssessed={block.totalAssessed}
+                        />
+                        <div className="mt-3">
+                          <GradeLegend distribution={block.distribution || []} profile={blockProfile} />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 

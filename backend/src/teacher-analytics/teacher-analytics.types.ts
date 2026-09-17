@@ -273,8 +273,20 @@ export interface TeacherSummary {
   assessedForGrading: number;
   gradingProfiles: ClassGradingProfile[];
   gradeDistribution: GradeDistribution[];
+  gradeDistributions: TeacherGradeDistributionBlock[];
   lastUpdated: string;
   dataPeriod: string;
+}
+
+export interface TeacherGradeDistributionBlock {
+  systemId: string | null;
+  systemName: string;
+  source: string | null;
+  grades: string[];
+  qualityBands: ClassGradingProfile['qualityBands'];
+  quantityBands: ClassGradingProfile['quantityBands'];
+  totalAssessed: number;
+  distribution: GradeDistribution[];
 }
 
 export interface InsightFact {

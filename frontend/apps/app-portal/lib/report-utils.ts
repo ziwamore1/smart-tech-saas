@@ -192,7 +192,23 @@ export function generateMarkScheduleReport(students: ReportStudent[], meta: Repo
 
   const subjectHeaders = subjects.map(s => `<th class="text-center" style="width:92px">${s}</th>`).join('');
 
-  const rows = students.map((s, i) => {
+  const finalScore = (s: ReportStudent): number | null => {
+    if (s.average != null) return s.average;
+    const scored = s.results.filter(r => r.score != null);
+    return scored.length > 0 ? scored.reduce((sum, r) => sum + (r.score || 0), 0) / scored.length : null;
+  };
+
+  // Class Teacher's mark schedule: position and rank by average score, highest first.
+  const orderedStudents = [...students].sort((a, b) => {
+    const av = finalScore(a);
+    const bv = finalScore(b);
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    return bv - av;
+  });
+
+  const rows = orderedStudents.map((s, i) => {
     const cells = s.results.map(r => {
       const pct = r.score;
       const gc = getGradeColor(r.grade);
@@ -205,7 +221,7 @@ export function generateMarkScheduleReport(students: ReportStudent[], meta: Repo
       </td>`;
     }).join('');
 
-    const avg = s.average ?? (s.results.filter(r => r.score != null).reduce((sum, r) => sum + (r.score || 0), 0) / (s.results.filter(r => r.score != null).length || 1));
+    const avg = finalScore(s);
     const avgColor = scoreColor(avg);
     const gradeColor = getGradeColor(s.grade);
     const grade = s.grade || (avg != null ? (avg >= 75 ? 'A' : avg >= 65 ? 'B' : avg >= 50 ? 'C' : avg >= 40 ? 'D' : 'E') : '-');
@@ -555,6 +571,7 @@ export interface TeacherMarkScheduleStudent {
   finalGrade?: string | null;
   points?: number | null;
   isAbsent: boolean;
+  isPartialFinal?: boolean;
   classRank?: number | null;
   status?: string | null;
   rank: number | null;
@@ -613,7 +630,7 @@ export function generateTeacherMarkSchedulesReport(data: TeacherMarkScheduleData
       const gc = getGradeColor(s.finalGrade);
       const finalCell = s.isAbsent
         ? `<td class="text-center" style="background:#fef3c7"><span style="display:inline-block;padding:2px 10px;border-radius:8px;font-size:12px;font-weight:700;background:#fef3c7;color:#92400e">ABSENT</span></td>`
-        : `<td class="text-center font-bold" style="color:${scoreColor(final)};min-width:52px">${final != null ? final.toFixed(1) + '%' : '-'}</td>`;
+        : `<td class="text-center font-bold" style="color:${scoreColor(final)};min-width:52px">${final != null ? final.toFixed(1) + '%' : '-'}${s.isPartialFinal ? '<span style="color:#b45309;font-weight:700">*</span>' : ''}</td>`;
 
       return `<tr>
         <td class="text-center" style="color:#374151;width:28px">${i + 1}</td>
@@ -629,6 +646,7 @@ export function generateTeacherMarkSchedulesReport(data: TeacherMarkScheduleData
     }).join('');
 
     const colSpan = 8 + (sched.components || []).length;
+    const hasPartialFinal = (sched.students || []).some((s) => s.isPartialFinal);
     return `
       <div class="schedule-block">
         <div class="schedule-title">${esc(sched.className)} — ${esc(sched.subjectName)}${sched.subjectCode ? ` (${esc(sched.subjectCode)})` : ''}</div>
@@ -646,6 +664,10 @@ export function generateTeacherMarkSchedulesReport(data: TeacherMarkScheduleData
           </tr></thead>
           <tbody>${rows || `<tr><td colspan="${colSpan}" class="text-center">No student records for this class and subject.</td></tr>`}</tbody>
         </table>
+        <p style="font-size:11px;color:#6b7280;margin:6px 2px 0">
+          Learners are listed by rank performance (highest to lowest).
+          ${hasPartialFinal ? 'Final % marked <span style="color:#b45309;font-weight:700">*</span> is re-based on the assessments the learner wrote; missed assessment(s) are excluded from the weighting.' : ''}
+        </p>
       </div>`;
   }).join('') || '<p style="color:#6b7280;text-align:center;font-size:14px">No mark schedules found for the selected term. Enter and compute results for your assigned classes and subjects first.</p>';
 

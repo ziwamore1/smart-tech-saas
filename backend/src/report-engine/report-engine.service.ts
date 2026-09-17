@@ -1865,15 +1865,14 @@ case ReportType.RESULTS_ANALYSIS:
     });
 
     const ranked = [...studentRowsData].sort((a, b) => b.avg - a.avg);
-    const rankMap = new Map<string, number>();
-    ranked.forEach((s, i) => rankMap.set(`${s.firstName}_${s.lastName}_${s.admissionNumber}`, i + 1));
 
-    const studentRows = studentRowsData.map(s => {
+    // Highest average first — consistent with the Class Teacher's mark schedule.
+    const studentRows = ranked.map((s, i) => {
       const avgColor = this.scoreColor(s.avg);
       const gc = this.gradeColor(s.grade);
-      const rank = rankMap.get(`${s.firstName}_${s.lastName}_${s.admissionNumber}`) || s.idx;
-      return `<tr style="background:${(s.idx - 1) % 2 === 0 ? 'white' : '#faf7f4'}">
-        <td class="text-center" style="color:#6b7280;width:30px">${s.idx}</td>
+      const rank = i + 1;
+      return `<tr style="background:${i % 2 === 0 ? 'white' : '#faf7f4'}">
+        <td class="text-center" style="color:#6b7280;width:30px">${i + 1}</td>
         <td style="font-weight:600">${s.firstName} ${s.lastName}</td>
         <td style="color:#6b7280;font-size:11px">${s.admissionNumber || '-'}</td>
         <td class="text-center" style="color:#6b7280">${s.gender}</td>

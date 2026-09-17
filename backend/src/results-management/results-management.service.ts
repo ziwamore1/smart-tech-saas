@@ -1602,9 +1602,13 @@ export class ResultsManagementService {
         totalPoints,
       };
     }).sort((a, b) => {
-      if (a.totalPoints !== b.totalPoints) return a.totalPoints - b.totalPoints;
-      if (b.average !== null && a.average !== null) return b.average - a.average;
-      return 0;
+      // Class Teacher's mark schedule: rank and position by average score,
+      // highest to lowest; learners with no average are listed last.
+      if (a.average === null && b.average === null) return 0;
+      if (a.average === null) return 1;
+      if (b.average === null) return -1;
+      if (b.average !== a.average) return b.average - a.average;
+      return a.totalPoints - b.totalPoints;
     }).map((entry, index) => ({ ...entry, rank: index + 1 }));
 
     const className = await this.prisma.class.findUnique({

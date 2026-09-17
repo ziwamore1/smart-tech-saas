@@ -13,6 +13,7 @@ import {
   HistoricalPoint,
   StudentRiskSummary,
   TeacherContext,
+  TeacherGradeDistributionBlock,
   TeacherReportData,
   TeacherSummary,
   TeachingLoad,
@@ -862,65 +863,54 @@ export class TeacherAnalyticsService {
     const overallQualityPassRate = totalGraded > 0 ? this.stats.round2((totalQualityPassed / totalGraded) * 100) : null;
     const overallQuantityPassRate = totalGraded > 0 ? this.stats.round2((totalQuantityPassed / totalGraded) * 100) : null;
 
-    // Combined grade distribution across all assignments (consolidated view)
+    // Grade distribution grouped per grading system — classes that use
+    // fundamentally different scales (e.g. ECZ Forms vs CBC Grades 1-9) must
+    // never be blended into one chart, so each system gets its own block.
     const uniqueProfiles = new Map<string, ClassGradingProfile>();
     for (const a of assignmentAnalytics) {
-      if (!uniqueProfiles.has(a.gradingProfile.systemName)) uniqueProfiles.set(a.gradingProfile.systemName, a.gradingProfile);
+      const key = a.gradingProfile.systemId || a.gradingProfile.systemName;
+      if (!uniqueProfiles.has(key)) uniqueProfiles.set(key, a.gradingProfile);
     }
-    const combinedGradeCounts = new Map<string, GradeCountBucket>();
+    const systemGroups = new Map<string, AssignmentAnalytics[]>();
     for (const a of assignmentAnalytics) {
-      for (const d of a.gradeScaleDistribution) {
-        const bucket = combinedGradeCounts.get(d.grade) || { count: 0, males: 0, females: 0, unknown: 0 };
-        bucket.count += d.count || 0;
-        bucket.males += d.males || 0;
-        bucket.females += d.females || 0;
-        bucket.unknown += d.unknown || 0;
-        combinedGradeCounts.set(d.grade, bucket);
-      }
+      const key = a.gradingProfile.systemId || a.gradingProfile.systemName;
+      const group = systemGroups.get(key) || [];
+      group.push(a);
+      systemGroups.set(key, group);
     }
-    const combinedProfileList = Array.from(uniqueProfiles.values());
-    const scaleByGrade = new Map<string, { minScore: number; maxScore: number; points: number | null; remark: string }>();
-    const rangeByGrade = new Map<string, string | null>();
-    for (const p of combinedProfileList) {
-      for (const s of p.gradeBreakdown) {
-        if (!scaleByGrade.has(s.grade)) scaleByGrade.set(s.grade, s);
-        const rng =
-          s.minScore != null && s.maxScore != null ? `${s.minScore}-${s.maxScore}` : null;
-        if (!rangeByGrade.has(s.grade)) rangeByGrade.set(s.grade, rng);
-        else if (rangeByGrade.get(s.grade) !== rng) rangeByGrade.set(s.grade, null);
-      }
-    }
-    const orderedCombinedGrades: string[] = [];
-    const seenCombined = new Set<string>();
-    for (const p of combinedProfileList) {
-      for (const g of p.grades) {
-        if (!seenCombined.has(g)) {
-          seenCombined.add(g);
-          orderedCombinedGrades.push(g);
+    const gradeDistributions: TeacherGradeDistributionBlock[] = Array.from(systemGroups.entries()).map(
+      ([key, rows]) => {
+        const profile = rows[0].gradingProfile;
+        const gradeCounts = new Map<string, GradeCountBucket>();
+        for (const r of rows) {
+          for (const d of r.gradeScaleDistribution) {
+            const bucket = gradeCounts.get(d.grade) || { count: 0, males: 0, females: 0, unknown: 0 };
+            bucket.count += d.count || 0;
+            bucket.males += d.males || 0;
+            bucket.females += d.females || 0;
+            bucket.unknown += d.unknown || 0;
+            gradeCounts.set(d.grade, bucket);
+          }
         }
-      }
-    }
-    for (const g of Array.from(combinedGradeCounts.keys())
-      .filter((g) => !seenCombined.has(g))
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))) {
-      orderedCombinedGrades.push(g);
-    }
-    const gradeDistribution: GradeDistribution[] = orderedCombinedGrades.map((g) => {
-      const scale = scaleByGrade.get(g);
-      const bucket = combinedGradeCounts.get(g);
-      const count = bucket?.count || 0;
-      return {
-        grade: g,
-        count,
-        percentage: totalGraded > 0 ? this.stats.round2((count / totalGraded) * 100) : null,
-        males: bucket?.males || 0,
-        females: bucket?.females || 0,
-        unknown: bucket?.unknown || 0,
-        range: rangeByGrade.get(g) ?? null,
-        points: scale?.points ?? null,
-        remark: scale?.remark || null,
-      };
-    });
+        const totalAssessed = rows.reduce((sum, r) => sum + (r.stats?.count || 0), 0);
+        const distribution = this.buildGradeScaleDistribution(profile, gradeCounts, totalAssessed);
+        return {
+          systemId: profile.systemId ?? null,
+          systemName: profile.systemName || key,
+          source: profile.source ?? null,
+          grades: distribution.map((d) => d.grade),
+          qualityBands: profile.qualityBands,
+          quantityBands: profile.quantityBands,
+          totalAssessed,
+          distribution,
+        };
+      },
+    );
+    // Present the system with the most assessed learners first.
+    gradeDistributions.sort((a, b) => b.totalAssessed - a.totalAssessed);
+    // Legacy single-series field: the primary system only (never a blend).
+    const gradeDistribution: GradeDistribution[] =
+      (gradeDistributions.find((s) => s.totalAssessed > 0) || gradeDistributions[0])?.distribution || [];
 
     return {
       teacher: context,
@@ -961,6 +951,7 @@ export class TeacherAnalyticsService {
       assessedForGrading: totalGraded,
       gradingProfiles: Array.from(uniqueProfiles.values()),
       gradeDistribution,
+      gradeDistributions,
       lastUpdated: new Date().toISOString(),
       dataPeriod: term ? `${term.name} ${academicYearName || ''}`.trim() : 'No active term',
     };
@@ -1814,6 +1805,10 @@ export class TeacherAnalyticsService {
       const hasAnyComputed = computed.some((c) => c.finalPercentage != null || c.isAbsent);
       if (!hasAnyComputed) continue; // skip assignments without entered/computed results
 
+      const profile = await resolveGradingProfile(this.prisma, classId, context.schoolId);
+      const gradeForScore = (score: number) =>
+        profile.gradeBreakdown.find((g) => score >= g.minScore && score <= g.maxScore) || null;
+
       const computedByStudent = new Map(computed.map((c) => [c.studentId, c]));
       const rows = enrolled.map((e) => {
         const student = e.student;
@@ -1840,6 +1835,24 @@ export class TeacherAnalyticsService {
             isAbsent,
           };
         });
+
+        // Learners who missed at least one assessment still receive a final %:
+        // it is re-based on the assessments they actually wrote (the written
+        // weight is renormalised to 100%) rather than showing a dash.
+        const written = components.filter((c) => !c.isAbsent && c.percentage != null);
+        const missedCount = components.length - written.length;
+        const writtenWeight = written.reduce((sum, c) => sum + (c.weightPercentage || 0), 0);
+        const earnedWeighted = written.reduce(
+          (sum, c) => sum + (c.percentage as number) * ((c.weightPercentage || 0) / 100),
+          0,
+        );
+        const partialFinal =
+          writtenWeight > 0 ? this.stats.round2(earnedWeighted / (writtenWeight / 100)) : null;
+        const canDerive = !cr?.isAbsent && partialFinal != null;
+        const finalPercentage = cr?.isAbsent ? null : cr?.finalPercentage ?? (canDerive ? partialFinal : null);
+        const isPartialFinal = cr?.finalPercentage == null && canDerive && missedCount > 0;
+        const derivedGrade = finalPercentage != null ? gradeForScore(finalPercentage) : null;
+
         return {
           student: {
             id: student.id,
@@ -1849,10 +1862,11 @@ export class TeacherAnalyticsService {
             gender: student.gender,
           },
           components,
-          finalPercentage: cr?.finalPercentage ?? null,
-          finalGrade: cr?.finalGrade ?? null,
-          points: cr?.points ?? null,
+          finalPercentage,
+          finalGrade: finalPercentage != null ? cr?.finalGrade ?? derivedGrade?.grade ?? null : null,
+          points: finalPercentage != null ? cr?.points ?? derivedGrade?.points ?? null : null,
           isAbsent: cr?.isAbsent ?? false,
+          isPartialFinal,
           classRank: cr?.classRank ?? null,
           status: cr?.status ?? null,
         };
@@ -1864,6 +1878,17 @@ export class TeacherAnalyticsService {
         .sort((a, b) => b.finalPercentage! - a.finalPercentage!);
       const rankByStudent = new Map<string, number>();
       ranked.forEach((r, idx) => rankByStudent.set(r.student.id, idx + 1));
+
+      // Mark schedules are listed by rank performance, highest to lowest
+      // (best performers first); learners without a final percentage last.
+      const orderedRows = [...rows].sort((a, b) => {
+        const av = a.finalPercentage;
+        const bv = b.finalPercentage;
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        return bv - av;
+      });
 
       schedules.push({
         classId,
@@ -1881,7 +1906,7 @@ export class TeacherAnalyticsService {
           weightPercentage: cfg.weightPercentage,
           maxScore: cfg.maxScore,
         })),
-        students: rows.map((r) => ({
+        students: orderedRows.map((r) => ({
           ...r,
           rank: r.finalPercentage != null && !r.isAbsent ? rankByStudent.get(r.student.id) ?? null : null,
         })),
