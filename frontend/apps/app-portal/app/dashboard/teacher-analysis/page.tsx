@@ -437,21 +437,50 @@ export default function TeacherAnalysisPage() {
   const competency = data?.competency || null;
   const insights = data?.insights || null;
 
-  const gradeSystemBlocks: any[] =
+  // Overview grade distribution is shown per class using the same class-level
+  // data as the "By Class" tab, so each class is read against its own grading
+  // system instead of being blended into one combined scale.
+  const classDistributionBlocks: any[] = (classes || [])
+    .filter((c: any) => (c.gradeScaleDistribution || []).length > 0)
+    .map((c: any) => ({
+      key: c.classId || c.className,
+      heading: c.className,
+      profile: c.gradingProfile,
+      distribution: c.gradeScaleDistribution || [],
+      totalAssessed: c.assessedCount,
+    }));
+  const systemDistributionBlocks: any[] =
     summary?.gradeDistributions?.length > 0
-      ? summary.gradeDistributions
+      ? summary.gradeDistributions.map((b: any) => ({
+          key: b.systemId || b.systemName,
+          heading: null,
+          profile: {
+            systemName: b.systemName,
+            qualityBands: b.qualityBands,
+            quantityBands: b.quantityBands,
+            gradeBreakdown: b.gradeBreakdown,
+          },
+          distribution: b.distribution || [],
+          totalAssessed: b.totalAssessed,
+        }))
       : summary?.gradeDistribution?.length > 0
         ? [
             {
-              systemId: summary.gradingProfiles?.[0]?.systemId ?? null,
-              systemName: summary.gradingProfiles?.[0]?.systemName || 'Grading System',
-              qualityBands: summary.gradingProfiles?.[0]?.qualityBands,
-              quantityBands: summary.gradingProfiles?.[0]?.quantityBands,
+              key: 'primary',
+              heading: null,
+              profile: {
+                systemName: summary.gradingProfiles?.[0]?.systemName || 'Grading System',
+                qualityBands: summary.gradingProfiles?.[0]?.qualityBands,
+                quantityBands: summary.gradingProfiles?.[0]?.quantityBands,
+                gradeBreakdown: summary.gradingProfiles?.[0]?.gradeBreakdown,
+              },
               distribution: summary.gradeDistribution,
               totalAssessed: summary.assessedForGrading,
             },
           ]
         : [];
+  const distributionBlocks = classDistributionBlocks.length > 0 ? classDistributionBlocks : systemDistributionBlocks;
+  const distributionGrouping = classDistributionBlocks.length > 0 ? 'by class' : 'by grading system';
 
   const tabs = [
     { key: 'overview', label: 'Overview' },
@@ -728,34 +757,27 @@ export default function TeacherAnalysisPage() {
                 </div>
               </div>
 
-              {gradeSystemBlocks.length > 0 && (
+              {distributionBlocks.length > 0 && (
                 <div className="mt-4">
                   <h2 className="text-lg font-semibold text-gray-900 mb-2">
                     Grade Distribution
-                    {gradeSystemBlocks.length > 1 && (
-                      <span className="ml-2 text-xs font-normal text-gray-500">by grading system</span>
-                    )}
+                    <span className="ml-2 text-xs font-normal text-gray-500">{distributionGrouping}</span>
                   </h2>
-                  {gradeSystemBlocks.map((block, i) => {
-                    const blockProfile = {
-                      systemName: block.systemName,
-                      qualityBands: block.qualityBands,
-                      quantityBands: block.quantityBands,
-                      gradeBreakdown: block.gradeBreakdown,
-                    };
-                    return (
-                      <div key={block.systemId || block.systemName || i} className={i > 0 ? 'mt-6' : undefined}>
-                        <GradeDistributionPanel
-                          distribution={block.distribution || []}
-                          profile={blockProfile}
-                          totalAssessed={block.totalAssessed}
-                        />
-                        <div className="mt-3">
-                          <GradeLegend distribution={block.distribution || []} profile={blockProfile} />
-                        </div>
+                  {distributionBlocks.map((block, i) => (
+                    <div key={block.key || i} className={i > 0 ? 'mt-6' : undefined}>
+                      {block.heading && (
+                        <h3 className="text-sm font-semibold text-gray-700 mb-2">{block.heading}</h3>
+                      )}
+                      <GradeDistributionPanel
+                        distribution={block.distribution || []}
+                        profile={block.profile}
+                        totalAssessed={block.totalAssessed}
+                      />
+                      <div className="mt-3">
+                        <GradeLegend distribution={block.distribution || []} profile={block.profile} />
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               )}
 
