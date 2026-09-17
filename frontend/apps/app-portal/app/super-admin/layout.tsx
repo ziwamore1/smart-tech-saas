@@ -111,6 +111,12 @@ const superAdminNav = [
     color: '#f59e0b'
   },
   { 
+    name: 'Financial Docs', 
+    href: '/super-admin/financial-documents', 
+    icon: 'fa-file-invoice-dollar',
+    color: '#059669'
+  },
+  { 
     name: 'Password Hub', 
     href: '/security/password-hub', 
     icon: 'fa-key',

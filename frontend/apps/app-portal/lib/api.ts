@@ -550,6 +550,100 @@ export const superAdminApi = {
     api.post('/super-admin/enroll-self-as-staff', { schoolId, role }),
 };
 
+export const financialDocumentsApi = {
+  // Dashboard / readiness / audit
+  dashboard: () => api.get('/financial-documents/dashboard'),
+  readiness: () => api.get('/financial-documents/readiness'),
+  auditLogs: (params?: Record<string, any>) => api.get('/financial-documents/audit-logs', { params }),
+
+  // Customers
+  listCustomers: (params?: Record<string, any>) => api.get('/financial-documents/customers', { params }),
+  getCustomer: (id: string) => api.get(`/financial-documents/customers/${id}`),
+  createCustomer: (data: any) => api.post('/financial-documents/customers', data),
+  updateCustomer: (id: string, data: any) => api.patch(`/financial-documents/customers/${id}`, data),
+  deleteCustomer: (id: string) => api.delete(`/financial-documents/customers/${id}`),
+
+  // Bank accounts
+  listBankAccounts: () => api.get('/financial-documents/bank-accounts'),
+  getBankAccount: (id: string) => api.get(`/financial-documents/bank-accounts/${id}`),
+  createBankAccount: (data: any) => api.post('/financial-documents/bank-accounts', data),
+  updateBankAccount: (id: string, data: any) => api.patch(`/financial-documents/bank-accounts/${id}`, data),
+  deleteBankAccount: (id: string) => api.delete(`/financial-documents/bank-accounts/${id}`),
+
+  // Tax configurations
+  listTaxConfigs: () => api.get('/financial-documents/tax-configurations'),
+  getTaxConfig: (id: string) => api.get(`/financial-documents/tax-configurations/${id}`),
+  createTaxConfig: (data: any) => api.post('/financial-documents/tax-configurations', data),
+  updateTaxConfig: (id: string, data: any) => api.patch(`/financial-documents/tax-configurations/${id}`, data),
+  deleteTaxConfig: (id: string) => api.delete(`/financial-documents/tax-configurations/${id}`),
+
+  // Templates
+  listTemplates: (docType?: string) => api.get('/financial-documents/templates', { params: docType ? { docType } : undefined }),
+  getTemplate: (id: string) => api.get(`/financial-documents/templates/${id}`),
+  createTemplate: (data: any) => api.post('/financial-documents/templates', data),
+  updateTemplate: (id: string, data: any) => api.patch(`/financial-documents/templates/${id}`, data),
+  deleteTemplate: (id: string) => api.delete(`/financial-documents/templates/${id}`),
+  duplicateTemplate: (id: string) => api.post(`/financial-documents/templates/${id}/duplicate`),
+
+  // Company profile
+  getCompanyProfile: () => api.get('/financial-documents/company-profile'),
+  updateCompanyProfile: (data: any) => api.patch('/financial-documents/company-profile', data),
+  uploadCompanyMedia: (file: File, kind: 'logo' | 'signature' | 'stamp') => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('kind', kind);
+    return api.post('/financial-documents/company-profile/media', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+
+  // Quotations
+  listQuotations: (params?: Record<string, any>) => api.get('/financial-documents/quotations', { params }),
+  getQuotation: (id: string) => api.get(`/financial-documents/quotations/${id}`),
+  createQuotation: (data: any) => api.post('/financial-documents/quotations', data),
+  updateQuotation: (id: string, data: any) => api.patch(`/financial-documents/quotations/${id}`, data),
+  deleteQuotation: (id: string) => api.delete(`/financial-documents/quotations/${id}`),
+  issueQuotation: (id: string) => api.post(`/financial-documents/quotations/${id}/issue`),
+  sendQuotation: (id: string) => api.post(`/financial-documents/quotations/${id}/send`),
+  transitionQuotation: (id: string, to: string, reason?: string) => api.post(`/financial-documents/quotations/${id}/transition`, { to, reason }),
+  convertQuotation: (id: string, data?: any) => api.post(`/financial-documents/quotations/${id}/convert`, data || {}),
+  quotationPdfUrl: (id: string) => authedUrl(`/financial-documents/quotations/${id}/pdf`),
+
+  // Invoices
+  listInvoices: (params?: Record<string, any>) => api.get('/financial-documents/invoices', { params }),
+  getInvoice: (id: string) => api.get(`/financial-documents/invoices/${id}`),
+  createInvoice: (data: any) => api.post('/financial-documents/invoices', data),
+  updateInvoice: (id: string, data: any) => api.patch(`/financial-documents/invoices/${id}`, data),
+  deleteInvoice: (id: string) => api.delete(`/financial-documents/invoices/${id}`),
+  issueInvoice: (id: string) => api.post(`/financial-documents/invoices/${id}/issue`),
+  sendInvoice: (id: string) => api.post(`/financial-documents/invoices/${id}/send`),
+  cancelInvoice: (id: string, reason?: string) => api.post(`/financial-documents/invoices/${id}/cancel`, { reason }),
+  voidInvoice: (id: string, reason?: string) => api.post(`/financial-documents/invoices/${id}/void`, { reason }),
+  recordPayment: (id: string, data: any) => api.post(`/financial-documents/invoices/${id}/payments`, data),
+  invoicePayments: (id: string) => api.get(`/financial-documents/invoices/${id}/payments`),
+  invoicePdfUrl: (id: string) => authedUrl(`/financial-documents/invoices/${id}/pdf`),
+
+  // Payments
+  listPayments: (params?: Record<string, any>) => api.get('/financial-documents/payments', { params }),
+  getPayment: (id: string) => api.get(`/financial-documents/payments/${id}`),
+  updatePaymentStatus: (id: string, status: string, reason?: string) => api.patch(`/financial-documents/payments/${id}/status`, { status, reason }),
+  deletePayment: (id: string) => api.delete(`/financial-documents/payments/${id}`),
+
+  // Receipts
+  listReceipts: (params?: Record<string, any>) => api.get('/financial-documents/receipts', { params }),
+  getReceipt: (id: string) => api.get(`/financial-documents/receipts/${id}`),
+  issueReceipt: (paymentId: string) => api.post('/financial-documents/receipts', { paymentId }),
+  voidReceipt: (id: string, reason?: string) => api.post(`/financial-documents/receipts/${id}/void`, { reason }),
+  receiptPdfUrl: (id: string) => authedUrl(`/financial-documents/receipts/${id}/pdf`),
+
+  // Sequences, numbering and settings
+  listSequences: () => api.get('/financial-documents/sequences'),
+  updateSequenceSettings: (docType: string, data: any) => api.post(`/financial-documents/sequences/${docType}/settings`, data),
+  resetSequence: (docType: string, data?: any) => api.post(`/financial-documents/sequences/${docType}/reset`, data || {}),
+  getSettings: () => api.get('/financial-documents/settings'),
+  setSetting: (key: string, value: any) => api.post('/financial-documents/settings', { key, value }),
+  getNumberingDefaults: () => api.get('/financial-documents/settings/numbering-defaults'),
+  setNumberingDefaults: (data: any) => api.put('/financial-documents/settings/numbering-defaults', data),
+};
+
 export const featureLockApi = {
   getFeatures: () => api.get('/feature-locks'),
   
