@@ -459,7 +459,7 @@ case ReportType.RESULTS_ANALYSIS:
   }
 
   async generateBulkReports(
-    request: Omit<ReportGenerationRequest, 'studentId'> & { studentIds?: string[] },
+    request: ReportGenerationRequest & { studentIds?: string[] },
   ): Promise<ReportGenerationResult[]> {
     const reports: ReportGenerationResult[] = [];
 
@@ -490,12 +490,14 @@ case ReportType.RESULTS_ANALYSIS:
     // with limited concurrency so large batches don't blow the request timeout.
     const studentIds = request.studentIds?.length
       ? request.studentIds
-      : request.classId && request.termId
-        ? (await this.prisma.enrollment.findMany({
-            where: { classId: request.classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
-            select: { studentId: true },
-          })).map(e => e.studentId)
-        : [];
+      : request.studentId
+        ? [request.studentId]
+        : request.classId && request.termId
+          ? (await this.prisma.enrollment.findMany({
+              where: { classId: request.classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
+              select: { studentId: true },
+            })).map(e => e.studentId)
+          : [];
 
     let index = 0;
     const worker = async () => {
@@ -1242,7 +1244,7 @@ case ReportType.RESULTS_ANALYSIS:
       include: { class: true, academicYear: true },
     });
 
-    const html = await this.templateRenderer.renderPreview(
+    const html = await this.templateRenderer.renderPreviewWithAuthenticity(
       request.schoolId,
       template.id,
       {

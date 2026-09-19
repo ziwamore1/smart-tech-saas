@@ -113,7 +113,9 @@ export default function ReportHubPage() {
     setGenerating(true);
     setResultUrl(null);
     try {
-      const isBulk = BULK_TYPES.includes(selectedType);
+      // Certificates support a single-student flow: when a student is picked we
+      // generate one signed certificate directly instead of a whole-class batch.
+      const isBulk = BULK_TYPES.includes(selectedType) && !(selectedType === 'CERTIFICATE' && selectedStudent);
       const payload: any = { type: selectedType };
       if (selectedStudent) payload.studentId = selectedStudent;
       if (selectedClass) payload.classId = selectedClass;

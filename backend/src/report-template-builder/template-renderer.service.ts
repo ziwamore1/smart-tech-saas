@@ -1171,7 +1171,7 @@ case 'SIGNATURE': {
            examType: defaultData.examType || 'END_TERM',
            certificateNumber: defaultData.certificateNumber || 'ST-PREVIEW-00000000',
            certificateComment: defaultData.certificateComment || defaultData.teacherComment || '',
-          verificationUrl: '',
+          verificationUrl: data?.authenticity?.verificationUrl || '',
           schoolLogo: school?.logoUrl || school?.logo || '',
           studentPhoto: defaultData.student.photoUrl || '',
           signature1Name: cert.signature1Name || '',
@@ -1182,7 +1182,7 @@ case 'SIGNATURE': {
           certificateType: cert.certificateType,
           borderStyle: cert.borderStyle || 'classic',
           borderColor: cert.borderColor || '#1a365d',
-          showQrCode: cert.showQrCode || false,
+          showQrCode: Boolean(data?.authenticity?.verification_qr) || cert.showQrCode === true,
           showBadge: cert.showBadge || false,
           badgeStyle: cert.badgeStyle || 'star',
           showWatermark: cert.showWatermark || false,
@@ -1415,7 +1415,7 @@ case 'SIGNATURE': {
     const studentName = `${s.firstName || ''} ${s.lastName || ''}`;
 
     return `<div style="position:relative;width:100%;min-height:${isLandscape ? '190' : '260'}mm;padding:30px;border:${borderCss};display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:white;overflow:hidden;">
-       <div style="position:absolute;right:40px;bottom:35px;width:70px;height:70px;z-index:1;overflow:hidden;">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal" style="display:block;width:70px;height:70px;max-width:70px;max-height:70px;object-fit:contain;" />` : `<div style="width:70px;height:70px;">${fallbackSeal}</div>`}</div>
+       <div style="position:absolute;left:40px;bottom:35px;width:70px;height:70px;z-index:1;overflow:hidden;">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal" style="display:block;width:70px;height:70px;max-width:70px;max-height:70px;object-fit:contain;" />` : `<div style="width:70px;height:70px;">${fallbackSeal}</div>`}</div>
       ${cert.showWatermark && cert.watermarkText ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)rotate(-30deg);font-size:80px;color:${borderColor};opacity:0.04;pointer-events:none;white-space:nowrap;font-weight:bold;">${cert.watermarkText}</div>` : ''}
       ${school?.logoUrl ? `<img src="${school.logoUrl}" style="height:60px;margin-bottom:10px;" />` : ''}
        <div style="font-size:34px;font-weight:800;color:${borderColor};margin-bottom:7px;">${school?.name || 'School Name'}</div>
@@ -1455,12 +1455,14 @@ case 'SIGNATURE': {
     })[character] || character);
   }
 
-  async renderPdf(schoolId: string, templateId: string, data?: any): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {
-    // ── Authenticity pipeline (Phase 6 wiring) ──
-    // When the template declares includeStamp/includeSignature, finalize a
-    // DocumentVerification and inject authenticity placeholders BEFORE HTML
-    // rendering. Fail-safe: any stamp-engine error renders the document
-    // WITHOUT authenticity tokens (never a fake-authenticated document).
+  /**
+   * Renders a template preview and, when the template opts in via
+   * includeStamp/includeSignature, finalizes authenticity and appends the
+   * visible digital-signature block. Shared by report cards (`renderPdf`) and
+   * certificates (`generateCertificate`) so both carry the same signatures.
+   * Fail-safe: authenticity errors degrade to a render without signatures.
+   */
+  async renderPreviewWithAuthenticity(schoolId: string, templateId: string, data?: any): Promise<string> {
     const renderData = await this.maybeAttachAuthenticity(schoolId, templateId, data);
     let html = await this.renderPreview(schoolId, templateId, renderData);
 
@@ -1468,10 +1470,30 @@ case 'SIGNATURE': {
     // template HTML does not declare a {{digital_signature}} placeholder.
     const sigBlock = renderData?.authenticity?.digital_signature;
     if (sigBlock && !html.includes('{{digital_signature}}')) {
-      html = html.includes('</body>')
-        ? html.replace('</body>', `${sigBlock}\n</body>`)
-        : `${html}\n${sigBlock}`;
+      if (html.includes('class="cert-page"')) {
+        // Certificates are a single fixed-size page: pin the signature block as
+        // a page footer (clear of the bottom-left seal and bottom-right stamp)
+        // so it never spills onto a second PDF page.
+        const footer = `<div style="position:fixed;left:50%;transform:translateX(-50%);bottom:4px;width:600px;z-index:50;">${sigBlock}</div>`;
+        html = html.includes('</body>')
+          ? html.replace('</body>', `${footer}</body>`)
+          : `${html}${footer}`;
+      } else {
+        html = html.includes('</body>')
+          ? html.replace('</body>', `${sigBlock}\n</body>`)
+          : `${html}\n${sigBlock}`;
+      }
     }
+    return html;
+  }
+
+  async renderPdf(schoolId: string, templateId: string, data?: any): Promise<{ buffer: Buffer; url: string | null; publicId: string | null }> {
+    // ── Authenticity pipeline (Phase 6 wiring) ──
+    // When the template declares includeStamp/includeSignature, finalize a
+    // DocumentVerification and inject authenticity placeholders BEFORE HTML
+    // rendering. Fail-safe: any stamp-engine error renders the document
+    // WITHOUT authenticity tokens (never a fake-authenticated document).
+    let html = await this.renderPreviewWithAuthenticity(schoolId, templateId, data);
 
     const template = await this.prisma.reportTemplate.findFirst({
       where: { id: templateId, schoolId },
@@ -1781,7 +1803,7 @@ case 'SIGNATURE': {
 
       return {
         ...(data || {}),
-        authenticity: placeholders,
+        authenticity: { ...placeholders, verificationUrl: finalized.verificationUrl },
       };
     } catch (e: any) {
       // Fail-safe per spec §Failure Handling: no serial/QR/stamp on the output.

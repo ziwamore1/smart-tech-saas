@@ -9,10 +9,15 @@ import * as fs from 'fs';
 @Injectable()
 export class CertificateRendererService {
   getSmartTechSealDataUrl(): string {
-    const candidates = [
-      path.join(process.cwd(), 'smart_tech_images', 'smarttech_seal 2.png'),
-      path.join(__dirname, '..', '..', 'smart_tech_images', 'smarttech_seal 2.png'),
+    const sealFileNames = ['smarttech_seal.png', 'smarttech_seal 2.png'];
+    const bases = [
+      path.join(process.cwd(), 'smart_tech_images'),
+      path.join(__dirname, '..', '..', 'smart_tech_images'),
+      path.join(__dirname, '..', '..', '..', 'backend', 'smart_tech_images'),
     ];
+    const candidates = bases.flatMap((base) =>
+      sealFileNames.map((name) => path.join(base, name)),
+    );
     const sealPath = candidates.find((candidate) => fs.existsSync(candidate));
     if (!sealPath) return '';
     try {
@@ -631,7 +636,7 @@ ${parts.join('\n')}
     }
     .border-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
     .border-layer svg { width: 100%; height: 100%; }
-      .seal-area { position: absolute; bottom: 18px; right: 24px; width: 72px; height: 72px; opacity: 0.95; z-index: 1; pointer-events: none; overflow: hidden; }
+      .seal-area { position: absolute; bottom: 18px; left: 24px; width: 72px; height: 72px; opacity: 0.95; z-index: 1; pointer-events: none; overflow: hidden; }
       .seal-area img, .seal-area svg { display: block; width: 72px; height: 72px; max-width: 72px; max-height: 72px; object-fit: contain; }
      .ribbon-area { margin: 2px 0; z-index: 1; }
     .watermark-text {
@@ -725,8 +730,8 @@ ${parts.join('\n')}
     <div class="border-layer">${borderSvg}</div>
      ${stampOverlay ? `<div class="stamp-layer" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:none;">${stampOverlay}</div>` : ''}
      ${data.showWatermark ? `<div class="watermark-text">${data.watermarkText || 'CERTIFICATE'}</div>` : ''}
+     <div class="seal-area">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal"/>` : sealSvg}</div>
      <div class="cert-inner">
-       <div class="seal-area">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal"/>` : sealSvg}</div>
        ${data.schoolLogo ? `<div class="logo-area"><img src="${data.schoolLogo}" alt="School Logo"/></div>` : ''}
       <div class="ribbon-area">${ribbonSvg}</div>
       <div class="school-name">${data.schoolName}</div>
