@@ -1053,35 +1053,36 @@ case 'SIGNATURE': {
       }
     }
 
-    // Resolve per-role signature images (Class Teacher / Head Teacher / Deputy)
-    // from TemplateSignatory bindings so each role renders its own bound artwork,
-    // falling back to the school default `signatureUrl` at the template layer.
+    // Resolve per-role signature images. Head Teacher / Deputy are school-wide
+    // so their template bindings are safe. Class Teacher is deliberately NOT
+    // resolved from the template binding: a template-level binding would sign on
+    // behalf of every class, including classes that teacher does not lead. It is
+    // resolved per class below, from the class's assigned class teacher.
     if (schoolId) {
       try {
         const signatorySlots = await this.prisma.templateSignatory.findMany({
           where: { templateId: template.id },
           select: {
             role: true,
+            label: true,
             signature: {
               select: { transparentImageUrl: true, processedImageUrl: true, imageUrl: true, signatureData: true },
             },
           },
         });
         for (const slot of signatorySlots) {
-          const role = (slot.role || '').toUpperCase();
+          const role = canonicalSignatoryRole(slot.role, slot.label);
           const url = slot.signature
             ? slot.signature.transparentImageUrl || slot.signature.processedImageUrl || slot.signature.imageUrl || slot.signature.signatureData || null
             : null;
           if (!url) continue;
-          if (role === 'CLASS_TEACHER' && !defaultData.classTeacherSignatureUrl) {
-            defaultData.classTeacherSignatureUrl = url;
-          } else if (role === 'HEAD_TEACHER' && !defaultData.headTeacherSignatureUrl) {
+          if (role === 'HEAD_TEACHER' && !defaultData.headTeacherSignatureUrl) {
             defaultData.headTeacherSignatureUrl = url;
           } else if (role === 'DEPUTY_HEAD_TEACHER' && !defaultData.deputySignatureUrl) {
             defaultData.deputySignatureUrl = url;
           }
         }
-        if (!defaultData.classTeacherSignatureUrl && defaultData.class?.classTeacherId && schoolId) {
+        if (!defaultData.classTeacherSignatureUrl && defaultData.class?.classTeacherId) {
           const teacherSig = await this.prisma.digitalSignature.findFirst({
             where: { schoolId, userId: defaultData.class.classTeacherId, status: 'ACTIVE' },
             orderBy: { isDefault: 'desc' },

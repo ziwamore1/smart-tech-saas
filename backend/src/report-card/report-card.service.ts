@@ -285,9 +285,11 @@ export class ReportCardService {
           const role = canonicalSignatoryRole(s.role, s.label);
           const url = pickUrl(s);
           if (!url) continue;
-          if (role === 'CLASS_TEACHER' && !result.classTeacherSignatureUrl) {
-            result.classTeacherSignatureUrl = url;
-          } else if (role === 'HEAD_TEACHER' && !result.headTeacherSignatureUrl) {
+          // CLASS_TEACHER is intentionally not bound here: it is resolved per
+          // class in step 1 from the class's assigned class teacher, so a
+          // template binding can never make one teacher sign for classes they
+          // do not lead.
+          if (role === 'HEAD_TEACHER' && !result.headTeacherSignatureUrl) {
             result.headTeacherSignatureUrl = url;
           } else if (role === 'DEPUTY_HEAD_TEACHER' && !result.deputySignatureUrl) {
             result.deputySignatureUrl = url;

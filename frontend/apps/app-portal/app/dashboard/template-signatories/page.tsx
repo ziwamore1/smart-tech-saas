@@ -27,6 +27,12 @@ interface SignatoryRow {
 const uid = () => Math.random().toString(36).slice(2, 10);
 const COMMON_ROLES = ['Class Teacher', 'Head Teacher', 'Deputy Head', 'Director', 'Registrar', 'Principal', 'Examination Officer', 'HOD', 'Secretary'];
 
+// Class Teacher is resolved per class from the class's assigned teacher, so it
+// must never be bound to a single saved signature (which would sign for every
+// class). Head Teacher / Deputy remain school-wide and can be bound.
+const isClassTeacherRole = (role: string, label: string) =>
+  /class\s*(teacher|master|mistress|advisor|tutor)|form\s*(master|mistress)/i.test(`${role} ${label}`);
+
 export default function TemplateSignatoriesPage() {
   const [templateSource, setTemplateSource] = useState<TemplateSource>('REPORT');
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -35,6 +41,7 @@ export default function TemplateSignatoriesPage() {
   const [signatures, setSignatures] = useState<SignatureOption[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState<'' | 'success' | 'error'>('');
 
   const loadSignatures = useCallback(async () => {
     try {
@@ -50,6 +57,7 @@ export default function TemplateSignatoriesPage() {
     setSelectedId('');
     setRows([]);
     setMessage('');
+    setMessageType('');
     if (templateSource === 'REPORT') {
       reportTemplateApi.getAll()
         .then(r => {
@@ -67,10 +75,10 @@ export default function TemplateSignatoriesPage() {
     }
   }, [templateSource]);
 
-  const selectTemplate = async (id: string) => {
+  const selectTemplate = async (id: string, options?: { preserveMessage?: boolean }): Promise<boolean> => {
     setSelectedId(id);
-    setMessage('');
-    if (!id) { setRows([]); return; }
+    if (!options?.preserveMessage) { setMessage(''); setMessageType(''); }
+    if (!id) { setRows([]); return true; }
     setBusy(true);
     try {
       const response = templateSource === 'REPORT'
@@ -81,7 +89,12 @@ export default function TemplateSignatoriesPage() {
       setRows(list.map((s: any, i: number) => ({
         key: uid(), id: s.id, label: s.label || '', role: s.role || '', position: s.position ?? i, isRequired: s.isRequired !== false, signatureId: s.signatureId || '',
       })));
-    } catch (error: any) { setMessage(error?.response?.data?.message || 'Could not load signatories'); }
+      return true;
+    } catch (error: any) {
+      setMessageType('error');
+      setMessage(error?.response?.data?.message || 'Could not load signatories');
+      return false;
+    }
     finally { setBusy(false); }
   };
 
@@ -103,24 +116,33 @@ export default function TemplateSignatoriesPage() {
 
   const save = async () => {
     if (!selectedId) return;
-    if (rows.length === 0) { setMessage('Add at least one signatory position, then save.'); return; }
+    if (rows.length === 0) { setMessageType('error'); setMessage('Add at least one signatory position, then save.'); return; }
     const labelsOk = rows.every(r => r.label.trim());
-    if (!labelsOk) { setMessage('Every position needs a label (e.g. "Class Teacher").'); return; }
+    if (!labelsOk) { setMessageType('error'); setMessage('Every position needs a label (e.g. "Class Teacher").'); return; }
     setBusy(true);
     try {
       const payload = rows.map((r, i) => ({
-        id: r.id, label: r.label.trim(), role: r.role.trim() || null, position: i, isRequired: r.isRequired, signatureId: r.signatureId || null,
+        id: r.id,
+        label: r.label.trim(),
+        role: r.role.trim() || null,
+        position: i,
+        isRequired: r.isRequired,
+        signatureId: isClassTeacherRole(r.role, r.label) ? null : (r.signatureId || null),
       }));
       if (templateSource === 'REPORT') {
         await templateBuilderApi.saveTemplateSignatories(selectedId, payload);
       } else {
         await templateBuilderApi.saveStampTemplateSignatories(selectedId, payload);
       }
-      setMessage(templateSource === 'REPORT'
+      const successMessage = templateSource === 'REPORT'
         ? 'Signatory positions saved. Bound signatures now appear on this report card/transcript template.'
-        : 'Signatory positions saved for this document type.');
-      void selectTemplate(selectedId);
-    } catch (error: any) { setMessage(error?.response?.data?.message || 'Could not save signatories'); }
+        : 'Signatory positions saved for this document type.';
+      const reloaded = await selectTemplate(selectedId, { preserveMessage: true });
+      if (reloaded) { setMessageType('success'); setMessage(successMessage); }
+    } catch (error: any) {
+      setMessageType('error');
+      setMessage(error?.response?.data?.message || 'Could not save signatories');
+    }
     finally { setBusy(false); }
   };
 
@@ -130,7 +152,7 @@ export default function TemplateSignatoriesPage() {
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Signatory Positions</h1>
-        <p className="text-sm text-gray-500 mt-1">Declare where signatures belong. Bind a saved signature to each position and it will render on every generated document of that type — report cards, transcripts, and issued stamp documents.</p>
+        <p className="text-sm text-gray-500 mt-1">Declare where signatures belong. Bind a saved signature to each position and it will render on every generated document of that type — report cards, transcripts, and issued stamp documents. Class Teacher positions are resolved automatically from each class&apos;s assigned class teacher, so they never need (or allow) a single school-wide binding.</p>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
@@ -190,11 +212,17 @@ export default function TemplateSignatoriesPage() {
                     <datalist id="common-roles">{COMMON_ROLES.map(r => <option key={r} value={r} />)}</datalist>
                   </div>
                   <div className="flex-1 min-w-[180px]">
-                    <label className="block text-xs font-medium text-gray-600">Signature to render</label>
-                    <select value={row.signatureId} onChange={e => patch(row.key, { signatureId: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-1.5 text-sm">
-                      <option value="">No signature image</option>
-                      {signatures.map(s => <option key={s.id} value={s.id}>{s.name}{s.title ? ` — ${s.title}` : ''}{s.scope === 'PLATFORM' ? ' (platform)' : ''}</option>)}
-                    </select>
+                    <label className="block text-xs font-medium text-gray-600">{isClassTeacherRole(row.role, row.label) ? 'Signature' : 'Signature to render'}</label>
+                    {isClassTeacherRole(row.role, row.label) ? (
+                      <div className="mt-1 w-full border border-dashed border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-500 bg-gray-50">
+                        Resolved per class — each class&apos;s assigned class teacher signs its own report cards.
+                      </div>
+                    ) : (
+                      <select value={row.signatureId} onChange={e => patch(row.key, { signatureId: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-1.5 text-sm">
+                        <option value="">No signature image</option>
+                        {signatures.map(s => <option key={s.id} value={s.id}>{s.name}{s.title ? ` — ${s.title}` : ''}{s.scope === 'PLATFORM' ? ' (platform)' : ''}</option>)}
+                      </select>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center justify-between pl-9">
@@ -215,7 +243,13 @@ export default function TemplateSignatoriesPage() {
               <button disabled={busy || rows.length === 0} onClick={save} className="rounded-lg bg-blue-600 text-white px-5 py-2.5 text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
                 {busy ? 'Saving…' : 'Save Signatory Positions'}
               </button>
-              {message && <span className="text-xs text-gray-600">{message}</span>}
+              {message && (
+                <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${messageType === 'success' ? 'text-green-600' : messageType === 'error' ? 'text-red-600' : 'text-gray-600'}`}>
+                  {messageType === 'success' && <i className="fa fa-check-circle" />}
+                  {messageType === 'error' && <i className="fa fa-exclamation-circle" />}
+                  {message}
+                </span>
+              )}
             </div>
           </div>
         )}

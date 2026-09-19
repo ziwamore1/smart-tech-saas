@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import * as crypto from 'crypto';
 import sharp from 'sharp';
+import { canonicalSignatoryRole } from './signatory-role.util';
 
 export interface SignatureProcessingOptions {
   threshold?: number | 'auto';
@@ -120,9 +121,11 @@ export class DigitalSignatureService {
       }
     }
 
-    // Declaring a bound signature position is an explicit opt-in: flip the
-    // template's signature flag on so the binding actually renders on the PDF.
-    if (list.some((s) => s.signatureId)) {
+    // Declaring a signature position is an explicit opt-in: flip the template's
+    // signature flag on so the signed block actually renders on the PDF. This
+    // includes role-only positions (e.g. Class Teacher) that intentionally carry
+    // no bound image because they are resolved per class at render time.
+    if (list.some((s) => s.signatureId || canonicalSignatoryRole(s.role, s.label))) {
       await this.prisma.reportTemplate.update({
         where: { id: templateId },
         data: { includeSignature: true },
