@@ -538,18 +538,21 @@ export class DigitalStampService {
 </div>`;
   }
 
-  getStampSvgOverlay(stamps: any[]): string {
+  getStampSvgOverlay(stamps: any[], canvasWidth = 820, canvasHeight = 1123): string {
     if (!stamps || stamps.length === 0) return '';
 
+    const margin = 20;
     const parts = stamps.map((s, i) => {
       const svgContent = s.stamp?.svgContent || s.svgContent || '';
       const templateStamp = s;
       const opacity = templateStamp?.opacity ?? 1;
       const rotation = templateStamp?.rotation ?? 0;
-      const x = templateStamp?.positionX ?? 0;
-      const y = templateStamp?.positionY ?? 0;
-      const w = templateStamp?.width ?? 150;
-      const h = templateStamp?.height ?? 150;
+      const w = Math.min(templateStamp?.width ?? 150, canvasWidth - 2 * margin);
+      const h = Math.min(templateStamp?.height ?? 150, canvasHeight - 2 * margin);
+      const maxX = Math.max(margin, canvasWidth - margin - w);
+      const maxY = Math.max(margin, canvasHeight - margin - h);
+      const x = Math.min(Math.max(templateStamp?.positionX ?? 0, margin), maxX);
+      const y = Math.min(Math.max(templateStamp?.positionY ?? 0, margin), maxY);
 
       return `<g transform="translate(${x},${y}) rotate(${rotation},${w / 2},${h / 2})" opacity="${opacity}">
   ${svgContent.replace(/<svg[^>]*>/i, '').replace(/<\/svg>/i, '')}

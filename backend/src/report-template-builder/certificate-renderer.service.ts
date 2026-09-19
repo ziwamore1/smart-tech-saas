@@ -10,13 +10,19 @@ import * as fs from 'fs';
 export class CertificateRendererService {
   getSmartTechSealDataUrl(): string {
     const sealFileNames = ['smarttech_seal.png', 'smarttech_seal 2.png'];
-    const bases = [
-      path.join(process.cwd(), 'smart_tech_images'),
+    const folderNames = ['smart_tech_images', 'smarttech_images'];
+    const repoRoot = path.resolve(process.cwd());
+    const baseSet = new Set<string>([
+      process.env.SMART_TECH_IMAGES_DIR || '',
+      path.join(repoRoot, 'smart_tech_images'),
+      path.join(repoRoot, 'backend', 'smart_tech_images'),
+      path.join(repoRoot, 'smarttech_images'),
+      path.join(repoRoot, 'backend', 'smarttech_images'),
       path.join(__dirname, '..', '..', 'smart_tech_images'),
-      path.join(__dirname, '..', '..', '..', 'backend', 'smart_tech_images'),
-    ];
-    const candidates = bases.flatMap((base) =>
-      sealFileNames.map((name) => path.join(base, name)),
+      path.join(__dirname, '..', '..', '..', '..', 'backend', 'smart_tech_images'),
+    ]);
+    const candidates = [...baseSet].flatMap((base) =>
+      base ? folderNames.flatMap((folder) => sealFileNames.map((name) => path.join(base, folder, name))) : [],
     );
     const sealPath = candidates.find((candidate) => fs.existsSync(candidate));
     if (!sealPath) return '';

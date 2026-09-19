@@ -1435,14 +1435,14 @@ case 'SIGNATURE': {
       <div style="display:flex;justify-content:space-between;width:80%;margin-top:25px;font-size:10px;">
         <div style="text-align:center;">
           <div style="border-top:1px solid #333;width:150px;margin-bottom:4px;"></div>
-          ${cert.signature1Label || 'Head Teacher'}<br/>${cert.signature1Name || ''}
+          ${cert.signature1Label || 'Head Teacher'}${cert.signature1Name ? ` — ${cert.signature1Name}` : ''}
         </div>
         <div style="text-align:center;">
           <div style="border-top:1px solid #333;width:150px;margin-bottom:4px;"></div>
-          ${cert.signature2Label || 'Director'}<br/>${cert.signature2Name || ''}
+          ${cert.signature2Label || 'Director'}${cert.signature2Name ? ` — ${cert.signature2Name}` : ''}
         </div>
       </div>
-       <div style="font-size:16px;color:#0f766e;font-weight:900;margin-top:16px;letter-spacing:2px;font-family:'Courier New',monospace;">Certificate No: ${data?.certificateNumber || 'ST-PREVIEW-00000000'}</div>
+      <div style="font-size:16px;color:#0f766e;font-weight:900;margin-top:24px;padding-top:12px;border-top:1px solid rgba(15,118,110,0.25);letter-spacing:2px;font-family:'Courier New',monospace;">Certificate No: ${data?.certificateNumber || 'ST-PREVIEW-00000000'}</div>
     </div>`;
   }
 
