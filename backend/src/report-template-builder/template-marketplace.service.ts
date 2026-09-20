@@ -5,11 +5,12 @@ import { PrismaService } from '../prisma/prisma.service';
 export class TemplateMarketplaceService {
   constructor(private prisma: PrismaService) {}
 
-  async getMarketplaceTemplates(filters?: { category?: string; featured?: boolean; search?: string }) {
+  async getMarketplaceTemplates(filters?: { category?: string; featured?: boolean; search?: string; documentType?: string }) {
     await this.ensureSystemTemplatesPublished();
     const where: any = {};
     if (filters?.category) where.category = filters.category;
     if (filters?.featured) where.featured = true;
+    if (filters?.documentType) where.documentType = filters.documentType;
     if (filters?.search) {
       where.OR = [
         { title: { contains: filters.search, mode: 'insensitive' } },
