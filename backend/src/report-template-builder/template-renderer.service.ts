@@ -1126,12 +1126,19 @@ case 'SIGNATURE': {
         },
       } : component;
     }));
-    const isProfessionalHbs = !renderTemplate.certificate && (
-      templateMetadata.enhancedProfessional ||
-      templateMetadata.professionalHbs ||
-      templateMetadata.source === 'system-seed' ||
-      templateMetadata.source === 'marketplace-download'
-    );
+    const renderDocumentType = (renderTemplate as any).documentType || '';
+    const isCertificateFamily =
+      renderDocumentType === 'CERTIFICATE' ||
+      renderDocumentType === 'LEADERSHIP' ||
+      renderDocumentType === 'TRANSCRIPT';
+    const isProfessionalHbs =
+      isCertificateFamily ||
+      (!renderTemplate.certificate && (
+        templateMetadata.enhancedProfessional ||
+        templateMetadata.professionalHbs ||
+        templateMetadata.source === 'system-seed' ||
+        templateMetadata.source === 'marketplace-download'
+      ));
     if (isProfessionalHbs) {
       const html = this.renderProfessionalHbsPreview(renderTemplate, defaultData, school);
       return this.applyDefaultStamp(schoolId, html);
