@@ -1,4 +1,4 @@
-import 'reflect-metadata';
+﻿import 'reflect-metadata';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -7,6 +7,12 @@ dotenv.config({ path: path.join(__dirname, '..', '.env.production') });
 
 process.env.SIGNATURE_SERVICE_URL = process.env.SIGNATURE_SERVICE_URL || 'http://127.0.0.1:4001';
 process.env.SIGNATURE_SERVICE_KEY = process.env.SIGNATURE_SERVICE_KEY || 'stamp-engine:dev-internal-service-secret';
+declare global { var __name: (fn: unknown, name: string) => unknown }
+(globalThis as any).__name ??= ((fn: any, name: string) => {
+  try { fn.name = name; } catch { /* read-only/class name, ignore */ }
+  return fn;
+});
+const __name = (globalThis as any).__name;
 
 import { PrismaClient } from '@prisma/client';
 import { CertificateRendererService } from '../src/report-template-builder/certificate-renderer.service';
