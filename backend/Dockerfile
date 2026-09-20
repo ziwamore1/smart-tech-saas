@@ -51,6 +51,9 @@ COPY --from=builder /app/prisma ./prisma
 # Copy Handlebars templates for report card generation
 COPY --from=builder /app/src/templates ./src/templates
 
+# Copy the Smart Tech seal used by certificate rendering.
+COPY --from=builder /app/smart_tech_images ./smart_tech_images
+
 # Remove build-only deps to shrink image
 RUN apk del .build-deps
 

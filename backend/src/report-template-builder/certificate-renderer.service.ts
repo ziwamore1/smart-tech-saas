@@ -10,9 +10,8 @@ import * as fs from 'fs';
 export class CertificateRendererService {
   getSmartTechSealDataUrl(): string {
     const sealFileNames = ['smarttech_seal.png', 'smarttech_seal 2.png'];
-    const folderNames = ['smart_tech_images', 'smarttech_images'];
     const repoRoot = path.resolve(process.cwd());
-    const baseSet = new Set<string>([
+    const imageDirs = new Set<string>([
       process.env.SMART_TECH_IMAGES_DIR || '',
       path.join(repoRoot, 'smart_tech_images'),
       path.join(repoRoot, 'backend', 'smart_tech_images'),
@@ -21,8 +20,8 @@ export class CertificateRendererService {
       path.join(__dirname, '..', '..', 'smart_tech_images'),
       path.join(__dirname, '..', '..', '..', '..', 'backend', 'smart_tech_images'),
     ]);
-    const candidates = [...baseSet].flatMap((base) =>
-      base ? folderNames.flatMap((folder) => sealFileNames.map((name) => path.join(base, folder, name))) : [],
+    const candidates = [...imageDirs].flatMap((dir) =>
+      dir ? sealFileNames.map((name) => path.join(dir, name)) : [],
     );
     const sealPath = candidates.find((candidate) => fs.existsSync(candidate));
     if (!sealPath) return '';
@@ -54,12 +53,16 @@ export class CertificateRendererService {
       const x = Math.min(Math.max(s.positionX ?? margin, margin), maxX);
       const y = Math.min(Math.max(s.positionY ?? margin, margin), maxY);
 
-      const innerSvg = svgContent
-        .replace(/<svg[^>]*>/i, '')
-        .replace(/<\/svg>/i, '');
+       const scaledSvg = svgContent.replace(/<svg([^>]*)>/i, (_match, attributes: string) => {
+         const cleanAttributes = attributes.replace(
+           /\s(?:x|y|width|height|preserveAspectRatio)="[^"]*"/gi,
+           '',
+         );
+         return `<svg${cleanAttributes} x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet">`;
+       });
 
-      return `<g transform="translate(${x},${y}) rotate(${rotation},${w / 2},${h / 2})" opacity="${opacity}">
-  ${innerSvg}
+       return `<g transform="translate(${x},${y}) rotate(${rotation},${w / 2},${h / 2})" opacity="${opacity}">
+  ${scaledSvg}
 </g>`;
     }).filter(Boolean);
 
@@ -736,7 +739,7 @@ ${parts.join('\n')}
     <div class="border-layer">${borderSvg}</div>
      ${stampOverlay ? `<div class="stamp-layer" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:none;">${stampOverlay}</div>` : ''}
      ${data.showWatermark ? `<div class="watermark-text">${data.watermarkText || 'CERTIFICATE'}</div>` : ''}
-     <div class="seal-area">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal"/>` : sealSvg}</div>
+      <div class="seal-area">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal"/>` : `<svg style="width:72px;height:72px;display:block;" viewBox="0 0 120 120" role="img">${sealSvg.replace(/<svg[^>]*>|<\/svg>/gi, '')}</svg>`}</div>
      <div class="cert-inner">
        ${data.schoolLogo ? `<div class="logo-area"><img src="${data.schoolLogo}" alt="School Logo"/></div>` : ''}
       <div class="ribbon-area">${ribbonSvg}</div>

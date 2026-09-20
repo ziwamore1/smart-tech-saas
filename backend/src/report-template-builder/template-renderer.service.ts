@@ -1274,7 +1274,11 @@ case 'SIGNATURE': {
         timezoneLabel: this.stampTimezoneLabel(tz),
         assets: assetMap,
       });
-      const overlay = `<div style="position:fixed;right:18mm;bottom:18mm;width:42mm;height:42mm;z-index:9999;pointer-events:none;">${svg}</div>`;
+       const certificateOverlay = html.includes('class="cert-page"');
+       const position = certificateOverlay
+         ? 'position:fixed;right:24mm;bottom:24mm;width:34mm;height:34mm;'
+         : 'position:fixed;right:18mm;bottom:18mm;width:42mm;height:42mm;';
+       const overlay = `<div class="default-stamp-overlay" style="${position}z-index:9999;overflow:hidden;pointer-events:none;"><style>.default-stamp-overlay > svg{display:block;width:100%;height:100%;max-width:100%;max-height:100%;}</style>${svg}</div>`;
       return html.includes('</body>') ? html.replace('</body>', `${overlay}</body>`) : `${html}${overlay}`;
     } catch (error: any) {
       this.logger.warn(`Default stamp rendering skipped for school ${schoolId}: ${error?.message || error}`);
@@ -1423,7 +1427,7 @@ case 'SIGNATURE': {
     const studentName = `${s.firstName || ''} ${s.lastName || ''}`;
 
     return `<div style="position:relative;width:100%;min-height:${isLandscape ? '190' : '260'}mm;padding:30px;border:${borderCss};display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:white;overflow:hidden;">
-       <div style="position:absolute;left:40px;bottom:35px;width:70px;height:70px;z-index:1;overflow:hidden;pointer-events:none;">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal" style="display:block;width:70px;height:70px;max-width:70px;max-height:70px;object-fit:contain;" />` : `<div style="width:70px;height:70px;overflow:hidden;">${fallbackSeal}</div>`}</div>
+        <div style="position:absolute;left:40px;bottom:35px;width:70px;height:70px;z-index:1;overflow:hidden;pointer-events:none;">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal" style="display:block;width:70px;height:70px;max-width:70px;max-height:70px;object-fit:contain;" />` : `<div style="width:70px;height:70px;overflow:hidden;"><svg style="width:70px;height:70px;display:block;" viewBox="0 0 120 120" role="img">${fallbackSeal.replace(/<svg[^>]*>|<\/svg>/gi, '')}</svg></div>`}</div>
       ${cert.showWatermark && cert.watermarkText ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)rotate(-30deg);font-size:80px;color:${borderColor};opacity:0.04;pointer-events:none;white-space:nowrap;font-weight:bold;">${cert.watermarkText}</div>` : ''}
       ${school?.logoUrl ? `<img src="${school.logoUrl}" style="height:60px;margin-bottom:10px;" />` : ''}
        <div style="font-size:34px;font-weight:800;color:${borderColor};margin-bottom:7px;">${school?.name || 'School Name'}</div>
@@ -1439,7 +1443,7 @@ case 'SIGNATURE': {
         <svg width="50" height="50" viewBox="0 0 50 50"><polygon points="25,3 31,18 47,19 35,30 38,47 25,38 12,47 15,30 3,19 19,18" fill="#f59e0b"/></svg>
       </div>` : ''}
       ${cert.showQrCode ? `<div style="margin:10px 0;"><svg width="50" height="50" viewBox="0 0 50 50"><rect width="50" height="50" fill="white"/><rect x="8" y="8" width="6" height="6" fill="black"/><rect x="8" y="20" width="6" height="6" fill="black"/><rect x="8" y="32" width="6" height="6" fill="black"/><rect x="20" y="8" width="6" height="6" fill="black"/><rect x="32" y="8" width="6" height="6" fill="black"/><rect x="32" y="20" width="6" height="6" fill="black"/><rect x="32" y="32" width="6" height="6" fill="black"/><rect x="20" y="32" width="6" height="6" fill="black"/></svg></div>` : ''}
-        <div style="display:flex;justify-content:space-between;width:80%;margin-top:25px;padding-bottom:26px;font-size:10px;">
+         <div style="display:flex;justify-content:space-between;width:80%;margin-top:25px;padding-bottom:0;font-size:10px;">
           <div style="text-align:center;">
           <div style="border-top:1px solid #333;width:150px;margin-bottom:4px;"></div>
           ${cert.signature1Label || 'Head Teacher'}${cert.signature1Name ? ` — ${cert.signature1Name}` : ''}
@@ -1449,7 +1453,7 @@ case 'SIGNATURE': {
           ${cert.signature2Label || 'Director'}${cert.signature2Name ? ` — ${cert.signature2Name}` : ''}
         </div>
       </div>
-      <div style="font-size:16px;color:#0f766e;font-weight:900;margin-top:24px;padding-top:12px;border-top:1px solid rgba(15,118,110,0.25);letter-spacing:2px;font-family:'Courier New',monospace;">Certificate No: ${data?.certificateNumber || 'ST-PREVIEW-00000000'}</div>
+       <div style="display:block;clear:both;width:100%;font-size:16px;color:#0f766e;font-weight:900;margin-top:28px;padding-top:12px;border-top:1px solid rgba(15,118,110,0.25);letter-spacing:2px;font-family:'Courier New',monospace;">Certificate No: ${data?.certificateNumber || 'ST-PREVIEW-00000000'}</div>
     </div>`;
   }
 
