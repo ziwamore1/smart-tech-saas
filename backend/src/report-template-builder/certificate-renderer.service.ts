@@ -645,7 +645,7 @@ ${parts.join('\n')}
     }
     .border-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
     .border-layer svg { width: 100%; height: 100%; }
-      .seal-area { position: absolute; bottom: 34px; left: 42px; width: 86px; height: 86px; opacity: 0.95; z-index: 1; pointer-events: none; overflow: hidden; }
+      .seal-area { position: absolute; bottom: 50px; left: 56px; width: 86px; height: 86px; opacity: 0.95; z-index: 1; pointer-events: none; overflow: hidden; }
       .seal-area img, .seal-area svg { display: block; width: 86px; height: 86px; max-width: 86px; max-height: 86px; object-fit: contain; }
      .ribbon-area { margin: 2px 0; z-index: 1; }
     .watermark-text {
@@ -703,7 +703,7 @@ ${parts.join('\n')}
      .qr-area svg { width: 40px; height: 40px; }
      .signatures {
        display: flex; justify-content: space-around;
-        width: 80%; margin-top: 9px; margin-bottom: 52px; z-index: 1;
+        width: 80%; margin-top: 9px; margin-bottom: 74px; z-index: 1;
     }
     .sig-box { text-align: center; width: 200px; }
     .sig-line {
@@ -721,8 +721,9 @@ ${parts.join('\n')}
     .verification-row {
        display: flex; align-items: center; gap: 12px;
         margin-top: 4px; z-index: 1;
-        position: absolute; left: 50%; right: auto; bottom: 10px;
+        position: absolute; left: 50%; right: auto; bottom: 8px;
         transform: translateX(-50%);
+        padding-top: 8px; border-top: 1px solid rgba(15,118,110,0.25);
     }
     @media print {
       .cert-page { margin: 0; padding: 0; }

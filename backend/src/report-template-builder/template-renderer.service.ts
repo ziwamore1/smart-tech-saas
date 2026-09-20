@@ -1276,7 +1276,7 @@ case 'SIGNATURE': {
       });
        const certificateOverlay = html.includes('class="cert-page"');
        const position = certificateOverlay
-         ? 'position:fixed;right:22mm;bottom:22mm;width:38mm;height:38mm;'
+         ? 'position:fixed;right:20mm;bottom:20mm;width:40mm;height:40mm;'
          : 'position:fixed;right:18mm;bottom:18mm;width:42mm;height:42mm;';
        const overlay = `<div class="default-stamp-overlay" style="${position}z-index:9999;overflow:hidden;pointer-events:none;"><style>.default-stamp-overlay > svg{display:block;width:100%;height:100%;max-width:100%;max-height:100%;}</style>${svg}</div>`;
       return html.includes('</body>') ? html.replace('</body>', `${overlay}</body>`) : `${html}${overlay}`;
@@ -1427,7 +1427,7 @@ case 'SIGNATURE': {
     const studentName = `${s.firstName || ''} ${s.lastName || ''}`;
 
     return `<div style="position:relative;width:100%;min-height:${isLandscape ? '190' : '260'}mm;padding:30px;border:${borderCss};display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:white;overflow:hidden;">
-        <div style="position:absolute;left:48px;bottom:42px;width:82px;height:82px;z-index:1;overflow:hidden;pointer-events:none;">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal" style="display:block;width:82px;height:82px;max-width:82px;max-height:82px;object-fit:contain;" />` : `<div style="width:82px;height:82px;overflow:hidden;"><svg style="width:82px;height:82px;display:block;" viewBox="0 0 120 120" role="img">${fallbackSeal.replace(/<svg[^>]*>|<\/svg>/gi, '')}</svg></div>`}</div>
+        <div style="position:absolute;left:60px;bottom:58px;width:82px;height:82px;z-index:1;overflow:hidden;pointer-events:none;">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal" style="display:block;width:82px;height:82px;max-width:82px;max-height:82px;object-fit:contain;" />` : `<div style="width:82px;height:82px;overflow:hidden;"><svg style="width:82px;height:82px;display:block;" viewBox="0 0 120 120" role="img">${fallbackSeal.replace(/<svg[^>]*>|<\/svg>/gi, '')}</svg></div>`}</div>
       ${cert.showWatermark && cert.watermarkText ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)rotate(-30deg);font-size:80px;color:${borderColor};opacity:0.04;pointer-events:none;white-space:nowrap;font-weight:bold;">${cert.watermarkText}</div>` : ''}
       ${school?.logoUrl ? `<img src="${school.logoUrl}" style="height:60px;margin-bottom:10px;" />` : ''}
        <div style="font-size:34px;font-weight:800;color:${borderColor};margin-bottom:7px;">${school?.name || 'School Name'}</div>
@@ -1453,7 +1453,7 @@ case 'SIGNATURE': {
           ${cert.signature2Label || 'Director'}${cert.signature2Name ? ` — ${cert.signature2Name}` : ''}
         </div>
       </div>
-       <div style="display:block;clear:both;width:100%;font-size:16px;color:#0f766e;font-weight:900;margin-top:28px;padding-top:12px;border-top:1px solid rgba(15,118,110,0.25);letter-spacing:2px;font-family:'Courier New',monospace;">Certificate No: ${data?.certificateNumber || 'ST-PREVIEW-00000000'}</div>
+       <div style="display:block;clear:both;width:100%;font-size:16px;color:#0f766e;font-weight:900;margin-top:40px;padding-top:16px;border-top:1px solid rgba(15,118,110,0.25);letter-spacing:2px;font-family:'Courier New',monospace;">Certificate No: ${data?.certificateNumber || 'ST-PREVIEW-00000000'}</div>
     </div>`;
   }
 
