@@ -4091,11 +4091,11 @@ enum MessageStatus {
 
 model TemplateMarketplace {
   id            String        @id @default(uuid())
-  templateId    String        @unique
-  schoolId      String?
-  title         String
+  templateId  String         @unique
+  schoolId    String?
+  documentType DocumentType @default(ACADEMIC_REPORT)
+  title       String
   description   String?
-  documentType  DocumentType  @default(ACADEMIC_REPORT)
   category      String?
   tags          String[]
   previewUrl    String?
