@@ -58,11 +58,12 @@ export class TemplateMarketplaceService {
 
     for (const template of systemTemplates) {
       const documentType = this.resolveTemplateDocumentType(template);
-      if (documentType === 'ACADEMIC_REPORT') continue hilabihan;
-      await this.prisma.templateMarketplace.updateMany({
-        where: { templateId: template.id, documentType: 'ACADEMIC_REPORT' },
-        data: { documentType },
-      });
+      if (documentType !== 'ACADEMIC_REPORT') {
+        await this.prisma.templateMarketplace.updateMany({
+          where: { templateId: template.id, documentType: 'ACADEMIC_REPORT' },
+          data: { documentType },
+        });
+      }
     }
 
     const published = await this.prisma.templateMarketplace.findMany({

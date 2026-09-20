@@ -1132,7 +1132,7 @@ case 'SIGNATURE': {
       renderDocumentType === 'LEADERSHIP' ||
       renderDocumentType === 'TRANSCRIPT';
     const isProfessionalHbs =
-      isCertificateFamily ||
+      !isCertificateFamily &&
       (!renderTemplate.certificate && (
         templateMetadata.enhancedProfessional ||
         templateMetadata.professionalHbs ||
