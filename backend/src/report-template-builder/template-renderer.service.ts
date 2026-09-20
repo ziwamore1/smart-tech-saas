@@ -1241,7 +1241,7 @@ case 'SIGNATURE': {
 <body>
   ${renderTemplate.headerText ? `<div style="text-align:center;margin-bottom:10px;font-size:12px;color:#374151;border-bottom:1px solid #9ca3af;padding-bottom:5px;">${renderTemplate.headerText}</div>` : ''}
   ${mainContent}
-  ${stampOverlay ? `<div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">${stampOverlay}</div>` : ''}
+      ${stampOverlay ? `<div style="position:absolute;top:35px;left:55px;right:55px;bottom:35px;pointer-events:none;z-index:10;">${stampOverlay}</div>` : ''}
   ${renderTemplate.footerText ? `<div style="text-align:center;margin-top:10px;font-size:11px;color:#4b5563;border-top:1px solid #9ca3af;padding-top:5px;">${renderTemplate.footerText}</div>` : ''}
 </body>
 </html>`;
@@ -1423,7 +1423,7 @@ case 'SIGNATURE': {
     const studentName = `${s.firstName || ''} ${s.lastName || ''}`;
 
     return `<div style="position:relative;width:100%;min-height:${isLandscape ? '190' : '260'}mm;padding:30px;border:${borderCss};display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:white;overflow:hidden;">
-       <div style="position:absolute;left:40px;bottom:35px;width:70px;height:70px;z-index:1;overflow:hidden;">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal" style="display:block;width:70px;height:70px;max-width:70px;max-height:70px;object-fit:contain;" />` : `<div style="width:70px;height:70px;">${fallbackSeal}</div>`}</div>
+       <div style="position:absolute;left:40px;bottom:35px;width:70px;height:70px;z-index:1;overflow:hidden;pointer-events:none;">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal" style="display:block;width:70px;height:70px;max-width:70px;max-height:70px;object-fit:contain;" />` : `<div style="width:70px;height:70px;overflow:hidden;">${fallbackSeal}</div>`}</div>
       ${cert.showWatermark && cert.watermarkText ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)rotate(-30deg);font-size:80px;color:${borderColor};opacity:0.04;pointer-events:none;white-space:nowrap;font-weight:bold;">${cert.watermarkText}</div>` : ''}
       ${school?.logoUrl ? `<img src="${school.logoUrl}" style="height:60px;margin-bottom:10px;" />` : ''}
        <div style="font-size:34px;font-weight:800;color:${borderColor};margin-bottom:7px;">${school?.name || 'School Name'}</div>
@@ -1439,8 +1439,8 @@ case 'SIGNATURE': {
         <svg width="50" height="50" viewBox="0 0 50 50"><polygon points="25,3 31,18 47,19 35,30 38,47 25,38 12,47 15,30 3,19 19,18" fill="#f59e0b"/></svg>
       </div>` : ''}
       ${cert.showQrCode ? `<div style="margin:10px 0;"><svg width="50" height="50" viewBox="0 0 50 50"><rect width="50" height="50" fill="white"/><rect x="8" y="8" width="6" height="6" fill="black"/><rect x="8" y="20" width="6" height="6" fill="black"/><rect x="8" y="32" width="6" height="6" fill="black"/><rect x="20" y="8" width="6" height="6" fill="black"/><rect x="32" y="8" width="6" height="6" fill="black"/><rect x="32" y="20" width="6" height="6" fill="black"/><rect x="32" y="32" width="6" height="6" fill="black"/><rect x="20" y="32" width="6" height="6" fill="black"/></svg></div>` : ''}
-      <div style="display:flex;justify-content:space-between;width:80%;margin-top:25px;font-size:10px;">
-        <div style="text-align:center;">
+        <div style="display:flex;justify-content:space-between;width:80%;margin-top:25px;padding-bottom:26px;font-size:10px;">
+          <div style="text-align:center;">
           <div style="border-top:1px solid #333;width:150px;margin-bottom:4px;"></div>
           ${cert.signature1Label || 'Head Teacher'}${cert.signature1Name ? ` — ${cert.signature1Name}` : ''}
         </div>
