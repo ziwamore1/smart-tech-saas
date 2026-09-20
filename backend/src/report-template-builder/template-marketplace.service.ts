@@ -88,14 +88,15 @@ export class TemplateMarketplaceService {
   }
 
   async publishToMarketplace(schoolId: string, templateId: string, data: {
-    title: string; description?: string; category?: string; tags?: string[]; price?: number; previewUrl?: string;
+    title: string; description?: string; category?: string; tags?: string[]; price?: number; previewUrl?: string; documentType?: DocumentType;
   }) {
     const t = await this.prisma.reportTemplate.findFirst({ where: { id: templateId, schoolId } });
     if (!t) throw new NotFoundException('Template not found');
+    const documentType = data.documentType || this.resolveTemplateDocumentType(t);
     return this.prisma.templateMarketplace.upsert({
       where: { templateId },
-      create: { templateId, schoolId, ...data, tags: data.tags || [] },
-      update: data,
+      create: { templateId, schoolId, ...data, documentType, tags: data.tags || [] },
+      update: { ...data, documentType },
     });
   }
 
@@ -104,10 +105,11 @@ export class TemplateMarketplaceService {
   }) {
     const t = await this.prisma.reportTemplate.findFirst({ where: { id: templateId, isDefault: true } });
     if (!t) throw new NotFoundException('System template not found');
+    const documentType = this.resolveTemplateDocumentType(t);
     return this.prisma.templateMarketplace.upsert({
       where: { templateId },
-      create: { templateId, schoolId: null, ...data, tags: data.tags || [] },
-      update: data,
+      create: { templateId, schoolId: null, ...data, documentType, tags: data.tags || [] },
+      update: { ...data, documentType },
     });
   }
 
