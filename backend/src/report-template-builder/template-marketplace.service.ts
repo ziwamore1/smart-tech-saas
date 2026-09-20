@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, RequestTimeoutException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { DocumentType } from '@prisma/client';
 
 @Injectable()
 export class TemplateMarketplaceService {
@@ -67,6 +68,7 @@ export class TemplateMarketplaceService {
       data: missing.map((template) => ({
         templateId: template.id,
         schoolId: null,
+        documentType: this.resolveTemplateDocumentType(template),
         title: template.name,
         description: template.description || '',
         category: template.category?.slug || 'Report Cards',
@@ -75,6 +77,14 @@ export class TemplateMarketplaceService {
       })),
       skipDuplicates: true,
     });
+  }
+
+  private resolveTemplateDocumentType(template: { templateType: string; name?: string; category?: { slug?: string } | null }): DocumentType {
+    const haystack = `${template.templateType} ${template.name || ''} ${template.category?.slug || ''}`.toUpperCase();
+    if (haystack.includes('TRANSCRIPT')) return DocumentType.TRANSCRIPT;
+    if (haystack.includes('ATTENDANCE')) return DocumentType.ATTENDANCE;
+    if (haystack.includes('LEADERSHIP') || haystack.includes('CERTIFICATE')) return DocumentType.LEADERSHIP;
+    return DocumentType.ACADEMIC_REPORT;
   }
 
   async publishToMarketplace(schoolId: string, templateId: string, data: {
