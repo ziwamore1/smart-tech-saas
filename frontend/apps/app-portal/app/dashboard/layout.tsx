@@ -612,7 +612,7 @@ const regularNav: NavItem[] = [
     href: '/dashboard/digital-signatures',
     icon: 'fa-signature',
     color: '#0e7490',
-    typeRoles: ROLE_MAP.admin,
+    typeRoles: ROLE_MAP.teaching,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
   {

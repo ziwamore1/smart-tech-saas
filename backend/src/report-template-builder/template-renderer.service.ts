@@ -1503,7 +1503,7 @@ case 'SIGNATURE': {
         // Certificates are a single fixed-size page: pin the signature block as
         // a page footer (clear of the bottom-left seal and bottom-right stamp)
         // so it never spills onto a second PDF page.
-        const footer = `<div style="position:fixed;left:50%;transform:translateX(-50%);bottom:4px;width:600px;z-index:50;">${sigBlock}</div>`;
+         const footer = `<div class="certificate-authenticity" style="position:fixed;left:50%;transform:translateX(-50%);bottom:32px;width:620px;max-height:42px;overflow:hidden;z-index:50;"><style>.certificate-authenticity>div{margin-top:0!important;gap:8px!important;line-height:1!important}.certificate-authenticity>div>div{min-width:0!important;padding:0 3px!important}.certificate-authenticity *{font-size:8px!important;line-height:1.05!important;margin-top:0!important;margin-bottom:0!important;padding-top:0!important;padding-bottom:0!important}.certificate-authenticity>div>div>div:first-child{font-size:8px!important}.certificate-authenticity>div>div>div:nth-child(2){font-size:10px!important;margin:1px 0!important}.certificate-authenticity>div>div>div:nth-child(3){font-size:8px!important}</style>${sigBlock}</div>`;
         html = html.includes('</body>')
           ? html.replace('</body>', `${footer}</body>`)
           : `${html}${footer}`;

@@ -701,7 +701,8 @@ ${parts.join('\n')}
       object-fit: cover; border: 2px solid ${data.borderColor};
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
-     .qr-area { margin: 3px 0; z-index: 1; }
+      .qr-area { margin: 3px 0; z-index: 1; }
+      .qr-corner { position: absolute; top: 44px; right: 44px; margin: 0; }
      .qr-area svg { width: 40px; height: 40px; }
      .signatures {
        display: flex; justify-content: space-around;
@@ -716,10 +717,11 @@ ${parts.join('\n')}
      .sig-label { font-size: 10px; color: #1f2937; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
      .sig-name { font-size: 12px; color: #111827; font-weight: 800; }
     .sig-title { font-size: 8px; color: #aaa; font-style: italic; }
-    .cert-number {
-       font-size: 11px; color: #0f766e; font-weight: 900; margin-top: 0;
-      z-index: 1; font-family: 'Courier New', monospace;
-      letter-spacing: 1px;
+      .cert-number {
+        position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+        font-size: 11px; color: #0f766e; font-weight: 900; margin-top: 0;
+       z-index: 1; font-family: 'Courier New', monospace;
+       letter-spacing: 1px; white-space: nowrap;
     }
     .verification-row {
        display: flex; align-items: center; gap: 12px;
@@ -775,10 +777,8 @@ ${parts.join('\n')}
           ${data.signature2Name ? '<div class="sig-title">Signature</div>' : ''}
         </div>
       </div>
-      <div class="verification-row">
-        ${qrSvg ? `<div class="qr-area">${qrSvg}</div>` : ''}
-        <div class="cert-number">Certificate No: ${data.certificateNumber}</div>
-      </div>
+       ${qrSvg ? `<div class="qr-area qr-corner">${qrSvg}</div>` : ''}
+       <div class="cert-number">Certificate No: ${data.certificateNumber}</div>
     </div>
   </div>
 </body>

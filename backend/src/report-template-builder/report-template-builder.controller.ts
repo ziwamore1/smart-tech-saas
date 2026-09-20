@@ -148,7 +148,7 @@ export class ReportTemplateBuilderController {
   }
 
   @Get('signatures')
-  @Roles('Director', 'Teacher')
+  @Roles('Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Teacher', 'Class Teacher', 'Primary Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Lecturer', 'Research Supervisor')
   async getSignatures(
     @Req() req,
     @Query('scope') scope?: string,
@@ -182,13 +182,13 @@ export class ReportTemplateBuilderController {
   // shadowed by @Get(':id')/@Post(':id/preview') template routes.
 
   @Post('signatures')
-  @Roles('Director', 'Head Teacher', 'Deputy Head', 'Deputy')
+  @Roles('Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Teacher', 'Class Teacher', 'Primary Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Lecturer', 'Research Supervisor')
   async createSignature(@Req() req, @Body() data: any) {
     return this.signatureService.createSignature(req.user.schoolId, { ...data, userId: req.user.id, processing: data.processing });
   }
 
   @Post('signatures/preview')
-  @Roles('Director', 'Head Teacher', 'Deputy Head', 'Deputy')
+  @Roles('Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Teacher', 'Class Teacher', 'Primary Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Lecturer', 'Research Supervisor')
   async previewSignature(@Req() req, @Body() body: { image: string; threshold?: number | 'auto'; contrast?: number; rotation?: number; feather?: number; crop?: { left: number; top: number; width: number; height: number } }) {
     const image = body?.image;
     if (!image) return { message: 'image is required', statusCode: 400 };
