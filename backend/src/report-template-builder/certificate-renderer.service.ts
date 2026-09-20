@@ -645,8 +645,8 @@ ${parts.join('\n')}
     }
     .border-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
     .border-layer svg { width: 100%; height: 100%; }
-      .seal-area { position: absolute; bottom: 18px; left: 24px; width: 72px; height: 72px; opacity: 0.95; z-index: 1; pointer-events: none; overflow: hidden; }
-      .seal-area img, .seal-area svg { display: block; width: 72px; height: 72px; max-width: 72px; max-height: 72px; object-fit: contain; }
+      .seal-area { position: absolute; bottom: 34px; left: 42px; width: 86px; height: 86px; opacity: 0.95; z-index: 1; pointer-events: none; overflow: hidden; }
+      .seal-area img, .seal-area svg { display: block; width: 86px; height: 86px; max-width: 86px; max-height: 86px; object-fit: contain; }
      .ribbon-area { margin: 2px 0; z-index: 1; }
     .watermark-text {
       position: absolute; top: 50%; left: 50%;
@@ -701,9 +701,9 @@ ${parts.join('\n')}
     }
      .qr-area { margin: 3px 0; z-index: 1; }
      .qr-area svg { width: 40px; height: 40px; }
-    .signatures {
-      display: flex; justify-content: space-around;
-       width: 80%; margin-top: 9px; z-index: 1;
+     .signatures {
+       display: flex; justify-content: space-around;
+        width: 80%; margin-top: 9px; margin-bottom: 52px; z-index: 1;
     }
     .sig-box { text-align: center; width: 200px; }
     .sig-line {
@@ -719,9 +719,10 @@ ${parts.join('\n')}
       letter-spacing: 1px;
     }
     .verification-row {
-      display: flex; align-items: center; gap: 12px;
-       margin-top: 4px; z-index: 1;
-       position: absolute; right: 150px; bottom: 28px;
+       display: flex; align-items: center; gap: 12px;
+        margin-top: 4px; z-index: 1;
+        position: absolute; left: 50%; right: auto; bottom: 10px;
+        transform: translateX(-50%);
     }
     @media print {
       .cert-page { margin: 0; padding: 0; }
@@ -739,7 +740,7 @@ ${parts.join('\n')}
     <div class="border-layer">${borderSvg}</div>
      ${stampOverlay ? `<div class="stamp-layer" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:none;">${stampOverlay}</div>` : ''}
      ${data.showWatermark ? `<div class="watermark-text">${data.watermarkText || 'CERTIFICATE'}</div>` : ''}
-      <div class="seal-area">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal"/>` : `<svg style="width:72px;height:72px;display:block;" viewBox="0 0 120 120" role="img">${sealSvg.replace(/<svg[^>]*>|<\/svg>/gi, '')}</svg>`}</div>
+      <div class="seal-area">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal"/>` : `<svg style="width:86px;height:86px;display:block;" viewBox="0 0 120 120" role="img">${sealSvg.replace(/<svg[^>]*>|<\/svg>/gi, '')}</svg>`}</div>
      <div class="cert-inner">
        ${data.schoolLogo ? `<div class="logo-area"><img src="${data.schoolLogo}" alt="School Logo"/></div>` : ''}
       <div class="ribbon-area">${ribbonSvg}</div>
