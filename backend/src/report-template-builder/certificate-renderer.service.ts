@@ -577,8 +577,10 @@ ${parts.join('\n')}
       certificateComment?: string;
       signature1Name?: string;
       signature1Label?: string;
+      signature1Url?: string;
       signature2Name?: string;
       signature2Label?: string;
+      signature2Url?: string;
       awardText?: string;
       certificateType?: string;
       borderStyle?: string;
@@ -706,10 +708,11 @@ ${parts.join('\n')}
         width: 80%; margin-top: 9px; margin-bottom: 74px; z-index: 1;
     }
     .sig-box { text-align: center; width: 200px; }
-    .sig-line {
-       border-top: 2px solid ${data.borderColor};
-       width: 85%; margin: 0 auto 3px; padding-top: 3px;
-    }
+     .sig-line {
+        border-top: 2px solid ${data.borderColor};
+        width: 85%; margin: 0 auto 3px; padding-top: 3px;
+     }
+     .sig-image { display: block; width: 120px; height: 34px; margin: -2px auto 2px; object-fit: contain; }
      .sig-label { font-size: 10px; color: #1f2937; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
      .sig-name { font-size: 12px; color: #111827; font-weight: 800; }
     .sig-title { font-size: 8px; color: #aaa; font-style: italic; }
@@ -721,8 +724,8 @@ ${parts.join('\n')}
     .verification-row {
        display: flex; align-items: center; gap: 12px;
         margin-top: 4px; z-index: 1;
-        position: absolute; left: 50%; right: auto; bottom: 8px;
-        transform: translateX(-50%);
+        position: absolute; right: 44px; left: auto; bottom: 8px;
+        transform: none;
         padding-top: 8px; border-top: 1px solid rgba(15,118,110,0.25);
     }
     @media print {
@@ -757,15 +760,17 @@ ${parts.join('\n')}
        ${certificateComment ? `<div class="comment-box">${certificateComment}</div>` : ''}
       ${badgeSvg ? `<div class="badge-area">${badgeSvg}</div>` : ''}
       <div class="signatures">
-        <div class="sig-box">
-          <div class="sig-line"></div>
-          <div class="sig-name">${data.signature1Name || ''}</div>
+         <div class="sig-box">
+           <div class="sig-line"></div>
+           ${data.signature1Url ? `<img class="sig-image" src="${data.signature1Url}" alt="${data.signature1Label || 'Head Teacher'} signature"/>` : ''}
+           <div class="sig-name">${data.signature1Name || ''}</div>
           <div class="sig-label">${data.signature1Label || 'Head Teacher'}</div>
           ${data.signature1Name ? '<div class="sig-title">Signature</div>' : ''}
         </div>
-        <div class="sig-box">
-          <div class="sig-line"></div>
-          <div class="sig-name">${data.signature2Name || ''}</div>
+         <div class="sig-box">
+           <div class="sig-line"></div>
+           ${data.signature2Url ? `<img class="sig-image" src="${data.signature2Url}" alt="${data.signature2Label || 'Director of Studies'} signature"/>` : ''}
+           <div class="sig-name">${data.signature2Name || ''}</div>
           <div class="sig-label">${data.signature2Label || 'Director'}</div>
           ${data.signature2Name ? '<div class="sig-title">Signature</div>' : ''}
         </div>

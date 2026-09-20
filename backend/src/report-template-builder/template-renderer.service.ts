@@ -1168,9 +1168,18 @@ case 'SIGNATURE': {
 
     if (renderTemplate.certificate) {
       try {
-        const templateStamps = await this.digitalStampService.getTemplateStamps(schoolId, templateId).catch(() => []);
-        const cert = renderTemplate.certificate;
-        mainContent = await this.certificateRenderer.generateCertificateHtml({}, {
+         const templateStamps = await this.digitalStampService.getTemplateStamps(schoolId, templateId).catch(() => []);
+         const cert = renderTemplate.certificate;
+         const showCertificateQr = cert.showQrCode !== false;
+         const verificationUrl = data?.authenticity?.verificationUrl || data?.verificationUrl || (
+           showCertificateQr
+             ? await this.certificateRenderer.createVerificationUrl(
+               process.env.PUBLIC_APP_URL || process.env.APP_URL || 'https://verify.smarttech.africa',
+               defaultData.certificateNumber || templateId,
+             )
+             : ''
+         );
+         mainContent = await this.certificateRenderer.generateCertificateHtml({}, {
           schoolName: school?.name || '',
           studentName: `${defaultData.student.firstName} ${defaultData.student.lastName}`,
           className: defaultData.class.name,
@@ -1179,18 +1188,20 @@ case 'SIGNATURE': {
            examType: defaultData.examType || 'END_TERM',
            certificateNumber: defaultData.certificateNumber || 'ST-PREVIEW-00000000',
            certificateComment: defaultData.certificateComment || defaultData.teacherComment || '',
-          verificationUrl: data?.authenticity?.verificationUrl || '',
+           verificationUrl,
           schoolLogo: school?.logoUrl || school?.logo || '',
           studentPhoto: defaultData.student.photoUrl || '',
-          signature1Name: cert.signature1Name || '',
-          signature1Label: cert.signature1Label || 'Head Teacher',
-          signature2Name: cert.signature2Name || '',
-          signature2Label: cert.signature2Label || 'Director',
+           signature1Name: cert.signature1Name || school?.headTeacherName || '',
+           signature1Label: cert.signature1Label || 'Head Teacher',
+           signature1Url: defaultData.headTeacherSignatureUrl || '',
+           signature2Name: cert.signature2Name || school?.deputyName || '',
+           signature2Label: cert.signature2Label || 'Director of Studies',
+           signature2Url: defaultData.deputySignatureUrl || '',
           awardText: cert.awardText || 'This certificate is awarded to',
           certificateType: cert.certificateType,
           borderStyle: cert.borderStyle || 'classic',
           borderColor: cert.borderColor || '#1a365d',
-          showQrCode: Boolean(data?.authenticity?.verification_qr) || cert.showQrCode === true,
+           showQrCode: showCertificateQr,
           showBadge: cert.showBadge || false,
           badgeStyle: cert.badgeStyle || 'star',
           showWatermark: cert.showWatermark || false,
@@ -1425,6 +1436,10 @@ case 'SIGNATURE': {
 
     const s = data?.student || {};
     const studentName = `${s.firstName || ''} ${s.lastName || ''}`;
+    const signature1Name = cert.signature1Name || school?.headTeacherName || '';
+    const signature2Name = cert.signature2Name || school?.deputyName || '';
+    const signature1Url = data?.headTeacherSignatureUrl || '';
+    const signature2Url = data?.deputySignatureUrl || '';
 
     return `<div style="position:relative;width:100%;min-height:${isLandscape ? '190' : '260'}mm;padding:30px;border:${borderCss};display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:white;overflow:hidden;">
         <div style="position:absolute;left:60px;bottom:58px;width:82px;height:82px;z-index:1;overflow:hidden;pointer-events:none;">${sealImage ? `<img src="${sealImage}" alt="Smart Tech authenticated seal" style="display:block;width:82px;height:82px;max-width:82px;max-height:82px;object-fit:contain;" />` : `<div style="width:82px;height:82px;overflow:hidden;"><svg style="width:82px;height:82px;display:block;" viewBox="0 0 120 120" role="img">${fallbackSeal.replace(/<svg[^>]*>|<\/svg>/gi, '')}</svg></div>`}</div>
@@ -1446,11 +1461,13 @@ case 'SIGNATURE': {
          <div style="display:flex;justify-content:space-between;width:80%;margin-top:25px;padding-bottom:0;font-size:10px;">
           <div style="text-align:center;">
           <div style="border-top:1px solid #333;width:150px;margin-bottom:4px;"></div>
-          ${cert.signature1Label || 'Head Teacher'}${cert.signature1Name ? ` — ${cert.signature1Name}` : ''}
+           ${signature1Url ? `<img src="${signature1Url}" alt="${cert.signature1Label || 'Head Teacher'} signature" style="display:block;width:120px;height:34px;margin:-2px auto 2px;object-fit:contain;" />` : ''}
+           ${cert.signature1Label || 'Head Teacher'}${signature1Name ? ` — ${signature1Name}` : ''}
         </div>
         <div style="text-align:center;">
           <div style="border-top:1px solid #333;width:150px;margin-bottom:4px;"></div>
-          ${cert.signature2Label || 'Director'}${cert.signature2Name ? ` — ${cert.signature2Name}` : ''}
+           ${signature2Url ? `<img src="${signature2Url}" alt="${cert.signature2Label || 'Director of Studies'} signature" style="display:block;width:120px;height:34px;margin:-2px auto 2px;object-fit:contain;" />` : ''}
+           ${cert.signature2Label || 'Director of Studies'}${signature2Name ? ` — ${signature2Name}` : ''}
         </div>
       </div>
        <div style="display:block;clear:both;width:100%;font-size:16px;color:#0f766e;font-weight:900;margin-top:40px;padding-top:16px;border-top:1px solid rgba(15,118,110,0.25);letter-spacing:2px;font-family:'Courier New',monospace;">Certificate No: ${data?.certificateNumber || 'ST-PREVIEW-00000000'}</div>
