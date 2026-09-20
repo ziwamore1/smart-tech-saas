@@ -702,11 +702,12 @@ ${parts.join('\n')}
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
       .qr-area { margin: 3px 0; z-index: 1; }
-      .qr-corner { position: absolute; top: 44px; right: 44px; margin: 0; }
-     .qr-area svg { width: 40px; height: 40px; }
+      .qr-corner { position: fixed; top: 42px; right: 44px; margin: 0; }
+     .qr-area svg { width: 64px; height: 64px; }
      .signatures {
        display: flex; justify-content: space-around;
         width: 80%; margin-top: 9px; margin-bottom: 74px; z-index: 1;
+        transform: translateY(-14px);
     }
     .sig-box { text-align: center; width: 200px; }
      .sig-line {
@@ -763,15 +764,15 @@ ${parts.join('\n')}
       ${badgeSvg ? `<div class="badge-area">${badgeSvg}</div>` : ''}
       <div class="signatures">
          <div class="sig-box">
-           <div class="sig-line"></div>
            ${data.signature1Url ? `<img class="sig-image" src="${data.signature1Url}" alt="${data.signature1Label || 'Head Teacher'} signature"/>` : ''}
+           <div class="sig-line"></div>
            <div class="sig-name">${data.signature1Name || ''}</div>
           <div class="sig-label">${data.signature1Label || 'Head Teacher'}</div>
           ${data.signature1Name ? '<div class="sig-title">Signature</div>' : ''}
         </div>
          <div class="sig-box">
-           <div class="sig-line"></div>
            ${data.signature2Url ? `<img class="sig-image" src="${data.signature2Url}" alt="${data.signature2Label || 'Director of Studies'} signature"/>` : ''}
+           <div class="sig-line"></div>
            <div class="sig-name">${data.signature2Name || ''}</div>
           <div class="sig-label">${data.signature2Label || 'Director'}</div>
           ${data.signature2Name ? '<div class="sig-title">Signature</div>' : ''}
