@@ -1729,7 +1729,7 @@ case 'SIGNATURE': {
         }
       }
 
-      const html = this.renderDigitalSignatureBlock(signed);
+       const html = this.renderDigitalSignatureBlock(signed, template.templateType === 'CERTIFICATE');
       return { html, signatureRecordId, signatures: signed };
     } catch (e: any) {
       // Fail-safe: signature failures degrade to stamp-only issuance so the
@@ -1747,7 +1747,7 @@ case 'SIGNATURE': {
    * status) with explicit font sizes so signatures are never rendered too small,
    * plus per-document cryptographic metadata. Mirrors the offline issuance block.
    */
-  private renderDigitalSignatureBlock(signed: Record<string, unknown>[]): string {
+  private renderDigitalSignatureBlock(signed: Record<string, unknown>[], compact = false): string {
     if (!signed.length) return '';
     const fields = signed
       .map((s) => {
@@ -1759,6 +1759,14 @@ case 'SIGNATURE': {
               hour: '2-digit', minute: '2-digit',
             })
           : '';
+        if (compact) {
+          return `<div style="flex:1;min-width:0;padding:0 4px;overflow:visible;line-height:1.15;white-space:nowrap;">
+            <div style="font-size:8px;letter-spacing:.3px;color:#059669;font-weight:700;">DIGITALLY SIGNED</div>
+            <div style="font-size:10px;font-weight:700;color:#111827;margin:1px 0;">${this.escapeHtml(name || 'Signatory')}</div>
+            <div style="font-size:8px;color:#374151;">${this.escapeHtml(role)}${when ? ` · Signed: ${this.escapeHtml(when)}` : ''}</div>
+            ${s.fingerprint ? `<div style="font-size:7px;color:#6b7280;">Key: ${this.escapeHtml(String(s.fingerprint))}</div>` : ''}
+          </div>`;
+        }
         return `
         <div style="flex:1;min-width:220px;padding:0 6px;page-break-inside:avoid;">
           <div style="font-family:Georgia,'Times New Roman',serif;">
@@ -1775,7 +1783,7 @@ case 'SIGNATURE': {
       .join('');
 
     return `
-      <div style="display:flex;flex-wrap:wrap;gap:22px;margin-top:20px;page-break-inside:avoid;">
+      <div style="display:flex;flex-wrap:wrap;gap:${compact ? '12px' : '22px'};margin-top:${compact ? '0' : '20px'};page-break-inside:avoid;">
         ${fields}
       </div>`;
   }
