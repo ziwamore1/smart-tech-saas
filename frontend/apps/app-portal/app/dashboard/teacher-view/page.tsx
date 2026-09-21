@@ -3,14 +3,13 @@
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { schoolApi, termApi, teacherApi, attendanceApi } from '@/lib/api';
-import { useMemo } from 'react';
+import { schoolApi, termApi, teacherApi, teacherAnalyticsApi } from '@/lib/api';
 import { RoleGuard } from '@/lib/role-guard';
 import Icon3D from '@/components/Icon3D';
 
 export default function TeacherDashboardPage() {
   return (
-    <RoleGuard requiredRoles={['Teacher']}>
+    <RoleGuard requiredRoles={['Teacher', 'Class Teacher']}>
       <TeacherDashboardContent />
     </RoleGuard>
   );
@@ -35,30 +34,26 @@ function TeacherDashboardContent() {
   });
 
   const totalStudents = statsData?.totalStudents || 0;
-  const totalTeachers = statsData?.totalTeachers || 0;
-  const totalClasses = statsData?.totalClasses || 0;
-  const studentsByClass: any[] = statsData?.studentsByClass || [];
-
-  const { data: attendanceStats } = useQuery({
-    queryKey: ['attendance-stats', currentTerm?.id],
-    queryFn: () => attendanceApi.getStats({ termId: currentTerm?.id }).then(r => r.data?.data || r.data),
-    enabled: !!currentTerm?.id,
-  });
-
-  const gradeEnrollment = useMemo(() => {
-    if (!studentsByClass.length) return [];
-    return studentsByClass.map((c: any) => ({
-      grade: c.className || c.class || 'Unknown',
-      count: (c.male || 0) + (c.female || 0),
-    }));
-  }, [studentsByClass]);
-
   const { data: myClasses } = useQuery({
     queryKey: ['teacher-classes'],
     queryFn: () => teacherApi.getClasses().then(r => r.data?.data || r.data),
   });
 
+  const { data: analyticsResponse } = useQuery({
+    queryKey: ['my-teacher-overview', currentTerm?.id],
+    queryFn: () => teacherAnalyticsApi.getOverview(currentTerm?.id ? { termId: currentTerm.id } : undefined)
+      .then(r => r.data?.data || r.data),
+    enabled: !!currentTerm?.id,
+    retry: false,
+  });
+
+  const teacherOverview = analyticsResponse?.data || analyticsResponse;
+  const teacherSummary = teacherOverview?.summary;
+  const assignedAnalyticsClasses = Array.isArray(teacherOverview?.classes) ? teacherOverview.classes : [];
+  const assignedAnalyticsSubjects = Array.isArray(teacherOverview?.subjects) ? teacherOverview.subjects : [];
+
   const teachingActions = [
+    { name: 'Results', href: '/dashboard/results', icon: 'fa-chart-bar', desc: 'View and manage school results', color: '#2563eb' },
     { name: 'Result Entry', href: '/dashboard/results-management/result-entry', icon: 'fa-edit', desc: 'Enter assessment & final scores', color: '#059669' },
     { name: 'Attendance Register', href: '/dashboard/attendance-register', icon: 'fa-clipboard-list', desc: 'Take daily attendance', color: '#059669' },
     { name: 'Results Management', href: '/dashboard/results-management', icon: 'fa-file-alt', desc: 'Manage class results', color: '#ea6645' },
@@ -76,7 +71,9 @@ function TeacherDashboardContent() {
     { name: 'Library', href: '/dashboard/library', icon: 'fa-book-open', desc: 'Library resources', color: '#0d9488' },
   ];
 
-  const classCount = myClasses?.length || 0;
+  const classCount = teacherSummary?.classesCount ?? myClasses?.length ?? 0;
+  const subjectCount = teacherSummary?.subjectsCount ?? assignedAnalyticsSubjects.length;
+  const studentCount = teacherSummary?.totalStudentsTaught ?? totalStudents;
 
   return (
     <div>
@@ -123,7 +120,7 @@ function TeacherDashboardContent() {
             <Icon3D name="students" size={40} />
             <div>
               <p className="text-sm text-gray-500">Total Students</p>
-              <p className="text-2xl font-bold text-gray-900">{totalStudents}</p>
+               <p className="text-2xl font-bold text-gray-900">{studentCount}</p>
             </div>
           </div>
         </div>
@@ -131,24 +128,24 @@ function TeacherDashboardContent() {
           <div className="flex items-center gap-3">
             <Icon3D name="teachers" size={40} />
             <div>
-              <p className="text-sm text-gray-500">Teachers</p>
-              <p className="text-2xl font-bold text-gray-900">{totalTeachers}</p>
+               <p className="text-sm text-gray-500">My Subjects</p>
+               <p className="text-2xl font-bold text-gray-900">{subjectCount}</p>
             </div>
           </div>
           <div className="mt-2 text-xs text-gray-500">
-            Ratio: {totalTeachers > 0 ? `${Math.round(totalStudents / totalTeachers)}:1` : '—'}
+             {teacherSummary?.strongestSubject?.subjectName || 'Assigned teaching subjects'}
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-center gap-3">
             <Icon3D name="classes" size={40} />
             <div>
-              <p className="text-sm text-gray-500">Classes</p>
-              <p className="text-2xl font-bold text-gray-900">{totalClasses}</p>
+               <p className="text-sm text-gray-500">Average Result</p>
+               <p className="text-2xl font-bold text-gray-900">{teacherSummary?.overallAverage != null ? `${Math.round(teacherSummary.overallAverage)}%` : '—'}</p>
             </div>
           </div>
           <div className="mt-2 text-xs text-gray-500">
-            {gradeEnrollment.filter((g: any) => g.count > 0).map((g: any) => g.grade).join(', ') || '—'}
+             {teacherSummary?.overallPassRate != null ? `${Math.round(teacherSummary.overallPassRate)}% pass rate` : 'Awaiting result data'}
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
@@ -157,9 +154,9 @@ function TeacherDashboardContent() {
               <i className="fa fa-clipboard-check" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Attendance Rate</p>
+               <p className="text-sm text-gray-500">Learners At Risk</p>
               <p className="text-2xl font-bold text-gray-900">
-                {attendanceStats?.averageRate ? `${Math.round(attendanceStats.averageRate * 100)}%` : '—'}
+                 {teacherSummary?.studentsAtRisk ?? '—'}
               </p>
             </div>
           </div>
@@ -188,6 +185,32 @@ function TeacherDashboardContent() {
             </Link>
           ))}
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">My Assigned Classes</h2>
+            <p className="text-sm text-gray-500">Classes and subjects are scoped to your current teaching assignments.</p>
+          </div>
+          <Link href="/dashboard/teacher-analysis" className="text-sm font-medium text-pink-600 hover:text-pink-700">Open teaching analysis</Link>
+        </div>
+        {assignedAnalyticsClasses.length === 0 ? (
+          <p className="text-sm text-gray-500 py-3">No published result data is available for your assignments yet.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {assignedAnalyticsClasses.map((cls: any) => (
+              <div key={cls.classId || cls.className} className="border border-gray-100 rounded-lg p-4 bg-gray-50">
+                <p className="font-semibold text-gray-900">{cls.className}</p>
+                <p className="text-xs text-gray-500 mt-1">{(cls.subjects || []).join(', ') || 'Assigned subjects'}</p>
+                <p className="text-sm text-gray-700 mt-3">
+                  {cls.average != null ? `${Math.round(cls.average)}% average` : 'No average yet'}
+                  {cls.passRate != null ? ` · ${Math.round(cls.passRate)}% pass` : ''}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div>

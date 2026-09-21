@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { api, teacherApi, resultApi, termApi, subjectApi, assessmentApi, assessmentEngineApi, studentApi } from '@/lib/api';
+import { api, teacherApi, resultApi, termApi, assessmentApi, assessmentEngineApi, studentApi } from '@/lib/api';
 import { socket } from '@/lib/socket';
 
 const PASS_THRESHOLD = 50;
@@ -89,21 +89,8 @@ export default function TeacherResultsPage() {
     },
   });
 
-  const { data: subjectsResponse } = useQuery({
-    queryKey: ['subjects'],
-    queryFn: async () => {
-      const res = await subjectApi.getAll();
-      let data = res.data;
-      if (data?.data) data = data.data;
-      if (data?.subjects) data = data.subjects;
-      if (data?.result) data = data.result;
-      return Array.isArray(data) ? data : [];
-    },
-  });
-
   const classes = Array.isArray(classesResponse) ? classesResponse : [];
   const terms = Array.isArray(termsResponse) ? termsResponse : [];
-  const subjects = Array.isArray(subjectsResponse) ? subjectsResponse : [];
 
   const { data: assessmentConfigs = [] } = useQuery({
     queryKey: ['assessment-configs', selectedClass, selectedSubject, selectedTerm],
@@ -124,7 +111,10 @@ export default function TeacherResultsPage() {
         headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
       });
       const json = await r.json();
-      return json?.data || json || [];
+      const raw = json?.data?.data || json?.data?.classSubjects || json?.data || json || [];
+      return Array.isArray(raw)
+        ? raw.map((item: any) => item?.subject ? item : { ...item, subject: item, subjectId: item?.id })
+        : [];
     },
     enabled: !!selectedClass,
   });
@@ -133,6 +123,9 @@ export default function TeacherResultsPage() {
   const assignedClass = teacher?.classTeacherOf;
   const teachingSubjects = teacher?.subjects || [];
   const classSubjects = Array.isArray(classSubjectsData) ? classSubjectsData : [];
+  const selectedClassSubjects = classSubjects.length > 0
+    ? classSubjects.map((item: any) => item.subject || item)
+    : teachingSubjects;
 
   const { data: studentsData } = useQuery({
     queryKey: ['class-students', selectedClass],
@@ -279,8 +272,8 @@ export default function TeacherResultsPage() {
   const displaySubjects = entryMode === 'class'
     ? classSubjects
     : selectedSubject === 'all'
-      ? teachingSubjects
-      : teachingSubjects.filter((s: any) => s.id === selectedSubject || s.subjectId === selectedSubject);
+      ? classSubjects
+      : classSubjects.filter((s: any) => (s.subject?.id || s.subjectId || s.id) === selectedSubject);
 
   const handleSaveAll = () => {
     const scoreList: Array<{ studentId: string; subjectId: string; score: number }> = [];
@@ -424,10 +417,7 @@ export default function TeacherResultsPage() {
                 className="w-full px-3 py-2 border rounded-lg"
               >
                 <option value="all">All My Subjects</option>
-                {teachingSubjects.map((subject: any) => (
-                  <option key={subject.id} value={subject.id}>{subject.name}</option>
-                ))}
-                {subjects?.map((subject: any) => (
+                {selectedClassSubjects.map((subject: any) => (
                   <option key={subject.id} value={subject.id}>{subject.name}</option>
                 ))}
               </select>
@@ -474,7 +464,7 @@ export default function TeacherResultsPage() {
               ) : selectedSubject === 'all' ? (
                 <span>Multi Subject Entry — {teachingSubjects.length} subjects</span>
               ) : (
-                <span>Enter Scores — {subjects?.find((s: any) => s.id === selectedSubject)?.name}</span>
+                <span>Enter Scores — {selectedClassSubjects.find((s: any) => s.id === selectedSubject)?.name}</span>
               )}
             </h2>
             <div className="flex gap-2">

@@ -40,11 +40,25 @@ export default function TeacherDashboard() {
       color: 'green',
     },
     {
-      href: '/teacher/results',
+      href: '/dashboard/results',
       icon: '📊',
       label: 'Results',
-      description: 'Enter and manage results',
+      description: 'View and manage school results',
       color: 'purple',
+    },
+    {
+      href: '/dashboard/results-management/result-entry',
+      icon: '✏️',
+      label: 'Result Entry',
+      description: 'Enter assessment and final scores',
+      color: 'green',
+    },
+    {
+      href: '/dashboard/results-management',
+      icon: '📋',
+      label: 'Results Management',
+      description: 'Review and submit result sheets',
+      color: 'orange',
     },
     {
       href: '/teacher/communications',

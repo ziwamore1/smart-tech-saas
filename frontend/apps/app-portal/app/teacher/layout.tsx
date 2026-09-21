@@ -13,10 +13,10 @@ export default function TeacherLayout({
   const { user, logout } = useAuth();
 
   const navItems = [
-    { href: '/teacher', label: 'Dashboard', icon: '🏠' },
+    { href: '/dashboard/teacher-view', label: 'My Dashboard', icon: '🏠' },
     { href: '/teacher/class', label: 'My Class', icon: '👥' },
     { href: '/teacher/enrollments', label: 'Enrollments', icon: '📝' },
-    { href: '/teacher/results', label: 'Results', icon: '📊' },
+    { href: '/dashboard/results', label: 'Results', icon: '📊' },
     { href: '/teacher/communications', label: 'Communications', icon: '💬' },
     { href: '/teacher/profile', label: 'Profile', icon: '👤' },
   ];

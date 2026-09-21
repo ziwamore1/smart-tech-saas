@@ -93,6 +93,14 @@ const ROLE_MAP: Record<string, Record<string, string[]>> = {
 };
 
 const regularNav: NavItem[] = [
+  {
+    name: 'My Dashboard',
+    href: '/dashboard/teacher-view',
+    icon: 'fa-user-circle',
+    color: '#2563eb',
+    typeRoles: ROLE_MAP.teachingStaff,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
+  },
   { 
     name: 'Dashboard', 
     href: '/dashboard', 
@@ -398,6 +406,14 @@ const regularNav: NavItem[] = [
     color: '#059669',
     typeRoles: ROLE_MAP.supervision,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
+  },
+  {
+    name: 'My Teaching Analysis',
+    href: '/dashboard/teacher-analysis',
+    icon: 'fa-chart-pie',
+    color: '#db2777',
+    typeRoles: ROLE_MAP.teachingStaff,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
   { 
     name: 'Activity Center', 
@@ -836,6 +852,7 @@ export default function DashboardLayout({
   });
 
   const resolvedInstitutionType = institutionType || schoolData?.institutionType?.code || null;
+  const normalizedUserRoles = userRoles.map((role) => role.toLowerCase().replace(/\s+/g, ''));
   const navigation = isPureSuperAdmin ? superAdminNav : regularNav.filter(item => {
     if (item.institutionTypes && item.institutionTypes.length > 0) {
       if (!resolvedInstitutionType) return false;
@@ -844,12 +861,12 @@ export default function DashboardLayout({
     if (item.typeRoles && resolvedInstitutionType) {
       const allowedRoles = item.typeRoles[resolvedInstitutionType];
       if (allowedRoles && allowedRoles.length > 0) {
-        return allowedRoles.some(role => userRoles.includes(role));
+          return allowedRoles.some(role => normalizedUserRoles.includes(role.toLowerCase().replace(/\s+/g, '')));
       }
       return false;
     }
     if (item.roles) {
-      return item.roles.some(role => userRoles.includes(role));
+      return item.roles.some(role => normalizedUserRoles.includes(role.toLowerCase().replace(/\s+/g, '')));
     }
     return true;
   });
