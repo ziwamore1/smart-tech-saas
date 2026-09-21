@@ -702,7 +702,7 @@ ${parts.join('\n')}
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
       .qr-area { margin: 3px 0; z-index: 1; }
-      .qr-corner { position: fixed; top: 42px; right: 44px; margin: 0; }
+      .qr-corner { position: fixed; top: 58px; right: 44px; margin: 0; }
      .qr-area svg { width: 64px; height: 64px; }
      .signatures {
        display: flex; justify-content: space-around;
