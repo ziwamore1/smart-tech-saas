@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { reportCardEngineApi, classApi, termApi, studentApi } from '@/lib/api';
+import { reportCardEngineApi, reportEngineApi, classApi, termApi, studentApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { checkEczEligibility } from '@/lib/ecz-eligibility';
 
@@ -13,6 +13,7 @@ export default function ReportCardsPage() {
   const [selectedTerm, setSelectedTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState('');
   const [reportCard, setReportCard] = useState<any>(null);
+  const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const { data: classes } = useQuery({
@@ -40,10 +41,17 @@ export default function ReportCardsPage() {
   });
 
   const generateStudentMutation = useMutation({
-    mutationFn: () =>
-      reportCardEngineApi.student(selectedStudent, selectedTerm).then(r => r.data?.data || r.data),
-    onSuccess: (data) => {
-      setReportCard(data);
+    mutationFn: () => reportEngineApi.generatePdf({
+      type: 'REPORT_CARD',
+      studentId: selectedStudent,
+      classId: selectedClass,
+      termId: selectedTerm,
+      examType: 'END_TERM',
+    }),
+    onSuccess: (response) => {
+      setReportCard(null);
+      if (generatedPdfUrl) URL.revokeObjectURL(generatedPdfUrl);
+      setGeneratedPdfUrl(URL.createObjectURL(response.data));
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to generate report card');
@@ -51,8 +59,12 @@ export default function ReportCardsPage() {
   });
 
   const generateBulkMutation = useMutation({
-    mutationFn: () =>
-      reportCardEngineApi.bulk(selectedClass, selectedTerm).then(r => r.data?.data || r.data),
+    mutationFn: () => reportEngineApi.generateBulk({
+      type: 'CLASS_REPORT',
+      classId: selectedClass,
+      termId: selectedTerm,
+      examType: 'END_TERM',
+    }),
     onSuccess: (data: any) => {
       toast.success(`${data?.length || 0} report cards generated`);
     },
@@ -93,7 +105,7 @@ export default function ReportCardsPage() {
             <select
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
               value={selectedClass}
-              onChange={e => { setSelectedClass(e.target.value); setSelectedStudent(''); setReportCard(null); }}
+               onChange={e => { setSelectedClass(e.target.value); setSelectedStudent(''); setReportCard(null); setGeneratedPdfUrl(null); }}
             >
               <option value="">Select Class</option>
               {classes?.map((c: any) => (
@@ -169,7 +181,23 @@ export default function ReportCardsPage() {
         )}
       </div>
 
-      {reportCard && (
+       {generatedPdfUrl && (
+         <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+             <div>
+               <h2 className="text-xl font-bold text-gray-900">Full Report Card</h2>
+               <p className="text-sm text-gray-500">Generated through the Report Hub template and report engine.</p>
+             </div>
+             <div className="flex gap-2">
+               <a href={generatedPdfUrl} download={`report-card-${selectedStudent}-${selectedTerm}.pdf`} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">Download PDF</a>
+               <button onClick={() => window.print()} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">Print</button>
+             </div>
+           </div>
+           <iframe src={generatedPdfUrl} title="Full report card" className="w-full h-[75vh] min-h-[520px] rounded-lg border" />
+         </div>
+       )}
+
+       {reportCard && (
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-900">Report Card Preview</h2>
