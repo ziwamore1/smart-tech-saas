@@ -740,8 +740,8 @@ export const resultsSmsApi = {
   getLogById: (id: string) =>
     api.get(`/results-sms/logs/${id}`),
 
-  getFailedLogs: (batchId?: string) =>
-    api.get('/results-sms/failed', { params: { batchId } }),
+  getFailedLogs: (batchId?: string, classId?: string, termId?: string) =>
+    api.get('/results-sms/failed', { params: { batchId, classId, termId } }),
 
   cancelBatch: (batchId: string) =>
     api.post(`/results-sms/batches/${batchId}/cancel`),

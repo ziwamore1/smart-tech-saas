@@ -42,7 +42,24 @@ export class ResultsSmsService {
   ) {}
 
   /** Builds the per-student subject list exactly like the results sheet, then formats and sends the SMS. */
-  async getRecipients(schoolId: string, classId: string, termId: string, studentIds?: string[]) {
+  private async assertClassAccess(schoolId: string, classId: string, userId?: string, roles?: string[]) {
+    if (!userId || !roles?.includes('Class Teacher')) return;
+    const assigned = await this.prisma.class.findFirst({
+      where: {
+        id: classId,
+        schoolId,
+        OR: [
+          { classTeacherId: userId },
+          { classTeacherAssignments: { some: { teacherId: userId } } },
+        ],
+      },
+      select: { id: true },
+    });
+    if (!assigned) throw new BadRequestException('You can only manage result delivery for your assigned class.');
+  }
+
+  async getRecipients(schoolId: string, classId: string, termId: string, studentIds?: string[], userId?: string, roles?: string[]) {
+    await this.assertClassAccess(schoolId, classId, userId, roles);
     const students = await this.prisma.student.findMany({
       where: { schoolId, ...(studentIds?.length ? { id: { in: studentIds } } : {}), enrollments: { some: { classId, status: 'ACTIVE' } } },
       select: {
@@ -372,7 +389,8 @@ export class ResultsSmsService {
 
   async sendResultsSms(schoolId: string, classId: string, termId: string, userId: string, options?: {
     parentIds?: string[]; studentIds?: string[]; allowResend?: boolean;
-  }) {
+  }, roles?: string[]) {
+    await this.assertClassAccess(schoolId, classId, userId, roles);
     const preview = await this.getRecipients(schoolId, classId, termId, options?.studentIds);
     const targets = preview.recipients.filter((r) => (!options?.parentIds?.length || options.parentIds.includes(r.parentId)) && r.phoneStatus === 'VALID');
     if (!targets.length) throw new BadRequestException('No valid parent phone numbers are available for this send.');
@@ -684,7 +702,7 @@ export class ResultsSmsService {
   }
 
   /** Controlled retry of a batch's failed messages: re-validates parent numbers and queues a fresh send. */
-  async retryFailedBatch(schoolId: string, batchId: string, userId: string) {
+  async retryFailedBatch(schoolId: string, batchId: string, userId: string, roles?: string[]) {
     const batch = await this.prisma.resultSmsBatch.findFirst({ where: { id: batchId, schoolId } });
     if (!batch) throw new NotFoundException('SMS batch not found');
     const failedLogs = await this.prisma.resultSmsLog.findMany({
@@ -696,20 +714,23 @@ export class ResultsSmsService {
     const klass = batch.classId ?? failedLogs[0].classId;
     const term = batch.termId ?? failedLogs[0].termId;
     if (!klass || !term) throw new BadRequestException('The batch has no class/term to retry against.');
-    return this.sendResultsSms(schoolId, klass, term, userId, { studentIds, allowResend: true });
+    await this.assertClassAccess(schoolId, klass, userId, roles);
+    return this.sendResultsSms(schoolId, klass, term, userId, { studentIds, allowResend: true }, roles);
   }
 
-  async retryLog(schoolId: string, id: string, userId: string) {
+  async retryLog(schoolId: string, id: string, userId: string, roles?: string[]) {
     const log = await this.prisma.resultSmsLog.findFirst({ where: { id, schoolId } });
     if (!log) throw new NotFoundException('SMS log not found');
     if (!['FAILED', 'REJECTED', 'INVALID_NUMBER', 'PROVIDER_ERROR'].includes(log.status)) throw new BadRequestException('Only failed messages can be retried.');
-    const result = await this.sendResultsSms(schoolId, log.classId, log.termId, userId, { studentIds: [log.studentId], parentIds: log.parentId ? [log.parentId] : [], allowResend: true });
+    await this.assertClassAccess(schoolId, log.classId, userId, roles);
+    const result = await this.sendResultsSms(schoolId, log.classId, log.termId, userId, { studentIds: [log.studentId], parentIds: log.parentId ? [log.parentId] : [], allowResend: true }, roles);
     await this.prisma.resultSmsLog.update({ where: { id }, data: { retryCount: { increment: 1 } } });
     return result;
   }
 
   async getBatchLogs(schoolId: string, batchId: string) { return this.prisma.resultSmsLog.findMany({ where: { schoolId, batchId }, orderBy: { createdAt: 'desc' } }); }
-  async getHistory(schoolId: string, classId?: string, termId?: string) {
+  async getHistory(schoolId: string, classId?: string, termId?: string, userId?: string, roles?: string[]) {
+    if (classId) await this.assertClassAccess(schoolId, classId, userId, roles);
     const logs = await this.prisma.resultSmsLog.findMany({ where: { schoolId, ...(classId ? { classId } : {}), ...(termId ? { termId } : {}) }, orderBy: { createdAt: 'desc' } });
     const batches = new Map<string, any>();
     for (const log of logs) { const key = log.batchId || 'UNKNOWN'; const b = batches.get(key) || { batchId: key, createdAt: log.createdAt, total: 0, sent: 0, delivered: 0, pending: 0, failed: 0, skipped: 0, units: 0 }; b.total++; b.units += Math.max(1, Math.ceil(log.message.length / SINGLE_SMS_LIMIT)); if (log.status === 'SENT') b.sent++; else if (log.status === 'DELIVERED') b.delivered++; else if (['FAILED', 'REJECTED', 'INVALID_NUMBER', 'PROVIDER_ERROR'].includes(log.status)) b.failed++; else if (log.status === 'SKIPPED') b.skipped++; else b.pending++; batches.set(key, b); }
@@ -724,10 +745,13 @@ export class ResultsSmsService {
     if (!log) throw new NotFoundException('SMS log not found');
     return this.prisma.resultSmsLog.update({ where: { id }, data: { status: normalized, providerResponse, deliveredAt: normalized === 'DELIVERED' ? new Date() : undefined, failedAt: ['FAILED', 'REJECTED', 'PROVIDER_ERROR'].includes(normalized) ? new Date() : undefined } });
   }
-  async getFailedLogs(schoolId: string, batchId?: string) { return this.prisma.resultSmsLog.findMany({ where: { schoolId, ...(batchId ? { batchId } : {}), status: { in: ['FAILED', 'REJECTED', 'INVALID_NUMBER', 'PROVIDER_ERROR', 'SKIPPED'] } }, orderBy: { createdAt: 'desc' } }); }
+  async getFailedLogs(schoolId: string, batchId?: string, classId?: string, termId?: string, userId?: string, roles?: string[]) {
+    if (classId) await this.assertClassAccess(schoolId, classId, userId, roles);
+    return this.prisma.resultSmsLog.findMany({ where: { schoolId, ...(batchId ? { batchId } : {}), ...(classId ? { classId } : {}), ...(termId ? { termId } : {}), status: { in: ['FAILED', 'REJECTED', 'INVALID_NUMBER', 'PROVIDER_ERROR', 'SKIPPED'] } }, orderBy: { createdAt: 'desc' } });
+  }
   async getSmsSettings(schoolId: string) { return this.prisma.communicationSettings.findUnique({ where: { schoolId }, select: { smsEnabled: true, smsProvider: true, smsSenderId: true } }); }
   async getDashboard(schoolId: string) { const [settings, logs] = await Promise.all([this.getSmsSettings(schoolId), this.prisma.resultSmsLog.findMany({ where: { schoolId }, select: { status: true, message: true } })]); const sent = logs.filter((l) => ['SENT', 'DELIVERED'].includes(l.status)).length; return { smsEnabled: settings?.smsEnabled ?? false, provider: settings?.smsProvider ?? null, balance: await this.getBalance(schoolId), total: logs.length, sent, delivered: logs.filter((l) => l.status === 'DELIVERED').length, failed: logs.filter((l) => ['FAILED', 'REJECTED', 'INVALID_NUMBER', 'PROVIDER_ERROR'].includes(l.status)).length, pending: logs.filter((l) => ['PENDING', 'QUEUED'].includes(l.status)).length, usedUnits: logs.reduce((n, l) => n + Math.max(1, Math.ceil(l.message.length / SINGLE_SMS_LIMIT)), 0), deliveryRate: sent ? Math.round((logs.filter((l) => l.status === 'DELIVERED').length / sent) * 100) : 0 }; }
-  async autoSendOnPublish(schoolId: string, classId: string, termId: string, userId: string) { const settings = await this.getSmsSettings(schoolId); return settings?.smsEnabled ? this.sendResultsSms(schoolId, classId, termId, userId) : null; }
+  async autoSendOnPublish(schoolId: string, classId: string, termId: string, userId: string, roles?: string[]) { const settings = await this.getSmsSettings(schoolId); return settings?.smsEnabled ? this.sendResultsSms(schoolId, classId, termId, userId, undefined, roles) : null; }
 
   private async resolveProvider(schoolId: string): Promise<SmsProvider> { try { const provider = await this.smsProviderFactory.getSchoolSmsProvider(schoolId); if (!provider) throw new Error('SMS provider is not configured.'); return provider; } catch (e: any) { throw new BadRequestException({ code: 'PROVIDER_NOT_CONFIGURED', message: e.message || 'Configure an SMS provider in Communications Settings.' }); } }
   private async getBalance(schoolId: string) { try { const p = await this.smsProviderFactory.getSchoolSmsProvider(schoolId); return await p.getBalance(); } catch { return null; } }

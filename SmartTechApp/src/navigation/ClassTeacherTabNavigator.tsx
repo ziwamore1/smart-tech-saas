@@ -9,6 +9,7 @@ import { PrimaryClassTeacherScreen } from '../screens/class-teacher/PrimaryClass
 import { ClassTeacherStudentsScreen } from '../screens/class-teacher/StudentsScreen';
 import { RegisterStudentScreen } from '../screens/registration/RegisterStudentScreen';
 import { ClassTeacherCommunicationScreen } from '../screens/class-teacher/CommunicationScreen';
+import { ClassTeacherResultsDeliveryScreen } from '../screens/class-teacher/ResultsDeliveryScreen';
 import { ClassTeacherAnalyticsScreen } from '../screens/class-teacher/AnalyticsScreen';
 import { ClassTeacherAttendanceScreen } from '../screens/class-teacher/AttendanceScreen';
 import { StudentPhotoScreen } from '../screens/class-teacher/StudentPhotoScreen';
@@ -35,6 +36,7 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'CTStudents', label: 'Students', icon: '👥', component: ClassTeacherStudentsScreen },
   { name: 'CTRegister', label: 'Register Student', icon: '➕', component: RegisterStudentScreen },
   { name: 'CTCommunication', label: 'Messages', icon: '💬', component: ClassTeacherCommunicationScreen },
+  { name: 'CTResultsDelivery', label: 'Result Delivery', icon: '📨', component: ClassTeacherResultsDeliveryScreen },
   { name: 'CTAnalytics', label: 'Analytics', icon: '📊', component: ClassTeacherAnalyticsScreen },
   { name: 'CTResultsMgmt', label: 'Results Management', icon: '📋', component: ResultsManagementScreen },
   { name: 'CTReportHub', label: 'Report Hub', icon: '🖨️', component: ReportCardsScreen },

@@ -25,7 +25,7 @@ export class ResultsSmsController {
     @Query('classId') classId: string,
     @Query('termId') termId: string,
   ) {
-    return this.resultsSmsService.getRecipients(req.user.schoolId, classId, termId);
+    return this.resultsSmsService.getRecipients(req.user.schoolId, classId, termId, undefined, req.user.id, req.user.roles);
   }
 
   @Post('send')
@@ -39,6 +39,7 @@ export class ResultsSmsController {
       data.termId,
       req.user.id,
       { parentIds: data.parentIds, studentIds: data.studentIds, allowResend: data.allowResend },
+      req.user.roles,
     );
   }
 
@@ -52,6 +53,7 @@ export class ResultsSmsController {
       data.classId,
       data.termId,
       req.user.id,
+      req.user.roles,
     );
   }
 
@@ -61,7 +63,7 @@ export class ResultsSmsController {
     @Query('classId') classId?: string,
     @Query('termId') termId?: string,
   ) {
-    return this.resultsSmsService.getHistory(req.user.schoolId, classId, termId);
+    return this.resultsSmsService.getHistory(req.user.schoolId, classId, termId, req.user.id, req.user.roles);
   }
 
   @Get('batches/:batchId/status')
@@ -81,7 +83,7 @@ export class ResultsSmsController {
 
   @Post('batches/:batchId/retry-failed')
   async retryFailedBatch(@Request() req: any, @Param('batchId') batchId: string) {
-    return this.resultsSmsService.retryFailedBatch(req.user.schoolId, batchId, req.user.id);
+    return this.resultsSmsService.retryFailedBatch(req.user.schoolId, batchId, req.user.id, req.user.roles);
   }
 
   @Get('batches/:batchId')
@@ -98,8 +100,10 @@ export class ResultsSmsController {
   async getFailedLogs(
     @Request() req: any,
     @Query('batchId') batchId?: string,
+    @Query('classId') classId?: string,
+    @Query('termId') termId?: string,
   ) {
-    return this.resultsSmsService.getFailedLogs(req.user.schoolId, batchId);
+    return this.resultsSmsService.getFailedLogs(req.user.schoolId, batchId, classId, termId, req.user.id, req.user.roles);
   }
 
   @Get('settings')
@@ -114,7 +118,7 @@ export class ResultsSmsController {
 
   @Post('logs/:id/retry')
   async retry(@Request() req: any, @Param('id') id: string) {
-    return this.resultsSmsService.retryLog(req.user.schoolId, id, req.user.id);
+    return this.resultsSmsService.retryLog(req.user.schoolId, id, req.user.id, req.user.roles);
   }
 
   @Post('logs/:id/delivery-status')

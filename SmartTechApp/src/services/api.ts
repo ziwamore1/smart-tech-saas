@@ -1803,7 +1803,7 @@ class ApiService {
     return response.data;
   }
 
-  async getResultsSmsFailedLogs(params?: { batchId?: string }) {
+  async getResultsSmsFailedLogs(params?: { batchId?: string; classId?: string; termId?: string }) {
     const response = await this.client.get('/results-sms/failed', { params });
     return response.data;
   }

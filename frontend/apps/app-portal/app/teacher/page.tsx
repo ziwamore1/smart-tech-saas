@@ -46,6 +46,13 @@ export default function TeacherDashboard() {
       description: 'Enter and manage results',
       color: 'purple',
     },
+    {
+      href: '/teacher/communications',
+      icon: '💬',
+      label: 'Communications',
+      description: 'Message parents and track result delivery',
+      color: 'indigo',
+    },
   ];
 
   return (

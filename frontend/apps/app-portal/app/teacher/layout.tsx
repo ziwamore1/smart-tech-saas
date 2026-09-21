@@ -17,6 +17,7 @@ export default function TeacherLayout({
     { href: '/teacher/class', label: 'My Class', icon: '👥' },
     { href: '/teacher/enrollments', label: 'Enrollments', icon: '📝' },
     { href: '/teacher/results', label: 'Results', icon: '📊' },
+    { href: '/teacher/communications', label: 'Communications', icon: '💬' },
     { href: '/teacher/profile', label: 'Profile', icon: '👤' },
   ];
 
