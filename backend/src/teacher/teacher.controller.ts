@@ -45,11 +45,6 @@ export class TeacherController {
     return this.teacherService.findAll(targetSchoolId);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.teacherService.findOne(id);
-  }
-
   @Post()
   @Roles('Director', 'Deputy Director', 'Deputy Head', 'Deputy')
   create(@Body() body: any, @Req() req: any) {
@@ -88,6 +83,11 @@ export class TeacherController {
   @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
   getClassStudents(@Query('classId') classId: string, @Req() req: any) {
     return this.teacherService.getClassStudents(classId, req.user.schoolId);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.teacherService.findOne(id);
   }
 
   @Post('enter-marks')
