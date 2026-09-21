@@ -423,6 +423,14 @@ const regularNav: NavItem[] = [
     typeRoles: ROLE_MAP.teaching,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
+  {
+    name: 'Communications & Result Delivery',
+    href: '/teacher/communications',
+    icon: 'fa-comments',
+    color: '#0ea5e9',
+    typeRoles: ROLE_MAP.teachingStaff,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
+  },
   { 
     name: 'Template Personalization', 
     href: '/dashboard/template-personalization', 

@@ -204,8 +204,13 @@ export default function ClassesPage() {
     enabled: !!selectedClass?.id && showStudentSubjectsModal,
   });
 
-  const levelTypes = Array.isArray(levelTypesResponse) ? levelTypesResponse : 
-                     levelTypesResponse?.data ? levelTypesResponse.data : [];
+  const levelTypes = Array.isArray(levelTypesResponse)
+    ? levelTypesResponse
+    : Array.isArray(levelTypesResponse?.data)
+      ? levelTypesResponse.data
+      : Array.isArray(levelTypesResponse?.data?.levelTypes)
+        ? levelTypesResponse.data.levelTypes
+        : [];
 
   const createLevelTypeMutation = useMutation({
     mutationFn: async (data: { name: string; order: number }) => {
@@ -444,7 +449,7 @@ export default function ClassesPage() {
               className="w-full px-3 py-2 border rounded-lg"
             >
               <option value="">All Levels</option>
-              {levelTypes.sort((a: any, b: any) => a.order - b.order).map((level: any) => (
+              {levelTypes.slice().sort((a: any, b: any) => a.order - b.order).map((level: any) => (
                 <option key={level.id} value={level.id}>{level.name}</option>
               ))}
             </select>
@@ -860,6 +865,7 @@ export default function ClassesPage() {
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {levelTypes
+                    .slice()
                     .sort((a: any, b: any) => a.order - b.order)
                     .map((level: any) => (
                       <div key={level.id} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded border">
