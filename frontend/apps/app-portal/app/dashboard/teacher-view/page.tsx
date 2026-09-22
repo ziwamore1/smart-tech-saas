@@ -28,6 +28,11 @@ function TeacherDashboardContent() {
     queryFn: () => termApi.getCurrent().then(r => r.data?.data || r.data),
   });
 
+  const { data: termsData } = useQuery({
+    queryKey: ['teacher-dashboard-terms'],
+    queryFn: () => termApi.getAll().then(r => r.data?.data || r.data),
+  });
+
   const { data: statsData } = useQuery({
     queryKey: ['school-stats'],
     queryFn: () => schoolApi.getStats().then(r => r.data?.data || r.data),
@@ -40,10 +45,51 @@ function TeacherDashboardContent() {
   });
 
   const { data: analyticsResponse } = useQuery({
-    queryKey: ['my-teacher-overview', currentTerm?.id],
-    queryFn: () => teacherAnalyticsApi.getOverview(currentTerm?.id ? { termId: currentTerm.id } : undefined)
-      .then(r => r.data?.data || r.data),
-    enabled: !!currentTerm?.id,
+    queryKey: ['my-teacher-overview', currentTerm?.id, termsData],
+    queryFn: async () => {
+      const readOverview = async (termId?: string) => {
+        const response = await teacherAnalyticsApi.getOverview(termId ? { termId } : undefined);
+        return response.data?.data || response.data;
+      };
+      const hasResults = (overview: any) => Boolean(
+        overview?.summary?.overallAverage != null ||
+        overview?.summary?.overallPassRate != null ||
+        overview?.assignments?.length ||
+        overview?.classes?.length ||
+        overview?.subjects?.length,
+      );
+
+      let current: any = null;
+      try {
+        current = await readOverview(currentTerm?.id);
+      } catch {
+        current = null;
+      }
+      if (hasResults(current)) return current;
+
+      const terms = Array.isArray(termsData) ? termsData : [];
+      const previousTerms = terms
+        .filter((term: any) => term.id !== currentTerm?.id)
+        .sort((a: any, b: any) => {
+          const aDate = new Date(a.endDate || a.startDate || a.createdAt || 0).getTime();
+          const bDate = new Date(b.endDate || b.startDate || b.createdAt || 0).getTime();
+          return bDate - aDate;
+        });
+
+      for (const term of previousTerms) {
+        let previous: any = null;
+        try {
+          previous = await readOverview(term.id);
+        } catch {
+          continue;
+        }
+        if (hasResults(previous)) {
+          return { ...previous, dashboardAnalyticsTerm: term };
+        }
+      }
+      return current;
+    },
+    enabled: !!currentTerm?.id && !!termsData,
     retry: false,
   });
 
@@ -51,6 +97,9 @@ function TeacherDashboardContent() {
   const teacherSummary = teacherOverview?.summary;
   const assignedAnalyticsClasses = Array.isArray(teacherOverview?.classes) ? teacherOverview.classes : [];
   const assignedAnalyticsSubjects = Array.isArray(teacherOverview?.subjects) ? teacherOverview.subjects : [];
+  const performanceHistory = Array.isArray(teacherOverview?.trends) ? teacherOverview.trends : [];
+  const analyticsTerm = teacherOverview?.dashboardAnalyticsTerm || teacherSummary?.term;
+  const showingPreviousTerm = Boolean(analyticsTerm?.id && analyticsTerm.id !== currentTerm?.id);
 
   const teachingActions = [
     { name: 'Results', href: '/dashboard/results', icon: 'fa-chart-bar', desc: 'View and manage school results', color: '#2563eb' },
@@ -67,6 +116,7 @@ function TeacherDashboardContent() {
     { name: 'Class List', href: '/dashboard/class-list', icon: 'fa-list-alt', desc: 'View student enrollment', color: '#06b6d4' },
     { name: 'SBA Tasks', href: '/dashboard/sba-tasks', icon: 'fa-tasks', desc: 'School-based assessment tasks', color: '#22c55e' },
     { name: 'Digital Stamps', href: '/dashboard/digital-stamps', icon: 'fa-stamp', desc: 'Digital stamps', color: '#7c3aed' },
+    { name: 'My Digital Signature', href: '/dashboard/digital-signatures', icon: 'fa-signature', desc: 'Create your official signature', color: '#0e7490' },
     { name: 'Students', href: '/dashboard/students', icon: 'fa-user-graduate', desc: 'Student records', color: '#3b82f6' },
     { name: 'Library', href: '/dashboard/library', icon: 'fa-book-open', desc: 'Library resources', color: '#0d9488' },
   ];
@@ -102,7 +152,8 @@ function TeacherDashboardContent() {
             {currentTerm && (
               <p style={{ fontSize: '13px', color: '#bfdbfe', margin: '8px 0 0' }}>
                 <i className="fa fa-calendar" style={{ marginRight: '6px' }} />
-                Current Term: {currentTerm.name}
+                 Current Term: {currentTerm.name}
+                 {showingPreviousTerm && analyticsTerm?.name ? ` | Showing results from ${analyticsTerm.name}` : ''}
               </p>
             )}
           </div>
@@ -145,7 +196,7 @@ function TeacherDashboardContent() {
             </div>
           </div>
           <div className="mt-2 text-xs text-gray-500">
-             {teacherSummary?.overallPassRate != null ? `${Math.round(teacherSummary.overallPassRate)}% pass rate` : 'Awaiting result data'}
+              {teacherSummary?.overallPassRate != null ? `${Math.round(teacherSummary.overallPassRate)}% pass rate` : 'Awaiting result data'}
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
@@ -207,6 +258,33 @@ function TeacherDashboardContent() {
                   {cls.average != null ? `${Math.round(cls.average)}% average` : 'No average yet'}
                   {cls.passRate != null ? ` · ${Math.round(cls.passRate)}% pass` : ''}
                 </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Performance Across Terms</h2>
+            <p className="text-sm text-gray-500">Previous published results remain visible when the current term has no assessments.</p>
+          </div>
+          <Link href="/dashboard/teacher-analysis" prefetch={false} className="text-sm font-medium text-blue-600 hover:text-blue-700">View full analytics</Link>
+        </div>
+        {performanceHistory.length === 0 ? (
+          <p className="text-sm text-gray-500">No published result history is available yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {performanceHistory.slice(-6).map((point: any) => (
+              <div key={point.termId || point.termName}>
+                <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                  <span>{point.termName || 'Term'}</span>
+                  <span>{point.average != null ? `${Math.round(point.average)}% average` : 'No average'}{point.passRate != null ? ` · ${Math.round(point.passRate)}% pass` : ''}</span>
+                </div>
+                <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400" style={{ width: `${Math.max(0, Math.min(100, Number(point.average) || 0))}%` }} />
+                </div>
               </div>
             ))}
           </div>

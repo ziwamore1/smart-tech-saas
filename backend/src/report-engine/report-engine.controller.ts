@@ -18,7 +18,7 @@ export class ReportEngineController {
   ) {}
 
   @Get('types')
-  @Roles('Director', 'Class Teacher', 'Teacher')
+  @Roles('Director', 'Class Teacher')
   getReportTypes() {
     return this.reportEngine.getReportTypes();
   }
@@ -164,6 +164,7 @@ export class ReportEngineController {
       const targetTeacherId = body.type === ReportType.TEACHER_ANALYSIS && body.teacherUserId
         ? (await this.teacherAnalytics.assertTeacherAccessible(req.user, body.teacherUserId, body.termId), body.teacherUserId)
         : req.user.id;
+      await this.reportEngine.assertClassTeacherReportCardGenerationAllowed(req.user, body);
       const report = await this.reportEngine.generateReport({
         ...body,
         schoolId: req.user.schoolId,
@@ -288,7 +289,7 @@ export class ReportEngineController {
   }
 
   @Post('generate-bulk')
-  @Roles('Director')
+  @Roles('Director', 'Class Teacher')
   async generateBulkReports(
     @Req() req,
     @Body() body: {
@@ -300,6 +301,9 @@ export class ReportEngineController {
       studentIds?: string[];
     },
   ) {
+    if (body.type === ReportType.CLASS_REPORT) {
+      await this.reportEngine.assertClassTeacherReportCardGenerationAllowed(req.user, body);
+    }
     return this.reportEngine.generateBulkReports({
       ...body,
       schoolId: req.user.schoolId,

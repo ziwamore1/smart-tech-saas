@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException, NotFoundException, Optional } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException, Optional, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportCardEngineService } from '../report-card-engine/report-card-engine.service';
 import { ReportCardService } from '../report-card/report-card.service';
@@ -315,6 +315,37 @@ private reportTemplateBuilder: ReportTemplateBuilderService,
   }
 
   async generateReport(request: ReportGenerationRequest): Promise<ReportGenerationResult> {
+    if (request.type === ReportType.REPORT_CARD && request.studentId && request.termId) {
+      const existing = await this.prisma.generatedReport.findFirst({
+        where: {
+          schoolId: request.schoolId,
+          reportType: ReportType.REPORT_CARD,
+          studentId: request.studentId,
+          termId: request.termId,
+          status: 'COMPLETED',
+          fileUrl: { not: null },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (existing) {
+        return {
+          id: existing.id,
+          type: ReportType.REPORT_CARD,
+          schoolId: existing.schoolId,
+          studentId: existing.studentId || undefined,
+          classId: existing.classId || undefined,
+          termId: existing.termId || undefined,
+          templateId: existing.templateId || undefined,
+          pdfUrl: existing.fileUrl,
+          publicId: null,
+          fileName: existing.fileName,
+          title: existing.title,
+          metadata: { ...(existing.metadata as any || {}), reused: true },
+          generatedAt: existing.createdAt,
+        };
+      }
+    }
+
     const validation = await this.validateGenerationRequest(request);
     if (!validation.valid) {
       throw new BadRequestException(`Validation failed: ${validation.errors.join(', ')}`);
@@ -456,6 +487,87 @@ case ReportType.RESULTS_ANALYSIS:
     }
 
     return report;
+  }
+
+  async assertClassTeacherReportCardGenerationAllowed(
+    user: any,
+    request: { classId?: string; studentId?: string; termId?: string },
+  ) {
+    const roles = (user?.roles || []).map((role: string) => String(role).toUpperCase().replace(/\s+/g, ''));
+    if (!roles.includes('CLASSTEACHER')) return;
+
+    let classId = request.classId;
+    if (!classId && request.studentId) {
+      const enrollment = await this.prisma.enrollment.findFirst({
+        where: { studentId: request.studentId, status: 'ACTIVE', class: { schoolId: user.schoolId } },
+        select: { classId: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      classId = enrollment?.classId;
+    }
+    if (!classId) throw new ForbiddenException('A class is required before generating report cards.');
+
+    const classRecord = await this.prisma.class.findFirst({
+      where: { id: classId, schoolId: user.schoolId },
+      select: { id: true, classTeacherId: true, reportTemplateId: true },
+    });
+    if (!classRecord) throw new ForbiddenException('The selected class is not available in your school.');
+
+    const assigned = classRecord.classTeacherId === user.id || await this.prisma.classTeacherAssignment.findFirst({
+      where: {
+        teacherId: user.id,
+        classId,
+        schoolId: user.schoolId,
+        isActive: true,
+        ...(request.termId ? { academicYear: { terms: { some: { id: request.termId } } } } : {}),
+      },
+      select: { id: true },
+    });
+    if (!assigned) throw new ForbiddenException('You can only generate report cards for your assigned class.');
+
+    const [school, template, stampTemplate] = await Promise.all([
+      this.prisma.school.findUnique({ where: { id: user.schoolId }, select: { headTeacherName: true } }),
+      classRecord.reportTemplateId
+        ? this.prisma.reportTemplate.findFirst({
+            where: { id: classRecord.reportTemplateId, schoolId: user.schoolId, templateType: 'REPORT_CARD' },
+            select: { id: true },
+          })
+        : this.prisma.reportTemplate.findFirst({
+            where: { schoolId: user.schoolId, templateType: 'REPORT_CARD', isDefault: true },
+            select: { id: true },
+          }),
+      this.prisma.stampTemplate.findFirst({
+        where: { schoolId: user.schoolId, isDefault: true, status: 'PUBLISHED', isActive: true },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!school?.headTeacherName?.trim()) {
+      throw new ForbiddenException('The Director must configure the Head Teacher name before report cards can be generated.');
+    }
+    if (!stampTemplate) {
+      throw new ForbiddenException('The Director must publish and set the official stamp as the school default before report cards can be generated.');
+    }
+    if (!template) {
+      throw new ForbiddenException('The Director must set a default Report Hub report-card template before report cards can be generated.');
+    }
+
+    const headSignatory = await this.prisma.templateSignatory.findFirst({
+      where: {
+        templateId: template.id,
+        isRequired: true,
+        OR: [
+          { role: 'HEAD_TEACHER' },
+          { role: 'Head Teacher' },
+          { label: { contains: 'Head Teacher', mode: 'insensitive' } },
+        ],
+        signatureId: { not: null },
+      },
+      select: { signature: { select: { id: true, status: true } } },
+    });
+    if (!headSignatory?.signature || headSignatory.signature.status !== 'ACTIVE') {
+      throw new ForbiddenException('The Director must bind an active Head Teacher signature to the default report-card template before you can generate report cards.');
+    }
   }
 
   async generateBulkReports(
