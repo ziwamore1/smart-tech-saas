@@ -29,21 +29,29 @@ function scoreBg(pct: number | null): string {
   return '#fee2e2';
 }
 
+function genderInitial(gender?: string | null): string {
+  const value = String(gender || '').trim().toLowerCase();
+  if (value.startsWith('m')) return 'M';
+  if (value.startsWith('f')) return 'F';
+  return '-';
+}
+
 const REPORT_STYLES = `
   @page { margin: 15mm; size: A4 landscape; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif; color: #1f2937; background: white; padding: 24px; line-height: 1.4; }
-  .report-header { text-align: center; margin-bottom: 24px; padding: 16px 20px; background: linear-gradient(135deg, #5f4b3a 0%, #7a6b5a 100%); border-radius: 8px; color: white; }
-  .school-name { font-size: 22px; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
-  .school-sub { font-size: 12px; color: #e8ddd0; margin-top: 4px; }
-  .report-title { font-size: 16px; font-weight: 600; color: white; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.95; }
-  .report-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; font-size: 13px; color: #374151; background: #f5f0eb; padding: 10px 16px; border-radius: 6px; border: 1px solid #e8ddd0; }
-  .report-meta strong { color: #5f4b3a; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  th { background: #5f4b3a; color: white; padding: 8px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; border: 1px solid #7a6b5a; }
-  td { padding: 6px 10px; border: 1px solid #e5e7eb; }
-  tr:nth-child(even) { background: #faf7f4; }
-  tr:hover { background: #f5efe8; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111827; background: white; padding: 24px; line-height: 1.45; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .report-header { text-align: center; margin-bottom: 24px; padding: 17px 20px; background: #123b5d; border: 2px solid #0b263d; border-radius: 6px; color: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .school-name { font-size: 25px; font-weight: 700; color: #ffffff; text-transform: uppercase; letter-spacing: 1px; }
+  .school-sub { font-size: 13px; color: #ffffff; margin-top: 4px; }
+  .report-title { font-size: 18px; font-weight: 700; color: #ffffff; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .report-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 20px; font-size: 14px; color: #111827; background: #ffffff; padding: 12px 16px; border-radius: 4px; border: 2px solid #123b5d; }
+  .report-meta strong { color: #123b5d; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; border: 2px solid #111827; }
+  th { background: #123b5d !important; color: #ffffff !important; padding: 9px 8px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.2px; border: 1px solid #ffffff; vertical-align: middle; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  td { padding: 7px 8px; border: 1px solid #374151; vertical-align: middle; }
+  tr:nth-child(even) { background: #f3f4f6; }
+  tr:hover { background: #e5e7eb; }
+  th, td { overflow: hidden; text-overflow: ellipsis; }
   .text-center { text-align: center; }
   .text-right { text-align: right; }
   .font-bold { font-weight: 700; }
@@ -52,18 +60,18 @@ const REPORT_STYLES = `
   .fail { color: #dc2626; }
   .warn { color: #d97706; }
   .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
-  .summary-card { background: #faf7f4; border: 1px solid #e8ddd0; border-radius: 8px; padding: 12px 16px; text-align: center; }
-  .summary-value { font-size: 24px; font-weight: 700; color: #5f4b3a; }
-  .summary-label { font-size: 11px; color: #6b7280; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .summary-card { background: #ffffff; border: 2px solid #374151; border-radius: 4px; padding: 12px 16px; text-align: center; }
+  .summary-value { font-size: 25px; font-weight: 700; color: #123b5d; }
+  .summary-label { font-size: 12px; color: #111827; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
   .grade-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
   .signatures { margin-top: 40px; display: flex; justify-content: space-between; }
   .sig { text-align: center; flex: 1; }
   .sig-line { width: 180px; border-top: 1px solid #1f2937; margin: 40px auto 0; padding-top: 6px; font-size: 11px; color: #6b7280; }
-  .footer { text-align: center; margin-top: 20px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #9ca3af; }
-  .print-btn { position: fixed; top: 16px; right: 16px; padding: 10px 20px; background: #5f4b3a; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-  .print-btn:hover { background: #4a3a2d; }
+  .footer { text-align: center; margin-top: 20px; padding-top: 12px; border-top: 2px solid #374151; font-size: 11px; color: #111827; }
+  .print-btn { position: fixed; top: 16px; right: 16px; padding: 10px 20px; background: #123b5d; color: white; border: 2px solid #0b263d; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 700; z-index: 1000; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
+  .print-btn:hover { background: #0b263d; }
   @media print { .print-btn { display: none; } body { padding: 0; } }
-  .section-title { font-size: 14px; font-weight: 600; color: #5f4b3a; margin: 20px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #e8ddd0; }
+  .section-title { font-size: 16px; font-weight: 700; color: #123b5d; margin: 20px 0 12px; padding-bottom: 6px; border-bottom: 3px solid #123b5d; }
   .chart-bar { height: 20px; border-radius: 4px; transition: width 0.3s; }
 `;
 
@@ -75,8 +83,9 @@ const MARK_SCHEDULE_EXTRA_STYLES = `
   .report-title { font-size: 18px; }
   .report-meta { font-size: 14px; padding: 12px 16px; }
   table { table-layout: fixed; width: 100%; font-size: 12px; }
-  th { font-size: 11px; padding: 8px 8px; }
-  td { padding: 7px 8px; word-wrap: break-word; overflow-wrap: break-word; }
+  th { font-size: 11px; padding: 8px 6px; }
+  td { padding: 7px 6px; word-wrap: normal; overflow-wrap: normal; white-space: nowrap; }
+  .report-table th, .report-table td { white-space: nowrap; }
   thead { display: table-header-group; }
   tr { break-inside: avoid; page-break-inside: avoid; }
   .grade-badge { font-size: 12px; padding: 3px 10px; }
@@ -230,7 +239,7 @@ export function generateMarkScheduleReport(students: ReportStudent[], meta: Repo
       <td class="text-center" style="color:#374151;width:28px">${i + 1}</td>
       <td style="font-weight:600;font-size:13px">${s.firstName} ${s.lastName}</td>
       <td style="color:#374151;font-size:12px">${s.admissionNumber || '-'}</td>
-      <td class="text-center" style="color:#374151;font-size:12px">${s.gender || '-'}</td>
+      <td class="text-center" style="color:#374151;font-size:12px">${genderInitial(s.gender)}</td>
       ${cells}
       <td class="text-center font-bold" style="color:${avgColor}">${avg != null ? avg.toFixed(1) + '%' : '-'}</td>
       <td class="text-center font-semibold" style="color:#059669">${s.totalPoints != null ? s.totalPoints : '-'}</td>
@@ -378,7 +387,7 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
     <td class="text-center" style="color:#6b7280">${i + 1}</td>
     <td style="font-weight:600">${s.firstName} ${s.lastName}</td>
     <td style="color:#6b7280;font-size:11px">${s.admissionNumber || '-'}</td>
-    <td class="text-center" style="color:${(s.gender || '').startsWith('M') ? '#2563eb' : '#db2777'};font-weight:600">${s.gender || '-'}</td>
+     <td class="text-center" style="color:${genderInitial(s.gender) === 'M' ? '#2563eb' : '#db2777'};font-weight:600">${genderInitial(s.gender)}</td>
     <td class="text-center font-bold fail">${(s.percentage || (s as any).avgPercentage || 0).toFixed(1)}%</td>
     <td class="text-center"><span class="grade-badge" style="background:#fee2e2;color:#dc2626">${s.grade || '-'}</span></td>
    </tr>`).join('');
@@ -485,7 +494,7 @@ export function generateRankingReport(rankings: RankingStudent[], meta: ReportMe
       <td class="text-center font-bold" style="font-size:14px;color:${i < 3 ? '#d97706' : '#6b7280'}">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : s.rank}</td>
       <td style="font-weight:600">${firstName} ${lastName}</td>
       <td style="color:#6b7280;font-size:11px">${s.admissionNumber || '-'}</td>
-      <td class="text-center" style="color:#6b7280">${s.gender || '-'}</td>
+       <td class="text-center" style="color:#6b7280">${genderInitial(s.gender)}</td>
       <td class="text-center font-bold" style="color:${avgColor}">${avg.toFixed(1)}%</td>
       <td class="text-center"><span class="grade-badge" style="background:${gc.bg};color:${gc.text}">${s.grade || '-'}</span></td>
       <td class="text-center font-bold" style="color:${i < 3 ? '#d97706' : '#1f2937'}">${s.rank}</td>
@@ -636,7 +645,7 @@ export function generateTeacherMarkSchedulesReport(data: TeacherMarkScheduleData
         <td class="text-center" style="color:#374151;width:28px">${i + 1}</td>
         <td style="font-weight:600;font-size:13px">${esc(s.student.firstName)} ${esc(s.student.lastName)}</td>
         <td style="color:#374151;font-size:12px">${esc(s.student.admissionNumber || '-')}</td>
-        <td class="text-center" style="color:#374151;font-size:12px">${esc(s.student.gender || '-')}</td>
+        <td class="text-center" style="color:#374151;font-size:12px">${genderInitial(s.student.gender)}</td>
         ${compCells}
         ${finalCell}
         <td class="text-center"><span class="grade-badge" style="background:${gc.bg};color:${gc.text}">${s.finalGrade || '-'}</span></td>
@@ -683,7 +692,7 @@ export function generateTeacherMarkSchedulesReport(data: TeacherMarkScheduleData
 <style>${REPORT_STYLES}
   ${MARK_SCHEDULE_EXTRA_STYLES}
   .schedule-block { margin-bottom: 26px; }
-  .schedule-title { background: linear-gradient(135deg, #5f4b3a 0%, #7a6b5a 100%); color: white; border-radius: 8px; padding: 10px 16px; margin-bottom: 10px; font-size: 16px; font-weight: 700; letter-spacing: 0.3px; }
+   .schedule-title { background: #123b5d; border: 2px solid #0b263d; color: white; border-radius: 4px; padding: 10px 16px; margin-bottom: 10px; font-size: 16px; font-weight: 700; letter-spacing: 0.3px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .schedule-block > .schedule-title { break-inside: avoid; page-break-inside: avoid; }
 </style>
 </head>
