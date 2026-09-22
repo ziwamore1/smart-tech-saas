@@ -72,6 +72,10 @@ const REPORT_STYLES = `
   .print-btn:hover { background: #0b263d; }
   @media print { .print-btn { display: none; } body { padding: 0; } }
   .section-title { font-size: 16px; font-weight: 700; color: #123b5d; margin: 20px 0 12px; padding-bottom: 6px; border-bottom: 3px solid #123b5d; }
+  .subject-performance-table { table-layout: auto; }
+  .subject-performance-table thead { display: table-header-group; }
+  .subject-performance-table th { min-width: 74px; white-space: normal; line-height: 1.25; }
+  .subject-performance-table th:first-child { min-width: 120px; }
   .chart-bar { height: 20px; border-radius: 4px; transition: width 0.3s; }
 `;
 
@@ -374,8 +378,7 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
         <span class="grade-badge" style="background:${s.passRate >= 70 ? '#d1fae5' : s.passRate >= 40 ? '#fef3c7' : '#fee2e2'};color:${s.passRate >= 70 ? '#059669' : s.passRate >= 40 ? '#d97706' : '#dc2626'}">${s.passRate.toFixed(1)}%</span>
       </td>
        <td class="text-center"><span class="grade-badge" style="background:#d1fae5;color:#047857">${(s.qualityPassRate ?? s.distinctionRate).toFixed(1)}%</span></td>
-       <td class="text-center"><span class="grade-badge" style="background:#dbeafe;color:#1d4ed8">${(s.quantityPassRate ?? s.passRate).toFixed(1)}%</span></td>
-       <td class="text-center" style="color:#6b7280">${s.gradedCount ?? '-'}</td>
+        <td class="text-center" style="color:#6b7280">${s.gradedCount ?? '-'}</td>
       <td class="text-center" style="color:#2563eb;font-weight:600">${sg ? sg.maleAverage.toFixed(1) + '%' : '-'}</td>
       <td class="text-center" style="color:#db2777;font-weight:600">${sg ? sg.femaleAverage.toFixed(1) + '%' : '-'}</td>
       <td class="text-center">${sg ? `<span style="color:#2563eb">${sg.malePassRate.toFixed(0)}%</span>` : '-'}</td>
@@ -450,7 +453,7 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
 
     ${(analysis.subjectAnalysis || []).length > 0 ? `
     <div class="section-title">Subject Performance Breakdown</div>
-    <table>
+     <table class="subject-performance-table">
        <thead><tr><th>Subject</th><th class="text-center">Class Avg</th><th class="text-center">Highest</th><th class="text-center">Lowest</th><th class="text-center">Quantity%</th><th class="text-center">Quality%</th><th class="text-center">Assessed</th><th class="text-center" style="color:#dbeafe">Male Avg</th><th class="text-center" style="color:#fce7f3">Female Avg</th><th class="text-center" style="color:#dbeafe">Male Quality%</th><th class="text-center" style="color:#fce7f3">Female Quality%</th></tr></thead>
       <tbody>${subjectRows}</tbody>
     </table>` : ''}
