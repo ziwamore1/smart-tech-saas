@@ -165,7 +165,7 @@ export default function StaffRecordsPage() {
 
   const tabs: { key: TabType; label: string; icon: string }[] = [
     { key: 'overview', label: 'Overview', icon: 'fa-th-large' },
-    { key: 'profiles', label: 'HR Profiles', icon: 'fa-id-badge' },
+    { key: 'profiles', label: 'Staff Records', icon: 'fa-id-badge' },
     { key: 'returns', label: 'Staff Returns', icon: 'fa-file-export' },
     { key: 'transfers', label: 'Transfers', icon: 'fa-exchange-alt' },
     { key: 'qualifications', label: 'Qualifications', icon: 'fa-graduation-cap' },
@@ -266,7 +266,7 @@ export default function StaffRecordsPage() {
       )}
 
       {!loading && activeTab === 'returns' && (
-        <ReturnsTabWithTemplates templates={templates} submissions={submissions} onRefresh={() => { fetchData(); fetchTemplates(); }} />
+        <ReturnsTabWithTemplates profiles={profiles} templates={templates} submissions={submissions} onRefresh={() => { fetchData(); fetchTemplates(); }} />
       )}
 
       {!loading && activeTab === 'transfers' && (
@@ -638,7 +638,7 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
   );
 }
 
-function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templates: any[]; submissions: any[]; onRefresh: () => void }) {
+function ReturnsTabWithTemplates({ profiles, templates, submissions, onRefresh }: { profiles: any[]; templates: any[]; submissions: any[]; onRefresh: () => void }) {
   const [activeSubTab, setActiveSubTab] = useState<'templates' | 'submissions'>('templates');
   const [editTemplate, setEditTemplate] = useState<any>(null);
   const [templateColumns, setTemplateColumns] = useState<any[]>([]);
@@ -872,6 +872,25 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
 
   return (
     <div>
+      <div style={{ background: '#fff', border: '1px solid #94a3b8', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div>
+            <h3 style={{ margin: 0, color: '#111827', fontSize: 17, fontWeight: 700 }}>Staff Records Available for Returns</h3>
+            <p style={{ margin: '4px 0 0', color: '#374151', fontSize: 13 }}>These records come from the canonical HR profiles and are reused automatically during compilation.</p>
+          </div>
+          <strong style={{ color: '#111827', fontSize: 20 }}>{profiles.length}</strong>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="hr-returns-table" style={{ fontSize: 13 }}>
+            <thead><tr><th style={{ padding: '8px 10px' }}>Staff Name</th><th style={{ padding: '8px 10px' }}>Employee No.</th><th style={{ padding: '8px 10px' }}>Type</th><th style={{ padding: '8px 10px' }}>Status</th><th style={{ padding: '8px 10px' }}>Position</th></tr></thead>
+            <tbody>
+              {profiles.slice(0, 10).map((profile: any) => <tr key={profile.id}><td style={{ padding: '8px 10px', fontWeight: 600 }}>{profile.teacherName || 'Unnamed staff'}</td><td style={{ padding: '8px 10px' }}>{profile.employeeNumber || '-'}</td><td style={{ padding: '8px 10px' }}>{profile.employmentType || '-'}</td><td style={{ padding: '8px 10px' }}><StatusBadge status={profile.employmentStatus} /></td><td style={{ padding: '8px 10px' }}>{profile.currentPosition || profile.substantivePosition || '-'}</td></tr>)}
+              {profiles.length === 0 && <tr><td colSpan={5} style={{ padding: 16, textAlign: 'center' }}>No staff records detected. Use Sync All Staff to load existing teacher and staff records.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        {profiles.length > 10 && <p style={{ margin: '10px 0 0', color: '#374151', fontSize: 12 }}>Showing 10 of {profiles.length}. Open Staff Records for the complete list.</p>}
+      </div>
       <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e8ddd0', marginBottom: 16 }}>
         <button onClick={() => setActiveSubTab('templates')} style={{ padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, fontWeight: activeSubTab === 'templates' ? 600 : 400, color: activeSubTab === 'templates' ? '#ea6645' : '#6b7280', borderBottom: activeSubTab === 'templates' ? '2px solid #ea6645' : '2px solid transparent', marginBottom: -2 }}>Template Configurator</button>
         <button onClick={() => setActiveSubTab('submissions')} style={{ padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, fontWeight: activeSubTab === 'submissions' ? 600 : 400, color: activeSubTab === 'submissions' ? '#ea6645' : '#6b7280', borderBottom: activeSubTab === 'submissions' ? '2px solid #ea6645' : '2px solid transparent', marginBottom: -2 }}>Submissions</button>
