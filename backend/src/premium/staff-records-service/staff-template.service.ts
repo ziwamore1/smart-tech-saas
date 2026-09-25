@@ -566,11 +566,58 @@ export class StaffTemplateService {
   }
 
   async updateSubmissionStaffFields(id: string, staffId: string, fields: Record<string, any>, performedBy?: string) {
-    let updated: any;
-    for (const [key, value] of Object.entries(fields || {})) {
-      updated = await this.updateSubmissionStaffField(id, staffId, key, value, performedBy);
+    if (!Object.keys(fields || {}).length) throw new BadRequestException('At least one field is required');
+    const submission = await this.prisma.staffReturnSubmission.findUnique({ where: { id }, include: { template: { include: { columns: true } } } });
+    if (!submission) throw new NotFoundException('Submission not found');
+    if (['SUBMITTED', 'APPROVED', 'EXPORTED', 'ARCHIVED'].includes(submission.status)) throw new BadRequestException('Historical returns are immutable. Duplicate the return to make changes.');
+    const row = ((submission.data as any[]) || []).map((candidate) => ({ ...candidate })).find((candidate) => candidate.staffId === staffId);
+    if (!row) throw new NotFoundException('Staff member is not part of this return snapshot');
+    const columns = new Map(submission.template.columns.map((column) => [column.columnName, column]));
+    const oldValues: Record<string, any> = {};
+    for (const [key, value] of Object.entries(fields)) {
+      if (!columns.has(key)) throw new BadRequestException(`Field ${key} is not configured for this return template`);
+      oldValues[key] = row.values?.[key] ?? '';
+      row.values = { ...(row.values || {}), [key]: value ?? '' };
     }
-    if (!updated) throw new BadRequestException('At least one field is required');
+    row.missing = submission.template.columns.filter((column) => column.isRequired && !row.values?.[column.columnName]).map((column) => ({ key: column.columnName, label: column.columnLabel }));
+    row.status = row.missing.length ? 'INCOMPLETE' : 'COMPLETE';
+
+    const profile = await this.prisma.staffHrProfile.findUnique({ where: { staffId } });
+    if (!profile) throw new NotFoundException('Canonical staff profile not found');
+    const directFields: Record<string, string> = {
+      'staff.nrcNumber': 'nrcNumber', 'staff.manTsNumber': 'tsNumber', 'staff.employeeNumber': 'employeeNumber', 'staff.gender': 'gender',
+      'staff.maritalStatus': 'maritalStatus', 'staff.nationality': 'nationality', 'staff.substantivePosition': 'substantivePosition',
+      'staff.currentPosition': 'currentPosition', 'staff.highestLevelOfEducation': 'academicQualification', 'staff.highestAcademicQualification': 'academicQualification',
+      'staff.highestTeacherQualification': 'professionalQualification', 'staff.employmentStatus': 'employmentStatus', 'staff.mainGradeTaught': 'gradeLevel',
+      'staff.dateOfBirth': 'dateOfBirth', 'staff.firstAppointmentDate': 'dateOfFirstAppointment', 'staff.currentPostAppointmentDate': 'dateOfPresentAppointment', 'staff.phoneNumber': 'phoneNumber',
+    };
+    const profileData: Record<string, any> = {};
+    const dynamicFields = { ...((profile.dynamicFields as any) || {}) };
+    const schoolData: Record<string, any> = {};
+    for (const [key, value] of Object.entries(fields)) {
+      if (key === 'staff.surname' || key === 'staff.firstName') continue;
+      if (directFields[key]) {
+        const field = directFields[key];
+        profileData[field] = field === 'phoneNumber' ? this.normalizeZambianPhone(value) : ['dateOfBirth', 'dateOfFirstAppointment', 'dateOfPresentAppointment'].includes(field) && value ? new Date(value) : value || null;
+      } else if (key.startsWith('school.')) {
+        const schoolField: Record<string, string> = { 'school.province': 'province', 'school.district': 'district', 'school.constituency': 'constituency', 'school.ward': 'ward', 'school.zone': 'zone', 'school.location': 'locationType', 'school.runningAgency': 'runningAgency', 'school.type': 'schoolType', 'school.emisNumber': 'emisNumber', 'school.distanceFromDebOffice': 'distanceFromDebOffice' };
+        if (schoolField[key]) schoolData[schoolField[key]] = key === 'school.distanceFromDebOffice' && value !== '' ? Number(value) : value || null;
+      } else {
+        dynamicFields[key.replace(/^staff\./, '')] = value ?? null;
+      }
+    }
+    if (fields['staff.surname'] !== undefined || fields['staff.firstName'] !== undefined) {
+      const currentName = String(profile.teacherName || '').trim().split(/\s+/);
+      const firstName = fields['staff.firstName'] ?? currentName.slice(0, -1).join(' ');
+      const surname = fields['staff.surname'] ?? currentName[currentName.length - 1] ?? '';
+      profileData.teacherName = `${firstName} ${surname}`.trim();
+    }
+    profileData.dynamicFields = dynamicFields;
+    await this.prisma.staffHrProfile.update({ where: { staffId }, data: profileData });
+    if (Object.keys(schoolData).length) await this.prisma.school.update({ where: { id: submission.schoolId }, data: schoolData });
+    const rows = ((submission.data as any[]) || []).map((candidate) => candidate.staffId === staffId ? row : candidate);
+    const updated = await this.prisma.staffReturnSubmission.update({ where: { id }, data: { data: rows as any, snapshot: { ...((submission.snapshot as any) || {}), rows } as any, status: 'DRAFT' }, include: { template: { select: { id: true, name: true } } } });
+    await this.createAuditLog({ submissionId: id, profileId: profile.id, schoolId: submission.schoolId, action: 'UPDATE_RETURN_FIELDS', entityType: 'INSTITUTIONAL_RETURN_FIELDS', entityId: staffId, performedBy, changes: { oldValues, newValues: fields } });
     return updated;
   }
 
