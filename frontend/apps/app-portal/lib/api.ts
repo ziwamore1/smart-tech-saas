@@ -2214,6 +2214,8 @@ export const premiumStaffRecordsApi = {
   createSubmission: (data: any) => api.post('/premium/staff-records/submissions', data),
   updateSubmissionData: (id: string, data: any[]) =>
     api.put(`/premium/staff-records/submissions/${id}/data`, { data }),
+  updateSubmissionStaffField: (id: string, staffId: string, key: string, value: any) =>
+    api.put(`/premium/staff-records/submissions/${id}/staff/${staffId}/field`, { key, value }),
   submitSubmission: (id: string) => api.post(`/premium/staff-records/submissions/${id}/submit`),
   approveSubmission: (id: string) => api.post(`/premium/staff-records/submissions/${id}/approve`),
   deleteSubmission: (id: string) => api.delete(`/premium/staff-records/submissions/${id}`),

@@ -1155,6 +1155,8 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [selectedSub, setSelectedSub] = useState<any>(null);
   const [subData, setSubData] = useState<any[]>([]);
+  const [editingStaff, setEditingStaff] = useState<any>(null);
+  const [editingValues, setEditingValues] = useState<Record<string, any>>({});
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [submissionPeriod, setSubmissionPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(false);
@@ -1232,6 +1234,25 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
     });
   };
 
+  const beginEdit = (row: any) => {
+    setEditingStaff(row);
+    const values: Record<string, any> = {};
+    (row.missing || []).forEach((field: any) => { values[field.key] = row.values?.[field.key] || ''; });
+    setEditingValues(values);
+  };
+
+  const saveMissingFields = () => {
+    if (!selectedSub?.id || !editingStaff) return;
+    withSubLoading(`save_${editingStaff.staffId}`, async () => {
+      for (const field of editingStaff.missing || []) {
+        await premiumStaffRecordsApi.updateSubmissionStaffField(selectedSub.id, editingStaff.staffId, field.key, editingValues[field.key] ?? '');
+      }
+      setEditingStaff(null);
+      await handleView(selectedSub.id);
+      fetchSubmissions(selectedTemplate || undefined);
+    });
+  };
+
   useEffect(() => { fetchSubmissions(); }, [fetchSubmissions]);
 
   return (
@@ -1297,9 +1318,22 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
           {subData.length > 0 && (
             <div style={{ overflowX: 'auto', marginTop: 10 }}>
               <table className="hr-returns-table" style={{ fontSize: 13 }}>
-                <thead><tr><th style={{ padding: '8px 10px' }}>Staff Name</th><th style={{ padding: '8px 10px' }}>Status</th><th style={{ padding: '8px 10px' }}>Missing Fields</th></tr></thead>
-                <tbody>{subData.slice(0, 25).map((row: any, index: number) => <tr key={row.staffId || index}><td style={{ padding: '8px 10px', fontWeight: 600 }}>{row.staffName || row.values?.['staff.firstName'] || 'Staff member'}</td><td style={{ padding: '8px 10px' }}><StatusBadge status={row.status || 'DRAFT'} /></td><td style={{ padding: '8px 10px' }}>{row.missing?.length || 0}</td></tr>)}</tbody>
+                <thead><tr><th style={{ padding: '8px 10px' }}>Staff Name</th><th style={{ padding: '8px 10px' }}>Status</th><th style={{ padding: '8px 10px' }}>Missing Fields</th><th style={{ padding: '8px 10px' }}>Action</th></tr></thead>
+                <tbody>{subData.slice(0, 25).map((row: any, index: number) => <tr key={row.staffId || index}><td style={{ padding: '8px 10px', fontWeight: 600 }}>{row.staffName || row.values?.['staff.firstName'] || 'Staff member'}</td><td style={{ padding: '8px 10px' }}><StatusBadge status={row.status || 'DRAFT'} /></td><td style={{ padding: '8px 10px' }}>{row.missing?.length || 0}</td><td style={{ padding: '8px 10px' }}>{row.missing?.length > 0 ? <button onClick={() => beginEdit(row)} style={{ padding: '4px 10px', background: '#ea6645', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Edit Missing Details</button> : <span style={{ color: '#166534', fontWeight: 600 }}>Complete</span>}</td></tr>)}</tbody>
               </table>
+            </div>
+          )}
+          {editingStaff && (
+            <div style={{ marginTop: 14, border: '1px solid #ea6645', borderRadius: 8, padding: 14, background: '#fffaf5' }}>
+              <strong style={{ color: '#111827' }}>Complete Missing Details: {editingStaff.staffName}</strong>
+              <p style={{ color: '#374151', fontSize: 12, margin: '5px 0 10px' }}>Only fields required by this configured return are shown. Saving updates both this return snapshot and the canonical staff record.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+                {(editingStaff.missing || []).map((field: any) => {
+                  const inputType = field.key.toLowerCase().includes('date') ? 'date' : field.key.toLowerCase().includes('daysabsent') ? 'number' : 'text';
+                  return <label key={field.key} style={{ color: '#111827', fontSize: 12, fontWeight: 700 }}>{field.label}<input type={inputType} value={editingValues[field.key] || ''} onChange={event => setEditingValues(current => ({ ...current, [field.key]: event.target.value }))} style={{ display: 'block', width: '100%', marginTop: 4, padding: '8px 10px', border: '1px solid #94a3b8', borderRadius: 5, color: '#111827', background: '#fff' }} /></label>;
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}><button onClick={saveMissingFields} disabled={!!subLoading[`save_${editingStaff.staffId}`]} style={{ padding: '7px 14px', background: '#059669', color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer' }}>{subLoading[`save_${editingStaff.staffId}`] ? 'Saving...' : 'Save and Update Staff Record'}</button><button onClick={() => setEditingStaff(null)} style={{ padding: '7px 14px', background: '#fff', color: '#111827', border: '1px solid #94a3b8', borderRadius: 5, cursor: 'pointer' }}>Cancel</button></div>
             </div>
           )}
         </div>

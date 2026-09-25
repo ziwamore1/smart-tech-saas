@@ -497,6 +497,66 @@ export class StaffTemplateService {
     });
   }
 
+  async updateSubmissionStaffField(id: string, staffId: string, key: string, value: any, performedBy?: string) {
+    const submission = await this.prisma.staffReturnSubmission.findUnique({
+      where: { id },
+      include: { template: { include: { columns: true } } },
+    });
+    if (!submission) throw new NotFoundException('Submission not found');
+    if (['SUBMITTED', 'APPROVED', 'EXPORTED', 'ARCHIVED'].includes(submission.status)) {
+      throw new BadRequestException('Historical returns are immutable. Duplicate the return to make changes.');
+    }
+    const rows = ((submission.data as any[]) || []).map((row) => ({ ...row }));
+    const row = rows.find((candidate) => candidate.staffId === staffId);
+    if (!row) throw new NotFoundException('Staff member is not part of this return snapshot');
+    const column = submission.template.columns.find((candidate) => candidate.columnName === key);
+    if (!column) throw new BadRequestException('Field is not configured for this return template');
+    const oldValue = row.values?.[key] ?? '';
+    row.values = { ...(row.values || {}), [key]: value ?? '' };
+    row.missing = (row.missing || []).filter((missing: any) => missing.key !== key);
+    if (column.isRequired && (value === null || value === undefined || value === '')) {
+      row.missing.push({ key, label: column.columnLabel });
+    }
+    row.status = row.missing.length ? 'INCOMPLETE' : 'COMPLETE';
+    await this.updateCanonicalField(staffId, key, value);
+    const updated = await this.prisma.staffReturnSubmission.update({
+      where: { id },
+      data: { data: rows as any, snapshot: { ...((submission.snapshot as any) || {}), rows } as any, status: 'DRAFT' },
+      include: { template: { select: { id: true, name: true } } },
+    });
+    await this.createAuditLog({ submissionId: id, profileId: staffId, schoolId: submission.schoolId, action: 'UPDATE_RETURN_FIELD', entityType: 'INSTITUTIONAL_RETURN_FIELD', entityId: key, performedBy, changes: { key, oldValue, newValue: value } });
+    return updated;
+  }
+
+  private async updateCanonicalField(staffId: string, key: string, value: any) {
+    const profile = await this.prisma.staffHrProfile.findUnique({ where: { staffId } });
+    if (!profile) throw new NotFoundException('Canonical staff profile not found');
+    const directFields: Record<string, string> = {
+      'staff.nrcNumber': 'nrcNumber', 'staff.manTsNumber': 'tsNumber', 'staff.employeeNumber': 'employeeNumber',
+      'staff.gender': 'gender', 'staff.maritalStatus': 'maritalStatus', 'staff.nationality': 'nationality',
+      'staff.substantivePosition': 'substantivePosition', 'staff.currentPosition': 'currentPosition',
+      'staff.highestLevelOfEducation': 'academicQualification', 'staff.highestAcademicQualification': 'academicQualification',
+      'staff.highestTeacherQualification': 'professionalQualification', 'staff.employmentStatus': 'employmentStatus',
+      'staff.mainGradeTaught': 'gradeLevel', 'staff.dateOfBirth': 'dateOfBirth',
+      'staff.firstAppointmentDate': 'dateOfFirstAppointment', 'staff.currentPostAppointmentDate': 'dateOfPresentAppointment',
+    };
+    if (directFields[key]) {
+      const field = directFields[key];
+      const dateField = ['dateOfBirth', 'dateOfFirstAppointment', 'dateOfPresentAppointment'].includes(field);
+      await this.prisma.staffHrProfile.update({ where: { staffId }, data: { [field]: dateField && value ? new Date(value) : value || null } });
+      return;
+    }
+    if (key === 'staff.surname' || key === 'staff.firstName') {
+      const current = String(profile.teacherName || '').trim().split(/\s+/);
+      const firstName = key === 'staff.firstName' ? String(value || '') : current.slice(0, -1).join(' ');
+      const surname = key === 'staff.surname' ? String(value || '') : current.at(-1) || '';
+      await this.prisma.staffHrProfile.update({ where: { staffId }, data: { teacherName: `${firstName} ${surname}`.trim() } });
+      return;
+    }
+    const dynamicFields = { ...((profile.dynamicFields as any) || {}), [key.replace(/^staff\./, '')]: value ?? null };
+    await this.prisma.staffHrProfile.update({ where: { staffId }, data: { dynamicFields } });
+  }
+
   async submitSubmission(id: string, performedBy?: string) {
     const submission = await this.prisma.staffReturnSubmission.findUnique({
       where: { id },
