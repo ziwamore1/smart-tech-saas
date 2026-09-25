@@ -848,8 +848,9 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
   const handleQuickCompile = async (templateId: string) => {
     withBtnLoading(`compile_${templateId}`, async () => {
       try {
-        const response = await premiumStaffRecordsApi.quickCompile({ templateId, period: String(new Date().getFullYear()) });
-        setCompileResult(response.data?.data || response.data);
+        const payload = response.data;
+        const result = payload?.data?.id ? payload.data : payload;
+        setCompileResult(result);
         showToast('success', 'Staff records loaded into the configured return');
         onRefresh();
       } catch (err: any) {
@@ -1224,7 +1225,8 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
   const handleView = (id: string) => {
     withSubLoading(`view_${id}`, async () => {
       const response = await premiumStaffRecordsApi.getSubmissionById(id);
-      const value = response.data?.data || response.data;
+      const payload = response.data;
+      const value = payload?.data?.id ? payload.data : payload;
       setSelectedSub(value);
       setSubData(value?.data || []);
     });
@@ -1292,6 +1294,14 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
             <button onClick={() => setSelectedSub(null)} style={{ border: '1px solid #94a3b8', background: '#fff', color: '#111827', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>Close</button>
           </div>
           <p style={{ color: '#374151', marginTop: 8 }}>Status: {selectedSub.status || 'DRAFT'} · Records: {subData.length}</p>
+          {subData.length > 0 && (
+            <div style={{ overflowX: 'auto', marginTop: 10 }}>
+              <table className="hr-returns-table" style={{ fontSize: 13 }}>
+                <thead><tr><th style={{ padding: '8px 10px' }}>Staff Name</th><th style={{ padding: '8px 10px' }}>Status</th><th style={{ padding: '8px 10px' }}>Missing Fields</th></tr></thead>
+                <tbody>{subData.slice(0, 25).map((row: any, index: number) => <tr key={row.staffId || index}><td style={{ padding: '8px 10px', fontWeight: 600 }}>{row.staffName || row.values?.['staff.firstName'] || 'Staff member'}</td><td style={{ padding: '8px 10px' }}><StatusBadge status={row.status || 'DRAFT'} /></td><td style={{ padding: '8px 10px' }}>{row.missing?.length || 0}</td></tr>)}</tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>
