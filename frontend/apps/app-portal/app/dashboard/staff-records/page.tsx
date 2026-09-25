@@ -205,6 +205,13 @@ export default function StaffRecordsPage() {
         .hr-returns-table th { border: 1px solid #94a3b8; background: #e2e8f0; color: #111827; font-weight: 700; text-align: left; }
         .hr-returns-table td { border: 1px solid #cbd5e1; color: #1f2937; }
         .hr-returns-table tbody tr:nth-child(even) { background: #f8fafc; }
+        .staff-detected-table { table-layout: fixed; }
+        .staff-detected-table th:nth-child(1), .staff-detected-table td:nth-child(1) { width: 29%; }
+        .staff-detected-table th:nth-child(2), .staff-detected-table td:nth-child(2) { width: 17%; }
+        .staff-detected-table th:nth-child(3), .staff-detected-table td:nth-child(3) { width: 16%; }
+        .staff-detected-table th:nth-child(4), .staff-detected-table td:nth-child(4) { width: 16%; }
+        .staff-detected-table th:nth-child(5), .staff-detected-table td:nth-child(5) { width: 22%; }
+        .staff-detected-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       `}</style>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -889,7 +896,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
           <strong style={{ color: '#111827', fontSize: 20 }}>{profiles.length}</strong>
         </div>
         <div style={{ overflowX: 'auto' }}>
-          <table className="hr-returns-table" style={{ fontSize: 13 }}>
+          <table className="hr-returns-table staff-detected-table" style={{ fontSize: 13 }}>
             <thead><tr><th style={{ padding: '8px 10px' }}>Staff Name</th><th style={{ padding: '8px 10px' }}>Employee No.</th><th style={{ padding: '8px 10px' }}>Type</th><th style={{ padding: '8px 10px' }}>Status</th><th style={{ padding: '8px 10px' }}>Position</th></tr></thead>
             <tbody>
               {profiles.slice(0, 10).map((profile: any) => <tr key={profile.id}><td style={{ padding: '8px 10px', fontWeight: 600 }}>{profile.teacherName || 'Unnamed staff'}</td><td style={{ padding: '8px 10px' }}>{profile.employeeNumber || '-'}</td><td style={{ padding: '8px 10px' }}>{profile.employmentType || '-'}</td><td style={{ padding: '8px 10px' }}><StatusBadge status={profile.employmentStatus} /></td><td style={{ padding: '8px 10px' }}>{profile.currentPosition || profile.substantivePosition || '-'}</td></tr>)}
