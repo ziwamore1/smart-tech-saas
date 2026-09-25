@@ -67,6 +67,7 @@ export default function StaffRecordsPage() {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [templateLoadError, setTemplateLoadError] = useState<string | null>(null);
   const [loadingActions, setLoadingActions] = useState<Record<string, boolean>>({});
 
   const withLoading = useCallback(async (key: string, fn: () => Promise<void>) => {
@@ -109,12 +110,19 @@ export default function StaffRecordsPage() {
   }, [canAccess]);
 
   const fetchTemplates = useCallback(async () => {
+    setTemplateLoadError(null);
     try {
       const res = await premiumStaffRecordsApi.getInstitutionalReturns();
       const value = res.data?.data || res.data || {};
       setTemplates(value.templates || []);
       setSubmissions(value.submissions || []);
-    } catch { }
+    } catch (err: any) {
+      setTemplateLoadError(err?.response?.data?.message || 'Institutional return templates could not be loaded.');
+      try {
+        const fallback = await premiumStaffRecordsApi.getTemplates();
+        setTemplates(fallback.data?.data || fallback.data || []);
+      } catch { setTemplates([]); }
+    }
   }, []);
 
   useEffect(() => {
@@ -266,7 +274,7 @@ export default function StaffRecordsPage() {
       )}
 
       {!loading && activeTab === 'returns' && (
-        <ReturnsTabWithTemplates profiles={profiles} templates={templates} submissions={submissions} onRefresh={() => { fetchData(); fetchTemplates(); }} />
+        <ReturnsTabWithTemplates profiles={profiles} templates={templates} submissions={submissions} templateLoadError={templateLoadError} onRefresh={() => { fetchData(); fetchTemplates(); }} />
       )}
 
       {!loading && activeTab === 'transfers' && (
@@ -638,7 +646,7 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
   );
 }
 
-function ReturnsTabWithTemplates({ profiles, templates, submissions, onRefresh }: { profiles: any[]; templates: any[]; submissions: any[]; onRefresh: () => void }) {
+function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoadError, onRefresh }: { profiles: any[]; templates: any[]; submissions: any[]; templateLoadError: string | null; onRefresh: () => void }) {
   const [activeSubTab, setActiveSubTab] = useState<'templates' | 'submissions'>('templates');
   const [editTemplate, setEditTemplate] = useState<any>(null);
   const [templateColumns, setTemplateColumns] = useState<any[]>([]);
@@ -891,6 +899,12 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, onRefresh }
         </div>
         {profiles.length > 10 && <p style={{ margin: '10px 0 0', color: '#374151', fontSize: 12 }}>Showing 10 of {profiles.length}. Open Staff Records for the complete list.</p>}
       </div>
+      {templateLoadError && (
+        <div style={{ background: '#fff7ed', border: '1px solid #c2410c', color: '#7c2d12', borderRadius: 8, padding: 12, marginBottom: 16, fontSize: 13 }}>
+          <strong>Return templates need attention:</strong> {templateLoadError}
+          <div style={{ marginTop: 4 }}>Existing staff records remain available. An administrator should apply the Institutional Returns database migration and redeploy the backend.</div>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e8ddd0', marginBottom: 16 }}>
         <button onClick={() => setActiveSubTab('templates')} style={{ padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, fontWeight: activeSubTab === 'templates' ? 600 : 400, color: activeSubTab === 'templates' ? '#ea6645' : '#6b7280', borderBottom: activeSubTab === 'templates' ? '2px solid #ea6645' : '2px solid transparent', marginBottom: -2 }}>Template Configurator</button>
         <button onClick={() => setActiveSubTab('submissions')} style={{ padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, fontWeight: activeSubTab === 'submissions' ? 600 : 400, color: activeSubTab === 'submissions' ? '#ea6645' : '#6b7280', borderBottom: activeSubTab === 'submissions' ? '2px solid #ea6645' : '2px solid transparent', marginBottom: -2 }}>Submissions</button>
