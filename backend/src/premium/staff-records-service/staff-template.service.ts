@@ -43,9 +43,17 @@ export class StaffTemplateService {
 
   private async ensureInstitutionalLookups(schoolId: string) {
     const seeds = [...INSTITUTIONAL_LOOKUP_SEEDS, ...ZAMBIA_GEOGRAPHY_SEEDS];
-    for (const seed of seeds) {
-      const existing = await this.prisma.institutionalLookupValue.findFirst({ where: { schoolId: null, category: seed.category, code: seed.code } });
-      if (!existing) await this.prisma.institutionalLookupValue.create({ data: { ...seed, schoolId: null } });
+    const existing = await this.prisma.institutionalLookupValue.findMany({
+      where: { schoolId: null },
+      select: { category: true, code: true },
+    });
+    const existingKeys = new Set(existing.map((value) => `${value.category}:${value.code}`));
+    const missing = seeds.filter((seed) => !existingKeys.has(`${seed.category}:${seed.code}`));
+    if (missing.length) {
+      await this.prisma.institutionalLookupValue.createMany({
+        data: missing.map((seed) => ({ ...seed, schoolId: null })),
+        skipDuplicates: true,
+      });
     }
   }
 
