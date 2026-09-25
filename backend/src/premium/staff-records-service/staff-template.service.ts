@@ -61,7 +61,11 @@ export class StaffTemplateService {
     if (!school) throw new NotFoundException('School profile not found');
     const staffType = config.staffType || 'TEACHING';
     const profiles = await this.prisma.staffHrProfile.findMany({
-      where: { schoolId: data.schoolId, employmentType: staffType, employmentStatus: { notIn: ['INACTIVE', 'TERMINATED', 'TRANSFERRED', 'RETIRED', 'RESIGNED'] } },
+      where: {
+        schoolId: data.schoolId,
+        ...(staffType === 'NON_TEACHING' ? { employmentType: 'NON_TEACHING' } : { employmentType: { not: 'NON_TEACHING' } }),
+        employmentStatus: { notIn: ['INACTIVE', 'TERMINATED', 'TRANSFERRED', 'RETIRED', 'RESIGNED'] },
+      },
       include: { qualifications: true, positions: true }, orderBy: { teacherName: 'asc' },
     });
     const rows = profiles.map((profile: any, index) => {
