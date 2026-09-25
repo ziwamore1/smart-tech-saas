@@ -565,6 +565,15 @@ export class StaffTemplateService {
     return updated;
   }
 
+  async updateSubmissionStaffFields(id: string, staffId: string, fields: Record<string, any>, performedBy?: string) {
+    let updated: any;
+    for (const [key, value] of Object.entries(fields || {})) {
+      updated = await this.updateSubmissionStaffField(id, staffId, key, value, performedBy);
+    }
+    if (!updated) throw new BadRequestException('At least one field is required');
+    return updated;
+  }
+
   private async updateCanonicalField(staffId: string, schoolId: string, key: string, value: any) {
     const profile = await this.prisma.staffHrProfile.findUnique({ where: { staffId } });
     if (!profile) throw new NotFoundException('Canonical staff profile not found');

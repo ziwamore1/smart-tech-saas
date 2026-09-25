@@ -1247,6 +1247,7 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
   const saveMissingFields = () => {
     if (!selectedSub?.id || !editingStaff) return;
     withSubLoading(`save_${editingStaff.staffId}`, async () => {
+      const fields: Record<string, any> = {};
       for (const field of editingStaff.fields || editingStaff.missing || []) {
         const key = field.key || field.columnName;
         const category = lookupCategory(key);
@@ -1254,8 +1255,9 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
         if (category && editingValues[key] && !current) {
           await premiumStaffRecordsApi.addInstitutionalLookup({ category, label: editingValues[key], parentCode: category === 'DISTRICT' ? String(editingValues['school.province'] || '').toUpperCase().replace(/[^A-Z0-9]+/g, '_') : undefined });
         }
-        await premiumStaffRecordsApi.updateSubmissionStaffField(selectedSub.id, editingStaff.staffId, key, editingValues[key] ?? '');
+        fields[key] = editingValues[key] ?? '';
       }
+      await premiumStaffRecordsApi.updateSubmissionStaffFields(selectedSub.id, editingStaff.staffId, fields);
       setEditingStaff(null);
       await handleView(selectedSub.id);
       fetchSubmissions(selectedTemplate || undefined);
@@ -1279,6 +1281,7 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
     if (key === 'staff.mainGradeTaught') return 'MAIN_GRADE_TAUGHT';
     if (key === 'staff.staffPresence') return 'STAFF_PRESENCE';
     if (key === 'staff.employer') return 'EMPLOYER';
+    if (key === 'school.runningAgency') return 'RUNNING_AGENCY';
     if (key === 'school.province') return 'PROVINCE';
     if (key === 'school.district') return 'DISTRICT';
     if (key === 'school.location') return 'LOCATION';

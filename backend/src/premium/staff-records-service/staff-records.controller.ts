@@ -304,6 +304,12 @@ export class StaffRecordsController {
     return this.staffTemplateService.updateSubmissionStaffField(id, staffId, body.key, body.value, req.user?.sub || req.user?.id);
   }
 
+  @Put('submissions/:id/staff/:staffId/fields')
+  @Roles(...ADMIN_ROLES)
+  updateSubmissionStaffFields(@Param('id') id: string, @Param('staffId') staffId: string, @Body('fields') fields: Record<string, any>, @Req() req: any) {
+    return this.staffTemplateService.updateSubmissionStaffFields(id, staffId, fields, req.user?.sub || req.user?.id);
+  }
+
   @Post('submissions/:id/submit')
   @Roles(...ADMIN_ROLES)
   submitSubmission(@Param('id') id: string, @Req() req: any) {
