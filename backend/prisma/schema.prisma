@@ -163,6 +163,14 @@ model School {
   address                        String?
   district                       String?
   province                       String?
+  constituency                   String?
+  ward                           String?
+  zone                           String?
+  locationType                   String?
+  runningAgency                  String?
+  schoolType                     String?
+  emisNumber                     String?
+  distanceFromDebOffice          Float?
   capacity                       Int?
   minEntryScore                  Float?
   subscriptionStatus             String                         @default("trial")
@@ -6188,6 +6196,11 @@ model StaffReturnTemplate {
   isDefault   Boolean  @default(false)
   category    String?  @default("DISTRICT")
   config      Json?    @default("{}")
+  templateCode String?
+  version     String   @default("1")
+  status      String   @default("DRAFT")
+  authority   String?
+  fileType    String   @default("xlsx")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -6233,6 +6246,8 @@ model StaffReturnSubmission {
   term         String?
   status       String              @default("DRAFT")
   data         Json                @default("[]")
+  snapshot     Json?
+  templateVersion String           @default("1")
   submittedAt  DateTime?
   approvedAt   DateTime?
   approvedBy   String?

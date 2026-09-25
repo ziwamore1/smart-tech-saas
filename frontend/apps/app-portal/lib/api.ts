@@ -2189,6 +2189,9 @@ export const premiumStaffRecordsApi = {
 
   // Templates (Dynamic Column Engine)
   getTemplates: () => api.get('/premium/staff-records/templates'),
+  getInstitutionalReturns: () => api.get('/premium/staff-records/institutional-returns'),
+  getCanonicalFields: () => api.get('/premium/staff-records/canonical-fields'),
+  quickCompile: (data: { templateId: string; period: string }) => api.post('/premium/staff-records/institutional-returns/quick-compile', data),
   getTemplateById: (id: string) => api.get(`/premium/staff-records/templates/${id}`),
   createTemplate: (data: any) => api.post('/premium/staff-records/templates', data),
   updateTemplate: (id: string, data: any) => api.put(`/premium/staff-records/templates/${id}`, data),

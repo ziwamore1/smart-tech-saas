@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as ExcelJS from 'exceljs';
+import * as path from 'path';
 
 export interface ExportOptions {
   schoolName?: string;
@@ -17,6 +18,52 @@ export class StaffExcelService {
   private readonly logger = new Logger(StaffExcelService.name);
 
   constructor(private prisma: PrismaService) {}
+
+  async generateInstitutionalReturnExcel(submissionId: string, options: ExportOptions = {}): Promise<ExcelJS.Buffer> {
+    const submission = await this.prisma.staffReturnSubmission.findUnique({
+      where: { id: submissionId },
+      include: { template: { include: { columns: { orderBy: { columnOrder: 'asc' } } } } },
+    });
+    if (!submission) throw new Error('Submission not found');
+    const config = (submission.template.config || {}) as any;
+    const asset = config.workbookAsset;
+    if (!asset || !config.sheetName) return this.generateStaffReturnExcel(submissionId, options);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(path.join(process.cwd(), 'hr_profile_docs', asset));
+    const worksheet = workbook.getWorksheet(config.sheetName);
+    if (!worksheet) throw new Error(`Template worksheet not found: ${config.sheetName}`);
+    const rows = (submission.data as any[]) || [];
+    const headerRow = Number(config.headerRow || 4);
+    const dataStartRow = Number(config.dataStartRow || headerRow + 1);
+    const columns = submission.template.columns;
+    rows.forEach((rowData: any, rowIndex: number) => {
+      const row = rowData?.values || rowData;
+      const target = worksheet.getRow(dataStartRow + rowIndex);
+      columns.forEach((column: any, columnIndex: number) => {
+        const value = row[column.columnName] ?? '';
+        const cell = target.getCell(columnIndex + 1);
+        cell.value = value instanceof Date ? value : this.coerceExcelValue(value, column.dataType);
+      });
+    });
+    workbook.creator = options.generatedBy || 'SmartTech SaaS';
+    workbook.modified = new Date();
+    const buffer = await workbook.xlsx.writeBuffer();
+    await this.prisma.staffReturnSubmission.update({
+      where: { id: submissionId },
+      data: { status: submission.status === 'APPROVED' ? 'APPROVED' : 'EXPORTED', generatedBy: options.generatedBy, generatedAt: new Date() },
+    });
+    return buffer;
+  }
+
+  private coerceExcelValue(value: any, dataType?: string) {
+    if (value === null || value === undefined || value === '') return '';
+    if (dataType === 'number' && typeof value === 'string' && !Number.isNaN(Number(value))) return Number(value);
+    if (dataType === 'date' && typeof value === 'string') {
+      const parsed = new Date(value);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+    return value;
+  }
 
   async generateStaffReturnExcel(
     submissionId: string,

@@ -184,6 +184,24 @@ export class StaffRecordsController {
     return this.staffTemplateService.findAllTemplates(req.user.schoolId);
   }
 
+  @Get('institutional-returns')
+  @Roles(...ADMIN_ROLES)
+  getInstitutionalReturns(@Req() req: any) {
+    return this.staffTemplateService.getInstitutionalReturns(req.user.schoolId);
+  }
+
+  @Get('canonical-fields')
+  @Roles(...ADMIN_ROLES)
+  getCanonicalFields() {
+    return this.staffTemplateService.getCanonicalFields();
+  }
+
+  @Post('institutional-returns/quick-compile')
+  @Roles(...ADMIN_ROLES)
+  quickCompile(@Body() body: { templateId: string; period: string }, @Req() req: any) {
+    return this.staffTemplateService.quickCompile({ ...body, schoolId: req.user.schoolId, performedBy: req.user?.sub || req.user?.id });
+  }
+
   @Get('templates/:id')
   @Roles(...ADMIN_ROLES)
   findTemplateById(@Param('id') id: string) {
@@ -295,7 +313,7 @@ export class StaffRecordsController {
   @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
   async exportSubmissionExcel(@Param('id') id: string, @Req() req: any, @Res() res: Response) {
     const school = await this.staffRecordsService.getSchoolInfo(req.user.schoolId);
-    const buffer = await this.staffExcelService.generateStaffReturnExcel(id, {
+    const buffer = await this.staffExcelService.generateInstitutionalReturnExcel(id, {
       schoolName: school?.name,
       province: school?.province,
       district: school?.district,

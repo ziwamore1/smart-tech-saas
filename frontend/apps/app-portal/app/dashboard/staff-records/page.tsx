@@ -92,7 +92,11 @@ export default function StaffRecordsPage() {
         ]);
 
       if (profilesRes.status === 'fulfilled') setProfiles(profilesRes.value.data?.data || profilesRes.value.data || []);
-      if (returnsRes.status === 'fulfilled') setReturns(returnsRes.value.data?.data || returnsRes.value.data || []);
+      if (returnsRes.status === 'fulfilled') {
+        const returnData = returnsRes.value.data?.data || returnsRes.value.data || [];
+        setReturns(returnData);
+        setSubmissions(returnData);
+      }
       if (transfersRes.status === 'fulfilled') setTransfers(transfersRes.value.data?.data || transfersRes.value.data || []);
       if (analyticsRes.status === 'fulfilled') setAnalytics(analyticsRes.value.data || null);
       if (syncStatusRes.status === 'fulfilled') setSyncStatus(syncStatusRes.value.data || null);
@@ -639,6 +643,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [sampleRows, setSampleRows] = useState<any[]>([]);
   const [btnLoading, setBtnLoading] = useState<Record<string, boolean>>({});
+  const [compileResult, setCompileResult] = useState<any>(null);
 
   const withBtnLoading = useCallback(async (key: string, fn: () => Promise<void>) => {
     setBtnLoading(prev => ({ ...prev, [key]: true }));
@@ -819,6 +824,19 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
     });
   };
 
+  const handleQuickCompile = async (templateId: string) => {
+    withBtnLoading(`compile_${templateId}`, async () => {
+      try {
+        const response = await premiumStaffRecordsApi.quickCompile({ templateId, period: String(new Date().getFullYear()) });
+        setCompileResult(response.data?.data || response.data);
+        showToast('success', 'Return compiled from existing HR records');
+        onRefresh();
+      } catch (err: any) {
+        showToast('error', err?.response?.data?.message || 'Could not compile return');
+      }
+    });
+  };
+
   const handleDuplicateTemplate = async (templateId: string) => {
     withBtnLoading(`dup_${templateId}`, async () => {
       try {
@@ -871,7 +889,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                     fontWeight: selectedTemplateId === t.id ? 600 : 400, fontSize: 13
                   }}>
                     <div>{t.name || 'Unnamed Template'}</div>
-                    <div style={{ fontSize: 11, color: '#6b7280' }}>{t.returnType || 'MONTHLY'} · {t.columns?.length || 0} cols</div>
+                    <div style={{ fontSize: 11, color: '#6b7280' }}>{t.authority || 'Institutional'} · v{t.version || '1'}</div>
                   </div>
                 ))
               )}
@@ -885,8 +903,17 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                   <button onClick={handleSaveTemplate} disabled={btnLoading['saveTemplate']} style={{ padding: '6px 14px', background: btnLoading['saveTemplate'] ? '#d1d5db' : '#059669', color: '#fff', border: 'none', borderRadius: 6, cursor: btnLoading['saveTemplate'] ? 'not-allowed' : 'pointer', fontSize: 13 }}>{btnLoading['saveTemplate'] ? 'Saving...' : 'Save'}</button>
                   <button onClick={() => handleDuplicateTemplate(editTemplate.id)} disabled={btnLoading[`dup_${editTemplate.id}`]} style={{ padding: '6px 14px', background: btnLoading[`dup_${editTemplate.id}`] ? '#d1d5db' : '#6b7280', color: '#fff', border: 'none', borderRadius: 6, cursor: btnLoading[`dup_${editTemplate.id}`] ? 'not-allowed' : 'pointer', fontSize: 13 }}>{btnLoading[`dup_${editTemplate.id}`] ? 'Duplicating...' : 'Duplicate'}</button>
                   <button onClick={() => handleDeleteTemplate(editTemplate.id)} disabled={btnLoading[`del_${editTemplate.id}`]} style={{ padding: '6px 14px', background: btnLoading[`del_${editTemplate.id}`] ? '#d1d5db' : '#dc2626', color: '#fff', border: 'none', borderRadius: 6, cursor: btnLoading[`del_${editTemplate.id}`] ? 'not-allowed' : 'pointer', fontSize: 13 }}>{btnLoading[`del_${editTemplate.id}`] ? 'Deleting...' : 'Delete'}</button>
-                  <button onClick={() => handleExportTemplate(editTemplate.id)} disabled={btnLoading[`export_${editTemplate.id}`]} style={{ padding: '6px 14px', background: btnLoading[`export_${editTemplate.id}`] ? '#d1d5db' : '#059669', color: '#fff', border: 'none', borderRadius: 6, cursor: btnLoading[`export_${editTemplate.id}`] ? 'not-allowed' : 'pointer', fontSize: 13 }}><i className={`fas ${btnLoading[`export_${editTemplate.id}`] ? 'fa-spinner fa-spin' : 'fa-file-excel'}`}></i> {btnLoading[`export_${editTemplate.id}`] ? 'Exporting...' : 'Excel'}</button>
-                </div>
+                   <button onClick={() => handleQuickCompile(editTemplate.id)} disabled={btnLoading[`compile_${editTemplate.id}`]} style={{ padding: '6px 14px', background: btnLoading[`compile_${editTemplate.id}`] ? '#d1d5db' : '#ea6645', color: '#fff', border: 'none', borderRadius: 6, cursor: btnLoading[`compile_${editTemplate.id}`] ? 'not-allowed' : 'pointer', fontSize: 13 }}><i className={`fas ${btnLoading[`compile_${editTemplate.id}`] ? 'fa-spinner fa-spin' : 'fa-bolt'}`}></i> {btnLoading[`compile_${editTemplate.id}`] ? 'Compiling...' : 'Quick Compile'}</button>
+                   <button onClick={() => handleExportTemplate(editTemplate.id)} disabled={btnLoading[`export_${editTemplate.id}`]} style={{ padding: '6px 14px', background: btnLoading[`export_${editTemplate.id}`] ? '#d1d5db' : '#059669', color: '#fff', border: 'none', borderRadius: 6, cursor: btnLoading[`export_${editTemplate.id}`] ? 'not-allowed' : 'pointer', fontSize: 13 }}><i className={`fas ${btnLoading[`export_${editTemplate.id}`] ? 'fa-spinner fa-spin' : 'fa-file-excel'}`}></i> {btnLoading[`export_${editTemplate.id}`] ? 'Exporting...' : 'Excel'}</button>
+                 </div>
+                 {compileResult && compileResult.templateId === editTemplate.id && (
+                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
+                     <StatCard icon="fa-users" label="Detected" value={compileResult.summary?.detected || 0} color="#3b82f6" />
+                     <StatCard icon="fa-check" label="Complete" value={compileResult.summary?.complete || 0} color="#059669" />
+                     <StatCard icon="fa-exclamation-triangle" label="Incomplete" value={compileResult.summary?.incomplete || 0} color="#d97706" />
+                     <StatCard icon="fa-times" label="Invalid" value={compileResult.summary?.invalid || 0} color="#dc2626" />
+                   </div>
+                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>Columns ({templateColumns.length})</span>
                   <button onClick={handleAddColumn} disabled={btnLoading['addColumn']} style={{ padding: '4px 10px', background: btnLoading['addColumn'] ? '#d1d5db' : '#ea6645', color: '#fff', border: 'none', borderRadius: 4, cursor: btnLoading['addColumn'] ? 'not-allowed' : 'pointer', fontSize: 12 }}><i className={`fas ${btnLoading['addColumn'] ? 'fa-spinner fa-spin' : 'fa-plus'}`}></i> {btnLoading['addColumn'] ? 'Adding...' : 'Add Column'}</button>
