@@ -6267,6 +6267,24 @@ model StaffReturnSubmission {
   @@index([status])
 }
 
+model InstitutionalLookupValue {
+  id         String   @id @default(uuid())
+  schoolId   String?
+  category   String
+  code       String
+  label      String
+  parentCode String?
+  active     Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([schoolId, category, code])
+  @@index([schoolId, category, active])
+  @@index([category, parentCode])
+}
+
 model StaffTransfer {
   id             String         @id @default(uuid())
   profileId      String

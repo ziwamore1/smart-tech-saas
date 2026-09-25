@@ -196,6 +196,18 @@ export class StaffRecordsController {
     return this.staffTemplateService.getCanonicalFields();
   }
 
+  @Get('lookups')
+  @Roles(...ADMIN_ROLES)
+  getInstitutionalLookups(@Req() req: any, @Query('category') category?: string) {
+    return this.staffTemplateService.getInstitutionalLookups(req.user.schoolId, category);
+  }
+
+  @Post('lookups')
+  @Roles(...ADMIN_ROLES)
+  addInstitutionalLookup(@Req() req: any, @Body() body: { category: string; label: string; parentCode?: string }) {
+    return this.staffTemplateService.addInstitutionalLookup(req.user.schoolId, body);
+  }
+
   @Post('institutional-returns/quick-compile')
   @Roles(...ADMIN_ROLES)
   quickCompile(@Body() body: { templateId: string; period: string }, @Req() req: any) {

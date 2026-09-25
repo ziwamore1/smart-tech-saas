@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CANONICAL_HR_FIELDS, detectCanonicalField, MOE_NON_TEACHING_HEADERS } from './institutional-returns.registry';
+import { CANONICAL_HR_FIELDS, detectCanonicalField, MOE_NON_TEACHING_HEADERS, INSTITUTIONAL_LOOKUP_SEEDS, ZAMBIA_GEOGRAPHY_SEEDS } from './institutional-returns.registry';
 
 @Injectable()
 export class StaffTemplateService {
@@ -13,12 +13,40 @@ export class StaffTemplateService {
   }
 
   async getInstitutionalReturns(schoolId: string) {
+    await this.ensureInstitutionalLookups(schoolId);
     await this.ensureOfficialTemplates(schoolId);
     const [templates, submissions] = await Promise.all([
       this.prisma.staffReturnTemplate.findMany({ where: { schoolId, isActive: true }, include: { _count: { select: { submissions: true } } }, orderBy: { updatedAt: 'desc' } }),
       this.findAllSubmissions(schoolId),
     ]);
     return { templates, submissions };
+  }
+
+  async getInstitutionalLookups(schoolId: string, category?: string) {
+    await this.ensureInstitutionalLookups(schoolId);
+    return this.prisma.institutionalLookupValue.findMany({
+      where: { active: true, ...(category ? { category } : {}), OR: [{ schoolId: null }, { schoolId }] },
+      orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }, { label: 'asc' }],
+    });
+  }
+
+  async addInstitutionalLookup(schoolId: string, data: { category: string; label: string; parentCode?: string }) {
+    const label = String(data.label || '').trim();
+    if (!label) throw new BadRequestException('Lookup value is required');
+    const code = label.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+    return this.prisma.institutionalLookupValue.upsert({
+      where: { schoolId_category_code: { schoolId, category: data.category, code } },
+      update: { label, parentCode: data.parentCode, active: true },
+      create: { schoolId, category: data.category, code, label, parentCode: data.parentCode, sortOrder: 9999 },
+    });
+  }
+
+  private async ensureInstitutionalLookups(schoolId: string) {
+    const seeds = [...INSTITUTIONAL_LOOKUP_SEEDS, ...ZAMBIA_GEOGRAPHY_SEEDS];
+    for (const seed of seeds) {
+      const existing = await this.prisma.institutionalLookupValue.findFirst({ where: { schoolId: null, category: seed.category, code: seed.code } });
+      if (!existing) await this.prisma.institutionalLookupValue.create({ data: { ...seed, schoolId: null } });
+    }
   }
 
   private async ensureOfficialTemplates(schoolId: string) {
@@ -84,6 +112,7 @@ export class StaffTemplateService {
         'staff.subjectBeingTaughtA': profile.dynamicFields?.subjectBeingTaughtA, 'staff.subjectBeingTaughtB': profile.dynamicFields?.subjectBeingTaughtB,
         'staff.subjectQualifiedToTeachA': profile.dynamicFields?.subjectQualifiedToTeachA, 'staff.subjectQualifiedToTeachB': profile.dynamicFields?.subjectQualifiedToTeachB,
         'staff.numberOfDaysAbsent': profile.dynamicFields?.numberOfDaysAbsent ?? 0,
+        'staff.phoneNumber': profile.phoneNumber,
         'staff.highestAcademicQualification': profile.academicQualification,
         'school.name': school.name, 'school.province': school.province, 'school.district': school.district,
         'school.constituency': (school as any).constituency, 'school.ward': (school as any).ward, 'school.zone': (school as any).zone,
@@ -518,7 +547,7 @@ export class StaffTemplateService {
       row.missing.push({ key, label: column.columnLabel });
     }
     row.status = row.missing.length ? 'INCOMPLETE' : 'COMPLETE';
-    await this.updateCanonicalField(staffId, key, value);
+    await this.updateCanonicalField(staffId, submission.schoolId, key, value);
     const updated = await this.prisma.staffReturnSubmission.update({
       where: { id },
       data: { data: rows as any, snapshot: { ...((submission.snapshot as any) || {}), rows } as any, status: 'DRAFT' },
@@ -528,7 +557,7 @@ export class StaffTemplateService {
     return updated;
   }
 
-  private async updateCanonicalField(staffId: string, key: string, value: any) {
+  private async updateCanonicalField(staffId: string, schoolId: string, key: string, value: any) {
     const profile = await this.prisma.staffHrProfile.findUnique({ where: { staffId } });
     if (!profile) throw new NotFoundException('Canonical staff profile not found');
     const directFields: Record<string, string> = {
@@ -539,11 +568,23 @@ export class StaffTemplateService {
       'staff.highestTeacherQualification': 'professionalQualification', 'staff.employmentStatus': 'employmentStatus',
       'staff.mainGradeTaught': 'gradeLevel', 'staff.dateOfBirth': 'dateOfBirth',
       'staff.firstAppointmentDate': 'dateOfFirstAppointment', 'staff.currentPostAppointmentDate': 'dateOfPresentAppointment',
+      'staff.phoneNumber': 'phoneNumber',
     };
+    if (key.startsWith('school.')) {
+      const schoolField: Record<string, string> = {
+        'school.province': 'province', 'school.district': 'district', 'school.constituency': 'constituency', 'school.ward': 'ward',
+        'school.zone': 'zone', 'school.location': 'locationType', 'school.runningAgency': 'runningAgency', 'school.type': 'schoolType',
+        'school.emisNumber': 'emisNumber', 'school.distanceFromDebOffice': 'distanceFromDebOffice',
+      };
+      const field = schoolField[key];
+      if (field) await this.prisma.school.update({ where: { id: schoolId }, data: { [field]: key === 'school.distanceFromDebOffice' && value !== '' ? Number(value) : value || null } });
+      return;
+    }
     if (directFields[key]) {
       const field = directFields[key];
       const dateField = ['dateOfBirth', 'dateOfFirstAppointment', 'dateOfPresentAppointment'].includes(field);
-      await this.prisma.staffHrProfile.update({ where: { staffId }, data: { [field]: dateField && value ? new Date(value) : value || null } });
+      const normalizedValue = field === 'phoneNumber' ? this.normalizeZambianPhone(value) : value;
+      await this.prisma.staffHrProfile.update({ where: { staffId }, data: { [field]: dateField && value ? new Date(value) : normalizedValue || null } });
       return;
     }
     if (key === 'staff.surname' || key === 'staff.firstName') {
@@ -555,6 +596,15 @@ export class StaffTemplateService {
     }
     const dynamicFields = { ...((profile.dynamicFields as any) || {}), [key.replace(/^staff\./, '')]: value ?? null };
     await this.prisma.staffHrProfile.update({ where: { staffId }, data: { dynamicFields } });
+  }
+
+  private normalizeZambianPhone(value: any) {
+    const input = String(value || '').trim().replace(/[\s()-]/g, '');
+    if (!input) return null;
+    if (input.startsWith('+')) return input;
+    if (input.startsWith('260')) return `+${input}`;
+    if (input.startsWith('0')) return `+260${input.slice(1)}`;
+    return `+260${input}`;
   }
 
   async submitSubmission(id: string, performedBy?: string) {
