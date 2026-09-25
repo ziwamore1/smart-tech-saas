@@ -554,6 +554,11 @@ export class StaffTemplateService {
   }
 
   async deleteSubmission(id: string) {
+    const submission = await this.prisma.staffReturnSubmission.findUnique({ where: { id } });
+    if (!submission) throw new NotFoundException('Submission not found');
+    if (['SUBMITTED', 'APPROVED', 'EXPORTED', 'ARCHIVED'].includes(submission.status)) {
+      throw new BadRequestException('Historical returns are immutable and cannot be deleted.');
+    }
     await this.prisma.staffReturnSubmission.delete({ where: { id } });
     return { message: 'Submission deleted successfully' };
   }

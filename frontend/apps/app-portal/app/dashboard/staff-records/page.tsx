@@ -110,8 +110,10 @@ export default function StaffRecordsPage() {
 
   const fetchTemplates = useCallback(async () => {
     try {
-      const res = await premiumStaffRecordsApi.getTemplates();
-      setTemplates(res.data?.data || res.data || []);
+      const res = await premiumStaffRecordsApi.getInstitutionalReturns();
+      const value = res.data?.data || res.data || {};
+      setTemplates(value.templates || []);
+      setSubmissions(value.submissions || []);
     } catch { }
   }, []);
 
@@ -191,6 +193,10 @@ export default function StaffRecordsPage() {
         .staff-records-grid .ag-root-wrapper { border: 1px solid #e5e7eb; border-radius: 8px; }
         .staff-records-grid .ag-header { background: #f9f5f0; border-bottom: 1px solid #e8ddd0; }
         .staff-records-grid .ag-row { border-bottom: 1px solid #f3eee8; }
+        .hr-returns-table { width: 100%; border-collapse: collapse; color: #111827; }
+        .hr-returns-table th { border: 1px solid #94a3b8; background: #e2e8f0; color: #111827; font-weight: 700; text-align: left; }
+        .hr-returns-table td { border: 1px solid #cbd5e1; color: #1f2937; }
+        .hr-returns-table tbody tr:nth-child(even) { background: #f8fafc; }
       `}</style>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -520,7 +526,7 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
       <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e8ddd0', overflow: 'hidden' }}>
         {gridError ? (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table className="hr-returns-table" style={{ fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#f9f5f0', textAlign: 'left' }}>
                   <th style={{ padding: '8px 12px', fontWeight: 600 }}>Staff ID</th>
@@ -922,7 +928,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                   <div style={{ textAlign: 'center', color: '#6b7280', padding: 20, fontSize: 13 }}>No columns. Add a column to start building your return template.</div>
                 ) : (
                   <div>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <table className="hr-returns-table" style={{ fontSize: 13 }}>
                       <thead>
                         <tr style={{ background: '#f9f5f0', textAlign: 'left' }}>
                           <th style={{ padding: '8px 10px', fontWeight: 600, width: 40 }}>#</th>
@@ -1022,7 +1028,7 @@ function ReturnsTabWithTemplates({ templates, submissions, onRefresh }: { templa
                       </div>
                     </div>
                     <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <table className="hr-returns-table" style={{ fontSize: 12 }}>
                         <thead>
                           <tr style={{ background: '#f9f5f0', textAlign: 'left' }}>
                             <th style={{ padding: '6px 8px', fontWeight: 600, width: 30 }}>#</th>
@@ -1166,6 +1172,24 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
     });
   };
 
+  const handleDelete = (id: string) => {
+    if (!window.confirm('Delete this draft return?')) return;
+    withSubLoading(`delete_${id}`, async () => {
+      await premiumStaffRecordsApi.deleteSubmission(id);
+      if (selectedSub?.id === id) setSelectedSub(null);
+      fetchSubmissions(selectedTemplate || undefined);
+    });
+  };
+
+  const handleView = (id: string) => {
+    withSubLoading(`view_${id}`, async () => {
+      const response = await premiumStaffRecordsApi.getSubmissionById(id);
+      const value = response.data?.data || response.data;
+      setSelectedSub(value);
+      setSubData(value?.data || []);
+    });
+  };
+
   useEffect(() => { fetchSubmissions(); }, [fetchSubmissions]);
 
   return (
@@ -1187,7 +1211,7 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
         </div>
       ) : (
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e8ddd0', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table className="hr-returns-table" style={{ fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#f9f5f0', textAlign: 'left' }}>
                 <th style={{ padding: '8px 12px', fontWeight: 600 }}>Template</th>
@@ -1210,13 +1234,24 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
                     <div style={{ display: 'flex', gap: 4 }}>
                       {s.status === 'DRAFT' && <button onClick={() => handleSubmit(s.id)} disabled={!!subLoading[`submit_${s.id}`]} style={{ padding: '3px 8px', background: subLoading[`submit_${s.id}`] ? '#93c5fd' : '#3b82f6', color: '#fff', border: 'none', borderRadius: 4, cursor: subLoading[`submit_${s.id}`] ? 'not-allowed' : 'pointer', fontSize: 11 }}>{subLoading[`submit_${s.id}`] ? '...' : 'Submit'}</button>}
                       {s.status === 'SUBMITTED' && <button onClick={() => handleApprove(s.id)} disabled={!!subLoading[`approve_${s.id}`]} style={{ padding: '3px 8px', background: subLoading[`approve_${s.id}`] ? '#6ee7b7' : '#059669', color: '#fff', border: 'none', borderRadius: 4, cursor: subLoading[`approve_${s.id}`] ? 'not-allowed' : 'pointer', fontSize: 11 }}>{subLoading[`approve_${s.id}`] ? '...' : 'Approve'}</button>}
+                      <button onClick={() => handleView(s.id)} disabled={!!subLoading[`view_${s.id}`]} style={{ padding: '3px 8px', background: '#475569', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>{subLoading[`view_${s.id}`] ? '...' : 'View'}</button>
                       <button onClick={() => handleExport(s.id)} disabled={!!subLoading[`export_${s.id}`]} style={{ padding: '3px 8px', background: subLoading[`export_${s.id}`] ? '#9ca3af' : '#6b7280', color: '#fff', border: 'none', borderRadius: 4, cursor: subLoading[`export_${s.id}`] ? 'not-allowed' : 'pointer', fontSize: 11 }}>{subLoading[`export_${s.id}`] ? '...' : 'Excel'}</button>
+                      {s.status === 'DRAFT' && <button onClick={() => handleDelete(s.id)} disabled={!!subLoading[`delete_${s.id}`]} style={{ padding: '3px 8px', background: '#b91c1c', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>{subLoading[`delete_${s.id}`] ? '...' : 'Delete'}</button>}
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {selectedSub && (
+        <div style={{ marginTop: 16, background: '#fff', border: '1px solid #94a3b8', borderRadius: 8, padding: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <strong style={{ color: '#111827' }}>Return Details</strong>
+            <button onClick={() => setSelectedSub(null)} style={{ border: '1px solid #94a3b8', background: '#fff', color: '#111827', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>Close</button>
+          </div>
+          <p style={{ color: '#374151', marginTop: 8 }}>Status: {selectedSub.status || 'DRAFT'} · Records: {subData.length}</p>
         </div>
       )}
     </div>
@@ -1233,7 +1268,7 @@ function TransfersTab({ transfers, onRefresh, profiles }: { transfers: any[]; on
         <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No staff transfers recorded.</div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table className="hr-returns-table" style={{ fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#f9f5f0', textAlign: 'left' }}>
                 <th style={{ padding: '10px 14px', fontWeight: 600 }}>Type</th>
@@ -1307,7 +1342,7 @@ function SyncTab({ syncStatus, syncHistory, onSyncAll }: { syncStatus: any; sync
           <div style={{ padding: 20, textAlign: 'center', color: '#6b7280', fontSize: 13 }}>No sync history yet.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <table className="hr-returns-table" style={{ fontSize: 12 }}>
               <thead>
                 <tr style={{ background: '#f9f5f0', textAlign: 'left' }}>
                   <th style={{ padding: '8px 12px', fontWeight: 600 }}>Type</th>
