@@ -316,6 +316,12 @@ export class StaffRecordsController {
     return this.staffTemplateService.submitSubmission(id, req.user?.sub || req.user?.id);
   }
 
+  @Post('submissions/:id/reopen')
+  @Roles(...ADMIN_ROLES)
+  reopenSubmission(@Param('id') id: string, @Req() req: any) {
+    return this.staffTemplateService.reopenSubmission(id, req.user?.sub || req.user?.id);
+  }
+
   @Post('submissions/:id/approve')
   @Roles('Director', 'SuperAdmin')
   approveSubmission(@Param('id') id: string, @Req() req: any) {

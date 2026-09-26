@@ -1205,6 +1205,14 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
     });
   };
 
+  const handleReopen = (id: string) => {
+    withSubLoading(`reopen_${id}`, async () => {
+      await premiumStaffRecordsApi.reopenSubmission(id);
+      fetchSubmissions(selectedTemplate || undefined);
+      if (selectedSub?.id === id) await handleView(id);
+    });
+  };
+
   const handleExport = (id: string) => {
     withSubLoading(`export_${id}`, async () => {
       const res = await premiumStaffRecordsApi.exportSubmissionExcel(id);
@@ -1236,8 +1244,8 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
     });
   };
 
-  const beginEdit = (row: any) => {
-    const fields = editAllFields ? (selectedSub?.template?.columns || []) : (row.missing || []);
+  const beginEdit = (row: any, allFields = false) => {
+    const fields = allFields ? (selectedSub?.template?.columns || []) : (row.missing || []);
     setEditingStaff({ ...row, fields });
     const values: Record<string, any> = {};
     fields.forEach((field: any) => { const key = field.key || field.columnName; values[key] = row.values?.[key] || ''; });
@@ -1339,6 +1347,7 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
                     <div style={{ display: 'flex', gap: 4 }}>
                       {s.status === 'DRAFT' && <button onClick={() => handleSubmit(s.id)} disabled={!!subLoading[`submit_${s.id}`]} style={{ padding: '3px 8px', background: subLoading[`submit_${s.id}`] ? '#93c5fd' : '#3b82f6', color: '#fff', border: 'none', borderRadius: 4, cursor: subLoading[`submit_${s.id}`] ? 'not-allowed' : 'pointer', fontSize: 11 }}>{subLoading[`submit_${s.id}`] ? '...' : 'Submit'}</button>}
                       {s.status === 'SUBMITTED' && <button onClick={() => handleApprove(s.id)} disabled={!!subLoading[`approve_${s.id}`]} style={{ padding: '3px 8px', background: subLoading[`approve_${s.id}`] ? '#6ee7b7' : '#059669', color: '#fff', border: 'none', borderRadius: 4, cursor: subLoading[`approve_${s.id}`] ? 'not-allowed' : 'pointer', fontSize: 11 }}>{subLoading[`approve_${s.id}`] ? '...' : 'Approve'}</button>}
+                      {['SUBMITTED', 'APPROVED', 'EXPORTED'].includes(s.status) && <button onClick={() => handleReopen(s.id)} disabled={!!subLoading[`reopen_${s.id}`]} style={{ padding: '3px 8px', background: '#b45309', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>{subLoading[`reopen_${s.id}`] ? '...' : 'Reopen'}</button>}
                       <button onClick={() => handleView(s.id)} disabled={!!subLoading[`view_${s.id}`]} style={{ padding: '3px 8px', background: '#475569', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>{subLoading[`view_${s.id}`] ? '...' : 'View'}</button>
                       <button onClick={() => handleExport(s.id)} disabled={!!subLoading[`export_${s.id}`]} style={{ padding: '3px 8px', background: subLoading[`export_${s.id}`] ? '#9ca3af' : '#6b7280', color: '#fff', border: 'none', borderRadius: 4, cursor: subLoading[`export_${s.id}`] ? 'not-allowed' : 'pointer', fontSize: 11 }}>{subLoading[`export_${s.id}`] ? '...' : 'Excel'}</button>
                       {s.status === 'DRAFT' && <button onClick={() => handleDelete(s.id)} disabled={!!subLoading[`delete_${s.id}`]} style={{ padding: '3px 8px', background: '#b91c1c', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>{subLoading[`delete_${s.id}`] ? '...' : 'Delete'}</button>}
@@ -1361,7 +1370,7 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
             <div style={{ overflowX: 'auto', marginTop: 10 }}>
               <table className="hr-returns-table" style={{ fontSize: 13 }}>
                 <thead><tr><th style={{ padding: '8px 10px' }}>Staff Name</th><th style={{ padding: '8px 10px' }}>Status</th><th style={{ padding: '8px 10px' }}>Missing Fields</th><th style={{ padding: '8px 10px' }}>Action</th></tr></thead>
-                <tbody>{subData.slice(0, 25).map((row: any, index: number) => <tr key={row.staffId || index}><td style={{ padding: '8px 10px', fontWeight: 600 }}>{row.staffName || row.values?.['staff.firstName'] || 'Staff member'}</td><td style={{ padding: '8px 10px' }}><StatusBadge status={row.status || 'DRAFT'} /></td><td style={{ padding: '8px 10px' }}>{row.missing?.length || 0}</td><td style={{ padding: '8px 10px' }}><button onClick={() => { setEditAllFields(false); beginEdit(row); }} style={{ padding: '4px 10px', background: '#ea6645', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Edit Missing</button> <button onClick={() => { setEditAllFields(true); beginEdit(row); }} style={{ padding: '4px 10px', background: '#475569', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Edit All</button></td></tr>)}</tbody>
+              <tbody>{subData.slice(0, 25).map((row: any, index: number) => <tr key={row.staffId || index}><td style={{ padding: '8px 10px', fontWeight: 600 }}>{row.staffName || row.values?.['staff.firstName'] || 'Staff member'}</td><td style={{ padding: '8px 10px' }}><StatusBadge status={row.status || 'DRAFT'} /></td><td style={{ padding: '8px 10px' }}>{row.missing?.length || 0}</td><td style={{ padding: '8px 10px' }}>{selectedSub.status === 'DRAFT' ? <><button onClick={() => { setEditAllFields(false); beginEdit(row, false); }} style={{ padding: '4px 10px', background: '#ea6645', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Edit Missing</button> <button onClick={() => { setEditAllFields(true); beginEdit(row, true); }} style={{ padding: '4px 10px', background: '#475569', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Edit All</button></> : <button onClick={() => handleReopen(selectedSub.id)} disabled={!!subLoading[`reopen_${selectedSub.id}`]} style={{ padding: '4px 10px', background: '#b45309', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>{subLoading[`reopen_${selectedSub.id}`] ? 'Reopening...' : 'Reopen for Correction'}</button>}</td></tr>)}</tbody>
               </table>
             </div>
           )}

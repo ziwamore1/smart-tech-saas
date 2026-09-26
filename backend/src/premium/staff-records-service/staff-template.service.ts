@@ -703,6 +703,15 @@ export class StaffTemplateService {
     });
   }
 
+  async reopenSubmission(id: string, performedBy?: string) {
+    const submission = await this.prisma.staffReturnSubmission.findUnique({ where: { id } });
+    if (!submission) throw new NotFoundException('Submission not found');
+    if (!['SUBMITTED', 'APPROVED', 'EXPORTED'].includes(submission.status)) return submission;
+    const updated = await this.prisma.staffReturnSubmission.update({ where: { id }, data: { status: 'DRAFT', submittedAt: null, approvedAt: null, approvedBy: null } });
+    await this.createAuditLog({ submissionId: id, schoolId: submission.schoolId, action: 'REOPEN_FOR_CORRECTION', entityType: 'INSTITUTIONAL_RETURN', entityId: id, performedBy });
+    return updated;
+  }
+
   async approveSubmission(id: string, approvedBy: string) {
     const submission = await this.prisma.staffReturnSubmission.findUnique({
       where: { id },
