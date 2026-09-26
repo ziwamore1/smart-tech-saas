@@ -891,8 +891,8 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
       <div style={{ background: '#fff', border: '1px solid #94a3b8', borderRadius: 12, padding: 16, marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div>
-            <h3 style={{ margin: 0, color: '#111827', fontSize: 17, fontWeight: 700 }}>Staff Records Available for Returns</h3>
-            <p style={{ margin: '4px 0 0', color: '#374151', fontSize: 13 }}>These records come from the canonical HR profiles and are reused automatically during compilation.</p>
+            <h3 style={{ margin: 0, color: '#111827', fontSize: 17, fontWeight: 700 }}>Canonical Staff Records Available for Returns</h3>
+            <p style={{ margin: '4px 0 0', color: '#374151', fontSize: 13 }}>This compact staff list is independent of the configured template columns. Template fields are applied only when you load or export a return.</p>
           </div>
           <strong style={{ color: '#111827', fontSize: 20 }}>{profiles.length}</strong>
         </div>
@@ -1275,6 +1275,8 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
     if (key === 'staff.employmentStatus') return 'EMPLOYMENT_STATUS';
     if (key === 'staff.differentlyAbled') return 'DIFFERENTLY_ABLED';
     if (key === 'staff.nationality') return 'NATIONALITY';
+    if (key === 'staff.highestAcademicQualification') return 'HIGHEST_ACADEMIC';
+    if (key === 'staff.highestLevelOfEducation') return 'EDUCATION_LEVEL';
     if (key.includes('Position')) return 'POSITION';
     if (key.includes('Qualification')) return key.includes('Teacher') ? 'TEACHER_QUALIFICATION' : 'QUALIFICATION';
     if (key.includes('Subject')) return 'SUBJECT';
