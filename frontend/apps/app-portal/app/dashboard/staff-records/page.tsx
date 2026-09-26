@@ -1275,6 +1275,7 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
     if (key === 'staff.employmentStatus') return 'EMPLOYMENT_STATUS';
     if (key === 'staff.differentlyAbled') return 'DIFFERENTLY_ABLED';
     if (key === 'staff.nationality') return 'NATIONALITY';
+    if (key === 'staff.additionalResponsibilities') return 'ADDITIONAL_RESPONSIBILITY';
     if (key === 'staff.highestAcademicQualification') return 'HIGHEST_ACADEMIC';
     if (key === 'staff.highestLevelOfEducation') return 'EDUCATION_LEVEL';
     if (key.includes('Position')) return 'POSITION';
