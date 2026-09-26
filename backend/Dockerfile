@@ -51,6 +51,9 @@ COPY --from=builder /app/prisma ./prisma
 # Copy Handlebars templates for report card generation
 COPY --from=builder /app/src/templates ./src/templates
 
+# Official institutional return workbooks used by the exact Excel renderer.
+COPY --from=builder /app/hr_profile_docs ./hr_profile_docs
+
 # Copy the Smart Tech seal used by certificate rendering.
 COPY --from=builder /app/smart_tech_images ./smart_tech_images
 
