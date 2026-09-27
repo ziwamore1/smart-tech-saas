@@ -1167,6 +1167,8 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
   const [submissionPeriod, setSubmissionPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(false);
   const [subLoading, setSubLoading] = useState<Record<string, boolean>>({});
+  const [staffPage, setStaffPage] = useState(1);
+  const staffPageSize = 25;
 
   const withSubLoading = async (key: string, fn: () => Promise<void>) => {
     setSubLoading(prev => ({ ...prev, [key]: true }));
@@ -1245,6 +1247,7 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
       const value = payload?.data?.id ? payload.data : payload;
       setSelectedSub(value);
       setSubData(value?.data || []);
+      setStaffPage(1);
     });
   };
 
@@ -1308,6 +1311,9 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
     const province = editingValues['school.province'] || editingStaff?.values?.['school.province'];
     return lookupValues.filter(option => option.category === category && (category !== 'DISTRICT' || !province || option.parentCode === String(province).toUpperCase().replace(/[^A-Z0-9]+/g, '_')));
   };
+
+  const staffPageCount = Math.max(1, Math.ceil(subData.length / staffPageSize));
+  const visibleStaffRows = subData.slice((staffPage - 1) * staffPageSize, staffPage * staffPageSize);
 
   return (
     <div>
@@ -1374,9 +1380,19 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
             <div style={{ overflowX: 'auto', marginTop: 10 }}>
               <table className="hr-returns-table" style={{ fontSize: 13 }}>
                 <thead><tr><th style={{ padding: '8px 10px' }}>Staff Name</th><th style={{ padding: '8px 10px' }}>Status</th><th style={{ padding: '8px 10px' }}>Missing Fields</th><th style={{ padding: '8px 10px' }}>Action</th></tr></thead>
-              <tbody>{subData.slice(0, 25).map((row: any, index: number) => <tr key={row.staffId || index}><td style={{ padding: '8px 10px', fontWeight: 600 }}>{row.staffName || row.values?.['staff.firstName'] || 'Staff member'}</td><td style={{ padding: '8px 10px' }}><StatusBadge status={row.status || 'DRAFT'} /></td><td style={{ padding: '8px 10px' }}>{row.missing?.length || 0}</td><td style={{ padding: '8px 10px' }}>{selectedSub.status === 'DRAFT' ? <><button onClick={() => { setEditAllFields(false); beginEdit(row, false); }} style={{ padding: '4px 10px', background: '#ea6645', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Edit Missing</button> <button onClick={() => { setEditAllFields(true); beginEdit(row, true); }} style={{ padding: '4px 10px', background: '#475569', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Edit All</button></> : <button onClick={() => handleReopen(selectedSub.id)} disabled={!!subLoading[`reopen_${selectedSub.id}`]} style={{ padding: '4px 10px', background: '#b45309', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>{subLoading[`reopen_${selectedSub.id}`] ? 'Reopening...' : 'Reopen for Correction'}</button>}</td></tr>)}</tbody>
-              </table>
-            </div>
+               <tbody>{visibleStaffRows.map((row: any, index: number) => <tr key={row.staffId || (staffPage - 1) * staffPageSize + index}><td style={{ padding: '8px 10px', fontWeight: 600 }}>{row.staffName || row.values?.['staff.firstName'] || 'Staff member'}</td><td style={{ padding: '8px 10px' }}><StatusBadge status={row.status || 'DRAFT'} /></td><td style={{ padding: '8px 10px' }}>{row.missing?.length || 0}</td><td style={{ padding: '8px 10px' }}>{selectedSub.status === 'DRAFT' ? <><button onClick={() => { setEditAllFields(false); beginEdit(row, false); }} style={{ padding: '4px 10px', background: '#ea6645', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Edit Missing</button> <button onClick={() => { setEditAllFields(true); beginEdit(row, true); }} style={{ padding: '4px 10px', background: '#475569', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Edit All</button></> : <button onClick={() => handleReopen(selectedSub.id)} disabled={!!subLoading[`reopen_${selectedSub.id}`]} style={{ padding: '4px 10px', background: '#b45309', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>{subLoading[`reopen_${selectedSub.id}`] ? 'Reopening...' : 'Reopen for Correction'}</button>}</td></tr>)}</tbody>
+               </table>
+               {subData.length > staffPageSize && (
+                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, padding: '0 2px', color: '#475569', fontSize: 12 }}>
+                   <span>Showing {(staffPage - 1) * staffPageSize + 1}-{Math.min(staffPage * staffPageSize, subData.length)} of {subData.length} staff</span>
+                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                     <button onClick={() => setStaffPage(page => Math.max(1, page - 1))} disabled={staffPage === 1} style={{ padding: '4px 10px', border: '1px solid #cbd5e1', borderRadius: 4, background: staffPage === 1 ? '#f1f5f9' : '#fff', color: '#334155', cursor: staffPage === 1 ? 'not-allowed' : 'pointer' }}>Previous</button>
+                     <span>Page {staffPage} of {staffPageCount}</span>
+                     <button onClick={() => setStaffPage(page => Math.min(staffPageCount, page + 1))} disabled={staffPage === staffPageCount} style={{ padding: '4px 10px', border: '1px solid #cbd5e1', borderRadius: 4, background: staffPage === staffPageCount ? '#f1f5f9' : '#fff', color: '#334155', cursor: staffPage === staffPageCount ? 'not-allowed' : 'pointer' }}>Next</button>
+                   </div>
+                 </div>
+               )}
+             </div>
           )}
           {editingStaff && (
             <div style={{ marginTop: 14, border: '1px solid #ea6645', borderRadius: 8, padding: 14, background: '#fffaf5' }}>
