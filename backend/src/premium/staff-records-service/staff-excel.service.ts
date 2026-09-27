@@ -19,15 +19,15 @@ export class StaffExcelService {
 
   constructor(private prisma: PrismaService) {}
 
-  async generateInstitutionalReturnExcel(submissionId: string, options: ExportOptions = {}): Promise<ExcelJS.Buffer> {
+  async generateInstitutionalReturnExcel(submissionId: string, schoolId: string, options: ExportOptions = {}): Promise<ExcelJS.Buffer> {
     const submission = await this.prisma.staffReturnSubmission.findUnique({
       where: { id: submissionId },
       include: { template: { include: { columns: { orderBy: { columnOrder: 'asc' } } } } },
     });
-    if (!submission) throw new Error('Submission not found');
+    if (!submission || submission.schoolId !== schoolId) throw new Error('Submission not found');
     const config = (submission.template.config || {}) as any;
     const asset = config.workbookAsset;
-    if (!asset || !config.sheetName) return this.generateStaffReturnExcel(submissionId, options);
+    if (!asset || !config.sheetName) return this.generateStaffReturnExcel(submissionId, schoolId, options);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(path.join(process.cwd(), 'hr_profile_docs', asset));
     const worksheet = workbook.getWorksheet(config.sheetName);
@@ -67,6 +67,7 @@ export class StaffExcelService {
 
   async generateStaffReturnExcel(
     submissionId: string,
+    schoolId: string,
     options: ExportOptions = {},
   ): Promise<ExcelJS.Buffer> {
     const submission = await this.prisma.staffReturnSubmission.findUnique({
@@ -80,7 +81,7 @@ export class StaffExcelService {
       },
     });
 
-    if (!submission) {
+    if (!submission || submission.schoolId !== schoolId) {
       throw new Error('Submission not found');
     }
 
@@ -316,10 +317,11 @@ export class StaffExcelService {
 
   async generateTemplateExcel(
     templateId: string,
+    schoolId: string,
     options: ExportOptions = {},
   ): Promise<ExcelJS.Buffer> {
-    const template = await this.prisma.staffReturnTemplate.findUnique({
-      where: { id: templateId },
+    const template = await this.prisma.staffReturnTemplate.findFirst({
+      where: { id: templateId, schoolId },
       include: {
         columns: { where: { isVisible: true }, orderBy: { columnOrder: 'asc' } },
       },

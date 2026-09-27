@@ -848,6 +848,10 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
   const handleQuickCompile = async (templateId: string) => {
     withBtnLoading(`compile_${templateId}`, async () => {
       try {
+        const response = await premiumStaffRecordsApi.quickCompile({
+          templateId,
+          period: templatePeriod || new Date().toISOString().slice(0, 7),
+        });
         const payload = response.data;
         const result = payload?.data?.id ? payload.data : payload;
         setCompileResult(result);

@@ -216,8 +216,8 @@ export class StaffRecordsController {
 
   @Get('templates/:id')
   @Roles(...ADMIN_ROLES)
-  findTemplateById(@Param('id') id: string) {
-    return this.staffTemplateService.findTemplateById(id);
+  findTemplateById(@Param('id') id: string, @Req() req: any) {
+    return this.staffTemplateService.findTemplateById(id, req.user.schoolId);
   }
 
   @Post('templates')
@@ -228,46 +228,46 @@ export class StaffRecordsController {
 
   @Put('templates/:id')
   @Roles(...ADMIN_ROLES)
-  updateTemplate(@Param('id') id: string, @Body() body: any) {
-    return this.staffTemplateService.updateTemplate(id, body);
+  updateTemplate(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.staffTemplateService.updateTemplate(id, req.user.schoolId, body);
   }
 
   @Delete('templates/:id')
   @Roles(...ADMIN_ROLES)
-  deleteTemplate(@Param('id') id: string) {
-    return this.staffTemplateService.deleteTemplate(id);
+  deleteTemplate(@Param('id') id: string, @Req() req: any) {
+    return this.staffTemplateService.deleteTemplate(id, req.user.schoolId);
   }
 
   @Post('templates/:id/duplicate')
   @Roles(...ADMIN_ROLES)
-  duplicateTemplate(@Param('id') id: string, @Body('name') name: string) {
-    return this.staffTemplateService.duplicateTemplate(id, name);
+  duplicateTemplate(@Param('id') id: string, @Body('name') name: string, @Req() req: any) {
+    return this.staffTemplateService.duplicateTemplate(id, req.user.schoolId, name);
   }
 
   // ── Template Columns ──
 
   @Post('templates/:templateId/columns')
   @Roles(...ADMIN_ROLES)
-  addColumn(@Param('templateId') templateId: string, @Body() body: any) {
-    return this.staffTemplateService.addColumn(templateId, body);
+  addColumn(@Param('templateId') templateId: string, @Body() body: any, @Req() req: any) {
+    return this.staffTemplateService.addColumn(templateId, req.user.schoolId, body);
   }
 
   @Put('columns/:id')
   @Roles(...ADMIN_ROLES)
-  updateColumn(@Param('id') id: string, @Body() body: any) {
-    return this.staffTemplateService.updateColumn(id, body);
+  updateColumn(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.staffTemplateService.updateColumn(id, req.user.schoolId, body);
   }
 
   @Delete('columns/:id')
   @Roles(...ADMIN_ROLES)
-  deleteColumn(@Param('id') id: string) {
-    return this.staffTemplateService.deleteColumn(id);
+  deleteColumn(@Param('id') id: string, @Req() req: any) {
+    return this.staffTemplateService.deleteColumn(id, req.user.schoolId);
   }
 
   @Post('templates/:templateId/columns/reorder')
   @Roles(...ADMIN_ROLES)
-  reorderColumns(@Param('templateId') templateId: string, @Body() body: { columns: { id: string; order: number }[] }) {
-    return this.staffTemplateService.reorderColumns(templateId, body.columns);
+  reorderColumns(@Param('templateId') templateId: string, @Body() body: { columns: { id: string; order: number }[] }, @Req() req: any) {
+    return this.staffTemplateService.reorderColumns(templateId, req.user.schoolId, body.columns);
   }
 
   // ══════════════════════════════════════════
@@ -282,8 +282,8 @@ export class StaffRecordsController {
 
   @Get('submissions/:id')
   @Roles(...ADMIN_ROLES)
-  findSubmissionById(@Param('id') id: string) {
-    return this.staffTemplateService.findSubmissionById(id);
+  findSubmissionById(@Param('id') id: string, @Req() req: any) {
+    return this.staffTemplateService.findSubmissionById(id, req.user.schoolId);
   }
 
   @Post('submissions')
@@ -294,44 +294,44 @@ export class StaffRecordsController {
 
   @Put('submissions/:id/data')
   @Roles(...ADMIN_ROLES)
-  updateSubmissionData(@Param('id') id: string, @Body('data') data: any[]) {
-    return this.staffTemplateService.updateSubmission(id, data);
+  updateSubmissionData(@Param('id') id: string, @Body('data') data: any[], @Req() req: any) {
+    return this.staffTemplateService.updateSubmission(id, req.user.schoolId, data);
   }
 
   @Put('submissions/:id/staff/:staffId/field')
   @Roles(...ADMIN_ROLES)
   updateSubmissionStaffField(@Param('id') id: string, @Param('staffId') staffId: string, @Body() body: { key: string; value: any }, @Req() req: any) {
-    return this.staffTemplateService.updateSubmissionStaffField(id, staffId, body.key, body.value, req.user?.sub || req.user?.id);
+    return this.staffTemplateService.updateSubmissionStaffField(id, req.user.schoolId, staffId, body.key, body.value, req.user?.sub || req.user?.id);
   }
 
   @Put('submissions/:id/staff/:staffId/fields')
   @Roles(...ADMIN_ROLES)
   updateSubmissionStaffFields(@Param('id') id: string, @Param('staffId') staffId: string, @Body('fields') fields: Record<string, any>, @Req() req: any) {
-    return this.staffTemplateService.updateSubmissionStaffFields(id, staffId, fields, req.user?.sub || req.user?.id);
+    return this.staffTemplateService.updateSubmissionStaffFields(id, req.user.schoolId, staffId, fields, req.user?.sub || req.user?.id);
   }
 
   @Post('submissions/:id/submit')
   @Roles(...ADMIN_ROLES)
   submitSubmission(@Param('id') id: string, @Req() req: any) {
-    return this.staffTemplateService.submitSubmission(id, req.user?.sub || req.user?.id);
+    return this.staffTemplateService.submitSubmission(id, req.user.schoolId, req.user?.sub || req.user?.id);
   }
 
   @Post('submissions/:id/reopen')
   @Roles(...ADMIN_ROLES)
   reopenSubmission(@Param('id') id: string, @Req() req: any) {
-    return this.staffTemplateService.reopenSubmission(id, req.user?.sub || req.user?.id);
+    return this.staffTemplateService.reopenSubmission(id, req.user.schoolId, req.user?.sub || req.user?.id);
   }
 
   @Post('submissions/:id/approve')
   @Roles('Director', 'SuperAdmin')
   approveSubmission(@Param('id') id: string, @Req() req: any) {
-    return this.staffTemplateService.approveSubmission(id, req.user?.sub || req.user?.id);
+    return this.staffTemplateService.approveSubmission(id, req.user.schoolId, req.user?.sub || req.user?.id);
   }
 
   @Delete('submissions/:id')
   @Roles(...ADMIN_ROLES)
-  deleteSubmission(@Param('id') id: string) {
-    return this.staffTemplateService.deleteSubmission(id);
+  deleteSubmission(@Param('id') id: string, @Req() req: any) {
+    return this.staffTemplateService.deleteSubmission(id, req.user.schoolId);
   }
 
   // ══════════════════════════════════════════
@@ -343,7 +343,7 @@ export class StaffRecordsController {
   @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
   async exportSubmissionExcel(@Param('id') id: string, @Req() req: any, @Res() res: Response) {
     const school = await this.staffRecordsService.getSchoolInfo(req.user.schoolId);
-    const buffer = await this.staffExcelService.generateInstitutionalReturnExcel(id, {
+    const buffer = await this.staffExcelService.generateInstitutionalReturnExcel(id, req.user.schoolId, {
       schoolName: school?.name,
       province: school?.province,
       district: school?.district,
@@ -360,7 +360,7 @@ export class StaffRecordsController {
   @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
   async exportTemplateExcel(@Param('id') id: string, @Req() req: any, @Res() res: Response) {
     const school = await this.staffRecordsService.getSchoolInfo(req.user.schoolId);
-    const buffer = await this.staffExcelService.generateTemplateExcel(id, {
+    const buffer = await this.staffExcelService.generateTemplateExcel(id, req.user.schoolId, {
       schoolName: school?.name,
     });
     res.setHeader('Content-Disposition', `attachment; filename="template-${id.slice(0, 8)}.xlsx"`);

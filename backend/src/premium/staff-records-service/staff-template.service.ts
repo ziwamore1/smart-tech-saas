@@ -193,7 +193,7 @@ export class StaffTemplateService {
     });
   }
 
-  async findTemplateById(id: string) {
+  async findTemplateById(id: string, schoolId: string) {
     const template = await this.prisma.staffReturnTemplate.findUnique({
       where: { id },
       include: {
@@ -202,7 +202,7 @@ export class StaffTemplateService {
       },
     });
 
-    if (!template) {
+    if (!template || template.schoolId !== schoolId) {
       throw new NotFoundException('Template not found');
     }
 
@@ -256,6 +256,7 @@ export class StaffTemplateService {
 
   async updateTemplate(
     id: string,
+    schoolId: string,
     data: {
       name?: string;
       description?: string;
@@ -270,7 +271,7 @@ export class StaffTemplateService {
       where: { id },
     });
 
-    if (!existing) {
+    if (!existing || existing.schoolId !== schoolId) {
       throw new NotFoundException('Template not found');
     }
 
@@ -291,12 +292,12 @@ export class StaffTemplateService {
     });
   }
 
-  async deleteTemplate(id: string) {
+  async deleteTemplate(id: string, schoolId: string) {
     const existing = await this.prisma.staffReturnTemplate.findUnique({
       where: { id },
     });
 
-    if (!existing) {
+    if (!existing || existing.schoolId !== schoolId) {
       throw new NotFoundException('Template not found');
     }
 
@@ -305,13 +306,13 @@ export class StaffTemplateService {
     return { message: 'Template deleted successfully' };
   }
 
-  async duplicateTemplate(id: string, newName: string) {
+  async duplicateTemplate(id: string, schoolId: string, newName: string) {
     const existing = await this.prisma.staffReturnTemplate.findUnique({
       where: { id },
       include: { columns: true },
     });
 
-    if (!existing) {
+    if (!existing || existing.schoolId !== schoolId) {
       throw new NotFoundException('Template not found');
     }
 
@@ -352,6 +353,7 @@ export class StaffTemplateService {
 
   async addColumn(
     templateId: string,
+    schoolId: string,
     data: {
       columnName: string;
       columnLabel: string;
@@ -367,7 +369,7 @@ export class StaffTemplateService {
       where: { id: templateId },
     });
 
-    if (!template) {
+    if (!template || template.schoolId !== schoolId) {
       throw new NotFoundException('Template not found');
     }
 
@@ -388,6 +390,7 @@ export class StaffTemplateService {
 
   async updateColumn(
     id: string,
+    schoolId: string,
     data: {
       columnName?: string;
       columnLabel?: string;
@@ -412,6 +415,8 @@ export class StaffTemplateService {
     if (!existing) {
       throw new NotFoundException('Column not found');
     }
+    const template = await this.prisma.staffReturnTemplate.findUnique({ where: { id: existing.templateId }, select: { schoolId: true } });
+    if (!template || template.schoolId !== schoolId) throw new NotFoundException('Column not found');
 
     return this.prisma.staffReturnColumn.update({
       where: { id },
@@ -434,7 +439,7 @@ export class StaffTemplateService {
     });
   }
 
-  async deleteColumn(id: string) {
+  async deleteColumn(id: string, schoolId: string) {
     const existing = await this.prisma.staffReturnColumn.findUnique({
       where: { id },
     });
@@ -442,22 +447,26 @@ export class StaffTemplateService {
     if (!existing) {
       throw new NotFoundException('Column not found');
     }
+    const template = await this.prisma.staffReturnTemplate.findUnique({ where: { id: existing.templateId }, select: { schoolId: true } });
+    if (!template || template.schoolId !== schoolId) throw new NotFoundException('Column not found');
 
     await this.prisma.staffReturnColumn.delete({ where: { id } });
 
     return { message: 'Column deleted successfully' };
   }
 
-  async reorderColumns(templateId: string, columnOrder: { id: string; order: number }[]) {
+  async reorderColumns(templateId: string, schoolId: string, columnOrder: { id: string; order: number }[]) {
     const template = await this.prisma.staffReturnTemplate.findUnique({
       where: { id: templateId },
     });
 
-    if (!template) {
+    if (!template || template.schoolId !== schoolId) {
       throw new NotFoundException('Template not found');
     }
 
     for (const item of columnOrder) {
+      const column = await this.prisma.staffReturnColumn.findFirst({ where: { id: item.id, templateId } });
+      if (!column) throw new NotFoundException('Column not found');
       await this.prisma.staffReturnColumn.update({
         where: { id: item.id },
         data: { columnOrder: item.order },
@@ -486,7 +495,7 @@ export class StaffTemplateService {
     });
   }
 
-  async findSubmissionById(id: string) {
+  async findSubmissionById(id: string, schoolId: string) {
     const submission = await this.prisma.staffReturnSubmission.findUnique({
       where: { id },
       include: {
@@ -497,7 +506,7 @@ export class StaffTemplateService {
       },
     });
 
-    if (!submission) {
+    if (!submission || submission.schoolId !== schoolId) {
       throw new NotFoundException('Submission not found');
     }
 
@@ -516,7 +525,7 @@ export class StaffTemplateService {
       where: { id: data.templateId },
     });
 
-    if (!template) {
+    if (!template || template.schoolId !== data.schoolId) {
       throw new NotFoundException('Template not found');
     }
 
@@ -538,12 +547,12 @@ export class StaffTemplateService {
     });
   }
 
-  async updateSubmission(id: string, data: any[]) {
+  async updateSubmission(id: string, schoolId: string, data: any[]) {
     const submission = await this.prisma.staffReturnSubmission.findUnique({
       where: { id },
     });
 
-    if (!submission) {
+    if (!submission || submission.schoolId !== schoolId) {
       throw new NotFoundException('Submission not found');
     }
     if (['SUBMITTED', 'APPROVED', 'EXPORTED', 'ARCHIVED'].includes(submission.status)) {
@@ -559,12 +568,12 @@ export class StaffTemplateService {
     });
   }
 
-  async updateSubmissionStaffField(id: string, staffId: string, key: string, value: any, performedBy?: string) {
+  async updateSubmissionStaffField(id: string, schoolId: string, staffId: string, key: string, value: any, performedBy?: string) {
     const submission = await this.prisma.staffReturnSubmission.findUnique({
       where: { id },
       include: { template: { include: { columns: true } } },
     });
-    if (!submission) throw new NotFoundException('Submission not found');
+    if (!submission || submission.schoolId !== schoolId) throw new NotFoundException('Submission not found');
     if (['SUBMITTED', 'APPROVED', 'EXPORTED', 'ARCHIVED'].includes(submission.status)) {
       throw new BadRequestException('Historical returns are immutable. Duplicate the return to make changes.');
     }
@@ -590,10 +599,10 @@ export class StaffTemplateService {
     return updated;
   }
 
-  async updateSubmissionStaffFields(id: string, staffId: string, fields: Record<string, any>, performedBy?: string) {
+  async updateSubmissionStaffFields(id: string, schoolId: string, staffId: string, fields: Record<string, any>, performedBy?: string) {
     if (!Object.keys(fields || {}).length) throw new BadRequestException('At least one field is required');
     const submission = await this.prisma.staffReturnSubmission.findUnique({ where: { id }, include: { template: { include: { columns: true } } } });
-    if (!submission) throw new NotFoundException('Submission not found');
+    if (!submission || submission.schoolId !== schoolId) throw new NotFoundException('Submission not found');
     if (['SUBMITTED', 'APPROVED', 'EXPORTED', 'ARCHIVED'].includes(submission.status)) throw new BadRequestException('Historical returns are immutable. Duplicate the return to make changes.');
     const row = ((submission.data as any[]) || []).map((candidate) => ({ ...candidate })).find((candidate) => candidate.staffId === staffId);
     if (!row) throw new NotFoundException('Staff member is not part of this return snapshot');
@@ -607,7 +616,7 @@ export class StaffTemplateService {
     row.missing = submission.template.columns.filter((column) => column.isRequired && !row.values?.[column.columnName]).map((column) => ({ key: column.columnName, label: column.columnLabel }));
     row.status = row.missing.length ? 'INCOMPLETE' : 'COMPLETE';
 
-    const profile = await this.prisma.staffHrProfile.findUnique({ where: { staffId } });
+    const profile = await this.prisma.staffHrProfile.findFirst({ where: { staffId, schoolId: submission.schoolId } });
     if (!profile) throw new NotFoundException('Canonical staff profile not found');
     const directFields: Record<string, string> = {
       'staff.nrcNumber': 'nrcNumber', 'staff.manTsNumber': 'tsNumber', 'staff.employeeNumber': 'employeeNumber', 'staff.gender': 'gender',
@@ -647,7 +656,7 @@ export class StaffTemplateService {
   }
 
   private async updateCanonicalField(staffId: string, schoolId: string, key: string, value: any) {
-    const profile = await this.prisma.staffHrProfile.findUnique({ where: { staffId } });
+    const profile = await this.prisma.staffHrProfile.findFirst({ where: { staffId, schoolId } });
     if (!profile) throw new NotFoundException('Canonical staff profile not found');
     const directFields: Record<string, string> = {
       'staff.nrcNumber': 'nrcNumber', 'staff.manTsNumber': 'tsNumber', 'staff.employeeNumber': 'employeeNumber',
@@ -696,12 +705,12 @@ export class StaffTemplateService {
     return `+260${input}`;
   }
 
-  async submitSubmission(id: string, performedBy?: string) {
+  async submitSubmission(id: string, schoolId: string, performedBy?: string) {
     const submission = await this.prisma.staffReturnSubmission.findUnique({
       where: { id },
     });
 
-    if (!submission) {
+    if (!submission || submission.schoolId !== schoolId) {
       throw new NotFoundException('Submission not found');
     }
     if (['APPROVED', 'ARCHIVED'].includes(submission.status)) {
@@ -728,21 +737,21 @@ export class StaffTemplateService {
     });
   }
 
-  async reopenSubmission(id: string, performedBy?: string) {
+  async reopenSubmission(id: string, schoolId: string, performedBy?: string) {
     const submission = await this.prisma.staffReturnSubmission.findUnique({ where: { id } });
-    if (!submission) throw new NotFoundException('Submission not found');
+    if (!submission || submission.schoolId !== schoolId) throw new NotFoundException('Submission not found');
     if (!['SUBMITTED', 'APPROVED', 'EXPORTED'].includes(submission.status)) return submission;
     const updated = await this.prisma.staffReturnSubmission.update({ where: { id }, data: { status: 'DRAFT', submittedAt: null, approvedAt: null, approvedBy: null } });
     await this.createAuditLog({ submissionId: id, schoolId: submission.schoolId, action: 'REOPEN_FOR_CORRECTION', entityType: 'INSTITUTIONAL_RETURN', entityId: id, performedBy });
     return updated;
   }
 
-  async approveSubmission(id: string, approvedBy: string) {
+  async approveSubmission(id: string, schoolId: string, approvedBy: string) {
     const submission = await this.prisma.staffReturnSubmission.findUnique({
       where: { id },
     });
 
-    if (!submission) {
+    if (!submission || submission.schoolId !== schoolId) {
       throw new NotFoundException('Submission not found');
     }
 
@@ -765,9 +774,9 @@ export class StaffTemplateService {
     });
   }
 
-  async deleteSubmission(id: string) {
+  async deleteSubmission(id: string, schoolId: string) {
     const submission = await this.prisma.staffReturnSubmission.findUnique({ where: { id } });
-    if (!submission) throw new NotFoundException('Submission not found');
+    if (!submission || submission.schoolId !== schoolId) throw new NotFoundException('Submission not found');
     if (['SUBMITTED', 'APPROVED', 'EXPORTED', 'ARCHIVED'].includes(submission.status)) {
       throw new BadRequestException('Historical returns are immutable and cannot be deleted.');
     }
