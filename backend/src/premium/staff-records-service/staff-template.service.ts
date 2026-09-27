@@ -112,22 +112,38 @@ export class StaffTemplateService {
             teacher: { teacher: { id: { in: teacherIds } } },
             academicYear: { isCurrent: true },
           },
-          select: { teacherId: true, subject: { select: { name: true } } },
+          select: {
+            teacher: { select: { teacher: { select: { id: true } } } },
+            subject: { select: { name: true } },
+            class: { select: { levelType: { select: { name: true } } } },
+          },
         })
       : [];
     const assignedSubjectsByTeacher = new Map<string, string[]>();
+    const assignedGradesByTeacher = new Map<string, string[]>();
     for (const assignment of subjectAssignments) {
+      const teacherId = assignment.teacher.teacher?.id;
+      if (!teacherId) continue;
       const subjectName = String(assignment.subject.name || '').trim();
-      if (!subjectName) continue;
-      const subjects = assignedSubjectsByTeacher.get(assignment.teacherId) || [];
-      if (!subjects.includes(subjectName)) subjects.push(subjectName);
-      assignedSubjectsByTeacher.set(assignment.teacherId, subjects);
+      if (subjectName) {
+        const subjects = assignedSubjectsByTeacher.get(teacherId) || [];
+        if (!subjects.includes(subjectName)) subjects.push(subjectName);
+        assignedSubjectsByTeacher.set(teacherId, subjects);
+      }
+      const gradeName = String(assignment.class.levelType.name || '').trim();
+      if (gradeName) {
+        const grades = assignedGradesByTeacher.get(teacherId) || [];
+        if (!grades.includes(gradeName)) grades.push(gradeName);
+        assignedGradesByTeacher.set(teacherId, grades);
+      }
     }
     for (const subjects of assignedSubjectsByTeacher.values()) subjects.sort((a, b) => a.localeCompare(b));
+    for (const grades of assignedGradesByTeacher.values()) grades.sort((a, b) => a.localeCompare(b));
 
     const rows = profiles.map((profile: any, index) => {
       const name = String(profile.teacherName || '').trim().split(/\s+/);
       const assignedSubjects = assignedSubjectsByTeacher.get(profile.staffId) || [];
+      const assignedGrades = assignedGradesByTeacher.get(profile.staffId) || [];
       const hasAssignedSubjects = assignedSubjects.length > 0;
       const canonical: Record<string, any> = {
         'staff.surname': name.length > 1 ? name.pop() : '', 'staff.firstName': name.join(' '),
@@ -138,7 +154,7 @@ export class StaffTemplateService {
         'staff.substantivePosition': profile.substantivePosition, 'staff.currentPosition': profile.currentPosition || profile.actingPosition,
         'staff.highestLevelOfEducation': profile.academicQualification, 'staff.highestTeacherQualification': profile.professionalQualification || profile.qualifications?.[0]?.qualificationName,
         'staff.additionalResponsibilities': profile.administration, 'staff.inServiceTraining': profile.dynamicFields?.inServiceTraining,
-        'staff.employmentStatus': profile.employmentStatus, 'staff.mainGradeTaught': profile.gradeLevel,
+        'staff.employmentStatus': profile.employmentStatus, 'staff.mainGradeTaught': assignedGrades.length ? assignedGrades.join(', ') : profile.gradeLevel,
         'staff.staffPresence': profile.dynamicFields?.staffPresence, 'staff.employer': profile.dynamicFields?.employer,
         'staff.subjectBeingTaughtA': hasAssignedSubjects ? assignedSubjects[0] : profile.dynamicFields?.subjectBeingTaughtA,
         'staff.subjectBeingTaughtB': hasAssignedSubjects ? assignedSubjects[1] || '' : profile.dynamicFields?.subjectBeingTaughtB,
