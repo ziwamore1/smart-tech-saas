@@ -104,8 +104,31 @@ export class StaffTemplateService {
       },
       include: { qualifications: true, positions: true }, orderBy: { teacherName: 'asc' },
     });
+    const teacherIds = profiles.map((profile: any) => profile.staffId).filter(Boolean);
+    const subjectAssignments = teacherIds.length
+      ? await this.prisma.teachingAssignment.findMany({
+          where: {
+            schoolId: data.schoolId,
+            teacher: { teacher: { id: { in: teacherIds } } },
+            academicYear: { isCurrent: true },
+          },
+          select: { teacherId: true, subject: { select: { name: true } } },
+        })
+      : [];
+    const assignedSubjectsByTeacher = new Map<string, string[]>();
+    for (const assignment of subjectAssignments) {
+      const subjectName = String(assignment.subject.name || '').trim();
+      if (!subjectName) continue;
+      const subjects = assignedSubjectsByTeacher.get(assignment.teacherId) || [];
+      if (!subjects.includes(subjectName)) subjects.push(subjectName);
+      assignedSubjectsByTeacher.set(assignment.teacherId, subjects);
+    }
+    for (const subjects of assignedSubjectsByTeacher.values()) subjects.sort((a, b) => a.localeCompare(b));
+
     const rows = profiles.map((profile: any, index) => {
       const name = String(profile.teacherName || '').trim().split(/\s+/);
+      const assignedSubjects = assignedSubjectsByTeacher.get(profile.staffId) || [];
+      const hasAssignedSubjects = assignedSubjects.length > 0;
       const canonical: Record<string, any> = {
         'staff.surname': name.length > 1 ? name.pop() : '', 'staff.firstName': name.join(' '),
         'staff.nrcNumber': profile.nrcNumber, 'staff.manTsNumber': profile.tsNumber, 'staff.employeeNumber': profile.employeeNumber,
@@ -117,8 +140,10 @@ export class StaffTemplateService {
         'staff.additionalResponsibilities': profile.administration, 'staff.inServiceTraining': profile.dynamicFields?.inServiceTraining,
         'staff.employmentStatus': profile.employmentStatus, 'staff.mainGradeTaught': profile.gradeLevel,
         'staff.staffPresence': profile.dynamicFields?.staffPresence, 'staff.employer': profile.dynamicFields?.employer,
-        'staff.subjectBeingTaughtA': profile.dynamicFields?.subjectBeingTaughtA, 'staff.subjectBeingTaughtB': profile.dynamicFields?.subjectBeingTaughtB,
-        'staff.subjectQualifiedToTeachA': profile.dynamicFields?.subjectQualifiedToTeachA, 'staff.subjectQualifiedToTeachB': profile.dynamicFields?.subjectQualifiedToTeachB,
+        'staff.subjectBeingTaughtA': hasAssignedSubjects ? assignedSubjects[0] : profile.dynamicFields?.subjectBeingTaughtA,
+        'staff.subjectBeingTaughtB': hasAssignedSubjects ? assignedSubjects[1] || '' : profile.dynamicFields?.subjectBeingTaughtB,
+        'staff.subjectQualifiedToTeachA': hasAssignedSubjects ? assignedSubjects[0] : profile.dynamicFields?.subjectQualifiedToTeachA,
+        'staff.subjectQualifiedToTeachB': hasAssignedSubjects ? assignedSubjects[1] || '' : profile.dynamicFields?.subjectQualifiedToTeachB,
         'staff.numberOfDaysAbsent': profile.dynamicFields?.numberOfDaysAbsent ?? 0,
         'staff.phoneNumber': profile.phoneNumber,
         'staff.highestAcademicQualification': profile.academicQualification,

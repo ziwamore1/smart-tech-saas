@@ -119,7 +119,7 @@ export class SchoolMembershipService {
           {
             user: {
               teachingAssignments: {
-                some: { schoolId, isActive: true },
+                some: { schoolId },
               },
             },
           },
