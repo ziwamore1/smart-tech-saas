@@ -71,6 +71,8 @@ export default function ClassListPage() {
     return classes.find((c: any) => c.id === selectedClassId) || null;
   }, [classes, selectedClassId]);
 
+  const levelLabel = selectedClass?.levelType?.name || 'Level';
+
   const { data: studentsData, isLoading } = useQuery({
     queryKey: ['class-students-list', selectedClassId],
     queryFn: async () => {
@@ -300,7 +302,7 @@ export default function ClassListPage() {
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #e8ddd0' }}>
               <h2 style={{ margin: 0, fontSize: 16, color: '#1f2937' }}>Age Distribution by Gender</h2>
               <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>
-                 Based on students' dates of birth. Grade totals combine all classes under {ageSummaryData?.level?.name || selectedClass?.levelType?.name || 'this level'}.
+                 Based on students' dates of birth. {levelLabel} totals combine all classes under this level.
               </p>
             </div>
             {ageSummaryLoading ? (
@@ -315,10 +317,10 @@ export default function ClassListPage() {
                        <th style={{ textAlign: 'center', color: '#db2777' }}>Class Female</th>
                        <th style={{ textAlign: 'center' }}>Class Other</th>
                        <th style={{ textAlign: 'center' }}>Class Total</th>
-                       <th style={{ textAlign: 'center', color: '#2563eb' }}>Grade Male</th>
-                       <th style={{ textAlign: 'center', color: '#db2777' }}>Grade Female</th>
-                       <th style={{ textAlign: 'center' }}>Grade Other</th>
-                       <th style={{ textAlign: 'center' }}>Grade Total</th>
+                       <th style={{ textAlign: 'center', color: '#2563eb' }}>{levelLabel} Male</th>
+                       <th style={{ textAlign: 'center', color: '#db2777' }}>{levelLabel} Female</th>
+                       <th style={{ textAlign: 'center' }}>{levelLabel} Other</th>
+                       <th style={{ textAlign: 'center' }}>{levelLabel} Total</th>
                      </tr>
                    </thead>
                    <tbody>
