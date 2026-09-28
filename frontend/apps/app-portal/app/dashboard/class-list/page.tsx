@@ -14,6 +14,17 @@ function calculateAge(dob: string): number {
   return age;
 }
 
+function getLevelLabel(levelTypeName?: string | null, className?: string | null): string {
+  const configuredName = levelTypeName?.trim();
+  if (configuredName && /\d/.test(configuredName)) return configuredName;
+
+  const source = `${configuredName || ''} ${className || ''}`;
+  const match = source.match(/\b(form|grade)\s*[- ]?\s*(\d+)\b/i);
+  if (match) return `${match[1][0].toUpperCase()}${match[1].slice(1).toLowerCase()} ${match[2]}`;
+
+  return configuredName || className || 'Level';
+}
+
 function exportToCSV(rows: Array<Record<string, any>>, filename: string) {
   if (rows.length === 0) return;
   const headers = Object.keys(rows[0]);
@@ -71,7 +82,7 @@ export default function ClassListPage() {
     return classes.find((c: any) => c.id === selectedClassId) || null;
   }, [classes, selectedClassId]);
 
-  const levelLabel = selectedClass?.levelType?.name || 'Level';
+  const levelLabel = getLevelLabel(selectedClass?.levelType?.name, selectedClass?.name);
 
   const { data: studentsData, isLoading } = useQuery({
     queryKey: ['class-students-list', selectedClassId],
@@ -300,7 +311,7 @@ export default function ClassListPage() {
 
           <div style={{ background: '#fefcf9', borderRadius: 12, border: '1px solid #e8ddd0', marginBottom: 16, overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #e8ddd0' }}>
-              <h2 style={{ margin: 0, fontSize: 16, color: '#1f2937' }}>Age Distribution by Gender</h2>
+              <h2 style={{ margin: 0, fontSize: 16, color: '#1f2937' }}>Age Distribution by Gender: {levelLabel}</h2>
               <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>
                  Based on students' dates of birth. {levelLabel} totals combine all classes under this level.
               </p>
