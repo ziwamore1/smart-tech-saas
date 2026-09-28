@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { DEFAULT_AGE_BANDS } from '../src/class/age-band.defaults';
 
 const prisma = new PrismaClient();
 
@@ -674,6 +675,17 @@ async function main() {
       update: provider,
       create: provider,
     });
+  }
+
+  const schools = await prisma.school.findMany({ select: { id: true } });
+  for (const school of schools) {
+    for (const band of DEFAULT_AGE_BANDS) {
+      await prisma.ageBand.upsert({
+        where: { schoolId_label: { schoolId: school.id, label: band.label } },
+        update: {},
+        create: { ...band, schoolId: school.id },
+      });
+    }
   }
 
   console.log('Institution type engine seeded successfully!');

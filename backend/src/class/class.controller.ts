@@ -49,6 +49,30 @@ export class ClassController {
     return this.service.findAll(req.user);
   }
 
+  @Get('age-bands')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
+  getAgeBands(@Req() req: any) {
+    return this.service.getAgeBands(req.user.schoolId);
+  }
+
+  @Get('age-summary')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
+  getAgeSummary(@Query('classId') classId: string, @Req() req: any) {
+    return this.service.getAgeSummary(classId, req.user.schoolId);
+  }
+
+  @Post('age-bands')
+  @Roles('Director')
+  createAgeBand(@Body() body: { label: string; minAge: number; maxAgeExclusive?: number | null; order?: number }, @Req() req: any) {
+    return this.service.createAgeBand(body, req.user.schoolId);
+  }
+
+  @Patch('age-bands/:id')
+  @Roles('Director')
+  updateAgeBand(@Param('id') id: string, @Body() body: { label?: string; minAge?: number; maxAgeExclusive?: number | null; order?: number; isActive?: boolean }, @Req() req: any) {
+    return this.service.updateAgeBand(id, body, req.user.schoolId);
+  }
+
   @Patch(':id')
   @Roles('Director')
   update(

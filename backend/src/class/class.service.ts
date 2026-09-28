@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClassAccessService } from '../common/access/class-access.service';
+import { DEFAULT_AGE_BANDS } from './age-band.defaults';
 
 @Injectable()
 export class ClassService {
@@ -278,5 +279,117 @@ export class ClassService {
     if (await this.classAccess.canAccessClasses(user)) return null;
 
     return [];
+  }
+
+  async getAgeBands(schoolId: string) {
+    let bands = await this.prisma.ageBand.findMany({
+      where: { schoolId, isActive: true },
+      orderBy: [{ order: 'asc' }, { minAge: 'asc' }],
+    });
+
+    if (bands.length === 0) {
+      await this.prisma.ageBand.createMany({
+        data: DEFAULT_AGE_BANDS.map((band) => ({ ...band, schoolId })),
+        skipDuplicates: true,
+      });
+      bands = await this.prisma.ageBand.findMany({
+        where: { schoolId, isActive: true },
+        orderBy: [{ order: 'asc' }, { minAge: 'asc' }],
+      });
+    }
+
+    return bands;
+  }
+
+  async createAgeBand(data: { label: string; minAge: number; maxAgeExclusive?: number | null; order?: number }, schoolId: string) {
+    if (!data.label?.trim()) throw new BadRequestException('Age band label is required');
+    this.validateAgeBand(data);
+    return this.prisma.ageBand.create({
+      data: {
+        schoolId,
+        label: data.label.trim(),
+        minAge: data.minAge,
+        maxAgeExclusive: data.maxAgeExclusive ?? null,
+        order: data.order ?? 0,
+      },
+    });
+  }
+
+  async updateAgeBand(id: string, data: { label?: string; minAge?: number; maxAgeExclusive?: number | null; order?: number; isActive?: boolean }, schoolId: string) {
+    const band = await this.prisma.ageBand.findFirst({ where: { id, schoolId } });
+    if (!band) throw new NotFoundException('Age band not found');
+    if (data.label !== undefined && !data.label.trim()) throw new BadRequestException('Age band label is required');
+    this.validateAgeBand({ minAge: data.minAge ?? band.minAge, maxAgeExclusive: data.maxAgeExclusive === undefined ? band.maxAgeExclusive : data.maxAgeExclusive });
+    return this.prisma.ageBand.update({
+      where: { id },
+      data: {
+        ...(data.label !== undefined ? { label: data.label.trim() } : {}),
+        ...(data.minAge !== undefined ? { minAge: data.minAge } : {}),
+        ...(data.maxAgeExclusive !== undefined ? { maxAgeExclusive: data.maxAgeExclusive } : {}),
+        ...(data.order !== undefined ? { order: data.order } : {}),
+        ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
+      },
+    });
+  }
+
+  async getAgeSummary(classId: string, schoolId: string) {
+    if (!classId) throw new BadRequestException('classId is required');
+    const selectedClass = await this.prisma.class.findFirst({
+      where: { id: classId, schoolId },
+      select: { id: true, name: true, levelTypeId: true, levelType: { select: { id: true, name: true } } },
+    });
+    if (!selectedClass) throw new NotFoundException('Class not found');
+
+    const bands = await this.getAgeBands(schoolId);
+    const classes = await this.prisma.class.findMany({
+      where: { schoolId, levelTypeId: selectedClass.levelTypeId },
+      select: { id: true, name: true },
+      orderBy: { order: 'asc' },
+    });
+    const classIds = classes.map((item) => item.id);
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { schoolId, classId: { in: classIds }, status: 'ACTIVE' },
+      select: { classId: true, student: { select: { dateOfBirth: true, gender: true, status: true } } },
+    });
+
+    const today = new Date();
+    const getAge = (dob: Date) => {
+      let age = today.getFullYear() - dob.getFullYear();
+      if (today.getMonth() < dob.getMonth() || (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())) age -= 1;
+      return age;
+    };
+    const empty = () => ({ male: 0, female: 0, other: 0, total: 0 });
+    const build = (classFilter?: string) => {
+      const rows = bands.map((band) => ({ label: band.label, minAge: band.minAge, maxAgeExclusive: band.maxAgeExclusive, ...empty() }));
+      let missingDob = 0;
+      let totalStudents = 0;
+      for (const enrollment of enrollments) {
+        if (classFilter && enrollment.classId !== classFilter) continue;
+        totalStudents += 1;
+        if (!enrollment.student.dateOfBirth) { missingDob += 1; continue; }
+        const age = getAge(enrollment.student.dateOfBirth);
+        const row = rows.find((band) => age >= band.minAge && (band.maxAgeExclusive == null || age < band.maxAgeExclusive));
+        if (!row) { missingDob += 1; continue; }
+        const gender = String(enrollment.student.gender || '').toLowerCase();
+        if (gender === 'male' || gender === 'm') row.male += 1;
+        else if (gender === 'female' || gender === 'f') row.female += 1;
+        else row.other += 1;
+        row.total += 1;
+      }
+      return { totalStudents, missingDob, bands: rows };
+    };
+
+    return {
+      bands,
+      selectedClass,
+      level: { ...selectedClass.levelType, classes, ...build() },
+      class: { id: selectedClass.id, name: selectedClass.name, ...build(selectedClass.id) },
+    };
+  }
+
+  private validateAgeBand(data: { minAge: number; maxAgeExclusive?: number | null }) {
+    if (!Number.isInteger(data.minAge) || data.minAge < 0 || (data.maxAgeExclusive != null && (!Number.isInteger(data.maxAgeExclusive) || data.maxAgeExclusive <= data.minAge))) {
+      throw new BadRequestException('Age band boundaries are invalid');
+    }
   }
 }

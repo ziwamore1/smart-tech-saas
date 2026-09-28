@@ -196,6 +196,7 @@ model School {
   subscriptionTier               String                         @default("basic")
   admissionSeqs                  AdmissionSequence[]
   academicYears                  AcademicYear[]
+  ageBands                       AgeBand[]
   adaptiveTestSessions           AdaptiveTestSession[]
   aiTutorSessions                AiTutorSession[]
   assessmentScores               AssessmentScore[]
@@ -579,6 +580,22 @@ model LevelType {
   school   School  @relation(fields: [schoolId], references: [id])
 
   @@unique([name, schoolId])
+}
+
+model AgeBand {
+  id                String   @id @default(uuid())
+  schoolId          String
+  label             String
+  minAge            Int
+  maxAgeExclusive   Int?
+  order             Int      @default(0)
+  isActive          Boolean  @default(true)
+  school            School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([schoolId, label])
+  @@index([schoolId, isActive, order])
 }
 
 model Class {

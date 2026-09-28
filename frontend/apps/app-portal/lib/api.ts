@@ -332,6 +332,10 @@ export const teachingAssignmentApi = {
 
 export const classApi = {
   getAll: () => api.get('/class'),
+  getAgeSummary: (classId: string) => api.get('/class/age-summary', { params: { classId } }),
+  getAgeBands: () => api.get('/class/age-bands'),
+  createAgeBand: (data: any) => api.post('/class/age-bands', data),
+  updateAgeBand: (id: string, data: any) => api.patch(`/class/age-bands/${id}`, data),
   getById: (id: string) => api.get(`/class/${id}`),
   create: (data: any) => api.post('/class', data),
   update: (id: string, data: any) => api.patch(`/class/${id}`, data),
