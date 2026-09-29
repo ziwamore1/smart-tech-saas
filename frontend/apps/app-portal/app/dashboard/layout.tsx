@@ -101,6 +101,14 @@ const regularNav: NavItem[] = [
     typeRoles: ROLE_MAP.teachingStaff,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
+  {
+    name: 'Advanced Staff Profile',
+    href: '/teacher/profile',
+    icon: 'fa-id-card',
+    color: '#4f46e5',
+    typeRoles: ROLE_MAP.teaching,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
+  },
   { 
     name: 'Dashboard', 
     href: '/dashboard', 

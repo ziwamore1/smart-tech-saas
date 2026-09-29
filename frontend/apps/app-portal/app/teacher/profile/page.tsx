@@ -274,7 +274,9 @@ export default function TeacherProfilePage() {
         </div>
       </div>
 
-      <AdvancedStaffProfileCard />
+      <div id="advanced-staff-profile">
+        <AdvancedStaffProfileCard />
+      </div>
     </div>
   );
 }

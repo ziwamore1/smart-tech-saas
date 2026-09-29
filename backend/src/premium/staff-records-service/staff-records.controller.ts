@@ -11,7 +11,12 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 
 const ADMIN_ROLES = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'SuperAdmin'];
-const STAFF_SELF_ROLES = ['Teacher', 'Class Teacher', 'HOD', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
+const STAFF_SELF_ROLES = [
+  'Teacher', 'Class Teacher', 'Primary Teacher', 'HOD',
+  'Head Teacher', 'Deputy Head', 'Deputy Director',
+  'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher',
+  'Lecturer', 'Research Supervisor',
+];
 
 @Controller('premium/staff-records')
 @UseGuards(JwtAuthGuard, RolesGuard)

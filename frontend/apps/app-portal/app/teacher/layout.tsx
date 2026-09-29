@@ -18,7 +18,8 @@ export default function TeacherLayout({
     { href: '/teacher/enrollments', label: 'Enrollments', icon: '📝' },
     { href: '/dashboard/results', label: 'Results', icon: '📊' },
     { href: '/teacher/communications', label: 'Communications', icon: '💬' },
-    { href: '/teacher/profile', label: 'Profile', icon: '👤' },
+    { href: '/teacher/profile', label: 'Account Profile', icon: '👤' },
+    { href: '/teacher/profile#advanced-staff-profile', label: 'Advanced Staff Profile', icon: '🪪' },
   ];
 
   return (
