@@ -11,6 +11,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 
 const ADMIN_ROLES = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'SuperAdmin'];
+const STAFF_SELF_ROLES = ['Teacher', 'Class Teacher', 'HOD', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
 
 @Controller('premium/staff-records')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -26,6 +27,24 @@ export class StaffRecordsController {
   // ══════════════════════════════════════════
   // HR PROFILES
   // ══════════════════════════════════════════
+
+  @Get('my-advanced-profile')
+  @Roles(...STAFF_SELF_ROLES)
+  getMyAdvancedProfile(@Req() req: any) {
+    return this.staffRecordsService.getMyAdvancedProfile(req.user?.sub || req.user?.id, req.user.schoolId);
+  }
+
+  @Put('my-advanced-profile')
+  @Roles(...STAFF_SELF_ROLES)
+  updateMyAdvancedProfile(@Req() req: any, @Body() body: any) {
+    return this.staffRecordsService.updateMyAdvancedProfile(req.user?.sub || req.user?.id, req.user.schoolId, body);
+  }
+
+  @Get('my-advanced-profile/lookups')
+  @Roles(...STAFF_SELF_ROLES)
+  getMyAdvancedProfileLookups(@Req() req: any) {
+    return this.staffTemplateService.getInstitutionalLookups(req.user.schoolId);
+  }
 
   @Get('profiles')
   @Roles(...ADMIN_ROLES)

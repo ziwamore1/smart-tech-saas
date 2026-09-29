@@ -2158,6 +2158,11 @@ export const notificationsApi = {
 // ==========================================
 
 export const premiumStaffRecordsApi = {
+  // Teacher-owned Advanced Staff Profile
+  getMyAdvancedProfile: () => api.get('/premium/staff-records/my-advanced-profile'),
+  updateMyAdvancedProfile: (data: any) => api.put('/premium/staff-records/my-advanced-profile', data),
+  getMyAdvancedProfileLookups: () => api.get('/premium/staff-records/my-advanced-profile/lookups'),
+
   // Profiles
   getProfiles: () => api.get('/premium/staff-records/profiles'),
   getProfileById: (id: string) => api.get(`/premium/staff-records/profiles/${id}`),

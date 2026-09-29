@@ -3,7 +3,42 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { identityApi } from '@/lib/api';
+import { identityApi, premiumStaffRecordsApi } from '@/lib/api';
+
+const ADVANCED_FIELDS = [
+  { key: 'gender', label: 'Gender', category: 'GENDER' },
+  { key: 'dateOfBirth', label: 'Date of Birth', type: 'date' },
+  { key: 'maritalStatus', label: 'Marital Status', category: 'MARITAL_STATUS' },
+  { key: 'nationality', label: 'Nationality', category: 'NATIONALITY' },
+  { key: 'nrcNumber', label: 'NRC Number' },
+  { key: 'tsNumber', label: 'MAN/TS Number' },
+  { key: 'aesNumber', label: 'AES Number' },
+  { key: 'phoneNumber', label: 'Staff Return Phone' },
+  { key: 'substantivePosition', label: 'Substantive Position', category: 'POSITION' },
+  { key: 'substantiveScale', label: 'Substantive Scale' },
+  { key: 'currentPosition', label: 'Current Position', category: 'POSITION' },
+  { key: 'actingPosition', label: 'Acting Position', category: 'POSITION' },
+  { key: 'administration', label: 'Additional Responsibility', category: 'ADDITIONAL_RESPONSIBILITY' },
+  { key: 'dateOfFirstAppointment', label: 'First Appointment Date', type: 'date' },
+  { key: 'dateOfPresentAppointment', label: 'Current Post Appointment Date', type: 'date' },
+  { key: 'academicQualification', label: 'Highest Academic Level', category: 'HIGHEST_ACADEMIC' },
+  { key: 'professionalQualification', label: 'Highest Teacher Qualification', category: 'TEACHER_QUALIFICATION' },
+  { key: 'yearOfQualification', label: 'Year of Qualification', type: 'number' },
+  { key: 'specialization', label: 'Specialization' },
+  { key: 'gradeLevel', label: 'Main Grade Taught', category: 'MAIN_GRADE_TAUGHT' },
+  { key: 'nextOfKin', label: 'Next of Kin' },
+  { key: 'nextOfKinContact', label: 'Next of Kin Contact' },
+  { key: 'nextOfKinRelationship', label: 'Next of Kin Relationship' },
+];
+
+const ADVANCED_DYNAMIC_FIELDS = [
+  { key: 'differentlyAbled', label: 'Differently Abled', category: 'DIFFERENTLY_ABLED' },
+  { key: 'inServiceTraining', label: 'In-Service Training / CPD' },
+  { key: 'staffPresence', label: 'Staff Presence', category: 'STAFF_PRESENCE' },
+  { key: 'employer', label: 'Employer', category: 'EMPLOYER' },
+  { key: 'subjectBeingTaughtA', label: 'Subject Being Taught (A)', category: 'SUBJECT' },
+  { key: 'subjectBeingTaughtB', label: 'Subject Being Taught (B)', category: 'SUBJECT' },
+];
 
 export default function TeacherProfilePage() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
@@ -238,6 +273,135 @@ export default function TeacherProfilePage() {
           </div>
         </div>
       </div>
+
+      <AdvancedStaffProfileCard />
+    </div>
+  );
+}
+
+function AdvancedStaffProfileCard() {
+  const [profile, setProfile] = useState<any>(null);
+  const [lookups, setLookups] = useState<Record<string, any[]>>({});
+  const [form, setForm] = useState<any>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const [profileRes, lookupRes] = await Promise.all([
+        premiumStaffRecordsApi.getMyAdvancedProfile(),
+        premiumStaffRecordsApi.getMyAdvancedProfileLookups(),
+      ]);
+      const value = profileRes.data?.data || profileRes.data || {};
+      const lookupRows = lookupRes.data?.data || lookupRes.data || [];
+      const grouped: Record<string, any[]> = {};
+      (Array.isArray(lookupRows) ? lookupRows : []).forEach((row: any) => {
+        grouped[row.category] = [...(grouped[row.category] || []), row];
+      });
+      setProfile(value);
+      setLookups(grouped);
+      setForm({ ...(value.profile || {}), dynamicFields: { ...((value.profile?.dynamicFields as any) || {}) } });
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error?.response?.data?.message || 'Advanced Staff Profile could not be loaded.' });
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const valueFor = (field: { key: string; dynamic?: boolean }) => {
+    const value = field.dynamic ? form.dynamicFields?.[field.key] : form[field.key];
+    if (field.key.toLowerCase().includes('date') && value) return String(value).slice(0, 10);
+    return value || '';
+  };
+
+  const setValue = (key: string, value: any, dynamic = false) => {
+    if (dynamic) setForm((current: any) => ({ ...current, dynamicFields: { ...(current.dynamicFields || {}), [key]: value } }));
+    else setForm((current: any) => ({ ...current, [key]: value }));
+  };
+
+  const save = async () => {
+    try {
+      setSaving(true);
+      const payload = { ...form, dynamicFields: form.dynamicFields || {} };
+      const response = await premiumStaffRecordsApi.updateMyAdvancedProfile(payload);
+      const result = response.data?.data || response.data || {};
+      setProfile((current: any) => ({ ...current, profile: result.profile || current.profile, editable: result.editable, syncedDraftReturns: result.syncedDraftReturns }));
+      setForm({ ...(result.profile || form), dynamicFields: { ...((result.profile?.dynamicFields as any) || form.dynamicFields || {}) } });
+      setMessage({ type: 'success', text: `Saved and synced to ${result.syncedDraftReturns || 0} open Staff Return(s).` });
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error?.response?.data?.message || 'Advanced Staff Profile could not be saved.' });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setMessage(null), 4000);
+    }
+  };
+
+  if (loading) return <div style={{ marginTop: 24, color: '#6b7280' }}>Loading Advanced Staff Profile...</div>;
+  if (!profile?.profile) return null;
+
+  const editable = Boolean(profile.editable);
+  const renderInput = (field: any, dynamic = false) => {
+    const options = field.category ? lookups[field.category] || [] : [];
+    const value = valueFor({ key: field.key, dynamic });
+    return (
+      <div key={`${dynamic ? 'dynamic-' : ''}${field.key}`}>
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>{field.label}</label>
+        {options.length ? (
+          <select disabled={!editable || saving} value={value} onChange={e => setValue(field.key, e.target.value, dynamic)} style={{ width: '100%', padding: '9px 10px', border: '1px solid #d1d5db', borderRadius: 7, background: editable ? '#fff' : '#f3f4f6', color: '#1f2937' }}>
+            <option value="">Select from lookup...</option>
+            {options.map((option: any) => <option key={option.id} value={option.label}>{option.label}</option>)}
+          </select>
+        ) : (
+          <input disabled={!editable || saving} type={field.type || 'text'} value={value} onChange={e => setValue(field.key, e.target.value, dynamic)} placeholder={`Enter ${field.label.toLowerCase()}`} style={{ width: '100%', padding: '9px 10px', border: '1px solid #d1d5db', borderRadius: 7, background: editable ? '#fff' : '#f3f4f6', color: '#1f2937', boxSizing: 'border-box' }} />
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ marginTop: 24, maxWidth: 1000, background: '#fefcf9', border: '1px solid #c7d2fe', borderRadius: 16, padding: 28, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 19, color: '#1e1b4b' }}><i className="fa fa-id-card" style={{ marginRight: 8, color: '#4f46e5' }}></i>Advanced Staff Profile</h2>
+          <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: 13 }}>Separate from your login profile. These records support current and future Staff Return templates.</p>
+        </div>
+        <span style={{ padding: '6px 10px', borderRadius: 999, fontSize: 12, fontWeight: 700, color: editable ? '#166534' : '#92400e', background: editable ? '#dcfce7' : '#fef3c7' }}>{editable ? 'DRAFT OPEN - EDITABLE' : 'LOCKED'}</span>
+      </div>
+
+      <div style={{ marginTop: 16, padding: 14, borderRadius: 9, background: editable ? '#eef2ff' : '#fff7ed', color: editable ? '#3730a3' : '#9a3412', fontSize: 13, lineHeight: 1.5 }}>
+        {profile.guidance?.message}
+        {profile.draftReturns?.length > 0 && <div style={{ marginTop: 5, fontWeight: 600 }}>Open return: {profile.draftReturns.map((item: any) => `${item.name} (${item.period})`).join(', ')}</div>}
+      </div>
+
+      {message && <div style={{ marginTop: 12, padding: 10, borderRadius: 7, background: message.type === 'success' ? '#dcfce7' : '#fee2e2', color: message.type === 'success' ? '#166534' : '#991b1b', fontSize: 13 }}>{message.text}</div>}
+
+      <button onClick={() => setOpen(true)} style={{ marginTop: 18, padding: '10px 18px', background: editable ? '#4f46e5' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 8, cursor: editable ? 'pointer' : 'default', fontWeight: 600 }}>
+        <i className="fa fa-edit" style={{ marginRight: 7 }}></i>{editable ? 'Open Advanced Staff Profile' : 'View Advanced Staff Profile'}
+      </button>
+
+      {open && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.55)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <div style={{ background: '#fff', borderRadius: 14, width: 'min(980px, 100%)', maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '16px 22px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div><h3 style={{ margin: 0, color: '#1e1b4b' }}>Advanced Staff Profile</h3><p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>Use the lookup options where provided. Leave unknown fields for the Staff Return Hub administrator.</p></div>
+              <button onClick={() => setOpen(false)} style={{ border: 'none', background: 'none', fontSize: 24, cursor: 'pointer', color: '#6b7280' }}>&times;</button>
+            </div>
+            <div style={{ padding: 22, overflowY: 'auto' }}>
+              <h4 style={{ margin: '0 0 12px', color: '#374151' }}>Identity and Employment Details</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>{ADVANCED_FIELDS.map(field => renderInput(field))}</div>
+              <h4 style={{ margin: '24px 0 12px', color: '#374151' }}>Staff Return Guidance Fields</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>{ADVANCED_DYNAMIC_FIELDS.map(field => renderInput(field, true))}</div>
+            </div>
+            <div style={{ padding: '12px 22px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button onClick={() => setOpen(false)} style={{ padding: '9px 16px', border: '1px solid #d1d5db', background: '#fff', borderRadius: 7, cursor: 'pointer' }}>Close</button>
+              <button onClick={save} disabled={!editable || saving} style={{ padding: '9px 18px', border: 'none', background: !editable || saving ? '#9ca3af' : '#4f46e5', color: '#fff', borderRadius: 7, cursor: !editable || saving ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{saving ? 'Saving and syncing...' : 'Save and Sync Return'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

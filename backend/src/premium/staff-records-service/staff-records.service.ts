@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StaffSyncEngineService } from '../../shared/staff-sync-engine/staff-sync-engine.service';
 import { v4 as uuidv4 } from 'uuid';
@@ -116,6 +116,119 @@ export class StaffRecordsService {
 
     if (!profile) throw new NotFoundException('HR profile not found for this staff member');
     return profile;
+  }
+
+  async getMyAdvancedProfile(userId: string, schoolId: string) {
+    const teacher = await this.prisma.teacher.findFirst({ where: { userId, schoolId }, select: { id: true } });
+    if (!teacher) throw new NotFoundException('No staff record is linked to this account');
+
+    let profile = await this.prisma.staffHrProfile.findUnique({ where: { staffId: teacher.id } });
+    if (!profile) {
+      await this.autoSyncFromTeachers(schoolId);
+      profile = await this.prisma.staffHrProfile.findUnique({ where: { staffId: teacher.id } });
+    }
+    if (!profile) throw new NotFoundException('Advanced Staff Profile is not available');
+
+    const draftReturns = await this.findDraftReturnsForStaff(teacher.id, schoolId);
+    return {
+      profile,
+      editable: draftReturns.length > 0,
+      draftReturns: draftReturns.map((submission: any) => ({ id: submission.id, name: submission.template.name, period: submission.period, status: submission.status })),
+      guidance: {
+        message: draftReturns.length
+          ? 'Complete the fields you know from the lookup choices and your official records. Fields not available to you can be completed by the Staff Return Hub administrator.'
+          : 'Your Advanced Staff Profile is locked because there is no open DRAFT Staff Return for your school. It will be available when the next return is compiled as DRAFT.',
+        lockedAfter: 'SUBMITTED_OR_APPROVED',
+      },
+    };
+  }
+
+  async updateMyAdvancedProfile(userId: string, schoolId: string, data: any) {
+    const teacher = await this.prisma.teacher.findFirst({ where: { userId, schoolId }, select: { id: true } });
+    if (!teacher) throw new NotFoundException('No staff record is linked to this account');
+    const profile = await this.prisma.staffHrProfile.findUnique({ where: { staffId: teacher.id } });
+    if (!profile) throw new NotFoundException('Advanced Staff Profile is not available');
+
+    const draftReturns = await this.findDraftReturnsForStaff(teacher.id, schoolId);
+    if (!draftReturns.length) {
+      throw new BadRequestException('This Advanced Staff Profile is locked. A new DRAFT Staff Return must be compiled before you can make updates.');
+    }
+
+    const allowed = new Set([
+      'gender', 'dateOfBirth', 'maritalStatus', 'nrcNumber', 'tsNumber', 'aesNumber',
+      'substantivePosition', 'substantiveScale', 'actingPosition', 'administration', 'actingType',
+      'dateOfFirstAppointment', 'dateOfPresentAppointment', 'dateOfActingAppointment', 'confirmed',
+      'expectedConfirmationDate', 'academicQualification', 'professionalQualification', 'yearOfQualification',
+      'specialization', 'nationality', 'emailAddress', 'phoneNumber', 'currentPosition', 'gradeLevel',
+      'nextOfKin', 'nextOfKinContact', 'nextOfKinRelationship', 'dynamicFields',
+    ]);
+    const safeData = Object.fromEntries(Object.entries(data || {}).filter(([key]) => allowed.has(key)));
+    if (!Object.keys(safeData).length) throw new BadRequestException('No editable Advanced Staff Profile fields were provided');
+
+    const profileData = this.mapProfileData(safeData);
+    const canonical = this.profileToReturnValues({ ...profile, ...safeData, dynamicFields: safeData.dynamicFields ?? profile.dynamicFields });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const updatedProfile = await tx.staffHrProfile.update({ where: { id: profile.id }, data: profileData });
+
+      for (const submission of draftReturns) {
+        const rows = ((submission.data as any[]) || []).map((candidate) => ({ ...candidate }));
+        const row = rows.find((candidate) => candidate.staffId === teacher.id);
+        if (!row) continue;
+        const columns = (submission.template.columns || []).filter((column: any) => column.isEditable !== false);
+        for (const column of columns) {
+          if (Object.prototype.hasOwnProperty.call(canonical, column.columnName)) {
+            row.values = { ...(row.values || {}), [column.columnName]: canonical[column.columnName] ?? '' };
+          }
+        }
+        row.missing = (submission.template.columns || [])
+          .filter((column: any) => column.isRequired && !row.values?.[column.columnName])
+          .map((column: any) => ({ key: column.columnName, label: column.columnLabel }));
+        row.status = row.missing.length ? 'INCOMPLETE' : 'COMPLETE';
+        await tx.staffReturnSubmission.update({
+          where: { id: submission.id },
+          data: { data: rows as any, snapshot: { ...((submission.snapshot as any) || {}), rows } as any, status: 'DRAFT' },
+        });
+      }
+      return updatedProfile;
+    });
+
+    await this.createAuditLog({
+      profileId: profile.id,
+      schoolId,
+      action: 'STAFF_SELF_UPDATE',
+      entityType: 'ADVANCED_STAFF_PROFILE',
+      entityId: profile.id,
+      performedBy: userId,
+      changes: { fields: Object.keys(safeData), draftReturns: draftReturns.map((submission: any) => submission.id) },
+    });
+    return { profile: updated, syncedDraftReturns: draftReturns.length, editable: true };
+  }
+
+  private async findDraftReturnsForStaff(staffId: string, schoolId: string) {
+    const submissions = await this.prisma.staffReturnSubmission.findMany({
+      where: { schoolId, status: 'DRAFT' },
+      include: { template: { select: { id: true, name: true, columns: true } } },
+      orderBy: { updatedAt: 'desc' },
+    });
+    return submissions.filter((submission: any) => ((submission.data as any[]) || []).some((row) => row.staffId === staffId));
+  }
+
+  private profileToReturnValues(profile: any): Record<string, any> {
+    const name = String(profile.teacherName || '').trim().split(/\s+/);
+    const dynamicFields = (profile.dynamicFields || {}) as Record<string, any>;
+    const values: Record<string, any> = {
+      'staff.surname': name.length > 1 ? name[name.length - 1] : '',
+      'staff.firstName': name.length > 1 ? name.slice(0, -1).join(' ') : name[0] || '',
+      'staff.nrcNumber': profile.nrcNumber, 'staff.manTsNumber': profile.tsNumber, 'staff.employeeNumber': profile.employeeNumber,
+      'staff.dateOfBirth': profile.dateOfBirth, 'staff.gender': profile.gender, 'staff.firstAppointmentDate': profile.dateOfFirstAppointment,
+      'staff.currentPostAppointmentDate': profile.dateOfPresentAppointment, 'staff.maritalStatus': profile.maritalStatus,
+      'staff.nationality': profile.nationality, 'staff.substantivePosition': profile.substantivePosition,
+      'staff.currentPosition': profile.currentPosition || profile.actingPosition, 'staff.highestLevelOfEducation': profile.academicQualification,
+      'staff.highestTeacherQualification': profile.professionalQualification, 'staff.additionalResponsibilities': profile.administration,
+      'staff.employmentStatus': profile.employmentStatus, 'staff.mainGradeTaught': profile.gradeLevel, 'staff.phoneNumber': profile.phoneNumber,
+    };
+    for (const [key, value] of Object.entries(dynamicFields)) values[`staff.${key.replace(/^staff\./, '')}`] = value;
+    return values;
   }
 
   async searchProfiles(schoolId: string, query: string) {

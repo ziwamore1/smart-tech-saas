@@ -59,16 +59,13 @@ export class StaffSyncEngineService {
 
       if (existing) {
         if (existing.syncHash !== hash) {
+          // StaffHrProfile is the independent Advanced Staff Profile. The
+          // operational Teacher record is used only to create missing profiles;
+          // normal profile edits must not overwrite return-ready data that may
+          // be needed by a future template.
           await this.prisma.staffHrProfile.update({
             where: { id: existing.id },
             data: {
-              employeeNumber: teacher.employeeNo,
-              teacherName: teacher.user ? `${teacher.user.firstName || ''} ${teacher.user.lastName || ''}`.trim() : undefined,
-              gender: teacher.gender || undefined,
-              phoneNumber: teacher.user?.phone || undefined,
-              emailAddress: teacher.user?.email || undefined,
-              academicQualification: teacher.qualification || undefined,
-              specialization: teacher.specialization || undefined,
               syncHash: hash,
               syncStatus: 'SYNCED',
               lastSyncedAt: new Date(),

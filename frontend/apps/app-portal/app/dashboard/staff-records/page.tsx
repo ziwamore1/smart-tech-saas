@@ -65,6 +65,7 @@ export default function StaffRecordsPage() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [columns, setColumns] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [templateLoadError, setTemplateLoadError] = useState<string | null>(null);
@@ -77,9 +78,9 @@ export default function StaffRecordsPage() {
 
   const canAccess = true;
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (silent = false) => {
     if (!canAccess) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const [profilesRes, returnsRes, transfersRes, analyticsRes, syncStatusRes, syncHistoryRes] =
@@ -102,6 +103,7 @@ export default function StaffRecordsPage() {
       if (analyticsRes.status === 'fulfilled') setAnalytics(analyticsRes.value.data || null);
       if (syncStatusRes.status === 'fulfilled') setSyncStatus(syncStatusRes.value.data || null);
       if (syncHistoryRes.status === 'fulfilled') setSyncHistory(syncHistoryRes.value.data?.data || syncHistoryRes.value.data || []);
+      setRefreshVersion(version => version + 1);
     } catch (err: any) {
       setError(err?.message || 'Failed to load staff records data');
     } finally {
@@ -136,6 +138,12 @@ export default function StaffRecordsPage() {
       setLoading(false);
     }
   }, [authLoading, isAuthenticated, canAccess, fetchData, router]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !canAccess) return;
+    const timer = window.setInterval(() => fetchData(true), 10000);
+    return () => window.clearInterval(timer);
+  }, [isAuthenticated, canAccess, fetchData]);
 
   const handleSyncAll = async () => {
     withLoading('syncAll', async () => {
@@ -281,7 +289,7 @@ export default function StaffRecordsPage() {
       )}
 
       {!loading && activeTab === 'returns' && (
-        <ReturnsTabWithTemplates profiles={profiles} templates={templates} submissions={submissions} templateLoadError={templateLoadError} onRefresh={() => { fetchData(); fetchTemplates(); }} />
+        <ReturnsTabWithTemplates profiles={profiles} templates={templates} submissions={submissions} templateLoadError={templateLoadError} refreshVersion={refreshVersion} onRefresh={() => { fetchData(); fetchTemplates(); }} />
       )}
 
       {!loading && activeTab === 'transfers' && (
@@ -653,7 +661,7 @@ function ProfilesGrid({ profiles, onRefresh }: { profiles: any[]; onRefresh: () 
   );
 }
 
-function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoadError, onRefresh }: { profiles: any[]; templates: any[]; submissions: any[]; templateLoadError: string | null; onRefresh: () => void }) {
+function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoadError, refreshVersion, onRefresh }: { profiles: any[]; templates: any[]; submissions: any[]; templateLoadError: string | null; refreshVersion: number; onRefresh: () => void }) {
   const [activeSubTab, setActiveSubTab] = useState<'templates' | 'submissions'>('templates');
   const [editTemplate, setEditTemplate] = useState<any>(null);
   const [templateColumns, setTemplateColumns] = useState<any[]>([]);
@@ -1137,7 +1145,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
       )}
 
       {activeSubTab === 'submissions' && (
-        <SubmissionsGrid templates={templates} />
+        <SubmissionsGrid templates={templates} refreshVersion={refreshVersion} />
       )}
 
       {toast && (
@@ -1155,7 +1163,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
   );
 }
 
-function SubmissionsGrid({ templates }: { templates: any[] }) {
+function SubmissionsGrid({ templates, refreshVersion }: { templates: any[]; refreshVersion: number }) {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [selectedSub, setSelectedSub] = useState<any>(null);
   const [subData, setSubData] = useState<any[]>([]);
@@ -1280,6 +1288,18 @@ function SubmissionsGrid({ templates }: { templates: any[] }) {
   };
 
   useEffect(() => { fetchSubmissions(); }, [fetchSubmissions]);
+  useEffect(() => {
+    if (refreshVersion <= 0) return;
+    fetchSubmissions(selectedTemplate || undefined);
+    if (selectedSub?.id) {
+      premiumStaffRecordsApi.getSubmissionById(selectedSub.id).then(response => {
+        const payload = response.data;
+        const value = payload?.data?.id ? payload.data : payload;
+        setSelectedSub(value);
+        setSubData(value?.data || []);
+      }).catch(() => {});
+    }
+  }, [refreshVersion, selectedTemplate, selectedSub?.id, fetchSubmissions]);
   useEffect(() => {
     premiumStaffRecordsApi.getInstitutionalLookups().then(response => setLookupValues(response.data?.data || response.data || [])).catch(() => setLookupValues([]));
   }, []);
