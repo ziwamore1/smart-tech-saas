@@ -74,5 +74,7 @@ RUN addgroup -g 1001 -S nodejs && \
     chown -R nodejs:nodejs /app/logs
 USER nodejs
 
-# Run migrations on startup, then start the application
-CMD ["sh", "-c", "set -e; echo 'Running migrations...'; npx prisma migrate deploy --schema=./prisma/schema.prisma; echo 'Migrations OK'; node dist/main.js"]
+# Run migrations on startup, then start the application. Supabase recommends a
+# direct database connection for migrations; keep DATABASE_URL as the fallback
+# for deployments that only provide the shared pooler connection.
+CMD ["sh", "-c", "set -eu; migration_url=\"${DIRECT_URL:-${DATABASE_URL:-}}\"; if [ -z \"$migration_url\" ]; then echo 'DATABASE_URL or DIRECT_URL is required'; exit 1; fi; attempt=1; while [ \"$attempt\" -le 5 ]; do echo \"Running migrations (attempt $attempt/5)...\"; if DATABASE_URL=\"$migration_url\" npx prisma migrate deploy --schema=./prisma/schema.prisma; then echo 'Migrations OK'; break; fi; if [ \"$attempt\" -eq 5 ]; then echo 'Migration failed after 5 attempts'; exit 1; fi; delay=$((attempt * 5)); echo \"Database unavailable; retrying in ${delay}s...\"; sleep \"$delay\"; attempt=$((attempt + 1)); done; node dist/main.js"]
