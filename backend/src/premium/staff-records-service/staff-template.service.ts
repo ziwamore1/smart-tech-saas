@@ -43,6 +43,20 @@ export class StaffTemplateService {
 
   private async ensureInstitutionalLookups(schoolId: string) {
     const seeds = [...INSTITUTIONAL_LOOKUP_SEEDS, ...ZAMBIA_GEOGRAPHY_SEEDS];
+    const controlledCategories = ['HIGHEST_ACADEMIC', 'EDUCATION_LEVEL'];
+    for (const category of controlledCategories) {
+      const desiredCodes = seeds.filter((seed) => seed.category === category).map((seed) => seed.code);
+      await this.prisma.institutionalLookupValue.updateMany({
+        where: { schoolId: null, category, code: { notIn: desiredCodes } },
+        data: { active: false },
+      });
+      for (const seed of seeds.filter((item) => item.category === category)) {
+        await this.prisma.institutionalLookupValue.updateMany({
+          where: { schoolId: null, category: seed.category, code: seed.code },
+          data: { label: seed.label, sortOrder: seed.sortOrder ?? 0, active: true },
+        });
+      }
+    }
     const existing = await this.prisma.institutionalLookupValue.findMany({
       where: { schoolId: null },
       select: { category: true, code: true },

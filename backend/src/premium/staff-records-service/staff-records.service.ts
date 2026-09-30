@@ -166,7 +166,7 @@ export class StaffRecordsService {
     if (!Object.keys(safeData).length) throw new BadRequestException('No editable Advanced Staff Profile fields were provided');
 
     const profileData = this.mapProfileData(safeData);
-    const canonical = this.profileToReturnValues({ ...profile, ...safeData, dynamicFields: safeData.dynamicFields ?? profile.dynamicFields });
+    const canonical = this.toJsonSafe(this.profileToReturnValues({ ...profile, ...safeData, dynamicFields: safeData.dynamicFields ?? profile.dynamicFields }));
     const updated = await this.prisma.$transaction(async (tx) => {
       const updatedProfile = await tx.staffHrProfile.update({ where: { id: profile.id }, data: profileData });
 
@@ -229,6 +229,15 @@ export class StaffRecordsService {
     };
     for (const [key, value] of Object.entries(dynamicFields)) values[`staff.${key.replace(/^staff\./, '')}`] = value;
     return values;
+  }
+
+  private toJsonSafe(value: any): any {
+    if (value instanceof Date) return value.toISOString();
+    if (Array.isArray(value)) return value.map((item) => this.toJsonSafe(item));
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, this.toJsonSafe(item)]));
+    }
+    return value;
   }
 
   async searchProfiles(schoolId: string, query: string) {

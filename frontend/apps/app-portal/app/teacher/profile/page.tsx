@@ -21,7 +21,7 @@ const ADVANCED_FIELDS = [
   { key: 'administration', label: 'Additional Responsibility', category: 'ADDITIONAL_RESPONSIBILITY' },
   { key: 'dateOfFirstAppointment', label: 'First Appointment Date', type: 'date' },
   { key: 'dateOfPresentAppointment', label: 'Current Post Appointment Date', type: 'date' },
-  { key: 'academicQualification', label: 'Highest Academic Level', category: 'HIGHEST_ACADEMIC' },
+  { key: 'academicQualification', label: 'Highest Academic', category: 'HIGHEST_ACADEMIC' },
   { key: 'professionalQualification', label: 'Highest Teacher Qualification', category: 'TEACHER_QUALIFICATION' },
   { key: 'yearOfQualification', label: 'Year of Qualification', type: 'number' },
   { key: 'specialization', label: 'Specialization' },
@@ -32,6 +32,7 @@ const ADVANCED_FIELDS = [
 ];
 
 const ADVANCED_DYNAMIC_FIELDS = [
+  { key: 'highestLevelOfEducation', label: 'Highest Level of Education', category: 'EDUCATION_LEVEL' },
   { key: 'differentlyAbled', label: 'Differently Abled', category: 'DIFFERENTLY_ABLED' },
   { key: 'inServiceTraining', label: 'In-Service Training / CPD' },
   { key: 'staffPresence', label: 'Staff Presence', category: 'STAFF_PRESENCE' },
