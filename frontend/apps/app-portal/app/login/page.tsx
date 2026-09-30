@@ -8,6 +8,7 @@ import Link from 'next/link';
 import '../super-admin-fix.css';
 
 import { getDefaultHomePath } from '@/lib/role-home';
+import { getApiErrorMessage } from '@/lib/api';
 
 function LoginForm() {
   const [loginMode, setLoginMode] = useState<'email' | 'phone' | 'student' | 'username'>('email');
@@ -40,12 +41,7 @@ function LoginForm() {
       }
     } catch (err: any) {
       console.error('Login error:', err);
-      const errorMessage = 
-        err?.response?.data?.message || 
-        err?.response?.message || 
-        err?.message || 
-        'Login failed. Please check your credentials.';
-      setError(errorMessage);
+      setError(getApiErrorMessage(err, 'Login failed. Please check your credentials.'));
     } finally {
       setIsLoading(false);
     }

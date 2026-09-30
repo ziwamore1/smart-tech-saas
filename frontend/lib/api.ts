@@ -1,5 +1,28 @@
 import axios from 'axios';
 
+export const SYSTEM_UNAVAILABLE_MESSAGE = 'The system is currently unavailable. Our technical team is working to restore it. Please try again shortly.';
+
+export function getApiErrorMessage(error: any, fallback = 'Something went wrong. Please try again.') {
+  const status = error?.response?.status;
+  const responseMessage = error?.response?.data?.message || error?.response?.message;
+  const serverMessage = Array.isArray(responseMessage) ? responseMessage.join(', ') : responseMessage;
+
+  if (status >= 500 && status <= 599) return SYSTEM_UNAVAILABLE_MESSAGE;
+  if (!error?.response) {
+    const isAxiosConnectionError = error?.isAxiosError || error?.request || error?.code === 'ERR_NETWORK' || error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT';
+    if (isAxiosConnectionError && (error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT')) {
+      return 'The system is taking too long to respond and may be temporarily unavailable. Please try again shortly.';
+    }
+    if (isAxiosConnectionError) {
+      if (typeof navigator !== 'undefined' && navigator.onLine === true) return SYSTEM_UNAVAILABLE_MESSAGE;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'Your internet connection appears to be offline. Please reconnect and try again.';
+      return 'We could not connect to Smart Tech. Please check your internet connection. If your connection is working, the system may be temporarily unavailable.';
+    }
+  }
+
+  return serverMessage || error?.message || fallback;
+}
+
 let API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 if (!API_BASE_URL.endsWith('/api/v1') && !API_BASE_URL.endsWith('/api/v1/')) {
   API_BASE_URL = API_BASE_URL.replace(/\/+$/, '') + '/api/v1';
@@ -95,6 +118,7 @@ api.interceptors.response.use(
         });
       }
     }
+    error.message = getApiErrorMessage(error, error.message);
     return Promise.reject(error);
   }
 );
