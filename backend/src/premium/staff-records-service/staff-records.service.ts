@@ -189,6 +189,19 @@ export class StaffRecordsService {
           data: { data: rows as any, snapshot: { ...((submission.snapshot as any) || {}), rows } as any, status: 'DRAFT' },
         });
       }
+
+      const subjectValues = ['subjectBeingTaughtA', 'subjectBeingTaughtB', 'subjectQualifiedToTeachA', 'subjectQualifiedToTeachB']
+        .map((key) => String((safeData.dynamicFields || {})[key] || '').trim())
+        .filter(Boolean);
+      for (const label of new Set(subjectValues)) {
+        const code = label.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        if (!code) continue;
+        await tx.institutionalLookupValue.upsert({
+          where: { schoolId_category_code: { schoolId, category: 'SUBJECT', code } },
+          update: { label, active: true },
+          create: { schoolId, category: 'SUBJECT', code, label, sortOrder: 9999 },
+        });
+      }
       return updatedProfile;
     });
 
@@ -301,6 +314,7 @@ export class StaffRecordsService {
     const profile = await this.prisma.staffHrProfile.create({
       data: this.mapProfileData({ ...data, staffId }, schoolId),
     });
+    await this.persistSubjectLookups(schoolId, data.dynamicFields);
 
     if (data.staffId) {
       try { await this.syncEngine.syncStaffProfile(data.staffId, schoolId); }
@@ -312,10 +326,30 @@ export class StaffRecordsService {
   async updateProfile(id: string, data: any) {
     const existing = await this.prisma.staffHrProfile.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('HR profile not found');
-    return this.prisma.staffHrProfile.update({
+    const updated = await this.prisma.staffHrProfile.update({
       where: { id },
       data: this.mapProfileData(data),
     });
+    await this.persistSubjectLookups(existing.schoolId, data.dynamicFields);
+    return updated;
+  }
+
+  private async persistSubjectLookups(schoolId: string, dynamicFields: any) {
+    const subjectKeys = ['subjectBeingTaughtA', 'subjectBeingTaughtB', 'subjectQualifiedToTeachA', 'subjectQualifiedToTeachB'];
+    const labels = [...new Set(subjectKeys.map((key) => String(dynamicFields?.[key] || '').trim()).filter(Boolean))];
+    for (const label of labels) {
+      const code = label.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      if (!code) continue;
+      try {
+        await this.prisma.institutionalLookupValue.upsert({
+          where: { schoolId_category_code: { schoolId, category: 'SUBJECT', code } },
+          update: { label, active: true },
+          create: { schoolId, category: 'SUBJECT', code, label, sortOrder: 9999 },
+        });
+      } catch (error: any) {
+        this.logger.warn(`Could not add custom subject lookup "${label}" for school ${schoolId}: ${error?.message || error}`);
+      }
+    }
   }
 
   async deleteProfile(id: string) {

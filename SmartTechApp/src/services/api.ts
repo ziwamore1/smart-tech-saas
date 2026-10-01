@@ -2014,6 +2014,11 @@ class ApiService {
     return response.data;
   }
 
+  async getStaffRecordLookups(category?: string) {
+    const response = await this.client.get('/premium/staff-records/lookups', { params: category ? { category } : undefined });
+    return response.data;
+  }
+
   async getStaffRecordProfileById(id: string) {
     const response = await this.client.get(`/premium/staff-records/profiles/${id}`);
     return response.data;

@@ -103,7 +103,7 @@ const regularNav: NavItem[] = [
   },
   {
     name: 'Advanced Staff Profile',
-    href: '/teacher/profile',
+    href: '/teacher/profile#advanced-staff-profile',
     icon: 'fa-id-card',
     color: '#4f46e5',
     typeRoles: ROLE_MAP.teaching,

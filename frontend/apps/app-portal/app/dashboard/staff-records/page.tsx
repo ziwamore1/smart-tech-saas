@@ -240,11 +240,11 @@ export default function StaffRecordsPage() {
 
       <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e8ddd0', marginBottom: 24, overflowX: 'auto' }}>
         {tabs.map(tab => (
-          <button key={tab.key} onClick={() => { setActiveTab(tab.key); if (tab.key === 'returns' || tab.key === 'profiles') fetchTemplates(); }} style={{
-            padding: '10px 18px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14,
-            fontWeight: activeTab === tab.key ? 600 : 400, color: activeTab === tab.key ? '#ea6645' : '#6b7280',
-            borderBottom: activeTab === tab.key ? '2px solid #ea6645' : '2px solid transparent', marginBottom: -2,
-            transition: 'all 0.2s', whiteSpace: 'nowrap'
+          <button key={tab.key} type="button" aria-selected={activeTab === tab.key} onClick={() => { setActiveTab(tab.key); if (tab.key === 'returns' || tab.key === 'profiles') fetchTemplates(); }} style={{
+            padding: '10px 18px', border: 'none', background: activeTab === tab.key ? '#fff1eb' : 'transparent', borderRadius: 8, cursor: 'pointer', fontSize: 14,
+            fontWeight: activeTab === tab.key ? 700 : 500, color: activeTab === tab.key ? '#c2410c' : '#6b7280',
+            borderBottom: activeTab === tab.key ? '3px solid #ea6645' : '3px solid transparent', marginBottom: -2,
+            transition: 'background-color 120ms ease, color 120ms ease, transform 120ms ease', whiteSpace: 'nowrap'
           }}>
             <i className={`fas ${tab.icon}`} style={{ marginRight: 6 }}></i>{tab.label}
           </button>

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 
 export default function TeacherLayout({
@@ -10,7 +11,15 @@ export default function TeacherLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const [activeHash, setActiveHash] = useState('');
   const { user, logout } = useAuth();
+
+  useEffect(() => {
+    const syncHash = () => setActiveHash(window.location.hash);
+    syncHash();
+    window.addEventListener('hashchange', syncHash);
+    return () => window.removeEventListener('hashchange', syncHash);
+  }, [pathname]);
 
   const navItems = [
     { href: '/dashboard/teacher-view', label: 'My Dashboard', icon: '🏠' },
@@ -36,10 +45,11 @@ export default function TeacherLayout({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      pathname === item.href
-                        ? 'bg-blue-50 text-blue-600'
-                        : 'text-gray-600 hover:bg-gray-50'
+                    aria-current={pathname === item.href.split('#')[0] && (!item.href.includes('#') || activeHash === item.href.slice(item.href.indexOf('#')) ) ? 'page' : undefined}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all active:scale-95 ${
+                      pathname === item.href.split('#')[0] && (!item.href.includes('#') || activeHash === item.href.slice(item.href.indexOf('#')))
+                        ? 'bg-blue-100 text-blue-700 shadow-sm ring-1 ring-blue-200'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-blue-700'
                     }`}
                   >
                     <span className="mr-2">{item.icon}</span>
@@ -70,10 +80,11 @@ export default function TeacherLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                  pathname === item.href
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-gray-600 bg-gray-50'
+                aria-current={pathname === item.href.split('#')[0] && (!item.href.includes('#') || activeHash === item.href.slice(item.href.indexOf('#')) ) ? 'page' : undefined}
+                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all active:scale-95 ${
+                  pathname === item.href.split('#')[0] && (!item.href.includes('#') || activeHash === item.href.slice(item.href.indexOf('#')))
+                    ? 'bg-blue-100 text-blue-700 shadow-sm ring-1 ring-blue-200'
+                    : 'text-gray-600 bg-gray-50 hover:bg-blue-50 hover:text-blue-700'
                 }`}
               >
                 <span className="mr-1">{item.icon}</span>

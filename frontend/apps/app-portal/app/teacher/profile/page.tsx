@@ -25,7 +25,7 @@ const ADVANCED_FIELDS = [
   { key: 'professionalQualification', label: 'Highest Teacher Qualification', category: 'TEACHER_QUALIFICATION' },
   { key: 'yearOfQualification', label: 'Year of Qualification', type: 'number' },
   { key: 'specialization', label: 'Specialization' },
-  { key: 'gradeLevel', label: 'Main Grade Taught', category: 'MAIN_GRADE_TAUGHT' },
+  { key: 'gradeLevel', label: 'Main Grade Taught', type: 'text', placeholder: 'For example: Form 1, Grade 10, Grade 11' },
   { key: 'nextOfKin', label: 'Next of Kin' },
   { key: 'nextOfKinContact', label: 'Next of Kin Contact' },
   { key: 'nextOfKinRelationship', label: 'Next of Kin Relationship' },
@@ -39,6 +39,8 @@ const ADVANCED_DYNAMIC_FIELDS = [
   { key: 'employer', label: 'Employer', category: 'EMPLOYER' },
   { key: 'subjectBeingTaughtA', label: 'Subject Being Taught (A)', category: 'SUBJECT' },
   { key: 'subjectBeingTaughtB', label: 'Subject Being Taught (B)', category: 'SUBJECT' },
+  { key: 'subjectQualifiedToTeachA', label: 'Subject Qualified to Teach (A)', category: 'SUBJECT' },
+  { key: 'subjectQualifiedToTeachB', label: 'Subject Qualified to Teach (B)', category: 'SUBJECT' },
 ];
 
 export default function TeacherProfilePage() {
@@ -353,12 +355,14 @@ function AdvancedStaffProfileCard() {
       <div key={`${dynamic ? 'dynamic-' : ''}${field.key}`}>
         <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>{field.label}</label>
         {options.length ? (
-          <select disabled={!editable || saving} value={value} onChange={e => setValue(field.key, e.target.value, dynamic)} style={{ width: '100%', padding: '9px 10px', border: '1px solid #d1d5db', borderRadius: 7, background: editable ? '#fff' : '#f3f4f6', color: '#1f2937' }}>
-            <option value="">Select from lookup...</option>
-            {options.map((option: any) => <option key={option.id} value={option.label}>{option.label}</option>)}
-          </select>
+          <>
+            <input list={`lookup-${field.key}`} disabled={!editable || saving} type={field.type || 'text'} value={value} onChange={e => setValue(field.key, e.target.value, dynamic)} placeholder={`Select or type ${field.label.toLowerCase()}`} style={{ width: '100%', padding: '9px 10px', border: '1px solid #d1d5db', borderRadius: 7, background: editable ? '#fff' : '#f3f4f6', color: '#1f2937', boxSizing: 'border-box' }} />
+            <datalist id={`lookup-${field.key}`}>
+              {options.map((option: any) => <option key={option.id} value={option.label} />)}
+            </datalist>
+          </>
         ) : (
-          <input disabled={!editable || saving} type={field.type || 'text'} value={value} onChange={e => setValue(field.key, e.target.value, dynamic)} placeholder={`Enter ${field.label.toLowerCase()}`} style={{ width: '100%', padding: '9px 10px', border: '1px solid #d1d5db', borderRadius: 7, background: editable ? '#fff' : '#f3f4f6', color: '#1f2937', boxSizing: 'border-box' }} />
+          <input disabled={!editable || saving} type={field.type || 'text'} value={value} onChange={e => setValue(field.key, e.target.value, dynamic)} placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`} style={{ width: '100%', padding: '9px 10px', border: '1px solid #d1d5db', borderRadius: 7, background: editable ? '#fff' : '#f3f4f6', color: '#1f2937', boxSizing: 'border-box' }} />
         )}
       </div>
     );

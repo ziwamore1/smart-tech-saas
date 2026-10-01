@@ -36,7 +36,11 @@ const ALL_FIELDS = [
   { key: 'actingPosition', label: 'Acting Position', type: 'text', section: 'Position' },
   { key: 'administration', label: 'Administration', type: 'text', section: 'Position' },
   { key: 'actingType', label: 'Acting Type', type: 'text', section: 'Position' },
-  { key: 'gradeLevel', label: 'Grade Level', type: 'text', section: 'Position' },
+  { key: 'gradeLevel', label: 'Main Grade Taught (e.g. Form 1, Grade 10)', type: 'text', section: 'Position' },
+  { key: 'subjectBeingTaughtA', label: 'Subject Being Taught (A)', type: 'text', section: 'Position' },
+  { key: 'subjectBeingTaughtB', label: 'Subject Being Taught (B)', type: 'text', section: 'Position' },
+  { key: 'subjectQualifiedToTeachA', label: 'Subject Qualified to Teach (A)', type: 'text', section: 'Position' },
+  { key: 'subjectQualifiedToTeachB', label: 'Subject Qualified to Teach (B)', type: 'text', section: 'Position' },
   { key: 'step', label: 'Step', type: 'text', section: 'Position' },
   { key: 'province', label: 'Province', type: 'text', section: 'Position' },
   { key: 'district', label: 'District', type: 'text', section: 'Position' },
@@ -100,6 +104,7 @@ export const StaffReturnsScreen: React.FC<StaffReturnsProps> = ({ onToggleDrawer
   const [editingProfile, setEditingProfile] = useState<any>(null);
   const [form, setForm] = useState<any>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [subjectLookups, setSubjectLookups] = useState<any[]>([]);
 
   const loadData = useCallback(async () => {
     try {
@@ -108,6 +113,8 @@ export const StaffReturnsScreen: React.FC<StaffReturnsProps> = ({ onToggleDrawer
         apiService.getStaffRecordReturns(),
         apiService.getStaffRecordAnalytics(),
       ]);
+      const lookupRows = await apiService.getStaffRecordLookups('SUBJECT').catch(() => []);
+      setSubjectLookups(Array.isArray(lookupRows) ? lookupRows : []);
       if (profilesRes.status === 'fulfilled') setProfiles(profilesRes.value || []);
       if (returnsRes.status === 'fulfilled') setReturns(returnsRes.value || []);
       if (analyticsRes.status === 'fulfilled') setAnalytics(analyticsRes.value);
@@ -128,13 +135,19 @@ export const StaffReturnsScreen: React.FC<StaffReturnsProps> = ({ onToggleDrawer
     setSaving(true);
     try {
       const payload: any = {};
+      const dynamicFields: Record<string, any> = { ...((editingProfile?.dynamicFields as any) || {}) };
       ALL_FIELDS.forEach(f => {
         const val = form[f.key];
         if (val !== null && val !== undefined) {
+          if (['subjectBeingTaughtA', 'subjectBeingTaughtB', 'subjectQualifiedToTeachA', 'subjectQualifiedToTeachB'].includes(f.key)) {
+            dynamicFields[f.key] = val === '' ? null : val;
+            return;
+          }
           if (f.type === 'bool') payload[f.key] = (val === 'true' || val === true) ? 'true' : '';
           else payload[f.key] = val === '' ? null : val;
         }
       });
+      payload.dynamicFields = dynamicFields;
 
       if (editingProfile) {
         await apiService.updateStaffRecordProfile(editingProfile.id, payload);
@@ -174,7 +187,8 @@ export const StaffReturnsScreen: React.FC<StaffReturnsProps> = ({ onToggleDrawer
     setEditingProfile(profile);
     const f: any = {};
     ALL_FIELDS.forEach(field => {
-      const val = profile[field.key];
+      const dynamicKeys = ['subjectBeingTaughtA', 'subjectBeingTaughtB', 'subjectQualifiedToTeachA', 'subjectQualifiedToTeachB'];
+      const val = dynamicKeys.includes(field.key) ? profile.dynamicFields?.[field.key] : profile[field.key];
       f[field.key] = val !== null && val !== undefined ? String(val) : '';
     });
     setForm(f);
@@ -361,6 +375,15 @@ export const StaffReturnsScreen: React.FC<StaffReturnsProps> = ({ onToggleDrawer
           placeholderTextColor={colors.textMuted}
           keyboardType={fieldDef.type === 'email' ? 'email-address' : fieldDef.type === 'phone' ? 'phone-pad' : 'default'}
         />
+        {fieldDef.key.startsWith('subject') && subjectLookups.length > 0 && (
+          <ScrollView horizontal keyboardShouldPersistTaps="handled" style={styles.subjectSuggestions} contentContainerStyle={styles.subjectSuggestionsContent}>
+            {subjectLookups.map((subject: any) => (
+              <TouchableOpacity key={subject.id} style={styles.subjectChip} onPress={() => updateField(fieldDef.key, subject.label)}>
+                <Text style={styles.subjectChipText}>{subject.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
       </View>
     );
   };
@@ -472,6 +495,10 @@ const styles = StyleSheet.create({
   fieldGroup: { marginBottom: spacing.sm },
   fieldLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 4 },
   fieldInput: { borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md, padding: spacing.sm, fontSize: 14, color: colors.text, backgroundColor: colors.white },
+  subjectSuggestions: { marginTop: 7, maxHeight: 40 },
+  subjectSuggestionsContent: { gap: 6, paddingRight: 8 },
+  subjectChip: { borderRadius: 999, borderWidth: 1, borderColor: colors.primary, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.infoLight },
+  subjectChipText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
   selectRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   selectOpt: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
   selectOptActive: { backgroundColor: colors.primary, borderColor: colors.primary },
