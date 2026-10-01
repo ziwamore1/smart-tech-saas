@@ -192,15 +192,19 @@ export class StaffRecordsService {
       return updatedProfile;
     });
 
-    await this.createAuditLog({
-      profileId: profile.id,
-      schoolId,
-      action: 'STAFF_SELF_UPDATE',
-      entityType: 'ADVANCED_STAFF_PROFILE',
-      entityId: profile.id,
-      performedBy: userId,
-      changes: { fields: Object.keys(safeData), draftReturns: draftReturns.map((submission: any) => submission.id) },
-    });
+    try {
+      await this.createAuditLog({
+        profileId: profile.id,
+        schoolId,
+        action: 'STAFF_SELF_UPDATE',
+        entityType: 'ADVANCED_STAFF_PROFILE',
+        entityId: profile.id,
+        performedBy: userId,
+        changes: { fields: Object.keys(safeData), draftReturns: draftReturns.map((submission: any) => submission.id) },
+      });
+    } catch (error: any) {
+      this.logger.warn(`Advanced Staff Profile saved, but audit logging failed for ${profile.id}: ${error?.message || error}`);
+    }
     return { profile: updated, syncedDraftReturns: draftReturns.length, editable: true };
   }
 
@@ -238,6 +242,34 @@ export class StaffRecordsService {
       return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, this.toJsonSafe(item)]));
     }
     return value;
+  }
+
+  private async createAuditLog(data: {
+    submissionId?: string;
+    profileId?: string;
+    schoolId?: string;
+    action: string;
+    entityType: string;
+    entityId?: string;
+    performedBy?: string;
+    performedByName?: string;
+    changes?: any;
+    metadata?: any;
+  }) {
+    return this.prisma.staffAuditLog.create({
+      data: {
+        submissionId: data.submissionId,
+        profileId: data.profileId,
+        schoolId: data.schoolId,
+        action: data.action,
+        entityType: data.entityType,
+        entityId: data.entityId,
+        performedBy: data.performedBy,
+        performedByName: data.performedByName,
+        changes: data.changes as any,
+        metadata: data.metadata as any,
+      },
+    });
   }
 
   async searchProfiles(schoolId: string, query: string) {
