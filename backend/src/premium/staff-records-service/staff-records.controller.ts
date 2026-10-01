@@ -12,7 +12,7 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 
 const ADMIN_ROLES = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'SuperAdmin'];
 const STAFF_SELF_ROLES = [
-  'Teacher', 'Class Teacher', 'Primary Teacher', 'HOD',
+  'Teacher', 'Class Teacher', 'Primary Teacher', 'HOD', 'Director',
   'Head Teacher', 'Deputy Head', 'Deputy Director',
   'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher',
   'Lecturer', 'Research Supervisor',

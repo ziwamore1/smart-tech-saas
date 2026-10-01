@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { identityApi, premiumStaffRecordsApi } from '@/lib/api';
 
@@ -44,8 +45,18 @@ const ADVANCED_DYNAMIC_FIELDS = [
 ];
 
 export default function TeacherProfilePage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: 220, display: 'grid', placeItems: 'center', color: '#64748b' }}>Loading profile...</div>}>
+      <TeacherProfilePageContent />
+    </Suspense>
+  );
+}
+
+function TeacherProfilePageContent() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const showAdvancedProfile = searchParams.get('section') === 'advanced';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -63,8 +74,10 @@ export default function TeacherProfilePage() {
   }, [isAuthenticated, authLoading, router]);
 
   useEffect(() => {
-    if (isAuthenticated) { loadProfile(); }
-  }, [isAuthenticated]);
+    if (!isAuthenticated) return;
+    if (showAdvancedProfile) setLoading(false);
+    else loadProfile();
+  }, [isAuthenticated, showAdvancedProfile]);
 
   const loadProfile = async () => {
     try {
@@ -135,6 +148,22 @@ export default function TeacherProfilePage() {
 
   if (!isAuthenticated) return null;
 
+  if (showAdvancedProfile) {
+    return (
+      <main style={{ minHeight: 'calc(100vh - 64px)', padding: '24px clamp(16px, 4vw, 40px)', background: '#f5f7fb' }}>
+        <div style={{ maxWidth: 1060, margin: '0 auto' }}>
+          <ProfileSectionTabs active="advanced" />
+          <AdvancedStaffProfileCard />
+        </div>
+      </main>
+    );
+  }
+
+  const roleCandidates = [...(accountInfo.roles || []), ...(user?.schoolRoles || []), ...(user?.roles || []), ...(user?.role ? [user.role] : [])];
+  const normalizeRole = (role: string) => role.toLowerCase().replace(/[^a-z]/g, '');
+  const profileRole = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Principal', 'Teacher', 'Class Teacher']
+    .find(expected => roleCandidates.some(role => normalizeRole(role) === normalizeRole(expected))) || roleCandidates[0] || 'Staff';
+
   return (
     <div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -149,6 +178,7 @@ export default function TeacherProfilePage() {
         <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#1f2937', margin: '0 0 8px' }}>Profile</h1>
         <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>Manage your account settings and security</p>
       </div>
+      <ProfileSectionTabs active="account" />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))', gap: '24px', maxWidth: '1000px' }}>
         <div style={{ background: '#fefcf9', borderRadius: '16px', padding: '28px', border: '1px solid #e8ddd0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
@@ -265,7 +295,7 @@ export default function TeacherProfilePage() {
               <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: 500 }}>Role</span>
               <span style={{ fontSize: '13px', color: '#1f2937', fontWeight: 600 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', background: '#dcfce7', borderRadius: '9999px', fontSize: '12px', color: '#166534' }}>
-                  <i className="fa fa-chalkboard-teacher" style={{ fontSize: '10px' }}></i> Teacher
+                  <i className="fa fa-user-tag" style={{ fontSize: '10px' }}></i> {profileRole}
                 </span>
               </span>
             </div>
@@ -277,10 +307,42 @@ export default function TeacherProfilePage() {
         </div>
       </div>
 
-      <div id="advanced-staff-profile">
-        <AdvancedStaffProfileCard />
-      </div>
     </div>
+  );
+}
+
+function ProfileSectionTabs({ active }: { active: 'account' | 'advanced' }) {
+  const tabs = [
+    { key: 'account' as const, label: 'Account Profile', href: '/teacher/profile', icon: 'fa-user-circle' },
+    { key: 'advanced' as const, label: 'Advanced Staff Profile', href: '/teacher/profile?section=advanced', icon: 'fa-id-card' },
+  ];
+
+  return (
+    <nav aria-label="Profile sections" role="tablist" style={{ display: 'flex', gap: 8, width: 'fit-content', maxWidth: '100%', overflowX: 'auto', padding: 5, marginBottom: 24, borderRadius: 12, background: '#e9edf5' }}>
+      {tabs.map(tab => {
+        const selected = active === tab.key;
+        return (
+          <Link
+            key={tab.key}
+            href={tab.href}
+            role="tab"
+            aria-selected={selected}
+            aria-current={selected ? 'page' : undefined}
+            className="transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              padding: '11px 16px', borderRadius: 9, whiteSpace: 'nowrap', textDecoration: 'none',
+              background: selected ? '#4338ca' : 'transparent', color: selected ? '#fff' : '#475569',
+              fontSize: 14, fontWeight: selected ? 700 : 600,
+              boxShadow: selected ? '0 3px 9px rgba(67, 56, 202, 0.25)' : 'none',
+              transition: 'background 140ms ease, color 140ms ease, transform 120ms ease, box-shadow 140ms ease',
+            }}
+          >
+            <i className={`fa ${tab.icon}`} aria-hidden="true"></i>{tab.label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -353,7 +415,13 @@ function AdvancedStaffProfileCard() {
   };
 
   if (loading) return <div style={{ marginTop: 24, color: '#6b7280' }}>Loading Advanced Staff Profile...</div>;
-  if (!profile?.profile) return null;
+  if (!profile?.profile) return (
+    <div role="alert" style={{ maxWidth: 1000, padding: 20, border: '1px solid #fca5a5', borderRadius: 12, background: '#fef2f2', color: '#991b1b', lineHeight: 1.5 }}>
+      <strong>Advanced Staff Profile could not be loaded.</strong>
+      <div style={{ marginTop: 6 }}>{message?.text || 'This account is not linked to a staff record in the active school. Ask a school administrator to link your account to your staff profile.'}</div>
+      <Link href="/dashboard/staff-records" style={{ display: 'inline-block', marginTop: 12, color: '#1d4ed8', fontWeight: 700 }}>Open Staff Returns Hub</Link>
+    </div>
+  );
 
   const editable = Boolean(profile.editable);
   const renderInput = (field: any, dynamic = false) => {

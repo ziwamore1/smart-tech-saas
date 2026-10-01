@@ -103,7 +103,7 @@ const regularNav: NavItem[] = [
   },
   {
     name: 'Advanced Staff Profile',
-    href: '/teacher/profile#advanced-staff-profile',
+    href: '/teacher/profile?section=advanced',
     icon: 'fa-id-card',
     color: '#4f46e5',
     typeRoles: ROLE_MAP.teaching,
@@ -840,6 +840,9 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const userRoles = allRoles || user?.roles || [];
+  const normalizeRole = (role: string) => role.toLowerCase().replace(/[^a-z]/g, '');
+  const dashboardRole = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Principal']
+    .find(expected => userRoles.some(role => normalizeRole(role) === normalizeRole(expected))) || user?.schoolRoles?.[0] || userRoles[0] || 'User';
   const institutionType = user?.institutionType || null;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -860,6 +863,10 @@ export default function DashboardLayout({
   });
 
   const resolvedInstitutionType = institutionType || schoolData?.institutionType?.code || null;
+  const isNavigationItemActive = (href: string) => {
+    const itemPath = href.split(/[?#]/)[0];
+    return pathname === itemPath || (itemPath !== '/super-admin' && pathname.startsWith(itemPath));
+  };
   const normalizedUserRoles = userRoles.map((role) => role.toLowerCase().replace(/\s+/g, ''));
   const navigation = isPureSuperAdmin ? superAdminNav : regularNav.filter(item => {
     if (item.institutionTypes && item.institutionTypes.length > 0) {
@@ -1114,15 +1121,18 @@ export default function DashboardLayout({
                 key={item.name}
                 href={item.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`sidebar-link ${pathname === item.href || (item.href !== '/super-admin' && pathname.startsWith(item.href)) ? 'active' : ''}`}
+                aria-current={isNavigationItemActive(item.href) ? 'page' : undefined}
+                className={`sidebar-link ${isNavigationItemActive(item.href) ? 'active' : ''} transition-all active:scale-[0.98]`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
                   padding: '14px 16px',
                   color: '#374151',
-                  borderLeft: '3px solid transparent',
-                  transition: 'all 0.2s'
+                  borderLeft: `3px solid ${isNavigationItemActive(item.href) ? item.color : 'transparent'}`,
+                  background: isNavigationItemActive(item.href) ? '#eef2ff' : 'transparent',
+                  boxShadow: isNavigationItemActive(item.href) ? 'inset 0 0 0 1px rgba(79, 70, 229, 0.12)' : 'none',
+                  transition: 'all 0.15s ease'
                 }}
               >
                 <i className={`fa ${item.icon} nav-icon`} style={{ 
@@ -1157,7 +1167,7 @@ export default function DashboardLayout({
                     {user?.firstName} {user?.lastName}
                   </p>
                   <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0, whiteSpace: 'nowrap' }}>
-                    {user?.roles?.[0] || 'User'}
+                    {dashboardRole}
                   </p>
                 </div>
               </div>
@@ -1262,7 +1272,8 @@ export default function DashboardLayout({
               <Link
                 key={item.name}
                 href={item.href}
-                className={`sidebar-link ${pathname === item.href || (item.href !== '/super-admin' && pathname.startsWith(item.href)) ? 'active' : ''}`}
+                aria-current={isNavigationItemActive(item.href) ? 'page' : undefined}
+                className={`sidebar-link ${isNavigationItemActive(item.href) ? 'active' : ''} transition-all active:scale-[0.98]`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1271,8 +1282,10 @@ export default function DashboardLayout({
                   marginBottom: '4px',
                   color: '#374151',
                   borderRadius: '8px',
-                  borderLeft: '3px solid transparent',
-                  transition: 'all 0.2s',
+                  borderLeft: `3px solid ${isNavigationItemActive(item.href) ? item.color : 'transparent'}`,
+                  background: isNavigationItemActive(item.href) ? '#eef2ff' : 'transparent',
+                  boxShadow: isNavigationItemActive(item.href) ? 'inset 0 0 0 1px rgba(79, 70, 229, 0.12)' : 'none',
+                  transition: 'all 0.15s ease',
                   justifyContent: sidebarCollapsed ? 'center' : 'flex-start'
                 }}
               >
@@ -1285,8 +1298,8 @@ export default function DashboardLayout({
                 {!sidebarCollapsed && (
                   <span className="nav-text" style={{ 
                     fontSize: '14px',
-                    fontWeight: pathname === item.href || (item.href !== '/super-admin' && pathname.startsWith(item.href)) ? 600 : 500,
-                    color: pathname === item.href || (item.href !== '/super-admin' && pathname.startsWith(item.href)) ? item.color : '#374151',
+                    fontWeight: isNavigationItemActive(item.href) ? 700 : 500,
+                    color: isNavigationItemActive(item.href) ? item.color : '#374151',
                     transition: 'all 0.2s'
                   }}>
                     {item.name}
@@ -1364,7 +1377,7 @@ export default function DashboardLayout({
                     margin: 0,
                     whiteSpace: 'nowrap'
                   }}>
-                    {user?.roles?.[0] || 'User'}
+                    {dashboardRole}
                   </p>
                 </div>
               )}

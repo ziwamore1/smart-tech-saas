@@ -119,17 +119,16 @@ export class StaffRecordsService {
   }
 
   async getMyAdvancedProfile(userId: string, schoolId: string) {
-    const teacher = await this.prisma.teacher.findFirst({ where: { userId, schoolId }, select: { id: true } });
-    if (!teacher) throw new NotFoundException('No staff record is linked to this account');
+    const staffId = await this.resolveAdvancedProfileStaffId(userId, schoolId);
 
-    let profile = await this.prisma.staffHrProfile.findUnique({ where: { staffId: teacher.id } });
+    let profile = await this.prisma.staffHrProfile.findFirst({ where: { staffId, schoolId } });
     if (!profile) {
       await this.autoSyncFromTeachers(schoolId);
-      profile = await this.prisma.staffHrProfile.findUnique({ where: { staffId: teacher.id } });
+      profile = await this.prisma.staffHrProfile.findFirst({ where: { staffId, schoolId } });
     }
     if (!profile) throw new NotFoundException('Advanced Staff Profile is not available');
 
-    const draftReturns = await this.findDraftReturnsForStaff(teacher.id, schoolId);
+    const draftReturns = await this.findDraftReturnsForStaff(staffId, schoolId);
     return {
       profile,
       editable: draftReturns.length > 0,
@@ -144,12 +143,11 @@ export class StaffRecordsService {
   }
 
   async updateMyAdvancedProfile(userId: string, schoolId: string, data: any) {
-    const teacher = await this.prisma.teacher.findFirst({ where: { userId, schoolId }, select: { id: true } });
-    if (!teacher) throw new NotFoundException('No staff record is linked to this account');
-    const profile = await this.prisma.staffHrProfile.findUnique({ where: { staffId: teacher.id } });
+    const staffId = await this.resolveAdvancedProfileStaffId(userId, schoolId);
+    const profile = await this.prisma.staffHrProfile.findFirst({ where: { staffId, schoolId } });
     if (!profile) throw new NotFoundException('Advanced Staff Profile is not available');
 
-    const draftReturns = await this.findDraftReturnsForStaff(teacher.id, schoolId);
+    const draftReturns = await this.findDraftReturnsForStaff(staffId, schoolId);
     if (!draftReturns.length) {
       throw new BadRequestException('This Advanced Staff Profile is locked. A new DRAFT Staff Return must be compiled before you can make updates.');
     }
@@ -172,7 +170,7 @@ export class StaffRecordsService {
 
       for (const submission of draftReturns) {
         const rows = ((submission.data as any[]) || []).map((candidate) => ({ ...candidate }));
-        const row = rows.find((candidate) => candidate.staffId === teacher.id);
+        const row = rows.find((candidate) => candidate.staffId === staffId);
         if (!row) continue;
         const columns = (submission.template.columns || []).filter((column: any) => column.isEditable !== false);
         for (const column of columns) {
@@ -219,6 +217,22 @@ export class StaffRecordsService {
       this.logger.warn(`Advanced Staff Profile saved, but audit logging failed for ${profile.id}: ${error?.message || error}`);
     }
     return { profile: updated, syncedDraftReturns: draftReturns.length, editable: true };
+  }
+
+  private async resolveAdvancedProfileStaffId(userId: string, schoolId: string) {
+    const teacher = await this.prisma.teacher.findFirst({ where: { userId, schoolId }, select: { id: true } });
+    if (teacher) return teacher.id;
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    if (user?.email) {
+      const profile = await this.prisma.staffHrProfile.findFirst({
+        where: { schoolId, emailAddress: { equals: user.email, mode: 'insensitive' } },
+        select: { staffId: true },
+      });
+      if (profile) return profile.staffId;
+    }
+
+    throw new NotFoundException('No staff profile is linked to this account in the active school. Ask a school administrator to link your staff record.');
   }
 
   private async findDraftReturnsForStaff(staffId: string, schoolId: string) {
