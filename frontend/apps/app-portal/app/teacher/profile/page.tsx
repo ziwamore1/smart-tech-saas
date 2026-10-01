@@ -293,6 +293,15 @@ function AdvancedStaffProfileCard() {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  useEffect(() => {
+    if (!message) return;
+    const timeout = window.setTimeout(() => {
+      if (message.type === 'success') setOpen(false);
+      setMessage(null);
+    }, message.type === 'success' ? 30000 : 5000);
+    return () => window.clearTimeout(timeout);
+  }, [message]);
+
   const load = async () => {
     try {
       setLoading(true);
@@ -335,12 +344,11 @@ function AdvancedStaffProfileCard() {
       const result = response.data?.data || response.data || {};
       setProfile((current: any) => ({ ...current, profile: result.profile || current.profile, editable: result.editable, syncedDraftReturns: result.syncedDraftReturns }));
       setForm({ ...(result.profile || form), dynamicFields: { ...((result.profile?.dynamicFields as any) || form.dynamicFields || {}) } });
-      setMessage({ type: 'success', text: `Saved and synced to ${result.syncedDraftReturns || 0} open Staff Return(s).` });
+      setMessage({ type: 'success', text: `Your details have been saved and synced to the Main Staff Return Hub${result.syncedDraftReturns ? ` (${result.syncedDraftReturns} open return${result.syncedDraftReturns === 1 ? '' : 's'})` : ''}.` });
     } catch (error: any) {
       setMessage({ type: 'error', text: error?.response?.data?.message || 'Advanced Staff Profile could not be saved.' });
     } finally {
       setSaving(false);
-      setTimeout(() => setMessage(null), 4000);
     }
   };
 
@@ -396,6 +404,25 @@ function AdvancedStaffProfileCard() {
               <div><h3 style={{ margin: 0, color: '#1e1b4b' }}>Advanced Staff Profile</h3><p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>Use the lookup options where provided. Leave unknown fields for the Staff Return Hub administrator.</p></div>
               <button onClick={() => setOpen(false)} style={{ border: 'none', background: 'none', fontSize: 24, cursor: 'pointer', color: '#6b7280' }}>&times;</button>
             </div>
+            {message && (
+              <div role={message.type === 'success' ? 'status' : 'alert'} style={{ margin: '14px 22px 0', padding: 16, borderRadius: 12, border: `2px solid ${message.type === 'success' ? '#22c55e' : '#ef4444'}`, background: message.type === 'success' ? '#f0fdf4' : '#fef2f2', color: message.type === 'success' ? '#166534' : '#991b1b', boxShadow: '0 4px 14px rgba(22, 101, 52, 0.12)' }}>
+                {message.type === 'success' ? (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <i className="fa fa-check-circle" aria-hidden="true" style={{ fontSize: 24, marginTop: 2 }}></i>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 16, fontWeight: 700 }}>Save successful</div>
+                        <div style={{ marginTop: 5, fontSize: 14, lineHeight: 1.5 }}>{message.text}</div>
+                        <div style={{ marginTop: 5, fontSize: 12, color: '#3f6212' }}>Review the saved values below. Confirm when you are ready; this notice will close automatically in 30 seconds.</div>
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => setOpen(false)} style={{ marginTop: 12, padding: '9px 14px', border: 'none', borderRadius: 7, background: '#15803d', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>
+                      I’ve confirmed — close profile
+                    </button>
+                  </>
+                ) : message.text}
+              </div>
+            )}
             <div style={{ padding: 22, overflowY: 'auto' }}>
               <h4 style={{ margin: '0 0 12px', color: '#374151' }}>Identity and Employment Details</h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>{ADVANCED_FIELDS.map(field => renderInput(field))}</div>
