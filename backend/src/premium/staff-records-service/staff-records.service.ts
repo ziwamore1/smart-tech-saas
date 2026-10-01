@@ -591,7 +591,11 @@ export class StaffRecordsService {
   async getSchoolInfo(schoolId: string) {
     return this.prisma.school.findUnique({
       where: { id: schoolId },
-      select: { id: true, name: true, province: true, district: true, logoUrl: true },
+      select: {
+        id: true, name: true, province: true, district: true, logoUrl: true,
+        address: true, phone: true, email: true, emisNumber: true, registrationNumber: true,
+        website: true, motto: true, schoolType: true, constituency: true, ward: true, zone: true,
+      },
     });
   }
 

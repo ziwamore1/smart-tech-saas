@@ -5,8 +5,19 @@ import * as path from 'path';
 
 export interface ExportOptions {
   schoolName?: string;
+  address?: string;
   province?: string;
   district?: string;
+  constituency?: string;
+  ward?: string;
+  zone?: string;
+  schoolType?: string;
+  emisNumber?: string;
+  registrationNumber?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  motto?: string;
   academicYear?: string;
   term?: string;
   generatedBy?: string;
@@ -16,6 +27,7 @@ export interface ExportOptions {
 @Injectable()
 export class StaffExcelService {
   private readonly logger = new Logger(StaffExcelService.name);
+  private readonly schoolHeaderRows = 4;
 
   constructor(private prisma: PrismaService) {}
 
@@ -34,8 +46,13 @@ export class StaffExcelService {
     if (!worksheet) throw new Error(`Template worksheet not found: ${config.sheetName}`);
     const rows = (submission.data as any[]) || [];
     const headerRow = Number(config.headerRow || 4);
-    const dataStartRow = Number(config.dataStartRow || headerRow + 1);
+    let dataStartRow = Number(config.dataStartRow || headerRow + 1);
     const columns = submission.template.columns;
+    worksheet.spliceRows(1, 0, ...Array.from({ length: this.schoolHeaderRows }, () => []));
+    this.shiftWorksheetValidations(workbook, worksheet, this.schoolHeaderRows);
+    dataStartRow += this.schoolHeaderRows;
+    this.writeSchoolHeader(worksheet, options, submission.template.name, submission.period, columns.length);
+    worksheet.pageSetup.printTitlesRow = `1:${headerRow + this.schoolHeaderRows}`;
     rows.forEach((rowData: any, rowIndex: number) => {
       const row = rowData?.values || rowData;
       const target = worksheet.getRow(dataStartRow + rowIndex);
@@ -98,48 +115,15 @@ export class StaffExcelService {
       }}}
     );
 
-    // ── Branding Header ──
-    const brandColor = 'EA6645';
+    this.writeSchoolHeader(worksheet, options, submission.template.name, submission.period, columns.length);
+
+    // ── Column Headers ──
     const headerBgColor = '1A1A2E';
-    const secondaryBg = 'F5EFE8';
     const whiteText = 'FFFFFF';
     const darkText = '1A1A2E';
 
-    // Title block
-    worksheet.mergeCells(1, 1, 1, columns.length);
-    const titleCell = worksheet.getCell(1, 1);
-    titleCell.value = `${options.schoolName || 'School'} - Staff Return`;
-    titleCell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: headerBgColor } };
-    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    worksheet.getRow(1).height = 36;
-
-    // Info block
-    worksheet.mergeCells(2, 1, 2, columns.length);
-    const infoParts = [];
-    if (options.province) infoParts.push(`Province: ${options.province}`);
-    if (options.district) infoParts.push(`District: ${options.district}`);
-    if (options.academicYear) infoParts.push(`Academic Year: ${options.academicYear}`);
-    if (options.term) infoParts.push(`Term: ${options.term}`);
-    infoParts.push(`Period: ${submission.period}`);
-    infoParts.push(`Generated: ${new Date().toLocaleDateString()}`);
-
-    const infoCell = worksheet.getCell(2, 1);
-    infoCell.value = infoParts.join('  |  ');
-    infoCell.font = { name: 'Calibri', size: 10, color: { argb: '666666' } };
-    infoCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    infoCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: secondaryBg } };
-    worksheet.getRow(2).height = 28;
-
-    // SmartTech branding footer note
-    worksheet.mergeCells(3, 1, 3, columns.length);
-    const brandCell = worksheet.getCell(3, 1);
-    brandCell.value = `Powered by SmartTech SaaS  |  Staff Returns & HR Intelligence Hub`;
-    brandCell.font = { name: 'Calibri', size: 8, italic: true, color: { argb: '999999' } };
-    brandCell.alignment = { horizontal: 'center' };
-    worksheet.getRow(3).height = 18;
-
-    // ── Column Headers ──
-    const headerRow = worksheet.getRow(4);
+    const columnHeaderRowIndex = this.schoolHeaderRows + 1;
+    const headerRow = worksheet.getRow(columnHeaderRowIndex);
     headerRow.height = 32;
 
     columns.forEach((col, index) => {
@@ -161,7 +145,7 @@ export class StaffExcelService {
     });
 
     // ── Data Rows ──
-    let rowIndex = 5;
+    let rowIndex = columnHeaderRowIndex + 1;
     for (const rowData of rows) {
       const row = worksheet.getRow(rowIndex);
       let maxLines = 1;
@@ -204,7 +188,6 @@ export class StaffExcelService {
 
     // ── Set column widths ──
     columns.forEach((col, index) => {
-      const colLetter = (index + 10).toString(36).toUpperCase();
       const width = col.width ? Math.max(col.width / 7, 10) : 18;
       worksheet.getColumn(index + 1).width = width;
     });
@@ -212,15 +195,15 @@ export class StaffExcelService {
     // ── Auto-filter ──
     if (rows.length > 0 && columns.length > 0) {
       const lastCol = columns.length;
-      const lastRow = 4 + rows.length;
+      const lastRow = columnHeaderRowIndex + rows.length;
       worksheet.autoFilter = {
-        from: { row: 4, column: 1 },
+        from: { row: columnHeaderRowIndex, column: 1 },
         to: { row: lastRow, column: lastCol },
       };
     }
 
     // ── Print settings ──
-    worksheet.pageSetup.printTitlesRow = '1:4';
+    worksheet.pageSetup.printTitlesRow = `1:${columnHeaderRowIndex}`;
     worksheet.pageSetup.paperSize = 9; // A4
     worksheet.pageSetup.orientation = 'landscape';
     worksheet.pageSetup.fitToPage = true;
@@ -242,26 +225,14 @@ export class StaffExcelService {
       pageSetup: { orientation: 'landscape', fitToPage: true },
     });
 
-    // Branding header
-    worksheet.mergeCells(1, 1, 1, 7);
-    const titleCell = worksheet.getCell(1, 1);
-    titleCell.value = `${options.schoolName || 'School'} - Staff Profiles`;
-    titleCell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: '1A1A2E' } };
-    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    worksheet.getRow(1).height = 36;
-
-    worksheet.mergeCells(2, 1, 2, 7);
-    const infoCell = worksheet.getCell(2, 1);
-    infoCell.value = `Total Staff: ${profiles.length}  |  Generated: ${new Date().toLocaleDateString()}  |  Powered by SmartTech SaaS`;
-    infoCell.font = { name: 'Calibri', size: 10, color: { argb: '666666' } };
-    infoCell.alignment = { horizontal: 'center' };
-    worksheet.getRow(2).height = 24;
+    this.writeSchoolHeader(worksheet, options, `Staff Profiles (${profiles.length})`, undefined, 8);
 
     const headers = [
       'Employee #', 'Name', 'Gender', 'Position', 'Grade', 'Status', 'Phone', 'Email',
     ];
 
-    const headerRow = worksheet.getRow(4);
+    const columnHeaderRowIndex = this.schoolHeaderRows + 1;
+    const headerRow = worksheet.getRow(columnHeaderRowIndex);
     headerRow.height = 30;
     headers.forEach((h, i) => {
       const cell = headerRow.getCell(i + 1);
@@ -275,7 +246,7 @@ export class StaffExcelService {
       };
     });
 
-    let rowIdx = 5;
+    let rowIdx = columnHeaderRowIndex + 1;
     for (const p of profiles) {
       const row = worksheet.getRow(rowIdx);
       const name = `${p.teacherName || ''}`;
@@ -311,6 +282,7 @@ export class StaffExcelService {
     worksheet.pageSetup.orientation = 'landscape';
     worksheet.pageSetup.fitToPage = true;
     worksheet.pageSetup.fitToWidth = 1;
+    worksheet.pageSetup.printTitlesRow = `1:${columnHeaderRowIndex}`;
 
     return await workbook.xlsx.writeBuffer();
   }
@@ -337,16 +309,11 @@ export class StaffExcelService {
       pageSetup: { orientation: 'landscape', fitToPage: true },
     });
 
-    // Header
-    worksheet.mergeCells(1, 1, 1, columns.length);
-    const titleCell = worksheet.getCell(1, 1);
-    titleCell.value = `${options.schoolName || 'School'} - ${template.name}`;
-    titleCell.font = { name: 'Calibri', size: 14, bold: true, color: { argb: '1A1A2E' } };
-    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    worksheet.getRow(1).height = 34;
+    this.writeSchoolHeader(worksheet, options, template.name, options.academicYear, columns.length);
 
     // Column headers
-    const headerRow = worksheet.getRow(3);
+    const columnHeaderRowIndex = this.schoolHeaderRows + 1;
+    const headerRow = worksheet.getRow(columnHeaderRowIndex);
     headerRow.height = 30;
 
     columns.forEach((col, index) => {
@@ -363,7 +330,7 @@ export class StaffExcelService {
 
     // Empty data rows (for manual entry)
     for (let i = 0; i < 50; i++) {
-      const row = worksheet.getRow(4 + i);
+      const row = worksheet.getRow(columnHeaderRowIndex + 1 + i);
       for (let j = 0; j < columns.length; j++) {
         const cell = row.getCell(j + 1);
         cell.border = {
@@ -381,6 +348,85 @@ export class StaffExcelService {
     });
 
     worksheet.pageSetup.orientation = 'landscape';
+    worksheet.pageSetup.printTitlesRow = `1:${columnHeaderRowIndex}`;
     return await workbook.xlsx.writeBuffer();
+  }
+
+  private writeSchoolHeader(
+    worksheet: ExcelJS.Worksheet,
+    options: ExportOptions,
+    returnName: string,
+    period: string | undefined,
+    requestedColumns: number,
+  ) {
+    const columnCount = Math.max(1, worksheet.columnCount, requestedColumns);
+    const detailParts = [
+      options.address,
+      options.ward && `Ward: ${options.ward}`,
+      options.constituency && `Constituency: ${options.constituency}`,
+      options.district && `District: ${options.district}`,
+      options.province && `Province: ${options.province}`,
+      options.zone && `Zone: ${options.zone}`,
+      options.schoolType && `School Type: ${options.schoolType}`,
+    ].filter(Boolean);
+    const contactParts = [
+      options.emisNumber && `EMIS: ${options.emisNumber}`,
+      options.registrationNumber && `Registration No.: ${options.registrationNumber}`,
+      options.phone && `Tel: ${options.phone}`,
+      options.email && `Email: ${options.email}`,
+      options.website,
+    ].filter(Boolean);
+    const title = String(options.schoolName || 'School').trim();
+    const brandColor = '17324D';
+    const accentColor = 'D8A54A';
+
+    for (let rowIndex = 1; rowIndex <= this.schoolHeaderRows; rowIndex++) {
+      worksheet.mergeCells(rowIndex, 1, rowIndex, columnCount);
+      const row = worksheet.getRow(rowIndex);
+      row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      row.getCell(1).border = { bottom: { style: rowIndex === this.schoolHeaderRows ? 'medium' : 'thin', color: { argb: accentColor } } };
+    }
+
+    const schoolTitleCell = worksheet.getCell(1, 1);
+    schoolTitleCell.value = title.toLocaleUpperCase();
+    schoolTitleCell.font = { name: 'Arial', size: 18, bold: true, color: { argb: 'FFFFFF' } };
+    schoolTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: brandColor } };
+    worksheet.getRow(1).height = 34;
+
+    const detailsText = detailParts.join('   |   ') || 'School details';
+    const detailsCell = worksheet.getCell(2, 1);
+    detailsCell.value = detailsText;
+    detailsCell.font = { name: 'Arial', size: 10, color: { argb: '263746' } };
+    detailsCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'EEF3F7' } };
+    worksheet.getRow(2).height = Math.min(48, Math.max(24, Math.ceil(detailsText.length / 90) * 16));
+
+    const contactCell = worksheet.getCell(3, 1);
+    const contactText = [options.motto && `“${options.motto}”`, ...contactParts].filter(Boolean).join('   |   ') || 'School contact and registration details';
+    contactCell.value = contactText;
+    contactCell.font = { name: 'Arial', size: 9, color: { argb: '455A64' }, italic: Boolean(options.motto) };
+    contactCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F7F9FB' } };
+    worksheet.getRow(3).height = Math.min(42, Math.max(22, Math.ceil(contactText.length / 100) * 14));
+
+    const reportCell = worksheet.getCell(4, 1);
+    const reportParts = [returnName, period && `Period: ${period}`, options.academicYear && `Academic Year: ${options.academicYear}`, options.term && `Term: ${options.term}`, `Generated: ${new Date().toLocaleDateString()}`].filter(Boolean);
+    reportCell.value = reportParts.join('   |   ');
+    reportCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: brandColor } };
+    reportCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8E8' } };
+    worksheet.getRow(4).height = 26;
+  }
+
+  private shiftWorksheetValidations(workbook: ExcelJS.Workbook, worksheet: ExcelJS.Worksheet, rowsInserted: number) {
+    workbook.definedNames.spliceRows(worksheet.name, 1, 0, rowsInserted);
+    const existing = worksheet.dataValidations.model as Record<string, any>;
+    const shifted: Record<string, any> = {};
+    const shiftReferences = (references: string) => references.replace(/(\$?[A-Z]{1,3}\$?)(\d+)/g, (_match, column: string, row: string) => `${column}${Number(row) + rowsInserted}`);
+
+    for (const [range, rule] of Object.entries(existing)) {
+      shifted[shiftReferences(range)] = {
+        ...rule,
+        formulae: Array.isArray(rule.formulae) ? rule.formulae.map((formula: any) => typeof formula === 'string' ? shiftReferences(formula) : formula) : rule.formulae,
+      };
+    }
+    worksheet.dataValidations.model = shifted;
   }
 }

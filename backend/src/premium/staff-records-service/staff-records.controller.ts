@@ -369,8 +369,19 @@ export class StaffRecordsController {
     const school = await this.staffRecordsService.getSchoolInfo(req.user.schoolId);
     const buffer = await this.staffExcelService.generateInstitutionalReturnExcel(id, req.user.schoolId, {
       schoolName: school?.name,
+      address: school?.address,
       province: school?.province,
       district: school?.district,
+      constituency: school?.constituency,
+      ward: school?.ward,
+      zone: school?.zone,
+      schoolType: school?.schoolType,
+      emisNumber: school?.emisNumber,
+      registrationNumber: school?.registrationNumber,
+      phone: school?.phone,
+      email: school?.email,
+      website: school?.website,
+      motto: school?.motto,
       academicYear: req.query.academicYear,
       term: req.query.term,
       generatedBy: req.user?.sub || req.user?.id,
@@ -386,6 +397,19 @@ export class StaffRecordsController {
     const school = await this.staffRecordsService.getSchoolInfo(req.user.schoolId);
     const buffer = await this.staffExcelService.generateTemplateExcel(id, req.user.schoolId, {
       schoolName: school?.name,
+      address: school?.address,
+      province: school?.province,
+      district: school?.district,
+      constituency: school?.constituency,
+      ward: school?.ward,
+      zone: school?.zone,
+      schoolType: school?.schoolType,
+      emisNumber: school?.emisNumber,
+      registrationNumber: school?.registrationNumber,
+      phone: school?.phone,
+      email: school?.email,
+      website: school?.website,
+      motto: school?.motto,
     });
     res.setHeader('Content-Disposition', `attachment; filename="template-${id.slice(0, 8)}.xlsx"`);
     res.send(buffer);
@@ -398,6 +422,19 @@ export class StaffRecordsController {
     const school = await this.staffRecordsService.getSchoolInfo(req.user.schoolId);
     const buffer = await this.staffExcelService.generateStaffProfileExport(req.user.schoolId, {
       schoolName: school?.name,
+      address: school?.address,
+      province: school?.province,
+      district: school?.district,
+      constituency: school?.constituency,
+      ward: school?.ward,
+      zone: school?.zone,
+      schoolType: school?.schoolType,
+      emisNumber: school?.emisNumber,
+      registrationNumber: school?.registrationNumber,
+      phone: school?.phone,
+      email: school?.email,
+      website: school?.website,
+      motto: school?.motto,
     });
     res.setHeader('Content-Disposition', `attachment; filename="staff-profiles.xlsx"`);
     res.send(buffer);
