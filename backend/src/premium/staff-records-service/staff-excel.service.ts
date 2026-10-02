@@ -52,13 +52,15 @@ export class StaffExcelService {
     this.shiftWorksheetValidations(workbook, worksheet, this.schoolHeaderRows);
     dataStartRow += this.schoolHeaderRows;
     this.writeSchoolHeader(worksheet, options, submission.template.name, submission.period, columns.length);
+    const columnOffset = this.resolveHeaderColumnOffset(worksheet, headerRow + this.schoolHeaderRows, columns);
+    this.writeColumnHeaders(worksheet, headerRow + this.schoolHeaderRows, columns, columnOffset);
     worksheet.pageSetup.printTitlesRow = `1:${headerRow + this.schoolHeaderRows}`;
     rows.forEach((rowData: any, rowIndex: number) => {
       const row = rowData?.values || rowData;
       const target = worksheet.getRow(dataStartRow + rowIndex);
       columns.forEach((column: any, columnIndex: number) => {
         const value = row[column.columnName] ?? '';
-        const cell = target.getCell(columnIndex + 1);
+        const cell = target.getCell(columnIndex + columnOffset);
         cell.value = value instanceof Date ? value : this.coerceExcelValue(value, column.dataType);
       });
     });
@@ -125,23 +127,10 @@ export class StaffExcelService {
     const columnHeaderRowIndex = this.schoolHeaderRows + 1;
     const headerRow = worksheet.getRow(columnHeaderRowIndex);
     headerRow.height = 32;
-
-    columns.forEach((col, index) => {
-      const cell = headerRow.getCell(index + 1);
-      cell.value = col.columnLabel || col.columnName;
-      cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: whiteText } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerBgColor } };
-      cell.alignment = {
-        horizontal: (col.alignment as any) || 'left',
-        vertical: 'middle',
-        wrapText: true,
-      };
-      cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' },
-      };
+    this.writeColumnHeaders(worksheet, columnHeaderRowIndex, columns, 1, {
+      fontColor: whiteText,
+      fillColor: headerBgColor,
+      defaultAlignment: 'left',
     });
 
     // ── Data Rows ──
@@ -315,17 +304,10 @@ export class StaffExcelService {
     const columnHeaderRowIndex = this.schoolHeaderRows + 1;
     const headerRow = worksheet.getRow(columnHeaderRowIndex);
     headerRow.height = 30;
-
-    columns.forEach((col, index) => {
-      const cell = headerRow.getCell(index + 1);
-      cell.value = col.columnLabel || col.columnName;
-      cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'EA6645' } };
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      cell.border = {
-        top: { style: 'thin' }, left: { style: 'thin' },
-        bottom: { style: 'thin' }, right: { style: 'thin' },
-      };
+    this.writeColumnHeaders(worksheet, columnHeaderRowIndex, columns, 1, {
+      fontColor: 'FFFFFF',
+      fillColor: 'EA6645',
+      defaultAlignment: 'center',
     });
 
     // Empty data rows (for manual entry)
@@ -413,6 +395,69 @@ export class StaffExcelService {
     reportCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: brandColor } };
     reportCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8E8' } };
     worksheet.getRow(4).height = 26;
+  }
+
+  private resolveHeaderColumnOffset(worksheet: ExcelJS.Worksheet, headerRowIndex: number, columns: any[]) {
+    const firstLabel = this.normalizeHeaderLabel(columns[0]?.columnLabel || columns[0]?.columnName);
+    if (!firstLabel) return 1;
+
+    for (let columnIndex = 1; columnIndex <= worksheet.columnCount; columnIndex++) {
+      const value = this.normalizeHeaderLabel(worksheet.getRow(headerRowIndex).getCell(columnIndex).value);
+      if (value === firstLabel) return columnIndex;
+    }
+    return 1;
+  }
+
+  private writeColumnHeaders(
+    worksheet: ExcelJS.Worksheet,
+    rowIndex: number,
+    columns: any[],
+    columnOffset: number,
+    options: { fontColor?: string; fillColor?: string; defaultAlignment?: 'left' | 'center' } = {},
+  ) {
+    const row = worksheet.getRow(rowIndex);
+    let requiredHeight = row.height || 30;
+
+    columns.forEach((column: any, index: number) => {
+      const label = String(column.columnLabel || column.columnName || '').trim();
+      const cell = row.getCell(index + columnOffset);
+      const width = worksheet.getColumn(index + columnOffset).width || 12;
+      const charactersPerLine = Math.max(8, Math.floor(width * 1.1));
+      const lineCount = Math.max(1, Math.ceil(label.length / charactersPerLine));
+      requiredHeight = Math.max(requiredHeight, Math.min(150, lineCount * 15 + 12));
+
+      cell.value = label;
+      cell.font = {
+        ...(cell.font || {}),
+        name: 'Calibri',
+        size: 11,
+        bold: true,
+        color: { argb: options.fontColor || '1A1A2E' },
+      };
+      if (options.fillColor) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: options.fillColor } };
+      } else if (!cell.fill || cell.fill.type === 'none') {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'EEF3F7' } };
+      }
+      cell.alignment = {
+        ...(cell.alignment || {}),
+        horizontal: (column.alignment as any) || options.defaultAlignment || 'center',
+        vertical: 'middle',
+        wrapText: true,
+      };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+    });
+
+    row.height = requiredHeight;
+  }
+
+  private normalizeHeaderLabel(value: any) {
+    return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
   }
 
   private shiftWorksheetValidations(workbook: ExcelJS.Workbook, worksheet: ExcelJS.Worksheet, rowsInserted: number) {
