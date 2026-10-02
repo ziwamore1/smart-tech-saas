@@ -511,6 +511,8 @@ model User {
   results                        Result[]                       @relation("TeacherResults")
   schoolUsers                    SchoolUser[]
   teacher                        Teacher?
+  parentProfile                  Parent?
+  parentCredentialRequests       ParentCredentialDelivery[]       @relation("ParentCredentialDeliveryRequester")
   teachingAssignments            TeachingAssignment[]
   school                         School?                        @relation(fields: [schoolId], references: [id])
   student                        Student?                       @relation(fields: [studentId], references: [id])
@@ -1476,9 +1478,18 @@ enum ResultSheetStatus {
 
 model Parent {
   id            String          @id @default(uuid())
+  userId        String?         @unique
   firstName     String
   lastName      String
   phone         String?
+  phoneStatus   String          @default("UNKNOWN")
+  phoneStatusReason String?
+  phoneValidatedAt DateTime?
+  phoneCorrectionRequestedAt DateTime?
+  phoneCorrectionRequestedById String?
+  credentialDeliveryStatus String?
+  credentialDeliveryError String?
+  credentialDeliveryUpdatedAt DateTime?
   email         String          @unique
   password      String
   photoUrl      String?
@@ -1486,9 +1497,31 @@ model Parent {
   schoolId      String
   createdAt     DateTime        @default(now())
   school        School          @relation(fields: [schoolId], references: [id])
+  user          User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   children      ParentStudent[]
+  credentialDeliveries ParentCredentialDelivery[]
 
   @@index([schoolId])
+}
+
+model ParentCredentialDelivery {
+  id             String   @id @default(uuid())
+  parentId       String
+  requestedById  String?
+  recipientPhone String?
+  channel        String   @default("SMS")
+  status         String
+  errorMessage   String?
+  messageId      String?
+  childCount     Int      @default(0)
+  createdAt      DateTime @default(now())
+  deliveredAt    DateTime?
+  parent         Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  requestedBy    User?    @relation("ParentCredentialDeliveryRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@index([parentId, createdAt])
+  @@index([requestedById])
+  @@index([status])
 }
 
 model ParentStudent {

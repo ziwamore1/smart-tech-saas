@@ -10,9 +10,10 @@ import { SessionManagementService } from './session-management.service';
 import { SecurityAuditService } from './security-audit.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { EmailModule } from '../email/email.module';
+import { MessagingModule } from '../messaging/messaging.module';
 
 @Module({
-  imports: [PrismaModule, EmailModule],
+  imports: [PrismaModule, EmailModule, MessagingModule],
   controllers: [IdentityController],
   providers: [
     IdentityService,

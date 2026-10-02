@@ -16,8 +16,8 @@ export default function TeacherLayout({
   const directorRoles = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Principal'];
   const normalizeRole = (role: string) => role.toLowerCase().replace(/[^a-z]/g, '');
   const roleCandidates = [...(user?.schoolRoles || []), ...(allRoles || [])];
-  const isSchoolAdministrator = roleCandidates.some(role => ['Director', 'Deputy Director', 'Principal'].some(adminRole => normalizeRole(role) === normalizeRole(adminRole)));
-  const roleLabel = directorRoles.find(expected => roleCandidates.some(role => normalizeRole(role) === normalizeRole(expected)))
+  const isSchoolAdministrator = roleCandidates.some(role => ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Principal'].some(adminRole => normalizeRole(role) === normalizeRole(adminRole)));
+  const roleLabel = [...directorRoles, 'Deputy', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'].find(expected => roleCandidates.some(role => normalizeRole(role) === normalizeRole(expected)))
     || user?.schoolRoles?.[0]
     || allRoles?.[0]
     || 'Staff';

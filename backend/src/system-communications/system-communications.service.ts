@@ -799,6 +799,9 @@ export class SystemCommunicationsService implements OnModuleInit {
   }
 
   private async handleAccountCreated(role: string, data: any) {
+    if (['student', 'parent'].includes(role.toLowerCase())) {
+      throw new BadRequestException('Student and parent credentials must be generated through Password Hub and delivered by SMS to a linked parent with a validated phone number.');
+    }
     const { email, phone, name, username, password, schoolName } = data;
 
     const tasks: Promise<any>[] = [];

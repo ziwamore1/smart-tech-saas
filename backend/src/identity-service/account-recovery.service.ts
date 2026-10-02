@@ -4,6 +4,7 @@ import { OtpService } from './otp.service';
 import { PasswordGenerationService } from './password-generation.service';
 import { EmailService } from '../email/email.service';
 import * as crypto from 'crypto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AccountRecoveryService {
@@ -81,7 +82,7 @@ export class AccountRecoveryService {
       throw new BadRequestException(validation.errors.join('; '));
     }
 
-    const passwordHash = crypto.createHash('sha256').update(newPassword).digest('hex');
+    const passwordHash = await bcrypt.hash(newPassword, 10);
 
     await this.prisma.$transaction([
       this.prisma.passwordHistory.create({
@@ -121,11 +122,29 @@ export class AccountRecoveryService {
       where: { id: userId },
     });
 
-    if (!user) throw new BadRequestException('User not found');
-
     const validation = this.passwordService.validatePasswordStrength(newPassword);
     if (!validation.valid) {
       throw new BadRequestException(validation.errors.join('; '));
+    }
+
+    if (!user) {
+      const systemUser = await this.prisma.systemUser.findUnique({ where: { id: userId } });
+      if (!systemUser) throw new BadRequestException('User not found');
+      let isCurrentPasswordValid = false;
+      try {
+        isCurrentPasswordValid = await bcrypt.compare(currentPassword, systemUser.password);
+      } catch {
+        isCurrentPasswordValid = false;
+      }
+      if (!isCurrentPasswordValid && crypto.createHash('sha256').update(currentPassword).digest('hex') === systemUser.password) {
+        isCurrentPasswordValid = true;
+      }
+      if (!isCurrentPasswordValid) throw new BadRequestException('Current password is incorrect');
+      await this.prisma.systemUser.update({
+        where: { id: userId },
+        data: { password: await bcrypt.hash(newPassword, 10) },
+      });
+      return { message: 'Password changed successfully.' };
     }
 
     const recentPasswords = await this.prisma.passwordHistory.findMany({
@@ -134,9 +153,12 @@ export class AccountRecoveryService {
       take: 5,
     });
 
-    const newHash = crypto.createHash('sha256').update(newPassword).digest('hex');
+    const newHash = await bcrypt.hash(newPassword, 10);
     for (const history of recentPasswords) {
-      if (history.passwordHash === newHash) {
+      const usedBefore = history.passwordHash.startsWith('$2')
+        ? await bcrypt.compare(newPassword, history.passwordHash)
+        : crypto.createHash('sha256').update(newPassword).digest('hex') === history.passwordHash;
+      if (usedBefore) {
         throw new BadRequestException('Cannot reuse a recent password');
       }
     }

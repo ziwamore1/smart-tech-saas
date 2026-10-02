@@ -68,6 +68,22 @@ export class IdentityController {
     return this.identityService.resendCredentials(userId, req.user.id, channel || 'EMAIL');
   }
 
+  @Post('credentials/parents/:parentId/send-sms')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SuperAdmin', 'Director')
+  async sendParentCredentialsBySms(@Param('parentId') parentId: string, @Req() req: any, @Body('schoolId') schoolId?: string) {
+    const effectiveSchoolId = req.user.type === 'super_admin' ? schoolId : req.user.schoolId;
+    return this.identityService.deliverParentCredentialsBySms(parentId, req.user.id, effectiveSchoolId);
+  }
+
+  @Post('credentials/parents/:parentId/request-phone-correction')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SuperAdmin', 'Director')
+  async requestParentPhoneCorrection(@Param('parentId') parentId: string, @Req() req: any, @Body('schoolId') schoolId?: string) {
+    const effectiveSchoolId = req.user.type === 'super_admin' ? schoolId : req.user.schoolId;
+    return this.identityService.requestParentPhoneCorrection(parentId, req.user.id, effectiveSchoolId);
+  }
+
   @Get('credentials/delivery-history/:userId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SuperAdmin', 'Director')

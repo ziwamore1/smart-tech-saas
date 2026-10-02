@@ -13,8 +13,9 @@ export class CreateParentDto {
   @IsString()
   lastName: string;
 
+  @IsOptional()
   @IsEmail()
-  email: string;
+  email?: string;
 
   @IsOptional()
   @IsString()

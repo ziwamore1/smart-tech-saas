@@ -1,12 +1,11 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportCardService } from '../report-card/report-card.service';
-import { UnifiedMessagingService } from '../messaging/unified-messaging.service';
-import { CredentialDeliveryService } from '../identity-service/credential-delivery.service';
-import { PasswordGenerationService } from '../identity-service/password-generation.service';
-import { normalizeZambianPhone } from '../common/utils/phone.util';
+import { IdentityService } from '../identity-service/identity.service';
+import { normalizeZambianPhone, validateZambianPhone } from '../common/utils/phone.util';
 import { CreateParentDto } from './dto/create-parent.dto';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class ParentService {
@@ -15,7 +14,7 @@ export class ParentService {
   constructor(
     private prisma: PrismaService,
     private reportCardService: ReportCardService,
-    private unifiedMessaging: UnifiedMessagingService,
+    private identityService: IdentityService,
   ) {}
 
   private async resolveParentId(userId: string): Promise<string | null> {
@@ -132,10 +131,14 @@ export class ParentService {
     return children;
   }
 
-  async register(dto: CreateParentDto, schoolId: string) {
-    const existingParent = await this.prisma.parent.findUnique({
-      where: { email: dto.email },
-    });
+  async register(dto: CreateParentDto, schoolId: string, requestedById = 'system') {
+    const submittedEmail = dto.email?.trim().toLowerCase();
+    const submittedPhone = normalizeZambianPhone(dto.phone);
+    const existingParent = submittedEmail
+      ? await this.prisma.parent.findUnique({ where: { email: submittedEmail } })
+      : submittedPhone
+        ? await this.prisma.parent.findFirst({ where: { schoolId, phone: submittedPhone, firstName: dto.firstName, lastName: dto.lastName } })
+        : null;
 
     if (existingParent) {
       if (dto.children && dto.children.length > 0) {
@@ -152,9 +155,11 @@ export class ParentService {
         where: { id: existingParent.id },
         include: { children: { include: { student: true } } },
       });
+      const delivery = await this.identityService.deliverParentCredentialsBySms(existingParent.id, requestedById, schoolId);
 
       return {
-        message: 'Existing parent found — children linked successfully',
+        message: delivery.success ? 'Existing parent found, children linked, and credentials sent by SMS' : 'Existing parent found and children linked. Correct the parent phone number before SMS delivery.',
+        delivery,
         data: {
           id: updatedParent.id,
           firstName: updatedParent.firstName,
@@ -169,59 +174,58 @@ export class ParentService {
       };
     }
 
-    const temporaryPassword = dto.password || 'Parent123!';
+    const temporaryPassword = dto.password || `STS-Parent#${randomUUID().replace(/-/g, '').slice(0, 12)}`;
     const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+    const parentEmail = submittedEmail || `parent_${randomUUID()}@internal.smarttech.edu`;
+    const parentUsername = submittedEmail || `parent_${randomUUID().slice(0, 8)}`;
+    const phoneStatus = validateZambianPhone(dto.phone);
+    const parentRole = await this.prisma.role.findFirst({ where: { name: 'Parent' } });
 
-    const parent = await this.prisma.parent.create({
-      data: {
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        email: dto.email,
-        phone: normalizeZambianPhone(dto.phone),
-        password: hashedPassword,
-        schoolId,
-        ...(dto.children && dto.children.length > 0 && {
-          children: {
-            create: dto.children.map(c => ({
-              studentId: c.studentId,
-            })),
-          },
-        }),
-      },
-      include: {
-        children: {
-          include: {
-            student: true,
-          },
+    const parent = await this.prisma.$transaction(async (tx) => {
+      const existingUser = await tx.user.findUnique({ where: { email: parentEmail } });
+      if (existingUser?.schoolId && existingUser.schoolId !== schoolId) {
+        throw new ConflictException('The supplied parent email belongs to an account in another school. Use the existing parent account or contact the school administrator.');
+      }
+      const user = existingUser
+        ? await tx.user.update({ where: { id: existingUser.id }, data: { phone: dto.phone?.trim() || null, schoolId: existingUser.schoolId || schoolId } })
+        : await tx.user.create({
+            data: {
+              firstName: dto.firstName,
+              lastName: dto.lastName,
+              email: parentEmail,
+              username: parentUsername,
+              phone: dto.phone?.trim() || null,
+              password: hashedPassword,
+              schoolId,
+              mustChangePassword: true,
+              ...(parentRole ? { userRoles: { create: { roleId: parentRole.id } } } : {}),
+            },
+          });
+      if (parentRole) {
+        await tx.userRole.upsert({ where: { userId_roleId: { userId: user.id, roleId: parentRole.id } }, create: { userId: user.id, roleId: parentRole.id }, update: {} });
+      }
+      return tx.parent.create({
+        data: {
+          userId: user.id,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          email: parentEmail,
+          phone: dto.phone?.trim() || null,
+          password: hashedPassword,
+          schoolId,
+          phoneStatus: phoneStatus.status,
+          phoneStatusReason: phoneStatus.reason,
+          phoneValidatedAt: new Date(),
+          ...(dto.children?.length ? { children: { create: dto.children.map(child => ({ studentId: child.studentId })) } } : {}),
         },
-      },
+        include: { children: { include: { student: { include: { user: true } } } } },
+      });
     });
-
-    const school = await this.prisma.school.findUnique({
-      where: { id: schoolId },
-      select: { name: true },
-    });
-
-    const childName = parent.children.length > 0
-      ? `${parent.children[0].student.firstName} ${parent.children[0].student.lastName}`
-      : 'your child';
-
-    this.unifiedMessaging
-      .sendParentWelcome(
-        {
-          email: parent.email,
-          phone: parent.phone || undefined,
-          firstName: parent.firstName,
-          lastName: parent.lastName,
-        },
-        { username: parent.email, password: temporaryPassword },
-        childName,
-        school?.name || 'Your School',
-      )
-      .catch((err) => this.logger.error('Failed to send parent welcome message:', err));
+    const delivery = await this.identityService.deliverParentCredentialsBySms(parent.id, requestedById, schoolId);
 
     return {
-      message: 'Parent registered successfully',
+      message: delivery.success ? 'Parent registered and credentials sent by SMS' : 'Parent registered, but SMS was blocked or failed. Review the phone guidance in Password Hub.',
+      delivery,
       data: {
         id: parent.id,
         firstName: parent.firstName,
@@ -232,10 +236,6 @@ export class ParentService {
           studentId: c.studentId,
           studentName: `${c.student.firstName} ${c.student.lastName}`,
         })),
-      },
-      credentials: {
-        username: parent.email,
-        password: temporaryPassword,
       },
     };
   }
@@ -535,12 +535,24 @@ export class ParentService {
     const parent = await this.prisma.parent.findUnique({ where: { id } });
     if (!parent) throw new NotFoundException('Parent not found');
 
-    const payload: { firstName?: string; lastName?: string; email?: string; phone?: string } = { ...data };
-    if (data.phone !== undefined) payload.phone = normalizeZambianPhone(data.phone) ?? undefined;
-
-    return this.prisma.parent.update({
+    const normalizedEmail = data.email === undefined ? undefined : data.email.trim().toLowerCase();
+    const phoneCheck = data.phone === undefined ? null : validateZambianPhone(data.phone);
+    const updated = await this.prisma.parent.update({
       where: { id },
-      data: payload,
+      data: {
+        ...(data.firstName !== undefined ? { firstName: data.firstName.trim() } : {}),
+        ...(data.lastName !== undefined ? { lastName: data.lastName.trim() } : {}),
+        ...(normalizedEmail !== undefined ? { email: normalizedEmail } : {}),
+        ...(data.phone !== undefined ? {
+          phone: data.phone.trim() || null,
+          phoneStatus: phoneCheck!.status,
+          phoneStatusReason: phoneCheck!.reason,
+          phoneValidatedAt: new Date(),
+          credentialDeliveryStatus: phoneCheck!.normalized ? parent.credentialDeliveryStatus : 'BLOCKED_INVALID_PHONE',
+          credentialDeliveryError: phoneCheck!.normalized ? null : phoneCheck!.reason,
+          credentialDeliveryUpdatedAt: new Date(),
+        } : {}),
+      },
       include: {
         children: {
           include: {
@@ -549,5 +561,14 @@ export class ParentService {
         },
       },
     });
+    if (parent.userId) {
+      await this.prisma.user.update({ where: { id: parent.userId }, data: {
+        ...(normalizedEmail !== undefined ? { email: normalizedEmail } : {}),
+        ...(data.phone !== undefined ? { phone: data.phone.trim() || null } : {}),
+        ...(data.firstName !== undefined ? { firstName: data.firstName.trim() } : {}),
+        ...(data.lastName !== undefined ? { lastName: data.lastName.trim() } : {}),
+      } });
+    }
+    return updated;
   }
 }

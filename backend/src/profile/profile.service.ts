@@ -1,10 +1,12 @@
 import { Injectable, Logger, BadRequestException, NotFoundException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import * as path from 'path';
 import * as fs from 'fs-extra';
 import { PrismaService } from '../prisma/prisma.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { UpdateProfileDto, ChangePasswordDto } from './dto/profile.dto';
+import { normalizeZambianPhone } from '../common/utils/phone.util';
 
 @Injectable()
 export class ProfileService {
@@ -40,28 +42,55 @@ export class ProfileService {
   }
 
   async updateProfile(userId: string, data: UpdateProfileDto) {
-    if (data.email) {
-      const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
+    const normalizedEmail = data.email === undefined ? undefined : data.email.trim().toLowerCase();
+    if (normalizedEmail !== undefined && !normalizedEmail) throw new BadRequestException('Email address cannot be blank');
+    const existingUser = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!existingUser) throw new NotFoundException('User not found');
+    const parent = await this.prisma.parent.findFirst({ where: { OR: [{ userId }, { email: existingUser.email }] } });
+    if (normalizedEmail) {
+      const existing = await this.prisma.user.findUnique({ where: { email: normalizedEmail } });
       if (existing && existing.id !== userId) {
         throw new ConflictException('Email already in use');
       }
+      const existingParent = await this.prisma.parent.findUnique({ where: { email: normalizedEmail } });
+      if (existingParent && existingParent.id !== parent?.id) throw new ConflictException('Email already in use by a parent account');
     }
 
     const changes: string[] = [];
     if (data.firstName) changes.push('firstName');
     if (data.lastName) changes.push('lastName');
-    if (data.email) changes.push('email');
-    if (data.phone) changes.push('phone');
+    if (normalizedEmail !== undefined) changes.push('email');
+    if (data.phone !== undefined) changes.push('phone');
 
-    const user = await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        phone: data.phone,
-      },
-      select: { id: true, email: true, firstName: true, lastName: true, phone: true, photoUrl: true, schoolId: true },
+    const user = await this.prisma.$transaction(async (tx) => {
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: {
+          firstName: data.firstName?.trim(),
+          lastName: data.lastName?.trim(),
+          email: normalizedEmail,
+          phone: data.phone === undefined ? undefined : (data.phone.trim() || null),
+        },
+        select: { id: true, email: true, firstName: true, lastName: true, phone: true, photoUrl: true, schoolId: true },
+      });
+      if (parent && (normalizedEmail !== undefined || data.phone !== undefined || data.firstName !== undefined || data.lastName !== undefined)) {
+        const phoneCheck = data.phone === undefined ? null : normalizeZambianPhone(data.phone);
+        await tx.parent.update({
+          where: { id: parent.id },
+          data: {
+            ...(normalizedEmail !== undefined ? { email: normalizedEmail } : {}),
+            ...(data.phone !== undefined ? {
+              phone: data.phone.trim() || null,
+              phoneStatus: phoneCheck ? 'VALID' : data.phone.trim() ? 'INVALID' : 'MISSING',
+              phoneStatusReason: phoneCheck ? null : data.phone.trim() ? 'The phone number is not valid.' : 'No phone number is recorded.',
+              phoneValidatedAt: new Date(),
+            } : {}),
+            ...(data.firstName !== undefined ? { firstName: data.firstName.trim() } : {}),
+            ...(data.lastName !== undefined ? { lastName: data.lastName.trim() } : {}),
+          },
+        });
+      }
+      return updatedUser;
     });
 
     if (user.schoolId) {
@@ -111,14 +140,22 @@ export class ProfileService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
-    const isValid = await bcrypt.compare(data.currentPassword, user.password);
+    let isValid = false;
+    try { isValid = await bcrypt.compare(data.currentPassword, user.password); } catch { isValid = false; }
+    const legacySha256 = /^[a-f0-9]{64}$/i.test(user.password);
+    if (!isValid && legacySha256) {
+      isValid = crypto.createHash('sha256').update(data.currentPassword).digest('hex') === user.password;
+    }
     if (!isValid) throw new UnauthorizedException('Current password is incorrect');
 
     const hashedPassword = await bcrypt.hash(data.newPassword, 10);
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { password: hashedPassword },
-    });
+    await this.prisma.$transaction([
+      this.prisma.passwordHistory.create({ data: { userId, passwordHash: user.password } }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { password: hashedPassword, mustChangePassword: false, lastPasswordChange: new Date() },
+      }),
+    ]);
 
     return { message: 'Password updated successfully' };
   }

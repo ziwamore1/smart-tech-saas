@@ -13,7 +13,7 @@ export class ParentController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SuperAdmin', 'Director')
   register(@Body() dto: CreateParentDto, @Req() req: any) {
-    return this.service.register(dto, req.user.schoolId);
+    return this.service.register(dto, req.user.schoolId, req.user.id);
   }
 
   @Get('children')

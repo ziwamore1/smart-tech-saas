@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
+import { UnifiedMessagingService } from '../messaging/unified-messaging.service';
+import { normalizeZambianPhone } from '../common/utils/phone.util';
 
 export interface DeliveryOptions {
   userId: string;
@@ -41,6 +43,7 @@ export class CredentialDeliveryService {
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,
+    private unifiedMessaging: UnifiedMessagingService,
   ) {}
 
   private getLoginUrl(schoolUrl?: string): string {
@@ -71,10 +74,10 @@ export class CredentialDeliveryService {
           break;
 
         case 'SMS':
-          if (!recipientPhone) throw new Error('Phone recipient required');
-          recipient = recipientPhone;
+          recipient = normalizeZambianPhone(recipientPhone);
+          if (!recipient) throw new Error('Phone number is invalid or missing. Ask the parent to provide a valid mobile number through their linked child.');
           messageId = await this.sendSmsCredentials({
-            to: recipientPhone,
+            to: recipient,
             username,
             password,
             recipientName,
@@ -129,41 +132,128 @@ export class CredentialDeliveryService {
       let recipient: string;
       let messageId: string;
 
-      if (parentEmail) {
-        recipient = parentEmail;
-        messageId = await this.sendBundledEmail({
-          to: parentEmail,
-          parentName,
-          parentUsername,
-          parentPassword,
-          studentName,
-          studentUsername,
-          studentPassword,
-          schoolName,
-          loginUrl,
-          parentUserEmail,
-        });
-      } else if (parentPhone) {
-        recipient = parentPhone;
-        messageId = await this.sendBundledSms({
-          to: parentPhone,
-          parentName,
-          parentUsername,
-          parentPassword,
-          studentName,
-          studentUsername,
-          studentPassword,
-          loginUrl,
-        });
-      } else {
-        throw new Error('Parent email or phone required for bundled delivery');
+      recipient = normalizeZambianPhone(parentPhone);
+      if (!recipient) {
+        await this.recordParentDeliveryFailure(options.parentUserId, parentPhone, 'INVALID_PHONE', 'No SMS was sent. The parent phone is missing or invalid; ask the parent to provide a correct mobile number through their linked child.');
+        return { success: false, error: 'Parent phone number is missing or invalid. No SMS was sent; request a correct number through the linked child.' };
       }
+      messageId = await this.sendBundledSms({
+        to: recipient,
+        parentName,
+        parentUsername,
+        parentPassword,
+        studentName,
+        studentUsername,
+        studentPassword,
+        loginUrl,
+        parentUserEmail,
+      });
 
       this.logger.log(`[Bundled Credentials] Sent to ${recipient} for ${parentName} & ${studentName}`);
       return { success: true, messageId };
     } catch (error: any) {
       this.logger.error(`Bundled credential delivery failed: ${error.message}`);
+      await this.recordParentDeliveryFailure(options.parentUserId, parentPhone, 'FAILED', error.message);
       return { success: false, error: error.message };
+    }
+  }
+
+  async sendSmsMessage(to: string, message: string) {
+    const recipient = normalizeZambianPhone(to);
+    if (!recipient) return { success: false, error: 'Phone number is missing or invalid. No SMS was sent.' };
+    const result = await this.unifiedMessaging.sendSMS(recipient, message);
+    if (!result.success) return { success: false, error: result.error || 'SMS provider failed to deliver the message.' };
+    return { success: true, messageId: result.messageId };
+  }
+
+  async sendParentBundleSms(input: {
+    parentUserId: string;
+    parentId: string;
+    requestedById?: string | null;
+    to: string;
+    message: string;
+    childCount: number;
+    parentCredentialId?: string;
+  }) {
+    const recipient = normalizeZambianPhone(input.to);
+    if (!recipient) return { success: false, error: 'Parent phone number is missing or invalid. No SMS was sent.' };
+    try {
+      const result = await this.unifiedMessaging.sendSMS(recipient, input.message);
+      const success = Boolean(result.success);
+      const errorMessage = success ? null : result.error || 'SMS provider failed to deliver the message.';
+      await this.prisma.parentCredentialDelivery.create({
+        data: {
+          parentId: input.parentId,
+          requestedById: input.requestedById,
+          recipientPhone: recipient,
+          status: success ? 'DELIVERED' : 'FAILED',
+          errorMessage,
+          messageId: result.messageId,
+          childCount: input.childCount,
+          deliveredAt: success ? new Date() : undefined,
+        },
+      });
+      await this.prisma.parent.update({
+        where: { id: input.parentId },
+        data: {
+          phone: recipient,
+          phoneStatus: 'VALID',
+          phoneStatusReason: null,
+          phoneValidatedAt: new Date(),
+          credentialDeliveryStatus: success ? 'DELIVERED' : 'FAILED',
+          credentialDeliveryError: errorMessage,
+          credentialDeliveryUpdatedAt: new Date(),
+        },
+      });
+      await this.prisma.credentialDeliveryLog.create({
+        data: {
+          userId: input.parentUserId,
+          userCredentialId: input.parentCredentialId,
+          channel: 'SMS',
+          recipient,
+          status: success ? 'DELIVERED' : 'FAILED',
+          messageId: result.messageId,
+          errorMessage: errorMessage || undefined,
+          deliveredAt: success ? new Date() : undefined,
+        },
+      });
+      return { success, messageId: result.messageId, error: errorMessage || undefined };
+    } catch (error: any) {
+      await this.recordParentDeliveryFailure(input.parentUserId, recipient, 'FAILED', error?.message || String(error), input.parentId, input.requestedById, input.childCount);
+      return { success: false, error: error?.message || 'SMS delivery failed.' };
+    }
+  }
+
+  async recordParentDeliveryFailure(
+    parentUserId: string,
+    phone: string | null | undefined,
+    status: string,
+    errorMessage: string,
+    parentId?: string,
+    requestedById?: string,
+    childCount = 0,
+  ) {
+    const normalized = normalizeZambianPhone(phone);
+    if (parentId) {
+      await this.prisma.parentCredentialDelivery.create({
+        data: { parentId, requestedById, recipientPhone: phone || null, status, errorMessage, childCount },
+      });
+      await this.prisma.parent.update({
+        where: { id: parentId },
+        data: {
+          phoneStatus: normalized ? 'VALID' : phone?.trim() ? 'INVALID' : 'MISSING',
+          phoneStatusReason: normalized ? null : errorMessage,
+          phoneValidatedAt: new Date(),
+          credentialDeliveryStatus: status,
+          credentialDeliveryError: errorMessage,
+          credentialDeliveryUpdatedAt: new Date(),
+        },
+      });
+    }
+    if (parentUserId) {
+      await this.prisma.credentialDeliveryLog.create({
+        data: { userId: parentUserId, channel: 'SMS', recipient: phone || 'MISSING', status, errorMessage },
+      });
     }
   }
 
@@ -348,12 +438,16 @@ export class CredentialDeliveryService {
       (data.parentUserEmail ? `You can also login with email: ${data.parentUserEmail}\n\n` : '\n') +
       `Student (${data.studentName}) account: User: ${data.studentUsername}, Pass: ${data.studentPassword}\n\n` +
       `Login: ${data.loginUrl}\n\nChange passwords on first login. - SmartTech`;
-    this.logger.log(`[SMS] Bundled credentials sent to ${data.to}`);
-    this.logger.log(`[SMS] Message: ${message}`);
-    return `bundle-sms-${Date.now()}`;
+    const result = await this.sendSmsMessage(data.to, message);
+    if (!result.success) throw new Error(result.error || 'SMS delivery failed');
+    if (!result.messageId) throw new Error('SMS provider did not return a delivery reference.');
+    return result.messageId;
   }
 
   async deliverStudentCredentialsOnRequest(options: DeliveryOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    void options;
+    return { success: false, error: 'Student credentials cannot be sent directly to students. Deliver them to linked parents with validated mobile numbers through Password Hub.' };
+
     const { channel, recipientEmail, username, password, recipientName, role, schoolName, schoolUrl, email } = options;
     const loginUrl = this.getLoginUrl(schoolUrl);
 
@@ -500,10 +594,7 @@ export class CredentialDeliveryService {
         await this.emailService.sendMail(recipientEmail, subject, html);
         messageId = `student-email-${Date.now()}`;
       } else if (recipientPhone) {
-        recipient = recipientPhone;
-        const text = `Hello ${recipientName}, your student login is ready. User: ${username}, Pass: ${password}.${emailLoginNote} Login: ${loginUrl}. Change password on first login. - SmartTech`;
-        this.logger.log(`[SMS] Student credentials sent to ${recipientPhone}`);
-        messageId = `student-sms-${Date.now()}`;
+        return { success: false, error: 'Student credentials can only be delivered to a linked parent using a valid parent phone number. No SMS was sent.' };
       } else {
         throw new Error('Recipient email or phone required');
       }
@@ -689,9 +780,10 @@ export class CredentialDeliveryService {
     const loginUrl = this.getLoginUrl(data.schoolUrl);
     const emailNote = data.email ? ` You can also login with email: ${data.email}.` : '';
     const message = `Welcome ${data.recipientName}! Your SmartTech account has been created. Username: ${data.username}, Password: ${data.password}.${emailNote} Login at: ${loginUrl}. Please change your password on first login.`;
-    this.logger.log(`[SMS] Sending credentials to ${data.to}`);
-    this.logger.log(`[SMS] Message: ${message}`);
-    return `sms-${Date.now()}`;
+    const result = await this.sendSmsMessage(data.to, message);
+    if (!result.success) throw new Error(result.error || 'SMS delivery failed');
+    if (!result.messageId) throw new Error('SMS provider did not return a delivery reference.');
+    return result.messageId;
   }
 
   private async sendWhatsAppCredentials(data: {
@@ -705,9 +797,10 @@ export class CredentialDeliveryService {
     const loginUrl = this.getLoginUrl(data.schoolUrl);
     const emailNote = data.email ? `\nYou can also login with email: ${data.email}` : '';
     const message = `Hello ${data.recipientName},\n\nYour SmartTech Education account has been created.\n\nUsername: ${data.username}\nPassword: ${data.password}${emailNote}\n\nLogin: ${loginUrl}\n\nPlease change your password on first login.\n\n- SmartTech Team`;
-    this.logger.log(`[WhatsApp] Sending credentials to ${data.to}`);
-    this.logger.log(`[WhatsApp] Message: ${message}`);
-    return `wa-${Date.now()}`;
+    const result = await this.unifiedMessaging.sendWhatsApp(data.to, message);
+    if (!result.success) throw new Error(result.error || 'WhatsApp delivery failed');
+    if (!result.messageId) throw new Error('WhatsApp provider did not return a delivery reference.');
+    return result.messageId;
   }
 
   private async logDelivery(

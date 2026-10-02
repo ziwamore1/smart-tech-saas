@@ -7,7 +7,13 @@
  * manual editing.
  */
 export function normalizeZambianPhone(value?: string | null): string | null {
-  if (value == null) return null;
+  return validateZambianPhone(value).normalized;
+}
+
+export function validateZambianPhone(value?: string | null): { normalized: string | null; status: 'VALID' | 'MISSING' | 'INVALID'; reason: string | null } {
+  if (value == null || value.trim() === '') {
+    return { normalized: null, status: 'MISSING', reason: 'No phone number is recorded.' };
+  }
 
   const candidates = value
     .split(/[/,;]/)
@@ -16,22 +22,22 @@ export function normalizeZambianPhone(value?: string | null): string | null {
 
   for (const candidate of candidates) {
     const normalized = normalizeSingle(candidate);
-    if (normalized) return normalized;
+    if (normalized) return { normalized, status: 'VALID', reason: null };
   }
 
-  return null;
+  return { normalized: null, status: 'INVALID', reason: 'The phone number is not a valid Zambia or international mobile number.' };
 }
 
 function normalizeSingle(value: string): string | null {
   if (value.trim() === '') return null;
 
   const compact = value.trim().replace(/[\s().-]/g, '');
-  if (compact.startsWith('+') && !compact.startsWith('+260')) return compact;
+  if (compact.startsWith('+')) return /^\+[1-9]\d{7,14}$/.test(compact) ? compact : null;
 
   let digits = compact.replace(/^\+/, '');
   if (digits.startsWith('00260')) digits = digits.slice(5);
   if (digits.startsWith('260')) digits = digits.slice(3);
   if (digits.startsWith('0')) digits = digits.slice(1);
 
-  return digits.length === 9 ? `+260${digits}` : compact;
+  return /^\d{9}$/.test(digits) ? `+260${digits}` : null;
 }

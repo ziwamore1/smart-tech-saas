@@ -81,17 +81,27 @@ export class AuthService {
   }
 
   async superAdminLogin(email: string, password: string) {
+    email = email.trim().toLowerCase();
     this.logger.log(`SuperAdmin login attempt: ${email}`);
     console.error('[probe:login-service] lookup system user');
 
     const systemUser = await this.prisma.systemUser.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email },
     });
     console.error(`[probe:login-service] system user lookup complete: ${!!systemUser}`);
 
     if (systemUser) {
       console.error('[probe:login-service] checking system user password');
-      const isPasswordValid = await bcrypt.compare(password, systemUser.password);
+      let isPasswordValid = false;
+      try {
+        isPasswordValid = await bcrypt.compare(password, systemUser.password);
+      } catch {
+        isPasswordValid = false;
+      }
+      if (!isPasswordValid && crypto.createHash('sha256').update(password).digest('hex') === systemUser.password) {
+        isPasswordValid = true;
+        await this.prisma.systemUser.update({ where: { id: systemUser.id }, data: { password: await bcrypt.hash(password, 10) } });
+      }
       console.error(`[probe:login-service] system user password complete: ${isPasswordValid}`);
       this.logger.log(`SuperAdmin system user found; password valid:`, isPasswordValid);
 
@@ -120,7 +130,7 @@ export class AuthService {
     }
 
     const user = await this.prisma.user.findFirst({
-      where: { email: { equals: email.toLowerCase(), mode: 'insensitive' } },
+      where: { email: { equals: email, mode: 'insensitive' } },
       include: { userRoles: { include: { role: true } } },
     });
     console.error(`[probe:login-service] user lookup complete: ${!!user}`);
@@ -134,7 +144,19 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    let isPasswordValid = false;
+    try {
+      isPasswordValid = await bcrypt.compare(password, user.password);
+    } catch {
+      isPasswordValid = false;
+    }
+    if (!isPasswordValid) {
+      const legacyHash = crypto.createHash('sha256').update(password).digest('hex');
+      if (legacyHash === user.password) {
+        isPasswordValid = true;
+        await this.prisma.user.update({ where: { id: user.id }, data: { password: await bcrypt.hash(password, 10) } });
+      }
+    }
     console.error(`[probe:login-service] user password complete: ${isPasswordValid}`);
     this.logger.log(`SuperAdmin user found; password valid:`, isPasswordValid);
 
@@ -448,6 +470,7 @@ export class AuthService {
   }
 
   async login(identifier: string, password: string, schoolId?: string) {
+    identifier = identifier.trim();
     this.logger.log(`Login attempt for identifier: "${identifier}"${schoolId ? `, URL schoolId: ${schoolId}` : ''}`);
 
     const isEmail = identifier.includes('@');
@@ -462,7 +485,7 @@ export class AuthService {
 
     if (isEmail) {
       user = await this.prisma.user.findFirst({
-        where: { email: identifier.trim().toLowerCase() },
+        where: { email: identifier.toLowerCase() },
         include: userInclude,
       });
     } else {
@@ -495,7 +518,19 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    let isPasswordValid = false;
+    try {
+      isPasswordValid = await bcrypt.compare(password, user.password);
+    } catch {
+      isPasswordValid = false;
+    }
+    if (!isPasswordValid) {
+      const legacyHash = crypto.createHash('sha256').update(password).digest('hex');
+      if (legacyHash === user.password) {
+        isPasswordValid = true;
+        await this.prisma.user.update({ where: { id: user.id }, data: { password: await bcrypt.hash(password, 10) } });
+      }
+    }
 
     if (!isPasswordValid) {
       this.logger.warn(`Invalid password for user: ${identifier}`);
@@ -805,7 +840,16 @@ export class AuthService {
       throw new UnauthorizedException('Password is required');
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    let isPasswordValid = false;
+    try {
+      isPasswordValid = await bcrypt.compare(password, user.password);
+    } catch {
+      isPasswordValid = false;
+    }
+    if (!isPasswordValid && crypto.createHash('sha256').update(password).digest('hex') === user.password) {
+      isPasswordValid = true;
+      await this.prisma.user.update({ where: { id: user.id }, data: { password: await bcrypt.hash(password, 10) } });
+    }
 
     if (!isPasswordValid) {
       this.logger.warn(`Invalid password for user: ${email || username}`);

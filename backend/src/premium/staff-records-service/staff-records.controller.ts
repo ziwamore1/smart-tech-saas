@@ -10,11 +10,11 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 
-const ADMIN_ROLES = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'SuperAdmin'];
-const STAFF_SELF_ROLES = [
-  'Teacher', 'Class Teacher', 'Primary Teacher', 'HOD', 'Director',
-  'Head Teacher', 'Deputy Head', 'Deputy Director',
-  'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher',
+export const ADMIN_ROLES = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'SuperAdmin'];
+export const STAFF_SELF_ROLES = [
+  'Teacher', 'Class Teacher', 'Primary Teacher', 'Subject Teacher', 'HOD', 'Head of Department', 'Director',
+  'Head Teacher', 'Deputy Head', 'Deputy Head Teacher', 'Deputy', 'Deputy Director',
+  'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Senior Teacher',
   'Lecturer', 'Research Supervisor',
 ];
 

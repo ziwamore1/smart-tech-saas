@@ -6,11 +6,13 @@ import { Prisma, EnrollmentStatus, StudentStatus } from '@prisma/client';
 import { PasswordGenerationService } from '../identity-service/password-generation.service';
 import { UsernameGenerationService } from '../identity-service/username-generation.service';
 import { CredentialDeliveryService } from '../identity-service/credential-delivery.service';
+import { IdentityService } from '../identity-service/identity.service';
 import { AdmissionNumberService } from '../admission-number/admission-number.service';
 import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { SchoolActivityService } from '../common/services/school-activity.service';
 import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import { normalizeZambianPhone } from '../common/utils/phone.util';
 
 @Injectable()
@@ -22,6 +24,7 @@ export class StudentService {
     private passwordGenService: PasswordGenerationService,
     private usernameGenService: UsernameGenerationService,
     private credentialDeliveryService: CredentialDeliveryService,
+    private identityService: IdentityService,
     private admissionNumberService: AdmissionNumberService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
     @Optional() private readonly activityService?: SchoolActivityService,
@@ -198,7 +201,7 @@ export class StudentService {
           studentName: `${dto.firstName} ${dto.lastName}`,
           studentUsername,
           studentPassword: studentPassword.password,
-        }, student.id, schoolId, school, schoolUrl);
+        }, student.id, schoolId, school, schoolUrl, userId);
       } catch (parentErr) {
         this.logger.warn(`Parent account creation skipped for student ${student.id}: ${parentErr.message}`);
       }
@@ -265,6 +268,7 @@ export class StudentService {
     schoolId: string,
     school: { id: string; name: string } | null,
     schoolUrl: string,
+    requestedById: string,
   ) {
     const parentPhone = normalizeZambianPhone(info.parentPhone);
     const parentName = info.parentName || `${info.studentFirstName}'s Parent`;
@@ -272,37 +276,48 @@ export class StudentService {
     const firstName = nameParts[0];
     const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Parent';
 
-    const existingParentUser = info.parentEmail
-      ? await this.prisma.user.findFirst({ where: { email: info.parentEmail } })
-      : null;
+    let existingParent = info.parentEmail
+      ? await this.prisma.parent.findUnique({ where: { email: info.parentEmail.trim().toLowerCase() } })
+      : parentPhone
+        ? await this.prisma.parent.findFirst({ where: { schoolId, phone: parentPhone, firstName, lastName } })
+        : null;
+    let existingParentUser = existingParent?.userId
+      ? await this.prisma.user.findUnique({ where: { id: existingParent.userId } })
+      : (existingParent?.email || info.parentEmail)
+        ? await this.prisma.user.findFirst({ where: { email: (existingParent?.email || info.parentEmail)!.trim().toLowerCase() } })
+        : null;
+
+    if (existingParent && !existingParentUser) {
+      const username = this.usernameGenService.generateUsername(existingParent.firstName, existingParent.lastName, 'Parent', schoolId);
+      existingParentUser = await this.prisma.user.create({
+        data: {
+          firstName: existingParent.firstName,
+          lastName: existingParent.lastName,
+          email: existingParent.email,
+          username,
+          phone: existingParent.phone,
+          password: existingParent.password,
+          schoolId,
+          mustChangePassword: true,
+        },
+      });
+      const role = await this.prisma.role.findFirst({ where: { name: 'Parent' } });
+      if (role) await this.prisma.userRole.upsert({ where: { userId_roleId: { userId: existingParentUser.id, roleId: role.id } }, create: { userId: existingParentUser.id, roleId: role.id }, update: {} });
+      await this.prisma.parent.update({ where: { id: existingParent.id }, data: { userId: existingParentUser.id } });
+    }
 
     if (existingParentUser) {
-      const existingParent = await this.prisma.parent.findFirst({ where: { email: info.parentEmail } });
       if (existingParent) {
-        if (parentPhone) {
-          await this.prisma.parent.update({ where: { id: existingParent.id }, data: { phone: parentPhone } });
-          await this.prisma.user.update({ where: { id: existingParentUser.id }, data: { phone: parentPhone } });
-        }
+        const phoneStatus = validateZambianPhone(info.parentPhone);
+        await this.prisma.parent.update({ where: { id: existingParent.id }, data: { userId: existingParentUser.id, phone: info.parentPhone?.trim() || null, phoneStatus: phoneStatus.status, phoneStatusReason: phoneStatus.reason, phoneValidatedAt: new Date() } });
+        if (existingParentUser.phone !== (info.parentPhone?.trim() || null)) await this.prisma.user.update({ where: { id: existingParentUser.id }, data: { phone: info.parentPhone?.trim() || null } });
         await this.prisma.parentStudent.upsert({
           where: { parentId_studentId: { parentId: existingParent.id, studentId } },
           create: { parentId: existingParent.id, studentId },
           update: {},
         });
-        this.credentialDeliveryService.deliverBundledCredentials({
-          parentUserId: existingParentUser.id,
-          studentUserId: studentId,
-          parentEmail: info.parentEmail,
-          parentPhone,
-          parentUsername: existingParentUser.username || existingParentUser.email,
-          parentPassword: 'Use existing password',
-          parentName: `${existingParent.firstName} ${existingParent.lastName}`,
-          studentUsername: info.studentUsername,
-          studentPassword: info.studentPassword,
-          studentName: info.studentName,
-          schoolName: school?.name,
-          schoolUrl,
-          channel: info.parentEmail ? 'EMAIL' : 'SMS',
-        }).catch(err => this.logger.error(`Failed to send bundled credentials to existing parent: ${err.message}`));
+        const delivery = await this.identityService.deliverParentCredentialsBySms(existingParent.id, requestedById, schoolId);
+        if (!delivery.success) this.logger.warn(`Parent credential SMS was blocked for ${existingParent.id}: ${delivery.guidance || delivery.error}`);
         return;
       }
       const parentRole = await this.prisma.role.findFirst({ where: { name: 'Parent' } });
@@ -315,30 +330,21 @@ export class StudentService {
       }
       const parentRecord = await this.prisma.parent.create({
         data: {
+          userId: existingParentUser.id,
           firstName: existingParentUser.firstName,
           lastName: existingParentUser.lastName,
           email: existingParentUser.email,
-           phone: parentPhone || normalizeZambianPhone(existingParentUser.phone),
+          phone: info.parentPhone?.trim() || existingParentUser.phone,
+          phoneStatus: validateZambianPhone(info.parentPhone || existingParentUser.phone).status,
+          phoneStatusReason: validateZambianPhone(info.parentPhone || existingParentUser.phone).reason,
+          phoneValidatedAt: new Date(),
           password: existingParentUser.password,
           schoolId,
           children: { create: { studentId } },
         },
       });
-      this.credentialDeliveryService.deliverBundledCredentials({
-        parentUserId: existingParentUser.id,
-        studentUserId: studentId,
-        parentEmail: existingParentUser.email || undefined,
-         parentPhone,
-        parentUsername: existingParentUser.username || existingParentUser.email,
-        parentPassword: 'See admin for password reset',
-        parentName: `${parentRecord.firstName} ${parentRecord.lastName}`,
-        studentUsername: info.studentUsername,
-        studentPassword: info.studentPassword,
-        studentName: info.studentName,
-        schoolName: school?.name,
-        schoolUrl,
-        channel: existingParentUser.email ? 'EMAIL' : 'SMS',
-      }).catch(err => this.logger.error(`Failed to send bundled credentials: ${err.message}`));
+      const delivery = await this.identityService.deliverParentCredentialsBySms(parentRecord.id, requestedById, schoolId);
+      if (!delivery.success) this.logger.warn(`Parent credential SMS was blocked for ${parentRecord.id}: ${delivery.guidance || delivery.error}`);
       return;
     }
 
@@ -349,15 +355,15 @@ export class StudentService {
 
     const hashedParentPwd = await bcrypt.hash(parentPassword.password, 10);
 
-    const parentEmail = info.parentEmail
-      || `parent_${firstName.toLowerCase()}.${lastName.toLowerCase()}.${schoolId.slice(0, 6)}@internal.smarttech.edu`;
+    const parentEmail = info.parentEmail?.trim().toLowerCase()
+      || `parent_${randomUUID()}@internal.smarttech.edu`;
 
     const parentUser = await this.prisma.user.create({
       data: {
         firstName,
         lastName,
         email: parentEmail,
-         phone: parentPhone,
+        phone: info.parentPhone?.trim() || null,
         password: hashedParentPwd,
         username: parentUsername,
         schoolId,
@@ -374,31 +380,22 @@ export class StudentService {
 
     const parentRecord = await this.prisma.parent.create({
       data: {
+        userId: parentUser.id,
         firstName,
         lastName,
         email: parentEmail,
-         phone: parentPhone,
+        phone: info.parentPhone?.trim() || null,
+        phoneStatus: validateZambianPhone(info.parentPhone).status,
+        phoneStatusReason: validateZambianPhone(info.parentPhone).reason,
+        phoneValidatedAt: new Date(),
         password: hashedParentPwd,
         schoolId,
         children: { create: { studentId } },
       },
     });
 
-    this.credentialDeliveryService.deliverBundledCredentials({
-      parentUserId: parentUser.id,
-      studentUserId: studentId,
-      parentEmail: info.parentEmail,
-       parentPhone,
-      parentUsername,
-      parentPassword: parentPassword.password,
-      parentName,
-      studentUsername: info.studentUsername,
-      studentPassword: info.studentPassword,
-      studentName: info.studentName,
-      schoolName: school?.name,
-      schoolUrl,
-      channel: info.parentEmail ? 'EMAIL' : 'SMS',
-    }).catch(err => this.logger.error(`Failed to send bundled credentials: ${err.message}`));
+    const delivery = await this.identityService.deliverParentCredentialsBySms(parentRecord.id, requestedById, schoolId);
+    if (!delivery.success) this.logger.warn(`Parent credential SMS was blocked for ${parentRecord.id}: ${delivery.guidance || delivery.error}`);
   }
 
   async getStudentCredentials(studentId: string, requesterId: string) {
@@ -432,59 +429,9 @@ export class StudentService {
   async generateAndDeliverStudentCredentials(
     studentId: string,
     requesterId: string,
-    channel: 'EMAIL' | 'SMS' | 'WHATSAPP' = 'EMAIL',
+    _channel: 'EMAIL' | 'SMS' | 'WHATSAPP' = 'SMS',
   ) {
-    const student = await this.prisma.student.findUnique({ where: { id: studentId }, select: {
-      id: true, admissionNumber: true, studentUuid: true, status: true, schoolId: true,
-      firstName: true, lastName: true, gender: true, photoUrl: true,
-    }});
-    if (!student) throw new NotFoundException('Student not found');
-
-    const school = await this.prisma.school.findUnique({ where: { id: student.schoolId } });
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const schoolUrl = `${frontendUrl}/login?school=${student.schoolId}`;
-
-    let user = await this.prisma.user.findFirst({ where: { studentId } });
-    if (!user) {
-      const generated = this.passwordGenService.generateRoleBasedPassword('Student');
-      const username = this.usernameGenService.generateUsername(
-        student.firstName, student.lastName, 'Student', student.schoolId,
-      );
-      const hashedPwd = await bcrypt.hash(generated.password, 10);
-
-      user = await this.prisma.user.create({
-        data: {
-          firstName: student.firstName,
-          lastName: student.lastName,
-          email: `${username}@student.smarttech.edu`,
-          username,
-          password: hashedPwd,
-          schoolId: student.schoolId,
-          studentId: student.id,
-          mustChangePassword: true,
-        },
-      });
-
-      const studentRole = await this.prisma.role.findFirst({ where: { name: 'Student' } });
-      if (studentRole) {
-        await this.prisma.userRole.create({
-          data: { userId: user.id, roleId: studentRole.id },
-        });
-      }
-    }
-
-    return this.credentialDeliveryService.deliverStudentCredentialsOnRequest({
-      userId: user.id,
-      recipientEmail: user.email || undefined,
-      recipientPhone: user.phone || undefined,
-      username: user.username || '',
-      password: 'See admin for password reset',
-      recipientName: `${student.firstName} ${student.lastName}`,
-      role: 'Student',
-      schoolName: school?.name,
-      schoolUrl,
-      channel,
-    });
+    return this.identityService.deliverParentCredentialsForStudent(studentId, requesterId);
   }
 
   async linkStudentToParent(studentId: string, parentId: string) {

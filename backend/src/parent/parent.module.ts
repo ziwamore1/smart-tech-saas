@@ -3,11 +3,10 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { ParentService } from './parent.service';
 import { ParentController } from './parent.controller';
 import { ReportCardModule } from '../report-card/report-card.module';
-import { MessagingModule } from '../messaging/messaging.module';
 import { IdentityModule } from '../identity-service/identity.module';
 
 @Module({
-  imports: [PrismaModule, ReportCardModule, MessagingModule, IdentityModule],
+  imports: [PrismaModule, ReportCardModule, IdentityModule],
   providers: [ParentService],
   controllers: [ParentController],
 })

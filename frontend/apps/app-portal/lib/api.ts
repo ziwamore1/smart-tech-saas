@@ -1895,6 +1895,12 @@ export const identityApi = {
   resendCredentials: (userId: string, channel: 'SMS' | 'EMAIL' | 'WHATSAPP' = 'EMAIL') =>
     api.post(`/identity/credentials/resend/${userId}`, { channel }),
 
+  sendParentCredentialsBySms: (parentId: string, schoolId?: string) =>
+    api.post(`/identity/credentials/parents/${parentId}/send-sms`, { schoolId }),
+
+  requestParentPhoneCorrection: (parentId: string, schoolId?: string) =>
+    api.post(`/identity/credentials/parents/${parentId}/request-phone-correction`, { schoolId }),
+
   getDeliveryHistory: (userId: string) =>
     api.get(`/identity/credentials/delivery-history/${userId}`),
 

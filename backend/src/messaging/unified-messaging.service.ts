@@ -237,9 +237,10 @@ export class UnifiedMessagingService {
     const beemConfigured = await this.beemService.isConfigured();
 
     if (!twilioConfigured && !beemConfigured) {
-      this.logger.warn(`[SMS] No SMS provider configured. Would send to: ${normalizedPhone}`);
-      await this.logMessage(null, 'SMS', 'SENT', undefined, normalizedPhone, undefined, message, 'sandbox_sms_id');
-      return { success: true, channel: 'SMS', messageId: 'sandbox_sms_id' };
+      const errorMessage = 'No SMS provider is configured; no message was sent.';
+      this.logger.error(`[SMS] ${errorMessage} Recipient: ${normalizedPhone}`);
+      await this.logMessage(null, 'SMS', 'FAILED', undefined, normalizedPhone, undefined, message, undefined, errorMessage);
+      return { success: false, channel: 'SMS', error: errorMessage };
     }
 
     if (twilioConfigured) {

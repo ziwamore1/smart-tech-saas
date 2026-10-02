@@ -51,20 +51,52 @@ export default function PasswordHubPage() {
   const handleAction = async (action: string, userId: string) => {
     setActionLoading(`${action}-${userId}`);
     try {
+      const row = users.find((candidate) => candidate.id === userId);
+      if (action === 'request-phone-correction' && row?.parentRecordId) {
+        const response = await identityApi.requestParentPhoneCorrection(row.parentRecordId, row.schoolId || user?.schoolId || undefined);
+        const result = response.data?.data || response.data || {};
+        toast.success(result.guidance || 'Parent flagged for phone correction. Ask the linked child to bring the correct number to school.');
+        await loadUsers();
+        return;
+      }
+      const parentAccount = row?.roles?.some((role: string) => role.toLowerCase() === 'parent');
+      const studentAccount = row?.roles?.some((role: string) => role.toLowerCase() === 'student');
+      if (parentAccount && ['generate', 'resend', 'reset'].includes(action)) {
+        if (!row.parentRecordId) throw new Error('No parent record is linked to this login. Link the account to a parent and child before delivering credentials.');
+        const response = await identityApi.sendParentCredentialsBySms(row.parentRecordId, row.schoolId || user?.schoolId || undefined);
+        const result = response.data?.data || response.data || {};
+        if (!result.success) {
+          toast.warning(result.guidance || result.error || 'No SMS was sent. Check the recorded parent phone issue.');
+        } else {
+          toast.success(`Parent and ${result.childCount} linked child credential set(s) sent by SMS.`);
+        }
+        await loadUsers();
+        return;
+      }
       switch (action) {
         case 'generate':
-          await identityApi.generateCredentials(userId);
-          toast.success('Credentials generated and sent');
+          {
+            const response = await identityApi.generateCredentials(userId, studentAccount ? 'SMS' : 'EMAIL');
+            const result = response.data?.data || response.data || {};
+            if (studentAccount && !result.success) toast.warning(result.guidance || result.error || 'No student credentials were sent. Check linked parent phone records.');
+            else toast.success(studentAccount ? result.guidance || 'Student credentials sent to linked parents by SMS.' : 'Credentials generated and sent');
+          }
           break;
         case 'resend':
-          await identityApi.resendCredentials(userId);
-          toast.success('Credentials resent');
+          {
+            const response = await identityApi.resendCredentials(userId, studentAccount ? 'SMS' : 'EMAIL');
+            const result = response.data?.data || response.data || {};
+            if (studentAccount && !result.success) toast.warning(result.guidance || result.error || 'No student credentials were sent. Check linked parent phone records.');
+            else toast.success(studentAccount ? result.guidance || 'Student credentials sent to linked parents by SMS.' : 'Credentials resent');
+          }
           break;
         case 'reset':
           const res = await identityApi.resetPassword(userId);
-          toast.success('Password reset successfully');
-          if (res.data?.newPassword) {
-            navigator.clipboard.writeText(res.data.newPassword);
+          const resetResult = res.data?.data || res.data || {};
+          if ((parentAccount || studentAccount) && !resetResult.success) toast.warning(resetResult.guidance || resetResult.error || 'Credentials were not sent.');
+          else toast.success(parentAccount || studentAccount ? resetResult.guidance || 'Credentials sent by SMS.' : 'Password reset successfully');
+          if (!parentAccount && !studentAccount && resetResult.newPassword) {
+            navigator.clipboard.writeText(resetResult.newPassword);
             toast.info('New password copied to clipboard');
           }
           break;
@@ -201,7 +233,8 @@ export default function PasswordHubPage() {
             <table className="w-full min-w-[800px]">
               <thead>
                 <tr className="border-b text-left text-sm font-medium text-muted-foreground">
-                  <th className="pb-3 pr-4 whitespace-nowrap">User</th>
+                    <th className="pb-3 pr-4 whitespace-nowrap">User</th>
+                    <th className="pb-3 pr-4 whitespace-nowrap">Phone / Linked Children</th>
                   <th className="pb-3 pr-4 whitespace-nowrap">Roles</th>
                   <th className="pb-3 pr-4 whitespace-nowrap">Status</th>
                   <th className="pb-3 pr-4 whitespace-nowrap">MFA</th>
@@ -213,13 +246,13 @@ export default function PasswordHubPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-12">
+                    <td colSpan={8} className="text-center py-12">
                       <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
                     </td>
                   </tr>
                 ) : users.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-12 text-muted-foreground">
+                    <td colSpan={8} className="text-center py-12 text-muted-foreground">
                       No users found matching your criteria
                     </td>
                   </tr>
@@ -229,9 +262,25 @@ export default function PasswordHubPage() {
                       <td className="py-3 pr-4 whitespace-nowrap">
                         <div>
                           <div className="font-medium">{u.firstName} {u.lastName}</div>
-                          <div className="text-sm text-muted-foreground">{u.email}</div>
+                          <div className="text-sm text-muted-foreground">{u.email || 'SMS-only parent account'}</div>
                           {u.username && <div className="text-xs text-muted-foreground">@{u.username}</div>}
                         </div>
+                      </td>
+                      <td className="py-3 pr-4 min-w-[190px]">
+                        <div className="text-sm">{u.phone || <span className="text-amber-700">No phone recorded</span>}</div>
+                        {u.roles?.some((role: string) => role.toLowerCase() === 'parent') && (
+                          <div className="mt-1 space-y-1">
+                            <Badge className={u.parentPhoneStatus === 'VALID' ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'}>
+                              {u.parentPhoneStatus || 'MISSING'} PHONE
+                            </Badge>
+                            <div className="text-xs text-muted-foreground">
+                              {u.linkedChildren?.length ? `${u.linkedChildren.length} linked child(ren): ${u.linkedChildren.map((child: any) => `${child.firstName} ${child.lastName}`).join(', ')}` : 'No linked children'}
+                            </div>
+                            {u.phoneCorrectionRequestedAt && <div className="text-xs text-amber-700">Correction requested {new Date(u.phoneCorrectionRequestedAt).toLocaleDateString()}</div>}
+                            {u.parentPhoneGuidance && <div className="text-xs text-red-700">{u.parentPhoneGuidance}</div>}
+                            {u.credentialDeliveryError && <div className="text-xs text-red-700">Last delivery: {u.credentialDeliveryError}</div>}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 pr-4">
                         <div className="flex flex-wrap gap-1">
@@ -254,7 +303,11 @@ export default function PasswordHubPage() {
                       <td className="py-3 pr-4 whitespace-nowrap text-sm">{u.activeSessions || 0}</td>
                       <td className="py-3 pr-4">
                         <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                          {actionLoading === `generate-${u.id}` ? (
+                          {u.roles?.some((role: string) => ['parent', 'student'].includes(role.toLowerCase())) ? (
+                            <Button size="icon" variant="outline" title={u.roles?.some((role: string) => role.toLowerCase() === 'student') ? 'Send student credentials to linked parents by SMS' : 'Send parent and linked child credentials by SMS'} onClick={() => handleAction('generate', u.id)} disabled={actionLoading === `generate-${u.id}` || (u.roles?.some((role: string) => role.toLowerCase() === 'parent') && !u.parentRecordId)} className="hover:bg-teal-50 hover:text-teal-700 hover:border-teal-300">
+                              {actionLoading === `generate-${u.id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                            </Button>
+                          ) : actionLoading === `generate-${u.id}` ? (
                             <Button size="icon" variant="outline" disabled>
                               <Loader2 className="w-4 h-4 animate-spin" />
                             </Button>
@@ -263,7 +316,7 @@ export default function PasswordHubPage() {
                               <Key className="w-4 h-4" />
                             </Button>
                           )}
-                          {actionLoading === `reset-${u.id}` ? (
+                          {!u.parentRecordId && (actionLoading === `reset-${u.id}` ? (
                             <Button size="icon" variant="outline" disabled>
                               <Loader2 className="w-4 h-4 animate-spin" />
                             </Button>
@@ -271,8 +324,8 @@ export default function PasswordHubPage() {
                             <Button size="icon" variant="outline" title="Reset Password" onClick={() => handleAction('reset', u.id)} className="hover:bg-amber-50 hover:text-amber-600 hover:border-amber-300 transition-all">
                               <RefreshCw className="w-4 h-4" />
                             </Button>
-                          )}
-                          {u.accountStatus === 'LOCKED' ? (
+                          ))}
+                          {!u.parentOnly && (u.accountStatus === 'LOCKED' ? (
                             actionLoading === `unlock-${u.id}` ? (
                               <Button size="icon" variant="outline" disabled>
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -292,8 +345,8 @@ export default function PasswordHubPage() {
                                 <Lock className="w-4 h-4 text-red-500" />
                               </Button>
                             )
-                          )}
-                          {actionLoading === `force-logout-${u.id}` ? (
+                          ))}
+                          {!u.parentOnly && (actionLoading === `force-logout-${u.id}` ? (
                             <Button size="icon" variant="outline" disabled>
                               <Loader2 className="w-4 h-4 animate-spin" />
                             </Button>
@@ -301,14 +354,19 @@ export default function PasswordHubPage() {
                             <Button size="icon" variant="outline" title="Force Logout" onClick={() => handleAction('force-logout', u.id)} className="hover:bg-purple-50 hover:text-purple-600 hover:border-purple-300 transition-all">
                               <Monitor className="w-4 h-4" />
                             </Button>
-                          )}
-                          {actionLoading === `resend-${u.id}` ? (
+                          ))}
+                          {!u.parentRecordId && (actionLoading === `resend-${u.id}` ? (
                             <Button size="icon" variant="outline" disabled>
                               <Loader2 className="w-4 h-4 animate-spin" />
                             </Button>
                           ) : (
                             <Button size="icon" variant="outline" title="Resend Credentials" onClick={() => handleAction('resend', u.id)} className="hover:bg-teal-50 hover:text-teal-600 hover:border-teal-300 transition-all">
                               <Send className="w-4 h-4" />
+                            </Button>
+                          ))}
+                          {u.parentRecordId && u.parentPhoneStatus !== 'VALID' && (
+                            <Button size="icon" variant="outline" title="Record request for a correct parent phone through the linked child" onClick={() => handleAction('request-phone-correction', u.id)} disabled={actionLoading === `request-phone-correction-${u.id}`} className="hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300">
+                              {actionLoading === `request-phone-correction-${u.id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
                             </Button>
                           )}
                         </div>
@@ -385,6 +443,37 @@ export default function PasswordHubPage() {
                 </div>
               </TabsContent>
               <TabsContent value="credentials" className="space-y-4 pt-4">
+                {selectedUser.parentRecordId && (
+                  <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                    <div>
+                      <h3 className="font-semibold">Parent SMS delivery and linked children</h3>
+                      <p className="text-sm text-muted-foreground">Phone status: {selectedUser.parentPhoneStatus || 'UNKNOWN'} · Phone: {selectedUser.phone || 'Not recorded'}</p>
+                      {selectedUser.parentPhoneGuidance && <p className="mt-1 text-sm text-red-700">{selectedUser.parentPhoneGuidance}</p>}
+                    </div>
+                    <div className="text-sm">
+                      <strong>Linked children:</strong>{' '}
+                      {selectedUser.linkedChildren?.length
+                        ? selectedUser.linkedChildren.map((child: any) => `${child.firstName} ${child.lastName}${child.username ? ` (${child.username})` : ''}`).join(', ')
+                        : 'None linked'}
+                    </div>
+                    {selectedUser.parentDeliveryHistory?.map((delivery: any) => (
+                      <div key={delivery.id} className="rounded-md border bg-background p-3 text-sm">
+                        <div className="flex flex-wrap justify-between gap-2 font-medium">
+                          <span>{delivery.status}</span>
+                          <span className="text-muted-foreground">{new Date(delivery.createdAt).toLocaleString()}</span>
+                        </div>
+                        {delivery.recipientPhone && <p className="text-muted-foreground">Recipient: {delivery.recipientPhone}</p>}
+                        {delivery.errorMessage && <p className="mt-1 text-red-700">{delivery.errorMessage}</p>}
+                      </div>
+                    ))}
+                    {selectedUser.parentPhoneStatus !== 'VALID' && selectedUser.parentRecordId && (
+                      <Button variant="outline" onClick={() => handleAction('request-phone-correction', selectedUser.id)} disabled={actionLoading === `request-phone-correction-${selectedUser.id}`}>
+                        {actionLoading === `request-phone-correction-${selectedUser.id}` ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <AlertTriangle className="w-4 h-4 mr-2" />}
+                        Record request for correct number through child
+                      </Button>
+                    )}
+                  </div>
+                )}
                 {selectedUser.lastCredential ? (
                   <div className="space-y-2">
                     <div className="flex justify-between p-3 bg-muted rounded-lg">

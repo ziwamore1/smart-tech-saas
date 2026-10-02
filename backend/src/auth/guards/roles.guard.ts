@@ -35,8 +35,10 @@ export class RolesGuard implements CanActivate {
     // super-admin/staff-position flows). Normalize them so both variants work
     // interchangeably across every @Roles(...) guard in the system.
     const normalize = (role: string) => {
-      const u = String(role).toUpperCase().replace(/\s+/g, '');
-      return u === 'DEPUTYHEAD' ? 'DEPUTY' : u;
+      const u = String(role).toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (u === 'DEPUTYHEAD' || u === 'DEPUTYHEADTEACHER') return 'DEPUTY';
+      if (u === 'HEADOFDEPARTMENT') return 'HOD';
+      return u;
     };
     this.logger.log(`RolesGuard: user=${user.id}, schoolId=${user.schoolId}, roles=${JSON.stringify(user.roles)}`);
     this.logger.log(`RolesGuard: requiredRoles=${JSON.stringify(requiredRoles)}`);
