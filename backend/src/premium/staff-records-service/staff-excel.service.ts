@@ -61,7 +61,8 @@ export class StaffExcelService {
       columns.forEach((column: any, columnIndex: number) => {
         const value = row[column.columnName] ?? '';
         const cell = target.getCell(columnIndex + columnOffset);
-        cell.value = value instanceof Date ? value : this.coerceExcelValue(value, column.dataType);
+        cell.value = this.coerceExcelValue(value, column.dataType);
+        this.applyDateFormat(cell, column.dataType);
       });
     });
     workbook.creator = options.generatedBy || 'SmartTech SaaS';
@@ -77,11 +78,48 @@ export class StaffExcelService {
   private coerceExcelValue(value: any, dataType?: string) {
     if (value === null || value === undefined || value === '') return '';
     if (dataType === 'number' && typeof value === 'string' && !Number.isNaN(Number(value))) return Number(value);
-    if (dataType === 'date' && typeof value === 'string') {
-      const parsed = new Date(value);
-      if (!Number.isNaN(parsed.getTime())) return parsed;
-    }
+    if (dataType === 'date') return this.coerceExcelDate(value);
     return value;
+  }
+
+  private coerceExcelDate(value: any): Date | '' {
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) return '';
+      return new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate()));
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const excelEpoch = Date.UTC(1899, 11, 30);
+      const parsed = new Date(excelEpoch + value * 86400000);
+      return Number.isNaN(parsed.getTime()) ? '' : parsed;
+    }
+
+    const text = String(value ?? '').trim();
+    if (!text) return '';
+
+    const yearMonthDay = text.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    const dayMonthYear = text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+    const parts = yearMonthDay
+      ? [Number(yearMonthDay[1]), Number(yearMonthDay[2]), Number(yearMonthDay[3])]
+      : dayMonthYear
+        ? [Number(dayMonthYear[3]), Number(dayMonthYear[2]), Number(dayMonthYear[1])]
+        : null;
+
+    if (parts) {
+      const [year, month, day] = parts;
+      const parsed = new Date(Date.UTC(year, month - 1, day));
+      if (parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day) return parsed;
+      return '';
+    }
+
+    const parsed = new Date(text);
+    return Number.isNaN(parsed.getTime())
+      ? ''
+      : new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
+  }
+
+  private applyDateFormat(cell: ExcelJS.Cell, dataType?: string) {
+    if (dataType === 'date') cell.numFmt = 'dd/mm/yyyy';
   }
 
   async generateStaffReturnExcel(
@@ -137,12 +175,14 @@ export class StaffExcelService {
     let rowIndex = columnHeaderRowIndex + 1;
     for (const rowData of rows) {
       const row = worksheet.getRow(rowIndex);
+      const sourceRow = rowData?.values || rowData;
       let maxLines = 1;
 
       columns.forEach((col, index) => {
         const cell = row.getCell(index + 1);
-        const value = rowData[col.columnName] !== undefined ? rowData[col.columnName] : '';
-        cell.value = value;
+        const value = sourceRow[col.columnName] !== undefined ? sourceRow[col.columnName] : '';
+        cell.value = this.coerceExcelValue(value, col.dataType);
+        this.applyDateFormat(cell, col.dataType);
 
         cell.font = { name: 'Calibri', size: 10, color: { argb: darkText } };
         cell.alignment = {

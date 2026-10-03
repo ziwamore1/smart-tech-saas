@@ -60,7 +60,12 @@ describe('StaffExcelService school headers', () => {
       schoolId: 'school-1',
       period: '2026',
       status: 'DRAFT',
-      data: [{ values: { 'return.serialNumber': 1, 'school.name': 'Example School' } }],
+      data: [{ values: {
+        'return.serialNumber': 1,
+        'school.name': 'Example School',
+        'field.17': '1981-03-15T00:00:00.000Z',
+        'field.19': '2002-08-01T00:00:00.000Z',
+      } }],
       template: {
         name: 'MoE Teaching Staffing Return',
         config: {
@@ -73,7 +78,7 @@ describe('StaffExcelService school headers', () => {
           columnName: index === 0 ? 'return.serialNumber' : index === 1 ? 'school.name' : `field.${index}`,
           columnLabel: label,
           columnOrder: index,
-          dataType: 'text',
+          dataType: [17, 19].includes(index) ? 'date' : 'text',
         })),
       },
     };
@@ -95,7 +100,50 @@ describe('StaffExcelService school headers', () => {
     expect(worksheet.getCell('AN8').value).toBe('Number of Days Absent');
     expect(worksheet.getCell('B9').value).toBe(1);
     expect(worksheet.getCell('C9').value).toBe('Example School');
+    expect(worksheet.getCell('S9').value).toBeInstanceOf(Date);
+    expect(worksheet.getCell('U9').value).toBeInstanceOf(Date);
+    expect(worksheet.getCell('S9').numFmt).toBe('dd/mm/yyyy');
+    expect(worksheet.getCell('U9').numFmt).toBe('dd/mm/yyyy');
     expect(worksheet.getCell('AN8').font?.color).toEqual({ argb: '1A1A2E' });
     expect(worksheet.getRow(8).height).toBeGreaterThanOrEqual(30);
+  });
+
+  it('writes DOB and appointment dates as real Excel dates with an explicit day/month/year format', async () => {
+    const columns = [
+      { columnName: 'staff.dateOfBirth', columnLabel: 'Date of Birth', columnOrder: 0, dataType: 'date' },
+      { columnName: 'staff.firstAppointmentDate', columnLabel: 'Date of First Appointment', columnOrder: 1, dataType: 'date' },
+    ];
+    const submission = {
+      id: 'submission-3',
+      schoolId: 'school-1',
+      period: '2026',
+      status: 'DRAFT',
+      data: [{ values: { 'staff.dateOfBirth': '1981-03-15T00:00:00.000Z', 'staff.firstAppointmentDate': '2002-08-01T00:00:00.000Z' } }],
+      template: {
+        name: 'Date Test Return',
+        config: { sheetName: '', headerRow: 1, dataStartRow: 2 },
+        columns,
+      },
+    };
+    const prisma = {
+      staffReturnSubmission: {
+        findUnique: jest.fn().mockResolvedValue(submission),
+      },
+    };
+    const service = new StaffExcelService(prisma as any);
+
+    const buffer = await service.generateStaffReturnExcel('submission-3', 'school-1');
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const worksheet = workbook.worksheets[0];
+    const dob = worksheet.getCell('A6');
+    const appointment = worksheet.getCell('B6');
+
+    expect(dob.value).toBeInstanceOf(Date);
+    expect(appointment.value).toBeInstanceOf(Date);
+    expect(dob.numFmt).toBe('dd/mm/yyyy');
+    expect(appointment.numFmt).toBe('dd/mm/yyyy');
+    expect((dob.value as Date).toISOString().slice(0, 10)).toBe('1981-03-15');
+    expect((appointment.value as Date).toISOString().slice(0, 10)).toBe('2002-08-01');
   });
 });
