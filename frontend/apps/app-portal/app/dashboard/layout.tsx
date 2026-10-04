@@ -21,7 +21,7 @@ type NavItem = {
   institutionTypes?: string[];
 };
 
-const ALL_SECONDARY = ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Accountant', 'Secretary', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
+const ALL_SECONDARY = ['Director', 'Deputy Director', 'Deputy', 'Deputy Head', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Accountant', 'Secretary', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
 const ALL_PRIMARY = ['Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Primary Teacher', 'Accountant', 'Secretary'];
 const ALL_COLLEGE = ['Principal', 'Registrar', 'Lecturer', 'Accountant', 'Secretary'];
 const ALL_UNIVERSITY = ['Vice Chancellor', 'Dean', 'Lecturer', 'Research Supervisor', 'Accountant', 'Secretary'];
@@ -29,15 +29,15 @@ const ALL_UNIVERSITY = ['Vice Chancellor', 'Dean', 'Lecturer', 'Research Supervi
 const ROLE_MAP: Record<string, Record<string, string[]>> = {
   admin: {
     PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Accountant', 'Secretary'],
-    SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD', 'Accountant', 'Secretary'],
-    ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD', 'Accountant', 'Secretary'],
+    SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Deputy', 'Deputy Head', 'Head Teacher', 'HOD', 'Accountant', 'Secretary'],
+    ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Deputy', 'Deputy Head', 'Head Teacher', 'HOD', 'Accountant', 'Secretary'],
     COLLEGE: ['Principal', 'Registrar', 'Accountant', 'Secretary'],
     UNIVERSITY: ['Vice Chancellor', 'Dean', 'Accountant', 'Secretary'],
   },
   teaching: {
     PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Primary Teacher'],
-    SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'],
-    ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'],
+    SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Deputy', 'Deputy Head', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'],
+    ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Deputy', 'Deputy Head', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'],
     COLLEGE: ['Principal', 'Lecturer'],
     UNIVERSITY: ['Dean', 'Lecturer', 'Research Supervisor'],
   },
@@ -50,8 +50,8 @@ const ROLE_MAP: Record<string, Record<string, string[]>> = {
   },
   supervision: {
     PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'],
-    SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD'],
-    ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD'],
+    SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Deputy', 'Deputy Head', 'Head Teacher', 'HOD'],
+    ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Deputy', 'Deputy Head', 'Head Teacher', 'HOD'],
     COLLEGE: ['Principal', 'Registrar'],
     UNIVERSITY: ['Vice Chancellor', 'Dean'],
   },
@@ -78,8 +78,8 @@ const ROLE_MAP: Record<string, Record<string, string[]>> = {
   },
   staff: {
     PRIMARY_SCHOOL: ['Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Primary Teacher', 'Accountant', 'Secretary'],
-    SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Accountant', 'Secretary'],
-    ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Deputy', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Accountant', 'Secretary'],
+    SECONDARY_SCHOOL: ['Director', 'Deputy Director', 'Deputy', 'Deputy Head', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Accountant', 'Secretary'],
+    ADVANCED_SECONDARY: ['Director', 'Deputy Director', 'Deputy', 'Deputy Head', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Accountant', 'Secretary'],
     COLLEGE: ['Principal', 'Registrar', 'Lecturer', 'Accountant', 'Secretary'],
     UNIVERSITY: ['Vice Chancellor', 'Dean', 'Lecturer', 'Research Supervisor', 'Accountant', 'Secretary'],
   },
@@ -93,6 +93,14 @@ const ROLE_MAP: Record<string, Record<string, string[]>> = {
 };
 
 const regularNav: NavItem[] = [
+  {
+    name: 'Academic Progress',
+    href: '/dashboard/academic-progress',
+    icon: 'fa-line-chart',
+    color: '#7c3aed',
+    typeRoles: ROLE_MAP.everyone,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
+  },
   {
     name: 'My Dashboard',
     href: '/dashboard/teacher-view',

@@ -444,8 +444,8 @@ model Term {
   resultSheets           ResultSheet[]
   SbaTask                SbaTask[]
   CurriculumLessonPlan   CurriculumLessonPlan[]
-  calendarActivities    CalendarActivity[]
-  calendarGoals         CalendarGoal[]
+  calendarActivities     CalendarActivity[]
+  calendarGoals          CalendarGoal[]
   SchoolBusinessCalendar SchoolBusinessCalendar[]
 
   @@index([academicYearId])
@@ -512,7 +512,7 @@ model User {
   schoolUsers                    SchoolUser[]
   teacher                        Teacher?
   parentProfile                  Parent?
-  parentCredentialRequests       ParentCredentialDelivery[]       @relation("ParentCredentialDeliveryRequester")
+  parentCredentialRequests       ParentCredentialDelivery[]     @relation("ParentCredentialDeliveryRequester")
   teachingAssignments            TeachingAssignment[]
   school                         School?                        @relation(fields: [schoolId], references: [id])
   student                        Student?                       @relation(fields: [studentId], references: [id])
@@ -585,16 +585,16 @@ model LevelType {
 }
 
 model AgeBand {
-  id                String   @id @default(uuid())
-  schoolId          String
-  label             String
-  minAge            Int
-  maxAgeExclusive   Int?
-  order             Int      @default(0)
-  isActive          Boolean  @default(true)
-  school            School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String   @id @default(uuid())
+  schoolId        String
+  label           String
+  minAge          Int
+  maxAgeExclusive Int?
+  order           Int      @default(0)
+  isActive        Boolean  @default(true)
+  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@unique([schoolId, label])
   @@index([schoolId, isActive, order])
@@ -938,45 +938,45 @@ model CalendarCategory {
 }
 
 model CalendarActivity {
-  id               String                   @id @default(uuid())
-  schoolId         String
-  calendarId       String
-  termId           String?
-  categoryId       String?
-  parentId         String?
-  activityCode     String?
-  departmentId     String?
-  officerId        String?
-  title            String
-  description      String?
-  startDate        DateTime
-  endDate          DateTime
-  startTime        String?
-  endTime          String?
-  deadline         DateTime?
-  allDay           Boolean                  @default(true)
-  recurrenceRule   CalendarRecurrenceRule   @default(NONE)
-  recurrenceConfig Json?
-  status                CalendarActivityStatus   @default(PLANNED)
-  priority              CalendarActivityPriority @default(NORMAL)
-  completionPercentage  Float                    @default(0)
-  target                Float?
-  targetUnit            String?
-  expectedOutcome       String?
-  actualOutcome         String?
-  actualCompletionDate  DateTime?
-  delayReason           String?
-  failureReason         String?
-  remarks               String?
-  responsibleRole       String?
-  reminderMinutes       Json?
-  attachments           Json?
-  notes                 String?
-  venue                 String?
-  createdById      String?
-  updatedById      String?
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
+  id                   String                   @id @default(uuid())
+  schoolId             String
+  calendarId           String
+  termId               String?
+  categoryId           String?
+  parentId             String?
+  activityCode         String?
+  departmentId         String?
+  officerId            String?
+  title                String
+  description          String?
+  startDate            DateTime
+  endDate              DateTime
+  startTime            String?
+  endTime              String?
+  deadline             DateTime?
+  allDay               Boolean                  @default(true)
+  recurrenceRule       CalendarRecurrenceRule   @default(NONE)
+  recurrenceConfig     Json?
+  status               CalendarActivityStatus   @default(PLANNED)
+  priority             CalendarActivityPriority @default(NORMAL)
+  completionPercentage Float                    @default(0)
+  target               Float?
+  targetUnit           String?
+  expectedOutcome      String?
+  actualOutcome        String?
+  actualCompletionDate DateTime?
+  delayReason          String?
+  failureReason        String?
+  remarks              String?
+  responsibleRole      String?
+  reminderMinutes      Json?
+  attachments          Json?
+  notes                String?
+  venue                String?
+  createdById          String?
+  updatedById          String?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
 
   school                 School                         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   calendar               SchoolBusinessCalendar         @relation(fields: [calendarId], references: [id], onDelete: Cascade)
@@ -1075,43 +1075,43 @@ model CalendarAuditEvent {
 }
 
 model CalendarGoal {
-  id               String                   @id @default(uuid())
+  id               String                 @id @default(uuid())
   schoolId         String
   calendarId       String
   termId           String?
   title            String
   description      String?
-  targetPercentage Float                    @default(90)
-  category         String                   @default("OVERALL")
+  targetPercentage Float                  @default(90)
+  category         String                 @default("OVERALL")
   departmentId     String?
   responsibleId    String?
   deadline         DateTime?
-  status           CalendarActivityStatus   @default(PLANNED)
-  currentProgress  Float                    @default(0)
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
+  status           CalendarActivityStatus @default(PLANNED)
+  currentProgress  Float                  @default(0)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 
-  school     School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  calendar   SchoolBusinessCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
-  term       Term?                  @relation(fields: [termId], references: [id])
-  department Department?            @relation(fields: [departmentId], references: [id])
-  responsible User?                 @relation(fields: [responsibleId], references: [id])
+  school      School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  calendar    SchoolBusinessCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  term        Term?                  @relation(fields: [termId], references: [id])
+  department  Department?            @relation(fields: [departmentId], references: [id])
+  responsible User?                  @relation(fields: [responsibleId], references: [id])
 
   @@index([schoolId, calendarId])
   @@index([termId])
 }
 
 model CalendarActivityTimeline {
-  id              String   @id @default(uuid())
-  activityId      String
-  schoolId        String
-  userId          String?
-  previousStatus  String?
-  newStatus       String
+  id                 String   @id @default(uuid())
+  activityId         String
+  schoolId           String
+  userId             String?
+  previousStatus     String?
+  newStatus          String
   previousPercentage Float?
-  newPercentage   Float?
-  notes           String?
-  createdAt       DateTime @default(now())
+  newPercentage      Float?
+  notes              String?
+  createdAt          DateTime @default(now())
 
   activity CalendarActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
   school   School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
@@ -1477,47 +1477,47 @@ enum ResultSheetStatus {
 }
 
 model Parent {
-  id            String          @id @default(uuid())
-  userId        String?         @unique
-  firstName     String
-  lastName      String
-  phone         String?
-  phoneStatus   String          @default("UNKNOWN")
-  phoneStatusReason String?
-  phoneValidatedAt DateTime?
-  phoneCorrectionRequestedAt DateTime?
+  id                           String                     @id @default(uuid())
+  userId                       String?                    @unique
+  firstName                    String
+  lastName                     String
+  phone                        String?
+  phoneStatus                  String                     @default("UNKNOWN")
+  phoneStatusReason            String?
+  phoneValidatedAt             DateTime?
+  phoneCorrectionRequestedAt   DateTime?
   phoneCorrectionRequestedById String?
-  credentialDeliveryStatus String?
-  credentialDeliveryError String?
-  credentialDeliveryUpdatedAt DateTime?
-  email         String          @unique
-  password      String
-  photoUrl      String?
-  photoPublicId String?
-  schoolId      String
-  createdAt     DateTime        @default(now())
-  school        School          @relation(fields: [schoolId], references: [id])
-  user          User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
-  children      ParentStudent[]
-  credentialDeliveries ParentCredentialDelivery[]
+  credentialDeliveryStatus     String?
+  credentialDeliveryError      String?
+  credentialDeliveryUpdatedAt  DateTime?
+  email                        String                     @unique
+  password                     String
+  photoUrl                     String?
+  photoPublicId                String?
+  schoolId                     String
+  createdAt                    DateTime                   @default(now())
+  school                       School                     @relation(fields: [schoolId], references: [id])
+  user                         User?                      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  children                     ParentStudent[]
+  credentialDeliveries         ParentCredentialDelivery[]
 
   @@index([schoolId])
 }
 
 model ParentCredentialDelivery {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   parentId       String
   requestedById  String?
   recipientPhone String?
-  channel        String   @default("SMS")
+  channel        String    @default("SMS")
   status         String
   errorMessage   String?
   messageId      String?
-  childCount     Int      @default(0)
-  createdAt      DateTime @default(now())
+  childCount     Int       @default(0)
+  createdAt      DateTime  @default(now())
   deliveredAt    DateTime?
-  parent         Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  requestedBy    User?    @relation("ParentCredentialDeliveryRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  parent         Parent    @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  requestedBy    User?     @relation("ParentCredentialDeliveryRequester", fields: [requestedById], references: [id], onDelete: SetNull)
 
   @@index([parentId, createdAt])
   @@index([requestedById])
@@ -2670,12 +2670,12 @@ model FeatureLock {
 }
 
 model ReportTemplate {
-  id             String  @id @default(uuid())
-  name           String
-  description    String?
-  documentType   DocumentType @default(ACADEMIC_REPORT)
-  isDefault      Boolean @default(false)
-  schoolId       String?
+  id                    String                 @id @default(uuid())
+  name                  String
+  description           String?
+  documentType          DocumentType           @default(ACADEMIC_REPORT)
+  isDefault             Boolean                @default(false)
+  schoolId              String?
   headerText            String?
   footerText            String?
   logoUrl               String?
@@ -4033,16 +4033,16 @@ enum PlanBillingInterval {
 }
 
 model PlanPricing {
-  id          String              @id @default(uuid())
-  schoolType  PlanSchoolType      @default(SECONDARY)
-  tier        SubscriptionTier    @default(BASIC)
-  interval    PlanBillingInterval @default(MONTHLY)
-  priceUsd    Float               @default(0)
-  priceZwK    Float               @default(0)
-  features    Json                @default("[]")
-  isActive    Boolean             @default(true)
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id         String              @id @default(uuid())
+  schoolType PlanSchoolType      @default(SECONDARY)
+  tier       SubscriptionTier    @default(BASIC)
+  interval   PlanBillingInterval @default(MONTHLY)
+  priceUsd   Float               @default(0)
+  priceZwK   Float               @default(0)
+  features   Json                @default("[]")
+  isActive   Boolean             @default(true)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
 
   @@unique([schoolType, tier, interval])
   @@index([schoolType, tier])
@@ -4148,24 +4148,24 @@ enum MessageStatus {
 }
 
 model TemplateMarketplace {
-  id            String        @id @default(uuid())
-  templateId  String         @unique
-  schoolId    String?
-  documentType DocumentType @default(ACADEMIC_REPORT)
-  title       String
-  description   String?
-  category      String?
-  tags          String[]
-  previewUrl    String?
-  downloads     Int           @default(0)
-  likes         Int           @default(0)
-  featured      Boolean       @default(false)
-  verified      Boolean       @default(false)
-  price         Float?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  template      ReportTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  school        School?       @relation(fields: [schoolId], references: [id])
+  id           String         @id @default(uuid())
+  templateId   String         @unique
+  schoolId     String?
+  documentType DocumentType   @default(ACADEMIC_REPORT)
+  title        String
+  description  String?
+  category     String?
+  tags         String[]
+  previewUrl   String?
+  downloads    Int            @default(0)
+  likes        Int            @default(0)
+  featured     Boolean        @default(false)
+  verified     Boolean        @default(false)
+  price        Float?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  template     ReportTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  school       School?        @relation(fields: [schoolId], references: [id])
 
   @@index([category])
   @@index([featured])
@@ -4956,6 +4956,100 @@ model LongitudinalRecord {
   @@index([schoolId])
   @@index([academicYearId])
   @@index([subjectId])
+}
+
+// Immutable, normalized academic evidence used by the longitudinal progress engine.
+// Existing assessment and result tables remain the source of truth.
+model ProgressEvidence {
+  id               String    @id @default(uuid())
+  schoolId         String
+  sourceType       String
+  sourceId         String
+  studentId        String
+  academicYearId   String
+  termId           String
+  classId          String
+  streamId         String?
+  subjectId        String
+  teacherId        String?
+  assessmentId     String?
+  assessmentTypeId String?
+  topicId          String?
+  competencyId     String?
+  rawScore         Float?
+  maxScore         Float?
+  percentage       Float?
+  weightedScore    Float?
+  grade            String?
+  isAbsent         Boolean   @default(false)
+  recordedAt       DateTime?
+  verifiedAt       DateTime?
+  imported         Boolean   @default(false)
+  metadata         Json?     @default("{}")
+  createdAt        DateTime  @default(now())
+
+  @@unique([sourceType, sourceId])
+  @@index([schoolId, studentId, academicYearId, termId, subjectId])
+  @@index([schoolId, classId, academicYearId, termId, subjectId])
+  @@index([studentId, subjectId, recordedAt])
+  @@index([teacherId, subjectId, academicYearId, termId])
+  @@index([assessmentTypeId])
+  @@index([topicId])
+  @@index([competencyId])
+}
+
+model AcademicProgressSnapshot {
+  id                   String   @id @default(uuid())
+  schoolId             String
+  studentId            String
+  academicYearId       String
+  termId               String
+  classId              String
+  subjectId            String
+  assessmentCount      Int      @default(0)
+  averagePercentage    Float?
+  weightedAverage      Float?
+  median               Float?
+  standardDeviation    Float?
+  percentile           Float?
+  rank                 Int?
+  grade                String?
+  passStatus           String?
+  trendDirection       String?
+  trendStrength        Float?
+  attendancePercentage Float?
+  competencyScore      Float?
+  generatedAt          DateTime @default(now())
+
+  @@unique([studentId, academicYearId, termId, classId, subjectId])
+  @@index([schoolId, academicYearId, termId, classId, subjectId])
+  @@index([studentId, subjectId, generatedAt])
+}
+
+model StudentAcademicYearSummary {
+  id                   String   @id @default(uuid())
+  schoolId             String
+  studentId            String
+  academicYearId       String
+  classId              String?
+  overallAverage       Float?
+  median               Float?
+  percentile           Float?
+  overallGrade         String?
+  subjectsTaken        Int      @default(0)
+  subjectsPassed       Int      @default(0)
+  subjectsFailed       Int      @default(0)
+  strongestSubject     String?
+  weakestSubject       String?
+  improvementRate      Float?
+  declineRate          Float?
+  attendancePercentage Float?
+  riskLevel            String?
+  generatedAt          DateTime @default(now())
+
+  @@unique([studentId, academicYearId])
+  @@index([schoolId, academicYearId])
+  @@index([studentId, generatedAt])
 }
 
 model CompositeSubject {
@@ -6237,22 +6331,22 @@ model StaffEmploymentRecord {
 }
 
 model StaffReturnTemplate {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  schoolId    String
-  returnType  String   @default("MONTHLY")
-  isActive    Boolean  @default(true)
-  isDefault   Boolean  @default(false)
-  category    String?  @default("DISTRICT")
-  config      Json?    @default("{}")
+  id           String   @id @default(uuid())
+  name         String
+  description  String?
+  schoolId     String
+  returnType   String   @default("MONTHLY")
+  isActive     Boolean  @default(true)
+  isDefault    Boolean  @default(false)
+  category     String?  @default("DISTRICT")
+  config       Json?    @default("{}")
   templateCode String?
-  version     String   @default("1")
-  status      String   @default("DRAFT")
-  authority   String?
-  fileType    String   @default("xlsx")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  version      String   @default("1")
+  status       String   @default("DRAFT")
+  authority    String?
+  fileType     String   @default("xlsx")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   columns     StaffReturnColumn[]
   submissions StaffReturnSubmission[]
@@ -6287,27 +6381,27 @@ model StaffReturnColumn {
 }
 
 model StaffReturnSubmission {
-  id           String              @id @default(uuid())
-  templateId   String
-  template     StaffReturnTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  schoolId     String
-  period       String
-  academicYear String?
-  term         String?
-  status       String              @default("DRAFT")
-  data         Json                @default("[]")
-  snapshot     Json?
-  templateVersion String           @default("1")
-  submittedAt  DateTime?
-  approvedAt   DateTime?
-  approvedBy   String?
-  generatedBy  String?
-  generatedAt  DateTime?
-  notes        String?
-  fileUrl      String?
-  fileVersion  Int                 @default(1)
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  id              String              @id @default(uuid())
+  templateId      String
+  template        StaffReturnTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  schoolId        String
+  period          String
+  academicYear    String?
+  term            String?
+  status          String              @default("DRAFT")
+  data            Json                @default("[]")
+  snapshot        Json?
+  templateVersion String              @default("1")
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  approvedBy      String?
+  generatedBy     String?
+  generatedAt     DateTime?
+  notes           String?
+  fileUrl         String?
+  fileVersion     Int                 @default(1)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 
   logs StaffAuditLog[]
 
@@ -7077,48 +7171,48 @@ enum FinancialCustomerType {
 // CENTRALIZED SMART_TECH COMPANY / BUSINESS IDENTITY (singleton)
 // ------------------------------------------------------------------
 model CompanyProfile {
-  id                              String   @id @default("company")
-  legalName                       String
-  tradingName                     String?
-  logoUrl                         String?
-  logoPublicId                    String?
-  companyRegistrationNumber       String? // PACRA registration / identity number
-  tpin                            String? // ZRA Taxpayer Identification Number
-  zraIdentityNumber               String?
-  physicalAddress                 String?
-  postalAddress                   String?
-  city                            String?
-  province                        String?
-  country                         String   @default("Zambia")
-  phone                           String?
-  email                           String?
-  website                         String?
-  businessDescription             String?
-  registrationInformation         Json?
-  authorizedContactName           String?
-  authorizedContactRole           String?
-  authorizedContactEmail          String?
-  authorizedContactPhone          String?
-  authorizedSignatoryName         String?
-  authorizedSignatoryRole         String?
-  signatureUrl                    String?
-  signaturePublicId               String?
-  stampUrl                        String?
-  stampPublicId                   String?
-  primaryColor                    String   @default("#1e3a5f")
-  secondaryColor                  String   @default("#c0a030")
-  headerLayout                    String   @default("logo-left")
-  footerLayout                    String   @default("standard")
-  watermarkText                   String?
-  defaultTerms                    String?
-  defaultPaymentTerms             String?
-  defaultNotes                    String?
-  defaultTaxConfigurationId      String?                @unique
-  isActive                        Boolean  @default(true)
-  createdById                     String?
-  updatedById                     String?
-  createdAt                       DateTime @default(now())
-  updatedAt                       DateTime @updatedAt
+  id                        String   @id @default("company")
+  legalName                 String
+  tradingName               String?
+  logoUrl                   String?
+  logoPublicId              String?
+  companyRegistrationNumber String? // PACRA registration / identity number
+  tpin                      String? // ZRA Taxpayer Identification Number
+  zraIdentityNumber         String?
+  physicalAddress           String?
+  postalAddress             String?
+  city                      String?
+  province                  String?
+  country                   String   @default("Zambia")
+  phone                     String?
+  email                     String?
+  website                   String?
+  businessDescription       String?
+  registrationInformation   Json?
+  authorizedContactName     String?
+  authorizedContactRole     String?
+  authorizedContactEmail    String?
+  authorizedContactPhone    String?
+  authorizedSignatoryName   String?
+  authorizedSignatoryRole   String?
+  signatureUrl              String?
+  signaturePublicId         String?
+  stampUrl                  String?
+  stampPublicId             String?
+  primaryColor              String   @default("#1e3a5f")
+  secondaryColor            String   @default("#c0a030")
+  headerLayout              String   @default("logo-left")
+  footerLayout              String   @default("standard")
+  watermarkText             String?
+  defaultTerms              String?
+  defaultPaymentTerms       String?
+  defaultNotes              String?
+  defaultTaxConfigurationId String?  @unique
+  isActive                  Boolean  @default(true)
+  createdById               String?
+  updatedById               String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
   defaultTaxConfiguration TaxConfiguration? @relation("CompanyDefaultTax", fields: [defaultTaxConfigurationId], references: [id])
 
@@ -7129,32 +7223,32 @@ model CompanyProfile {
 // CUSTOMERS / INSTITUTIONS
 // ------------------------------------------------------------------
 model FinancialCustomer {
-  id              String                @id @default(uuid())
-  schoolId        String?
-  customerType    FinancialCustomerType @default(SCHOOL)
-  name            String
-  legalName       String?
-  address         String?
-  postalAddress   String?
-  city            String?
-  province        String?
-  country         String?
-  contactPerson   String?
-  billingContact  String?
-  email           String?
-  phone           String?
+  id                String                @id @default(uuid())
+  schoolId          String?
+  customerType      FinancialCustomerType @default(SCHOOL)
+  name              String
+  legalName         String?
+  address           String?
+  postalAddress     String?
+  city              String?
+  province          String?
+  country           String?
+  contactPerson     String?
+  billingContact    String?
+  email             String?
+  phone             String?
   customerReference String?
-  taxInformation  String?
-  notes           String?
-  isActive        Boolean               @default(true)
-  createdById     String?
-  updatedById     String?
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  taxInformation    String?
+  notes             String?
+  isActive          Boolean               @default(true)
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
-  school     School?     @relation(fields: [schoolId], references: [id])
-  quotations Quotation[] @relation("CustomerQuotations")
-  invoices   Invoice[]   @relation("CustomerInvoices")
+  school     School?            @relation(fields: [schoolId], references: [id])
+  quotations Quotation[]        @relation("CustomerQuotations")
+  invoices   Invoice[]          @relation("CustomerInvoices")
   payments   FinancialPayment[] @relation("CustomerPayments")
   receipts   FinancialReceipt[] @relation("CustomerReceipts")
 
@@ -7167,23 +7261,23 @@ model FinancialCustomer {
 // BANK ACCOUNTS (config-driven, never hardcoded into templates)
 // ------------------------------------------------------------------
 model BankAccount {
-  id              String   @id @default(uuid())
-  bankName        String
-  accountName     String
-  accountNumber   String
-  branch          String?
-  branchCode      String?
-  swiftCode       String?
-  currency        String   @default("ZMW")
-  accountType     String?
-  isActive        Boolean  @default(true)
-  isDefault       Boolean  @default(false)
-  displayOrder    Int      @default(0)
-  notes           String?
-  createdById     String?
-  updatedById     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            String   @id @default(uuid())
+  bankName      String
+  accountName   String
+  accountNumber String
+  branch        String?
+  branchCode    String?
+  swiftCode     String?
+  currency      String   @default("ZMW")
+  accountType   String?
+  isActive      Boolean  @default(true)
+  isDefault     Boolean  @default(false)
+  displayOrder  Int      @default(0)
+  notes         String?
+  createdById   String?
+  updatedById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   quotations Quotation[] @relation("QuotationBankAccount")
   invoices   Invoice[]   @relation("InvoiceBankAccount")
@@ -7197,24 +7291,24 @@ model BankAccount {
 // TAX / ZRA CONFIGURATION
 // ------------------------------------------------------------------
 model TaxConfiguration {
-  id               String                   @id @default(uuid())
-  name             String
-  taxRate          Float                    @default(0)
+  id                 String                  @id @default(uuid())
+  name               String
+  taxRate            Float                   @default(0)
   registrationNumber String?
-  description      String?
-  pricingMode      FinancialTaxPricingMode  @default(EXCLUSIVE)
-  isActive         Boolean                  @default(true)
-  isDefault        Boolean                  @default(false)
-  effectiveFrom    DateTime?
-  effectiveTo      DateTime?
-  createdById      String?
-  updatedById      String?
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
+  description        String?
+  pricingMode        FinancialTaxPricingMode @default(EXCLUSIVE)
+  isActive           Boolean                 @default(true)
+  isDefault          Boolean                 @default(false)
+  effectiveFrom      DateTime?
+  effectiveTo        DateTime?
+  createdById        String?
+  updatedById        String?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
 
   companyDefault CompanyProfile? @relation("CompanyDefaultTax")
-  quotations    Quotation[]      @relation("QuotationTaxConfig")
-  invoices      Invoice[]        @relation("InvoiceTaxConfig")
+  quotations     Quotation[]     @relation("QuotationTaxConfig")
+  invoices       Invoice[]       @relation("InvoiceTaxConfig")
 
   @@index([isActive])
   @@index([isDefault])
@@ -7244,57 +7338,57 @@ model FinancialDocumentSequence {
 // QUOTATION
 // ------------------------------------------------------------------
 model Quotation {
-  id               String          @id @default(uuid())
-  quotationNumber  String          @unique
-  status           QuotationStatus @default(DRAFT)
-  quotationDate    DateTime
-  validUntil       DateTime?
-  issueDate        DateTime?
-  sentAt           DateTime?
-  acceptedAt       DateTime?
-  rejectedAt       DateTime?
-  expiredAt        DateTime?
-  cancelledAt      DateTime?
-  cancelledBy      String?
+  id                 String          @id @default(uuid())
+  quotationNumber    String          @unique
+  status             QuotationStatus @default(DRAFT)
+  quotationDate      DateTime
+  validUntil         DateTime?
+  issueDate          DateTime?
+  sentAt             DateTime?
+  acceptedAt         DateTime?
+  rejectedAt         DateTime?
+  expiredAt          DateTime?
+  cancelledAt        DateTime?
+  cancelledBy        String?
   cancellationReason String?
-  convertedAt      DateTime?
-  customerId       String
-  currency         String          @default("ZMW")
-  reference        String?
-  customerReference String?
-  subtotal         Float           @default(0)
-  discount         Float           @default(0)
-  taxableAmount    Float           @default(0)
-  taxAmount        Float           @default(0)
-  taxRate          Float?
-  totalAmount      Float           @default(0)
-  amountInWords    String?
+  convertedAt        DateTime?
+  customerId         String
+  currency           String          @default("ZMW")
+  reference          String?
+  customerReference  String?
+  subtotal           Float           @default(0)
+  discount           Float           @default(0)
+  taxableAmount      Float           @default(0)
+  taxAmount          Float           @default(0)
+  taxRate            Float?
+  totalAmount        Float           @default(0)
+  amountInWords      String?
   taxConfigurationId String?
-  bankAccountId    String?
-  quotationValidity String?
-  paymentTerms     String?
-  deliveryTerms    String?
-  notes            String?
-  specialConditions String?
-  templateId       String?
-  templateVersion  Int?
-  pdfUrl           String?
-  pdfPublicId      String?
-  verificationCode String?
-  documentHash     String?
-  verificationUrl  String?
-  createdById      String?
-  issuedById       String?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  bankAccountId      String?
+  quotationValidity  String?
+  paymentTerms       String?
+  deliveryTerms      String?
+  notes              String?
+  specialConditions  String?
+  templateId         String?
+  templateVersion    Int?
+  pdfUrl             String?
+  pdfPublicId        String?
+  verificationCode   String?
+  documentHash       String?
+  verificationUrl    String?
+  createdById        String?
+  issuedById         String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 
-  customer     FinancialCustomer @relation("CustomerQuotations", fields: [customerId], references: [id])
-  taxConfig    TaxConfiguration? @relation("QuotationTaxConfig", fields: [taxConfigurationId], references: [id])
-  bankAccount  BankAccount?      @relation("QuotationBankAccount", fields: [bankAccountId], references: [id])
-  items        QuotationItem[]
-  invoice      Invoice?          @relation("InvoiceFromQuotation")
-  payments     FinancialPayment[] @relation("QuotationPayments")
-  receipts     FinancialReceipt[]
+  customer    FinancialCustomer  @relation("CustomerQuotations", fields: [customerId], references: [id])
+  taxConfig   TaxConfiguration?  @relation("QuotationTaxConfig", fields: [taxConfigurationId], references: [id])
+  bankAccount BankAccount?       @relation("QuotationBankAccount", fields: [bankAccountId], references: [id])
+  items       QuotationItem[]
+  invoice     Invoice?           @relation("InvoiceFromQuotation")
+  payments    FinancialPayment[] @relation("QuotationPayments")
+  receipts    FinancialReceipt[]
 
   @@index([status])
   @@index([customerId])
@@ -7368,16 +7462,16 @@ model Invoice {
   cancelledAt        DateTime?
   cancelledBy        String?
   cancellationReason String?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
-  customer    FinancialCustomer @relation("CustomerInvoices", fields: [customerId], references: [id])
-  quotation   Quotation?        @relation("InvoiceFromQuotation", fields: [quotationId], references: [id])
-  taxConfig   TaxConfiguration? @relation("InvoiceTaxConfig", fields: [taxConfigurationId], references: [id])
-  bankAccount BankAccount?      @relation("InvoiceBankAccount", fields: [bankAccountId], references: [id])
+  customer    FinancialCustomer   @relation("CustomerInvoices", fields: [customerId], references: [id])
+  quotation   Quotation?          @relation("InvoiceFromQuotation", fields: [quotationId], references: [id])
+  taxConfig   TaxConfiguration?   @relation("InvoiceTaxConfig", fields: [taxConfigurationId], references: [id])
+  bankAccount BankAccount?        @relation("InvoiceBankAccount", fields: [bankAccountId], references: [id])
   items       InvoiceItem[]
-  payments    FinancialPayment[] @relation("InvoicePayments")
-  receipts    FinancialReceipt[] @relation("InvoiceReceipts")
+  payments    FinancialPayment[]  @relation("InvoicePayments")
+  receipts    FinancialReceipt[]  @relation("InvoiceReceipts")
   allocations PaymentAllocation[]
 
   @@index([status])
@@ -7388,19 +7482,19 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id        String  @id @default(uuid())
-  invoiceId String
-  itemName  String?
+  id          String  @id @default(uuid())
+  invoiceId   String
+  itemName    String?
   description String
-  quantity  Float   @default(1)
-  unit      String?
-  unitPrice Float   @default(0)
-  discount  Float   @default(0)
-  taxRate   Float?
-  taxAmount Float   @default(0)
-  subtotal  Float   @default(0)
-  lineTotal Float   @default(0)
-  sortOrder Int     @default(0)
+  quantity    Float   @default(1)
+  unit        String?
+  unitPrice   Float   @default(0)
+  discount    Float   @default(0)
+  taxRate     Float?
+  taxAmount   Float   @default(0)
+  subtotal    Float   @default(0)
+  lineTotal   Float   @default(0)
+  sortOrder   Int     @default(0)
 
   invoice Invoice @relation(fields: [invoiceId], references: [id])
 
@@ -7440,7 +7534,7 @@ model FinancialPayment {
   quotation   Quotation?          @relation("QuotationPayments", fields: [quotationId], references: [id])
   customer    FinancialCustomer   @relation("CustomerPayments", fields: [customerId], references: [id])
   allocations PaymentAllocation[]
-  receipts    FinancialReceipt[] @relation("PaymentReceipts")
+  receipts    FinancialReceipt[]  @relation("PaymentReceipts")
 
   @@index([invoiceId])
   @@index([quotationId])
@@ -7450,14 +7544,14 @@ model FinancialPayment {
 }
 
 model PaymentAllocation {
-  id        String  @id @default(uuid())
+  id        String   @id @default(uuid())
   paymentId String
   invoiceId String
   amount    Float
   createdAt DateTime @default(now())
 
   payment FinancialPayment @relation(fields: [paymentId], references: [id])
-  invoice Invoice         @relation(fields: [invoiceId], references: [id])
+  invoice Invoice          @relation(fields: [invoiceId], references: [id])
 
   @@index([paymentId])
   @@index([invoiceId])
@@ -7467,44 +7561,44 @@ model PaymentAllocation {
 // PAYMENT RECEIPTS (only ever issued against a CONFIRMED payment)
 // ------------------------------------------------------------------
 model FinancialReceipt {
-  id                String                 @id @default(uuid())
-  receiptNumber     String                 @unique
-  paymentId         String                 @unique
-  invoiceId         String
-  quotationId       String?
-  customerId        String
-  receiptDate       DateTime               @default(now())
-  paymentDate       DateTime?
-  amountReceived    Float
-  currency          String                 @default("ZMW")
-  amountInWords     String?
-  paymentMethod     FinancialPaymentMethod
+  id                   String                 @id @default(uuid())
+  receiptNumber        String                 @unique
+  paymentId            String                 @unique
+  invoiceId            String
+  quotationId          String?
+  customerId           String
+  receiptDate          DateTime               @default(now())
+  paymentDate          DateTime?
+  amountReceived       Float
+  currency             String                 @default("ZMW")
+  amountInWords        String?
+  paymentMethod        FinancialPaymentMethod
   transactionReference String?
-  bankName          String?
-  accountName       String?
-  accountLast4      String?
-  description       String?
-  notes             String?
-  status            FinancialReceiptStatus @default(ISSUED)
-  issuedById        String?
-  issuedAt          DateTime?
-  voidedAt          DateTime?
-  voidedById        String?
-  voidReason        String?
-  pdfUrl            String?
-  pdfPublicId       String?
-  verificationCode  String?
-  documentHash      String?
-  verificationUrl   String?
-  templateId        String?
-  templateVersion   Int?
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
+  bankName             String?
+  accountName          String?
+  accountLast4         String?
+  description          String?
+  notes                String?
+  status               FinancialReceiptStatus @default(ISSUED)
+  issuedById           String?
+  issuedAt             DateTime?
+  voidedAt             DateTime?
+  voidedById           String?
+  voidReason           String?
+  pdfUrl               String?
+  pdfPublicId          String?
+  verificationCode     String?
+  documentHash         String?
+  verificationUrl      String?
+  templateId           String?
+  templateVersion      Int?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
-  payment  FinancialPayment  @relation("PaymentReceipts", fields: [paymentId], references: [id])
-  invoice  Invoice           @relation("InvoiceReceipts", fields: [invoiceId], references: [id])
+  payment   FinancialPayment  @relation("PaymentReceipts", fields: [paymentId], references: [id])
+  invoice   Invoice           @relation("InvoiceReceipts", fields: [invoiceId], references: [id])
   quotation Quotation?        @relation(fields: [quotationId], references: [id])
-  customer FinancialCustomer  @relation("CustomerReceipts", fields: [customerId], references: [id])
+  customer  FinancialCustomer @relation("CustomerReceipts", fields: [customerId], references: [id])
 
   @@index([invoiceId])
   @@index([quotationId])
@@ -7515,7 +7609,7 @@ model FinancialReceipt {
 // DOCUMENT VERSIONS (immutable snapshots of issued documents/PDFs)
 // ------------------------------------------------------------------
 model FinancialDocumentVersion {
-  id               String   @id @default(uuid())
+  id               String                @id @default(uuid())
   documentType     FinancialDocumentType
   documentId       String
   documentNumber   String
@@ -7527,7 +7621,7 @@ model FinancialDocumentVersion {
   templateVersion  Int?
   templateSnapshot Json?
   generatedById    String?
-  generatedAt      DateTime @default(now())
+  generatedAt      DateTime              @default(now())
   sourceFile       String?
 
   @@unique([documentType, documentId, version])
@@ -7539,7 +7633,7 @@ model FinancialDocumentVersion {
 // AUDIT TRAIL (all important financial actions)
 // ------------------------------------------------------------------
 model FinancialDocumentAudit {
-  id             String    @id @default(uuid())
+  id             String                 @id @default(uuid())
   documentType   FinancialDocumentType?
   documentId     String?
   documentNumber String?
@@ -7552,7 +7646,7 @@ model FinancialDocumentAudit {
   newValues      Json?
   ipAddress      String?
   userAgent      String?
-  createdAt      DateTime  @default(now())
+  createdAt      DateTime               @default(now())
 
   @@index([documentType])
   @@index([documentId])
@@ -7565,34 +7659,34 @@ model FinancialDocumentAudit {
 // FINANCIAL DOCUMENT SETTINGS (key/value configuration)
 // ------------------------------------------------------------------
 model FinancialDocumentSetting {
-  id        String   @id @default(uuid())
-  key       String   @unique
-  value     Json?
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json?
   updatedById String?
-  updatedAt DateTime @updatedAt
+  updatedAt   DateTime @updatedAt
 }
 
 // ------------------------------------------------------------------
 // FINANCIAL DOCUMENT TEMPLATES (dedicated, non-academic templates)
 // ------------------------------------------------------------------
 model FinancialDocumentTemplate {
-  id             String                @id @default(uuid())
-  docType        FinancialDocumentType
-  name           String
-  description    String?
-  theme          Json? // primaryColor / secondaryColor / typography / layout
-  headerLayout   String?
-  footerLayout   String?
-  watermarkText  String?
-  components     Json? // reusable blocks: company_header, customer_block, ...
-  legalFooter    String?
+  id                 String                @id @default(uuid())
+  docType            FinancialDocumentType
+  name               String
+  description        String?
+  theme              Json? // primaryColor / secondaryColor / typography / layout
+  headerLayout       String?
+  footerLayout       String?
+  watermarkText      String?
+  components         Json? // reusable blocks: company_header, customer_block, ...
+  legalFooter        String?
   termsAndConditions String?
-  isActive       Boolean               @default(true)
-  isDefault      Boolean               @default(false)
-  version        Int                   @default(1)
-  createdById    String?
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  isActive           Boolean               @default(true)
+  isDefault          Boolean               @default(false)
+  version            Int                   @default(1)
+  createdById        String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
   @@index([docType])
   @@index([isDefault])

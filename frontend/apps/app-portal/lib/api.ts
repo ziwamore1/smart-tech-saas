@@ -414,6 +414,17 @@ export const academicYearApi = {
   delete: (id: string) => api.delete(`/academic-year/${id}`),
 };
 
+export const progressApi = {
+  student: (studentId: string, params?: Record<string, string>) =>
+    api.get(`/progress/students/${studentId}`, { params }),
+  timeline: (studentId: string, params?: Record<string, string>) =>
+    api.get(`/progress/students/${studentId}/timeline`, { params }),
+  class: (classId: string, params?: Record<string, string>) =>
+    api.get(`/progress/classes/${classId}`, { params }),
+  recalculate: (studentId: string) => api.post(`/progress/students/${studentId}/recalculate`),
+  studentReportPdf: (studentId: string) => api.get(`/progress/reports/student/${studentId}/pdf`, { responseType: 'blob' }),
+};
+
 export const resultApi = {
   getAll: (params?: { classId?: string; termId?: string; subjectId?: string }) =>
     api.get('/results', { params }),

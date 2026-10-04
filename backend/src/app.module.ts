@@ -102,6 +102,7 @@ import { TeacherAnalyticsModule } from './teacher-analytics/teacher-analytics.mo
 import { BusinessCalendarModule } from './business-calendar/business-calendar.module';
 import { PricingModule } from './pricing/pricing.module';
 import { FinancialDocumentsModule } from './financial-documents/financial-documents.module';
+import { ProgressEngineModule } from './progress-engine/progress-engine.module';
 import { getRedisConnectionOptions } from './queues/redis.config';
 
 @Module({
@@ -207,6 +208,7 @@ import { getRedisConnectionOptions } from './queues/redis.config';
     BusinessCalendarModule,
     PricingModule,
     FinancialDocumentsModule,
+    ProgressEngineModule,
   ],
   providers: [ProductionLogger],
 })
