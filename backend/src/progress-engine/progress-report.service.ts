@@ -69,39 +69,45 @@ export class ProgressReportService {
       this.prisma.computedResult.findMany({ where: { schoolId, subjectId, classId: { in: classIds }, termId: { in: termIds }, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] as any } }, include: { term: { include: { academicYear: { select: { id: true, name: true } } } } } }),
       this.prisma.termAssessmentConfiguration.findMany({ where: { subjectId, classId: { in: classIds }, termId: { in: termIds } }, include: { assessmentDef: { select: { id: true, name: true, code: true, category: true, defaultWeight: true, defaultMaxScore: true } }, term: { include: { academicYear: { select: { id: true, name: true } } } } }, orderBy: { sequenceOrder: 'asc' } }),
     ]);
-    const verifiedEvidence = await this.prisma.progressEvidence.findMany({ where: { schoolId, subjectId, classId: { in: classIds }, termId: { in: termIds }, sourceType: { in: ['ASSESSMENT', 'TERM_RESULT'] } }, select: { studentId: true, classId: true, academicYearId: true, termId: true, assessmentId: true, rawScore: true, maxScore: true, percentage: true, isAbsent: true } });
+    const studentIds = [...new Set(students.map(item => item.studentId))];
+    const supplementalResults = await this.prisma.studentAssessmentResult.findMany({ where: { studentId: { in: studentIds }, subjectId, termId: { in: termIds }, OR: [{ status: { in: ['VERIFIED', 'APPROVED', 'PUBLISHED'] as any } }, { verifiedAt: { not: null } }] }, include: { assessmentDef: { select: { id: true, name: true, code: true, category: true, defaultWeight: true, defaultMaxScore: true } }, term: { include: { academicYear: { select: { id: true, name: true } } } }, student: { select: { id: true } } } });
+    const allResults = [...new Map([...results, ...supplementalResults].map(result => [result.id, result])).values()];
+    const verifiedEvidence = await this.prisma.progressEvidence.findMany({ where: { schoolId, subjectId, termId: { in: termIds }, sourceType: { in: ['ASSESSMENT', 'TERM_RESULT'] }, studentId: { in: studentIds } }, select: { studentId: true, classId: true, academicYearId: true, termId: true, assessmentId: true, rawScore: true, maxScore: true, percentage: true, isAbsent: true } });
     const evidenceAssessmentIds = [...new Set(verifiedEvidence.map(item => item.assessmentId).filter((id): id is string => Boolean(id)))];
     const evidenceDefinitions = await this.prisma.assessmentDefinition.findMany({ where: { id: { in: evidenceAssessmentIds } }, select: { id: true, name: true, code: true, category: true, defaultWeight: true, defaultMaxScore: true } });
     const scope = (classId: string, academicYearId: string, termId: string) => `${classId}:${academicYearId}:${termId}`;
     const assignmentScopes = new Set(assignments.flatMap(item => terms.filter(term => term.academicYearId === item.academicYearId).map(term => scope(item.classId, item.academicYearId, term.id))));
     const definitions = new Map<string, any[]>();
     configurations.forEach(config => { const key = scope(config.classId, config.term.academicYearId, config.termId); definitions.set(key, [...(definitions.get(key) || []), { ...config.assessmentDef, maxScore: config.maxScore, weight: config.weightPercentage }]); });
-    results.forEach(result => { const key = scope(result.classId, result.term.academicYearId, result.termId); if (!definitions.get(key)?.some(item => item.id === result.assessmentDefId)) definitions.set(key, [...(definitions.get(key) || []), { ...result.assessmentDef, maxScore: result.maxScore, weight: result.assessmentDef.defaultWeight }]); });
-    const resultMap = new Map<string, any>(results.map(result => [`${result.studentId}:${scope(result.classId, result.term.academicYearId, result.termId)}:${result.assessmentDefId}`, result]));
+    allResults.forEach(result => { const key = scope(result.classId, result.term.academicYearId, result.termId); if (!definitions.get(key)?.some(item => item.id === result.assessmentDefId)) definitions.set(key, [...(definitions.get(key) || []), { ...result.assessmentDef, maxScore: result.maxScore, weight: result.assessmentDef.defaultWeight }]); });
+    const resultMap = new Map<string, any>(allResults.map(result => [`${result.studentId}:${scope(result.classId, result.term.academicYearId, result.termId)}:${result.assessmentDefId}`, result]));
     verifiedEvidence.forEach(result => { if (result.assessmentId) resultMap.set(`${result.studentId}:${scope(result.classId, result.academicYearId, result.termId)}:${result.assessmentId}`, result); });
+    const resultByPeriod = new Map<string, any>();
+    allResults.forEach(result => resultByPeriod.set(`${result.studentId}:${result.term.academicYearId}:${result.termId}:${result.assessmentDefId}`, result));
+    verifiedEvidence.forEach(result => { if (result.assessmentId) resultByPeriod.set(`${result.studentId}:${result.academicYearId}:${result.termId}:${result.assessmentId}`, result); });
     const finalMap = new Map(finalResults.map(result => [`${result.studentId}:${scope(result.classId, result.term.academicYearId, result.termId)}`, result]));
     const assessmentRows: any[] = [];
     const finalRows: any[] = [];
     for (const enrollment of students) {
       for (const term of terms.filter(item => assignmentScopes.has(scope(enrollment.classId, enrollment.academicYearId, item.id)))) {
         const key = scope(enrollment.classId, enrollment.academicYearId, term.id);
-        const items = definitions.get(key) || [];
+        const items = definitions.get(key) || definitions.get(scope(classIds[0], enrollment.academicYearId, term.id)) || [];
         for (const definition of items.length ? items : [{ id: '', name: 'No verified assessment recorded', category: '', maxScore: null, weight: null }]) {
-          const result = definition.id ? resultMap.get(`${enrollment.studentId}:${key}:${definition.id}`) : null;
+          const result = definition.id ? (resultMap.get(`${enrollment.studentId}:${key}:${definition.id}`) || resultByPeriod.get(`${enrollment.studentId}:${term.academicYearId}:${term.id}:${definition.id}`)) : null;
           const percentage = result?.percentage;
           const weighted = typeof percentage === 'number' && typeof definition.weight === 'number' ? percentage * definition.weight / 100 : null;
           assessmentRows.push({ student: enrollment.student, className: enrollment.class.name, academicYear: enrollment.academicYear.name, term: term.name, assessment: definition.name, category: definition.category, weight: definition.weight, maxScore: definition.maxScore, rawScore: result?.rawScore, percentage, weighted, status: result ? (result.isAbsent ? 'ABSENT' : 'VERIFIED') : 'NOT SUBMITTED' });
         }
         const final = finalMap.get(`${enrollment.studentId}:${key}`);
-        const recorded = items.filter(item => resultMap.has(`${enrollment.studentId}:${key}:${item.id}`));
-        finalRows.push({ student: enrollment.student, className: enrollment.class.name, academicYear: enrollment.academicYear.name, term: term.name, finalPercentage: final?.finalPercentage, grade: final?.finalGrade, assessed: recorded.length, missing: Math.max(0, items.length - recorded.length), absent: recorded.filter(item => resultMap.get(`${enrollment.studentId}:${key}:${item.id}`)?.isAbsent).length });
+        const recorded = items.filter(item => resultMap.has(`${enrollment.studentId}:${key}:${item.id}`) || resultByPeriod.has(`${enrollment.studentId}:${term.academicYearId}:${term.id}:${item.id}`));
+        finalRows.push({ student: enrollment.student, className: enrollment.class.name, academicYear: enrollment.academicYear.name, term: term.name, finalPercentage: final?.finalPercentage, grade: final?.finalGrade, assessed: recorded.length, missing: Math.max(0, items.length - recorded.length), absent: recorded.filter(item => (resultMap.get(`${enrollment.studentId}:${key}:${item.id}`) || resultByPeriod.get(`${enrollment.studentId}:${term.academicYearId}:${term.id}:${item.id}`))?.isAbsent).length });
       }
     }
     const yearGroups = academicYearIds.map(yearId => {
       const year = assignments.find(item => item.academicYearId === yearId)?.academicYear;
       const columns = new Map<string, any>();
       configurations.filter(item => item.term.academicYearId === yearId).forEach(item => columns.set(item.assessmentDefId, { ...item.assessmentDef, weight: item.weightPercentage }));
-      results.filter(item => item.term.academicYearId === yearId).forEach(item => { if (!columns.has(item.assessmentDefId)) columns.set(item.assessmentDefId, { ...item.assessmentDef, weight: item.assessmentDef.defaultWeight, maxScore: item.maxScore }); });
+      allResults.filter(item => item.term.academicYearId === yearId).forEach(item => { if (!columns.has(item.assessmentDefId)) columns.set(item.assessmentDefId, { ...item.assessmentDef, weight: item.assessmentDef.defaultWeight, maxScore: item.maxScore }); });
       verifiedEvidence.filter(item => item.academicYearId === yearId && item.assessmentId).forEach(item => { const definition = evidenceDefinitions.find(definitionItem => definitionItem.id === item.assessmentId); if (definition && !columns.has(definition.id)) columns.set(definition.id, { ...definition, weight: definition.defaultWeight, maxScore: item.maxScore || definition.defaultMaxScore }); });
       return { id: yearId, name: year?.name || yearId, columns: [...columns.values()] };
     });
