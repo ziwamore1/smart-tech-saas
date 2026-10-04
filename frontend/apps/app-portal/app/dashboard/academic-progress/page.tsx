@@ -47,6 +47,7 @@ export default function AcademicProgressPage() {
   const [subjectId, setSubjectId] = useState('');
   const [academicYearId, setAcademicYearId] = useState('');
   const [termId, setTermId] = useState('');
+  const [backfillState, setBackfillState] = useState<string | null>(null);
 
   const { data: students } = useQuery({ queryKey: ['progress-students'], queryFn: () => studentApi.getAll({ limit: 200 }).then(r => r.data?.data || r.data || []) });
   const { data: classes } = useQuery({ queryKey: ['progress-classes'], queryFn: () => classApi.getAll().then(r => r.data?.data || r.data || []) });
@@ -57,11 +58,21 @@ export default function AcademicProgressPage() {
   const studentQuery = useQuery({ queryKey: ['progress-student', studentId, filters], queryFn: () => progressApi.student(studentId, filters).then(r => r.data?.data || r.data), enabled: tab === 'student' && !!studentId });
   const classQuery = useQuery({ queryKey: ['progress-class', classId, filters], queryFn: () => progressApi.class(classId, filters).then(r => r.data?.data || r.data), enabled: tab !== 'student' && !!classId });
   const studentName = (student: any) => `${student.firstName || ''} ${student.lastName || ''}`.trim() || student.name || student.admissionNumber;
+  const runBackfill = async () => {
+    setBackfillState('Backfill running...');
+    try {
+      const response = await progressApi.recalculateSchool();
+      const result = response.data?.data || response.data;
+      setBackfillState(`Backfill complete: ${result.students || 0} students, ${result.snapshots || 0} snapshots.`);
+    } catch (error: any) {
+      setBackfillState(error?.response?.data?.message || 'Backfill failed. Check your permissions.');
+    }
+  };
 
   return (
     <main className="space-y-6 pb-12">
       <header className="rounded-2xl bg-gradient-to-br from-slate-950 via-violet-950 to-indigo-900 p-7 text-white shadow-lg">
-        <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[0.24em] text-violet-200">Longitudinal academic memory</p><h1 className="mt-2 text-3xl font-bold">Academic Progress</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">Explore verified academic evidence across years, terms, classes and subjects. Progress analytics are separate from marksheet entry.</p></div><div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-right"><p className="text-xs text-violet-200">Data source</p><p className="mt-1 text-sm font-semibold">Verified results & assessments</p></div></div>
+        <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[0.24em] text-violet-200">Longitudinal academic memory</p><h1 className="mt-2 text-3xl font-bold">Academic Progress</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">Explore verified academic evidence across years, terms, classes and subjects. Progress analytics are separate from marksheet entry.</p></div><div className="flex flex-col items-end gap-2"><div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-right"><p className="text-xs text-violet-200">Data source</p><p className="mt-1 text-sm font-semibold">Verified results & assessments</p></div><button onClick={runBackfill} className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-violet-800 hover:bg-violet-50">Backfill Progress Data</button>{backfillState && <p className="max-w-xs text-right text-xs text-violet-100">{backfillState}</p>}</div></div>
       </header>
 
       <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
