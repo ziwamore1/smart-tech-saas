@@ -15,7 +15,10 @@ async function viewPdf(request: Promise<any>) {
   try {
     const response = await request;
     const url = URL.createObjectURL(response.data);
-    if (reportWindow) reportWindow.location.href = url;
+    if (reportWindow) {
+      reportWindow.document.title = 'Progress Report';
+      reportWindow.document.body.innerHTML = `<embed src="${url}" type="application/pdf" style="width:100vw;height:100vh;border:0" />`;
+    }
     window.setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (error) {
     reportWindow?.close();
