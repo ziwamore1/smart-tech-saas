@@ -59,6 +59,12 @@ export class ProgressEngineController {
     return this.progress.recalculateClass(classId, req.user.schoolId);
   }
 
+  @Post('recalculate')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'SuperAdmin')
+  recalculateSchool(@Req() req: any) {
+    return this.progress.recalculateSchool(req.user.schoolId);
+  }
+
   @Get('reports/student/:studentId/pdf')
   @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Teacher', 'Class Teacher', 'SuperAdmin')
   @Header('Content-Type', 'application/pdf')

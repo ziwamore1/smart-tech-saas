@@ -246,6 +246,24 @@ export class ProgressEngineService {
     return { classId, students: enrollments.length, evidence, snapshots, updatedAt: new Date() };
   }
 
+  async recalculateSchool(schoolId: string) {
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { schoolId, student: { status: 'ACTIVE' } },
+      select: { studentId: true },
+      distinct: ['studentId'],
+    });
+    let evidence = 0;
+    let snapshots = 0;
+    const batchSize = 10;
+    for (let index = 0; index < enrollments.length; index += batchSize) {
+      const batch = enrollments.slice(index, index + batchSize);
+      const results = await Promise.all(batch.map(item => this.recalculateStudent(item.studentId, schoolId)));
+      evidence += results.reduce((sum, result) => sum + result.evidence, 0);
+      snapshots += results.reduce((sum, result) => sum + result.snapshots, 0);
+    }
+    return { schoolId, students: enrollments.length, evidence, snapshots, updatedAt: new Date() };
+  }
+
   async getTeacherSubjectProgress(teacherId: string, subjectId: string, schoolId: string, filters: Record<string, string | undefined> = {}) {
     const evidence = await this.prisma.progressEvidence.findMany({
       where: { schoolId, teacherId, subjectId, sourceType: 'ASSESSMENT', ...(filters.classId ? { classId: filters.classId } : {}), ...(filters.academicYearId ? { academicYearId: filters.academicYearId } : {}), ...(filters.termId ? { termId: filters.termId } : {}) },

@@ -424,6 +424,7 @@ export const progressApi = {
   class: (classId: string, params?: Record<string, string>) =>
     api.get(`/progress/classes/${classId}`, { params }),
   recalculate: (studentId: string) => api.post(`/progress/students/${studentId}/recalculate`),
+  recalculateSchool: () => api.post('/progress/recalculate'),
   studentReportPdf: (studentId: string) => api.get(`/progress/reports/student/${studentId}/pdf`, { responseType: 'blob' }),
   classReportPdf: (classId: string, params?: Record<string, string>) => api.get(`/progress/reports/class/${classId}/pdf`, { params, responseType: 'blob' }),
   teacherSubjectReportPdf: (teacherId: string, subjectId: string, params?: Record<string, string>) => api.get(`/progress/reports/teachers/${teacherId}/subjects/${subjectId}/pdf`, { params, responseType: 'blob' }),
