@@ -5052,6 +5052,24 @@ model StudentAcademicYearSummary {
   @@index([studentId, generatedAt])
 }
 
+model ProgressBackfillJob {
+  id          String    @id @default(uuid())
+  schoolId    String
+  status      String    @default("QUEUED")
+  total       Int       @default(0)
+  processed   Int       @default(0)
+  evidence    Int       @default(0)
+  snapshots   Int       @default(0)
+  errorMessage String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([schoolId, status])
+  @@index([createdAt])
+}
+
 model CompositeSubject {
   id                String                      @id @default(uuid())
   name              String

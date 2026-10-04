@@ -264,6 +264,36 @@ export class ProgressEngineService {
     return { schoolId, students: enrollments.length, evidence, snapshots, updatedAt: new Date() };
   }
 
+  async startSchoolBackfill(schoolId: string) {
+    const active = await this.prisma.progressBackfillJob.findFirst({ where: { schoolId, status: { in: ['QUEUED', 'RUNNING'] } }, orderBy: { createdAt: 'desc' } });
+    if (active) return active;
+    const enrollments = await this.prisma.enrollment.findMany({ where: { schoolId, student: { status: 'ACTIVE' } }, select: { studentId: true }, distinct: ['studentId'] });
+    const job = await this.prisma.progressBackfillJob.create({ data: { schoolId, total: enrollments.length } });
+    void this.processSchoolBackfill(job.id, schoolId, enrollments.map(item => item.studentId));
+    return job;
+  }
+
+  async getBackfillStatus(jobId: string, schoolId: string) {
+    return this.prisma.progressBackfillJob.findFirst({ where: { id: jobId, schoolId } });
+  }
+
+  private async processSchoolBackfill(jobId: string, schoolId: string, studentIds: string[]) {
+    await this.prisma.progressBackfillJob.update({ where: { id: jobId }, data: { status: 'RUNNING', startedAt: new Date() } });
+    try {
+      let evidence = 0;
+      let snapshots = 0;
+      for (const studentId of studentIds) {
+        const result = await this.recalculateStudent(studentId, schoolId);
+        evidence += result.evidence;
+        snapshots += result.snapshots;
+        await this.prisma.progressBackfillJob.update({ where: { id: jobId }, data: { processed: { increment: 1 }, evidence, snapshots } });
+      }
+      await this.prisma.progressBackfillJob.update({ where: { id: jobId }, data: { status: 'COMPLETED', completedAt: new Date() } });
+    } catch (error: any) {
+      await this.prisma.progressBackfillJob.update({ where: { id: jobId }, data: { status: 'FAILED', errorMessage: error?.message || 'Backfill failed', completedAt: new Date() } });
+    }
+  }
+
   async getTeacherSubjectProgress(teacherId: string, subjectId: string, schoolId: string, filters: Record<string, string | undefined> = {}) {
     const evidence = await this.prisma.progressEvidence.findMany({
       where: { schoolId, teacherId, subjectId, sourceType: 'ASSESSMENT', ...(filters.classId ? { classId: filters.classId } : {}), ...(filters.academicYearId ? { academicYearId: filters.academicYearId } : {}), ...(filters.termId ? { termId: filters.termId } : {}) },

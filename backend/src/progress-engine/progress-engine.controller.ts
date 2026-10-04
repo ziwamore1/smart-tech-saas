@@ -62,7 +62,13 @@ export class ProgressEngineController {
   @Post('recalculate')
   @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'SuperAdmin')
   recalculateSchool(@Req() req: any) {
-    return this.progress.recalculateSchool(req.user.schoolId);
+    return this.progress.startSchoolBackfill(req.user.schoolId);
+  }
+
+  @Get('recalculate/:jobId')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'SuperAdmin')
+  backfillStatus(@Param('jobId') jobId: string, @Req() req: any) {
+    return this.progress.getBackfillStatus(jobId, req.user.schoolId);
   }
 
   @Get('reports/student/:studentId/pdf')

@@ -63,9 +63,22 @@ export default function AcademicProgressPage() {
     try {
       const response = await progressApi.recalculateSchool();
       const result = response.data?.data || response.data;
-      setBackfillState(`Backfill complete: ${result.students || 0} students, ${result.snapshots || 0} snapshots.`);
+      const poll = async (jobId: string): Promise<void> => {
+        const statusResponse = await progressApi.backfillStatus(jobId);
+        const status = statusResponse.data?.data || statusResponse.data;
+        if (status?.status === 'COMPLETED') {
+          setBackfillState(`Backfill complete: ${status.processed || 0} students, ${status.snapshots || 0} snapshots.`);
+        } else if (status?.status === 'FAILED') {
+          setBackfillState(status.errorMessage || 'Backfill failed.');
+        } else {
+          setBackfillState(`Backfill ${status?.status?.toLowerCase() || 'running'}: ${status?.processed || 0}/${status?.total || 0} students.`);
+          window.setTimeout(() => { void poll(jobId); }, 2000);
+        }
+      };
+      if (result?.id) await poll(result.id);
+      else setBackfillState('Backfill could not be started.');
     } catch (error: any) {
-      setBackfillState(error?.response?.data?.message || 'Backfill failed. Check your permissions.');
+      setBackfillState(error?.response?.data?.message || error?.message || 'Backfill failed. Check your permissions.');
     }
   };
 
