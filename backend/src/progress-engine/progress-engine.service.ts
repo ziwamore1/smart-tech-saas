@@ -61,6 +61,14 @@ export class ProgressEngineService {
     return student;
   }
 
+  async getStudentProgressForOwner(studentId: string, schoolId: string, userId: string, ownerType: 'STUDENT' | 'PARENT', filters: Record<string, string | undefined> = {}) {
+    const student = ownerType === 'STUDENT'
+      ? await this.prisma.student.findFirst({ where: { id: studentId, schoolId, user: { id: userId } }, select: { id: true } })
+      : await this.prisma.student.findFirst({ where: { id: studentId, schoolId, parents: { some: { parent: { userId } } } }, select: { id: true } });
+    if (!student) throw new ForbiddenException('You may only view your permitted academic history');
+    return this.getStudentProgress(student.id, schoolId, filters);
+  }
+
   private async upsertEvidence(studentId: string, schoolId: string) {
     const assessmentResults = await this.prisma.studentAssessmentResult.findMany({
       where: { studentId, status: { in: VERIFIED_ASSESSMENT_STATUSES as any } },
@@ -158,7 +166,33 @@ export class ProgressEngineService {
       });
       snapshots.push(snapshot);
     }
+    await this.buildAnnualSummaries(studentId, schoolId, snapshots);
     return snapshots;
+  }
+
+  private async buildAnnualSummaries(studentId: string, schoolId: string, snapshots: any[]) {
+    const byYear = new Map<string, any[]>();
+    for (const snapshot of snapshots) byYear.set(snapshot.academicYearId, [...(byYear.get(snapshot.academicYearId) || []), snapshot]);
+    const subjects = await this.prisma.subject.findMany({ where: { id: { in: [...new Set(snapshots.map(item => item.subjectId))] } }, select: { id: true, name: true } });
+    const terms = await this.prisma.term.findMany({ where: { id: { in: [...new Set(snapshots.map(item => item.termId))] } }, select: { id: true, startDate: true } });
+    const termOrder = new Map(terms.sort((a, b) => a.startDate.getTime() - b.startDate.getTime()).map((term, index) => [term.id, index]));
+    const subjectNames = new Map(subjects.map(subject => [subject.id, subject.name]));
+    for (const [academicYearId, items] of byYear) {
+      const orderedItems = [...items].sort((a, b) => (termOrder.get(a.termId) ?? 0) - (termOrder.get(b.termId) ?? 0));
+      const values = orderedItems.map(item => item.averagePercentage).filter((value): value is number => value !== null);
+      const bySubject = new Map<string, number[]>();
+      items.forEach(item => { if (item.averagePercentage !== null) bySubject.set(item.subjectId, [...(bySubject.get(item.subjectId) || []), item.averagePercentage]); });
+      const subjectAverages = [...bySubject.entries()].map(([subjectId, scores]) => ({ subjectId, average: scores.reduce((a, b) => a + b, 0) / scores.length }));
+      const strongest = subjectAverages.sort((a, b) => b.average - a.average)[0];
+      const weakest = subjectAverages.sort((a, b) => a.average - b.average)[0];
+      const first = values[0];
+      const last = values[values.length - 1];
+      await this.prisma.studentAcademicYearSummary.upsert({
+        where: { studentId_academicYearId: { studentId, academicYearId } },
+        create: { schoolId, studentId, academicYearId, classId: items[0]?.classId, overallAverage: values.length ? values.reduce((a, b) => a + b, 0) / values.length : null, median: median(values), subjectsTaken: subjectAverages.length, subjectsPassed: items.filter(item => item.passStatus === 'PASS').length, subjectsFailed: items.filter(item => item.passStatus === 'FAIL').length, strongestSubject: strongest ? subjectNames.get(strongest.subjectId) : null, weakestSubject: weakest ? subjectNames.get(weakest.subjectId) : null, improvementRate: values.length > 1 && first ? ((last - first) / first) * 100 : null, declineRate: values.length > 1 && first && last < first ? ((first - last) / first) * 100 : null, generatedAt: new Date() },
+        update: { classId: items[0]?.classId, overallAverage: values.length ? values.reduce((a, b) => a + b, 0) / values.length : null, median: median(values), subjectsTaken: subjectAverages.length, subjectsPassed: items.filter(item => item.passStatus === 'PASS').length, subjectsFailed: items.filter(item => item.passStatus === 'FAIL').length, strongestSubject: strongest ? subjectNames.get(strongest.subjectId) : null, weakestSubject: weakest ? subjectNames.get(weakest.subjectId) : null, improvementRate: values.length > 1 && first ? ((last - first) / first) * 100 : null, declineRate: values.length > 1 && first && last < first ? ((first - last) / first) * 100 : null, generatedAt: new Date() },
+      });
+    }
   }
 
   async getStudentProgress(studentId: string, schoolId: string, filters: Record<string, string | undefined> = {}) {
@@ -169,6 +203,7 @@ export class ProgressEngineService {
     const termMap = new Map(terms.map(term => [term.id, term]));
     const subjectIds = [...new Set(snapshots.map(item => item.subjectId))];
     const subjects = await this.prisma.subject.findMany({ where: { id: { in: subjectIds } }, select: { id: true, name: true, code: true } });
+    const annualSummaries = await this.prisma.studentAcademicYearSummary.findMany({ where: { studentId, schoolId }, orderBy: { generatedAt: 'asc' } });
     const subjectMap = new Map(subjects.map(subject => [subject.id, subject]));
     const filtered = snapshots.filter(snapshot => (!filters.academicYearId || snapshot.academicYearId === filters.academicYearId) && (!filters.termId || snapshot.termId === filters.termId) && (!filters.subjectId || snapshot.subjectId === filters.subjectId));
     const bySubject = new Map<string, any[]>();
@@ -177,6 +212,7 @@ export class ProgressEngineService {
     const overallValues = filtered.map(item => item.averagePercentage).filter((value): value is number => value !== null);
     return {
       student: { id: student.id, name: `${student.firstName} ${student.lastName}`.trim(), admissionNumber: student.admissionNumber, photoUrl: student.photoUrl, grade: student.grade, className: student.className, status: student.status, enrollments: student.enrollments.map(item => ({ academicYear: item.academicYear.name, class: item.class.name, status: item.status })) },
+      annualSummaries,
       summary: { average: overallValues.length ? round(overallValues.reduce((a, b) => a + b, 0) / overallValues.length) : null, median: round(median(overallValues)), trend: trend(overallValues), dataStatus: overallValues.length ? 'AVAILABLE' : 'INSUFFICIENT_DATA' },
       timeline: filtered.map(item => ({ ...item, academicYear: termMap.get(item.termId)?.academicYear.name, term: termMap.get(item.termId)?.name, subject: subjectMap.get(item.subjectId) })),
       subjectTrends,

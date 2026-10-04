@@ -35,4 +35,40 @@ export class ProgressReportService {
       await browser.close();
     }
   }
+
+  async generateClassPdf(classId: string, schoolId: string, generatedById: string, filters: Record<string, string | undefined> = {}) {
+    const data = await this.progress.getClassProgress(classId, schoolId, filters);
+    const classEntity = await this.prisma.class.findFirst({ where: { id: classId, schoolId }, select: { name: true } });
+    const periods = data.periods.map((period: any) => `<tr><td>${escapeHtml(period.academicYear)}</td><td>${escapeHtml(period.term)}</td><td>${period.average === null ? 'Insufficient data' : `${period.average.toFixed(1)}%`}</td><td>${period.count}</td></tr>`).join('');
+    const html = this.summaryHtml(`Class Progress Report`, `${classEntity?.name || 'Class'} · Population Analysis`, `<div class="cards"><div class="card"><strong>Students</strong><span>${data.count}</span></div><div class="card"><strong>Mean</strong><span>${data.statistics.mean === null ? 'Insufficient data' : `${data.statistics.mean.toFixed(1)}%`}</span></div><div class="card"><strong>Pass rate</strong><span>${data.statistics.passRate === null ? 'Insufficient data' : `${data.statistics.passRate.toFixed(1)}%`}</span></div><div class="card"><strong>Trend</strong><span>${escapeHtml(data.trend.direction.replace('_', ' '))}</span></div></div><h2>Progress trend</h2><table><thead><tr><th>Academic year</th><th>Term</th><th>Average</th><th>Observed</th></tr></thead><tbody>${periods || '<tr><td colspan="4">Insufficient data</td></tr>'}</tbody></table><h2>Population statistics</h2><p>Median: ${data.statistics.median ?? 'Insufficient data'} · Standard deviation: ${data.statistics.standardDeviation ?? 'Insufficient data'} · Range: ${data.statistics.min ?? '—'} to ${data.statistics.max ?? '—'}</p>`);
+    return this.writePdf(html, schoolId, generatedById, { reportType: 'CLASS_PROGRESS_REPORT', title: `Class Progress Report - ${classEntity?.name || classId}`, classId, fileName: `class-progress-${classId.slice(0, 8)}.pdf`, metadata: { reportScope: 'CLASS', filters } });
+  }
+
+  async generateTeacherSubjectPdf(teacherId: string, subjectId: string, schoolId: string, generatedById: string, filters: Record<string, string | undefined> = {}) {
+    const data = await this.progress.getTeacherSubjectProgress(teacherId, subjectId, schoolId, filters);
+    const [teacher, subject] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: teacherId }, select: { firstName: true, lastName: true, email: true } }),
+      this.prisma.subject.findFirst({ where: { id: subjectId, schoolId }, select: { name: true } }),
+    ]);
+    const periods = data.periods.map((period: any) => `<tr><td>${escapeHtml(period.academicYear)}</td><td>${escapeHtml(period.term)}</td><td>${period.average === null ? 'Insufficient data' : `${period.average.toFixed(1)}%`}</td><td>${period.assessed}</td></tr>`).join('');
+    const html = this.summaryHtml(`Teacher Subject Progress Report`, `${teacher ? `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim() : teacherId} · ${subject?.name || subjectId}`, `<div class="cards"><div class="card"><strong>Assessments</strong><span>${data.statistics.count}</span></div><div class="card"><strong>Mean</strong><span>${data.statistics.mean === null ? 'Insufficient data' : `${data.statistics.mean.toFixed(1)}%`}</span></div><div class="card"><strong>Pass rate</strong><span>${data.statistics.passRate === null ? 'Insufficient data' : `${data.statistics.passRate.toFixed(1)}%`}</span></div><div class="card"><strong>Trend</strong><span>${escapeHtml(data.trend.direction.replace('_', ' '))}</span></div></div><h2>Assessment period performance</h2><table><thead><tr><th>Academic year</th><th>Term</th><th>Average</th><th>Assessed</th></tr></thead><tbody>${periods || '<tr><td colspan="4">Insufficient data</td></tr>'}</tbody></table><h2>Subject statistics</h2><p>Median: ${data.statistics.median ?? 'Insufficient data'} · Standard deviation: ${data.statistics.standardDeviation ?? 'Insufficient data'}</p>`);
+    return this.writePdf(html, schoolId, generatedById, { reportType: 'TEACHER_SUBJECT_PROGRESS_REPORT', title: `Teacher Subject Progress Report - ${subject?.name || subjectId}`, metadata: { reportScope: 'TEACHER_SUBJECT', teacherId, subjectId, filters }, fileName: `teacher-subject-progress-${subjectId.slice(0, 8)}.pdf` });
+  }
+
+  private summaryHtml(title: string, subtitle: string, content: string) {
+    return `<!doctype html><html><head><meta charset="utf-8"><style>@page{size:A4;margin:16mm 14mm 18mm}*{box-sizing:border-box}body{font-family:Arial;color:#172033;font-size:10px;line-height:1.45}header{border-bottom:3px solid #6d28d9;padding-bottom:12px;margin-bottom:18px}h1{font-size:21px;margin:0}h2{font-size:13px;text-transform:uppercase;color:#5b21b6;border-bottom:1px solid #ddd6fe;padding-bottom:5px;margin:22px 0 9px}.muted{color:#64748b}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.card{border:1px solid #e2e8f0;border-radius:7px;padding:9px}.card strong{display:block;color:#6d28d9;font-size:8px;text-transform:uppercase}.card span{display:block;font-size:17px;font-weight:bold;margin-top:3px}table{width:100%;border-collapse:collapse}th{background:#172033;color:#fff;text-align:left;font-size:8px;text-transform:uppercase}td,th{padding:6px;border:1px solid #dbe2ea}tr:nth-child(even){background:#f8fafc}</style></head><body><header><h1>${escapeHtml(title)}</h1><div class="muted">${escapeHtml(subtitle)} · Smart Tech SaaS</div></header>${content}<p class="muted">Generated ${new Date().toLocaleDateString()} from server-side verified progress snapshots.</p></body></html>`;
+  }
+
+  private async writePdf(html: string, schoolId: string, generatedById: string, details: { reportType: string; title: string; fileName: string; classId?: string; metadata: Record<string, any> }) {
+    const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'domcontentloaded' });
+      const pdf = Buffer.from(await page.pdf({ format: 'A4', printBackground: true }));
+      const report = await this.prisma.generatedReport.create({ data: { schoolId, reportType: details.reportType, title: details.title, classId: details.classId, fileName: details.fileName, fileSize: pdf.length, generatedById, metadata: details.metadata } });
+      return { pdf, reportId: report.id, fileName: report.fileName };
+    } finally {
+      await browser.close();
+    }
+  }
 }

@@ -17,6 +17,18 @@ export class ProgressEngineController {
     return this.progress.getStudentProgress(studentId, req.user.schoolId, query);
   }
 
+  @Get('me')
+  @Roles('Student')
+  getMyProgress(@Query() query: Record<string, string>, @Req() req: any) {
+    return this.progress.getStudentProgressForOwner(req.user.studentId || req.user.sub || req.user.id, req.user.schoolId, req.user.sub || req.user.id, 'STUDENT', query);
+  }
+
+  @Get('children/:studentId')
+  @Roles('Parent')
+  getChildProgress(@Param('studentId') studentId: string, @Query() query: Record<string, string>, @Req() req: any) {
+    return this.progress.getStudentProgressForOwner(studentId, req.user.schoolId, req.user.sub || req.user.id, 'PARENT', query);
+  }
+
   @Get('students/:studentId/timeline')
   @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Teacher', 'Class Teacher', 'SuperAdmin')
   getTimeline(@Param('studentId') studentId: string, @Query() query: Record<string, string>, @Req() req: any) {
@@ -52,6 +64,24 @@ export class ProgressEngineController {
   @Header('Content-Type', 'application/pdf')
   async studentReport(@Param('studentId') studentId: string, @Req() req: any, @Res() res: Response) {
     const report = await this.reports.generateStudentPdf(studentId, req.user.schoolId, req.user.sub || req.user.id);
+    res.setHeader('Content-Disposition', `attachment; filename="${report.fileName}"`);
+    res.send(report.pdf);
+  }
+
+  @Get('reports/class/:classId/pdf')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'SuperAdmin')
+  @Header('Content-Type', 'application/pdf')
+  async classReport(@Param('classId') classId: string, @Query() query: Record<string, string>, @Req() req: any, @Res() res: Response) {
+    const report = await this.reports.generateClassPdf(classId, req.user.schoolId, req.user.sub || req.user.id, query);
+    res.setHeader('Content-Disposition', `attachment; filename="${report.fileName}"`);
+    res.send(report.pdf);
+  }
+
+  @Get('reports/teachers/:teacherId/subjects/:subjectId/pdf')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Teacher', 'Class Teacher', 'SuperAdmin')
+  @Header('Content-Type', 'application/pdf')
+  async teacherSubjectReport(@Param('teacherId') teacherId: string, @Param('subjectId') subjectId: string, @Query() query: Record<string, string>, @Req() req: any, @Res() res: Response) {
+    const report = await this.reports.generateTeacherSubjectPdf(teacherId, subjectId, req.user.schoolId, req.user.sub || req.user.id, query);
     res.setHeader('Content-Disposition', `attachment; filename="${report.fileName}"`);
     res.send(report.pdf);
   }
