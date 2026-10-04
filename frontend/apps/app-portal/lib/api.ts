@@ -423,6 +423,8 @@ export const progressApi = {
     api.get(`/progress/students/${studentId}/timeline`, { params }),
   class: (classId: string, params?: Record<string, string>) =>
     api.get(`/progress/classes/${classId}`, { params }),
+  teacherSubject: (teacherId: string, subjectId: string, params?: Record<string, string>) =>
+    api.get(`/progress/teachers/${teacherId}/subjects/${subjectId}`, { params }),
   recalculate: (studentId: string) => api.post(`/progress/students/${studentId}/recalculate`),
   recalculateSchool: () => api.post('/progress/recalculate'),
   backfillStatus: (jobId: string) => api.get(`/progress/recalculate/${jobId}`),

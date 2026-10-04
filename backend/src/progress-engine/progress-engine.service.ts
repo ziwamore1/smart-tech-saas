@@ -82,6 +82,11 @@ export class ProgressEngineService {
       where: { studentId, schoolId },
       include: { term: { include: { academicYear: true } } },
     });
+    const computedAssignmentRows = await this.prisma.teachingAssignment.findMany({
+      where: { schoolId, subjectId: { in: [...new Set(computedResults.map(result => result.subjectId))] } },
+      select: { teacherId: true, classId: true, subjectId: true, academicYearId: true },
+    });
+    const computedAssignmentMap = new Map(computedAssignmentRows.map(item => [`${item.academicYearId}:${item.classId}:${item.subjectId}`, item.teacherId]));
 
     for (const result of assessmentResults) {
       await this.prisma.progressEvidence.upsert({
@@ -104,12 +109,13 @@ export class ProgressEngineService {
     }
 
     for (const result of computedResults) {
+      const assignmentTeacherId = computedAssignmentMap.get(`${result.term.academicYearId}:${result.classId}:${result.subjectId}`);
       await this.prisma.progressEvidence.upsert({
         where: { sourceType_sourceId: { sourceType: 'TERM_RESULT', sourceId: result.id } },
         create: {
           schoolId, sourceType: 'TERM_RESULT', sourceId: result.id, studentId,
           academicYearId: result.term.academicYearId, termId: result.termId, classId: result.classId,
-          subjectId: result.subjectId, percentage: result.finalPercentage, weightedScore: result.totalWeightedScore,
+          subjectId: result.subjectId, teacherId: assignmentTeacherId, percentage: result.finalPercentage, weightedScore: result.totalWeightedScore,
           grade: result.finalGrade, isAbsent: result.isAbsent, verifiedAt: result.verifiedAt,
           recordedAt: result.computedAt, metadata: result.metadata as any,
         },
@@ -118,6 +124,9 @@ export class ProgressEngineService {
           isAbsent: result.isAbsent, verifiedAt: result.verifiedAt, metadata: result.metadata as any,
         },
       });
+      if (assignmentTeacherId) {
+        await this.prisma.progressEvidence.updateMany({ where: { sourceType: 'TERM_RESULT', sourceId: result.id, teacherId: null }, data: { teacherId: assignmentTeacherId } });
+      }
     }
 
     // Legacy results are included as imported evidence so historical records are not lost.
@@ -295,14 +304,20 @@ export class ProgressEngineService {
   }
 
   async getTeacherSubjectProgress(teacherId: string, subjectId: string, schoolId: string, filters: Record<string, string | undefined> = {}) {
+    const assignments = await this.prisma.teachingAssignment.findMany({
+      where: { schoolId, teacherId, subjectId, ...(filters.classId ? { classId: filters.classId } : {}), ...(filters.academicYearId ? { academicYearId: filters.academicYearId } : {}) },
+      select: { classId: true, subjectId: true, academicYearId: true, class: { select: { id: true, name: true } }, subject: { select: { id: true, name: true, code: true } }, academicYear: { select: { id: true, name: true } } },
+    });
+    const assignmentKeys = assignments.map(item => ({ classId: item.classId, academicYearId: item.academicYearId }));
+    const assignmentFallback = assignmentKeys.map(item => ({ teacherId: null, classId: item.classId, academicYearId: item.academicYearId }));
     const evidence = await this.prisma.progressEvidence.findMany({
-      where: { schoolId, teacherId, subjectId, sourceType: 'ASSESSMENT', ...(filters.classId ? { classId: filters.classId } : {}), ...(filters.academicYearId ? { academicYearId: filters.academicYearId } : {}), ...(filters.termId ? { termId: filters.termId } : {}) },
-      select: { termId: true, classId: true, percentage: true, isAbsent: true },
+      where: { schoolId, subjectId, sourceType: { in: ['ASSESSMENT', 'TERM_RESULT', 'IMPORTED_RESULT'] }, ...(filters.termId ? { termId: filters.termId } : {}), OR: [{ teacherId, ...(filters.classId ? { classId: filters.classId } : {}), ...(filters.academicYearId ? { academicYearId: filters.academicYearId } : {}) }, ...assignmentFallback] },
+      select: { termId: true, classId: true, studentId: true, percentage: true, isAbsent: true },
     });
     const values = evidence.map(item => item.percentage).filter((value): value is number => value !== null && value !== undefined);
     const terms = await this.prisma.term.findMany({ where: { id: { in: [...new Set(evidence.map(item => item.termId))] } }, include: { academicYear: true }, orderBy: { startDate: 'asc' } });
     const periods = terms.map(term => { const scores = evidence.filter(item => item.termId === term.id && item.percentage !== null).map(item => item.percentage as number); return { academicYear: term.academicYear.name, term: term.name, average: scores.length ? round(scores.reduce((a, b) => a + b, 0) / scores.length) : null, assessed: scores.length }; });
-    return { teacherId, subjectId, statistics: { count: values.length, mean: round(values.length ? values.reduce((a, b) => a + b, 0) / values.length : null), median: round(median(values)), standardDeviation: round(standardDeviation(values)), passRate: values.length ? round(values.filter(value => value >= 50).length / values.length * 100) : null }, trend: trend(periods.map(item => item.average)), periods };
+    return { teacherId, subjectId, assignments, count: new Set(evidence.map(item => item.studentId)).size, statistics: { count: values.length, mean: round(values.length ? values.reduce((a, b) => a + b, 0) / values.length : null), median: round(median(values)), standardDeviation: round(standardDeviation(values)), passRate: values.length ? round(values.filter(value => value >= 50).length / values.length * 100) : null }, trend: trend(periods.map(item => item.average)), periods };
   }
 
   async recalculateStudent(studentId: string, schoolId: string) {
