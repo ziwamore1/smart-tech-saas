@@ -10,22 +10,6 @@ function format(value: number | null | undefined) {
   return value === null || value === undefined ? 'Insufficient data' : `${value.toFixed(1)}%`;
 }
 
-async function viewPdf(request: Promise<any>) {
-  const reportWindow = window.open('about:blank', '_blank');
-  try {
-    const response = await request;
-    const url = URL.createObjectURL(response.data);
-    if (reportWindow) {
-      reportWindow.document.title = 'Progress Report';
-      reportWindow.document.body.innerHTML = `<embed src="${url}" type="application/pdf" style="width:100vw;height:100vh;border:0" />`;
-    }
-    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
-  } catch (error) {
-    reportWindow?.close();
-    throw error;
-  }
-}
-
 async function downloadPdf(request: Promise<any>, fileName: string) {
   const response = await request;
   const url = URL.createObjectURL(response.data);
@@ -170,4 +154,28 @@ function TeacherSubjectView({ data, loading, teacherId, subjectId, filters }: { 
 
 function LoadingState() { return <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">Calculating verified progress analytics...</div>; }
 function EmptyState({ title, text }: { title: string; text: string }) { return <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center"><h2 className="text-lg font-bold text-slate-800">{title}</h2><p className="mt-2 text-sm text-slate-500">{text}</p></div>; }
-function ReportActions({ request, fileName }: { request: () => Promise<any>; fileName: string }) { return <div className="flex flex-wrap gap-2"><button onClick={() => void viewPdf(request())} className="rounded-lg border border-violet-200 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50">View Report</button><button onClick={() => void downloadPdf(request(), fileName)} className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700">Download Report</button></div>; }
+function ReportActions({ request, fileName }: { request: () => Promise<any>; fileName: string }) {
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const viewReport = async () => {
+    setLoading(true);
+    try {
+      const response = await request();
+      const blob = response.data instanceof Blob ? response.data : new Blob([response.data], { type: 'application/pdf' });
+      setPdfUrl(URL.createObjectURL(blob));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const closeReport = () => {
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    setPdfUrl(null);
+  };
+
+  return <>
+    <div className="flex flex-wrap gap-2"><button onClick={() => void viewReport()} disabled={loading} className="rounded-lg border border-violet-200 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-50">{loading ? 'Loading...' : 'View Report'}</button><button onClick={() => void downloadPdf(request(), fileName)} className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700">Download Report</button></div>
+    {pdfUrl && <div className="fixed inset-0 z-50 flex flex-col bg-slate-900"><div className="flex items-center justify-between border-b border-slate-700 bg-slate-900 px-4 py-3"><p className="text-sm font-semibold text-white">Progress Report</p><button onClick={closeReport} className="rounded-lg bg-slate-700 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-600">Close</button></div><iframe src={pdfUrl} title="Progress report preview" className="h-full w-full bg-white" /></div>}
+  </>;
+}
