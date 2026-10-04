@@ -51,6 +51,7 @@ describe('StaffExcelService school headers', () => {
     expect(worksheet.dataValidations.model.B6?.formulae).toEqual(['$AJ$7:$AS$7']);
     expect(worksheet.dataValidations.model.B2).toBeUndefined();
     expect(workbook.definedNames.model.find((name) => name.name === 'Central')?.ranges).toEqual(["'Teacher Info'!$AJ$8:$AJ$18"]);
+    expect(worksheet.tables.DataTable.model.tableRef).toBe('A5:AH10004');
   });
 
   it('rewrites all MoE headers visibly and aligns compiled values with the template columns', async () => {

@@ -502,6 +502,13 @@ export class StaffExcelService {
 
   private shiftWorksheetValidations(workbook: ExcelJS.Workbook, worksheet: ExcelJS.Worksheet, rowsInserted: number) {
     workbook.definedNames.spliceRows(worksheet.name, 1, 0, rowsInserted);
+    Object.values(worksheet.tables).forEach((table: any) => {
+      const tableRef = table.model?.tableRef;
+      if (!tableRef) return;
+      table.model.tableRef = tableRef.replace(/^(\$?[A-Z]{1,3}\$?)?(\d+):(\$?[A-Z]{1,3}\$?)(\d+)$/, (_match: string, startColumn = '', startRow: string, endColumn: string, endRow: string) =>
+        `${startColumn}${Number(startRow) + rowsInserted}:${endColumn}${Number(endRow) + rowsInserted}`,
+      );
+    });
     const existing = worksheet.dataValidations.model as Record<string, any>;
     const shifted: Record<string, any> = {};
     const shiftReferences = (references: string) => references.replace(/(\$?[A-Z]{1,3}\$?)(\d+)/g, (_match, column: string, row: string) => `${column}${Number(row) + rowsInserted}`);
