@@ -63,6 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = localStorage.getItem('user');
     
     if (!storedToken || !storedUser) {
+      // Do not let a stale cookie make middleware redirect back to the dashboard.
+      document.cookie = 'auth_token=;path=/;max-age=0';
+      document.cookie = 'institution_type=;path=/;max-age=0';
       setToken(null);
       setUser(null);
       setIsLoading(false);

@@ -33,10 +33,6 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL(LANDING_URL));
   }
 
-  if (isAuthenticated && pathname === '/login') {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
-  }
-
   if (pathname.startsWith('/api')) {
     const institutionType = getInstitutionTypeFromToken(request);
     const response = NextResponse.next();
