@@ -24,6 +24,7 @@ export default function StudentLayout({
     { href: '/student/library', label: 'Library', icon: '📚' },
     { href: '/student/notifications', label: 'Notifications', icon: '🔔' },
     { href: '/student/analytics', label: 'Analytics', icon: '📈' },
+    { href: '/student/academic-progress', label: 'Academic Progress', icon: '🧭' },
     { href: '/student/profile', label: 'Profile', icon: '👤' },
   ];
 
