@@ -49,7 +49,7 @@ export class ProgressReportService {
   async generateTeacherSubjectPdf(teacherId: string, subjectId: string, schoolId: string, generatedById: string, filters: Record<string, string | undefined> = {}) {
     if (!filters.classId) throw new Error('Select one class before generating a teacher subject report');
     const data = await this.getTeacherSubjectReportData(teacherId, subjectId, schoolId, filters);
-    const html = this.teacherSubjectHtml(data);
+    const html = await this.teacherSubjectHtml(data);
     return this.writePdf(html, schoolId, generatedById, { reportType: 'TEACHER_SUBJECT_PROGRESS_REPORT', title: `Teacher Subject Progress Report - ${data.subject.name}`, metadata: { reportScope: 'TEACHER_SUBJECT', teacherId, subjectId, filters, studentCount: data.students.length, assessmentRowCount: data.assessmentRows.length }, fileName: `teacher-subject-progress-${subjectId.slice(0, 8)}.pdf` });
   }
 
@@ -128,7 +128,7 @@ export class ProgressReportService {
     return { school, teacher, subject, assignments, students, assessmentRows, finalRows, yearGroups, pivotStudents, className: assignments[0]?.class.name || 'Class' };
   }
 
-  private teacherSubjectHtml(data: any) {
+  private async teacherSubjectHtml(data: any) {
     const teacherName = `${data.teacher?.firstName || ''} ${data.teacher?.lastName || ''}`.trim() || data.teacher?.email || 'Teacher';
     const location = [data.school?.address, data.school?.district, data.school?.province].filter(Boolean).join(' · ');
     const assignmentText = `${data.className} · ${data.assignments[0]?.academicYear.name || ''}`;
