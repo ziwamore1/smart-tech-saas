@@ -85,8 +85,8 @@ export class ProgressReportService {
     const resultMap = new Map<string, any>(allResults.map(result => [`${result.studentId}:${scope(result.classId, result.term.academicYearId, result.termId)}:${result.assessmentDefId}`, result]));
     verifiedEvidence.forEach(result => { if (result.assessmentId) resultMap.set(`${result.studentId}:${scope(result.classId, result.academicYearId, result.termId)}:${result.assessmentId}`, result); });
     const resultByPeriod = new Map<string, any>();const resultByCode = new Map<string, any>();
-    allResults.forEach(result => { const def = result.assessmentDef; if (def?.code) resultByCode.set(${result.studentId}:::, result); });
-    verifiedEvidence.forEach(result => { if (result.assessmentId) { const def = evidenceDefinitions.find(d=>d.id===result.assessmentId); if (def?.code) resultByCode.set(${result.studentId}:::, result); } });
+    allResults.forEach(result => { const def = result.assessmentDef; if (def?.code) resultByCode.set(`${result.studentId}:${result.term.academicYearId}:${result.termId}:${def.code}`, result); });
+    verifiedEvidence.forEach(result => { if (result.assessmentId) { const def = evidenceDefinitions.find(d=>d.id===result.assessmentId); if (def?.code) resultByCode.set(`${result.studentId}:${result.academicYearId}:${result.termId}:${def.code}`, result); } });
 
     allResults.forEach(result => resultByPeriod.set(`${result.studentId}:${result.term.academicYearId}:${result.termId}:${result.assessmentDefId}`, result));
     verifiedEvidence.forEach(result => { if (result.assessmentId) resultByPeriod.set(`${result.studentId}:${result.academicYearId}:${result.termId}:${result.assessmentId}`, result); });
