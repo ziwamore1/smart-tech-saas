@@ -122,7 +122,7 @@ export class ProgressReportService {
         const enrollments = students.filter(item => item.studentId === student.id && item.academicYearId === group.id);
         const enrollmentClassId = enrollments[0]?.classId;
         const termItems = terms.filter(term => term.academicYearId === group.id && assignmentScopes.has(scope(enrollmentClassId, group.id, term.id)));
-        return { yearId: group.id, cells: group.columns.map(column => ({ ...column, entries: termItems.map(term => { const result = resultMap.get(`${student.id}:${scope(enrollmentClassId, group.id, term.id)}:${column.id}`); return { term: term.name, result }; }).filter(item => item.result || group.columns.length) })), final: termItems.map(term => finalMap.get(`${student.id}:${scope(enrollmentClassId, group.id, term.id)}`)).filter(Boolean) };
+       return { yearId: group.id, cells: group.columns.map(column => ({ ...column, entries: termItems.map(term => { const result = resultMap.get(`${student.id}:${scope(enrollmentClassId, group.id, term.id)}:${column.id}`) || resultByPeriod.get(`${student.id}:${group.id}:${term.id}:${column.id}`) || (column.code ? resultByCode.get(`${student.id}:${group.id}:${term.id}:${column.code}`) : null); return { term: term.name, result }; }).filter(item => item.result || group.columns.length) })), final: termItems.map(term => finalMap.get(`${student.id}:${scope(enrollmentClassId, group.id, term.id)}`)).filter(Boolean) };
       }),
     }));
     return { school, teacher, subject, assignments, students, assessmentRows, finalRows, yearGroups, pivotStudents, className: assignments[0]?.class.name || 'Class' };
