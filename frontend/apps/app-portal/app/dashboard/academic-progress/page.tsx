@@ -166,13 +166,23 @@ function EmptyState({ title, text }: { title: string; text: string }) { return <
 function ReportActions({ request, fileName, disabled = false }: { request: () => Promise<any>; fileName: string; disabled?: boolean }) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const viewReport = async () => {
     setLoading(true);
+    setError(null);
     try {
       const response = await request();
-      const blob = response.data instanceof Blob ? response.data : new Blob([response.data], { type: 'application/pdf' });
+      const contentType = response.headers?.['content-type'] || response.headers?.get?.('content-type') || '';
+      const blob = response.data instanceof Blob ? response.data : new Blob([response.data], { type: contentType || 'application/pdf' });
+      if (!contentType.includes('pdf') && blob.type && !blob.type.includes('pdf')) {
+        const message = await blob.text();
+        throw new Error(message || 'The server did not return a PDF report.');
+      }
       setPdfUrl(URL.createObjectURL(blob));
+    } catch (requestError: any) {
+      const responseMessage = requestError?.response?.data?.message || requestError?.response?.data?.error;
+      setError(responseMessage || requestError?.message || 'Unable to open the report.');
     } finally {
       setLoading(false);
     }
@@ -184,7 +194,7 @@ function ReportActions({ request, fileName, disabled = false }: { request: () =>
   };
 
   return <>
-    <div className="flex flex-wrap gap-2"><button onClick={() => void viewReport()} disabled={disabled || loading} className="rounded-lg border border-violet-200 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-50">{loading ? 'Loading...' : 'View Report'}</button><button onClick={() => void downloadPdf(request(), fileName)} disabled={disabled} className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50">Download Report</button></div>
+    <div className="flex flex-wrap items-center gap-2"><button onClick={() => void viewReport()} disabled={disabled || loading} className="rounded-lg border border-violet-200 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-50">{loading ? 'Loading...' : 'View Report'}</button><button onClick={() => void downloadPdf(request(), fileName)} disabled={disabled} className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50">Download Report</button>{error && <span className="text-xs font-semibold text-red-600">{error}</span>}</div>
     {pdfUrl && <div className="fixed inset-0 z-50 flex flex-col bg-slate-900"><div className="flex items-center justify-between border-b border-slate-700 bg-slate-900 px-4 py-3"><p className="text-sm font-semibold text-white">Progress Report</p><button onClick={closeReport} className="rounded-lg bg-slate-700 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-600">Close</button></div><iframe src={pdfUrl} title="Progress report preview" className="h-full w-full bg-white" /></div>}
   </>;
 }
