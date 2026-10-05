@@ -428,9 +428,9 @@ export const progressApi = {
   recalculate: (studentId: string) => api.post(`/progress/students/${studentId}/recalculate`),
   recalculateSchool: () => api.post('/progress/recalculate'),
   backfillStatus: (jobId: string) => api.get(`/progress/recalculate/${jobId}`),
-  studentReportPdf: (studentId: string) => api.get(`/progress/reports/student/${studentId}/pdf`, { responseType: 'blob' }),
-  classReportPdf: (classId: string, params?: Record<string, string>) => api.get(`/progress/reports/class/${classId}/pdf`, { params, responseType: 'blob' }),
-  teacherSubjectReportPdf: (teacherId: string, subjectId: string, params?: Record<string, string>) => api.get(`/progress/reports/teachers/${teacherId}/subjects/${subjectId}/pdf`, { params, responseType: 'blob' }),
+  studentReportPdf: (studentId: string) => api.get(`/progress/reports/student/${studentId}/pdf`, { responseType: 'blob', timeout: 300000 }),
+  classReportPdf: (classId: string, params?: Record<string, string>) => api.get(`/progress/reports/class/${classId}/pdf`, { params, responseType: 'blob', timeout: 300000 }),
+  teacherSubjectReportPdf: (teacherId: string, subjectId: string, params?: Record<string, string>) => api.get(`/progress/reports/teachers/${teacherId}/subjects/${subjectId}/pdf`, { params, responseType: 'blob', timeout: 300000 }),
 };
 
 export const resultApi = {
