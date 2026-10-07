@@ -26,6 +26,18 @@ interface SvgOptions {
   height: number;
   ink: string;
   border: string;
+  topStart?: number;
+  topEnd?: number;
+  topRadius?: number;
+  bottomStart?: number;
+  bottomEnd?: number;
+  bottomRadius?: number;
+  customCircularText?: string;
+  customStart?: number;
+  customEnd?: number;
+  customRadius?: number;
+  centerX?: number;
+  centerY?: number;
 }
 
 function escapeXml(text: string): string {
@@ -59,14 +71,30 @@ function borderColor(type: string): string {
   return BORDERS[(type || '').toUpperCase()] || '#555555';
 }
 
+function arcPath(cx: number, cy: number, radius: number, start: number, end: number): string {
+  const point = (angle: number) => {
+    const radians = (angle - 90) * Math.PI / 180;
+    return [cx + radius * Math.cos(radians), cy + radius * Math.sin(radians)];
+  };
+  const [sx, sy] = point(start);
+  const [ex, ey] = point(end);
+  const large = Math.abs(end - start) > 180 ? 1 : 0;
+  const sweep = end >= start ? 1 : 0;
+  return `M ${sx.toFixed(2)},${sy.toFixed(2)} A ${radius},${radius} 0 ${large},${sweep} ${ex.toFixed(2)},${ey.toFixed(2)}`;
+}
+
 function circularSvg(o: SvgOptions): string {
   const size = o.width;
-  const cx = size / 2, cy = size / 2, r = size / 2 - 4, innerR = r - 16;
+  const cx = o.centerX ?? size / 2, cy = o.centerY ?? size / 2, r = size / 2 - 4, innerR = r - 16;
   const fontSize = Math.max(8, Math.floor(r / 6));
   const innerFontSize = Math.max(10, Math.floor(r / 5));
   const subSize = Math.max(6, fontSize - 4);
   const bottom = o.subtitle?.trim() || formatDate();
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><defs><path id="topArc" d="M ${cx - innerR + 4},${cy} A ${innerR - 4},${innerR - 4} 0 0,1 ${cx + innerR - 4},${cy}" fill="none"/><path id="bottomArc" d="M ${cx - innerR + 8},${cy} A ${innerR - 8},${innerR - 8} 0 0,0 ${cx + innerR - 8},${cy}" fill="none"/></defs><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${o.border}" stroke-width="2.5"/><circle cx="${cx}" cy="${cy}" r="${r - 7}" fill="none" stroke="${o.ink}" stroke-width="1" stroke-dasharray="3,3"/><circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" stroke="${o.border}" stroke-width="1.5"/><text font-size="${fontSize}" font-family="Georgia, 'Times New Roman', serif" fill="${o.border}" font-weight="bold" text-anchor="middle" letter-spacing="2"><textPath href="#topArc" startOffset="50%">${escapeXml(o.text)}</textPath></text><text x="${cx}" y="${cy - 10}" font-size="${innerFontSize}" font-family="Arial, sans-serif" fill="${o.ink}" font-weight="bold" text-anchor="middle">${escapeXml(o.type)}</text><polygon points="${cx - 12},${cy + 4} ${cx},${cy - 8} ${cx + 12},${cy + 4} ${cx},${cy + 16}" fill="${o.ink}" opacity="0.9"/><text x="${cx}" y="${cy + 30}" font-size="${subSize}" font-family="Arial, sans-serif" fill="#666" text-anchor="middle"><textPath href="#bottomArc" startOffset="50%">${escapeXml(bottom)}</textPath></text></svg>`;
+  const custom = o.customCircularText?.trim();
+  const topStart = o.topStart ?? -160, topEnd = o.topEnd ?? -20, topRadius = o.topRadius ?? innerR - 4;
+  const bottomStart = o.bottomStart ?? 150, bottomEnd = o.bottomEnd ?? 30, bottomRadius = o.bottomRadius ?? innerR - 8;
+  const customStart = o.customStart ?? -80, customEnd = o.customEnd ?? 80, customRadius = o.customRadius ?? innerR - 28;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><defs><path id="topArc" d="${arcPath(cx, cy, topRadius, topStart, topEnd)}" fill="none"/><path id="bottomArc" d="${arcPath(cx, cy, bottomRadius, bottomStart, bottomEnd)}" fill="none"/><path id="customArc" d="${arcPath(cx, cy, customRadius, customStart, customEnd)}" fill="none"/></defs><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${o.border}" stroke-width="2.5"/><circle cx="${cx}" cy="${cy}" r="${r - 7}" fill="none" stroke="${o.ink}" stroke-width="1" stroke-dasharray="3,3"/><circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" stroke="${o.border}" stroke-width="1.5"/><text font-size="${fontSize}" font-family="Georgia, 'Times New Roman', serif" fill="${o.border}" font-weight="bold" text-anchor="middle" letter-spacing="2"><textPath href="#topArc" startOffset="50%">${escapeXml(o.text)}</textPath></text>${custom ? `<text font-size="${Math.max(8, fontSize - 3)}" font-family="Georgia, 'Times New Roman', serif" fill="${o.ink}" font-weight="bold" text-anchor="middle" letter-spacing="1"><textPath href="#customArc" startOffset="50%">${escapeXml(custom)}</textPath></text>` : ''}<text x="${cx}" y="${cy - 10}" font-size="${innerFontSize}" font-family="Arial, sans-serif" fill="${o.ink}" font-weight="bold" text-anchor="middle">${escapeXml(o.type)}</text><polygon points="${cx - 12},${cy + 4} ${cx},${cy - 8} ${cx + 12},${cy + 4} ${cx},${cy + 16}" fill="${o.ink}" opacity="0.9"/><text x="${cx}" y="${cy + 30}" font-size="${subSize}" font-family="Arial, sans-serif" fill="#666" text-anchor="middle"><textPath href="#bottomArc" startOffset="50%">${escapeXml(bottom)}</textPath></text></svg>`;
 }
 
 function boxSvg(o: SvgOptions, shape: string): string {
@@ -118,6 +146,18 @@ export default function SuperAdminStampDesignerPage() {
   const [width, setWidth] = useState(200);
   const [height, setHeight] = useState(200);
   const [opacity, setOpacity] = useState(1);
+  const [topStart, setTopStart] = useState(-160);
+  const [topEnd, setTopEnd] = useState(-20);
+  const [topRadius, setTopRadius] = useState(150);
+  const [bottomStart, setBottomStart] = useState(150);
+  const [bottomEnd, setBottomEnd] = useState(30);
+  const [bottomRadius, setBottomRadius] = useState(134);
+  const [customCircularText, setCustomCircularText] = useState('');
+  const [customStart, setCustomStart] = useState(-80);
+  const [customEnd, setCustomEnd] = useState(80);
+  const [customRadius, setCustomRadius] = useState(105);
+  const [circularCenterX, setCircularCenterX] = useState<number | null>(null);
+  const [circularCenterY, setCircularCenterY] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -128,8 +168,8 @@ export default function SuperAdminStampDesignerPage() {
   const effectiveHeight = shape === 'CIRCULAR' ? width : height;
 
   const svgContent = useMemo(
-    () => buildSvg({ shape, type, text: text || 'INSTITUTION NAME', subtitle, width, height: effectiveHeight, ink, border }),
-    [shape, type, text, subtitle, width, effectiveHeight, ink, border],
+    () => buildSvg({ shape, type, text: text || 'INSTITUTION NAME', subtitle, width, height: effectiveHeight, ink, border, topStart, topEnd, topRadius, bottomStart, bottomEnd, bottomRadius, customCircularText, customStart, customEnd, customRadius, centerX: circularCenterX ?? width / 2, centerY: circularCenterY ?? effectiveHeight / 2 }),
+    [shape, type, text, subtitle, width, effectiveHeight, ink, border, topStart, topEnd, topRadius, bottomStart, bottomEnd, bottomRadius, customCircularText, customStart, customEnd, customRadius, circularCenterX, circularCenterY],
   );
 
   const load = useCallback(async () => {
@@ -273,6 +313,14 @@ export default function SuperAdminStampDesignerPage() {
             </select>
           </label>
         </div>
+        {shape === 'CIRCULAR' && <section className="rounded-lg border border-cyan-100 bg-cyan-50/40 p-3 space-y-3">
+          <div><h3 className="text-xs font-semibold text-cyan-900">Circular text paths</h3><p className="text-[11px] text-cyan-700 mt-1">Adjust each arc directly. Add custom circular text for stamps that do not use a standard top/bottom layout.</p></div>
+          <div className="grid grid-cols-3 gap-2 text-xs"><label>Center X<input type="number" value={circularCenterX ?? width / 2} onChange={e => setCircularCenterX(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Center Y<input type="number" value={circularCenterY ?? effectiveHeight / 2} onChange={e => setCircularCenterY(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Top radius<input type="number" min={30} value={topRadius} onChange={e => setTopRadius(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label></div>
+          <div className="grid grid-cols-2 gap-2 text-xs"><label>Top start<input type="number" value={topStart} onChange={e => setTopStart(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Top end<input type="number" value={topEnd} onChange={e => setTopEnd(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label></div>
+          <div className="grid grid-cols-3 gap-2 text-xs"><label>Bottom start<input type="number" value={bottomStart} onChange={e => setBottomStart(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Bottom end<input type="number" value={bottomEnd} onChange={e => setBottomEnd(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Bottom radius<input type="number" min={30} value={bottomRadius} onChange={e => setBottomRadius(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label></div>
+          <label className="block text-xs text-gray-600">Custom circular text<input value={customCircularText} onChange={e => setCustomCircularText(e.target.value)} placeholder="Optional text on its own arc" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" /></label>
+          <div className="grid grid-cols-3 gap-2 text-xs"><label>Custom start<input type="number" value={customStart} onChange={e => setCustomStart(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Custom end<input type="number" value={customEnd} onChange={e => setCustomEnd(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Custom radius<input type="number" min={30} value={customRadius} onChange={e => setCustomRadius(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label></div>
+        </section>}
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-xs text-gray-600">Ink colour
             <input type="color" value={ink} onChange={e => setInk(e.target.value)} className="mt-1 w-full h-9 rounded cursor-pointer" />
