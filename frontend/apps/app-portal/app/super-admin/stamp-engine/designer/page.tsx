@@ -26,6 +26,25 @@ interface ShapeLayer {
   rx?: number;
 }
 
+interface ContentLayer {
+  id: string;
+  type: 'text' | 'image';
+  name: string;
+  content?: string;
+  assetId?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fontSize: number;
+  fontWeight: string;
+  letterSpacing: number;
+  align: 'start' | 'middle' | 'end';
+  rotation: number;
+  opacity: number;
+  zIndex: number;
+}
+
 const SHAPE_OPTIONS: { value: ShapeKind; label: string }[] = [
   { value: 'shield', label: 'Shield (crest)' },
   { value: 'hexagon', label: 'Hexagon' },
@@ -50,6 +69,7 @@ const SHAPE_OPTIONS: { value: ShapeKind; label: string }[] = [
 
 const CATEGORIES = ['CUSTOM', 'OFFICIAL_SCHOOL', 'EXAMINATION', 'CERTIFICATE', 'VERIFICATION'];
 const TIERS = ['STANDARD', 'PREMIUM'];
+const STAMP_TYPES = ['VERIFIED', 'PAID', 'APPROVED', 'CONFIDENTIAL', 'PRINCIPAL', 'EXAMINATION', 'REGISTRAR', 'DEPARTMENT', 'REGISTRATION BOARD'];
 
 const CANVAS = 600;
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -70,9 +90,17 @@ export default function SuperAdminStampDesignerPage() {
   const [bottomArc, setBottomArc] = useState('EDUCATION BOARD');
   const [centerText, setCenterText] = useState('CERTIFIED COPY');
   const [centerSub, setCenterSub] = useState('OFFICIAL');
+  const [stampType, setStampType] = useState('VERIFIED');
 
   const [shapes, setShapes] = useState<ShapeLayer[]>([]);
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
+  const [contentLayers, setContentLayers] = useState<ContentLayer[]>([
+    { id: 'institution', type: 'text', name: 'Institution name', content: 'INSTITUTION NAME', x: 300, y: 105, width: 500, height: 40, fontSize: 28, fontWeight: 'bold', letterSpacing: 3, align: 'middle', rotation: 0, opacity: 1, zIndex: 15 },
+    { id: 'stamp-type', type: 'text', name: 'Stamp type', content: 'CERTIFIED COPY', x: 300, y: 300, width: 460, height: 40, fontSize: 24, fontWeight: 'bold', letterSpacing: 2, align: 'middle', rotation: 0, opacity: 1, zIndex: 30 },
+    { id: 'department', type: 'text', name: 'Office / department', content: 'OFFICIAL', x: 300, y: 345, width: 440, height: 32, fontSize: 16, fontWeight: 'normal', letterSpacing: 2, align: 'middle', rotation: 0, opacity: 1, zIndex: 31 },
+  ]);
+  const [assets, setAssets] = useState<any[]>([]);
+  const [selectedContentId, setSelectedContentId] = useState<string | null>(null);
 
   const [templates, setTemplates] = useState<any[]>([]);
   const [listError, setListError] = useState('');
@@ -92,19 +120,20 @@ export default function SuperAdminStampDesignerPage() {
     const cx = CANVAS / 2;
     const cy = CANVAS / 2;
     const layers: any[] = [];
-    if (topArc) {
+    if (topArc && outerShape !== 'rectangle') {
       layers.push({ id: 'arc_top', type: 'curved-text', name: 'Top arc', content: topArc, x: cx, y: 90, rotation: 0, opacity: 1, zIndex: 10, fontFamily: 'serif', fontSize: 30, fontWeight: 'bold', letterSpacing: 4, color: inkColor, separator: '★', curve: { centerX: cx, centerY: cy, radius: 225, startAngle: -160, endAngle: -20, orientation: 'outward' } });
     }
     for (const s of shapes) {
       layers.push({ id: s.id, type: 'shape', name: s.id, x: s.x, y: s.y, rotation: s.rotation, opacity: s.opacity, zIndex: s.zIndex, shape: s.shape, size: s.size, width: s.width, height: s.height, fill: s.fill, stroke: s.stroke, strokeWidth: s.strokeWidth, rx: s.rx, innerRatio: s.innerRatio });
     }
-    if (centerText) {
-      layers.push({ id: 'txt_center', type: 'text', name: 'Center', content: centerText, x: cx, y: cy + 10, rotation: 0, opacity: 1, zIndex: 30, fontFamily: 'serif', fontSize: 18, fontWeight: 'bold', letterSpacing: 2, color: inkColor, direction: 'horizontal' });
+    for (const layer of contentLayers) {
+      if (layer.type === 'image') {
+        layers.push({ id: layer.id, type: 'image', name: layer.name, assetId: layer.assetId, x: layer.x, y: layer.y, width: layer.width, height: layer.height, rotation: layer.rotation, opacity: layer.opacity, zIndex: layer.zIndex });
+      } else {
+        layers.push({ id: layer.id, type: 'text', name: layer.name, content: layer.content || '', x: layer.x, y: layer.y, rotation: layer.rotation, opacity: layer.opacity, zIndex: layer.zIndex, fontFamily: 'sans-serif', fontSize: layer.fontSize, fontWeight: layer.fontWeight, letterSpacing: layer.letterSpacing, color: inkColor, align: layer.align, direction: 'horizontal' });
+      }
     }
-    if (centerSub) {
-      layers.push({ id: 'txt_sub', type: 'text', name: 'Center sub', content: centerSub, x: cx, y: cy + 40, rotation: 0, opacity: 1, zIndex: 31, fontFamily: 'sans-serif', fontSize: 12, fontWeight: 'normal', letterSpacing: 3, color: inkColor, direction: 'horizontal' });
-    }
-    if (bottomArc) {
+    if (bottomArc && outerShape !== 'rectangle') {
       layers.push({ id: 'arc_bottom', type: 'curved-text', name: 'Bottom arc', content: bottomArc, x: cx, y: cy + 120, rotation: 0, opacity: 1, zIndex: 12, fontFamily: 'serif', fontSize: 22, fontWeight: 'bold', letterSpacing: 3, color: inkColor, curve: { centerX: cx, centerY: cy, radius: 235, startAngle: 150, endAngle: 30, orientation: 'outward' } });
     }
     layers.push({ id: 'date', type: 'date', name: 'Date', label: 'DIGITALLY STAMPED', showTime: true, x: cx, y: cy + 92, rotation: 0, opacity: 1, zIndex: 40, fontFamily: 'sans-serif', fontSize: 12, fontWeight: 'bold', letterSpacing: 1, color: '#111827' });
@@ -113,12 +142,12 @@ export default function SuperAdminStampDesignerPage() {
     return {
       canvas: { width: CANVAS, height: CANVAS, background: 'transparent' },
       shape: outerShape === 'circle'
-        ? { type: 'circle', outerRadius, borderWidth, borderColor }
-        : { type: outerShape, width: outerRadius * 2, height: outerRadius * 1.4, borderWidth, borderColor },
+        ? { type: 'circle', outerRadius, borderWidth, borderColor, innerRings: [{ radius: Math.max(60, outerRadius - 28), width: 2, color: borderColor, dashed: false }] }
+        : { type: outerShape, width: outerRadius * 2, height: outerRadius * 1.4, borderWidth, borderColor, innerRings: [{ inset: 24, width: 2, color: borderColor, dashed: false }] },
       layers,
       effects: { inkOpacity: 1, texture: 'none' },
     };
-  }, [outerShape, outerRadius, borderColor, borderWidth, inkColor, topArc, bottomArc, centerText, centerSub, shapes]);
+  }, [outerShape, outerRadius, borderColor, borderWidth, inkColor, topArc, bottomArc, shapes, contentLayers]);
 
   // Debounced server-rendered live preview (same engine the PDF pipeline uses).
   useEffect(() => {
@@ -136,10 +165,11 @@ export default function SuperAdminStampDesignerPage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await stampMarketplaceApi.adminPlatformList();
+      const [res, assetRes] = await Promise.all([stampMarketplaceApi.adminPlatformList(), stampEngineApi.listAssets()]);
       const list = res.data?.templates;
       setTemplates(Array.isArray(list) ? list : []);
       setListError(Array.isArray(list) ? '' : 'Unexpected response from the marketplace service.');
+      setAssets(assetRes.data?.assets || []);
     } catch (err: any) {
       setTemplates([]);
       setListError(err?.response?.data?.message || 'Could not load saved platform stamps.');
@@ -152,17 +182,44 @@ export default function SuperAdminStampDesignerPage() {
     const cfg = t.configJson || {};
     setEditingId(t.id);
     setName(t.name || '');
+    setOuterShape(cfg.shape?.type || 'circle');
+    setOuterRadius(cfg.shape?.outerRadius || 270);
     setInkColor('#123456');
     setTopArc('REPUBLIC OF ZAMBIA');
     setBottomArc('EDUCATION BOARD');
-    setShapes((cfg.layers || []).filter((l: any) => l.type === 'shape').map((l: any) => ({
+      setShapes((cfg.layers || []).filter((l: any) => l.type === 'shape').map((l: any) => ({
       id: l.id, shape: l.shape || 'shield', x: l.x, y: l.y, size: l.size ?? 100, width: l.width, height: l.height,
       fill: l.fill || '#1e3a5f', stroke: l.stroke, strokeWidth: l.strokeWidth ?? 0, rotation: l.rotation ?? 0, opacity: l.opacity ?? 1, zIndex: l.zIndex ?? 20, innerRatio: l.innerRatio, rx: l.rx,
-    })));
+      })));
+      setContentLayers((cfg.layers || []).filter((l: any) => l.type === 'text' || l.type === 'image').map((l: any) => ({
+        id: l.id || uid(), type: l.type, name: l.name || l.type, content: l.content, assetId: l.assetId || '', x: l.x ?? 300, y: l.y ?? 300,
+        width: l.width ?? 300, height: l.height ?? 40, fontSize: l.fontSize ?? 18, fontWeight: l.fontWeight || 'normal',
+        letterSpacing: l.letterSpacing ?? 0, align: l.align || 'middle', rotation: l.rotation ?? 0, opacity: l.opacity ?? 1, zIndex: l.zIndex ?? 20,
+      })));
   };
 
   const updateShape = (id: string, patch: Partial<ShapeLayer>) =>
     setShapes(prev => prev.map(s => (s.id === id ? { ...s, ...patch } : s)));
+  const updateContent = (id: string, patch: Partial<ContentLayer>) =>
+    setContentLayers(prev => prev.map(l => (l.id === id ? { ...l, ...patch } : l)));
+
+  const addContent = (type: 'text' | 'image') => {
+    const id = uid();
+    const layer: ContentLayer = { id, type, name: type === 'text' ? 'Custom text' : 'Emblem / logo', content: type === 'text' ? 'CUSTOM TEXT' : undefined, assetId: '', x: 300, y: 300, width: type === 'text' ? 360 : 90, height: type === 'text' ? 40 : 90, fontSize: 18, fontWeight: 'bold', letterSpacing: 1, align: 'middle', rotation: 0, opacity: 1, zIndex: 50 + contentLayers.length };
+    setContentLayers(prev => [...prev, layer]);
+    setSelectedContentId(id);
+  };
+
+  const uploadAsset = async (file?: File) => {
+    if (!file) return;
+    try {
+      const res = await stampEngineApi.uploadAsset(file, file.name.replace(/\.[^.]+$/, ''), 'LOGO');
+      setAssets(prev => [res.data, ...prev]);
+      const id = uid();
+      setContentLayers(prev => [...prev, { id, type: 'image', name: file.name, assetId: res.data.id, x: 300, y: 300, width: 100, height: 100, fontSize: 12, fontWeight: 'normal', letterSpacing: 0, align: 'middle', rotation: 0, opacity: 1, zIndex: 50 + prev.length }]);
+      setSelectedContentId(id);
+    } catch (err: any) { setMessage(err?.response?.data?.message || 'Could not upload emblem'); }
+  };
 
   const getCoords = (e: React.MouseEvent) => {
     const el = previewRef.current;
@@ -172,11 +229,11 @@ export default function SuperAdminStampDesignerPage() {
   };
   const dragPos = useRef<{ id: string; startX: number; startY: number; x: number; y: number } | null>(null);
   const onPreviewDown = (e: React.MouseEvent) => {
-    if (!selectedShapeId || busy) return;
-    const layer = shapes.find(s => s.id === selectedShapeId);
+    if (busy) return;
+    const layer = selectedShapeId ? shapes.find(s => s.id === selectedShapeId) : contentLayers.find(l => l.id === selectedContentId);
     if (!layer) return;
     const c = getCoords(e);
-    dragPos.current = { id: selectedShapeId, startX: c.cx, startY: c.cy, x: layer.x, y: layer.y };
+    dragPos.current = { id: layer.id, startX: c.cx, startY: c.cy, x: layer.x, y: layer.y };
     e.preventDefault();
   };
   const onPreviewMove = (e: React.MouseEvent) => {
@@ -184,10 +241,11 @@ export default function SuperAdminStampDesignerPage() {
     const c = getCoords(e);
     const dx = c.cx - dragPos.current.startX;
     const dy = c.cy - dragPos.current.startY;
-    updateShape(dragPos.current.id, {
+    if (selectedShapeId) updateShape(dragPos.current.id, {
       x: Math.max(0, Math.min(CANVAS, dragPos.current.x + dx)),
       y: Math.max(0, Math.min(CANVAS, dragPos.current.y + dy)),
     });
+    else updateContent(dragPos.current.id, { x: Math.max(0, Math.min(CANVAS, dragPos.current.x + dx)), y: Math.max(0, Math.min(CANVAS, dragPos.current.y + dy)) });
   };
   const onPreviewUp = () => { dragPos.current = null; };
 
@@ -276,6 +334,7 @@ export default function SuperAdminStampDesignerPage() {
             <label className="block text-xs text-gray-600">Top arc<input value={topArc} onChange={e => setTopArc(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" /></label>
             <label className="block text-xs text-gray-600">Bottom arc<input value={bottomArc} onChange={e => setBottomArc(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" /></label>
             <label className="block text-xs text-gray-600">Center<input value={centerText} onChange={e => setCenterText(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" /></label>
+            <label className="block text-xs text-gray-600">Stamp type<select value={stampType} onChange={e => { setStampType(e.target.value); setCenterText(e.target.value); }} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm">{STAMP_TYPES.map(type => <option key={type}>{type}</option>)}</select></label>
             <label className="block text-xs text-gray-600">Center sub<input value={centerSub} onChange={e => setCenterSub(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" /></label>
           </section>
 
@@ -287,8 +346,8 @@ export default function SuperAdminStampDesignerPage() {
             </select>
             {shapes.length === 0 && <p className="text-[11px] text-gray-400">Add shields, stars, hexagons, diamonds, boxes… then drag them on the canvas and recolor to the ink.</p>}
             <div className="space-y-1 max-h-40 overflow-y-auto">
-              {shapes.map(s => (
-                <div key={s.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer ${selectedShapeId === s.id ? 'bg-violet-50 ring-1 ring-violet-300' : 'hover:bg-gray-50'}`} onClick={() => setSelectedShapeId(s.id)}>
+                {shapes.map(s => (
+                  <div key={s.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer ${selectedShapeId === s.id ? 'bg-violet-50 ring-1 ring-violet-300' : 'hover:bg-gray-50'}`} onClick={() => { setSelectedShapeId(s.id); setSelectedContentId(null); }}>
                   <span className="flex-1 truncate text-gray-700">{s.shape}</span>
                   <span className="text-gray-400">z{s.zIndex}</span>
                   <button onClick={() => setShapes(prev => prev.filter(x => x.id !== s.id))} className="text-red-500 hover:text-red-700">✕</button>
@@ -316,6 +375,13 @@ export default function SuperAdminStampDesignerPage() {
                 </div>
               );
             })()}
+          </section>
+          <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+            <div className="flex items-center justify-between"><h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Text & emblems</h2><div className="flex gap-1"><button onClick={() => addContent('text')} className="px-2 py-1 text-[11px] border rounded text-violet-700">+ Text</button><button onClick={() => addContent('image')} className="px-2 py-1 text-[11px] border rounded text-violet-700">+ Emblem</button></div></div>
+            <input type="file" accept=".png,.svg,.webp" onChange={e => void uploadAsset(e.target.files?.[0])} className="block w-full text-[11px] text-gray-500" />
+            <p className="text-[10px] text-gray-400">Add multiple logos or emblems and position each independently on the template.</p>
+            <div className="space-y-1 max-h-36 overflow-y-auto">{contentLayers.map(layer => <div key={layer.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer ${selectedContentId === layer.id ? 'bg-violet-50 ring-1 ring-violet-300' : 'hover:bg-gray-50'}`} onClick={() => { setSelectedContentId(layer.id); setSelectedShapeId(null); }}><span className="flex-1 truncate">{layer.name}</span><span className="text-gray-400">{layer.type}</span><button onClick={e => { e.stopPropagation(); setContentLayers(prev => prev.filter(x => x.id !== layer.id)); }} className="text-red-500">✕</button></div>)}</div>
+            {contentLayers.find(l => l.id === selectedContentId) && (() => { const sel = contentLayers.find(l => l.id === selectedContentId)!; return <div className="border-t pt-2 space-y-2 text-xs text-gray-600"><label className="block">Name<input value={sel.name} onChange={e => updateContent(sel.id, { name: e.target.value })} className="mt-1 w-full border rounded px-2 py-1.5" /></label>{sel.type === 'text' ? <label className="block">Text<input value={sel.content || ''} onChange={e => updateContent(sel.id, { content: e.target.value })} className="mt-1 w-full border rounded px-2 py-1.5" /></label> : <label className="block">Asset<select value={sel.assetId || ''} onChange={e => updateContent(sel.id, { assetId: e.target.value })} className="mt-1 w-full border rounded px-2 py-1.5"><option value="">Select uploaded emblem</option>{assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>}<div className="grid grid-cols-2 gap-2"><label>X<input type="number" value={sel.x} onChange={e => updateContent(sel.id, { x: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Y<input type="number" value={sel.y} onChange={e => updateContent(sel.id, { y: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Width<input type="number" min={10} value={sel.width} onChange={e => updateContent(sel.id, { width: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Height<input type="number" min={10} value={sel.height} onChange={e => updateContent(sel.id, { height: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label></div>{sel.type === 'text' && <div className="grid grid-cols-2 gap-2"><label>Font size<input type="number" min={6} value={sel.fontSize} onChange={e => updateContent(sel.id, { fontSize: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Align<select value={sel.align} onChange={e => updateContent(sel.id, { align: e.target.value as ContentLayer['align'] })} className="mt-1 w-full border rounded px-2 py-1"><option value="start">Left</option><option value="middle">Center</option><option value="end">Right</option></select></label></div>}</div>; })()}
           </section>
         </div>
 
@@ -346,7 +412,7 @@ export default function SuperAdminStampDesignerPage() {
           <div className="flex items-center gap-1 mt-3">
             <button onClick={() => setZoom(z => Math.max(0.5, z - 0.15))} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">−</button>
             <button onClick={() => setZoom(z => Math.min(2, z + 0.15))} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">＋</button>
-            <span className="text-[11px] text-gray-400 ml-2">Tip: select a shape, then drag it on the canvas to position it.</span>
+             <span className="text-[11px] text-gray-400 ml-2">Select any text, emblem, or shape, then drag it on the canvas to position it.</span>
           </div>
         </div>
 

@@ -951,7 +951,7 @@ export default function StampDesignerPage() {
                     className="w-full h-full flex items-center justify-center"
                     dangerouslySetInnerHTML={{ __html: svg || '<span style="color:#9ca3af;font-size:13px">Rendering…</span>' }}
                   />
-                  {!selectedId && (() => {
+                   {(() => {
                 const isCircle = shapeType === 'circle';
                 const oR = isCircle ? outerRadius : shapeWidth / 2;
                 const oRB = isCircle ? outerRadius : shapeHeight / 2;
