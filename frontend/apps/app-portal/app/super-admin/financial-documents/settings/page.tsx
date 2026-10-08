@@ -1,16 +1,17 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { financialDocumentsApi } from '@/lib/api';
+import { financialDocumentsApi, stampApi, stampEngineApi, stampMarketplaceApi, templateBuilderApi } from '@/lib/api';
 import {
   Card, PageHeader, Loading, ErrorBox, StatusBadge, Modal, Field,
   inputStyle, primaryBtn, ghostBtn, dangerBtn, formatDate, C,
   CURRENCIES, RESET_POLICIES, TAX_PRICING_MODES,
 } from '../_shared';
 
-type Tab = 'profile' | 'bank' | 'tax' | 'templates' | 'numbering';
+type Tab = 'profile' | 'branding' | 'bank' | 'tax' | 'templates' | 'numbering';
 const TABS: Array<{ key: Tab; label: string; icon: string }> = [
   { key: 'profile', label: 'Company Profile', icon: 'fa-building' },
+  { key: 'branding', label: 'Signature & Stamp', icon: 'fa-signature' },
   { key: 'bank', label: 'Bank Accounts', icon: 'fa-university' },
   { key: 'tax', label: 'Tax Configurations', icon: 'fa-percent' },
   { key: 'templates', label: 'Templates', icon: 'fa-file-alt' },
@@ -59,11 +60,97 @@ function SettingsTabs() {
       )}
 
       {tab === 'profile' && <CompanyProfileTab />}
+      {tab === 'branding' && <PlatformBrandingTab />}
       {tab === 'bank' && <BankAccountsTab />}
       {tab === 'tax' && <TaxConfigsTab />}
       {tab === 'templates' && <TemplatesTab />}
       {tab === 'numbering' && <NumberingTab />}
     </div>
+  );
+}
+
+function PlatformBrandingTab() {
+  const [signatures, setSignatures] = useState<any[]>([]);
+  const [stamps, setStamps] = useState<any[]>([]);
+  const [signatureUrl, setSignatureUrl] = useState('');
+  const [stampUrl, setStampUrl] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const stampVisualUrl = (stamp: any) => stamp?.imageUrl || (stamp?.svgContent ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(stamp.svgContent)}` : '');
+  const signatureVisualUrl = (signature: any) => signature?.transparentImageUrl || signature?.processedImageUrl || signature?.imageUrl || '';
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const [profileRes, signatureRes, stampRes, platformStampRes] = await Promise.all([
+        financialDocumentsApi.getCompanyProfile(),
+        templateBuilderApi.getSignatures({ scope: 'PLATFORM', status: 'ACTIVE' }),
+        stampApi.getStamps({ scope: 'PLATFORM', status: 'ACTIVE' }),
+        stampMarketplaceApi.adminPlatformList().catch(() => ({ data: { templates: [] } })),
+      ]);
+      const profile = profileRes.data || profileRes || {};
+      setSignatureUrl(profile.signatureUrl || '');
+      setStampUrl(profile.stampUrl || '');
+      setSignatures(signatureRes.data?.signatures || signatureRes.data || []);
+      const digitalStamps = stampRes.data?.stamps || stampRes.data || [];
+      const platformTemplates = (platformStampRes.data?.templates || []).filter((template: any) => template.status === 'PUBLISHED' && template.marketplace?.status === 'PUBLISHED');
+      const renderedPlatformStamps = await Promise.all(platformTemplates.map(async (template: any) => {
+        try {
+          const preview = await stampEngineApi.renderPreview(template.configJson, []);
+          return { id: `platform-${template.id}`, name: template.name, type: 'PLATFORM TEMPLATE', svgContent: preview.data?.svg || '' };
+        } catch { return null; }
+      }));
+      setStamps([...digitalStamps, ...renderedPlatformStamps.filter(Boolean)]);
+    } catch (e: any) {
+      setError(e?.response?.data?.message || e?.message || 'Could not load platform signatures and stamps.');
+    } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const save = async () => {
+    setSaving(true); setError(null);
+    try {
+      await financialDocumentsApi.updateCompanyProfile({ signatureUrl: signatureUrl || null, stampUrl: stampUrl || null });
+      window.alert('Platform signature and stamp settings saved.');
+    } catch (e: any) {
+      setError(e?.response?.data?.message || e?.message || 'Could not save signature and stamp settings.');
+    } finally { setSaving(false); }
+  };
+
+  if (loading) return <Loading />;
+  return (
+    <Card>
+      {error && <div style={{ marginBottom: 14 }}><ErrorBox message={error} onRetry={load} /></div>}
+      <p style={{ color: C.muted, fontSize: 13, marginTop: 0 }}>
+        Select active platform assets for financial documents. These assets are platform-scoped and do not require school context.
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+        <div>
+          <Field label="Platform digital signature">
+            <select style={inputStyle} value={signatureUrl} onChange={e => setSignatureUrl(e.target.value)}>
+              <option value="">No platform signature</option>
+              {signatures.map(signature => <option key={signature.id} value={signatureVisualUrl(signature)}>{signature.name}{signature.title ? ` — ${signature.title}` : ''}</option>)}
+            </select>
+          </Field>
+          {signatureUrl && <img src={signatureUrl} alt="Selected platform signature" style={{ maxWidth: '100%', maxHeight: 90, objectFit: 'contain', border: `1px solid ${C.border}`, borderRadius: 8, padding: 8 }} />}
+        </div>
+        <div>
+          <Field label="Platform digital stamp">
+            <select style={inputStyle} value={stampUrl} onChange={e => setStampUrl(e.target.value)}>
+              <option value="">No platform stamp</option>
+              {stamps.map(stamp => <option key={stamp.id} value={stampVisualUrl(stamp)}>{stamp.name}{stamp.type ? ` — ${stamp.type}` : ''}</option>)}
+            </select>
+          </Field>
+          {stampUrl && <img src={stampUrl} alt="Selected platform stamp" style={{ maxWidth: '100%', maxHeight: 140, objectFit: 'contain', border: `1px solid ${C.border}`, borderRadius: 8, padding: 8 }} />}
+        </div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+        <button style={primaryBtn} disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save Signature & Stamp Settings'}</button>
+      </div>
+    </Card>
   );
 }
 
