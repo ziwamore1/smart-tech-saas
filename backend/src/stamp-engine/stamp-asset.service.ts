@@ -67,6 +67,31 @@ export class StampAssetService {
     });
   }
 
+  async uploadPlatform(
+    userId: string,
+    file: Express.Multer.File,
+    meta: { name: string; kind?: string },
+  ) {
+    this.validate(file);
+    const result = await this.cloudinary.uploadBuffer(file.buffer, {
+      folder: 'smarttech/stamp-assets/platform',
+      publicId: `${meta.kind || 'LOGO'}_${Date.now()}`,
+      fileName: file.originalname,
+      resourceType: 'image',
+    });
+    return {
+      name: meta.name,
+      kind: meta.kind || 'LOGO',
+      url: result.secureUrl || result.url,
+      publicId: result.publicId,
+      format: result.format || file.mimetype.split('/')[1],
+      width: result.width ?? null,
+      height: result.height ?? null,
+      sizeBytes: file.size,
+      uploadedById: userId,
+    };
+  }
+
   async delete(schoolId: string, id: string) {
     const asset = await this.getById(schoolId, id);
     try {

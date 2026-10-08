@@ -32,6 +32,7 @@ interface ContentLayer {
   name: string;
   content?: string;
   assetId?: string;
+  url?: string;
   x: number;
   y: number;
   width: number;
@@ -157,7 +158,7 @@ export default function SuperAdminStampDesignerPage() {
     }
     for (const layer of contentLayers) {
       if (layer.type === 'image') {
-        layers.push({ id: layer.id, type: 'image', name: layer.name, assetId: layer.assetId, x: layer.x, y: layer.y, width: layer.width, height: layer.height, rotation: layer.rotation, opacity: layer.opacity, zIndex: layer.zIndex });
+         layers.push({ id: layer.id, type: 'image', name: layer.name, assetId: layer.assetId, url: layer.url, x: layer.x, y: layer.y, width: layer.width, height: layer.height, rotation: layer.rotation, opacity: layer.opacity, zIndex: layer.zIndex });
       } else {
         layers.push({ id: layer.id, type: 'text', name: layer.name, content: layer.content || '', x: layer.x, y: layer.y, rotation: layer.rotation, opacity: layer.opacity, zIndex: layer.zIndex, fontFamily: 'sans-serif', fontSize: layer.fontSize, fontWeight: layer.fontWeight, letterSpacing: layer.letterSpacing, color: inkColor, align: layer.align, direction: 'horizontal' });
       }
@@ -191,7 +192,10 @@ export default function SuperAdminStampDesignerPage() {
 
   const load = useCallback(async () => {
     try {
-      const [res, assetRes] = await Promise.all([stampMarketplaceApi.adminPlatformList(), stampEngineApi.listAssets()]);
+      const [res, assetRes] = await Promise.all([
+        stampMarketplaceApi.adminPlatformList(),
+        stampEngineApi.listAssets().catch(() => ({ data: { assets: [] } })),
+      ]);
       const list = res.data?.templates;
       setTemplates(Array.isArray(list) ? list : []);
       setListError(Array.isArray(list) ? '' : 'Unexpected response from the marketplace service.');
@@ -220,7 +224,7 @@ export default function SuperAdminStampDesignerPage() {
        const loadedSerial = (cfg.layers || []).find((l: any) => l.id === 'serial');
        setSystemPositions({ date: { x: loadedDate?.x ?? 300, y: loadedDate?.y ?? 392 }, serial: { x: loadedSerial?.x ?? 300, y: loadedSerial?.y ?? 430 } });
        const loadedContentLayers = (cfg.layers || []).filter((l: any) => l.type === 'text' || l.type === 'image').map((l: any) => ({
-         id: l.id || uid(), type: l.type, name: l.name || l.type, content: l.content, assetId: l.assetId || '', x: l.x ?? 300, y: l.y ?? 300,
+         id: l.id || uid(), type: l.type, name: l.name || l.type, content: l.content, assetId: l.assetId || '', url: l.url || '', x: l.x ?? 300, y: l.y ?? 300,
          width: l.width ?? 300, height: l.height ?? 40, fontSize: l.fontSize ?? 18, fontWeight: l.fontWeight || 'normal',
          letterSpacing: l.letterSpacing ?? 0, align: l.align || 'middle', rotation: l.rotation ?? 0, opacity: l.opacity ?? 1, zIndex: l.zIndex ?? 20,
        }));
@@ -285,10 +289,10 @@ export default function SuperAdminStampDesignerPage() {
   const uploadAsset = async (file?: File) => {
     if (!file) return;
     try {
-      const res = await stampEngineApi.uploadAsset(file, file.name.replace(/\.[^.]+$/, ''), 'LOGO');
+      const res = await stampEngineApi.uploadPlatformAsset(file, file.name.replace(/\.[^.]+$/, ''), 'LOGO');
       setAssets(prev => [res.data, ...prev]);
       const id = uid();
-      setContentLayers(prev => [...prev, { id, type: 'image', name: file.name, assetId: res.data.id, x: 300, y: 300, width: 100, height: 100, fontSize: 12, fontWeight: 'normal', letterSpacing: 0, align: 'middle', rotation: 0, opacity: 1, zIndex: 50 + prev.length }]);
+      setContentLayers(prev => [...prev, { id, type: 'image', name: file.name, assetId: res.data.id, url: res.data.url, x: 300, y: 300, width: 100, height: 100, fontSize: 12, fontWeight: 'normal', letterSpacing: 0, align: 'middle', rotation: 0, opacity: 1, zIndex: 50 + prev.length }]);
        setSelectedContentId(id);
        setSelectedSystemId(null);
      } catch (err: any) { setMessage(err?.response?.data?.message || 'Could not upload emblem'); }

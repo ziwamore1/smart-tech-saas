@@ -1816,6 +1816,15 @@ export const assessmentEngineApi = {
     pending: (termId?: string) => api.get('/assessment-engine/teacher/pending', { params: { termId } }),
     overview: (teacherIds: string[], termId?: string) => api.get('/assessment-engine/teacher/overview', { params: { teacherIds: teacherIds.join(','), termId } }),
   },
+  uploadPlatformAsset: (file: File, name: string, kind: string = 'LOGO') => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('name', name);
+    form.append('kind', kind);
+    return api.post('/stamp-engine/platform-assets/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   completionStats: (classId: string, subjectId: string, termId: string) =>
     api.get(`/assessment-engine/completion-stats?classId=${classId}&subjectId=${subjectId}&termId=${termId}`),
 };

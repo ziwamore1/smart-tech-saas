@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { StampPermissionService, ActorContext, actorFromRequestUser } from './stamp-permission.service';
@@ -151,6 +151,19 @@ export class StampEngineController {
     await this.permissions.assert(this.actor(req), 'DOCUMENT_STAMP_CREATE', { schoolId });
     if (!body?.name) throw new BadRequestException('Asset name is required');
     return this.assets.upload(schoolId, req.user.id, file, { name: body.name, kind: body.kind });
+  }
+
+  @Post('platform-assets/upload')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  async uploadPlatformAsset(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { name?: string; kind?: string },
+  ) {
+    const actor = this.actor(req);
+    if (!actor.isSuperAdmin) throw new ForbiddenException('Platform asset upload requires super admin');
+    if (!body?.name) throw new BadRequestException('Asset name is required');
+    return this.assets.uploadPlatform(req.user.id, file, { name: body.name, kind: body.kind });
   }
 
   @Delete('assets/:id')
