@@ -295,7 +295,23 @@ export default function SuperAdminStampDesignerPage() {
       setContentLayers(prev => [...prev, { id, type: 'image', name: file.name, assetId: res.data.id, url: res.data.url, x: 300, y: 300, width: 100, height: 100, fontSize: 12, fontWeight: 'normal', letterSpacing: 0, align: 'middle', rotation: 0, opacity: 1, zIndex: 50 + prev.length }]);
        setSelectedContentId(id);
        setSelectedSystemId(null);
-     } catch (err: any) { setMessage(err?.response?.data?.message || 'Could not upload emblem'); }
+     } catch (err: any) {
+       if (file.size <= 2 * 1024 * 1024 && ['image/png', 'image/svg+xml', 'image/webp'].includes(file.type)) {
+         const url = await new Promise<string>((resolve, reject) => {
+           const reader = new FileReader();
+           reader.onload = () => resolve(String(reader.result));
+           reader.onerror = reject;
+           reader.readAsDataURL(file);
+         });
+         const id = uid();
+         setContentLayers(prev => [...prev, { id, type: 'image', name: file.name, assetId: '', url, x: 300, y: 300, width: 100, height: 100, fontSize: 12, fontWeight: 'normal', letterSpacing: 0, align: 'middle', rotation: 0, opacity: 1, zIndex: 50 + prev.length }]);
+         setSelectedContentId(id);
+         setSelectedSystemId(null);
+         setMessage('Logo added to this draft. The server upload was unavailable, so it will be saved with the draft.');
+       } else {
+         setMessage(err?.response?.data?.message || err?.message || 'Could not upload emblem');
+       }
+     }
   };
 
   const getCoords = (e: React.MouseEvent) => {
