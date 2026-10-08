@@ -101,6 +101,7 @@ export default function SuperAdminStampDesignerPage() {
 
   const [outerShape, setOuterShape] = useState<'circle' | 'rectangle' | 'oval'>('circle');
   const [outerRadius, setOuterRadius] = useState(270);
+  const [innerRadius, setInnerRadius] = useState(242);
   const [borderColor, setBorderColor] = useState('#1e3a5f');
   const [borderWidth, setBorderWidth] = useState(6);
   const [inkColor, setInkColor] = useState('#123456');
@@ -159,12 +160,12 @@ export default function SuperAdminStampDesignerPage() {
     return {
       canvas: { width: CANVAS, height: CANVAS, background: 'transparent' },
       shape: outerShape === 'circle'
-        ? { type: 'circle', outerRadius, borderWidth, borderColor, innerRings: [{ radius: Math.max(60, outerRadius - 28), width: 2, color: borderColor, dashed: false }] }
+        ? { type: 'circle', outerRadius, borderWidth, borderColor, innerRings: [{ radius: Math.min(innerRadius, outerRadius - 4), width: 2, color: borderColor, dashed: false }] }
         : { type: outerShape, width: outerRadius * 2, height: outerRadius * 1.4, borderWidth, borderColor, innerRings: [{ inset: 24, width: 2, color: borderColor, dashed: false }] },
       layers,
       effects: { inkOpacity: 1, texture: 'none' },
     };
-  }, [outerShape, outerRadius, borderColor, borderWidth, inkColor, shapes, contentLayers, curvedLayers]);
+  }, [outerShape, outerRadius, innerRadius, borderColor, borderWidth, inkColor, shapes, contentLayers, curvedLayers]);
 
   // Debounced server-rendered live preview (same engine the PDF pipeline uses).
   useEffect(() => {
@@ -201,6 +202,7 @@ export default function SuperAdminStampDesignerPage() {
     setName(t.name || '');
     setOuterShape(cfg.shape?.type || 'circle');
     setOuterRadius(cfg.shape?.outerRadius || 270);
+    setInnerRadius(cfg.shape?.innerRings?.[0]?.radius || Math.max(60, (cfg.shape?.outerRadius || 270) - 28));
     setInkColor('#123456');
       setShapes((cfg.layers || []).filter((l: any) => l.type === 'shape').map((l: any) => ({
       id: l.id, shape: l.shape || 'shield', x: l.x, y: l.y, size: l.size ?? 100, width: l.width, height: l.height,
@@ -354,6 +356,7 @@ export default function SuperAdminStampDesignerPage() {
               ))}
             </div>
             <label className="block text-xs text-gray-600">Radius: {outerRadius}px<input className="w-full" type="range" min="140" max="285" value={outerRadius} onChange={e => setOuterRadius(Number(e.target.value))} /></label>
+            {outerShape === 'circle' && <label className="block text-xs text-gray-600">Inner circle radius: {innerRadius}px<input className="w-full" type="range" min="30" max={Math.max(30, outerRadius - 4)} value={Math.min(innerRadius, outerRadius - 4)} onChange={e => setInnerRadius(Number(e.target.value))} /></label>}
             <label className="block text-xs text-gray-600">Ink colour<input type="color" value={inkColor} onChange={e => setInkColor(e.target.value)} className="mt-1 w-full h-8 rounded cursor-pointer" /></label>
             <label className="block text-xs text-gray-600">Border colour<input type="color" value={borderColor} onChange={e => setBorderColor(e.target.value)} className="mt-1 w-full h-8 rounded cursor-pointer" /></label>
             <label className="block text-xs text-gray-600">Border width: {borderWidth}<input className="w-full" type="range" min="2" max="12" value={borderWidth} onChange={e => setBorderWidth(Number(e.target.value))} /></label>

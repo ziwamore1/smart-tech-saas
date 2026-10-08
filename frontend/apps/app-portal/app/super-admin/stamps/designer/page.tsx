@@ -39,6 +39,7 @@ interface SvgOptions {
   centerX?: number;
   centerY?: number;
   arcRotation?: number;
+  innerRadius?: number;
 }
 
 function escapeXml(text: string): string {
@@ -86,7 +87,7 @@ function arcPath(cx: number, cy: number, radius: number, start: number, end: num
 
 function circularSvg(o: SvgOptions): string {
   const size = o.width;
-  const cx = o.centerX ?? size / 2, cy = o.centerY ?? size / 2, r = size / 2 - 4, innerR = r - 16;
+  const cx = o.centerX ?? size / 2, cy = o.centerY ?? size / 2, r = size / 2 - 4, innerR = Math.min(r - 4, o.innerRadius ?? r - 16);
   const fontSize = Math.max(8, Math.floor(r / 6));
   const innerFontSize = Math.max(10, Math.floor(r / 5));
   const subSize = Math.max(6, fontSize - 4);
@@ -161,6 +162,7 @@ export default function SuperAdminStampDesignerPage() {
   const [circularCenterX, setCircularCenterX] = useState<number | null>(null);
   const [circularCenterY, setCircularCenterY] = useState<number | null>(null);
   const [arcRotation, setArcRotation] = useState(0);
+  const [innerRadius, setInnerRadius] = useState(84);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -171,8 +173,8 @@ export default function SuperAdminStampDesignerPage() {
   const effectiveHeight = shape === 'CIRCULAR' ? width : height;
 
   const svgContent = useMemo(
-    () => buildSvg({ shape, type, text: text || 'INSTITUTION NAME', subtitle, width, height: effectiveHeight, ink, border, topStart, topEnd, topRadius, bottomStart, bottomEnd, bottomRadius, customCircularText, customStart, customEnd, customRadius, centerX: circularCenterX ?? width / 2, centerY: circularCenterY ?? effectiveHeight / 2, arcRotation }),
-    [shape, type, text, subtitle, width, effectiveHeight, ink, border, topStart, topEnd, topRadius, bottomStart, bottomEnd, bottomRadius, customCircularText, customStart, customEnd, customRadius, circularCenterX, circularCenterY, arcRotation],
+    () => buildSvg({ shape, type, text: text || 'INSTITUTION NAME', subtitle, width, height: effectiveHeight, ink, border, topStart, topEnd, topRadius, bottomStart, bottomEnd, bottomRadius, customCircularText, customStart, customEnd, customRadius, centerX: circularCenterX ?? width / 2, centerY: circularCenterY ?? effectiveHeight / 2, arcRotation, innerRadius }),
+    [shape, type, text, subtitle, width, effectiveHeight, ink, border, topStart, topEnd, topRadius, bottomStart, bottomEnd, bottomRadius, customCircularText, customStart, customEnd, customRadius, circularCenterX, circularCenterY, arcRotation, innerRadius],
   );
 
   const load = useCallback(async () => {
@@ -318,7 +320,7 @@ export default function SuperAdminStampDesignerPage() {
         </div>
         {shape === 'CIRCULAR' && <section className="rounded-lg border border-cyan-100 bg-cyan-50/40 p-3 space-y-3">
           <div><h3 className="text-xs font-semibold text-cyan-900">Circular text paths</h3><p className="text-[11px] text-cyan-700 mt-1">Adjust each arc directly. Add custom circular text for stamps that do not use a standard top/bottom layout.</p></div>
-          <div className="grid grid-cols-4 gap-2 text-xs"><label>Center X<input type="number" value={circularCenterX ?? width / 2} onChange={e => setCircularCenterX(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Center Y<input type="number" value={circularCenterY ?? effectiveHeight / 2} onChange={e => setCircularCenterY(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Rotation°<input type="number" value={arcRotation} onChange={e => setArcRotation(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Top radius<input type="number" min={30} value={topRadius} onChange={e => setTopRadius(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label></div>
+          <div className="grid grid-cols-5 gap-2 text-xs"><label>Center X<input type="number" value={circularCenterX ?? width / 2} onChange={e => setCircularCenterX(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Center Y<input type="number" value={circularCenterY ?? effectiveHeight / 2} onChange={e => setCircularCenterY(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Rotation°<input type="number" value={arcRotation} onChange={e => setArcRotation(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Outer radius<input type="number" min={30} value={Math.round(width / 2 - 4)} onChange={e => { const next = Number(e.target.value); setWidth(Math.max(100, Math.min(400, (next + 4) * 2))); }} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Inner radius<input type="number" min={20} max={Math.round(width / 2 - 8)} value={Math.min(innerRadius, Math.round(width / 2 - 8))} onChange={e => setInnerRadius(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label></div>
           <div className="grid grid-cols-2 gap-2 text-xs"><label>Top start<input type="number" value={topStart} onChange={e => setTopStart(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Top end<input type="number" value={topEnd} onChange={e => setTopEnd(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label></div>
           <div className="grid grid-cols-3 gap-2 text-xs"><label>Bottom start<input type="number" value={bottomStart} onChange={e => setBottomStart(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Bottom end<input type="number" value={bottomEnd} onChange={e => setBottomEnd(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Bottom radius<input type="number" min={30} value={bottomRadius} onChange={e => setBottomRadius(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1" /></label></div>
           <label className="block text-xs text-gray-600">Custom circular text<input value={customCircularText} onChange={e => setCustomCircularText(e.target.value)} placeholder="Optional text on its own arc" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" /></label>
