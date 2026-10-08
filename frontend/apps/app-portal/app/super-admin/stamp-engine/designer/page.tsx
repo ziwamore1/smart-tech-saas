@@ -371,7 +371,10 @@ export default function SuperAdminStampDesignerPage() {
       }
        setMessage('Stamp draft saved. It is not available to schools until published.');
       void load();
-    } catch (err: any) { setMessage(err?.response?.data?.message || 'Could not save stamp'); }
+    } catch (err: any) {
+      const detail = err?.response?.data?.message || err?.message || 'Could not save stamp';
+      setMessage(Array.isArray(detail) ? detail.join(', ') : String(detail));
+    }
     finally { setBusy(false); }
   };
 
