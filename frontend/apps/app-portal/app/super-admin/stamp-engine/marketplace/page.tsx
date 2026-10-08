@@ -25,7 +25,22 @@ export default function SuperAdminStampMarketplacePage() {
     try {
       const res = await stampMarketplaceApi.adminEntries();
       setEntries(res.data?.entries || []);
-    } catch (err: any) { setError(err?.response?.data?.message || 'Could not load marketplace'); }
+    } catch (err: any) {
+      try {
+        const fallback = await stampMarketplaceApi.adminPlatformList();
+        const templates = fallback.data?.templates || [];
+        setEntries(templates.map((template: any) => ({
+          ...template,
+          template,
+          platformTemplateId: template.id,
+          marketplace: template.marketplace,
+          _count: { installs: 0 },
+        })));
+        setError('Marketplace statistics are temporarily unavailable; platform stamps are shown from the authoring registry.');
+      } catch (fallbackErr: any) {
+        setError(fallbackErr?.response?.data?.message || err?.response?.data?.message || err?.message || 'Could not load marketplace');
+      }
+    }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
