@@ -391,11 +391,15 @@ export class StampRendererService {
     const spacing = layer.letterSpacing ?? 2;
     const color = layer.color || '#111827';
     const content = this.resolveDynamicContent(layer.content, ctx);
+    const arcDegrees = Math.min(360, Math.abs(endAngle - startAngle));
+    const availableLength = Math.max(1, radius * Math.PI * arcDegrees / 180 * 0.92);
+    const estimatedLength = Math.max(1, [...content].length * fontSize * 0.62 + Math.max(0, [...content].length - 1) * spacing);
+    const textLength = Math.min(estimatedLength, availableLength);
 
     const parts = [
       `<path id="${id}" d="M ${p1.x.toFixed(2)},${p1.y.toFixed(2)} A ${radius},${radius} 0 ${largeArc} ${sweep} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}" fill="none"/>`,
       `<text font-family="${escXml(layer.fontFamily || 'serif')}" font-size="${fontSize}" font-weight="${layer.fontWeight || 'bold'}" ` +
-      `letter-spacing="${spacing}" fill="${color}" text-anchor="middle"${this.layerTransform(layer, centerX, centerY)}>` +
+      `letter-spacing="${spacing}" textLength="${textLength.toFixed(2)}" lengthAdjust="spacingAndGlyphs" fill="${color}" text-anchor="middle"${this.layerTransform(layer, centerX, centerY)}>` +
       `<textPath href="#${id}" xlink:href="#${id}" startOffset="50%">${escXml(content)}</textPath></text>`,
     ];
 

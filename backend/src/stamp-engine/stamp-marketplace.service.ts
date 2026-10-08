@@ -75,7 +75,7 @@ export class StampMarketplaceService {
         scope: 'PLATFORM',
         name: data.name.trim(),
         type: (data.type as any) || 'CUSTOM',
-        status: 'PUBLISHED',
+        status: 'DRAFT',
         version: 1,
         configJson: data.configJson as any,
         createdBy: actor.userId,
@@ -98,8 +98,9 @@ export class StampMarketplaceService {
       });
       await this.prisma.stampTemplate.update({
         where: { id },
-        data: { name: data.name || t.name, configJson: data.configJson as any, version: nextVersion, status: 'PUBLISHED', updatedBy: actor.userId },
+        data: { name: data.name || t.name, configJson: data.configJson as any, version: nextVersion, status: 'DRAFT', updatedBy: actor.userId },
       });
+      await this.prisma.stampMarketplace.updateMany({ where: { templateId: id }, data: { status: 'UNPUBLISHED', publishedAt: null } });
     } else if (data.name) {
       await this.prisma.stampTemplate.update({ where: { id }, data: { name: data.name, updatedBy: actor.userId } });
     }
@@ -162,6 +163,7 @@ export class StampMarketplaceService {
         createdBy: actor.userId,
       },
     });
+    await this.prisma.stampTemplate.update({ where: { id: templateId }, data: { status: 'PUBLISHED' } });
     return entry;
   }
 

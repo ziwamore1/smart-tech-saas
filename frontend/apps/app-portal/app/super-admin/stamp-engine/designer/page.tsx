@@ -67,6 +67,8 @@ interface CurvedTextLayer {
   zIndex: number;
 }
 
+type SystemLayerId = 'date' | 'serial';
+
 const SHAPE_OPTIONS: { value: ShapeKind; label: string }[] = [
   { value: 'shield', label: 'Shield (crest)' },
   { value: 'hexagon', label: 'Hexagon' },
@@ -123,6 +125,8 @@ export default function SuperAdminStampDesignerPage() {
   ]);
   const [assets, setAssets] = useState<any[]>([]);
   const [selectedContentId, setSelectedContentId] = useState<string | null>(null);
+  const [selectedSystemId, setSelectedSystemId] = useState<SystemLayerId | null>(null);
+  const [systemPositions, setSystemPositions] = useState<Record<SystemLayerId, { x: number; y: number }>>({ date: { x: 300, y: 392 }, serial: { x: 300, y: 430 } });
   const [curvedLayers, setCurvedLayers] = useState<CurvedTextLayer[]>([
     { id: 'arc_top', name: 'Top circular text', content: 'REPUBLIC OF ZAMBIA', x: 300, y: 300, radius: 225, startAngle: -60, endAngle: 60, rotation: 0, fontSize: 30, letterSpacing: 4, fontWeight: 'bold', orientation: 'outward', separator: '★', separatorPlacement: 'ends', separatorAngle: 180, separatorOffset: 30, opacity: 1, zIndex: 10 },
     { id: 'arc_bottom', name: 'Bottom circular text', content: 'EDUCATION BOARD', x: 300, y: 300, radius: 235, startAngle: 240, endAngle: 120, rotation: 0, fontSize: 22, letterSpacing: 3, fontWeight: 'bold', orientation: 'inward', separator: '', separatorPlacement: 'gap', separatorAngle: 180, separatorOffset: 30, opacity: 1, zIndex: 12 },
@@ -158,8 +162,8 @@ export default function SuperAdminStampDesignerPage() {
         layers.push({ id: layer.id, type: 'text', name: layer.name, content: layer.content || '', x: layer.x, y: layer.y, rotation: layer.rotation, opacity: layer.opacity, zIndex: layer.zIndex, fontFamily: 'sans-serif', fontSize: layer.fontSize, fontWeight: layer.fontWeight, letterSpacing: layer.letterSpacing, color: inkColor, align: layer.align, direction: 'horizontal' });
       }
     }
-    layers.push({ id: 'date', type: 'date', name: 'Date', label: 'DIGITALLY STAMPED', showTime: true, x: cx, y: cy + 92, rotation: 0, opacity: 1, zIndex: 40, fontFamily: 'sans-serif', fontSize: 12, fontWeight: 'bold', letterSpacing: 1, color: '#111827' });
-    layers.push({ id: 'serial', type: 'serial', name: 'Serial', label: '', x: cx, y: cy + 130, rotation: 0, opacity: 1, zIndex: 41, fontFamily: 'monospace', fontSize: 11, fontWeight: 'bold', letterSpacing: 1, color: '#374151' });
+    layers.push({ id: 'date', type: 'date', name: 'Date', label: 'DIGITALLY STAMPED', showTime: true, x: systemPositions.date.x, y: systemPositions.date.y, rotation: 0, opacity: 1, zIndex: 40, fontFamily: 'sans-serif', fontSize: 12, fontWeight: 'bold', letterSpacing: 1, color: '#111827' });
+    layers.push({ id: 'serial', type: 'serial', name: 'Serial', label: '', x: systemPositions.serial.x, y: systemPositions.serial.y, rotation: 0, opacity: 1, zIndex: 41, fontFamily: 'monospace', fontSize: 11, fontWeight: 'bold', letterSpacing: 1, color: '#374151' });
 
     return {
       canvas: { width: CANVAS, height: CANVAS, background: 'transparent' },
@@ -169,7 +173,7 @@ export default function SuperAdminStampDesignerPage() {
       layers,
       effects: { inkOpacity: 1, texture: 'none' },
     };
-  }, [outerShape, outerRadius, innerRadius, borderColor, borderWidth, inkColor, shapes, contentLayers, curvedLayers]);
+  }, [outerShape, outerRadius, innerRadius, borderColor, borderWidth, inkColor, shapes, contentLayers, curvedLayers, systemPositions]);
 
   // Debounced server-rendered live preview (same engine the PDF pipeline uses).
   useEffect(() => {
@@ -208,15 +212,25 @@ export default function SuperAdminStampDesignerPage() {
     setOuterRadius(cfg.shape?.outerRadius || 270);
     setInnerRadius(cfg.shape?.innerRings?.[0]?.radius || Math.max(60, (cfg.shape?.outerRadius || 270) - 28));
     setInkColor('#123456');
-      setShapes((cfg.layers || []).filter((l: any) => l.type === 'shape').map((l: any) => ({
+       setShapes((cfg.layers || []).filter((l: any) => l.type === 'shape').map((l: any) => ({
       id: l.id, shape: l.shape || 'shield', x: l.x, y: l.y, size: l.size ?? 100, width: l.width, height: l.height,
       fill: l.fill || '#1e3a5f', stroke: l.stroke, strokeWidth: l.strokeWidth ?? 0, rotation: l.rotation ?? 0, opacity: l.opacity ?? 1, zIndex: l.zIndex ?? 20, innerRatio: l.innerRatio, rx: l.rx,
-      })));
-      setContentLayers((cfg.layers || []).filter((l: any) => l.type === 'text' || l.type === 'image').map((l: any) => ({
-        id: l.id || uid(), type: l.type, name: l.name || l.type, content: l.content, assetId: l.assetId || '', x: l.x ?? 300, y: l.y ?? 300,
-        width: l.width ?? 300, height: l.height ?? 40, fontSize: l.fontSize ?? 18, fontWeight: l.fontWeight || 'normal',
-        letterSpacing: l.letterSpacing ?? 0, align: l.align || 'middle', rotation: l.rotation ?? 0, opacity: l.opacity ?? 1, zIndex: l.zIndex ?? 20,
-      })));
+       })));
+       const loadedDate = (cfg.layers || []).find((l: any) => l.id === 'date');
+       const loadedSerial = (cfg.layers || []).find((l: any) => l.id === 'serial');
+       setSystemPositions({ date: { x: loadedDate?.x ?? 300, y: loadedDate?.y ?? 392 }, serial: { x: loadedSerial?.x ?? 300, y: loadedSerial?.y ?? 430 } });
+       const loadedContentLayers = (cfg.layers || []).filter((l: any) => l.type === 'text' || l.type === 'image').map((l: any) => ({
+         id: l.id || uid(), type: l.type, name: l.name || l.type, content: l.content, assetId: l.assetId || '', x: l.x ?? 300, y: l.y ?? 300,
+         width: l.width ?? 300, height: l.height ?? 40, fontSize: l.fontSize ?? 18, fontWeight: l.fontWeight || 'normal',
+         letterSpacing: l.letterSpacing ?? 0, align: l.align || 'middle', rotation: l.rotation ?? 0, opacity: l.opacity ?? 1, zIndex: l.zIndex ?? 20,
+       }));
+       setContentLayers(loadedContentLayers);
+       const loadedStampType = loadedContentLayers.find((l: any) => l.id === 'stamp-type')?.content;
+       if (loadedStampType && STAMP_TYPES.includes(loadedStampType)) setStampType(loadedStampType);
+       const loadedCenter = loadedContentLayers.find((l: any) => l.id === 'stamp-type')?.content;
+       if (loadedCenter) setCenterText(loadedCenter);
+       const loadedSub = loadedContentLayers.find((l: any) => l.id === 'department')?.content;
+       if (loadedSub) setCenterSub(loadedSub);
       setCurvedLayers((cfg.layers || []).filter((l: any) => l.type === 'curved-text').map((l: any) => ({
         id: l.id || uid(), name: l.name || 'Circular text', content: l.content || '', x: l.curve?.centerX ?? l.x ?? 300, y: l.curve?.centerY ?? l.y ?? 300,
         radius: l.curve?.radius ?? 220, startAngle: l.curve?.startAngle ?? -60, endAngle: l.curve?.endAngle ?? 60, rotation: l.rotation ?? 0, fontSize: l.fontSize ?? 24,
@@ -257,7 +271,15 @@ export default function SuperAdminStampDesignerPage() {
     const id = uid();
     const layer: ContentLayer = { id, type, name: type === 'text' ? 'Custom text' : 'Emblem / logo', content: type === 'text' ? 'CUSTOM TEXT' : undefined, assetId: '', x: 300, y: 300, width: type === 'text' ? 360 : 90, height: type === 'text' ? 40 : 90, fontSize: 18, fontWeight: 'bold', letterSpacing: 1, align: 'middle', rotation: 0, opacity: 1, zIndex: 50 + contentLayers.length };
     setContentLayers(prev => [...prev, layer]);
+     setSelectedContentId(id);
+     setSelectedSystemId(null);
+  };
+
+  const addSeparator = () => {
+    const id = uid();
+    setContentLayers(prev => [...prev, { id, type: 'text', name: 'Independent separator', content: '★', x: 300, y: 450, width: 40, height: 40, fontSize: 24, fontWeight: 'bold', letterSpacing: 0, align: 'middle', rotation: 0, opacity: 1, zIndex: 55 + prev.length }]);
     setSelectedContentId(id);
+     setSelectedShapeId(null); setSelectedCurvedId(null); setSelectedSystemId(null);
   };
 
   const uploadAsset = async (file?: File) => {
@@ -267,8 +289,9 @@ export default function SuperAdminStampDesignerPage() {
       setAssets(prev => [res.data, ...prev]);
       const id = uid();
       setContentLayers(prev => [...prev, { id, type: 'image', name: file.name, assetId: res.data.id, x: 300, y: 300, width: 100, height: 100, fontSize: 12, fontWeight: 'normal', letterSpacing: 0, align: 'middle', rotation: 0, opacity: 1, zIndex: 50 + prev.length }]);
-      setSelectedContentId(id);
-    } catch (err: any) { setMessage(err?.response?.data?.message || 'Could not upload emblem'); }
+       setSelectedContentId(id);
+       setSelectedSystemId(null);
+     } catch (err: any) { setMessage(err?.response?.data?.message || 'Could not upload emblem'); }
   };
 
   const getCoords = (e: React.MouseEvent) => {
@@ -280,10 +303,11 @@ export default function SuperAdminStampDesignerPage() {
   const dragPos = useRef<{ id: string; startX: number; startY: number; x: number; y: number } | null>(null);
   const onPreviewDown = (e: React.MouseEvent) => {
     if (busy) return;
-    const layer = selectedShapeId ? shapes.find(s => s.id === selectedShapeId) : selectedContentId ? contentLayers.find(l => l.id === selectedContentId) : curvedLayers.find(l => l.id === selectedCurvedId);
-    if (!layer) return;
+    const layer = selectedShapeId ? shapes.find(s => s.id === selectedShapeId) : selectedContentId ? contentLayers.find(l => l.id === selectedContentId) : selectedCurvedId ? curvedLayers.find(l => l.id === selectedCurvedId) : null;
+    const systemLayer = selectedSystemId ? systemPositions[selectedSystemId] : null;
+    if (!layer && !systemLayer) return;
     const c = getCoords(e);
-    dragPos.current = { id: layer.id, startX: c.cx, startY: c.cy, x: layer.x, y: layer.y };
+    dragPos.current = { id: layer?.id || selectedSystemId || '', startX: c.cx, startY: c.cy, x: layer?.x ?? systemLayer!.x, y: layer?.y ?? systemLayer!.y };
     e.preventDefault();
   };
   const onPreviewMove = (e: React.MouseEvent) => {
@@ -296,6 +320,7 @@ export default function SuperAdminStampDesignerPage() {
       y: Math.max(0, Math.min(CANVAS, dragPos.current.y + dy)),
     });
     else if (selectedContentId) updateContent(dragPos.current.id, { x: Math.max(0, Math.min(CANVAS, dragPos.current.x + dx)), y: Math.max(0, Math.min(CANVAS, dragPos.current.y + dy)) });
+    else if (selectedSystemId) setSystemPositions(prev => ({ ...prev, [selectedSystemId]: { x: Math.max(0, Math.min(CANVAS, dragPos.current!.x + dx)), y: Math.max(0, Math.min(CANVAS, dragPos.current!.y + dy)) } }));
     else updateCurved(dragPos.current.id, { x: Math.max(0, Math.min(CANVAS, dragPos.current.x + dx)), y: Math.max(0, Math.min(CANVAS, dragPos.current.y + dy)) });
   };
   const onPreviewUp = () => { dragPos.current = null; };
@@ -311,6 +336,7 @@ export default function SuperAdminStampDesignerPage() {
     setSelectedShapeId(id);
     setSelectedContentId(null);
     setSelectedCurvedId(null);
+    setSelectedSystemId(null);
   };
 
   const save = async () => {
@@ -323,7 +349,7 @@ export default function SuperAdminStampDesignerPage() {
         const res = await stampMarketplaceApi.adminPlatformCreate({ name: name.trim(), configJson });
         setEditingId(res.data?.id);
       }
-      setMessage('Platform stamp saved.');
+       setMessage('Stamp draft saved. It is not available to schools until published.');
       void load();
     } catch (err: any) { setMessage(err?.response?.data?.message || 'Could not save stamp'); }
     finally { setBusy(false); }
@@ -362,7 +388,7 @@ export default function SuperAdminStampDesignerPage() {
           <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
             <h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Save / load</h2>
             <input value={name} onChange={e => setName(e.target.value)} placeholder="Platform stamp name" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-            <button onClick={save} disabled={busy} className="w-full rounded-lg bg-violet-700 text-white py-2.5 font-semibold disabled:opacity-50">{busy ? 'Saving…' : 'Save Platform Stamp'}</button>
+            <button onClick={save} disabled={busy} className="w-full rounded-lg bg-violet-700 text-white py-2.5 font-semibold disabled:opacity-50">{busy ? 'Saving…' : 'Save Draft'}</button>
             <select onChange={e => { const t = templates.find(x => x.id === e.target.value); if (t) selectTemplate(t); }} value={editingId || ''} className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm">
               <option value="">— Load existing —</option>
               {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -392,7 +418,7 @@ export default function SuperAdminStampDesignerPage() {
           <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
              <div className="flex items-center justify-between"><h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Circular text</h2><div className="flex flex-wrap gap-1"><button onClick={() => addCurvedText('top')} className="px-2 py-1 text-[11px] border rounded text-violet-700">+ Top</button><button onClick={() => addCurvedText('bottom')} className="px-2 py-1 text-[11px] border rounded text-violet-700">+ Bottom</button><button onClick={() => addCurvedText('left')} className="px-2 py-1 text-[11px] border rounded text-violet-700">+ Left</button><button onClick={() => addCurvedText('right')} className="px-2 py-1 text-[11px] border rounded text-violet-700">+ Right</button></div></div>
             <p className="text-[10px] text-gray-400">Select an arc to edit its path, radius, angle range, size, and exact center. Drag it on the preview to reposition it.</p>
-            <div className="space-y-1">{curvedLayers.map(layer => <div key={layer.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer ${selectedCurvedId === layer.id ? 'bg-violet-50 ring-1 ring-violet-300' : 'hover:bg-gray-50'}`} onClick={() => { setSelectedCurvedId(layer.id); setSelectedShapeId(null); setSelectedContentId(null); }}><span className="flex-1 truncate">{layer.name}</span><button onClick={e => { e.stopPropagation(); setCurvedLayers(prev => prev.filter(x => x.id !== layer.id)); }} className="text-red-500">✕</button></div>)}</div>
+             <div className="space-y-1">{curvedLayers.map(layer => <div key={layer.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer ${selectedCurvedId === layer.id ? 'bg-violet-50 ring-1 ring-violet-300' : 'hover:bg-gray-50'}`} onClick={() => { setSelectedCurvedId(layer.id); setSelectedShapeId(null); setSelectedContentId(null); setSelectedSystemId(null); }}><span className="flex-1 truncate">{layer.name}</span><button onClick={e => { e.stopPropagation(); setCurvedLayers(prev => prev.filter(x => x.id !== layer.id)); }} className="text-red-500">✕</button></div>)}</div>
              {curvedLayers.find(l => l.id === selectedCurvedId) && (() => { const sel = curvedLayers.find(l => l.id === selectedCurvedId)!; return <div className="border-t pt-2 space-y-2 text-xs text-gray-600"><label className="block">Name<input value={sel.name} onChange={e => updateCurved(sel.id, { name: e.target.value })} className="mt-1 w-full border rounded px-2 py-1.5" /></label><label className="block">Text<input value={sel.content} onChange={e => updateCurved(sel.id, { content: e.target.value })} className="mt-1 w-full border rounded px-2 py-1.5" /></label><div className="grid grid-cols-2 gap-2"><label>Center X<input type="number" value={sel.x} onChange={e => updateCurved(sel.id, { x: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Center Y<input type="number" value={sel.y} onChange={e => updateCurved(sel.id, { y: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Radius<input type="number" min={20} value={sel.radius} onChange={e => updateCurved(sel.id, { radius: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Font size<input type="number" min={6} value={sel.fontSize} onChange={e => updateCurved(sel.id, { fontSize: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Start angle<input type="number" value={sel.startAngle} onChange={e => updateCurved(sel.id, { startAngle: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label><label>End angle<input type="number" value={sel.endAngle} onChange={e => updateCurved(sel.id, { endAngle: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Rotation°<input type="number" value={sel.rotation} onChange={e => updateCurved(sel.id, { rotation: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label></div><div className="grid grid-cols-2 gap-2"><label>Letter spacing<input type="number" value={sel.letterSpacing} onChange={e => updateCurved(sel.id, { letterSpacing: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Direction<select value={sel.orientation} onChange={e => updateCurved(sel.id, { orientation: e.target.value as CurvedTextLayer['orientation'] })} className="mt-1 w-full border rounded px-2 py-1"><option value="outward">Outward</option><option value="inward">Inward</option></select></label></div><div className="grid grid-cols-2 gap-2"><label>Separator<select value={SEPARATOR_OPTIONS.includes(sel.separator) ? sel.separator : ''} onChange={e => updateCurved(sel.id, { separator: e.target.value })} className="mt-1 w-full border rounded px-2 py-1.5">{SEPARATOR_OPTIONS.map((separator, index) => <option key={`${separator}-${index}`} value={separator}>{separator || 'None'}</option>)}</select></label><label>Custom separator<input value={SEPARATOR_OPTIONS.includes(sel.separator) ? '' : sel.separator} onChange={e => updateCurved(sel.id, { separator: e.target.value })} placeholder="Any symbol or text" className="mt-1 w-full border rounded px-2 py-1.5" /></label></div><div className="grid grid-cols-2 gap-2"><label>Placement<select value={sel.separatorPlacement} onChange={e => updateCurved(sel.id, { separatorPlacement: e.target.value as CurvedTextLayer['separatorPlacement'] })} className="mt-1 w-full border rounded px-2 py-1"><option value="gap">Gap center</option><option value="ends">Both arc ends</option><option value="custom">Custom angle</option></select></label><label>Custom angle<input type="number" value={sel.separatorAngle} disabled={sel.separatorPlacement !== 'custom'} onChange={e => updateCurved(sel.id, { separatorAngle: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1 disabled:bg-gray-100" /></label></div><label className="block">End offset: {sel.separatorOffset}°<input type="range" min="0" max="60" value={sel.separatorOffset} onChange={e => updateCurved(sel.id, { separatorOffset: Number(e.target.value) })} className="w-full" /></label></div>; })()}
           </section>
 
@@ -403,9 +429,9 @@ export default function SuperAdminStampDesignerPage() {
               {SHAPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             {shapes.length === 0 && <p className="text-[11px] text-gray-400">Add shields, stars, hexagons, diamonds, boxes… then drag them on the canvas and recolor to the ink.</p>}
-            <div className="space-y-1 max-h-40 overflow-y-auto">
+             <div className="space-y-1 max-h-40 overflow-y-auto">
                 {shapes.map(s => (
-                  <div key={s.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer ${selectedShapeId === s.id ? 'bg-violet-50 ring-1 ring-violet-300' : 'hover:bg-gray-50'}`} onClick={() => { setSelectedShapeId(s.id); setSelectedContentId(null); setSelectedCurvedId(null); }}>
+                   <div key={s.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer ${selectedShapeId === s.id ? 'bg-violet-50 ring-1 ring-violet-300' : 'hover:bg-gray-50'}`} onClick={() => { setSelectedShapeId(s.id); setSelectedContentId(null); setSelectedCurvedId(null); setSelectedSystemId(null); }}>
                   <span className="flex-1 truncate text-gray-700">{s.shape}</span>
                   <span className="text-gray-400">z{s.zIndex}</span>
                   <button onClick={() => setShapes(prev => prev.filter(x => x.id !== s.id))} className="text-red-500 hover:text-red-700">✕</button>
@@ -435,10 +461,11 @@ export default function SuperAdminStampDesignerPage() {
             })()}
           </section>
           <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-            <div className="flex items-center justify-between"><h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Text & emblems</h2><div className="flex gap-1"><button onClick={() => addContent('text')} className="px-2 py-1 text-[11px] border rounded text-violet-700">+ Text</button><button onClick={() => addContent('image')} className="px-2 py-1 text-[11px] border rounded text-violet-700">+ Emblem</button></div></div>
+             <div className="flex items-center justify-between"><h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Text & emblems</h2><div className="flex flex-wrap gap-1"><button onClick={() => addContent('text')} className="px-2 py-1 text-[11px] border rounded text-violet-700">+ Text</button><button onClick={addSeparator} className="px-2 py-1 text-[11px] border rounded text-violet-700">+ Separator</button><button onClick={() => addContent('image')} className="px-2 py-1 text-[11px] border rounded text-violet-700">+ Emblem</button></div></div>
             <input type="file" accept=".png,.svg,.webp" onChange={e => void uploadAsset(e.target.files?.[0])} className="block w-full text-[11px] text-gray-500" />
-            <p className="text-[10px] text-gray-400">Add multiple logos or emblems and position each independently on the template.</p>
-            <div className="space-y-1 max-h-36 overflow-y-auto">{contentLayers.map(layer => <div key={layer.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer ${selectedContentId === layer.id ? 'bg-violet-50 ring-1 ring-violet-300' : 'hover:bg-gray-50'}`} onClick={() => { setSelectedContentId(layer.id); setSelectedShapeId(null); }}><span className="flex-1 truncate">{layer.name}</span><span className="text-gray-400">{layer.type}</span><button onClick={e => { e.stopPropagation(); setContentLayers(prev => prev.filter(x => x.id !== layer.id)); }} className="text-red-500">✕</button></div>)}</div>
+             <p className="text-[10px] text-gray-400">Add multiple logos or emblems and position each independently on the template.</p>
+             <div className="space-y-1 max-h-36 overflow-y-auto">{contentLayers.map(layer => <div key={layer.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer ${selectedContentId === layer.id ? 'bg-violet-50 ring-1 ring-violet-300' : 'hover:bg-gray-50'}`} onClick={() => { setSelectedContentId(layer.id); setSelectedShapeId(null); setSelectedCurvedId(null); setSelectedSystemId(null); }}><span className="flex-1 truncate">{layer.name}</span><span className="text-gray-400">{layer.type}</span><button onClick={e => { e.stopPropagation(); setContentLayers(prev => prev.filter(x => x.id !== layer.id)); }} className="text-red-500">✕</button></div>)}</div>
+             <div className="space-y-1 border-t pt-2"><p className="text-[10px] font-semibold text-gray-500 uppercase">System fields</p>{(['date', 'serial'] as SystemLayerId[]).map(id => <button key={id} onClick={() => { setSelectedSystemId(id); setSelectedContentId(null); setSelectedShapeId(null); setSelectedCurvedId(null); }} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left ${selectedSystemId === id ? 'bg-violet-50 ring-1 ring-violet-300' : 'hover:bg-gray-50'}`}><span className="flex-1">{id === 'date' ? 'Date / time' : 'Serial number'}</span><span className="text-gray-400">{Math.round(systemPositions[id].x)}, {Math.round(systemPositions[id].y)}</span></button>)}</div>
             {contentLayers.find(l => l.id === selectedContentId) && (() => { const sel = contentLayers.find(l => l.id === selectedContentId)!; return <div className="border-t pt-2 space-y-2 text-xs text-gray-600"><label className="block">Name<input value={sel.name} onChange={e => updateContent(sel.id, { name: e.target.value })} className="mt-1 w-full border rounded px-2 py-1.5" /></label>{sel.type === 'text' ? <label className="block">Text<input value={sel.content || ''} onChange={e => updateContent(sel.id, { content: e.target.value })} className="mt-1 w-full border rounded px-2 py-1.5" /></label> : <label className="block">Asset<select value={sel.assetId || ''} onChange={e => updateContent(sel.id, { assetId: e.target.value })} className="mt-1 w-full border rounded px-2 py-1.5"><option value="">Select uploaded emblem</option>{assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>}<div className="grid grid-cols-2 gap-2"><label>X<input type="number" value={sel.x} onChange={e => updateContent(sel.id, { x: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Y<input type="number" value={sel.y} onChange={e => updateContent(sel.id, { y: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Width<input type="number" min={10} value={sel.width} onChange={e => updateContent(sel.id, { width: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Height<input type="number" min={10} value={sel.height} onChange={e => updateContent(sel.id, { height: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label></div>{sel.type === 'text' && <div className="grid grid-cols-2 gap-2"><label>Font size<input type="number" min={6} value={sel.fontSize} onChange={e => updateContent(sel.id, { fontSize: Number(e.target.value) })} className="mt-1 w-full border rounded px-2 py-1" /></label><label>Align<select value={sel.align} onChange={e => updateContent(sel.id, { align: e.target.value as ContentLayer['align'] })} className="mt-1 w-full border rounded px-2 py-1"><option value="start">Left</option><option value="middle">Center</option><option value="end">Right</option></select></label></div>}</div>; })()}
           </section>
         </div>
@@ -504,7 +531,7 @@ export default function SuperAdminStampDesignerPage() {
               {templates.length === 0 && <li className="py-2 text-xs text-gray-400">None yet. Save your first stamp above.</li>}
               {templates.map(t => (
                 <li key={t.id} className="py-2 flex items-center gap-2 text-xs">
-                  <span className={`flex-1 truncate ${editingId === t.id ? 'text-violet-700 font-medium' : 'text-gray-700'}`}>{t.name}</span>
+                  <span className={`flex-1 truncate ${editingId === t.id ? 'text-violet-700 font-medium' : 'text-gray-700'}`}>{t.name}</span><span className={`text-[10px] rounded px-1.5 py-0.5 ${t.status === 'PUBLISHED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{t.status || 'DRAFT'}</span>
                   <span className="text-gray-400">v{t.version}</span>
                   <button onClick={() => selectTemplate(t)} className="text-violet-600 hover:underline">Edit</button>
                 </li>
