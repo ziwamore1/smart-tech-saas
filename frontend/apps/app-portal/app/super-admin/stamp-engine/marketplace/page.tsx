@@ -34,11 +34,13 @@ export default function SuperAdminStampMarketplacePage() {
     setBusyId(t.id);
     setMessage(''); setError('');
     try {
+      const platformTemplateId = t.platformTemplateId || t.template?.id || t.templateId;
+      if (!platformTemplateId) throw new Error('Published stamp is missing its platform template reference.');
       if (publish) {
-        await stampMarketplaceApi.adminPublish(t.id, { name: t.name, minTier: t.marketplace?.minTier || 'STANDARD' });
+        await stampMarketplaceApi.adminPublish(platformTemplateId, { name: t.name, minTier: t.marketplace?.minTier || 'STANDARD' });
         setMessage(`"${t.name}" published to the marketplace.`);
       } else {
-        await stampMarketplaceApi.adminUnpublish(t.id);
+        await stampMarketplaceApi.adminUnpublish(platformTemplateId);
         setMessage(`"${t.name}" unpublished.`);
       }
       void load();
