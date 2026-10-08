@@ -179,12 +179,19 @@ export class StampMarketplaceService {
 
   async listMarketplaceEntries(actor: TemplateActor, opts: { mineOnly?: boolean } = {}): Promise<any[]> {
     this.assertPlatformAdmin(actor);
-    const entries = await this.prisma.stampMarketplace.findMany({
-      where: opts.mineOnly ? undefined : undefined,
-      include: { template: true, _count: { select: { installs: true } } },
+    void opts;
+    const templates = await this.prisma.stampTemplate.findMany({
+      where: { schoolId: null, scope: 'PLATFORM', marketplace: { isNot: null } },
+      include: { marketplace: true, _count: { select: { stampMarketplaceInstalls: true } } },
       orderBy: { updatedAt: 'desc' },
     });
-    return entries.map(entry => ({ ...entry, platformTemplateId: entry.templateId }));
+    return templates.map(template => ({
+      ...template,
+      template,
+      platformTemplateId: template.id,
+      marketplace: template.marketplace,
+      _count: { installs: template._count.stampMarketplaceInstalls },
+    }));
   }
 
   // ── School-facing browse / install ──
