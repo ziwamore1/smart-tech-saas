@@ -93,9 +93,9 @@ function circularSvg(o: SvgOptions): string {
   const subSize = Math.max(6, fontSize - 4);
   const bottom = o.subtitle?.trim() || formatDate();
   const custom = o.customCircularText?.trim();
-  const topStart = o.topStart ?? -160, topEnd = o.topEnd ?? -20, topRadius = o.topRadius ?? innerR - 4;
-  const bottomStart = o.bottomStart ?? 150, bottomEnd = o.bottomEnd ?? 30, bottomRadius = o.bottomRadius ?? innerR - 8;
-  const customStart = o.customStart ?? -80, customEnd = o.customEnd ?? 80, customRadius = o.customRadius ?? innerR - 28;
+  const topStart = o.topStart ?? -60, topEnd = o.topEnd ?? 60, topRadius = o.topRadius ?? innerR - 4;
+  const bottomStart = o.bottomStart ?? 240, bottomEnd = o.bottomEnd ?? 120, bottomRadius = o.bottomRadius ?? innerR - 8;
+  const customStart = o.customStart ?? -60, customEnd = o.customEnd ?? 60, customRadius = o.customRadius ?? innerR - 28;
   const rotation = o.arcRotation ?? 0;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><defs><path id="topArc" d="${arcPath(cx, cy, topRadius, topStart, topEnd)}" fill="none"/><path id="bottomArc" d="${arcPath(cx, cy, bottomRadius, bottomStart, bottomEnd)}" fill="none"/><path id="customArc" d="${arcPath(cx, cy, customRadius, customStart, customEnd)}" fill="none"/></defs><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${o.border}" stroke-width="2.5"/><circle cx="${cx}" cy="${cy}" r="${r - 7}" fill="none" stroke="${o.ink}" stroke-width="1" stroke-dasharray="3,3"/><circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" stroke="${o.border}" stroke-width="1.5"/><text transform="rotate(${rotation} ${cx} ${cy})" font-size="${fontSize}" font-family="Georgia, 'Times New Roman', serif" fill="${o.border}" font-weight="bold" text-anchor="middle" letter-spacing="2"><textPath href="#topArc" startOffset="50%">${escapeXml(o.text)}</textPath></text>${custom ? `<text transform="rotate(${rotation} ${cx} ${cy})" font-size="${Math.max(8, fontSize - 3)}" font-family="Georgia, 'Times New Roman', serif" fill="${o.ink}" font-weight="bold" text-anchor="middle" letter-spacing="1"><textPath href="#customArc" startOffset="50%">${escapeXml(custom)}</textPath></text>` : ''}<text x="${cx}" y="${cy - 10}" font-size="${innerFontSize}" font-family="Arial, sans-serif" fill="${o.ink}" font-weight="bold" text-anchor="middle">${escapeXml(o.type)}</text><polygon points="${cx - 12},${cy + 4} ${cx},${cy - 8} ${cx + 12},${cy + 4} ${cx},${cy + 16}" fill="${o.ink}" opacity="0.9"/><text transform="rotate(${rotation} ${cx} ${cy})" x="${cx}" y="${cy + 30}" font-size="${subSize}" font-family="Arial, sans-serif" fill="#666" text-anchor="middle"><textPath href="#bottomArc" startOffset="50%">${escapeXml(bottom)}</textPath></text></svg>`;
 }
@@ -149,15 +149,15 @@ export default function SuperAdminStampDesignerPage() {
   const [width, setWidth] = useState(200);
   const [height, setHeight] = useState(200);
   const [opacity, setOpacity] = useState(1);
-  const [topStart, setTopStart] = useState(-160);
-  const [topEnd, setTopEnd] = useState(-20);
+  const [topStart, setTopStart] = useState(-60);
+  const [topEnd, setTopEnd] = useState(60);
   const [topRadius, setTopRadius] = useState(150);
-  const [bottomStart, setBottomStart] = useState(150);
-  const [bottomEnd, setBottomEnd] = useState(30);
+  const [bottomStart, setBottomStart] = useState(240);
+  const [bottomEnd, setBottomEnd] = useState(120);
   const [bottomRadius, setBottomRadius] = useState(134);
   const [customCircularText, setCustomCircularText] = useState('');
-  const [customStart, setCustomStart] = useState(-80);
-  const [customEnd, setCustomEnd] = useState(80);
+  const [customStart, setCustomStart] = useState(-60);
+  const [customEnd, setCustomEnd] = useState(60);
   const [customRadius, setCustomRadius] = useState(105);
   const [circularCenterX, setCircularCenterX] = useState<number | null>(null);
   const [circularCenterY, setCircularCenterY] = useState<number | null>(null);

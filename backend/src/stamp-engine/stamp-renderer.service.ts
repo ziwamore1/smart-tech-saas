@@ -400,15 +400,23 @@ export class StampRendererService {
     ];
 
     if (layer.separator) {
-      const gapMidAngle = (startAngle + endAngle + 360) / 2;
-      const sp = polarPoint(centerX, centerY, radius, gapMidAngle);
+      const placement = layer.separatorPlacement || 'gap';
+      const offset = Math.max(0, layer.separatorOffset ?? 30);
+      const normalize = (angle: number) => ((angle % 360) + 360) % 360;
+      const gapMidAngle = normalize((startAngle + endAngle) / 2 + (endAngle >= startAngle ? 180 : -180));
+      const separatorAngles = placement === 'ends'
+        ? [startAngle - offset, endAngle + offset]
+        : [placement === 'custom' ? (layer.separatorAngle ?? gapMidAngle) : gapMidAngle];
       const sepSize = Math.max(10, Math.round(fontSize * 0.6));
-      parts.push(
-        `<text x="${sp.x.toFixed(2)}" y="${sp.y.toFixed(2)}" font-family="${escXml(layer.fontFamily || 'serif')}" ` +
-        `font-size="${sepSize}" font-weight="${layer.fontWeight || 'bold'}" fill="${color}" ` +
-        `text-anchor="middle" dominant-baseline="central"${this.layerTransform(layer, centerX, centerY)}>` +
-        `${escXml(layer.separator)}</text>`,
-      );
+      for (const separatorAngle of separatorAngles) {
+        const sp = polarPoint(centerX, centerY, radius, separatorAngle);
+        parts.push(
+          `<text x="${sp.x.toFixed(2)}" y="${sp.y.toFixed(2)}" font-family="${escXml(layer.fontFamily || 'serif')}" ` +
+          `font-size="${sepSize}" font-weight="${layer.fontWeight || 'bold'}" fill="${color}" ` +
+          `text-anchor="middle" dominant-baseline="central"${this.layerTransform(layer, centerX, centerY)}>` +
+          `${escXml(layer.separator)}</text>`,
+        );
+      }
     }
 
     return parts.join('');

@@ -130,7 +130,10 @@ export interface StampCurvedTextLayer extends StampLayerBase {
   fontWeight?: string;
   letterSpacing?: number;
   color?: string;
-  separator?: string; // character placed at the arc gap midpoint (e.g. '★')
+  separator?: string;
+  separatorPlacement?: 'gap' | 'ends' | 'custom';
+  separatorAngle?: number;
+  separatorOffset?: number;
   curve: {
     centerX: number;
     centerY: number;
