@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { reportEngineApi, reportTemplateApi, classApi, classSubjectApi, termApi, studentApi, teacherApi } from '@/lib/api';
+import { api, reportEngineApi, reportTemplateApi, classApi, classSubjectApi, termApi, studentApi, teacherApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { examTypeLabel } from '@/lib/exam-types';
 import { useExamTypes } from '@/lib/use-exam-types';
+import { openSubjectPerformanceReport, ReportMeta } from '@/lib/report-utils';
 
 const REPORT_TYPES = [
   { type: 'REPORT_CARD', label: 'Report Card', icon: 'fa-file-text', color: '#3b82f6', desc: 'Individual student report card with charts and analysis', bulk: false },
@@ -18,6 +19,7 @@ const REPORT_TYPES = [
   { type: 'PERFORMANCE_REPORT', label: 'Performance Report', icon: 'fa-chart-line', color: '#ec4899', desc: 'Detailed student performance profile', bulk: false },
   { type: 'RANKING_REPORT', label: 'Class Ranking Report', icon: 'fa-trophy', color: '#d97706', desc: 'Ranked student performance and class distribution', bulk: true },
   { type: 'RESULTS_ANALYSIS', label: 'Results Analysis Report', icon: 'fa-chart-bar', color: '#0891b2', desc: 'Advanced class-based Quality and Quantity results analysis', bulk: false },
+  { type: 'SUBJECT_PERFORMANCE', label: 'Subject-Based Performance Report', icon: 'fa-book', color: '#0f766e', desc: 'Ranked performance register for one subject in a selected class and department', bulk: false },
 ];
 
 const BULK_TYPES = ['CLASS_REPORT', 'ATTENDANCE_REPORT', 'ANALYTICS_SUMMARY', 'MARK_SCHEDULE', 'TRANSCRIPT', 'CERTIFICATE', 'RANKING_REPORT'];
@@ -80,7 +82,7 @@ export default function ReportHubPage() {
   const { data: subjects } = useQuery({
     queryKey: ['class-subjects-for-certificates', selectedClass],
     queryFn: () => classSubjectApi.getByClass(selectedClass).then(r => unwrap(r.data)),
-    enabled: selectedType === 'CERTIFICATE' && awardCategory === 'SUBJECT_PERCENTAGE' && !!selectedClass,
+    enabled: (selectedType === 'CERTIFICATE' && awardCategory === 'SUBJECT_PERCENTAGE' || selectedType === 'SUBJECT_PERFORMANCE') && !!selectedClass,
   });
 
   const { data: templates } = useQuery({
@@ -122,10 +124,11 @@ export default function ReportHubPage() {
   const config = REPORT_TYPES.find(t => t.type === selectedType);
   const needsStudent = selectedType && ['REPORT_CARD', 'TRANSCRIPT', 'PERFORMANCE_REPORT'].includes(selectedType) || (selectedType === 'CERTIFICATE' && recipientType === 'STUDENT');
   const needsClass = selectedType && ['CLASS_REPORT', 'MARK_SCHEDULE', 'ATTENDANCE_REPORT', 'ANALYTICS_SUMMARY', 'RANKING_REPORT', 'RESULTS_ANALYSIS'].includes(selectedType);
+  const needsSubjectPerformance = selectedType === 'SUBJECT_PERFORMANCE';
   const needsTerm = selectedType && !['TRANSCRIPT'].includes(selectedType);
   const needsTemplate = selectedType === 'CERTIFICATE';
 
-  const canGenerate = selectedType && (!needsStudent || selectedStudent) && (selectedType !== 'CERTIFICATE' || recipientType !== 'TEACHER' || selectedTeacher) && (selectedType !== 'CERTIFICATE' || awardCategory !== 'SUBJECT_PERCENTAGE' || selectedSubject) && (selectedType !== 'CERTIFICATE' || recipientType !== 'TEACHER' || awardCategory !== 'TEACHER_HONORARY' || achievementCitation.trim().length >= 15) && (!needsClass || selectedClass) && (!needsTerm || selectedTerm) && (!needsTemplate || selectedTemplate || ((templates || []).length === 0));
+  const canGenerate = selectedType && (!needsStudent || selectedStudent) && (selectedType !== 'CERTIFICATE' || recipientType !== 'TEACHER' || selectedTeacher) && (selectedType !== 'CERTIFICATE' || awardCategory !== 'SUBJECT_PERCENTAGE' || selectedSubject) && (!needsSubjectPerformance || selectedSubject) && (selectedType !== 'CERTIFICATE' || recipientType !== 'TEACHER' || awardCategory !== 'TEACHER_HONORARY' || achievementCitation.trim().length >= 15) && (!needsClass || selectedClass) && (!needsSubjectPerformance || selectedClass) && (!needsTerm || selectedTerm) && (!needsTemplate || selectedTemplate || ((templates || []).length === 0));
 
   const handleGenerate = async () => {
     if (!selectedType) return;
@@ -135,6 +138,22 @@ export default function ReportHubPage() {
       // Certificates support a single-student flow: when a student is picked we
       // generate one signed certificate directly instead of a whole-class batch.
       const isBulk = BULK_TYPES.includes(selectedType) && !(selectedType === 'CERTIFICATE' && (selectedStudent || selectedTeacher));
+      if (selectedType === 'SUBJECT_PERFORMANCE') {
+        const sheetsResponse = await api.get('/results-management/sheets', { params: { classId: selectedClass, termId: selectedTerm, examType: selectedExamType || undefined } });
+        const sheets = unwrap(sheetsResponse);
+        const sheet = Array.isArray(sheets) ? sheets[0] : null;
+        if (!sheet) throw new Error('No result sheet found for the selected class, term, and exam type.');
+        const response = await api.get(`/results-management/sheets/${sheet.id}/top-performers`, { params: { category: 'SUBJECT_PERCENTAGE', subjectId: selectedSubject, limit: 500 }, timeout: 120000 });
+        const result = unwrap(response);
+        const subject = (Array.isArray(subjects) ? subjects : []).map((row: any) => row.subject || row).find((item: any) => item.id === selectedSubject);
+        const cls = (Array.isArray(classes) ? classes : []).find((item: any) => item.id === selectedClass);
+        const term = (Array.isArray(terms) ? terms : []).find((item: any) => item.id === selectedTerm);
+        const meta: ReportMeta = { schoolName: 'Smart Tech School', className: cls?.name || 'Class', termName: term?.name || 'Term', academicYear: term?.academicYear?.name || '', examType: selectedExamType ? examTypeLabel(selectedExamType) : 'Latest result sheet', department: result.department?.name || 'Department not assigned', subjectTeacher: result.assignedTeacher || 'Teacher not assigned' };
+        openSubjectPerformanceReport({ ...result, subject }, meta);
+        toast.success('HTML subject performance report opened');
+        setGenerating(false);
+        return;
+      }
       const payload: any = { type: selectedType };
       if (selectedStudent) payload.studentId = selectedStudent;
       if (selectedTeacher) payload.teacherUserId = selectedTeacher;
@@ -244,7 +263,7 @@ export default function ReportHubPage() {
                     <option value="TEACHER">Teacher certificate</option>
                   </select>
                 </div>
-                {awardCategory === 'SUBJECT_PERCENTAGE' && <div>
+                {(awardCategory === 'SUBJECT_PERCENTAGE' || needsSubjectPerformance) && <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
                   <select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm">
                     <option value="">Select subject...</option>
@@ -267,7 +286,7 @@ export default function ReportHubPage() {
                 </div>
               </>
             )}
-            {(needsClass || needsStudent) && (
+            {(needsClass || needsStudent || needsSubjectPerformance) && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Class</label>
                 <select

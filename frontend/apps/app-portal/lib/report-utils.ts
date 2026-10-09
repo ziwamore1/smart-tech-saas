@@ -169,6 +169,8 @@ export interface ReportMeta {
   date?: string;
   classTeacher?: string;
   director?: string;
+  department?: string;
+  subjectTeacher?: string;
 }
 
 function buildReportShell(meta: ReportMeta, title: string, content: string, extraStyles?: string): string {
@@ -192,6 +194,8 @@ function buildReportShell(meta: ReportMeta, title: string, content: string, extr
   <span><strong>Class:</strong> ${meta.className}</span>
   <span><strong>Term:</strong> ${meta.termName}</span>
   ${meta.academicYear ? `<span><strong>Year:</strong> ${meta.academicYear}</span>` : ''}
+  ${meta.department ? `<span><strong>Department:</strong> ${meta.department}</span>` : ''}
+  ${meta.subjectTeacher ? `<span><strong>Subject Teacher:</strong> ${meta.subjectTeacher}</span>` : ''}
   <span><strong>Exam:</strong> ${meta.examType}</span>
   <span><strong>Date:</strong> ${date}</span>
 </div>
@@ -556,6 +560,43 @@ export function openAnalysisReport(analysis: AnalysisData, meta: ReportMeta) {
 
 export function openRankingReport(rankings: RankingStudent[], meta: ReportMeta, title?: string) {
   openReport(generateRankingReport(rankings, meta, title), `Rankings - ${meta.className}`);
+}
+
+export function generateSubjectPerformanceReport(data: { subject?: any; department?: any; performers?: any[] }, meta: ReportMeta): string {
+  const esc = (value: any) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const performers = data.performers || [];
+  const subject = data.subject || {};
+  const rows = performers.map((row: any, index) => {
+    const score = Number(row.percentage ?? row.score ?? row.average ?? 0);
+    const grade = row.grade || '-';
+    const gradeColor = getGradeColor(grade);
+    return `<tr>
+      <td class="text-center font-bold" style="color:${index < 3 ? '#d97706' : '#6b7280'}">${row.rank || index + 1}</td>
+      <td style="font-weight:600">${esc(row.studentName || `${row.firstName || ''} ${row.lastName || ''}`.trim())}</td>
+      <td style="color:#6b7280;font-size:11px">${esc(row.admissionNumber || '-')}</td>
+      <td class="text-center">${genderInitial(row.gender)}</td>
+      <td class="text-center font-bold" style="color:${scoreColor(score)}">${score.toFixed(1)}%</td>
+      <td class="text-center"><span class="grade-badge" style="background:${gradeColor.bg};color:${gradeColor.text}">${esc(grade)}</span></td>
+      <td class="text-center"><span class="grade-badge" style="background:${score >= 50 ? '#d1fae5' : '#fee2e2'};color:${score >= 50 ? '#047857' : '#b91c1c'}">${score >= 50 ? 'PASS' : 'BELOW'}</span></td>
+    </tr>`;
+  }).join('');
+  const scores = performers.map((row: any) => Number(row.percentage ?? row.score ?? row.average ?? 0));
+  const average = scores.length ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
+  const passRate = scores.length ? scores.filter(score => score >= 50).length / scores.length * 100 : 0;
+  const content = `<div class="summary-grid">
+    <div class="summary-card"><div class="summary-value">${performers.length}</div><div class="summary-label">Students Assessed</div></div>
+    <div class="summary-card" style="border-top:4px solid #059669"><div class="summary-value" style="color:#059669">${scores.length ? Math.max(...scores).toFixed(1) : '0.0'}%</div><div class="summary-label">Highest Score</div></div>
+    <div class="summary-card" style="border-top:4px solid #2563eb"><div class="summary-value" style="color:#2563eb">${average.toFixed(1)}%</div><div class="summary-label">Subject Average</div></div>
+    <div class="summary-card" style="border-top:4px solid #d97706"><div class="summary-value" style="color:#d97706">${passRate.toFixed(1)}%</div><div class="summary-label">Pass Rate</div></div>
+  </div>
+  <div class="section-title">${esc(subject.name || 'Subject')}${subject.code ? ` (${esc(subject.code)})` : ''} Performance Register</div>
+  <table><thead><tr><th class="text-center">Rank</th><th>Student Name</th><th>Admission No.</th><th class="text-center">Gender</th><th class="text-center">Score</th><th class="text-center">Grade</th><th class="text-center">Status</th></tr></thead><tbody>${rows || '<tr><td colspan="7" class="text-center">No subject performance records available.</td></tr>'}</tbody></table>
+  <div class="signatures"><div class="sig"><div class="sig-line">Subject Teacher: ${esc(meta.subjectTeacher || '________________')}</div></div><div class="sig"><div class="sig-line">Head of Department</div></div><div class="sig"><div class="sig-line">Director / Principal: ${esc(meta.director || '________________')}</div></div></div>`;
+  return buildReportShell(meta, `Subject-Based Performance Report - ${subject.name || 'Subject'}`, content);
+}
+
+export function openSubjectPerformanceReport(data: { subject?: any; department?: any; performers?: any[] }, meta: ReportMeta) {
+  openReport(generateSubjectPerformanceReport(data, meta), `Subject Performance - ${data.subject?.name || meta.className}`);
 }
 
 export interface TeacherMarkScheduleComponent {

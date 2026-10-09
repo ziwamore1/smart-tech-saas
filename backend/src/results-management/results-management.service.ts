@@ -1183,10 +1183,11 @@ export class ResultsManagementService {
       const assignment = term?.academicYearId ? await this.prisma.teachingAssignment.findFirst({
         where: { classId: sheet.classId, subjectId: options.subjectId, schoolId: sheet.schoolId, academicYearId: term.academicYearId },
         orderBy: { id: 'asc' },
-        select: { teacher: { select: { teacher: { select: { department: true, departmentRel: { select: { name: true, code: true } } } } } } },
+        select: { teacher: { select: { firstName: true, lastName: true, teacher: { select: { department: true, departmentRel: { select: { name: true, code: true } } } } } } },
       }) : null;
       const department = assignment?.teacher?.teacher?.departmentRel?.name || assignment?.teacher?.teacher?.department || subject?.category || null;
-      return { category, subject, department: department ? { name: department } : null, limit, performers: rows.slice(0, limit) };
+      const assignedTeacher = assignment?.teacher ? `${assignment.teacher.firstName || ''} ${assignment.teacher.lastName || ''}`.trim() : null;
+      return { category, subject, department: department ? { name: department } : null, assignedTeacher, limit, performers: rows.slice(0, limit) };
     }
 
     const rankings = await this.rankingService.computeClassRankings(sheet.classId, sheet.termId, sheet.schoolId);

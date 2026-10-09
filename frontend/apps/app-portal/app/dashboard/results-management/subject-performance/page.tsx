@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, classApi, classSubjectApi, termApi } from '@/lib/api';
 import { EXAM_TYPE_OPTIONS, examTypeLabel } from '@/lib/exam-types';
+import { openSubjectPerformanceReport, ReportMeta } from '@/lib/report-utils';
 
 const unwrap = (response: any) => response?.data?.data ?? response?.data ?? response;
 
@@ -33,7 +34,18 @@ export default function SubjectPerformanceReportPage() {
       const sheet = Array.isArray(sheets) ? sheets[0] : null;
       if (!sheet) throw new Error('No result sheet found for the selected class, term, and exam type.');
       const response = await api.get(`/results-management/sheets/${sheet.id}/top-performers`, { params: { category: 'SUBJECT_PERCENTAGE', subjectId, limit: 500 }, timeout: 120000 });
-      setReport({ ...unwrap(response), sheet });
+      const result = { ...unwrap(response), sheet };
+      setReport(result);
+      const meta: ReportMeta = {
+        schoolName: 'Smart Tech School',
+        className: selectedClass?.name || 'Class',
+        termName: selectedTerm?.name || 'Term',
+        academicYear: selectedTerm?.academicYear?.name || '',
+        examType: examType ? examTypeLabel(examType) : 'Latest result sheet',
+        department: result.department?.name || 'Department not assigned',
+        subjectTeacher: result.assignedTeacher || 'Teacher not assigned',
+      };
+      openSubjectPerformanceReport(result, meta);
     } catch (error: any) {
       setReport({ error: error?.response?.data?.message || error?.message || 'Unable to load subject performance report' });
     } finally { setLoading(false); }
@@ -47,7 +59,7 @@ export default function SubjectPerformanceReportPage() {
   return <main style={{ maxWidth: 1180, margin: '0 auto', padding: 24, color: '#1f2937' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 24 }}>
       <div><h1 style={{ margin: 0, fontSize: 26 }}>Subject-Based Performance Report</h1><p style={{ color: '#6b7280', marginTop: 6 }}>Review every learner&apos;s performance in one subject, ranked from highest to lowest.</p></div>
-      {performers.length > 0 && <button onClick={() => window.print()} style={{ background: '#0f766e', color: '#fff', border: 0, borderRadius: 8, padding: '10px 16px', fontWeight: 700, cursor: 'pointer' }}><i className="fa fa-print" /> Print Report</button>}
+      {performers.length > 0 && <button onClick={() => openSubjectPerformanceReport(report, { schoolName: 'Smart Tech School', className: selectedClass?.name || 'Class', termName: selectedTerm?.name || 'Term', academicYear: selectedTerm?.academicYear?.name || '', examType: examType ? examTypeLabel(examType) : 'Latest result sheet', department: report?.department?.name || 'Department not assigned', subjectTeacher: report?.assignedTeacher || 'Teacher not assigned' })} style={{ background: '#0f766e', color: '#fff', border: 0, borderRadius: 8, padding: '10px 16px', fontWeight: 700, cursor: 'pointer' }}><i className="fa fa-print" /> Open HTML Report</button>}
     </div>
     <section className="no-print" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 14, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 18, marginBottom: 24 }}>
       <label>Class<select value={classId} onChange={e => { setClassId(e.target.value); setSubjectId(''); setReport(null); }} style={{ display: 'block', width: '100%', marginTop: 6, padding: 10, border: '1px solid #cbd5e1', borderRadius: 7 }}><option value="">Select class</option>{classes.map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
