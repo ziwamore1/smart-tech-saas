@@ -147,7 +147,7 @@ export class FinancialDocumentsController {
   }
 
   @Post('company-profile/media')
-  @UseInterceptors(FileInterceptor('file', { storage: cloudinaryMemoryStorage, fileFilter: CLOUDINARY_FILE_FILTER }))
+  @UseInterceptors(FileInterceptor('file', { storage: cloudinaryMemoryStorage(), fileFilter: CLOUDINARY_FILE_FILTER }))
   uploadCompanyMedia(@UploadedFile() file: any, @Body('kind') kind: string) {
     if (!file || !file.buffer) throw new Error('A file is required.');
     const kinds = ['logo', 'signature', 'stamp'];
