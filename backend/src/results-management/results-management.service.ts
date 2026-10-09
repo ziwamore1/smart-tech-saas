@@ -1176,8 +1176,17 @@ export class ResultsManagementService {
     if (category === 'SUBJECT_PERCENTAGE') {
       if (!options.subjectId) throw new BadRequestException('subjectId is required for subject performers');
       const rows = await this.rankingService.computeSubjectRankings(options.subjectId, sheet.termId, sheet.classId, sheet.schoolId);
-      const subject = await this.prisma.subject.findUnique({ where: { id: options.subjectId }, select: { id: true, name: true, code: true } });
-      return { category, subject, limit, performers: rows.slice(0, limit) };
+      const [subject, term] = await Promise.all([
+        this.prisma.subject.findUnique({ where: { id: options.subjectId }, select: { id: true, name: true, code: true, category: true } }),
+        this.prisma.term.findUnique({ where: { id: sheet.termId }, select: { academicYearId: true } }),
+      ]);
+      const assignment = term?.academicYearId ? await this.prisma.teachingAssignment.findFirst({
+        where: { classId: sheet.classId, subjectId: options.subjectId, schoolId: sheet.schoolId, academicYearId: term.academicYearId },
+        orderBy: { id: 'asc' },
+        select: { teacher: { select: { department: true, departmentRel: { select: { name: true, code: true } } } } },
+      }) : null;
+      const department = assignment?.teacher?.departmentRel?.name || assignment?.teacher?.department || subject?.category || null;
+      return { category, subject, department: department ? { name: department } : null, limit, performers: rows.slice(0, limit) };
     }
 
     const rankings = await this.rankingService.computeClassRankings(sheet.classId, sheet.termId, sheet.schoolId);
