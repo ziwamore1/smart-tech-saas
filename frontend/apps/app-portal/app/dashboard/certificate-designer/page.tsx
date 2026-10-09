@@ -228,6 +228,7 @@ export default function CertificateDesignerPage() {
     if (!selectedId) return;
     try {
       const res = await certApi.renderCert(selectedId, {
+        preview: true,
         studentName: 'John Doe',
         className: 'Grade 10A',
         termName: 'Term 1',
@@ -242,6 +243,7 @@ export default function CertificateDesignerPage() {
     if (!selectedId) return;
     try {
       const res = await certApi.getPdf(selectedId, {
+        preview: true,
         studentName: 'John Doe',
         className: 'Grade 10A',
         termName: 'Term 1',

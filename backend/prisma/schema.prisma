@@ -2887,6 +2887,7 @@ model CertificateTemplate {
   certificateType CertificateType @default(ACADEMIC_EXCELLENCE)
   audience        String          @default("STUDENT")
   awardCategory   String          @default("OVERALL_AVERAGE")
+  eligibilityRules Json            @default("{}")
   subjectId       String?
   borderStyle     String          @default("classic")
   borderColor     String          @default("#1a365d")

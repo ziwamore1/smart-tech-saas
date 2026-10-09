@@ -389,11 +389,14 @@ export class ReportTemplateBuilderController {
     @Param('id') id: string,
     @Body() body: any,
   ) {
+    if (body.preview !== true) {
+      throw new BadRequestException('Certificate issuance must use the eligibility-checked report engine. This endpoint is preview-only.');
+    }
     const template = await this.builderService.getTemplate(id, req.user.schoolId);
     const school = await this.rendererService.getSchool(req.user.schoolId);
     const cert = await this.certificateService.getCertificateSettings(req.user.schoolId, id);
 
-    const certNumber = await this.certificateService.issueCertificateNumber(req.user.schoolId, id);
+    const certNumber = null;
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const verificationUrl = await this.certificateRendererService.createVerificationUrl(baseUrl, certNumber || id);
 

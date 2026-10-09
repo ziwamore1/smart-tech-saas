@@ -702,10 +702,38 @@ case ReportType.RESULTS_ANALYSIS:
     if (!scored.length) throw new BadRequestException('Teacher Performance Awards require assessed student results in the selected subjects.');
     const average = scored.reduce((sum, row) => sum + (row.finalPercentage || 0), 0) / scored.length;
     const passRate = scored.filter(row => (row.finalPercentage || 0) >= 40).length / scored.length * 100;
+    if (average < 60) throw new BadRequestException(`Teacher Performance Awards require at least a 60% average student result; the calculated average is ${average.toFixed(1)}%.`);
+    if (passRate < 70) throw new BadRequestException(`Teacher Performance Awards require at least a 70% student pass rate; the calculated pass rate is ${passRate.toFixed(1)}%.`);
     const best = assignments.map(a => ({ assignment: a, rows: scored.filter(r => r.classId === a.classId && r.subjectId === a.subjectId) })).filter(x => x.rows.length).sort((a, b) => b.rows.reduce((s, r) => s + (r.finalPercentage || 0), 0) / b.rows.length - a.rows.reduce((s, r) => s + (r.finalPercentage || 0), 0) / a.rows.length)[0];
     const bestAverage = best ? best.rows.reduce((s, r) => s + (r.finalPercentage || 0), 0) / best.rows.length : average;
     const subjectLabel = best ? `${best.assignment.subject.name} (${best.assignment.class.name})` : 'assigned subjects';
     return { category, statement: `For measurable impact across ${assignments.length} assigned subject class${assignments.length === 1 ? '' : 'es'}: ${average.toFixed(1)}% average student result and ${passRate.toFixed(1)}% pass rate. Strongest area: ${subjectLabel} at ${bestAverage.toFixed(1)}%.`, evidence: { assignments: assignments.map(a => ({ subject: a.subject.name, class: a.class.name })), assessedResults: scored.length, studentAverage: Number(average.toFixed(2)), passRate: Number(passRate.toFixed(2)), strongestAssignmentAverage: Number(bestAverage.toFixed(2)) } };
+  }
+
+  private async enforceStudentCertificateEligibility(request: ReportGenerationRequest, certificate: any, performance: any): Promise<void> {
+    const rules = (certificate.eligibilityRules || {}) as any;
+    const code = String(rules.code || certificate.awardCategory || '').toUpperCase();
+    if (!['DEANS_LIST', 'HONOR_ROLL', 'PRINCIPALS_AWARD', 'GRADUATION'].includes(code)) return;
+    if (!request.studentId || !request.termId || !performance) {
+      throw new BadRequestException(`${code.replace(/_/g, ' ')} certificates require a student and a term with assessed results.`);
+    }
+    if (rules.requiresPublishedResults && !(await this.hasPublishedResults(request.studentId, request.termId, request.schoolId))) {
+      throw new BadRequestException(`${code.replace(/_/g, ' ')} certificates require published results for the selected term.`);
+    }
+
+    const average = Number(performance.termSummary?.overallPercentage ?? 0);
+    const attendance = Number(performance.attendance?.attendanceRate ?? 0);
+    const subjects = (performance.subjectBreakdown || []).filter((subject: any) => subject.finalPercentage != null);
+    const minimumSubject = Number(rules.minimumSubjectPercentage ?? 0);
+    const failedSubjects = subjects.filter((subject: any) => Number(subject.finalPercentage) < minimumSubject);
+    const failures: string[] = [];
+    if (!subjects.length) failures.push('at least one assessed subject is required');
+    if (average < Number(rules.minimumAverage ?? 0)) failures.push(`overall average must be at least ${rules.minimumAverage}% (calculated ${average.toFixed(1)}%)`);
+    if (minimumSubject > 0 && failedSubjects.length) failures.push(`every subject must be at least ${minimumSubject}% (below minimum: ${failedSubjects.map((subject: any) => subject.subjectName).join(', ')})`);
+    if (rules.requiredClassRank != null && Number(performance.termSummary?.classRank) !== Number(rules.requiredClassRank)) failures.push(`the student must be ranked #${rules.requiredClassRank} in class`);
+    if (attendance < Number(rules.minimumAttendance ?? 0)) failures.push(`attendance must be at least ${rules.minimumAttendance}% (calculated ${attendance.toFixed(1)}%)`);
+    if (rules.requiresAllSubjectsPassed && failedSubjects.length) failures.push('all subjects must be passed');
+    if (failures.length) throw new BadRequestException(`Certificate eligibility failed: ${failures.join('; ')}.`);
   }
 
   async downloadPdf(reportUrl: string): Promise<Buffer> {
@@ -1434,6 +1462,7 @@ case ReportType.RESULTS_ANALYSIS:
         studentAwardStatement = `Verified attendance rate: ${Number(attendanceRate).toFixed(1)}% for the selected term.`;
       }
     }
+    await this.enforceStudentCertificateEligibility(request, cert, performance);
     const certificateNumber = cert.autoNumbering
       ? await this.certificateTemplateService.issueCertificateNumber(request.schoolId, template.id)
       : `ST-${new Date().getFullYear()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
