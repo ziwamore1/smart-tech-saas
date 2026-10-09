@@ -105,6 +105,12 @@ ${parts.join('\n')}
           subtitle: 'Official Graduation Document',
           description: 'In recognition of successful completion of academic requirements',
         };
+      case 'CUSTOM':
+        return {
+          title: 'Certificate of Completion',
+          subtitle: 'Official Secondary Education Completion Document',
+          description: 'In recognition of successful completion of secondary education requirements',
+        };
       case 'PARTICIPATION':
         return {
           title: 'Certificate of Participation',
@@ -128,6 +134,7 @@ ${parts.join('\n')}
       TEACHER_PERFORMANCE: { title: 'Certificate of Teaching Excellence', description: 'For exceptional professional performance and contribution to the school', color: '#b45309', label: 'Teaching Excellence' },
       TEACHER_SERVICE: { title: 'Certificate of Dedicated Service', description: 'For sustained and dedicated service to the school community', color: '#0369a1', label: 'Dedicated Service' },
       TEACHER_HONORARY: { title: 'Honorary Certificate of Excellence', description: 'Presented for a distinguished achievement and exceptional contribution', color: '#be123c', label: 'Honorary Excellence' },
+      COMPLETION: { title: 'Certificate of Completion', description: 'For successful completion of secondary education requirements', color: '#164e63', label: 'Secondary Education Completion' },
     };
     const selected = presentations[category || ''] || presentations[audience === 'TEACHER' ? 'TEACHER_PERFORMANCE' : 'OVERALL_AVERAGE'];
     return audience === 'TEACHER' && category !== 'TEACHER_PERFORMANCE'

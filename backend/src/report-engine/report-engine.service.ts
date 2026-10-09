@@ -713,7 +713,7 @@ case ReportType.RESULTS_ANALYSIS:
   private async enforceStudentCertificateEligibility(request: ReportGenerationRequest, certificate: any, performance: any): Promise<void> {
     const rules = (certificate.eligibilityRules || {}) as any;
     const code = String(rules.code || certificate.awardCategory || '').toUpperCase();
-    if (!['DEANS_LIST', 'HONOR_ROLL', 'PRINCIPALS_AWARD', 'GRADUATION'].includes(code)) return;
+    if (!['DEANS_LIST', 'HONOR_ROLL', 'PRINCIPALS_AWARD', 'GRADUATION', 'COMPLETION'].includes(code)) return;
     if (!request.studentId || !request.termId || !performance) {
       throw new BadRequestException(`${code.replace(/_/g, ' ')} certificates require a student and a term with assessed results.`);
     }
@@ -728,6 +728,9 @@ case ReportType.RESULTS_ANALYSIS:
     const failedSubjects = subjects.filter((subject: any) => Number(subject.finalPercentage) < minimumSubject);
     const failures: string[] = [];
     if (!subjects.length) failures.push('at least one assessed subject is required');
+    if (rules.requiresSecondaryFinalClass && !/grade\s*12|form\s*6|sixth\s*form|final\s*year/i.test(String(performance.class?.name || ''))) {
+      failures.push('the student must be enrolled in the final secondary class (for example Grade 12 or Form 6)');
+    }
     if (average < Number(rules.minimumAverage ?? 0)) failures.push(`overall average must be at least ${rules.minimumAverage}% (calculated ${average.toFixed(1)}%)`);
     if (minimumSubject > 0 && failedSubjects.length) failures.push(`every subject must be at least ${minimumSubject}% (below minimum: ${failedSubjects.map((subject: any) => subject.subjectName).join(', ')})`);
     if (rules.requiredClassRank != null && Number(performance.termSummary?.classRank) !== Number(rules.requiredClassRank)) failures.push(`the student must be ranked #${rules.requiredClassRank} in class`);
@@ -1509,9 +1512,10 @@ case ReportType.RESULTS_ANALYSIS:
         certificateNumber,
         certificateComment,
         certificateAwardCategory: teacherAward?.category || studentAwardCategory,
-        certificateAchievement: teacherAward?.statement || studentAwardStatement,
-        teacherAwardEvidence: teacherAward?.evidence || studentAwardEvidence,
-        teacherComment: certificateComment,
+         certificateAchievement: teacherAward?.statement || studentAwardStatement,
+         teacherAwardEvidence: teacherAward?.evidence || studentAwardEvidence,
+         teacherComment: certificateComment,
+         subjectBreakdown: performance?.subjectBreakdown || [],
       },
     );
 
