@@ -166,6 +166,18 @@ export default function ResultsManagementPage() {
             <i className="fa fa-eye"></i>
             View Results
           </a>
+          <a
+            href="/dashboard/results-management/subject-performance"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '12px 24px', background: '#2563eb', color: 'white',
+              border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600,
+              cursor: 'pointer', textDecoration: 'none'
+            }}
+          >
+            <i className="fa fa-book"></i>
+            Subject Performance
+          </a>
           <button
             onClick={() => {
               const currentYear = academicYears?.find((y: any) => y.isCurrent);

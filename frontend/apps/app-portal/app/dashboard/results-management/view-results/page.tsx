@@ -245,6 +245,12 @@ export default function ViewResultsPage() {
         {students.length > 0 && (
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
+              onClick={() => window.location.href = '/dashboard/results-management/subject-performance'}
+              style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 600, background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <i className="fa fa-book"></i> Subject Performance
+            </button>
+            <button
               onClick={() => openMarkScheduleReport(students, buildMeta())}
               style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 600, background: '#5f4b3a', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
