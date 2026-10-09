@@ -6,7 +6,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, classApi, termApi, gradingSystemApi, teacherApi, assessmentEngineApi, bulkSaveResults, bulkSaveAssessmentScores, accessApi, teacherAnalyticsApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
-import { EXAM_TYPE_OPTIONS, examTypeLabel } from '@/lib/exam-types';
+import { examTypeLabel } from '@/lib/exam-types';
+import { useExamTypes } from '@/lib/use-exam-types';
 import { socket } from '@/lib/socket';
 import { openTeacherMarkSchedulesReport } from '@/lib/report-utils';
 
@@ -114,6 +115,7 @@ const WORKFLOW_STEPS = [
 export default function ResultEntryPage() {
   const { user, isClassTeacher, isTeacher } = useAuth();
   const queryClient = useQueryClient();
+  const { examTypes } = useExamTypes();
   const searchParams = useSearchParams();
   const requestedSheetId = searchParams.get('sheetId');
 
@@ -124,6 +126,7 @@ export default function ResultEntryPage() {
   // found-or-created automatically on the server, so teachers never have to
   // visit the Results Management page to set one up first.
   const [selectedExamType, setSelectedExamType] = useState('');
+  const [customExamType, setCustomExamType] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('all');
   const [entryMode, setEntryMode] = useState<'single' | 'bulk'>('bulk');
   const [searchFilter, setSearchFilter] = useState('');
@@ -144,6 +147,17 @@ export default function ResultEntryPage() {
   const [sheetId, setSheetId] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const createExamTypeMutation = useMutation({
+    mutationFn: (label: string) => api.post('/results-management/exam-types', { label }),
+    onSuccess: (response) => {
+      const created = response.data?.data ?? response.data;
+      queryClient.invalidateQueries({ queryKey: ['exam-type-catalog'] });
+      setSelectedExamType(created.value);
+      setCustomExamType('');
+      toast.success('Exam type added');
+    },
+    onError: (error: any) => toast.error(error?.response?.data?.message || 'Could not add exam type'),
+  });
 
   useEffect(() => {
     const schoolId = user?.schoolId;
@@ -1034,18 +1048,45 @@ export default function ResultEntryPage() {
           <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
             Exam Type <span style={{ color: '#dc2626' }}>*</span>
           </label>
-          <select value={selectedExamType} onChange={e => setSelectedExamType(e.target.value)}
+           <select value={selectedExamType} onChange={e => {
+             const value = e.target.value;
+             if (value === '__CUSTOM__') {
+               setSelectedExamType('');
+               setCustomExamType('');
+             } else {
+               setSelectedExamType(value);
+             }
+           }}
             style={{
               width: '100%', padding: '10px 14px', fontSize: '14px',
               border: selectedExamType ? '1px solid #d1d5db' : '2px solid #f59e0b',
               borderRadius: '8px', background: '#ffffff', fontWeight: selectedExamType ? 600 : 400
             }}>
-            <option value="">Select Exam</option>
-            {EXAM_TYPE_OPTIONS.map(et => (
-              <option key={et.value} value={et.value}>{et.label}</option>
-            ))}
-          </select>
-        </div>
+             <option value="">Select Exam</option>
+             {examTypes.map((et: any) => (
+               <option key={et.value} value={et.value}>{et.label}</option>
+             ))}
+             <option value="__CUSTOM__">+ Add custom exam type</option>
+           </select>
+           {customExamType !== '' || selectedExamType === '' && (
+             <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+               <input
+                 value={customExamType}
+                 onChange={e => setCustomExamType(e.target.value)}
+                 placeholder="e.g. National Mock Examination"
+                 style={{ flex: 1, minWidth: 0, padding: '8px 10px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '7px' }}
+               />
+               <button
+                 type="button"
+                 disabled={!customExamType.trim() || createExamTypeMutation.isPending}
+                 onClick={() => createExamTypeMutation.mutate(customExamType.trim())}
+                 style={{ padding: '8px 10px', border: 0, borderRadius: '7px', background: '#4f46e5', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+               >
+                 {createExamTypeMutation.isPending ? 'Saving...' : 'Add'}
+               </button>
+             </div>
+           )}
+         </div>
         {entryMode === 'single' && (
           <div style={{ flex: '1', minWidth: '160px' }}>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>Subject</label>

@@ -519,6 +519,14 @@ const regularNav: NavItem[] = [
     typeRoles: ROLE_MAP.admin,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
+  {
+    name: 'Student Awards Evidence',
+    href: '/dashboard/student-awards',
+    icon: 'fa-medal',
+    color: '#d97706',
+    typeRoles: ROLE_MAP.teaching,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
+  },
   { 
     name: 'Communications', 
     href: '/dashboard/communications', 

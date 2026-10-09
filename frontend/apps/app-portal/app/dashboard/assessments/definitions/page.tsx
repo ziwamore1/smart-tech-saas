@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { assessmentEngineApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { EXAM_TYPE_OPTIONS, examTypeLabel } from '@/lib/exam-types';
+import { examTypeLabel } from '@/lib/exam-types';
+import { useExamTypes } from '@/lib/use-exam-types';
 
 interface Definition {
   id: string;
@@ -22,8 +23,6 @@ interface Definition {
 }
 
 const CATEGORIES = ['continuous', 'midterm', 'end_of_term', 'project', 'practical', 'other'];
-const EXAM_TYPES = EXAM_TYPE_OPTIONS;
-
 const defaultForm = {
   name: '',
   code: '',
@@ -38,6 +37,7 @@ const defaultForm = {
 };
 
 export default function AssessmentDefinitionsPage() {
+  const { examTypes } = useExamTypes();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Definition | null>(null);
@@ -166,7 +166,7 @@ export default function AssessmentDefinitionsPage() {
                   <select value={form.examType} onChange={e => setForm({ ...form, examType: e.target.value })}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     <option value="">-- None --</option>
-                    {EXAM_TYPES.map(et => <option key={et.value} value={et.value}>{et.label}</option>)}
+                    {examTypes.map((et: any) => <option key={et.value} value={et.value}>{et.label}</option>)}
                   </select>
                 </div>
               </div>

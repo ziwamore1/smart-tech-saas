@@ -299,6 +299,7 @@ export class ReportEngineController {
       examType?: string;
       templateId?: string;
       studentIds?: string[];
+      options?: Record<string, any>;
     },
   ) {
     if (body.type === ReportType.CLASS_REPORT) {
@@ -308,6 +309,7 @@ export class ReportEngineController {
       ...body,
       schoolId: req.user.schoolId,
       options: {
+        ...body.options,
         userId: req.user.id,
         userName: req.user.name || req.user.firstName,
       },

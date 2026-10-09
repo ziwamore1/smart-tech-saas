@@ -14,6 +14,7 @@ import { ReportTemplateBuilderService } from '../report-template-builder/report-
 import { ResultsManagementService } from '../results-management/results-management.service';
 import { TeacherAnalyticsService } from '../teacher-analytics/teacher-analytics.service';
 import { TeacherAnalyticsAiService } from '../teacher-analytics/teacher-analytics-ai.service';
+import { StudentAwardsService } from '../student-awards/student-awards.service';
 import { normalizeExamType } from '../common/utils/exam-type.util';
 import { checkEczEligibility, detectEczGradingSystem } from '../ecz-eligibility/ecz-eligibility.util';
 import * as crypto from 'crypto';
@@ -37,6 +38,7 @@ export interface ReportGenerationRequest {
   schoolId: string;
   userId?: string;
   studentId?: string;
+  teacherUserId?: string;
   classId?: string;
   termId?: string;
   examType?: string;
@@ -96,7 +98,7 @@ const REPORT_TYPE_CONFIG: Record<ReportType, {
     label: 'Certificate',
     description: 'Achievement, merit, or graduation certificate',
     icon: '🏆',
-    requiredFields: ['studentId', 'termId'],
+    requiredFields: ['termId'],
     optionalFields: ['templateId'],
     supportsBulk: false,
   },
@@ -178,6 +180,7 @@ private reportTemplateBuilder: ReportTemplateBuilderService,
     private resultsManagement: ResultsManagementService,
     private teacherAnalytics: TeacherAnalyticsService,
     private teacherAnalyticsAi: TeacherAnalyticsAiService,
+    private studentAwards: StudentAwardsService,
     @Optional() private schoolEvents?: SchoolEventsGateway,
   ) {}
 
@@ -346,6 +349,13 @@ private reportTemplateBuilder: ReportTemplateBuilderService,
       }
     }
 
+    if (request.type === ReportType.CERTIFICATE && request.options?.recipientType === 'TEACHER' && !request.teacherUserId) {
+      errors.push('Missing required field: teacherUserId');
+    }
+    if (request.type === ReportType.CERTIFICATE && request.options?.recipientType !== 'TEACHER' && !request.studentId) {
+      errors.push('Missing required field: studentId');
+    }
+
     const validation = await this.validateGenerationRequest(request);
     if (!validation.valid) {
       throw new BadRequestException(`Validation failed: ${validation.errors.join(', ')}`);
@@ -374,7 +384,7 @@ private reportTemplateBuilder: ReportTemplateBuilderService,
 
       case ReportType.CERTIFICATE:
         result = await this.generateCertificate(request);
-        fileName = `certificate-${request.studentId}-${request.termId}.pdf`;
+        fileName = `certificate-${request.teacherUserId || request.studentId}-${request.termId}.pdf`;
         break;
 
       case ReportType.ATTENDANCE_REPORT:
@@ -420,6 +430,10 @@ case ReportType.RESULTS_ANALYSIS:
     metadata.generationTimeMs = elapsed;
     metadata.warnings = validation.warnings;
     metadata.examType = request.examType || 'END_TERM';
+    if (request.type === ReportType.CERTIFICATE && request.options?.recipientType === 'TEACHER') {
+      metadata.awardCategory = request.options.awardCategory;
+      metadata.awardEvidence = request.options.awardEvidence || null;
+    }
 
     const title = this.buildReportTitle(request.type, request);
 
@@ -438,6 +452,8 @@ case ReportType.RESULTS_ANALYSIS:
           reportType: request.type,
           title,
           studentId: request.studentId || null,
+          recipientType: request.options?.recipientType || 'STUDENT',
+          recipientUserId: request.teacherUserId || null,
           className: cls?.name || null,
           classId: request.classId || null,
           termId: request.termId || null,
@@ -582,6 +598,21 @@ case ReportType.RESULTS_ANALYSIS:
       return this.generateClassReportCards(request);
     }
 
+    if (request.type === ReportType.CERTIFICATE && request.classId && request.termId && request.options?.awardCategory) {
+      const sheet = await this.prisma.resultSheet.findFirst({
+        where: { classId: request.classId, termId: request.termId, schoolId: request.schoolId },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+      if (!sheet) return reports;
+      const candidates = await this.resultsManagement.getTopPerformers(sheet.id, {
+        category: request.options.awardCategory,
+        subjectId: request.options.subjectId,
+        limit: request.options.topLimit,
+      });
+      request = { ...request, studentIds: candidates.performers.map((p: any) => p.studentId) } as any;
+    }
+
     if (
       request.type === ReportType.ATTENDANCE_REPORT ||
       request.type === ReportType.ANALYTICS_SUMMARY ||
@@ -632,6 +663,49 @@ case ReportType.RESULTS_ANALYSIS:
     const workers = Array.from({ length: Math.min(3, studentIds.length || 1) }, worker);
     await Promise.all(workers);
     return reports;
+  }
+
+  private async buildTeacherAwardEvidence(request: ReportGenerationRequest, teacher: any): Promise<{ category: string; statement: string; evidence: Record<string, any> }> {
+    const category = String(request.options?.awardCategory || '').toUpperCase();
+    if (!['TEACHER_SERVICE', 'TEACHER_PERFORMANCE', 'TEACHER_HONORARY'].includes(category)) {
+      throw new BadRequestException('Teacher certificates must use a specific category: service, performance, or honorary.');
+    }
+
+    if (category === 'TEACHER_SERVICE') {
+      if (!teacher.teacher?.hireDate) throw new BadRequestException('A verified hire date is required for a Teacher Service Award.');
+      const start = new Date(teacher.teacher.hireDate);
+      const now = new Date();
+      let years = now.getFullYear() - start.getFullYear();
+      if (now.getMonth() < start.getMonth() || (now.getMonth() === start.getMonth() && now.getDate() < start.getDate())) years--;
+      if (years < 1) throw new BadRequestException('Teacher Service Awards require at least one completed year of verified service.');
+      return { category, statement: `In recognition of ${years} completed year${years === 1 ? '' : 's'} of dedicated service to the school.`, evidence: { hireDate: start.toISOString().slice(0, 10), completedServiceYears: years } };
+    }
+
+    if (category === 'TEACHER_HONORARY') {
+      const citation = String(request.options?.achievementCitation || '').trim();
+      if (citation.length < 15) throw new BadRequestException('An honorary award requires a specific achievement citation of at least 15 characters.');
+      return { category, statement: citation, evidence: { achievementCitation: citation, evidenceReference: request.options?.evidenceReference || null } };
+    }
+
+    if (!request.termId) throw new BadRequestException('A term is required to calculate a Teacher Performance Award.');
+    const term = await this.prisma.term.findUnique({ where: { id: request.termId }, select: { academicYearId: true } });
+    const assignments = await this.prisma.teachingAssignment.findMany({
+      where: { teacherId: teacher.id, schoolId: request.schoolId, academicYearId: term?.academicYearId },
+      select: { classId: true, subjectId: true, class: { select: { name: true } }, subject: { select: { name: true } } },
+    });
+    if (!assignments.length) throw new BadRequestException('Teacher Performance Awards require at least one verified subject assignment for the selected academic year.');
+    const rows = await this.prisma.computedResult.findMany({
+      where: { termId: request.termId, schoolId: request.schoolId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, OR: assignments.map(a => ({ classId: a.classId, subjectId: a.subjectId })) },
+      select: { classId: true, subjectId: true, finalPercentage: true },
+    });
+    const scored = rows.filter(r => r.finalPercentage != null);
+    if (!scored.length) throw new BadRequestException('Teacher Performance Awards require assessed student results in the selected subjects.');
+    const average = scored.reduce((sum, row) => sum + (row.finalPercentage || 0), 0) / scored.length;
+    const passRate = scored.filter(row => (row.finalPercentage || 0) >= 40).length / scored.length * 100;
+    const best = assignments.map(a => ({ assignment: a, rows: scored.filter(r => r.classId === a.classId && r.subjectId === a.subjectId) })).filter(x => x.rows.length).sort((a, b) => b.rows.reduce((s, r) => s + (r.finalPercentage || 0), 0) / b.rows.length - a.rows.reduce((s, r) => s + (r.finalPercentage || 0), 0) / a.rows.length)[0];
+    const bestAverage = best ? best.rows.reduce((s, r) => s + (r.finalPercentage || 0), 0) / best.rows.length : average;
+    const subjectLabel = best ? `${best.assignment.subject.name} (${best.assignment.class.name})` : 'assigned subjects';
+    return { category, statement: `For measurable impact across ${assignments.length} assigned subject class${assignments.length === 1 ? '' : 'es'}: ${average.toFixed(1)}% average student result and ${passRate.toFixed(1)}% pass rate. Strongest area: ${subjectLabel} at ${bestAverage.toFixed(1)}%.`, evidence: { assignments: assignments.map(a => ({ subject: a.subject.name, class: a.class.name })), assessedResults: scored.length, studentAverage: Number(average.toFixed(2)), passRate: Number(passRate.toFixed(2)), strongestAssignmentAverage: Number(bestAverage.toFixed(2)) } };
   }
 
   async downloadPdf(reportUrl: string): Promise<Buffer> {
@@ -1283,7 +1357,11 @@ case ReportType.RESULTS_ANALYSIS:
 
   private async generateCertificate(request: ReportGenerationRequest) {
     const school = await this.prisma.school.findUnique({ where: { id: request.schoolId } });
-    const student = await this.prisma.student.findUnique({
+    const isTeacherCertificate = request.options?.recipientType === 'TEACHER';
+    const teacher = isTeacherCertificate && request.teacherUserId
+      ? await this.prisma.user.findFirst({ where: { id: request.teacherUserId, schoolId: request.schoolId, isActive: true }, include: { teacher: true } })
+      : null;
+    const student = !isTeacherCertificate ? await this.prisma.student.findUnique({
       where: { id: request.studentId },
       include: {
         studentPhotos: {
@@ -1292,7 +1370,10 @@ case ReportType.RESULTS_ANALYSIS:
           select: { imageUrl: true, thumbnailUrl: true },
         },
       },
-    });
+    }) : null;
+    if (isTeacherCertificate && !teacher) throw new BadRequestException('Teacher not found or does not belong to this school');
+    const teacherAward = isTeacherCertificate ? await this.buildTeacherAwardEvidence(request, teacher) : null;
+    if (teacherAward) request.options = { ...request.options, awardCategory: teacherAward.category, awardEvidence: teacherAward.evidence };
 
     // Resolve template: explicit -> first school certificate template -> any template
     let template = request.templateId
@@ -1303,14 +1384,14 @@ case ReportType.RESULTS_ANALYSIS:
       : null;
     if (!template) {
       template = await this.prisma.reportTemplate.findFirst({
-        where: { schoolId: request.schoolId, certificate: { isNot: null } },
+        where: { schoolId: request.schoolId, certificate: { is: { audience: isTeacherCertificate ? 'TEACHER' : 'STUDENT' } } },
         include: { certificate: true },
         orderBy: { createdAt: 'asc' },
       });
     }
     if (!template) {
       template = await this.prisma.reportTemplate.findFirst({
-        where: { schoolId: request.schoolId },
+        where: { schoolId: request.schoolId, certificate: { isNot: null } },
         include: { certificate: true },
         orderBy: { createdAt: 'asc' },
       });
@@ -1321,11 +1402,38 @@ case ReportType.RESULTS_ANALYSIS:
         'No certificate template configured for this school. Create one in the Template Builder first.',
       );
     }
+    if ((template.certificate.audience || 'STUDENT') !== (isTeacherCertificate ? 'TEACHER' : 'STUDENT')) {
+      throw new BadRequestException('The selected certificate template belongs to a different recipient type. Choose a student or teacher template that matches the recipient.');
+    }
+    if (isTeacherCertificate && template.certificate.awardCategory !== teacherAward?.category) {
+      throw new BadRequestException(`The selected template is for ${template.certificate.awardCategory}, but this certificate is ${teacherAward?.category}. Use an independent template for the selected Teacher award category.`);
+    }
 
-    const performance = request.termId
+    const performance = !isTeacherCertificate && request.termId
       ? await this.reportCardEngine.generateReportCardData(request.studentId!, request.termId, request.schoolId, request.examType)
       : null;
     const cert = template.certificate;
+    const studentAwardCategory = String(cert.awardCategory || '').toUpperCase();
+    let studentAwardEvidence: any = null;
+    let studentAwardStatement = '';
+    if (!isTeacherCertificate) {
+      if (studentAwardCategory === 'LEADERSHIP' || studentAwardCategory === 'SPORTS') {
+        const eligibility = await this.studentAwards.getEligibility(request.schoolId, request.studentId!, studentAwardCategory);
+        if (!eligibility.eligible) throw new BadRequestException(`Student is not eligible for this ${studentAwardCategory.toLowerCase()} certificate. Complete and verify the required appointment/participation evidence first.`);
+        studentAwardEvidence = eligibility.evidence;
+        const evidence = eligibility.evidence[0] as any;
+        studentAwardStatement = studentAwardCategory === 'LEADERSHIP'
+          ? `Verified leadership service as ${evidence.roleTitle}, with ${evidence.totalPoints} duty points.`
+          : `Verified ${evidence.sportCategory.replace(/_/g, ' ').toLowerCase()} participation with teacher recommendation and ${evidence.pointsAwarded} activity points.`;
+      } else if (studentAwardCategory === 'COMMUNITY_SERVICE') {
+        throw new BadRequestException('Community Service certificates require verified service evidence and are not available until a service record is completed.');
+      } else if (studentAwardCategory === 'ATTENDANCE') {
+        const attendanceRate = performance?.attendance?.attendanceRate;
+        if (attendanceRate == null || attendanceRate < 95) throw new BadRequestException('Attendance certificates require a verified attendance rate of at least 95% for the selected term.');
+        studentAwardEvidence = { attendanceRate };
+        studentAwardStatement = `Verified attendance rate: ${Number(attendanceRate).toFixed(1)}% for the selected term.`;
+      }
+    }
     const certificateNumber = cert.autoNumbering
       ? await this.certificateTemplateService.issueCertificateNumber(request.schoolId, template.id)
       : `ST-${new Date().getFullYear()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
@@ -1333,7 +1441,7 @@ case ReportType.RESULTS_ANALYSIS:
     const certificateComment = await this.certificateCommentService.generate({
       certificateType: cert.certificateType,
       awardText: cert.awardText,
-      studentName: `${student?.firstName || ''} ${student?.lastName || ''}`.trim(),
+      studentName: isTeacherCertificate ? `${teacher?.firstName || ''} ${teacher?.lastName || ''}`.trim() : `${student?.firstName || ''} ${student?.lastName || ''}`.trim(),
       termName: performance?.term?.name,
       average: summary.overallPercentage,
       classRank: summary.classRank,
@@ -1346,7 +1454,7 @@ case ReportType.RESULTS_ANALYSIS:
       })),
     });
 
-    const enrollment = await this.prisma.enrollment.findFirst({
+    const enrollment = !isTeacherCertificate ? await this.prisma.enrollment.findFirst({
       where: {
         studentId: request.studentId!,
         academicYear: { terms: { some: { id: request.termId } } },
@@ -1354,23 +1462,26 @@ case ReportType.RESULTS_ANALYSIS:
         student: { status: 'ACTIVE' },
       },
       include: { class: true, academicYear: true },
-    });
+    }) : null;
 
     const html = await this.templateRenderer.renderPreviewWithAuthenticity(
       request.schoolId,
       template.id,
       {
         student: {
-          firstName: student?.firstName,
-          lastName: student?.lastName,
-          admissionNumber: student?.admissionNumber,
-           photoUrl: student?.photoUrl || student?.studentPhotos?.[0]?.imageUrl || student?.studentPhotos?.[0]?.thumbnailUrl,
+          firstName: isTeacherCertificate ? teacher?.firstName : student?.firstName,
+          lastName: isTeacherCertificate ? teacher?.lastName : student?.lastName,
+          admissionNumber: isTeacherCertificate ? teacher?.teacher?.employeeNo : student?.admissionNumber,
+           photoUrl: isTeacherCertificate ? (teacher?.teacher?.photoUrl || teacher?.photoUrl) : (student?.photoUrl || student?.studentPhotos?.[0]?.imageUrl || student?.studentPhotos?.[0]?.thumbnailUrl),
         },
-        class: { name: enrollment?.class?.name || '' },
+        class: { name: isTeacherCertificate ? (teacher?.teacher?.department || 'Teaching Staff') : (enrollment?.class?.name || '') },
         term: { name: performance?.term?.name || '', academicYear: enrollment?.academicYear?.name || '' },
         examType: performance?.examType || request.examType || 'END_TERM',
         certificateNumber,
         certificateComment,
+        certificateAwardCategory: teacherAward?.category || studentAwardCategory,
+        certificateAchievement: teacherAward?.statement || studentAwardStatement,
+        teacherAwardEvidence: teacherAward?.evidence || studentAwardEvidence,
         teacherComment: certificateComment,
       },
     );

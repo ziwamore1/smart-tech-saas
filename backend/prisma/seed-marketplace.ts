@@ -29,6 +29,9 @@ async function main() {
       ? (await prisma.templateCategory.findUnique({ where: { id: t.categoryId } }))?.slug
       : null;
 
+    const certificate = t.templateType === 'CERTIFICATE'
+      ? await prisma.certificateTemplate.findUnique({ where: { templateId: t.id }, select: { audience: true, awardCategory: true } })
+      : null;
     await prisma.templateMarketplace.create({
       data: {
         templateId: t.id,
@@ -37,6 +40,9 @@ async function main() {
         description: t.description || '',
         category: categorySlug || 'Report Cards',
         tags: [t.templateType],
+        documentType: t.templateType === 'CERTIFICATE' ? 'CERTIFICATE' : undefined,
+        recipientType: certificate?.audience || 'STUDENT',
+        awardCategory: certificate?.awardCategory || undefined,
         featured: false,
       },
     });

@@ -61,9 +61,15 @@ export function ReportDocumentViewer({ report, onClose }: ReportDocumentViewerPr
     }
   };
 
+  const handleOpenNativeViewer = () => {
+    if (!pdfUrl) return;
+    const opened = window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+    if (!opened) toast.error('Allow pop-ups to view this document.');
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-gray-900">
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-700">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-3 bg-gray-900 border-b border-gray-700">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
             <i className="fas fa-file-pdf text-indigo-400" />
@@ -73,18 +79,26 @@ export function ReportDocumentViewer({ report, onClose }: ReportDocumentViewerPr
             <div className="text-gray-400 text-xs truncate">{report.fileName}</div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <button
+            onClick={handleOpenNativeViewer}
+            disabled={!pdfUrl}
+            className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+            title="Open in your device PDF viewer"
+          >
+            <i className="fas fa-external-link-alt" /> <span className="hidden sm:inline">Open</span>
+          </button>
           <button
             onClick={handlePrint}
             disabled={!pdfUrl}
-            className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+            className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-xs sm:text-sm font-medium disabled:opacity-50 flex items-center gap-2"
           >
             <i className="fas fa-print" /> Print
           </button>
           <button
             onClick={handleDownload}
             disabled={!pdfUrl}
-            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+            className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-medium disabled:opacity-50 flex items-center gap-2"
           >
             <i className="fas fa-download" /> Download
           </button>
@@ -115,7 +129,7 @@ export function ReportDocumentViewer({ report, onClose }: ReportDocumentViewerPr
           <iframe
             ref={iframeRef}
             src={pdfUrl}
-            className="w-full h-full"
+            className="w-full h-full min-h-[70vh]"
             title={report.title}
           />
         )}

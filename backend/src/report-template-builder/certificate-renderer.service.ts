@@ -119,6 +119,21 @@ ${parts.join('\n')}
         };
     }
   }
+
+  getAwardCategoryPresentation(category?: string, audience = 'STUDENT'): { title: string; description: string; color: string; label: string } {
+    const presentations: Record<string, { title: string; description: string; color: string; label: string }> = {
+      SUBJECT_PERCENTAGE: { title: 'Certificate of Subject Excellence', description: 'For exceptional achievement in the designated subject area', color: '#0f766e', label: 'Subject Excellence' },
+      BEST_SIX_POINTS: { title: 'Certificate of Best Six Excellence', description: 'For outstanding results across the best six assessed subjects', color: '#7c3aed', label: 'Best Six Excellence' },
+      OVERALL_AVERAGE: { title: 'Certificate of Overall Excellence', description: 'For the highest overall assessed average in the class', color: '#1d4ed8', label: 'Overall Excellence' },
+      TEACHER_PERFORMANCE: { title: 'Certificate of Teaching Excellence', description: 'For exceptional professional performance and contribution to the school', color: '#b45309', label: 'Teaching Excellence' },
+      TEACHER_SERVICE: { title: 'Certificate of Dedicated Service', description: 'For sustained and dedicated service to the school community', color: '#0369a1', label: 'Dedicated Service' },
+      TEACHER_HONORARY: { title: 'Honorary Certificate of Excellence', description: 'Presented for a distinguished achievement and exceptional contribution', color: '#be123c', label: 'Honorary Excellence' },
+    };
+    const selected = presentations[category || ''] || presentations[audience === 'TEACHER' ? 'TEACHER_PERFORMANCE' : 'OVERALL_AVERAGE'];
+    return audience === 'TEACHER' && category !== 'TEACHER_PERFORMANCE'
+      ? { ...selected, title: 'Certificate of Teaching Excellence', label: 'Teaching Excellence' }
+      : selected;
+  }
   async generateQrCodeDataUrl(data: string): Promise<string> {
     try {
       return await QRCode.toDataURL(data, {

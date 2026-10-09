@@ -239,9 +239,6 @@ export class SuperAdminService {
       where: {
         OR: [
           { name: data.name },
-          data.registrationNumber
-            ? { registrationNumber: data.registrationNumber }
-            : {},
         ],
       },
     });
@@ -263,11 +260,12 @@ export class SuperAdminService {
       institutionTypeId = institutionType.id;
     }
 
+    const registrationNumber = await this.allocateSchoolRegistrationNumber();
     const school = await this.prisma.school.create({
       data: {
         name: data.name,
         institutionTypeId,
-        registrationNumber: data.registrationNumber,
+        registrationNumber,
         phone: data.phone,
         email: data.email,
         address: data.address,
@@ -347,6 +345,9 @@ export class SuperAdminService {
       }
     }
 
+    // Registration numbers are platform-issued identifiers and are not editable.
+    delete data.registrationNumber;
+
     return this.prisma.school.update({
       where: { id: schoolId },
       data,
@@ -367,6 +368,7 @@ export class SuperAdminService {
         throw new BadRequestException('This school must have an approved registration request before activation.');
       }
     }
+
     return this.prisma.school.update({
       where: { id: schoolId },
       data,
@@ -385,6 +387,16 @@ export class SuperAdminService {
     await this.provisioningService.provisionInstitution(schoolId, request.institutionType).catch((error) => this.logger.error(`Provisioning failed after school activation: ${error.message}`));
     await this.sendEmail(request.email, 'Your Smart Tech school trial is approved', `<p>Hello ${escapeHtml(request.directorFirstName)},</p><p>Your Smart Tech school workspace has been approved and your 30-day trial is now active.</p>`);
     return school;
+  }
+
+  private async allocateSchoolRegistrationNumber(): Promise<string> {
+    const sequence = await this.prisma.schoolRegistrationSequence.upsert({
+      where: { key: 'SCHOOL' },
+      create: { key: 'SCHOOL', nextValue: 2 },
+      update: { nextValue: { increment: 1 } },
+      select: { nextValue: true },
+    });
+    return `ST-AUTO-${new Date().getFullYear()}-${String(sequence.nextValue - 1).padStart(6, '0')}`;
   }
 
   async deactivateSchool(schoolId: string) {

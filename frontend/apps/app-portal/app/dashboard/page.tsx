@@ -166,6 +166,9 @@ export default function DashboardPage() {
     { name: 'Classes', href: '/dashboard/classes', icon3d: 'classes' },
     { name: 'Subjects', href: '/dashboard/subjects', icon3d: 'subjects' },
     { name: 'Result Entry', href: '/dashboard/results-management/result-entry', icon3d: 'assessments' },
+    { name: 'Report Hub', href: '/dashboard/report-hub', icon3d: 'reports' },
+    { name: 'Report Manager', href: '/dashboard/report-manager', icon3d: 'reports' },
+    { name: 'Student Awards', href: '/dashboard/student-awards', icon3d: 'reports' },
     { name: 'Fees', href: '/dashboard/fees', icon3d: 'fees' },
   ];
 

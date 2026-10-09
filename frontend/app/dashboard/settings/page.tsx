@@ -439,8 +439,8 @@ export default function SettingsPage() {
                   <input
                     type="text"
                     value={schoolForm.registrationNumber}
-                    onChange={(e) => setSchoolForm({ ...schoolForm, registrationNumber: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg"
+                    readOnly
+                    className="w-full px-3 py-2 border rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
                   />
                 ) : (
                   <p className="text-gray-900">{schoolData?.registrationNumber || '-'}</p>

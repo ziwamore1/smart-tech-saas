@@ -107,6 +107,8 @@ function TeacherDashboardContent() {
     { name: 'Attendance Register', href: '/dashboard/attendance-register', icon: 'fa-clipboard-list', desc: 'Take daily attendance', color: '#059669' },
     { name: 'Results Management', href: '/dashboard/results-management', icon: 'fa-file-alt', desc: 'Manage class results', color: '#ea6645' },
     { name: 'Report Cards', href: '/dashboard/report-cards', icon: 'fa-file-text', desc: 'Generate report cards', color: '#0891b2' },
+    { name: 'Report Hub', href: '/dashboard/report-hub', icon: 'fa-print', desc: 'Generate certificates and reports', color: '#3b82f6' },
+    { name: 'Student Awards', href: '/dashboard/student-awards', icon: 'fa-medal', desc: 'Record leadership and sports evidence', color: '#d97706' },
     { name: 'Online Exams', href: '/dashboard/exams', icon: 'fa-file-signature', desc: 'Create and manage exams', color: '#dc2626' },
   ];
 

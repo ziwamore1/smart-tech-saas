@@ -22,6 +22,9 @@ export class CertificateTemplateService {
 
   async updateCertificateSettings(schoolId: string, templateId: string, data: {
     certificateType?: CertificateType;
+    audience?: string;
+    awardCategory?: string;
+    subjectId?: string | null;
     borderStyle?: string;
     borderColor?: string;
     sealUrl?: string;

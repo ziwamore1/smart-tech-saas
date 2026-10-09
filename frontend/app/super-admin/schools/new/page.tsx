@@ -222,7 +222,7 @@ export default function NewSchoolPage() {
             </div>
             <div>
               <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px', display: 'block' }}>Registration Number</label>
-              <input type="text" value={schoolForm.registrationNumber} onChange={(e) => setSchoolForm({ ...schoolForm, registrationNumber: e.target.value })} style={inputStyle} placeholder="SCH/2024/001" />
+              <p style={{ ...inputStyle, background: '#f8fafc', color: '#64748b' }}>Assigned automatically after creation</p>
             </div>
             <div>
               <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px', display: 'block' }}>Email *</label>

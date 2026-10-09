@@ -6,12 +6,13 @@ import { DocumentType } from '@prisma/client';
 export class TemplateMarketplaceService {
   constructor(private prisma: PrismaService) {}
 
-  async getMarketplaceTemplates(filters?: { category?: string; featured?: boolean; search?: string; documentType?: string }) {
+  async getMarketplaceTemplates(filters?: { category?: string; featured?: boolean; search?: string; documentType?: string; recipientType?: string }) {
     await this.ensureSystemTemplatesPublished();
     const where: any = {};
     if (filters?.category) where.category = filters.category;
     if (filters?.featured) where.featured = true;
     if (filters?.documentType) where.documentType = filters.documentType;
+    if (filters?.recipientType) where.recipientType = filters.recipientType;
     if (filters?.search) {
       where.OR = [
         { title: { contains: filters.search, mode: 'insensitive' } },
@@ -22,7 +23,7 @@ export class TemplateMarketplaceService {
     return withTimeout(
       this.prisma.templateMarketplace.findMany({
         where,
-        include: { template: { select: { id: true, name: true, templateType: true, pageSize: true } }, school: { select: { name: true } } },
+        include: { template: { select: { id: true, name: true, templateType: true, pageSize: true, certificate: true } }, school: { select: { name: true } } },
         orderBy: [{ featured: 'desc' }, { downloads: 'desc' }],
       }),
       15000,
@@ -32,9 +33,47 @@ export class TemplateMarketplaceService {
   private async ensureSystemTemplatesPublished(): Promise<void> {
     const systemTemplates = await this.prisma.reportTemplate.findMany({
       where: { schoolId: null, isDefault: true },
-      include: { category: { select: { slug: true } } },
+      include: { category: { select: { slug: true } }, certificate: true },
     });
     if (systemTemplates.length === 0) return;
+
+    // Repair legacy system certificates that were seeded before recipient and
+    // award-category metadata existed. Only system templates are touched.
+    for (const template of systemTemplates.filter((item) => item.templateType === 'CERTIFICATE' && item.certificate)) {
+      const name = template.name.toLowerCase();
+      const audience = /teacher|staff/.test(name) ? 'TEACHER' : 'STUDENT';
+      const awardCategory = audience === 'TEACHER'
+        ? (name.includes('staff') || name.includes('service') ? 'TEACHER_SERVICE' : 'TEACHER_PERFORMANCE')
+        : name.includes('attendance') ? 'ATTENDANCE'
+          : name.includes('sports') ? 'SPORTS'
+            : name.includes('leadership') ? 'LEADERSHIP'
+              : name.includes('graduation') ? 'GRADUATION'
+                : name.includes('service') ? 'COMMUNITY_SERVICE'
+                  : 'OVERALL_AVERAGE';
+      if (template.certificate!.audience !== audience || template.certificate!.awardCategory !== awardCategory) {
+        await this.prisma.certificateTemplate.update({ where: { templateId: template.id }, data: { audience, awardCategory } });
+      }
+      await this.prisma.templateMarketplace.updateMany({
+        where: { templateId: template.id },
+        data: { documentType: 'CERTIFICATE', recipientType: audience, awardCategory },
+      });
+    }
+
+    // Normalize every published certificate, including school-authored entries,
+    // from the certificate template itself. Marketplace metadata must never be
+    // allowed to disagree with the source template audience.
+    const certificateEntries = await this.prisma.templateMarketplace.findMany({
+      where: { template: { templateType: 'CERTIFICATE', certificate: { isNot: null } } },
+      select: { id: true, template: { select: { certificate: { select: { audience: true, awardCategory: true } } } } },
+    });
+    for (const entry of certificateEntries) {
+      const certificate = entry.template.certificate;
+      if (!certificate) continue;
+      await this.prisma.templateMarketplace.update({
+        where: { id: entry.id },
+        data: { documentType: DocumentType.CERTIFICATE, recipientType: certificate.audience || 'STUDENT', awardCategory: certificate.awardCategory || 'OVERALL_AVERAGE' },
+      });
+    }
 
     // Backfill the professional HBS contract for templates seeded before the
     // marketplace renderer was introduced. Rendering uses this metadata to
@@ -93,33 +132,37 @@ export class TemplateMarketplaceService {
     const haystack = `${template.templateType} ${template.name || ''} ${template.category?.slug || ''}`.toUpperCase();
     if (haystack.includes('TRANSCRIPT')) return DocumentType.TRANSCRIPT;
     if (haystack.includes('ATTENDANCE')) return DocumentType.ATTENDANCE;
-    if (haystack.includes('LEADERSHIP') || haystack.includes('CERTIFICATE')) return DocumentType.LEADERSHIP;
+    if (haystack.includes('CERTIFICATE')) return DocumentType.CERTIFICATE;
+    if (haystack.includes('LEADERSHIP')) return DocumentType.LEADERSHIP;
     return DocumentType.ACADEMIC_REPORT;
   }
 
   async publishToMarketplace(schoolId: string, templateId: string, data: {
-    title: string; description?: string; category?: string; tags?: string[]; price?: number; previewUrl?: string; documentType?: DocumentType;
+    title: string; description?: string; category?: string; tags?: string[]; price?: number; previewUrl?: string; documentType?: DocumentType; recipientType?: string; awardCategory?: string;
   }) {
-    const t = await this.prisma.reportTemplate.findFirst({ where: { id: templateId, schoolId } });
+    const t = await this.prisma.reportTemplate.findFirst({ where: { id: templateId, schoolId }, include: { certificate: true } });
     if (!t) throw new NotFoundException('Template not found');
-    const documentType = data.documentType || this.resolveTemplateDocumentType(t);
+    const documentType = t.templateType === 'CERTIFICATE' ? DocumentType.CERTIFICATE : (data.documentType || this.resolveTemplateDocumentType(t));
+    if (t.templateType === 'CERTIFICATE' && data.recipientType && data.recipientType !== (t.certificate?.audience || 'STUDENT')) {
+      throw new NotFoundException('Certificate recipient type does not match the template audience');
+    }
     return this.prisma.templateMarketplace.upsert({
       where: { templateId },
-      create: { templateId, schoolId, ...data, documentType, tags: data.tags || [] },
-      update: { ...data, documentType },
+      create: { templateId, schoolId, ...data, documentType, recipientType: t.templateType === 'CERTIFICATE' ? (t.certificate?.audience || 'STUDENT') : (data.recipientType || 'STUDENT'), awardCategory: t.templateType === 'CERTIFICATE' ? t.certificate?.awardCategory : data.awardCategory, tags: data.tags || [] },
+      update: { ...data, documentType, recipientType: t.templateType === 'CERTIFICATE' ? (t.certificate?.audience || 'STUDENT') : (data.recipientType || 'STUDENT'), awardCategory: t.templateType === 'CERTIFICATE' ? t.certificate?.awardCategory : data.awardCategory },
     });
   }
 
   async publishSystemTemplate(templateId: string, data: {
     title: string; description?: string; category?: string; tags?: string[]; price?: number; previewUrl?: string; featured?: boolean;
   }) {
-    const t = await this.prisma.reportTemplate.findFirst({ where: { id: templateId, isDefault: true } });
+    const t = await this.prisma.reportTemplate.findFirst({ where: { id: templateId, isDefault: true }, include: { certificate: true } });
     if (!t) throw new NotFoundException('System template not found');
-    const documentType = this.resolveTemplateDocumentType(t);
+    const documentType = t.templateType === 'CERTIFICATE' ? DocumentType.CERTIFICATE : this.resolveTemplateDocumentType(t);
     return this.prisma.templateMarketplace.upsert({
       where: { templateId },
-      create: { templateId, schoolId: null, ...data, documentType, tags: data.tags || [] },
-      update: { ...data, documentType },
+      create: { templateId, schoolId: null, ...data, documentType, recipientType: t.templateType === 'CERTIFICATE' ? (t.certificate?.audience || 'STUDENT') : 'STUDENT', awardCategory: t.templateType === 'CERTIFICATE' ? t.certificate?.awardCategory : undefined, tags: data.tags || [] },
+      update: { ...data, documentType, recipientType: t.templateType === 'CERTIFICATE' ? (t.certificate?.audience || 'STUDENT') : 'STUDENT', awardCategory: t.templateType === 'CERTIFICATE' ? t.certificate?.awardCategory : undefined },
     });
   }
 
@@ -190,6 +233,9 @@ export class TemplateMarketplaceService {
         data: {
           templateId: copy.id,
           certificateType: template.certificate.certificateType,
+          audience: template.certificate.audience,
+          awardCategory: template.certificate.awardCategory,
+          subjectId: template.certificate.subjectId,
           borderStyle: template.certificate.borderStyle,
           borderColor: template.certificate.borderColor,
           sealUrl: template.certificate.sealUrl,

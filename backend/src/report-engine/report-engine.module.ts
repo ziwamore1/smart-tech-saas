@@ -11,6 +11,7 @@ import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { CommonModule } from '../common/common.module';
 import { ResultsManagementModule } from '../results-management/results-management.module';
 import { TeacherAnalyticsModule } from '../teacher-analytics/teacher-analytics.module';
+import { StudentAwardsModule } from '../student-awards/student-awards.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { TeacherAnalyticsModule } from '../teacher-analytics/teacher-analytics.m
     CloudinaryModule,
     ResultsManagementModule,
     TeacherAnalyticsModule,
+    StudentAwardsModule,
   ],
   controllers: [ReportEngineController],
   providers: [ReportEngineService],

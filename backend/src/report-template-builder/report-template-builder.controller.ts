@@ -129,11 +129,15 @@ export class ReportTemplateBuilderController {
     @Query('category') category?: string,
     @Query('featured') featured?: string,
     @Query('search') search?: string,
+    @Query('documentType') documentType?: string,
+    @Query('recipientType') recipientType?: string,
   ) {
     return this.marketplaceService.getMarketplaceTemplates({
       category,
       featured: featured === 'true',
       search,
+      documentType,
+      recipientType,
     });
   }
 

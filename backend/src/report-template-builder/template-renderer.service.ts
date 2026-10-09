@@ -1412,9 +1412,12 @@ case 'SIGNATURE': {
     if (!cert) return '';
 
     const borderStyle = cert.borderStyle || 'classic';
-    const borderColor = cert.borderColor || '#1a365d';
     const isLandscape = template.orientation === 'landscape';
     const typeCopy = this.certificateRenderer.getCertificateTypeCopy(cert.certificateType);
+    const audience = cert.audience || 'STUDENT';
+    const award = this.certificateRenderer.getAwardCategoryPresentation(cert.awardCategory, audience);
+    const borderColor = cert.borderColor && cert.borderColor !== '#1a365d' ? cert.borderColor : award.color;
+    const accentColor = borderColor;
 
     const borderMap: Record<string, string> = {
       classic: `10px double ${borderColor}`,
@@ -1446,13 +1449,14 @@ case 'SIGNATURE': {
       ${cert.showWatermark && cert.watermarkText ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)rotate(-30deg);font-size:80px;color:${borderColor};opacity:0.04;pointer-events:none;white-space:nowrap;font-weight:bold;">${cert.watermarkText}</div>` : ''}
       ${school?.logoUrl ? `<img src="${school.logoUrl}" style="height:60px;margin-bottom:10px;" />` : ''}
        <div style="font-size:34px;font-weight:800;color:${borderColor};margin-bottom:7px;">${school?.name || 'School Name'}</div>
-       <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:10px;text-transform:uppercase;letter-spacing:3px;">${cert.borderStyle === 'university' ? 'Official University Document' : typeCopy.subtitle}</div>
-      <hr style="width:160px;border:none;height:1px;background:linear-gradient(90deg,transparent,${borderColor},transparent);margin:10px auto;opacity:0.6;" />
-       <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:7px;text-transform:uppercase;letter-spacing:5px;">${typeCopy.title}</div>
+        <div style="font-size:12px;font-weight:700;color:${accentColor};margin-bottom:10px;text-transform:uppercase;letter-spacing:3px;">${cert.borderStyle === 'university' ? 'Official University Document' : (audience === 'TEACHER' ? 'Official Staff Award Document' : typeCopy.subtitle)}</div>
+       <hr style="width:160px;border:none;height:1px;background:linear-gradient(90deg,transparent,${accentColor},transparent);margin:10px auto;opacity:0.6;" />
+        <div style="font-size:13px;font-weight:700;color:${accentColor};margin-bottom:7px;text-transform:uppercase;letter-spacing:5px;">${award.title}</div>
        <div style="font-size:17px;font-weight:600;color:#111827;margin:8px 0;font-style:italic;">${cert.awardText || 'This certificate is awarded to'}</div>
        <div style="font-size:40px;font-weight:800;color:${borderColor};margin:8px 0;font-family:'Georgia',serif;">${studentName}</div>
-       <div style="font-size:14px;font-weight:600;color:#1f2937;margin:5px 0;line-height:1.6;">${typeCopy.description}</div>
-        <div style="font-size:13px;font-weight:600;color:#374151;margin:6px 0;">Class: ${data?.class?.name || ''} | Term: ${data?.term?.name || ''} ${data?.term?.academicYear || ''} | Exam: ${data?.examType || 'END_TERM'}</div>
+        <div style="font-size:14px;font-weight:600;color:#1f2937;margin:5px 0;line-height:1.6;">${award.description}</div>
+         <div style="font-size:13px;font-weight:600;color:#374151;margin:6px 0;">${audience === 'TEACHER' ? `Department: ${data?.class?.name || 'Teaching Staff'}` : `Class: ${data?.class?.name || ''}`} | Term: ${data?.term?.name || ''} ${data?.term?.academicYear || ''} | Exam: ${data?.examType || 'END_TERM'}</div>
+        ${data?.certificateAchievement ? `<div style="max-width:680px;margin:14px auto 6px;padding:12px 20px;border-left:4px solid ${accentColor};border-right:4px solid ${accentColor};background:${accentColor}12;color:#1f2937;font-size:14px;font-weight:700;line-height:1.55;"><span style="display:block;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:${accentColor};margin-bottom:4px;">Verified achievement</span>${this.escapeHtml(String(data.certificateAchievement))}</div>` : ''}
        ${data?.certificateComment ? `<div style="max-width:620px;margin:12px auto 5px;padding:10px 18px;border-left:4px solid #0f766e;border-right:4px solid #0f766e;background:#f0fdfa;color:#134e4a;font-size:13px;font-weight:600;line-height:1.5;">${this.escapeHtml(String(data.certificateComment))}</div>` : ''}
       ${cert.showBadge ? `<div style="margin:15px 0;">
         <svg width="50" height="50" viewBox="0 0 50 50"><polygon points="25,3 31,18 47,19 35,30 38,47 25,38 12,47 15,30 3,19 19,18" fill="#f59e0b"/></svg>

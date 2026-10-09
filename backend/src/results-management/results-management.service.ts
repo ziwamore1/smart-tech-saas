@@ -91,6 +91,33 @@ export class ResultsManagementService {
     private pushNotification?: PushNotificationService,
   ) {}
 
+  async getExamTypes() {
+    return this.prisma.examTypeDefinition.findMany({
+      orderBy: [{ isSystem: 'desc' }, { label: 'asc' }],
+      select: { value: true, label: true, isSystem: true },
+    });
+  }
+
+  async createExamType(value: string, label?: string) {
+    const cleanedLabel = String(label || value || '').trim();
+    const cleanedValue = String(value || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+
+    if (!cleanedValue || !cleanedLabel) {
+      throw new BadRequestException('Exam type name is required');
+    }
+
+    return this.prisma.examTypeDefinition.upsert({
+      where: { value: cleanedValue },
+      create: { value: cleanedValue, label: cleanedLabel, isSystem: false },
+      update: { label: cleanedLabel },
+      select: { value: true, label: true, isSystem: true },
+    });
+  }
+
   async recalculateSheetCounts(sheetId: string): Promise<{ totalStudents: number; enteredCount: number }> {
     const sheet = await this.prisma.resultSheet.findUnique({
       where: { id: sheetId },
@@ -1132,6 +1159,34 @@ export class ResultsManagementService {
         totalPoints: r.totalPoints || 0,
       })),
     };
+  }
+
+  /** Director-facing certificate candidates. The limit is supplied by the caller,
+   * so awards are never silently restricted to a hard-coded class size. */
+  async getTopPerformers(sheetId: string, options: { category?: string; subjectId?: string; limit?: number } = {}) {
+    const limit = Math.max(1, Math.min(Number(options.limit) || 10, 500));
+    const category = options.category || 'OVERALL_AVERAGE';
+    const sheet = await this.prisma.resultSheet.findUnique({
+      where: { id: sheetId },
+      select: { classId: true, termId: true, schoolId: true },
+    });
+    if (!sheet) throw new NotFoundException('Result sheet not found');
+    await this.ensureComputedResults(sheet.classId, sheet.termId, sheet.schoolId);
+
+    if (category === 'SUBJECT_PERCENTAGE') {
+      if (!options.subjectId) throw new BadRequestException('subjectId is required for subject performers');
+      const rows = await this.rankingService.computeSubjectRankings(options.subjectId, sheet.termId, sheet.classId, sheet.schoolId);
+      const subject = await this.prisma.subject.findUnique({ where: { id: options.subjectId }, select: { id: true, name: true, code: true } });
+      return { category, subject, limit, performers: rows.slice(0, limit) };
+    }
+
+    const rankings = await this.rankingService.computeClassRankings(sheet.classId, sheet.termId, sheet.schoolId);
+    const sorted = [...(Array.isArray(rankings) ? rankings : [])].sort((a: any, b: any) =>
+      category === 'BEST_SIX_POINTS'
+        ? (a.totalPoints ?? Number.MAX_SAFE_INTEGER) - (b.totalPoints ?? Number.MAX_SAFE_INTEGER)
+        : (b.average ?? b.percentage ?? 0) - (a.average ?? a.percentage ?? 0),
+    );
+    return { category, limit, performers: sorted.slice(0, limit).map((row: any, index) => ({ ...row, rank: index + 1 })) };
   }
 
   async getAnalysis(sheetId: string) {

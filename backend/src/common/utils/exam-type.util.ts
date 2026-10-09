@@ -2,7 +2,7 @@
  * Shared exam type normalization utility.
  *
  * The ResultSheet.examType column is a plain TEXT field, so any string can be stored.
- * This utility normalizes user-provided exam type values to match the Prisma ExamType enum.
+ * This utility normalizes standard values while preserving registered custom types.
  */
 
 export const VALID_EXAM_TYPES = [
@@ -33,7 +33,7 @@ const EXAM_TYPE_MAP: Record<string, string> = {
 };
 
 /**
- * Normalize an exam type value to the Prisma ExamType enum format.
+ * Normalize an exam type value to the standard storage format.
  * Returns 'END_TERM' if the input is empty/null/undefined.
  * Returns the original value (with no transformation) if no mapping is found.
  */

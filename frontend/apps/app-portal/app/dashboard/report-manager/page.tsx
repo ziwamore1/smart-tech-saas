@@ -66,8 +66,8 @@ export default function ReportManagerPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-3 sm:p-6 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
             <i className="fas fa-folder-open text-indigo-500" />
@@ -115,7 +115,8 @@ export default function ReportManagerPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px]">
             <thead>
               <tr className="bg-gray-50">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Report</th>
@@ -180,6 +181,7 @@ export default function ReportManagerPage() {
               })}
             </tbody>
           </table>
+          </div>
 
           {pagination && pagination.totalPages > 1 && (
             <div className="flex justify-center items-center gap-3 py-4 border-t border-gray-100">

@@ -71,6 +71,7 @@ import { AssessmentEngineModule } from './assessment-engine/assessment-engine.mo
 import { GradingEngineModule } from './grading-engine/grading-engine.module';
 import { ResultAnalyticsModule } from './result-analytics/result-analytics.module';
 import { ResultsManagementModule } from './results-management/results-management.module';
+import { StudentAwardsModule } from './student-awards/student-awards.module';
 import { SyncEngineModule } from './sync-engine/sync-engine.module';
 import { ReportCardEngineModule } from './report-card-engine/report-card-engine.module';
 import { RankingModule } from './ranking-service/ranking.module';
@@ -179,6 +180,7 @@ import { getRedisConnectionOptions } from './queues/redis.config';
     GradingEngineModule,
     ResultAnalyticsModule,
     ResultsManagementModule,
+    StudentAwardsModule,
     SyncEngineModule,
     ReportCardEngineModule,
     RankingModule,

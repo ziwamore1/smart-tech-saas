@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { reportEngineApi, classApi, termApi, studentApi } from '@/lib/api';
+import { reportEngineApi, classApi, termApi, studentApi, teacherApi } from '@/lib/api';
 import { toast } from 'sonner';
 
 const REPORT_TYPES = [
@@ -21,6 +21,11 @@ export default function ReportHubPage() {
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState('');
+  const [recipientType, setRecipientType] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
+  const [selectedTeacher, setSelectedTeacher] = useState('');
+  const [awardCategory, setAwardCategory] = useState('OVERALL_AVERAGE');
+  const [topLimit, setTopLimit] = useState('10');
+  const [achievementCitation, setAchievementCitation] = useState('');
   const [generating, setGenerating] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultFileName, setResultFileName] = useState('');
@@ -46,12 +51,18 @@ export default function ReportHubPage() {
     enabled: !!selectedClass,
   });
 
+  const { data: teachers } = useQuery({
+    queryKey: ['teachers-for-certificates'],
+    queryFn: () => teacherApi.getAll({ limit: 500 }).then(r => r.data?.data || r.data?.teachers || r.data),
+    enabled: selectedType === 'CERTIFICATE' && recipientType === 'TEACHER',
+  });
+
   const config = REPORT_TYPES.find(t => t.type === selectedType);
-  const needsStudent = selectedType && ['REPORT_CARD', 'TRANSCRIPT', 'CERTIFICATE', 'PERFORMANCE_REPORT'].includes(selectedType);
+  const needsStudent = selectedType && ['REPORT_CARD', 'TRANSCRIPT', 'PERFORMANCE_REPORT'].includes(selectedType) || (selectedType === 'CERTIFICATE' && recipientType === 'STUDENT');
   const needsClass = selectedType && ['CLASS_REPORT', 'MARK_SCHEDULE'].includes(selectedType);
   const needsTerm = selectedType && !['TRANSCRIPT'].includes(selectedType);
 
-  const canGenerate = selectedType && (!needsStudent || selectedStudent) && (!needsClass || selectedClass) && (!needsTerm || selectedTerm);
+  const canGenerate = selectedType && (!needsStudent || selectedStudent) && (selectedType !== 'CERTIFICATE' || recipientType !== 'TEACHER' || selectedTeacher) && (selectedType !== 'CERTIFICATE' || recipientType !== 'TEACHER' || awardCategory !== 'TEACHER_HONORARY' || achievementCitation.trim().length >= 15) && (!needsClass || selectedClass) && (!needsTerm || selectedTerm);
 
   const handleGenerate = async () => {
     if (!selectedType) return;
@@ -60,8 +71,10 @@ export default function ReportHubPage() {
     try {
       const payload: any = { type: selectedType };
       if (selectedStudent) payload.studentId = selectedStudent;
+      if (selectedTeacher) payload.teacherUserId = selectedTeacher;
       if (selectedClass) payload.classId = selectedClass;
       if (selectedTerm) payload.termId = selectedTerm;
+      if (selectedType === 'CERTIFICATE') payload.options = { recipientType, awardCategory, topLimit: Number(topLimit) || 10, achievementCitation: achievementCitation.trim() || undefined };
 
       const res = await reportEngineApi.generatePdf(payload);
       const blob = res.data;
@@ -101,7 +114,7 @@ export default function ReportHubPage() {
         {REPORT_TYPES.map(rt => (
           <div
             key={rt.type}
-            onClick={() => { setSelectedType(rt.type); setResultUrl(null); }}
+            onClick={() => { setSelectedType(rt.type); setResultUrl(null); setSelectedStudent(''); setSelectedTeacher(''); }}
             style={{
               padding: '20px',
               borderRadius: '12px',
@@ -138,6 +151,12 @@ export default function ReportHubPage() {
           </h3>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+            {selectedType === 'CERTIFICATE' && <>
+               <div><label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Certificate recipient</label><select value={recipientType} onChange={e => { const next = e.target.value as any; setRecipientType(next); setAwardCategory(next === 'TEACHER' ? 'TEACHER_PERFORMANCE' : 'OVERALL_AVERAGE'); setSelectedStudent(''); setSelectedTeacher(''); }} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px' }}><option value="STUDENT">Student certificate</option><option value="TEACHER">Teacher certificate</option></select></div>
+               <div><label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Award category</label><select value={awardCategory} onChange={e => setAwardCategory(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px' }}>{recipientType === 'TEACHER' ? <><option value="TEACHER_PERFORMANCE">Performance from assigned subjects</option><option value="TEACHER_SERVICE">Verified service</option><option value="TEACHER_HONORARY">Honorary achievement</option></> : <><option value="OVERALL_AVERAGE">Overall average</option><option value="BEST_SIX_POINTS">Best 6 subjects (points)</option><option value="SUBJECT_PERCENTAGE">Best in a subject</option></>}</select></div>
+               {recipientType === 'TEACHER' && awardCategory === 'TEACHER_HONORARY' && <div style={{ gridColumn: 'span 2' }}><label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Specific honorary achievement citation</label><textarea value={achievementCitation} onChange={e => setAchievementCitation(e.target.value)} minLength={15} placeholder="State the actual achievement that justifies this honorary award..." style={{ width: '100%', minHeight: '76px', padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px' }} /></div>}
+              <div><label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Top performers to award</label><input type="number" min="1" max="500" value={topLimit} onChange={e => setTopLimit(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px' }} /></div>
+            </>}
             {(needsClass || needsStudent) && (
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Class</label>
@@ -185,6 +204,7 @@ export default function ReportHubPage() {
                 </select>
               </div>
             )}
+            {selectedType === 'CERTIFICATE' && recipientType === 'TEACHER' && <div><label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>Teacher</label><select value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px' }}><option value="">Select teacher...</option>{(Array.isArray(teachers) ? teachers : []).map((t: any) => <option key={t.userId || t.id} value={t.userId || t.id}>{(t.user || t).firstName} {(t.user || t).lastName}{t.department ? ` — ${t.department}` : ''}</option>)}</select></div>}
           </div>
 
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>

@@ -74,6 +74,7 @@ function SecretaryDashboardContent() {
     { name: 'Reports', href: '/dashboard/reports', icon: 'fa-file-alt', desc: 'School reports', color: '#6366f1' },
     { name: 'Report Hub', href: '/dashboard/report-hub', icon: 'fa-print', desc: 'Print documents', color: '#3b82f6' },
     { name: 'Report Manager', href: '/dashboard/report-manager', icon: 'fa-folder-open', desc: 'Manage report documents', color: '#6366f1' },
+    { name: 'Student Awards Evidence', href: '/dashboard/student-awards', icon: 'fa-medal', desc: 'Manage award evidence records', color: '#d97706' },
   ];
 
   return (

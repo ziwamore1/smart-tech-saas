@@ -2,7 +2,6 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import * as crypto from 'crypto';
 import { InstitutionProvisioningService } from './institution-provisioning.service';
 import { RegisterInstitutionDto, InstitutionTypeCodeEnum } from './dto/institution-type.dto';
 import { EmailService } from '../email/email.service';
@@ -203,12 +202,13 @@ export class InstitutionRegistrationService {
   }
 
   private async generateRegistrationNumber(): Promise<string> {
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const candidate = `ST-${new Date().getFullYear()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-      const existing = await this.prisma.school.findUnique({ where: { registrationNumber: candidate }, select: { id: true } });
-      if (!existing) return candidate;
-    }
-    throw new BadRequestException('Unable to allocate a school registration number. Please try again.');
+    const sequence = await this.prisma.schoolRegistrationSequence.upsert({
+      where: { key: 'SCHOOL' },
+      create: { key: 'SCHOOL', nextValue: 2 },
+      update: { nextValue: { increment: 1 } },
+      select: { nextValue: true },
+    });
+    return `ST-AUTO-${new Date().getFullYear()}-${String(sequence.nextValue - 1).padStart(6, '0')}`;
   }
 
   async getRegistrationSteps() {

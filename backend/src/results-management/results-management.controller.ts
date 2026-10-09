@@ -25,6 +25,19 @@ import { Roles } from '../auth/decorators/roles.decorator';
 export class ResultsManagementController {
   constructor(private readonly resultsManagement: ResultsManagementService) {}
 
+  @Get('exam-types')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
+  async getExamTypes() {
+    return { data: await this.resultsManagement.getExamTypes(), message: 'Exam types retrieved successfully' };
+  }
+
+  @Post('exam-types')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD')
+  async createExamType(@Body() body: { value?: string; label?: string }) {
+    const data = await this.resultsManagement.createExamType(body.value || body.label || '', body.label);
+    return { data, message: 'Exam type saved successfully' };
+  }
+
   @Get('sheets')
   @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   async getSheets(
@@ -131,6 +144,18 @@ export class ResultsManagementController {
   async getRankings(@Param('id') id: string, @Query('type') type: string) {
     const data = await this.resultsManagement.getRankings(id, type || 'class');
     return { data, message: 'Rankings retrieved successfully' };
+  }
+
+  @Get('sheets/:id/top-performers')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
+  async getTopPerformers(
+    @Param('id') id: string,
+    @Query('category') category?: string,
+    @Query('subjectId') subjectId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const data = await this.resultsManagement.getTopPerformers(id, { category, subjectId, limit: Number(limit) || 10 });
+    return { data, message: 'Top performers retrieved successfully' };
   }
 
   @Get('sheets/:id/analysis')

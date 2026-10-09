@@ -60,6 +60,12 @@ export function ReportDocumentViewer({ report, onClose }: ReportDocumentViewerPr
     }
   };
 
+  const handleOpenNativeViewer = () => {
+    if (!pdfUrl) return;
+    const opened = window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+    if (!opened) toast.error('Allow pop-ups to view this document.');
+  };
+
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 100, display: 'flex', flexDirection: 'column',
@@ -85,7 +91,10 @@ export function ReportDocumentViewer({ report, onClose }: ReportDocumentViewerPr
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button onClick={handleOpenNativeViewer} disabled={!pdfUrl} title="Open in your device PDF viewer" style={{ padding: '6px 10px', borderRadius: '8px', border: 'none', background: '#4f46e5', color: 'white', fontSize: '13px', fontWeight: '500', opacity: pdfUrl ? 1 : 0.5 }}>
+            <i className="fas fa-external-link-alt" /> <span className="mobile-action-label">Open</span>
+          </button>
           <button
             onClick={handlePrint}
             disabled={!pdfUrl}
@@ -140,7 +149,7 @@ export function ReportDocumentViewer({ report, onClose }: ReportDocumentViewerPr
           <iframe
             ref={iframeRef}
             src={pdfUrl}
-            style={{ width: '100%', height: '100%', border: 'none' }}
+            style={{ width: '100%', height: '100%', minHeight: '70vh', border: 'none' }}
             title={report.title}
           />
         )}

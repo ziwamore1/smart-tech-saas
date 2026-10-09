@@ -341,6 +341,9 @@ model School {
   calendarGoals                  CalendarGoal[]
   calendarActivityTimelines      CalendarActivityTimeline[]
   financialCustomers             FinancialCustomer[]
+  studentLeadershipRoles         StudentLeadershipRole[]
+  studentLeadershipAppointments StudentLeadershipAppointment[]
+  studentSportsParticipations   StudentSportsParticipation[]
 
   @@index([institutionTypeId])
   @@index([isActive])
@@ -642,6 +645,7 @@ model Class {
   classTeacherAssignments ClassTeacherAssignment[]
   studentSubjects         StudentSubject[]
   ResultEntryPermission   ResultEntryPermission[]
+  studentLeadershipAppointments StudentLeadershipAppointment[]
 
   @@index([reportTemplateId])
 }
@@ -1270,6 +1274,8 @@ model Student {
   aiTopicMasteries     AiTopicMastery[]
   grade7Results        Grade7Result[]
   studentSubjects      StudentSubject[]
+  leadershipAppointments StudentLeadershipAppointment[]
+  sportsParticipations   StudentSportsParticipation[]
 
   @@unique([admissionNumber, classId])
   @@unique([studentUuid])
@@ -1293,6 +1299,95 @@ model StudentPhoto {
 
   @@index([studentId])
   @@index([uploadedById])
+}
+
+model StudentLeadershipAppointment {
+  id             String   @id @default(uuid())
+  schoolId       String
+  studentId      String
+  classId        String?
+  roleCode       String
+  roleTitle      String
+  institutionTier String  @default("SECONDARY_SCHOOL")
+  startDate      DateTime
+  endDate        DateTime?
+  status         String   @default("ACTIVE")
+  appointedBy    String
+  recommendation String?
+  totalPoints    Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  school         School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student        Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class          Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
+  duties         StudentLeadershipDuty[]
+
+  @@index([schoolId, roleCode, status])
+  @@index([studentId, startDate])
+}
+
+model StudentLeadershipDuty {
+  id             String   @id @default(uuid())
+  appointmentId  String
+  title          String
+  description    String?
+  pointsPossible Int      @default(10)
+  pointsAwarded  Int      @default(0)
+  status         String   @default("PENDING")
+  completedAt    DateTime?
+  verifiedBy     String?
+  evidence       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  appointment    StudentLeadershipAppointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([appointmentId, status])
+}
+
+model StudentSportsParticipation {
+  id                String   @id @default(uuid())
+  schoolId          String
+  studentId         String
+  sportCategory     String
+  eventLevel        String   @default("SCHOOL")
+  startDate         DateTime
+  endDate           DateTime?
+  status            String   @default("ACTIVE")
+  teacherRecommended Boolean  @default(false)
+  recommendedBy    String?
+  recommendation    String?
+  pointsAwarded     Int      @default(0)
+  evidence          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  school            School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student           Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, sportCategory, status])
+  @@index([studentId, teacherRecommended])
+}
+
+model StudentLeadershipRole {
+  id              String   @id @default(uuid())
+  schoolId        String
+  code            String
+  title           String
+  institutionTier String   @default("SECONDARY_SCHOOL")
+  minimumPoints   Int      @default(10)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, code])
+  @@index([schoolId, institutionTier, isActive])
+}
+
+model SchoolRegistrationSequence {
+  id        String   @id @default(uuid())
+  key       String   @unique @default("SCHOOL")
+  nextValue Int      @default(1)
+  updatedAt DateTime @updatedAt
 }
 
 model AdmissionSequence {
@@ -1436,6 +1531,17 @@ model ResultSheet {
   @@index([termId])
   @@index([status])
   @@index([examType])
+}
+
+model ExamTypeDefinition {
+  id        String   @id @default(uuid())
+  value     String   @unique
+  label     String
+  isSystem  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isSystem])
 }
 
 model ResultAuditLog {
@@ -2779,6 +2885,9 @@ model CertificateTemplate {
   id              String          @id @default(uuid())
   templateId      String          @unique
   certificateType CertificateType @default(ACADEMIC_EXCELLENCE)
+  audience        String          @default("STUDENT")
+  awardCategory   String          @default("OVERALL_AVERAGE")
+  subjectId       String?
   borderStyle     String          @default("classic")
   borderColor     String          @default("#1a365d")
   sealUrl         String?
@@ -2803,6 +2912,8 @@ model CertificateTemplate {
   template        ReportTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@index([certificateType])
+  @@index([audience, awardCategory])
+  @@index([subjectId])
 }
 
 model TemplateAsset {
@@ -4152,6 +4263,8 @@ model TemplateMarketplace {
   templateId   String         @unique
   schoolId     String?
   documentType DocumentType   @default(ACADEMIC_REPORT)
+  recipientType String        @default("STUDENT")
+  awardCategory String?
   title        String
   description  String?
   category     String?
@@ -4170,6 +4283,7 @@ model TemplateMarketplace {
   @@index([category])
   @@index([featured])
   @@index([downloads])
+  @@index([recipientType, awardCategory])
 }
 
 model BrandPreset {
@@ -6729,6 +6843,8 @@ model GeneratedReport {
   reportType      String // REPORT_CARD, CLASS_REPORT, TRANSCRIPT, CERTIFICATE, ATTENDANCE_REPORT, ANALYTICS_SUMMARY, MARK_SCHEDULE, PERFORMANCE_REPORT
   title           String
   studentId       String?
+  recipientType   String   @default("STUDENT")
+  recipientUserId String?
   className       String?
   classId         String?
   termId          String?
