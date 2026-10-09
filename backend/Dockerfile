@@ -1,5 +1,5 @@
 # Backend Dockerfile
-FROM node:20-alpine AS builder
+FROM public.ecr.aws/docker/library/node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -25,7 +25,7 @@ RUN node --max-old-space-size=1024 ./node_modules/@nestjs/cli/bin/nest.js build 
     (echo "=== BUILD FAILED ===" && ls -la /app/ && exit 1)
 
 # Production stage
-FROM node:20-alpine
+FROM public.ecr.aws/docker/library/node:20-alpine
 
 WORKDIR /app
 

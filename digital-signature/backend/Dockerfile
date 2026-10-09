@@ -1,5 +1,5 @@
 # Digital Signature Service (Part B) Dockerfile
-FROM node:20-alpine AS builder
+FROM public.ecr.aws/docker/library/node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ RUN npx prisma generate --schema=./prisma/schema.postgres.prisma && \
     ./node_modules/@nestjs/cli/bin/nest.js build && \
     test -f dist/main.js || (echo "BUILD FAILED" && exit 1)
 
-FROM node:20-alpine
+FROM public.ecr.aws/docker/library/node:20-alpine
 
 WORKDIR /app
 
