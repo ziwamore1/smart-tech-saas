@@ -37,7 +37,7 @@ function genderInitial(gender?: string | null): string {
 }
 
 const REPORT_STYLES = `
-  @page { margin: 18mm 16mm 24mm; size: A4 landscape; }
+  @page { margin: 24mm 26mm 32mm; size: A4 landscape; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, Helvetica, sans-serif; color: #111827; background: white; padding: 24px; line-height: 1.45; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .report-header { text-align: center; margin-bottom: 24px; padding: 17px 20px; background: #123b5d; border: 2px solid #0b263d; border-radius: 6px; color: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; page-break-inside: avoid; }
@@ -46,7 +46,7 @@ const REPORT_STYLES = `
   .report-title { font-size: 18px; font-weight: 700; color: #ffffff; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
   .report-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 20px; font-size: 14px; color: #111827; background: #ffffff; padding: 12px 16px; border-radius: 4px; border: 2px solid #123b5d; break-inside: avoid; page-break-inside: avoid; }
   .report-meta strong { color: #123b5d; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; border: 2px solid #111827; }
+  table { width: 100%; max-width: 100%; border-collapse: collapse; font-size: 12px; border: 2px solid #111827; }
   th { background: #123b5d !important; color: #ffffff !important; padding: 9px 8px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.2px; border: 1px solid #ffffff; vertical-align: middle; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   td { padding: 7px 8px; border: 1px solid #374151; vertical-align: middle; }
   tr:nth-child(even) { background: #f3f4f6; }
@@ -80,7 +80,7 @@ const REPORT_STYLES = `
 `;
 
 const MARK_SCHEDULE_EXTRA_STYLES = `
-  @page { margin: 18mm 16mm 24mm; size: A4 landscape; }
+  @page { margin: 24mm 26mm 32mm; size: A4 landscape; }
   body { font-size: 13px; }
   .report-header { margin-bottom: 20px; padding: 14px 20px; }
   .school-name { font-size: 26px; }
