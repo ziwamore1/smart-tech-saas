@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api, reportEngineApi, reportTemplateApi, classApi, classSubjectApi, termApi, studentApi, teacherApi } from '@/lib/api';
+import { api, reportEngineApi, reportTemplateApi, classApi, classSubjectApi, schoolApi, termApi, studentApi, teacherApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { examTypeLabel } from '@/lib/exam-types';
 import { useExamTypes } from '@/lib/use-exam-types';
@@ -64,6 +64,12 @@ export default function ReportHubPage() {
   const { data: terms } = useQuery({
     queryKey: ['terms'],
     queryFn: () => termApi.getAll().then(r => unwrap(r.data)),
+    staleTime: 60000,
+  });
+
+  const { data: school } = useQuery({
+    queryKey: ['report-hub-school'],
+    queryFn: () => schoolApi.getCurrentSchool().then(r => r.data?.data || r.data),
     staleTime: 60000,
   });
 
@@ -148,7 +154,7 @@ export default function ReportHubPage() {
         const subject = (Array.isArray(subjects) ? subjects : []).map((row: any) => row.subject || row).find((item: any) => item.id === selectedSubject);
         const cls = (Array.isArray(classes) ? classes : []).find((item: any) => item.id === selectedClass);
         const term = (Array.isArray(terms) ? terms : []).find((item: any) => item.id === selectedTerm);
-        const meta: ReportMeta = { schoolName: 'Smart Tech School', className: cls?.name || 'Class', termName: term?.name || 'Term', academicYear: term?.academicYear?.name || '', examType: selectedExamType ? examTypeLabel(selectedExamType) : 'Latest result sheet', department: result.department?.name || 'Department not assigned', subjectTeacher: result.assignedTeacher || 'Teacher not assigned' };
+        const meta: ReportMeta = { schoolName: school?.name || 'Smart Tech School', schoolAddress: school?.address || '', schoolPhone: school?.phone || '', schoolEmail: school?.email || '', className: cls?.name || 'Class', termName: term?.name || 'Term', academicYear: term?.academicYear?.name || '', examType: selectedExamType ? examTypeLabel(selectedExamType) : 'Latest result sheet', department: result.department?.name || 'Department not assigned', subjectTeacher: result.assignedTeacher || 'Teacher not assigned' };
         openSubjectPerformanceReport({ ...result, subject }, meta);
         toast.success('HTML subject performance report opened');
         setGenerating(false);

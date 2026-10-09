@@ -37,14 +37,14 @@ function genderInitial(gender?: string | null): string {
 }
 
 const REPORT_STYLES = `
-  @page { margin: 15mm; size: A4 landscape; }
+  @page { margin: 18mm 16mm 24mm; size: A4 landscape; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, Helvetica, sans-serif; color: #111827; background: white; padding: 24px; line-height: 1.45; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .report-header { text-align: center; margin-bottom: 24px; padding: 17px 20px; background: #123b5d; border: 2px solid #0b263d; border-radius: 6px; color: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .report-header { text-align: center; margin-bottom: 24px; padding: 17px 20px; background: #123b5d; border: 2px solid #0b263d; border-radius: 6px; color: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; page-break-inside: avoid; }
   .school-name { font-size: 25px; font-weight: 700; color: #ffffff; text-transform: uppercase; letter-spacing: 1px; }
   .school-sub { font-size: 13px; color: #ffffff; margin-top: 4px; }
   .report-title { font-size: 18px; font-weight: 700; color: #ffffff; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .report-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 20px; font-size: 14px; color: #111827; background: #ffffff; padding: 12px 16px; border-radius: 4px; border: 2px solid #123b5d; }
+  .report-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 20px; font-size: 14px; color: #111827; background: #ffffff; padding: 12px 16px; border-radius: 4px; border: 2px solid #123b5d; break-inside: avoid; page-break-inside: avoid; }
   .report-meta strong { color: #123b5d; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; border: 2px solid #111827; }
   th { background: #123b5d !important; color: #ffffff !important; padding: 9px 8px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.2px; border: 1px solid #ffffff; vertical-align: middle; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -67,10 +67,10 @@ const REPORT_STYLES = `
   .signatures { margin-top: 40px; display: flex; justify-content: space-between; }
   .sig { text-align: center; flex: 1; }
   .sig-line { width: 180px; border-top: 1px solid #1f2937; margin: 40px auto 0; padding-top: 6px; font-size: 11px; color: #6b7280; }
-  .footer { text-align: center; margin-top: 20px; padding-top: 12px; border-top: 2px solid #374151; font-size: 11px; color: #111827; }
+  .footer { text-align: center; margin-top: 24px; margin-bottom: 8mm; padding-top: 12px; border-top: 2px solid #374151; font-size: 11px; color: #111827; break-inside: avoid; page-break-inside: avoid; }
   .print-btn { position: fixed; top: 16px; right: 16px; padding: 10px 20px; background: #123b5d; color: white; border: 2px solid #0b263d; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 700; z-index: 1000; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
   .print-btn:hover { background: #0b263d; }
-  @media print { .print-btn { display: none; } body { padding: 0; } }
+  @media print { .print-btn { display: none; } body { padding: 0 0 8mm; } .footer { break-inside: avoid; page-break-inside: avoid; } }
   .section-title { font-size: 16px; font-weight: 700; color: #123b5d; margin: 20px 0 12px; padding-bottom: 6px; border-bottom: 3px solid #123b5d; }
   .subject-performance-table { table-layout: auto; }
   .subject-performance-table thead { display: table-header-group; }
@@ -80,7 +80,7 @@ const REPORT_STYLES = `
 `;
 
 const MARK_SCHEDULE_EXTRA_STYLES = `
-  @page { margin: 15mm; size: A4 landscape; }
+  @page { margin: 18mm 16mm 24mm; size: A4 landscape; }
   body { font-size: 13px; }
   .report-header { margin-bottom: 20px; padding: 14px 20px; }
   .school-name { font-size: 26px; }
@@ -98,7 +98,7 @@ const MARK_SCHEDULE_EXTRA_STYLES = `
   @media print {
     tr, td, th { break-inside: avoid; page-break-inside: avoid; }
     .print-btn { display: none; }
-    body { padding: 0; }
+    body { padding: 0 0 8mm; }
   }
 `;
 
