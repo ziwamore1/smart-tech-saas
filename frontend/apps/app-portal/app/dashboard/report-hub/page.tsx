@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { reportEngineApi, reportTemplateApi, classApi, termApi, studentApi, teacherApi, subjectApi } from '@/lib/api';
+import { reportEngineApi, reportTemplateApi, classApi, classSubjectApi, termApi, studentApi, teacherApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { examTypeLabel } from '@/lib/exam-types';
 import { useExamTypes } from '@/lib/use-exam-types';
@@ -78,9 +78,9 @@ export default function ReportHubPage() {
   });
 
   const { data: subjects } = useQuery({
-    queryKey: ['subjects-for-certificates'],
-    queryFn: () => subjectApi.getAll().then(r => unwrap(r.data)),
-    enabled: selectedType === 'CERTIFICATE' && awardCategory === 'SUBJECT_PERCENTAGE',
+    queryKey: ['class-subjects-for-certificates', selectedClass],
+    queryFn: () => classSubjectApi.getByClass(selectedClass).then(r => unwrap(r.data)),
+    enabled: selectedType === 'CERTIFICATE' && awardCategory === 'SUBJECT_PERCENTAGE' && !!selectedClass,
   });
 
   const { data: templates } = useQuery({
@@ -248,7 +248,7 @@ export default function ReportHubPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
                   <select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm">
                     <option value="">Select subject...</option>
-                    {(Array.isArray(subjects) ? subjects : []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    {(Array.isArray(subjects) ? subjects : []).map((row: any) => { const subject = row.subject || row; return <option key={subject.id} value={subject.id}>{subject.name}{subject.code ? ` (${subject.code})` : ''}</option>; })}
                   </select>
                 </div>}
                 <div>
@@ -272,7 +272,7 @@ export default function ReportHubPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Class</label>
                 <select
                   value={selectedClass}
-                  onChange={e => { setSelectedClass(e.target.value); setSelectedStudent(''); }}
+                  onChange={e => { setSelectedClass(e.target.value); setSelectedStudent(''); setSelectedSubject(''); }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
                 >
                   <option value="">Select class...</option>
