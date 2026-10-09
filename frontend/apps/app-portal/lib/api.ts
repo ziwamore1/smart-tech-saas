@@ -2932,3 +2932,17 @@ export const teacherAnalyticsApi = {
   getTeacherMarkSchedules: (teacherId: string, opts?: { termId?: string; examType?: string }) =>
     api.get(`/teacher-analytics/teacher/${teacherId}/mark-schedules`, { params: opts, timeout: 120000 }),
 };
+
+export const studentAwardsApi = {
+  catalog: () => api.get('/student-awards/catalog'),
+  addLeadershipRole: (data: { title: string; minimumPoints: number }) =>
+    api.post('/student-awards/leadership-roles', data),
+  appointLeadership: (data: { studentId: string; roleCode: string; startDate: string }) =>
+    api.post('/student-awards/leadership-appointments', data),
+  addLeadershipDuty: (appointmentId: string, data: { title: string; pointsPossible: number }) =>
+    api.post(`/student-awards/leadership-appointments/${appointmentId}/duties`, data),
+  verifyLeadershipDuty: (dutyId: string, data: { pointsAwarded: number; evidence?: string }) =>
+    api.post(`/student-awards/leadership-duties/${dutyId}/verify`, data),
+  recommendSport: (data: { studentId: string; sportCategory: string; startDate: string; recommendation: string; pointsAwarded: number }) =>
+    api.post('/student-awards/sports-recommendations', data),
+};
