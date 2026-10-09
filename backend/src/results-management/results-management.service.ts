@@ -1183,9 +1183,9 @@ export class ResultsManagementService {
       const assignment = term?.academicYearId ? await this.prisma.teachingAssignment.findFirst({
         where: { classId: sheet.classId, subjectId: options.subjectId, schoolId: sheet.schoolId, academicYearId: term.academicYearId },
         orderBy: { id: 'asc' },
-        select: { teacher: { select: { department: true, departmentRel: { select: { name: true, code: true } } } } },
+        select: { teacher: { select: { teacher: { select: { department: true, departmentRel: { select: { name: true, code: true } } } } } } },
       }) : null;
-      const department = assignment?.teacher?.departmentRel?.name || assignment?.teacher?.department || subject?.category || null;
+      const department = assignment?.teacher?.teacher?.departmentRel?.name || assignment?.teacher?.teacher?.department || subject?.category || null;
       return { category, subject, department: department ? { name: department } : null, limit, performers: rows.slice(0, limit) };
     }
 
