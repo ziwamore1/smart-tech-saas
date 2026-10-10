@@ -1,21 +1,31 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
 import { schoolApi, termApi } from '@/lib/api';
-import { useAuth } from '@/lib/auth-context';
-import Icon3D from '@/components/Icon3D';
 import { SchoolLogo } from '@/components/SchoolLogo';
+import SchoolPerformanceOverview from '@/components/dashboard/SchoolPerformanceOverview';
+import TierActionGrid from '@/components/dashboard/TierActionGrid';
+import { SubscriptionTier } from '@/types/subscription';
 
-const quickActions = [
-  { name: 'Faculties', href: '/dashboard/classes', icon3d: 'classes', desc: 'Faculty & department management' },
-  { name: 'Students', href: '/dashboard/students', icon3d: 'students', desc: 'Student admissions & records' },
-  { name: 'Lecturers', href: '/dashboard/teachers', icon3d: 'teachers', desc: 'Academic staff' },
-  { name: 'Courses', href: '/dashboard/subjects', icon3d: 'subjects', desc: 'Course catalog & curriculum' },
-  { name: 'Research', href: '/dashboard/research', icon3d: 'intelligence', desc: 'Research management' },
-  { name: 'Transcripts', href: '/dashboard/report-cards', icon3d: 'reports', desc: 'Academic transcripts & CWA' },
-  { name: 'Library', href: '/dashboard/library', icon3d: 'books', desc: 'Digital library & resources' },
-];
+const tierActions = {
+  BASIC: [
+    { name: 'Faculties', href: '/dashboard/classes', icon3d: 'classes', desc: 'Faculty and department management', featureKey: 'classes.view' },
+    { name: 'Students', href: '/dashboard/students', icon3d: 'students', desc: 'Student admissions and records', featureKey: 'students.view' },
+    { name: 'Lecturers', href: '/dashboard/teachers', icon3d: 'teachers', desc: 'Academic staff', featureKey: 'teachers.view' },
+    { name: 'Courses', href: '/dashboard/subjects', icon3d: 'subjects', desc: 'Course catalogue and curriculum', featureKey: 'subjects.view' },
+  ],
+  STANDARD: [
+    { name: 'Research', href: '/dashboard/research', icon3d: 'intelligence', desc: 'Research management', featureKey: 'research.manage' },
+    { name: 'Transcripts', href: '/dashboard/report-cards', icon3d: 'reports', desc: 'Academic transcripts and CWA', featureKey: 'reports.generate' },
+    { name: 'Library', href: '/dashboard/library', icon3d: 'books', desc: 'Digital library and resources', featureKey: 'library.view' },
+    { name: 'Fees', href: '/dashboard/fees', icon3d: 'fees', desc: 'Fee structures and collections', featureKey: 'fees.view' },
+  ],
+  PREMIUM: [
+    { name: 'Enhanced Analytics', href: '/dashboard/analytics-enhanced', icon3d: 'analytics', desc: 'Advanced performance intelligence', featureKey: 'analytics.advanced' },
+    { name: 'AI Analytics', href: '/dashboard/analytics/ai', icon3d: 'analytics', desc: 'AI-powered performance insights', featureKey: 'analytics.ai' },
+    { name: 'Online Payments', href: '/dashboard/fees/online', icon3d: 'fees', desc: 'Payment gateway and reconciliation', featureKey: 'fees.onlinePayment' },
+  ],
+};
 
 export default function UniversityDashboardPage() {
   const { data: schoolProfile } = useQuery({
@@ -61,43 +71,10 @@ export default function UniversityDashboardPage() {
         )}
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px',
-        marginBottom: '32px'
-      }}>
-        {quickActions.map((action) => (
-          <Link
-            key={action.name}
-            href={action.href}
-            style={{
-              background: '#fefcf9',
-              borderRadius: '12px',
-              padding: '20px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-              border: '1px solid #e8ddd0',
-              textDecoration: 'none',
-              color: 'inherit',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 10px 40px rgba(0,0,0,0.1)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ marginBottom: '12px' }}>
-              <Icon3D name={action.icon3d} size={40} />
-            </div>
-            <h3 style={{ fontSize: '15px', fontWeight: 600, margin: '0 0 4px' }}>{action.name}</h3>
-            <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>{action.desc}</p>
-          </Link>
-        ))}
-      </div>
+      <SchoolPerformanceOverview termId={currentTerm?.id} accent="#d97706" />
+      <div style={{ height: 24 }} />
+
+      <TierActionGrid currentTier={(schoolProfile?.subscriptionTier || 'BASIC').toUpperCase() as SubscriptionTier} actions={tierActions} />
     </div>
   );
 }

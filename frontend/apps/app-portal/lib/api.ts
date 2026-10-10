@@ -950,6 +950,9 @@ export const analyticsApi = {
   
   getDashboardCharts: () => api.get('/analytics/dashboard-charts'),
 
+  getSchoolPerformanceOverview: (termId?: string) =>
+    api.get('/analytics/school-performance-overview', { params: termId ? { termId } : undefined }),
+
   getAiInsights: (params?: { classId?: string; termId?: string; teacherId?: string }) =>
     api.get('/analytics/ai-insights', { params }),
 };

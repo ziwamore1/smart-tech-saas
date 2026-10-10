@@ -5,33 +5,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { schoolApi, termApi, accessApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { useFeatureLock } from '@/lib/feature-lock-context';
-import { TIER_ORDER, SubscriptionTier } from '@/types/subscription';
-import Icon3D from '@/components/Icon3D';
+import { SubscriptionTier } from '@/types/subscription';
 import { SchoolLogo } from '@/components/SchoolLogo';
 import { useSchoolSocket } from '@/lib/use-school-socket';
-
-const basicActions = [
-  { name: 'Form Classes', href: '/dashboard/classes', icon3d: 'classes', desc: 'Manage Form 1–6 classes' },
-  { name: 'Students', href: '/dashboard/students', icon3d: 'students', desc: 'Student admissions & records' },
-  { name: 'Teachers', href: '/dashboard/teachers', icon3d: 'teachers', desc: 'Teaching staff management' },
-  { name: 'Exams', href: '/dashboard/exams', icon3d: 'exam', desc: 'GCE & internal exams' },
-  { name: 'Results', href: '/dashboard/results', icon3d: 'results', desc: 'GCE grading & analysis' },
-  { name: 'Report Cards', href: '/dashboard/report-cards', icon3d: 'reports', desc: 'Cumulative reports' },
-  { name: 'Analytics', href: '/dashboard/analytics', icon3d: 'analytics', desc: 'Performance analytics' },
-];
-
-const standardHighlightActions = [
-  { name: 'Result Reports', href: '/dashboard/results/reports', icon3d: 'results', desc: 'Comprehensive reports', featureKey: 'results.reports' },
-  { name: 'Custom Reports', href: '/dashboard/report-cards/custom', icon3d: 'reports', desc: 'Customized report layouts', featureKey: 'reports.custom' },
-  { name: 'Bulk Messaging', href: '/dashboard/communications', icon3d: 'communications', desc: 'Bulk SMS & email', featureKey: 'communications.bulk' },
-];
-
-const premiumHighlightActions = [
-  { name: 'AI Analytics', href: '/dashboard/analytics/ai', icon3d: 'analytics', desc: 'AI-powered insights', featureKey: 'analytics.ai' },
-  { name: 'WhatsApp Comms', href: '/dashboard/communications/whatsapp', icon3d: 'communications', desc: 'WhatsApp messaging', featureKey: 'communications.whatsapp' },
-  { name: 'Online Payments', href: '/dashboard/fees/online', icon3d: 'fees', desc: 'Payment gateway', featureKey: 'fees.onlinePayment' },
-];
+import SchoolPerformanceOverview from '@/components/dashboard/SchoolPerformanceOverview';
+import TierActionGrid from '@/components/dashboard/TierActionGrid';
 
 const tierNames: Record<SubscriptionTier, string> = { BASIC: 'Basic', STANDARD: 'Standard', PREMIUM: 'Premium' };
 const PLAN_LIMITS: Record<SubscriptionTier, { label: string; students: number; teachers: number; classes: number }> = {
@@ -43,7 +21,6 @@ const PLAN_LIMITS: Record<SubscriptionTier, { label: string; students: number; t
 export default function SecondaryDashboardPage() {
   const { user, isDirector, allRoles } = useAuth();
   const canViewLive = isDirector || (allRoles || []).some((r: string) => ['Deputy Director', 'Head Teacher'].includes(r));
-  const { hasAccess } = useFeatureLock();
   const [liveActivities, setLiveActivities] = useState<any[]>([]);
 
   const { data: schoolProfile } = useQuery({
@@ -87,6 +64,39 @@ export default function SecondaryDashboardPage() {
 
   const currentTier: SubscriptionTier = (schoolProfile?.subscriptionTier || 'BASIC').toUpperCase() as SubscriptionTier;
   const planLimits = PLAN_LIMITS[currentTier];
+
+  const tierActions = {
+    BASIC: [
+      { name: 'Form Classes', href: '/dashboard/classes', icon3d: 'classes', desc: 'Manage Form 1–6 classes', featureKey: 'classes.view' },
+      { name: 'Students', href: '/dashboard/students', icon3d: 'students', desc: 'Admissions and student records', featureKey: 'students.view' },
+      { name: 'Teachers', href: '/dashboard/teachers', icon3d: 'teachers', desc: 'Teaching staff management', featureKey: 'teachers.view' },
+      { name: 'Subjects', href: '/dashboard/subjects', icon3d: 'subjects', desc: 'Subject catalogue and allocation', featureKey: 'subjects.view' },
+      { name: 'Attendance', href: '/dashboard/attendance-register', icon3d: 'assessments', desc: 'Daily attendance register', featureKey: 'attendance.view' },
+      { name: 'Result Entry', href: '/dashboard/results-management/result-entry', icon3d: 'assessments', desc: 'Enter assessed results', featureKey: 'results.add' },
+      { name: 'Results', href: '/dashboard/results', icon3d: 'results', desc: 'View published results', featureKey: 'results.view' },
+      { name: 'Report Cards', href: '/dashboard/report-cards', icon3d: 'reports', desc: 'Generate academic reports', featureKey: 'reports.generate' },
+    ],
+    STANDARD: [
+      { name: 'Results Management', href: '/dashboard/results-management', icon3d: 'results', desc: 'Moderate, publish and lock result sheets', featureKey: 'results.reports' },
+      { name: 'Result Reports', href: '/dashboard/results/reports', icon3d: 'results', desc: 'Comprehensive result reporting', featureKey: 'results.reports' },
+      { name: 'Custom Reports', href: '/dashboard/report-cards/custom', icon3d: 'reports', desc: 'Build custom report layouts', featureKey: 'reports.custom' },
+      { name: 'Bulk Messaging', href: '/dashboard/communications', icon3d: 'communications', desc: 'Bulk SMS and email delivery', featureKey: 'communications.bulk' },
+      { name: 'Online Exams', href: '/dashboard/exams', icon3d: 'exam', desc: 'Create and manage online exams', featureKey: 'exams.view' },
+      { name: 'Library', href: '/dashboard/library', icon3d: 'books', desc: 'School learning resources', featureKey: 'library.view' },
+      { name: 'Lesson Plans', href: '/dashboard/lesson-plans', icon3d: 'reports', desc: 'Plan and track teaching delivery', featureKey: 'lesson-plans.view' },
+      { name: 'Fees', href: '/dashboard/fees', icon3d: 'fees', desc: 'Fee structures and collections', featureKey: 'fees.view' },
+    ],
+    PREMIUM: [
+      { name: 'Enhanced Analytics', href: '/dashboard/analytics-enhanced', icon3d: 'analytics', desc: 'Heatmaps, distributions and cohort trends', featureKey: 'analytics.advanced' },
+      { name: 'AI Analytics', href: '/dashboard/analytics/ai', icon3d: 'analytics', desc: 'AI-powered performance insights', featureKey: 'analytics.ai' },
+      { name: 'Benchmarking', href: '/dashboard/benchmarking', icon3d: 'results', desc: 'Compare results against benchmarks', featureKey: 'analytics.advanced' },
+      { name: 'WhatsApp Comms', href: '/dashboard/communications/whatsapp', icon3d: 'communications', desc: 'WhatsApp school messaging', featureKey: 'communications.whatsapp' },
+      { name: 'Online Payments', href: '/dashboard/fees/online', icon3d: 'fees', desc: 'Payment gateway and reconciliation', featureKey: 'fees.onlinePayment' },
+      { name: 'Staff Returns Hub', href: '/dashboard/staff-records', icon3d: 'teachers', desc: 'Advanced workforce intelligence', featureKey: 'premium.staff.analytics' },
+      { name: 'Digital Signatures', href: '/dashboard/digital-signatures', icon3d: 'reports', desc: 'Sign official school documents', featureKey: 'digital-signatures.manage' },
+      { name: 'Digital Stamps', href: '/dashboard/digital-stamps', icon3d: 'reports', desc: 'Issue and verify trusted documents', featureKey: 'stamps.manage' },
+    ],
+  };
 
   const totalStudents = statsData?.totalStudents || 0;
   const totalTeachers = statsData?.totalTeachers || 0;
@@ -199,78 +209,8 @@ export default function SecondaryDashboardPage() {
             {Array.isArray(completionData) && completionData.length > 0 && <div className="mt-5 border-t border-slate-200 pt-4"><div className="flex items-center justify-between mb-3"><h3 className="font-bold text-slate-900">Class Completion</h3><span className="text-xs text-slate-500">Subjects fully entered for all enrolled students</span></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left text-xs uppercase text-slate-500 border-b"><th className="py-2">Class</th><th className="py-2">Subjects complete</th><th className="py-2">Progress</th><th className="py-2 text-right">Status</th></tr></thead><tbody>{completionData.map((item: any) => <tr key={item.classId} className="border-b last:border-0"><td className="py-3 font-semibold text-slate-900">{item.className}</td><td className="py-3 text-slate-600">{item.completeSubjects}/{item.totalSubjects}</td><td className="py-3 min-w-[180px]"><div className="flex items-center gap-2"><div className="h-2 flex-1 rounded-full bg-slate-200 overflow-hidden"><div className={`h-full rounded-full ${item.complete ? 'bg-emerald-500' : item.completionRate >= 50 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${item.completionRate}%` }} /></div><span className="text-xs font-bold text-slate-700">{item.completionRate}%</span></div></td><td className="py-3 text-right"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${item.complete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{item.complete ? 'Complete' : 'In progress'}</span></td></tr>)}</tbody></table></div></div>}
           </div>
         )}
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {basicActions.map((action) => (
-            <Link key={action.name} href={action.href} className="block">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-gray-200 transition-all cursor-pointer group h-full">
-                <div className="mb-2.5">
-                  <Icon3D name={action.icon3d} size={36} />
-                </div>
-                <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors text-sm">{action.name}</h3>
-                <p className="text-xs text-gray-500 mt-0.5">{action.desc}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-
-        {TIER_ORDER[currentTier] >= TIER_ORDER.STANDARD && (
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs font-bold uppercase text-blue-700 bg-blue-100 px-2 py-0.5 rounded">Standard</span>
-              <span className="text-xs text-gray-400">— Advanced features</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {standardHighlightActions.map((action) => {
-                const locked = !hasAccess(action.featureKey);
-                return locked ? (
-                  <div key={action.name} className="bg-gray-50 rounded-xl border border-gray-200 p-4 opacity-60 cursor-not-allowed h-full">
-                    <div className="mb-2.5 opacity-50"><Icon3D name={action.icon3d} size={36} /></div>
-                    <h3 className="font-semibold text-gray-400 text-sm">{action.name}</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">Upgrade or enable in settings</p>
-                  </div>
-                ) : (
-                  <Link key={action.name} href={action.href} className="block">
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-gray-200 transition-all cursor-pointer group h-full">
-                      <div className="mb-2.5"><Icon3D name={action.icon3d} size={36} /></div>
-                      <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors text-sm">{action.name}</h3>
-                      <p className="text-xs text-gray-500 mt-0.5">{action.desc}</p>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {TIER_ORDER[currentTier] >= TIER_ORDER.PREMIUM && (
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs font-bold uppercase text-purple-700 bg-purple-100 px-2 py-0.5 rounded">Premium</span>
-              <span className="text-xs text-gray-400">— Exclusive features</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {premiumHighlightActions.map((action) => {
-                const locked = !hasAccess(action.featureKey);
-                return locked ? (
-                  <div key={action.name} className="bg-gray-50 rounded-xl border border-gray-200 p-4 opacity-60 cursor-not-allowed h-full">
-                    <div className="mb-2.5 opacity-50"><Icon3D name={action.icon3d} size={36} /></div>
-                    <h3 className="font-semibold text-gray-400 text-sm">{action.name}</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">Upgrade or enable in settings</p>
-                  </div>
-                ) : (
-                  <Link key={action.name} href={action.href} className="block">
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-gray-200 transition-all cursor-pointer group h-full">
-                      <div className="mb-2.5"><Icon3D name={action.icon3d} size={36} /></div>
-                      <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors text-sm">{action.name}</h3>
-                      <p className="text-xs text-gray-500 mt-0.5">{action.desc}</p>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
+         <SchoolPerformanceOverview termId={currentTerm?.id} accent="#2563eb" />
+         <div className="mt-6"><TierActionGrid currentTier={currentTier} actions={tierActions} /></div>
 
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">

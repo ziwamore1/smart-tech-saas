@@ -207,4 +207,11 @@ export class AnalyticsController {
     const user = (req as any).user;
     return this.analyticsService.getDashboardCharts(user.schoolId);
   }
+
+  @Get('school-performance-overview')
+  @UseGuards(JwtAuthGuard)
+  async getSchoolPerformanceOverview(@Req() req: Request, @Query('termId') termId?: string) {
+    const user = (req as any).user;
+    return this.analyticsService.getSchoolPerformanceOverview(user.schoolId, termId);
+  }
 }

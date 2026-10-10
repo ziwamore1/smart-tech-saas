@@ -1498,4 +1498,57 @@ Respond with ONLY valid JSON, no markdown.`;
       subscription: subscriptionStats,
     };
   }
+
+  async getSchoolPerformanceOverview(schoolId: string, requestedTermId?: string) {
+    const [terms, classes] = await Promise.all([
+      this.prisma.term.findMany({
+        where: { academicYear: { schoolId } },
+        orderBy: { startDate: 'asc' },
+        select: { id: true, name: true, startDate: true, isCurrent: true },
+      }),
+      this.prisma.class.findMany({
+        where: { schoolId },
+        orderBy: { order: 'asc' },
+        select: { id: true, name: true },
+      }),
+    ]);
+
+    const selectedTerm = terms.find((term) => term.id === requestedTermId)
+      || terms.find((term) => term.isCurrent)
+      || terms[terms.length - 1];
+
+    if (!selectedTerm) {
+      return { term: null, classes: [], history: [] };
+    }
+
+    const currentClassPerformance = await Promise.all(
+      classes.slice(0, 30).map(async (schoolClass) => {
+        const performance = await this.getClassPerformance(schoolId, schoolClass.id, selectedTerm.id).catch(() => null);
+        return performance ? { classId: schoolClass.id, className: schoolClass.name, ...performance } : null;
+      }),
+    );
+
+    const history = await Promise.all(
+      terms.slice(-6).map(async (term) => {
+        const performance = await Promise.all(
+          classes.slice(0, 30).map((schoolClass) => this.getClassPerformance(schoolId, schoolClass.id, term.id).catch(() => null)),
+        );
+        const valid = performance.filter((item): item is NonNullable<typeof item> => !!item);
+        const totalStudents = valid.reduce((sum, item) => sum + item.totalStudents, 0);
+        return {
+          termId: term.id,
+          termName: term.name,
+          classCount: valid.length,
+          average: valid.length ? Number((valid.reduce((sum, item) => sum + item.classAverage, 0) / valid.length).toFixed(1)) : null,
+          passRate: totalStudents ? Number((valid.reduce((sum, item) => sum + item.passRate * item.totalStudents, 0) / totalStudents).toFixed(1)) : null,
+        };
+      }),
+    );
+
+    return {
+      term: { id: selectedTerm.id, name: selectedTerm.name },
+      classes: currentClassPerformance.filter((item): item is NonNullable<typeof item> => !!item),
+      history,
+    };
+  }
 }

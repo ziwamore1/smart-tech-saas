@@ -1,25 +1,33 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
 import { schoolApi, termApi } from '@/lib/api';
-import { useAuth } from '@/lib/auth-context';
-import Icon3D from '@/components/Icon3D';
 import { SchoolLogo } from '@/components/SchoolLogo';
+import SchoolPerformanceOverview from '@/components/dashboard/SchoolPerformanceOverview';
+import TierActionGrid from '@/components/dashboard/TierActionGrid';
+import { SubscriptionTier } from '@/types/subscription';
 
-const quickActions = [
-  { name: 'Form Classes', href: '/dashboard/classes', icon3d: 'classes', desc: 'Advanced Level Form classes' },
-  { name: 'Students', href: '/dashboard/students', icon3d: 'students', desc: 'Student records & admissions' },
-  { name: 'Teachers', href: '/dashboard/teachers', icon3d: 'teachers', desc: 'Teaching staff' },
-  { name: 'Exams', href: '/dashboard/exams', icon3d: 'exam', desc: 'GCE Advanced Level exams' },
-  { name: 'Results', href: '/dashboard/results', icon3d: 'results', desc: 'A-Level grading & analysis' },
-  { name: 'Report Cards', href: '/dashboard/report-cards', icon3d: 'reports', desc: 'Academic transcripts' },
-  { name: 'Subject Selection', href: '/dashboard/subjects', icon3d: 'subjects', desc: 'A-Level subject choices' },
-];
+const tierActions = {
+  BASIC: [
+    { name: 'Form Classes', href: '/dashboard/classes', icon3d: 'classes', desc: 'Advanced Level Form classes', featureKey: 'classes.view' },
+    { name: 'Students', href: '/dashboard/students', icon3d: 'students', desc: 'Student records and admissions', featureKey: 'students.view' },
+    { name: 'Teachers', href: '/dashboard/teachers', icon3d: 'teachers', desc: 'Teaching staff', featureKey: 'teachers.view' },
+    { name: 'Subject Selection', href: '/dashboard/subjects', icon3d: 'subjects', desc: 'A-Level subject choices', featureKey: 'subjects.view' },
+  ],
+  STANDARD: [
+    { name: 'Exams', href: '/dashboard/exams', icon3d: 'exam', desc: 'GCE Advanced Level exams', featureKey: 'exams.view' },
+    { name: 'Results', href: '/dashboard/results', icon3d: 'results', desc: 'A-Level grading and analysis', featureKey: 'results.view' },
+    { name: 'Report Cards', href: '/dashboard/report-cards', icon3d: 'reports', desc: 'Academic transcripts', featureKey: 'reports.generate' },
+    { name: 'Fees', href: '/dashboard/fees', icon3d: 'fees', desc: 'Fee structures and collections', featureKey: 'fees.view' },
+  ],
+  PREMIUM: [
+    { name: 'Enhanced Analytics', href: '/dashboard/analytics-enhanced', icon3d: 'analytics', desc: 'Advanced performance intelligence', featureKey: 'analytics.advanced' },
+    { name: 'Benchmarking', href: '/dashboard/benchmarking', icon3d: 'results', desc: 'Compare results against benchmarks', featureKey: 'analytics.advanced' },
+    { name: 'AI Analytics', href: '/dashboard/analytics/ai', icon3d: 'analytics', desc: 'AI-powered performance insights', featureKey: 'analytics.ai' },
+  ],
+};
 
 export default function AdvancedSecondaryDashboardPage() {
-  const { user } = useAuth();
-
   const { data: schoolProfile } = useQuery({
     queryKey: ['school-profile'],
     queryFn: () => schoolApi.getCurrentSchool().then(res => res.data?.data || res.data),
@@ -63,43 +71,9 @@ export default function AdvancedSecondaryDashboardPage() {
         )}
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px',
-        marginBottom: '32px'
-      }}>
-        {quickActions.map((action) => (
-          <Link
-            key={action.name}
-            href={action.href}
-            style={{
-              background: '#fefcf9',
-              borderRadius: '12px',
-              padding: '20px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-              border: '1px solid #e8ddd0',
-              textDecoration: 'none',
-              color: 'inherit',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 10px 40px rgba(0,0,0,0.1)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ marginBottom: '12px' }}>
-              <Icon3D name={action.icon3d} size={40} />
-            </div>
-            <h3 style={{ fontSize: '15px', fontWeight: 600, margin: '0 0 4px' }}>{action.name}</h3>
-            <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>{action.desc}</p>
-          </Link>
-        ))}
-      </div>
+      <SchoolPerformanceOverview termId={currentTerm?.id} accent="#7c3aed" />
+      <div style={{ height: 24 }} />
+      <TierActionGrid currentTier={(schoolProfile?.subscriptionTier || 'BASIC').toUpperCase() as SubscriptionTier} actions={tierActions} />
     </div>
   );
 }

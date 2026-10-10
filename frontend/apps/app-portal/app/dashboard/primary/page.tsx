@@ -10,6 +10,7 @@ import { TIER_ORDER, SubscriptionTier } from '@/types/subscription';
 import Icon3D from '@/components/Icon3D';
 import { SchoolLogo } from '@/components/SchoolLogo';
 import { useSchoolSocket } from '@/lib/use-school-socket';
+import SchoolPerformanceOverview from '@/components/dashboard/SchoolPerformanceOverview';
 
 const GRADE_LABELS = ['Pre', '1', '2', '3', '4', '5', '6', '7'];
 const GRADE_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#0891b2', '#ea6645', '#7c3aed'];
@@ -188,7 +189,7 @@ export default function PrimaryDashboardPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-center gap-3">
             <Icon3D name="students" size={40} />
-            <div>
+         <div>
               <p className="text-sm text-gray-500">Total Pupils</p>
               <p className="text-2xl font-bold text-gray-900">{totalPupils}</p>
             </div>
@@ -385,8 +386,10 @@ export default function PrimaryDashboardPage() {
             {liveResultsLoading && liveActivities.length === 0 ? <div className="py-5 text-slate-600 text-sm">Loading recent activity...</div> : liveActivities.length === 0 ? <div className="py-5 text-slate-600 text-sm">No result entries have been recorded for the current term yet.</div> : <div className="grid gap-2 max-h-[420px] overflow-y-auto pr-1">{liveActivities.map((activity: any) => <div key={`${activity.id}-${activity.timestamp}`} className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-center bg-slate-50 border border-slate-200 rounded-xl p-3"><div><div className="font-bold text-sm text-slate-900">{activity.teacherName || `${activity.teacher?.firstName || ''} ${activity.teacher?.lastName || ''}`.trim() || 'Teacher'}</div><div className="text-[11px] text-slate-600">entered a result</div></div><div><div className="text-sm font-semibold text-blue-700">{activity.className || activity.class?.name || 'Class'}</div><div className="text-[11px] text-slate-600">Class</div></div><div><div className="text-sm font-semibold text-amber-700">{activity.subjectName || activity.subject?.name || 'Subject'}</div><div className="text-[11px] text-slate-600">Subject</div></div><div className="sm:text-right"><div className="text-sm font-bold text-emerald-700">{activity.score ?? '--'}%</div><div className="text-[11px] text-slate-600">{activity.timestamp ? new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'now'}</div></div></div>)}</div>}
             {Array.isArray(completionData) && completionData.length > 0 && <div className="mt-5 border-t border-slate-200 pt-4"><div className="flex items-center justify-between mb-3"><h3 className="font-bold text-slate-900">Class Completion</h3><span className="text-xs text-slate-500">Subjects fully entered for all enrolled pupils</span></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left text-xs uppercase text-slate-500 border-b"><th className="py-2">Class</th><th className="py-2">Subjects complete</th><th className="py-2">Progress</th><th className="py-2 text-right">Status</th></tr></thead><tbody>{completionData.map((item: any) => <tr key={item.classId} className="border-b last:border-0"><td className="py-3 font-semibold text-slate-900">{item.className}</td><td className="py-3 text-slate-600">{item.completeSubjects}/{item.totalSubjects}</td><td className="py-3 min-w-[180px]"><div className="flex items-center gap-2"><div className="h-2 flex-1 rounded-full bg-slate-200 overflow-hidden"><div className={`h-full rounded-full ${item.complete ? 'bg-emerald-500' : item.completionRate >= 50 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${item.completionRate}%` }} /></div><span className="text-xs font-bold text-slate-700">{item.completionRate}%</span></div></td><td className="py-3 text-right"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${item.complete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{item.complete ? 'Complete' : 'In progress'}</span></td></tr>)}</tbody></table></div></div>}
           </div>
-        )}
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
+         )}
+         <SchoolPerformanceOverview termId={currentTerm?.id} accent="#059669" />
+         <div className="h-6" />
+         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
 
         {TIER_ORDER[currentTier] >= TIER_ORDER.BASIC && (
           <div className="mb-6">

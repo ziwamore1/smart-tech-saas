@@ -3,35 +3,42 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { subscriptionApi } from '@/lib/api';
-import { useRouter } from 'next/navigation';
 
 export default function SubscriptionPage() {
-  const router = useRouter();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'mobilemoney'>('card');
   const [phone, setPhone] = useState('');
   const [network, setNetwork] = useState<'MTN' | 'AIRTEL' | 'ZAMTEL'>('MTN');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const { data: plansData, isLoading: loadingPlans } = useQuery({
+  const { data: plansData, isLoading: loadingPlans, isError: plansError } = useQuery({
     queryKey: ['subscription-plans'],
     queryFn: () => subscriptionApi.getPlans(),
   });
 
-  const { data: currentSubscription } = useQuery({
+  const { data: currentSubscription, isError: subscriptionError } = useQuery({
     queryKey: ['current-subscription'],
     queryFn: () => subscriptionApi.getMySubscription(),
   });
 
-  const { data: subscriptionStatus } = useQuery({
+  const { data: subscriptionStatus, isError: statusError } = useQuery({
     queryKey: ['subscription-status'],
     queryFn: () => subscriptionApi.checkStatus(),
   });
 
-  const plans = Array.isArray(plansData?.data) ? plansData.data : 
-               Array.isArray(plansData) ? plansData : [];
-  const subscription = currentSubscription?.data || currentSubscription;
-  const status = subscriptionStatus?.data || subscriptionStatus;
+  const unwrap = (value: any): any => {
+    let current = value;
+    for (let i = 0; i < 3; i += 1) {
+      if (Array.isArray(current)) return current;
+      if (!current || typeof current !== 'object') return current;
+      if (current.data !== undefined) current = current.data;
+      else break;
+    }
+    return current;
+  };
+  const plans = Array.isArray(unwrap(plansData)) ? unwrap(plansData) : [];
+  const subscription = unwrap(currentSubscription);
+  const status = unwrap(subscriptionStatus);
 
   const createPaymentMutation = useMutation({
     mutationFn: (planId: string) => subscriptionApi.createPayment({
@@ -41,11 +48,15 @@ export default function SubscriptionPage() {
       network: paymentMethod === 'mobilemoney' ? network : undefined,
     }),
     onSuccess: (data) => {
+      setIsProcessing(false);
       if (data.data?.paymentLink) {
         window.location.href = data.data.paymentLink;
+      } else if (data?.paymentLink) {
+        window.location.href = data.paymentLink;
       }
     },
     onError: (error: any) => {
+      setIsProcessing(false);
       alert(error.response?.data?.message || 'Payment failed');
     },
   });
@@ -76,6 +87,12 @@ export default function SubscriptionPage() {
         <h1 className="text-4xl font-bold text-gray-900">Choose Your Plan</h1>
         <p className="text-gray-600 mt-2">Select the plan that best fits your school&apos;s needs</p>
       </div>
+
+      {(plansError || subscriptionError || statusError) && (
+        <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-4 text-center text-sm text-amber-800">
+          Some subscription details could not be loaded. You can still review the available plans or try again shortly.
+        </div>
+      )}
 
       {status?.status === 'trial' && status.daysLeft && (
         <div className="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
