@@ -37,7 +37,7 @@ function genderInitial(gender?: string | null): string {
 }
 
 const REPORT_STYLES = `
-  @page { margin: 24mm 26mm 32mm; size: A4 landscape; }
+  @page { margin: 32mm 30mm 38mm; size: A4 landscape; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, Helvetica, sans-serif; color: #111827; background: white; padding: 24px; line-height: 1.45; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .report-header { text-align: center; margin-bottom: 24px; padding: 17px 20px; background: #123b5d; border: 2px solid #0b263d; border-radius: 6px; color: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; page-break-inside: avoid; }
@@ -68,6 +68,7 @@ const REPORT_STYLES = `
   .sig { text-align: center; flex: 1; }
   .sig-line { width: 180px; border-top: 1px solid #1f2937; margin: 40px auto 0; padding-top: 6px; font-size: 11px; color: #6b7280; }
   .footer { text-align: center; margin-top: 24px; margin-bottom: 8mm; padding-top: 12px; border-top: 2px solid #374151; font-size: 11px; color: #111827; break-inside: avoid; page-break-inside: avoid; }
+  .footer-meta { display: block; margin-top: 4px; color: #6b7280; }
   .print-btn { position: fixed; top: 16px; right: 16px; padding: 10px 20px; background: #123b5d; color: white; border: 2px solid #0b263d; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 700; z-index: 1000; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
   .print-btn:hover { background: #0b263d; }
   @media print { .print-btn { display: none; } body { padding: 0 0 8mm; } .footer { break-inside: avoid; page-break-inside: avoid; } }
@@ -80,7 +81,7 @@ const REPORT_STYLES = `
 `;
 
 const MARK_SCHEDULE_EXTRA_STYLES = `
-  @page { margin: 24mm 26mm 32mm; size: A4 landscape; }
+  @page { margin: 32mm 30mm 38mm; size: A4 landscape; }
   body { font-size: 13px; }
   .report-header { margin-bottom: 20px; padding: 14px 20px; }
   .school-name { font-size: 26px; }
@@ -175,6 +176,7 @@ export interface ReportMeta {
 
 function buildReportShell(meta: ReportMeta, title: string, content: string, extraStyles?: string): string {
   const date = meta.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const generatedAt = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -200,7 +202,7 @@ function buildReportShell(meta: ReportMeta, title: string, content: string, extr
   <span><strong>Date:</strong> ${date}</span>
 </div>
 ${content}
-<div class="footer">Smart Tech SaaS - Results Management System | Confidential</div>
+<div class="footer">Smart Tech SaaS - Results Management System | Confidential<span class="footer-meta">${title} | Generated ${generatedAt}</span></div>
 </body></html>`;
 }
 
@@ -727,6 +729,7 @@ export function generateTeacherMarkSchedulesReport(data: TeacherMarkScheduleData
   const dateLabel = data.term.academicYear
     ? `${data.term.name} (${data.term.academicYear})`
     : data.term.name;
+  const generatedAt = data.generatedAt || new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -761,7 +764,7 @@ ${blocks}
   <div class="sig"><div class="sig-line">Head of Department</div></div>
   <div class="sig"><div class="sig-line">Director / Principal</div></div>
 </div>
-<div class="footer">Smart Tech SaaS - Results Management System | Weights shown per component; Final % is the weighted total. Confidential</div>
+<div class="footer">Smart Tech SaaS - Results Management System | Weights shown per component; Final % is the weighted total. Confidential<span class="footer-meta">Teacher Mark Schedule | Generated ${esc(generatedAt)}</span></div>
 </body></html>`;
 }
 
