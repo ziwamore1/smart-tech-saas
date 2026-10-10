@@ -256,7 +256,7 @@ export function generateMarkScheduleReport(students: ReportStudent[], meta: Repo
       <td class="text-center">
         <span class="grade-badge" style="background:${gradeColor.bg};color:${gradeColor.text}">${grade}</span>
       </td>
-      <td class="text-center font-semibold">${s.rank || i + 1}</td>
+      <td class="text-center font-semibold">${s.rank ?? '—'}</td>
     </tr>`;
   }).join('');
 
@@ -392,20 +392,20 @@ export function generateAnalysisReport(analysis: AnalysisData, meta: ReportMeta)
     </tr>`;
   }).join('');
 
-   const atRiskRows = (analysis.students || []).filter(s => (s as any).quantityPassed === false || ((s as any).quantityPassed == null && (s.percentage || (s as any).avgPercentage || 0) < 40)).sort((a, b) => (a.percentage || (a as any).avgPercentage || 0) - (b.percentage || (b as any).avgPercentage || 0)).slice(0, 25).map((s, i) => `<tr>
+   const atRiskRows = (analysis.students || []).filter(s => (s as any).quantityPassed === false || ((s as any).quantityPassed == null && (s.percentage ?? (s as any).avgPercentage ?? 0) < 40)).sort((a, b) => (a.percentage ?? (a as any).avgPercentage ?? 0) - (b.percentage ?? (b as any).avgPercentage ?? 0)).slice(0, 25).map((s, i) => `<tr>
     <td class="text-center" style="color:#6b7280">${i + 1}</td>
     <td style="font-weight:600">${s.firstName} ${s.lastName}</td>
     <td style="color:#6b7280;font-size:11px">${s.admissionNumber || '-'}</td>
      <td class="text-center" style="color:${genderInitial(s.gender) === 'M' ? '#2563eb' : '#db2777'};font-weight:600">${genderInitial(s.gender)}</td>
-    <td class="text-center font-bold fail">${(s.percentage || (s as any).avgPercentage || 0).toFixed(1)}%</td>
+     <td class="text-center font-bold fail">${(s.percentage ?? (s as any).avgPercentage ?? 0).toFixed(1)}%</td>
     <td class="text-center"><span class="grade-badge" style="background:#fee2e2;color:#dc2626">${s.grade || '-'}</span></td>
    </tr>`).join('');
 
-   const studentRows = [...(analysis.students || [])].sort((a, b) => (b.percentage || 0) - (a.percentage || 0)).slice(0, 50).map((s, i) => `<tr>
+   const studentRows = [...(analysis.students || [])].sort((a, b) => (b.percentage ?? 0) - (a.percentage ?? 0)).slice(0, 50).map((s, i) => `<tr>
      <td class="text-center">${i + 1}</td>
      <td style="font-weight:600">${s.firstName} ${s.lastName}</td>
      <td>${s.admissionNumber || '-'}</td>
-     <td class="text-center">${(s.percentage || 0).toFixed(1)}%</td>
+     <td class="text-center">${(s.percentage ?? 0).toFixed(1)}%</td>
      <td class="text-center">${s.grade || '-'}</td>
      <td class="text-center">${(s as any).subjectCount ?? '-'}</td>
      <td class="text-center"><span class="grade-badge" style="background:${(s as any).qualityPassed ? '#d1fae5' : '#fee2e2'};color:${(s as any).qualityPassed ? '#047857' : '#dc2626'}">${(s as any).qualityPassed ? 'PASS' : 'BELOW'}</span></td>
@@ -496,7 +496,7 @@ export function generateRankingReport(rankings: RankingStudent[], meta: ReportMe
   const rows = rankings.map((s, i) => {
     const firstName = s.firstName || (s as any).studentName?.split(' ')[0] || '';
     const lastName = s.lastName || (s as any).studentName?.split(' ').slice(1).join(' ') || '';
-    const avg = s.average || (s as any).percentage || (s as any).totalPercentage || 0;
+    const avg = s.average ?? (s as any).percentage ?? (s as any).totalPercentage ?? 0;
     const avgColor = scoreColor(avg);
     const gc = getGradeColor(s.grade);
     return `<tr>
@@ -514,8 +514,8 @@ export function generateRankingReport(rankings: RankingStudent[], meta: ReportMe
   const content = `
     <div class="summary-grid">
       <div class="summary-card"><div class="summary-value">${rankings.length}</div><div class="summary-label">Total Students</div></div>
-      <div class="summary-card"><div class="summary-value">${rankings.length > 0 ? (rankings[0].average || (rankings[0] as any).percentage || 0).toFixed(1) + '%' : '-'}</div><div class="summary-label">Top Score</div></div>
-      <div class="summary-card"><div class="summary-value">${rankings.length > 0 ? (rankings.reduce((sum, s) => sum + (s.average || (s as any).percentage || 0), 0) / rankings.length).toFixed(1) + '%' : '-'}</div><div class="summary-label">Class Average</div></div>
+      <div class="summary-card"><div class="summary-value">${rankings.length > 0 ? (rankings[0].average ?? (rankings[0] as any).percentage ?? 0).toFixed(1) + '%' : '-'}</div><div class="summary-label">Top Score</div></div>
+      <div class="summary-card"><div class="summary-value">${rankings.length > 0 ? (rankings.reduce((sum, s) => sum + (s.average ?? (s as any).percentage ?? 0), 0) / rankings.length).toFixed(1) + '%' : '-'}</div><div class="summary-label">Class Average</div></div>
     </div>
     <table>
       <thead><tr>
@@ -569,24 +569,27 @@ export function generateSubjectPerformanceReport(data: { subject?: any; departme
   const performers = data.performers || [];
   const subject = data.subject || {};
   const rows = performers.map((row: any, index) => {
+    const hasScore = row.percentage != null || row.score != null || row.average != null;
     const score = Number(row.percentage ?? row.score ?? row.average ?? 0);
     const grade = row.grade || '-';
+    const isRanked = row.subjectRank != null || row.rank != null;
     const gradeColor = getGradeColor(grade);
     return `<tr>
-      <td class="text-center font-bold" style="color:${index < 3 ? '#d97706' : '#6b7280'}">${row.rank || index + 1}</td>
+      <td class="text-center font-bold" style="color:${isRanked && index < 3 ? '#d97706' : '#6b7280'}">${row.subjectRank ?? row.rank ?? '—'}</td>
       <td style="font-weight:600">${esc(row.studentName || `${row.firstName || ''} ${row.lastName || ''}`.trim())}</td>
       <td style="color:#6b7280;font-size:11px">${esc(row.admissionNumber || '-')}</td>
       <td class="text-center">${genderInitial(row.gender)}</td>
-      <td class="text-center font-bold" style="color:${scoreColor(score)}">${score.toFixed(1)}%</td>
+      <td class="text-center font-bold" style="color:${hasScore ? scoreColor(score) : '#6b7280'}">${hasScore ? `${score.toFixed(1)}%` : '—'}</td>
       <td class="text-center"><span class="grade-badge" style="background:${gradeColor.bg};color:${gradeColor.text}">${esc(grade)}</span></td>
-      <td class="text-center"><span class="grade-badge" style="background:${score >= 50 ? '#d1fae5' : '#fee2e2'};color:${score >= 50 ? '#047857' : '#b91c1c'}">${score >= 50 ? 'PASS' : 'BELOW'}</span></td>
+      <td class="text-center"><span class="grade-badge" style="background:${isRanked && score >= 50 ? '#d1fae5' : isRanked ? '#fee2e2' : '#e5e7eb'};color:${isRanked && score >= 50 ? '#047857' : isRanked ? '#b91c1b' : '#4b5563'}">${isRanked ? (score >= 50 ? 'PASS' : 'BELOW') : 'NOT GRADED'}</span></td>
     </tr>`;
   }).join('');
-  const scores = performers.map((row: any) => Number(row.percentage ?? row.score ?? row.average ?? 0));
+   const assessedPerformers = performers.filter((row: any) => row.subjectRank != null || row.rank != null);
+   const scores = assessedPerformers.map((row: any) => Number(row.percentage ?? row.score ?? row.average ?? 0));
   const average = scores.length ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
   const passRate = scores.length ? scores.filter(score => score >= 50).length / scores.length * 100 : 0;
   const content = `<div class="summary-grid">
-    <div class="summary-card"><div class="summary-value">${performers.length}</div><div class="summary-label">Students Assessed</div></div>
+     <div class="summary-card"><div class="summary-value">${assessedPerformers.length}</div><div class="summary-label">Students Assessed</div></div>
     <div class="summary-card" style="border-top:4px solid #059669"><div class="summary-value" style="color:#059669">${scores.length ? Math.max(...scores).toFixed(1) : '0.0'}%</div><div class="summary-label">Highest Score</div></div>
     <div class="summary-card" style="border-top:4px solid #2563eb"><div class="summary-value" style="color:#2563eb">${average.toFixed(1)}%</div><div class="summary-label">Subject Average</div></div>
     <div class="summary-card" style="border-top:4px solid #d97706"><div class="summary-value" style="color:#d97706">${passRate.toFixed(1)}%</div><div class="summary-label">Pass Rate</div></div>

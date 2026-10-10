@@ -153,8 +153,9 @@ export class ResultsManagementController {
     @Query('category') category?: string,
     @Query('subjectId') subjectId?: string,
     @Query('limit') limit?: string,
+    @Query('includeUnranked') includeUnranked?: string,
   ) {
-    const data = await this.resultsManagement.getTopPerformers(id, { category, subjectId, limit: Number(limit) || 10 });
+    const data = await this.resultsManagement.getTopPerformers(id, { category, subjectId, limit: Number(limit) || 10, includeUnranked: includeUnranked === 'true' });
     return { data, message: 'Top performers retrieved successfully' };
   }
 

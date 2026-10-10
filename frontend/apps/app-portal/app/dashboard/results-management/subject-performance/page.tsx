@@ -34,7 +34,7 @@ export default function SubjectPerformanceReportPage() {
       const sheets = unwrap(sheetsResponse);
       const sheet = Array.isArray(sheets) ? sheets[0] : null;
       if (!sheet) throw new Error('No result sheet found for the selected class, term, and exam type.');
-      const response = await api.get(`/results-management/sheets/${sheet.id}/top-performers`, { params: { category: 'SUBJECT_PERCENTAGE', subjectId, limit: 500 }, timeout: 120000 });
+      const response = await api.get(`/results-management/sheets/${sheet.id}/top-performers`, { params: { category: 'SUBJECT_PERCENTAGE', subjectId, limit: 500, includeUnranked: true }, timeout: 120000 });
       const result = { ...unwrap(response), sheet };
       setReport(result);
       const meta: ReportMeta = {

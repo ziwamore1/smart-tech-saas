@@ -257,14 +257,16 @@ export class ResultService {
         where: {
           classId: first.classId,
           termId,
+          schoolId,
           status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
           student: { status: 'ACTIVE' },
+          isAbsent: false,
         },
-        select: { studentId: true, finalPercentage: true },
+        select: { studentId: true, finalPercentage: true, finalGrade: true },
       });
       const avgMap = new Map<string, { total: number; count: number }>();
       for (const p of peers) {
-        if (p.finalPercentage == null) continue;
+        if (p.finalPercentage == null || p.finalGrade == null || p.finalGrade.trim() === '') continue;
         const existing = avgMap.get(p.studentId) ?? { total: 0, count: 0 };
         existing.total += p.finalPercentage;
         existing.count += 1;
@@ -301,8 +303,8 @@ export class ResultService {
       points: r.points,
       gradePoints: r.points,
       gpa: r.gpa,
-      classRank: classRank ?? r.classRank,
-      subjectRank: r.subjectRank,
+       classRank: classRank ?? (!r.isAbsent && r.finalPercentage != null && r.finalGrade ? r.classRank : null),
+       subjectRank: !r.isAbsent && r.finalPercentage != null && r.finalGrade ? r.subjectRank : null,
       isAbsent: r.isAbsent,
     }));
   }

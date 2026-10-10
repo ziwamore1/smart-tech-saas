@@ -113,8 +113,8 @@ export default function AnalysisPage() {
   const atRiskStudents = useMemo(() => {
     if (!analysis?.students) return [];
     return analysis.students
-      .filter((s: any) => s.quantityPassed === false || (s.quantityPassed == null && (s.percentage || s.totalPercentage || s.avgPercentage || 0) < 40))
-      .sort((a: any, b: any) => (a.percentage || a.totalPercentage || a.avgPercentage || 0) - (b.percentage || b.totalPercentage || b.avgPercentage || 0));
+      .filter((s: any) => s.quantityPassed === false || (s.quantityPassed == null && (s.percentage ?? s.totalPercentage ?? s.avgPercentage ?? 0) < 40))
+      .sort((a: any, b: any) => (a.percentage ?? a.totalPercentage ?? a.avgPercentage ?? 0) - (b.percentage ?? b.totalPercentage ?? b.avgPercentage ?? 0));
   }, [analysis]);
 
   const subjectBreakdown = useMemo(() => {

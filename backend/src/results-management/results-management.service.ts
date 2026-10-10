@@ -1151,19 +1151,19 @@ export class ResultsManagementService {
         lastName: r.lastName || (r.studentName ? r.studentName.split(' ').slice(1).join(' ') : ''),
         admissionNumber: r.admissionNumber || '',
         gender: r.gender || null,
-        percentage: r.average || r.percentage || r.totalPercentage || 0,
-        totalPercentage: r.average || r.percentage || r.totalPercentage || 0,
-        average: r.average || r.percentage || r.totalPercentage || 0,
+        percentage: r.average ?? r.percentage ?? r.totalPercentage ?? null,
+        totalPercentage: r.average ?? r.percentage ?? r.totalPercentage ?? null,
+        average: r.average ?? r.percentage ?? r.totalPercentage ?? null,
         grade: r.grade || null,
-        rank: r.rank || 0,
-        totalPoints: r.totalPoints || 0,
+        rank: r.rank ?? null,
+        totalPoints: r.totalPoints ?? 0,
       })),
     };
   }
 
   /** Director-facing certificate candidates. The limit is supplied by the caller,
    * so awards are never silently restricted to a hard-coded class size. */
-  async getTopPerformers(sheetId: string, options: { category?: string; subjectId?: string; limit?: number } = {}) {
+  async getTopPerformers(sheetId: string, options: { category?: string; subjectId?: string; limit?: number; includeUnranked?: boolean } = {}) {
     const limit = Math.max(1, Math.min(Number(options.limit) || 10, 500));
     const category = options.category || 'OVERALL_AVERAGE';
     const sheet = await this.prisma.resultSheet.findUnique({
@@ -1187,7 +1187,8 @@ export class ResultsManagementService {
       }) : null;
       const department = assignment?.teacher?.teacher?.departmentRel?.name || assignment?.teacher?.teacher?.department || subject?.category || null;
       const assignedTeacher = assignment?.teacher ? `${assignment.teacher.firstName || ''} ${assignment.teacher.lastName || ''}`.trim() : null;
-      return { category, subject, department: department ? { name: department } : null, assignedTeacher, limit, performers: rows.slice(0, limit) };
+       const performers = options.includeUnranked ? rows.slice(0, limit) : rows.filter((row: any) => row.subjectRank != null).slice(0, limit);
+       return { category, subject, department: department ? { name: department } : null, assignedTeacher, limit, performers };
     }
 
     const rankings = await this.rankingService.computeClassRankings(sheet.classId, sheet.termId, sheet.schoolId);

@@ -21,6 +21,8 @@ export class RankingService {
         studentId: true,
         subjectId: true,
         finalPercentage: true,
+        finalGrade: true,
+        isAbsent: true,
         points: true,
         student: {
           select: {
@@ -80,13 +82,14 @@ export class RankingService {
       const existing = studentMap.get(r.studentId);
 
       let effectivePercentage = r.finalPercentage;
-      if (effectivePercentage == null || effectivePercentage === 0) {
+      if (effectivePercentage == null) {
         const rawScore = r.subjectId ? rawScoreMap.get(`${r.studentId}::${r.subjectId}`) : undefined;
         if (rawScore != null) {
           effectivePercentage = rawScore;
         }
       }
 
+      const isRankable = !r.isAbsent && effectivePercentage != null && r.finalGrade != null && r.finalGrade.trim() !== '';
       const points = r.points ?? (effectivePercentage != null
         ? effectivePercentage >= 75 ? 1
           : effectivePercentage >= 65 ? 2
@@ -95,10 +98,11 @@ export class RankingService {
           : 5
         : 0);
       if (existing) {
+        if (!isRankable) continue;
         existing.totalPercentage += effectivePercentage ?? 0;
         existing.subjectCount += 1;
         if (points > 0) existing.points.push(points);
-      } else {
+      } else if (isRankable) {
         studentMap.set(r.studentId, {
           studentId: r.studentId,
           firstName: r.student.firstName,
@@ -162,6 +166,7 @@ export class RankingService {
             studentId: ranking.studentId,
             classId,
             termId,
+            schoolId,
           },
           data: { classRank: ranking.rank },
         }),
@@ -188,6 +193,7 @@ export class RankingService {
         subjectId: true,
         finalPercentage: true,
         finalGrade: true,
+        isAbsent: true,
         student: {
           select: {
             id: true,
@@ -228,9 +234,9 @@ export class RankingService {
       }
     }
 
-    const rankings = computedResults.map((result, index) => {
+    const rankings = computedResults.map((result) => {
       let effectivePercentage = result.finalPercentage;
-      if (effectivePercentage == null || effectivePercentage === 0) {
+      if (effectivePercentage == null) {
         const rawScore = rawScoreMap.get(result.studentId);
         if (rawScore != null) {
           effectivePercentage = rawScore;
@@ -245,8 +251,27 @@ export class RankingService {
         gender: (result.student as any).gender ?? null,
         percentage: effectivePercentage,
         grade: result.finalGrade,
-        subjectRank: index + 1,
+        isRankable: !result.isAbsent && effectivePercentage != null && result.finalGrade != null && result.finalGrade.trim() !== '',
+        subjectRank: null as number | null,
       };
+    });
+
+    const rankable = rankings
+      .filter(ranking => ranking.isRankable)
+      .sort((a, b) => (b.percentage as number) - (a.percentage as number));
+    let lastRank = 0;
+    let lastPercentage: number | null = null;
+    rankable.forEach((ranking, index) => {
+      if (lastPercentage === null || Math.abs((ranking.percentage as number) - lastPercentage) > 0.001) {
+        lastRank = index + 1;
+        lastPercentage = ranking.percentage as number;
+      }
+      ranking.subjectRank = lastRank;
+    });
+    rankings.sort((a, b) => {
+      if (a.isRankable !== b.isRankable) return a.isRankable ? -1 : 1;
+      if (!a.isRankable) return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
+      return (b.percentage as number) - (a.percentage as number);
     });
 
     await this.prisma.$transaction(
@@ -256,13 +281,15 @@ export class RankingService {
             studentId: ranking.studentId,
             subjectId,
             termId,
+            classId,
+            schoolId,
           },
           data: { subjectRank: ranking.subjectRank },
         }),
       ),
     );
 
-    return rankings;
+    return rankings.map(({ isRankable, ...ranking }) => ranking);
   }
 
   async getStudentRankings(studentId: string, termId: string) {
@@ -315,8 +342,8 @@ export class RankingService {
         className: result.class.name,
         percentage: effectivePercentage,
         grade: result.finalGrade,
-        classRank: result.classRank,
-        subjectRank: result.subjectRank,
+         classRank: !result.isAbsent && result.finalPercentage != null && result.finalGrade ? result.classRank : null,
+         subjectRank: !result.isAbsent && result.finalPercentage != null && result.finalGrade ? result.subjectRank : null,
         points: result.points,
         gpa: result.gpa,
       };

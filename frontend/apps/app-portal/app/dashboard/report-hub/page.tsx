@@ -149,7 +149,7 @@ export default function ReportHubPage() {
         const sheets = unwrap(sheetsResponse);
         const sheet = Array.isArray(sheets) ? sheets[0] : null;
         if (!sheet) throw new Error('No result sheet found for the selected class, term, and exam type.');
-        const response = await api.get(`/results-management/sheets/${sheet.id}/top-performers`, { params: { category: 'SUBJECT_PERCENTAGE', subjectId: selectedSubject, limit: 500 }, timeout: 120000 });
+        const response = await api.get(`/results-management/sheets/${sheet.id}/top-performers`, { params: { category: 'SUBJECT_PERCENTAGE', subjectId: selectedSubject, limit: 500, includeUnranked: true }, timeout: 120000 });
         const result = unwrap(response);
         const subject = (Array.isArray(subjects) ? subjects : []).map((row: any) => row.subject || row).find((item: any) => item.id === selectedSubject);
         const cls = (Array.isArray(classes) ? classes : []).find((item: any) => item.id === selectedClass);

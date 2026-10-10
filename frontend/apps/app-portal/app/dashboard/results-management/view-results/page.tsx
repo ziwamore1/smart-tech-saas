@@ -138,13 +138,6 @@ export default function ViewResultsPage() {
         ? validScores.reduce((sum: number, r: any) => sum + r.score, 0) / validScores.length
         : null;
       let grade = s.grade || s.ComputedResult?.finalGrade || null;
-      if (!grade && avg != null) {
-        if (avg >= 75) grade = 'A';
-        else if (avg >= 65) grade = 'B';
-        else if (avg >= 50) grade = 'C';
-        else if (avg >= 40) grade = 'D';
-        else grade = 'E';
-      }
       const subjectPoints = results
         .filter((r: any) => r.score != null)
         .map((r: any) => {
@@ -170,10 +163,18 @@ export default function ViewResultsPage() {
         totalPoints: s.ComputedResult?.totalPoints || totalPoints || null,
       };
     });
-    const withAvg = mapped.filter(s => s.average != null).sort((a, b) => (b.average || 0) - (a.average || 0));
-    const withoutAvg = mapped.filter(s => s.average == null);
-    withAvg.forEach((s, i) => { (s as any).rank = i + 1; });
-    withoutAvg.forEach((s, i) => { (s as any).rank = withAvg.length + i + 1; });
+    const withAvg = mapped.filter(s => s.average != null && s.grade != null).sort((a, b) => (b.average as number) - (a.average as number));
+    const withoutAvg = mapped.filter(s => s.average == null || s.grade == null);
+    let lastAverage: number | null = null;
+    let rank = 0;
+    withAvg.forEach((s, i) => {
+      if (lastAverage === null || Math.abs((s.average as number) - lastAverage) > 0.001) {
+        rank = i + 1;
+        lastAverage = s.average as number;
+      }
+      (s as any).rank = rank;
+    });
+    withoutAvg.forEach(s => { (s as any).rank = null; });
     return [...withAvg, ...withoutAvg];
   }, [studentsData]);
 

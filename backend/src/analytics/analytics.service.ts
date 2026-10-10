@@ -147,7 +147,7 @@ export class AnalyticsService {
     });
 
     computedResults = await this.resolveLegacyScores(computedResults, termId, schoolId);
-    computedResults = computedResults.filter(r => r.finalPercentage != null);
+    computedResults = computedResults.filter(r => r.finalPercentage != null && r.finalGrade != null && r.finalGrade.trim() !== '');
 
     computedResults = await this.filterComputedResultsBySubjects(computedResults, classId);
 
@@ -183,19 +183,18 @@ export class AnalyticsService {
 
     ranking.sort((a, b) => b.average - a.average);
 
-    const byPoints = [...ranking].sort((a, b) => a.totalPoints - b.totalPoints);
     const positions = new Map<string, number>();
-    let lastPoints: number | null = null;
+    let lastAverage: number | null = null;
     let position = 0;
-    byPoints.forEach((s, i) => {
-      if (s.totalPoints !== lastPoints) {
+    ranking.forEach((s, i) => {
+      if (lastAverage === null || Math.abs(s.average - lastAverage) > 0.001) {
         position = i + 1;
-        lastPoints = s.totalPoints;
+        lastAverage = s.average;
       }
       positions.set(s.studentId, position);
     });
 
-    return ranking.map((s) => ({ position: positions.get(s.studentId) ?? 0, ...s }));
+    return ranking.map((s) => ({ position: positions.get(s.studentId) ?? null, ...s }));
   }
   // ----------------------
   // 2️⃣ Student Comment
