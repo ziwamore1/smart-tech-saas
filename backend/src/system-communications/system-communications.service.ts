@@ -808,7 +808,7 @@ export class SystemCommunicationsService implements OnModuleInit {
 
     if (email) {
       tasks.push(
-        this.emailService.sendCredentialsEmail(email, {
+        this.emailService.sendEnhancedCredentialsEmail(email, {
           recipientName: name,
           username: username || email,
           password: password || 'Welcome123',

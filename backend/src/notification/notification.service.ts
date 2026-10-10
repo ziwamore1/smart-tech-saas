@@ -80,7 +80,7 @@ export class NotificationService {
 
     if (data.email) {
       try {
-        await this.emailService.sendCredentialsEmail(data.email, {
+        await this.emailService.sendEnhancedCredentialsEmail(data.email, {
           recipientName: data.recipientName,
           username: data.username,
           password: data.password,

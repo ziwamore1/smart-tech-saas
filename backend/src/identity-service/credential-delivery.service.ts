@@ -616,10 +616,9 @@ export class CredentialDeliveryService {
     schoolUrl?: string;
     email?: string;
   }): Promise<string> {
-    const loginUrl = this.getLoginUrl(data.schoolUrl);
-    const displayName = data.schoolName || 'SmartTech';
-    const subject = `Your ${displayName} Account Credentials — Action Required`;
-    const html = `
+    await this.emailService.sendEnhancedCredentialsEmail(data.to, data);
+    return `email-${Date.now()}`;
+    /*
       <!DOCTYPE html>
       <html lang="en">
       <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -765,8 +764,7 @@ export class CredentialDeliveryService {
       </html>
     `;
 
-    await this.emailService.sendMail(data.to, subject, html);
-    return `email-${Date.now()}`;
+    */
   }
 
   private async sendSmsCredentials(data: {

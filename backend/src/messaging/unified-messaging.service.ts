@@ -395,10 +395,31 @@ export class UnifiedMessagingService {
       schoolType: school.type,
     });
 
-    return this.sendNotification(user, message, {
+    const result = await this.sendNotification(user, message, {
+      channels: ['SMS', 'WHATSAPP'],
       subject: 'Welcome to Smart Tech - Director Account',
       userId: user.id,
     });
+
+    if (user.email) {
+      try {
+        await this.emailService.sendEnhancedCredentialsEmail(user.email, {
+          recipientName: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Director',
+          username: credentials.username,
+          password: credentials.password,
+          role: 'Director',
+          schoolName: school.name,
+          loginUrl: school.url,
+          email: user.email,
+        });
+        result.email = { success: true, channel: 'EMAIL', messageId: `email-${Date.now()}` };
+      } catch (error: any) {
+        result.email = { success: false, channel: 'EMAIL', error: error.message };
+        result.errors.push(`Email: ${error.message}`);
+      }
+    }
+
+    return result;
   }
 
   async sendTeacherWelcome(

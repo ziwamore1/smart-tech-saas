@@ -167,6 +167,16 @@ export class InstitutionRegistrationService {
       'We received your Smart Tech school registration request',
       `<p>Hello ${safeApplicantName},</p><p>We received your request for <strong>${safeInstitutionName}</strong>. The workspace is pending System Owner review. Please reply to this email or contact the Smart Tech team for guidance. Access and the trial period will begin after approval.</p><p>Your reference number is <strong>${safeRegistrationNumber}</strong>.</p>`,
     ).catch((error) => this.logger.warn(`Registration applicant notification failed: ${error.message}`));
+    this.emailService.sendEnhancedCredentialsEmail(normalizedEmail, {
+      recipientName: applicantName,
+      username: normalizedEmail,
+      password: dto.password,
+      role: 'Director',
+      schoolName: dto.institutionName,
+      loginUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?school=${school.id}`,
+      email: normalizedEmail,
+      loginNote: 'Your school workspace is pending approval. Portal access will be available once the registration review is completed.',
+    }).catch((error) => this.logger.warn(`Registration credentials email failed: ${error.message}`));
 
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId: user.id },

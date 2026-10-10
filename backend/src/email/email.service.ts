@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import { buildCredentialEmail, CredentialEmailTemplateData } from './credential-email.template';
 
 const SENDGRID_API = 'https://api.sendgrid.com/v3/mail/send';
 const MAILJET_API = 'https://api.mailjet.com/v3.1/send';
@@ -315,6 +316,11 @@ export class EmailService {
       </div>
     `;
     return this.sendMail(to, 'Your Login Credentials - Smart Tech', html);
+  }
+
+  async sendEnhancedCredentialsEmail(to: string, data: CredentialEmailTemplateData) {
+    const template = buildCredentialEmail(data);
+    return this.sendMail(to, template.subject, template.html);
   }
 
   async sendAttendanceAlert(to: string, data: {

@@ -33,6 +33,7 @@ export class SchoolService {
 
     const temporaryPassword = this.generateTempPassword();
     const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+    const registrationNumber = await this.allocateSchoolRegistrationNumber();
 
     return this.prisma.$transaction(async (tx) => {
       const school = await tx.school.create({
@@ -41,6 +42,7 @@ export class SchoolService {
           email: dto.email,
           phone: dto.phone,
           institutionTypeId: institutionType.id,
+          registrationNumber,
         },
       });
 
@@ -105,10 +107,21 @@ export class SchoolService {
       return {
         message: 'School registered successfully',
         schoolId: school.id,
+        registrationNumber: school.registrationNumber,
         directorLogin: dto.email,
         temporaryPassword: temporaryPassword,
       };
     });
+  }
+
+  private async allocateSchoolRegistrationNumber(): Promise<string> {
+    const sequence = await this.prisma.schoolRegistrationSequence.upsert({
+      where: { key: 'SCHOOL' },
+      create: { key: 'SCHOOL', nextValue: 2 },
+      update: { nextValue: { increment: 1 } },
+      select: { nextValue: true },
+    });
+    return `ST-AUTO-${new Date().getFullYear()}-${String(sequence.nextValue - 1).padStart(6, '0')}`;
   }
 
   private generateTempPassword(): string {

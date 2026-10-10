@@ -194,6 +194,8 @@ export class AuthService {
       throw new BadRequestException(`Institution type '${institutionTypeCode}' not found. Please run seed script.`);
     }
 
+    const registrationNumber = await this.allocateSchoolRegistrationNumber();
+
     const school = await this.prisma.school.create({
       data: {
         name: data.schoolName,
@@ -201,6 +203,7 @@ export class AuthService {
         email: data.email,
         phone: data.phone,
         institutionTypeId: institutionType.id,
+        registrationNumber,
         subscriptionStatus: 'trial',
       },
     });
@@ -215,11 +218,22 @@ export class AuthService {
       school: {
         id: school.id,
         name: school.name,
+        registrationNumber: school.registrationNumber,
         email: school.email,
         phone: school.phone,
         institutionType: institutionTypeCode,
       },
     };
+  }
+
+  private async allocateSchoolRegistrationNumber(): Promise<string> {
+    const sequence = await this.prisma.schoolRegistrationSequence.upsert({
+      where: { key: 'SCHOOL' },
+      create: { key: 'SCHOOL', nextValue: 2 },
+      update: { nextValue: { increment: 1 } },
+      select: { nextValue: true },
+    });
+    return `ST-AUTO-${new Date().getFullYear()}-${String(sequence.nextValue - 1).padStart(6, '0')}`;
   }
 
   async createDirector(data: CreateDirectorDto, superAdminId: string) {
