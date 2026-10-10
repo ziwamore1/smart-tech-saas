@@ -36,6 +36,7 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'TeacherExams', label: 'Exams', icon: '📋', stackScreen: 'ExamList' },
   { name: 'TeacherAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor' },
   { name: 'TeacherTemplates', label: 'Templates', icon: '📄', stackScreen: 'TemplateMarketplace' },
+  { name: 'TeacherNotifications', label: 'Notifications', icon: '🔔', stackScreen: 'Notifications' },
   { name: 'TeacherProfile', label: 'Profile', icon: '👤', component: ProfileScreen },
 ];
 

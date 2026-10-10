@@ -17,6 +17,7 @@ import { StudentAttendanceScreen } from '../screens/student/AttendanceScreen';
 import { StudentHomeworkScreen } from '../screens/student/HomeworkScreen';
 import { StudentReportCardsScreen } from '../screens/student/ReportCardsScreen';
 import { StudentAssessmentsScreen } from '../screens/student/AssessmentsScreen';
+import { StudentLibraryScreen } from '../screens/student/LibraryScreen';
 import { ParentDashboardScreen } from '../screens/parent/DashboardScreen';
 import { ParentPrimaryDashboardScreen } from '../screens/parent/ParentPrimaryDashboardScreen';
 import { ParentChildrenScreen } from '../screens/parent/ChildrenScreen';
@@ -104,10 +105,10 @@ function useRoleCheck(user: any) {
   const isUniDirector = institutionType === 'UNIVERSITY' && (hasRole('Vice Chancellor') || hasRole('Dean'));
   const isDirector = isPrimaryDirector || isSecDirector || isCollegeDirector || isUniDirector;
 
-  const isClassTeacher = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && hasRole('Class Teacher');
+  const isClassTeacher = (institutionType === 'PRIMARY_SCHOOL' || institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && hasRole('Class Teacher');
 
   const isPrimaryTeacher = institutionType === 'PRIMARY_SCHOOL' && (hasRole('Primary Teacher') || hasRole('Lower Primary Senior Teacher') || hasRole('Upper Primary Senior Teacher'));
-  const isSecTeacher = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && (hasRole('Teacher') || hasRole('Class Teacher'));
+  const isSecTeacher = (institutionType === 'SECONDARY_SCHOOL' || institutionType === 'ADVANCED_SECONDARY') && !isClassTeacher && hasRole('Teacher');
   const isCollegeTeacher = institutionType === 'COLLEGE' && (hasRole('Lecturer'));
   const isUniTeacher = institutionType === 'UNIVERSITY' && (hasRole('Lecturer') || hasRole('Research Supervisor'));
   const isTeacher = isPrimaryTeacher || isSecTeacher || isCollegeTeacher || isUniTeacher;
@@ -170,6 +171,7 @@ export function AppNavigator() {
             {isStudent && <Stack.Screen name="StudentHomework" component={StudentHomeworkScreen} />}
             {isStudent && <Stack.Screen name="StudentReportCards" component={StudentReportCardsScreen} />}
             {isStudent && <Stack.Screen name="StudentAssessments" component={StudentAssessmentsScreen} />}
+            {isStudent && <Stack.Screen name="StudentLibrary" component={StudentLibraryScreen} />}
 
             {isParent && <Stack.Screen name="ParentChildren" component={ParentChildrenScreen} />}
             {isParent && <Stack.Screen name="ParentChildResults" component={ParentChildResultsScreen} />}

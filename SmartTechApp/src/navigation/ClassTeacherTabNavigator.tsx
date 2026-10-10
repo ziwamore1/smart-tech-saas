@@ -11,7 +11,7 @@ import { RegisterStudentScreen } from '../screens/registration/RegisterStudentSc
 import { ClassTeacherCommunicationScreen } from '../screens/class-teacher/CommunicationScreen';
 import { ClassTeacherResultsDeliveryScreen } from '../screens/class-teacher/ResultsDeliveryScreen';
 import { ClassTeacherAnalyticsScreen } from '../screens/class-teacher/AnalyticsScreen';
-import { ClassTeacherAttendanceScreen } from '../screens/class-teacher/AttendanceScreen';
+import { AttendanceScreen as ClassTeacherAttendanceScreen } from '../screens/class-teacher/AttendanceScreen';
 import { StudentPhotoScreen } from '../screens/class-teacher/StudentPhotoScreen';
 import { ResultsManagementScreen } from '../screens/director/ResultsManagementScreen';
 import { ReportCardsScreen } from '../screens/director/ReportCardsScreen';
@@ -43,6 +43,7 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'CTAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor' },
   { name: 'CTAttendance', label: 'Attendance', icon: '📋', component: ClassTeacherAttendanceScreen },
   { name: 'CTPhotos', label: 'Photos', icon: '📸', component: StudentPhotoScreen },
+  { name: 'CTNotifications', label: 'Notifications', icon: '🔔', stackScreen: 'Notifications' },
   { name: 'CTProfile', label: 'Profile', icon: '👤', component: ProfileScreen },
 ];
 

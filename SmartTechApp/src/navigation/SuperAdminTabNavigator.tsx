@@ -65,6 +65,7 @@ const allDrawerScreens: (DrawerScreen & { section?: string })[] = [
   { name: 'SuperAdminMedia', label: 'Media Library', icon: '🖼️', component: SuperAdminMediaScreen, institutionTypes: null as any, section: 'TOOLS' },
   { name: 'SuperAdminEnrollStaff', label: 'Enroll as Staff', icon: '👨‍🏫', stackScreen: 'SuperAdminEnrollStaff', institutionTypes: null as any, section: 'TOOLS' },
   { name: 'SuperAdminProfile', label: 'Profile', icon: '👤', component: ProfileScreen, institutionTypes: null as any, section: 'ACCOUNT' },
+  { name: 'SuperAdminNotifications', label: 'Notifications', icon: '🔔', stackScreen: 'Notifications', institutionTypes: null as any, section: 'ACCOUNT' },
 ];
 
 export const SuperAdminTabNavigator: React.FC = () => {

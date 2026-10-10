@@ -52,6 +52,7 @@ const drawerSections: DrawerSection[] = [
   { title: 'SERVICES',
     items: [
       { name: 'ParentAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor' },
+      { name: 'ParentNotifications', label: 'Notifications', icon: '🔔', stackScreen: 'Notifications' },
       { name: 'ParentProfile', label: 'Profile', icon: '👤', component: ProfileScreen },
     ],
   },

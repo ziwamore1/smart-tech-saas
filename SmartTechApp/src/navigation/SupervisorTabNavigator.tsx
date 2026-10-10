@@ -9,6 +9,8 @@ import { DepartmentTeachersScreen } from '../screens/monitoring/DepartmentTeache
 import { TeacherMarksScreen } from '../screens/teacher/MarksScreen';
 import { TeacherClassesScreen } from '../screens/teacher/ClassesScreen';
 import { ResultsManagementScreen } from '../screens/director/ResultsManagementScreen';
+import ActivityCenterScreen from '../screens/monitoring/ActivityCenterScreen';
+import { BusinessCalendarScreen } from '../screens/common/BusinessCalendarScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
 import { colors, spacing, borderRadius, shadows } from '../theme';
 
@@ -30,8 +32,11 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'SupervisorClasses', label: 'Classes', icon: '🏫', component: TeacherClassesScreen },
   { name: 'SupervisorMarks', label: 'Marks', icon: '✏️', component: TeacherMarksScreen },
   { name: 'SupervisorResultsMgmt', label: 'Results Management', icon: '📊', component: ResultsManagementScreen },
+  { name: 'SupervisorActivity', label: 'Activity Center', icon: '⚡', component: ActivityCenterScreen },
+  { name: 'SupervisorCalendar', label: 'Business Calendar', icon: '🗓️', component: BusinessCalendarScreen },
   { name: 'SupervisorExams', label: 'Exams', icon: '📋', stackScreen: 'ExamList' },
   { name: 'SupervisorAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor' },
+  { name: 'SupervisorNotifications', label: 'Notifications', icon: '🔔', stackScreen: 'Notifications' },
   { name: 'SupervisorProfile', label: 'Profile', icon: '👤', component: ProfileScreen },
 ];
 
@@ -106,6 +111,8 @@ export const SupervisorTabNavigator: React.FC = () => {
     if (activeScreen === 'SupervisorDeptTeachers') return <DepartmentTeachersScreen stackNavigation={navigation} onToggleDrawer={toggleDrawer} />;
     if (activeScreen === 'SupervisorClasses') return <TeacherClassesScreen onToggleDrawer={toggleDrawer} />;
     if (activeScreen === 'SupervisorMarks') return <TeacherMarksScreen onToggleDrawer={toggleDrawer} />;
+    if (activeScreen === 'SupervisorActivity') return <ActivityCenterScreen stackNavigation={navigation} onToggleDrawer={toggleDrawer} />;
+    if (activeScreen === 'SupervisorCalendar') return <BusinessCalendarScreen />;
     if (activeScreen === 'SupervisorProfile') return <ProfileScreen navigation={navigation as any} onToggleDrawer={toggleDrawer} />;
     const Component = screenConfig.component as React.FC<any>;
     return <Component />;

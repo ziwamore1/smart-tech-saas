@@ -32,6 +32,8 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'StudentAiTutor', label: 'AI Tutor', icon: '🤖', stackScreen: 'AiTutor' },
   { name: 'StudentLearningStyle', label: 'My Style', icon: '🧠', stackScreen: 'LearningStyle' },
   { name: 'StudentAnalytics', label: 'Analytics', icon: '📊', stackScreen: 'Analytics' },
+  { name: 'StudentLibrary', label: 'Library', icon: '📚', stackScreen: 'StudentLibrary' },
+  { name: 'StudentNotifications', label: 'Notifications', icon: '🔔', stackScreen: 'Notifications' },
   { name: 'StudentProfile', label: 'Profile', icon: '👤', component: ProfileScreen },
 ];
 

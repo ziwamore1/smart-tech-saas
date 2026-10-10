@@ -89,6 +89,7 @@ const allDrawerScreens: DrawerScreen[] = [
   { name: 'DirectorCurriculumCompliance', label: 'Compliance', icon: '📊', component: DirectorCurriculumScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY'] },
   { name: 'DirectorSettings', label: 'Settings', icon: '⚙️', component: DirectorSettingsScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
   { name: 'DirectorProfile', label: 'Profile', icon: '👤', component: ProfileScreen, institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
+  { name: 'DirectorNotifications', label: 'Notifications', icon: '🔔', stackScreen: 'Notifications', institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY'] },
 ];
 
 export const DirectorTabNavigator: React.FC = () => {
