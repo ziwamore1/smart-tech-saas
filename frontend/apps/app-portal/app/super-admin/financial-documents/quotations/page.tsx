@@ -56,6 +56,13 @@ export default function QuotationsPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1') {
+      setForm(emptyForm());
+      setNewOpen(true);
+    }
+  }, []);
+
   const run = async (fn: () => Promise<any>, okMsg: string) => {
     setBusy(true); setError(null);
     try {

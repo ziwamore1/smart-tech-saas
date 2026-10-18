@@ -124,6 +124,12 @@ export const SuperAdminDashboardScreen: React.FC<SuperAdminDashboardProps> = ({ 
             </View>
             <Text style={styles.quickActionLabel}>Schools</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => handleNavigate('SuperAdminRevenueDesk')}>
+            <View style={[styles.quickActionIcon, { backgroundColor: colors.tealLight }]}>
+              <Text style={styles.quickActionEmoji}>🧾</Text>
+            </View>
+            <Text style={styles.quickActionLabel}>Revenue Desk</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.quickActionCard} onPress={() => handleNavigate('SuperAdminSubscriptionPlans')}>
             <View style={[styles.quickActionIcon, { backgroundColor: colors.successLight }]}>
               <Text style={styles.quickActionEmoji}>📋</Text>

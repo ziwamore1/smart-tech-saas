@@ -97,7 +97,7 @@ export default function FinancialDocumentsHubPage() {
       <PageHeader
         title="Financial Documents"
         subtitle="Company invoicing, quotations, receipts and payment management for the platform."
-        actions={<Link href="/super-admin/financial-documents/invoices" style={{ textDecoration: 'none' }}><button style={{ padding: '10px 16px', border: 'none', borderRadius: '10px', background: C.primary, color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}><i className="fa fa-file-invoice" style={{ marginRight: '8px' }}></i>Manage Invoices</button></Link>}
+         actions={<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><Link href="/super-admin/financial-documents/quotations?new=1" style={{ textDecoration: 'none' }}><button style={{ padding: '10px 16px', border: `1px solid ${C.border}`, borderRadius: '10px', background: '#fff', color: C.text, fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}><i className="fa fa-file-contract" style={{ marginRight: '8px', color: '#7c3aed' }}></i>New Quotation</button></Link><Link href="/super-admin/financial-documents/invoices?new=1" style={{ textDecoration: 'none' }}><button style={{ padding: '10px 16px', border: 'none', borderRadius: '10px', background: C.primary, color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}><i className="fa fa-file-invoice" style={{ marginRight: '8px' }}></i>New Invoice</button></Link></div>}
       />
 
       {error && (
@@ -120,7 +120,8 @@ export default function FinancialDocumentsHubPage() {
         <Section to="/super-admin/financial-documents/payments" icon="fa-money-bill-wave" color="#059669" title="Payments" desc="Review and confirm payments received against invoices." stats={[['Total', String(pay?.total ?? 0)], ['Confirmed', String(pay?.confirmedCount ?? 0)], ['Collected', formatMoney(pay?.collected)], ['Pending', String(pay?.byStatus?.PENDING ?? 0)]]} />
         <Section to="/super-admin/financial-documents/receipts" icon="fa-receipt" color="#3b82f6" title="Receipts" desc="Issue and void payment receipts." stats={[['Total', String(rec?.total ?? 0)], ['This month', String(rec?.monthly ?? 0)], ['Issued', String(rec?.byStatus?.ISSUED ?? 0)], ['Void', String(rec?.byStatus?.VOID ?? 0)]]} />
         <Section to="/super-admin/financial-documents/customers" icon="fa-users" color="#0d9488" title="Customers" desc="Manage the businesses and clients you bill." stats={[['Active', String(data?.customers ?? 0)], ['', '']]} />
-        <Section to="/super-admin/financial-documents/settings" icon="fa-cog" color="#64748b" title="Settings" desc="Company profile, tax, bank accounts, templates and numbering." stats={[['Ready', readiness ? (readiness.ready ? 'All checks pass' : `${readiness.checks.filter((c) => !c.ok).length} outstanding`) : '—'], ['', '']]} />
+         <Section to="/super-admin/financial-documents/audit" icon="fa-history" color="#b45309" title="Audit Archive" desc="Trace every draft, issue, send, payment and void event." stats={[['Events', 'Immutable'], ['Scope', 'Platform-wide']]} />
+         <Section to="/super-admin/financial-documents/settings" icon="fa-cog" color="#64748b" title="Settings" desc="Company profile, tax, bank accounts, templates and numbering." stats={[['Ready', readiness ? (readiness.ready ? 'All checks pass' : `${readiness.checks.filter((c) => !c.ok).length} outstanding`) : '—'], ['', '']]} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>

@@ -3121,6 +3121,31 @@ class ApiService {
     return response.data;
   }
 
+  // ===== SuperAdmin Financial Documents API =====
+  async getFinancialDashboard() { return (await this.client.get('/financial-documents/dashboard')).data; }
+  async getFinancialCustomers(params?: { search?: string; page?: number; pageSize?: number }) { return (await this.client.get('/financial-documents/customers', { params })).data; }
+  async getFinancialQuotations(params?: any) { return (await this.client.get('/financial-documents/quotations', { params })).data; }
+  async getFinancialInvoices(params?: any) { return (await this.client.get('/financial-documents/invoices', { params })).data; }
+  async getFinancialPayments(params?: any) { return (await this.client.get('/financial-documents/payments', { params })).data; }
+  async getFinancialReceipts(params?: any) { return (await this.client.get('/financial-documents/receipts', { params })).data; }
+  async getFinancialAuditLogs(params?: any) { return (await this.client.get('/financial-documents/audit-logs', { params })).data; }
+  async getFinancialSequences() { return (await this.client.get('/financial-documents/sequences')).data; }
+  async getFinancialCompanyProfile() { return (await this.client.get('/financial-documents/company-profile')).data; }
+  async createFinancialQuotation(data: any) { return (await this.client.post('/financial-documents/quotations', data)).data; }
+  async createFinancialInvoice(data: any) { return (await this.client.post('/financial-documents/invoices', data)).data; }
+  async issueFinancialQuotation(id: string) { return (await this.client.post(`/financial-documents/quotations/${id}/issue`)).data; }
+  async sendFinancialQuotation(id: string) { return (await this.client.post(`/financial-documents/quotations/${id}/send`)).data; }
+  async convertFinancialQuotation(id: string) { return (await this.client.post(`/financial-documents/quotations/${id}/convert`, {})).data; }
+  async issueFinancialInvoice(id: string) { return (await this.client.post(`/financial-documents/invoices/${id}/issue`)).data; }
+  async sendFinancialInvoice(id: string) { return (await this.client.post(`/financial-documents/invoices/${id}/send`)).data; }
+  async recordFinancialPayment(id: string, data: any) { return (await this.client.post(`/financial-documents/invoices/${id}/payments`, data)).data; }
+  async issueFinancialReceipt(paymentId: string) { return (await this.client.post('/financial-documents/receipts', { paymentId })).data; }
+  async getFinancialDocument(id: string, type: 'quotation' | 'invoice' | 'receipt') { return (await this.client.get(`/financial-documents/${type}s/${id}`)).data; }
+  async getFinancialPdf(id: string, type: 'quotation' | 'invoice' | 'receipt') {
+    const response = await this.client.get(`/financial-documents/${type}s/${id}/pdf`, { responseType: 'arraybuffer' });
+    return extractPdfBase64(response);
+  }
+
   async getBusinessCalendars(current = false) {
     const response = await this.client.get('/business-calendar', { params: current ? { current: true } : undefined });
     return response.data;

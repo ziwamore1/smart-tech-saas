@@ -4,6 +4,7 @@ import { colors, spacing, borderRadius, shadows, typography } from '../theme';
 
 interface WidgetCardProps {
   title: string;
+  subtitle?: string;
   action?: { label: string; onPress: () => void };
   style?: ViewStyle;
   children: React.ReactNode;
@@ -11,6 +12,7 @@ interface WidgetCardProps {
 
 export const WidgetCard: React.FC<WidgetCardProps> = ({
   title,
+  subtitle,
   action,
   style,
   children,
@@ -18,7 +20,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   return (
     <View style={[styles.card, style]}>
       <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
+        <View style={styles.titleBlock}><Text style={styles.title}>{title}</Text>{subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}</View>
         {action && (
           <TouchableOpacity onPress={action.onPress}>
             <Text style={styles.action}>{action.label}</Text>
@@ -47,6 +49,8 @@ const styles = StyleSheet.create({
   title: {
     ...typography.h4,
   },
+  titleBlock: { flex: 1 },
+  subtitle: { fontSize: 11, color: colors.textLight, marginTop: 3 },
   action: {
     fontSize: 13,
     fontWeight: '600',

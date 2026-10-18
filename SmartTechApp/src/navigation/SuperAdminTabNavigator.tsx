@@ -15,6 +15,7 @@ import { SuperAdminAuditLogsScreen } from '../screens/super-admin/AuditLogsScree
 import { SuperAdminSettingsScreen } from '../screens/super-admin/SettingsScreen';
 import { SuperAdminCurriculumCenterScreen } from '../screens/super-admin/CurriculumCenterScreen';
 import { ProfileScreen } from '../screens/common/ProfileScreen';
+import { SuperAdminRevenueDeskScreen } from '../screens/super-admin/RevenueDeskScreen';
 import { colors, spacing, borderRadius, shadows } from '../theme';
 
 const { width } = Dimensions.get('window');
@@ -32,6 +33,7 @@ interface DrawerScreen {
 const allDrawerScreens: (DrawerScreen & { section?: string })[] = [
   { name: 'SuperAdminHome', label: 'Dashboard', icon: '📊', component: SuperAdminDashboardScreen, institutionTypes: null as any, section: 'MAIN' },
   { name: 'SuperAdminSchools', label: 'Schools', icon: '🏫', component: SuperAdminSchoolsScreen, institutionTypes: null as any, section: 'MAIN' },
+  { name: 'SuperAdminRevenueDesk', label: 'Revenue Desk', icon: '🧾', component: SuperAdminRevenueDeskScreen, institutionTypes: null as any, section: 'MAIN' },
   { name: 'SuperAdminSwitchSchool', label: 'Linked Schools', icon: '🔁', stackScreen: 'SuperAdminSwitchSchool', institutionTypes: null as any, section: 'MAIN' },
   { name: 'SuperAdminSchoolMembers', label: 'School Members', icon: '🔑', stackScreen: 'PendingAssessments', institutionTypes: null as any, section: 'MAIN' },
   { name: 'SuperAdminSubscriptionPlans', label: 'Subscription Plans', icon: '💳', stackScreen: 'SuperAdminSubscriptionPlans', institutionTypes: null as any, section: 'ACADEMIC' },
