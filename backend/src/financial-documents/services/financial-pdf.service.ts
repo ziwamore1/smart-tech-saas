@@ -31,6 +31,7 @@ export interface PdfCompany {
   authorizedSignatoryName?: string | null;
   authorizedSignatoryRole?: string | null;
   zraIdentityNumber?: string | null;
+  registrationInformation?: Record<string, unknown> | null;
 }
 
 export interface PdfBank {
@@ -294,6 +295,21 @@ verification: input.verification,
     return lines.map((l: any) => this.escapeHtml(l)).join('<br/>');
   }
 
+  private companyLegalBlock(c: PdfCompany): string {
+    const known = [
+      c.companyRegistrationNumber ? ['Registration No.', c.companyRegistrationNumber] : null,
+      c.tpin ? ['TPIN', c.tpin] : null,
+      c.zraIdentityNumber ? ['ZRA Identity', c.zraIdentityNumber] : null,
+      c.authorizedSignatoryName ? ['Authorized Signatory', c.authorizedSignatoryName] : null,
+    ].filter(Boolean) as Array<[string, string]>;
+    const additional = Object.entries(c.registrationInformation || {})
+      .filter(([, value]) => value !== null && value !== undefined && String(value).trim())
+      .map(([key, value]) => [key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (char) => char.toUpperCase()), String(value)] as [string, string]);
+    const entries = [...known, ...additional.filter(([label]) => !known.some(([knownLabel]) => knownLabel.toLowerCase() === label.toLowerCase()))];
+    if (!entries.length) return '';
+    return `<div class="company-legal">${entries.map(([label, value]) => `<span class="company-legal-item"><strong>${this.escapeHtml(label)}</strong>${this.escapeHtml(value)}</span>`).join('')}</div>`;
+  }
+
   private detailsBlock(rows: Array<[string, string]>): string {
     const body = rows
       .filter(([, v]) => v)
@@ -466,6 +482,9 @@ verification: input.verification,
         .doc-number { font-size: 13px; font-weight: 700; margin-top: 2px; }
         .doc-number span { color: ${secondary}; }
         .company-address { font-size: 10px; color: #556; margin-top: 6px; line-height: 1.45; }
+        .company-legal { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; padding: 7px 10px; border: 1px solid #d7dee8; border-left: 4px solid ${secondary}; background: #f8fafc; page-break-inside: avoid; }
+        .company-legal-item { font-size: 10px; color: #334155; white-space: nowrap; }
+        .company-legal-item strong { color: ${primary}; font-weight: 800; margin-right: 4px; }
 
         .meta { display: flex; justify-content: space-between; margin-top: 14px; }
         .details { width: 48%; background: #f7f9fc; border-left: 3px solid ${secondary}; padding: 8px 10px; }
@@ -502,13 +521,16 @@ verification: input.verification,
         .notes-title { font-weight: 800; font-size: 10px; color: ${primary}; letter-spacing: 0.5px; }
         .notes-block div { line-height: 1.5; white-space: pre-wrap; }
 
-        .verification { position: absolute; left: 16mm; right: 16mm; bottom: 78mm; display: flex; align-items: center; gap: 12px; background: #f7f9fc; border: 1px dashed #c7d0dd; border-radius: 4px; padding: 8px 10px; max-width: 62%; }
+        .verification { display: flex; align-items: center; gap: 12px; margin-top: 14px; background: #f7f9fc; border: 1px dashed #c7d0dd; border-radius: 4px; padding: 8px 10px; width: 100%; page-break-inside: avoid; }
         .verification-title { font-weight: 800; font-size: 9px; color: ${primary}; letter-spacing: 1px; margin-bottom: 2px; }
         .verification-text { font-size: 9px; color: #556; line-height: 1.5; }
         .verification-url { font-weight: 700; color: #1a365d; word-break: break-all; }
 
-        .signature-zone { position: absolute; right: 16mm; bottom: 52mm; text-align: center; max-width: 45%; }
-        .signature-img { max-height: 52px; max-width: 150px; object-fit: contain; }
+        .approval-area { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-top: 18px; padding-top: 12px; border-top: 1px solid #dfe4ec; min-height: 105px; page-break-inside: avoid; }
+        .stamp-zone { flex: 1; text-align: left; min-height: 90px; display: flex; align-items: center; }
+        .stamp-img { max-height: 90px; max-width: 180px; object-fit: contain; }
+        .signature-zone { flex: 1; text-align: center; max-width: 45%; min-height: 90px; }
+        .signature-img { max-height: 58px; max-width: 170px; object-fit: contain; }
         .signatory-placeholder { border-bottom: 1px solid #333; width: 160px; height: 34px; margin: 0 auto; }
         .signatory-name { font-weight: 800; font-size: 11px; margin-top: 4px; }
         .signatory-role { font-size: 9.5px; color: #667; }
@@ -543,6 +565,8 @@ verification: input.verification,
             </div>
           </div>
 
+          ${this.companyLegalBlock(c)}
+
           <div class="meta">
             ${input.detailsBlock}
             ${input.customerBlock}
@@ -553,14 +577,10 @@ verification: input.verification,
           ${input.bankBlock}
           ${input.notesBlock}
 
-          ${c.stampUrl ? `<div class="verification" style="right:auto; left:16mm; bottom:52mm; background:transparent; border:none; max-width:34%;"><img src="${c.stampUrl}" style="max-height:120px; max-width:200px; object-fit:contain; opacity:0.85;" /></div>` : ''}
-
           ${this.signatureAndVerification(input)}
 
           <div class="footer">
             <div class="footer-left">
-              ${c.companyRegistrationNumber ? `<span>Reg No: ${this.escapeHtml(c.companyRegistrationNumber)}</span><br/>` : ''}
-              ${c.tpin ? `<span>TPIN: ${this.escapeHtml(c.tpin)}</span> &nbsp;|&nbsp; <span>ZRA: ${this.escapeHtml(c.zraIdentityNumber || c.tpin)}</span><br/>` : ''}
               ${c.phone ? `<span>Tel: ${this.escapeHtml(c.phone)}</span>` : ''} ${c.email ? `<span>Email: ${this.escapeHtml(c.email)}</span>` : ''}
             </div>
             <div class="footer-right">
@@ -577,16 +597,19 @@ verification: input.verification,
   private signatureAndVerification(input: any): string {
     const c = input.company;
     let block = '';
-    if (c.signatureUrl || c.authorizedSignatoryName) {
-      block += `<div class="signature-zone">
-        <div style="font-size:9px;font-weight:800;color:#667;letter-spacing:1px;margin-bottom:4px;">AUTHORIZED SIGNATURE</div>
-        ${c.signatureUrl ? `<img class="signature-img" src="${c.signatureUrl}" alt="Signature" />` : `<div class="signatory-placeholder"></div>`}
-        <div class="signatory-name">${this.escapeHtml(c.authorizedSignatoryName || 'Authorized Signatory')}</div>
-        ${c.authorizedSignatoryRole ? `<div class="signatory-role">${this.escapeHtml(c.authorizedSignatoryRole)}</div>` : ''}
+    if (c.signatureUrl || c.authorizedSignatoryName || c.stampUrl) {
+      block += `<div class="approval-area">
+        <div class="stamp-zone">${c.stampUrl ? `<img class="stamp-img" src="${c.stampUrl}" alt="Company stamp" />` : ''}</div>
+        <div class="signature-zone">
+          <div style="font-size:9px;font-weight:800;color:#667;letter-spacing:1px;margin-bottom:4px;">AUTHORIZED SIGNATURE</div>
+          ${c.signatureUrl ? `<img class="signature-img" src="${c.signatureUrl}" alt="Signature" />` : `<div class="signatory-placeholder"></div>`}
+          <div class="signatory-name">${this.escapeHtml(c.authorizedSignatoryName || 'Authorized Signatory')}</div>
+          ${c.authorizedSignatoryRole ? `<div class="signatory-role">${this.escapeHtml(c.authorizedSignatoryRole)}</div>` : ''}
+        </div>
       </div>`;
     }
     if (input.verification?.verificationQr) {
-      block += `<div class="verification" style="max-width:56%;">
+      block += `<div class="verification">
         <div class="verification-qr"><img src="${input.verification.verificationQr}" width="82" height="82" alt="QR" /></div>
         <div class="verification-text">
           <div class="verification-title">DOCUMENT VERIFICATION</div>
