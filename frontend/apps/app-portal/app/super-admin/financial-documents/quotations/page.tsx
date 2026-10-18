@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { financialDocumentsApi } from '@/lib/api';
+import { financialDocumentsApi, superAdminApi } from '@/lib/api';
 import {
   Card, PageHeader, Loading, Empty, ErrorBox, StatusBadge, Modal, Field,
   inputStyle, primaryBtn, ghostBtn, dangerBtn,
@@ -24,6 +24,7 @@ export default function QuotationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [institutions, setInstitutions] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [templateId, setTemplateId] = useState('');
   const [newOpen, setNewOpen] = useState(false);
@@ -53,8 +54,8 @@ export default function QuotationsPage() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    Promise.all([financialDocumentsApi.listCustomers({ pageSize: 100 }), financialDocumentsApi.listTemplates('QUOTATION')])
-      .then(([customersRes, templatesRes]: any[]) => { setCustomers(responseItems(customersRes)); setTemplates(responseItems(templatesRes)); })
+    Promise.all([financialDocumentsApi.listCustomers({ pageSize: 100 }), financialDocumentsApi.listTemplates('QUOTATION'), superAdminApi.getSchools().catch(() => null)])
+      .then(([customersRes, templatesRes, schoolsRes]: any[]) => { setCustomers(responseItems(customersRes)); setTemplates(responseItems(templatesRes)); const schoolsPayload = schoolsRes?.data?.data || schoolsRes?.data || schoolsRes; setInstitutions(schoolsPayload?.data || schoolsPayload || []); })
       .catch(() => {});
   }, []);
 
@@ -106,6 +107,18 @@ export default function QuotationsPage() {
   };
 
   const updateItem = (idx: number, key: keyof ItemRow, value: any) => setForm((f) => ({ ...f, items: f.items.map((it, i) => (i === idx ? { ...it, [key]: value } : it)) }));
+  const selectCustomer = async (value: string) => {
+    if (!value.startsWith('__school__:')) { setForm((current) => ({ ...current, customerId: value })); return; }
+    const school = institutions.find((item) => item.id === value.replace('__school__:', ''));
+    if (!school) return;
+    setBusy(true); setError(null);
+    try {
+      const res: any = await financialDocumentsApi.createCustomer({ schoolId: school.id, customerType: 'SCHOOL', name: school.name, legalName: school.name, email: school.email, phone: school.phone, address: school.address, isActive: true });
+      const customer = res.data || res;
+      setCustomers((current) => [customer, ...current]); setForm((current) => ({ ...current, customerId: customer.id }));
+    } catch (e: any) { setError(e?.response?.data?.message || e?.message || 'Could not prepare this institution for billing.'); }
+    finally { setBusy(false); }
+  };
 
   const itemTotals = (it: ItemRow) => {
     const qty = Number(it.quantity) || 0, price = Number(it.unitPrice) || 0;
@@ -198,9 +211,10 @@ export default function QuotationsPage() {
       <Modal open={newOpen} onClose={() => setNewOpen(false)} title="New Quotation" width={860}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
          <Field label="Customer *">
-            <select style={inputStyle} value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })}>
+            <select style={inputStyle} value={form.customerId} onChange={(e) => { void selectCustomer(e.target.value); }}>
               <option value="">Select customer…</option>
               {customers.filter((c) => c.isActive !== false).map((c) => <option key={c.id} value={c.id}>{c.name || c.legalName}</option>)}
+              {institutions.filter((school) => !customers.some((customer) => customer.schoolId === school.id)).map((school) => <option key={`school-${school.id}`} value={`__school__:${school.id}`}>{school.name} · create billing profile</option>)}
             </select>
           </Field>
           <Field label="Reusable template" hint="Applies saved terms, notes and line items. You can edit them before saving.">

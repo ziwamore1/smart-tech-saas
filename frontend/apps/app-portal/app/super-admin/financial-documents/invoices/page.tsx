@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { financialDocumentsApi } from '@/lib/api';
+import { financialDocumentsApi, superAdminApi } from '@/lib/api';
 import {
   Card, PageHeader, Loading, Empty, ErrorBox, StatusBadge, Modal, Field,
   inputStyle, primaryBtn, ghostBtn, dangerBtn,
@@ -72,6 +72,7 @@ export default function InvoicesPage() {
   const [busy, setBusy] = useState(false);
 
   const [customers, setCustomers] = useState<any[]>([]);
+  const [institutions, setInstitutions] = useState<any[]>([]);
   const [taxConfigs, setTaxConfigs] = useState<any[]>([]);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
@@ -109,15 +110,18 @@ export default function InvoicesPage() {
 
   const loadOptions = useCallback(async () => {
     try {
-      const [cRes, tRes, bRes, templateRes] = await Promise.all([
+      const [cRes, tRes, bRes, templateRes, schoolsRes] = await Promise.all([
         financialDocumentsApi.listCustomers({ pageSize: 100 }),
         financialDocumentsApi.listTaxConfigs(),
         financialDocumentsApi.listBankAccounts(), financialDocumentsApi.listTemplates('INVOICE'),
+        superAdminApi.getSchools().catch(() => null),
       ]);
       setCustomers(responseItems(cRes));
       setTaxConfigs(responseItems(tRes));
       setBankAccounts(responseItems(bRes));
       setTemplates(responseItems(templateRes));
+      const schoolsPayload = (schoolsRes as any)?.data?.data || (schoolsRes as any)?.data || schoolsRes;
+      setInstitutions(schoolsPayload?.data || schoolsPayload || []);
     } catch { /* options are optional */ }
   }, []);
 
@@ -195,6 +199,19 @@ export default function InvoicesPage() {
       const items = f.items.map((it, i) => (i === idx ? { ...it, [key]: value } : it));
       return { ...f, items };
     });
+  };
+
+  const selectCustomer = async (value: string) => {
+    if (!value.startsWith('__school__:')) { setForm((current) => ({ ...current, customerId: value })); return; }
+    const school = institutions.find((item) => item.id === value.replace('__school__:', ''));
+    if (!school) return;
+    setBusy(true); setError(null);
+    try {
+      const res: any = await financialDocumentsApi.createCustomer({ schoolId: school.id, customerType: 'SCHOOL', name: school.name, legalName: school.name, email: school.email, phone: school.phone, address: school.address, isActive: true });
+      const customer = res.data || res;
+      setCustomers((current) => [customer, ...current]); setForm((current) => ({ ...current, customerId: customer.id }));
+    } catch (e: any) { setError(e?.response?.data?.message || e?.message || 'Could not prepare this institution for billing.'); }
+    finally { setBusy(false); }
   };
 
   const itemTotals = (it: ItemRow) => {
@@ -312,9 +329,10 @@ export default function InvoicesPage() {
       <Modal open={newOpen} onClose={() => setNewOpen(false)} title="New Invoice" width={860}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
           <Field label="Customer *">
-            <select style={inputStyle} value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })}>
+            <select style={inputStyle} value={form.customerId} onChange={(e) => { void selectCustomer(e.target.value); }}>
               <option value="">Select customer…</option>
               {customers.filter((c) => c.isActive !== false).map((c) => <option key={c.id} value={c.id}>{c.name || c.legalName}</option>)}
+              {institutions.filter((school) => !customers.some((customer) => customer.schoolId === school.id)).map((school) => <option key={`school-${school.id}`} value={`__school__:${school.id}`}>{school.name} · create billing profile</option>)}
             </select>
           </Field>
           <Field label="Currency">
