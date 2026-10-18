@@ -481,20 +481,22 @@ function TemplatesTab() {
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
-    try { const res: any = await financialDocumentsApi.listTemplates(docType || undefined); setRows(res.data || []); }
+    try { const res: any = await financialDocumentsApi.listTemplates(docType || undefined); const payload = res.data || res; setRows(payload.items || payload || []); }
     catch (e: any) { setError(e?.response?.data?.message || e?.message || 'Failed to load templates.'); }
     finally { setLoading(false); }
   }, [docType]);
   useEffect(() => { load(); }, [load]);
 
-  const openCreate = () => { setForm({ name: '', docType: docType || 'INVOICE', description: '', isDefault: false, isActive: true }); setModal({ mode: 'create' }); };
-  const openEdit = (r: any) => { setForm({ name: r.name || '', docType: r.docType || 'INVOICE', description: r.description || '', isDefault: !!r.isDefault, isActive: r.isActive !== false }); setModal({ mode: 'edit', id: r.id }); };
+  const openCreate = () => { setForm({ name: '', docType: docType || 'INVOICE', description: '', paymentTerms: '', notes: '', itemsText: '', isDefault: false, isActive: true }); setModal({ mode: 'create' }); };
+  const openEdit = (r: any) => { const defaults = r.components?.formDefaults || {}; setForm({ name: r.name || '', docType: r.docType || 'INVOICE', description: r.description || '', paymentTerms: defaults.paymentTerms || r.termsAndConditions || '', notes: defaults.notes || r.legalFooter || '', itemsText: (defaults.items || []).map((item: any) => `${item.itemName}|${item.description || ''}|${item.quantity}|${item.unitPrice}`).join('\n'), isDefault: !!r.isDefault, isActive: r.isActive !== false }); setModal({ mode: 'edit', id: r.id }); };
 
   const save = async () => {
     setBusy(true); setError(null);
     try {
-      if (modal?.mode === 'create') await financialDocumentsApi.createTemplate(form);
-      else if (modal?.id) await financialDocumentsApi.updateTemplate(modal.id, form);
+      const items = String(form.itemsText || '').split('\n').map((line: string) => line.trim()).filter(Boolean).map((line: string) => { const [itemName, description, quantity, unitPrice] = line.split('|'); return { itemName: itemName?.trim(), description: description?.trim(), quantity: Number(quantity) || 1, unitPrice: Number(unitPrice) || 0 }; });
+      const payload = { name: form.name, docType: form.docType, description: form.description, isDefault: form.isDefault, isActive: form.isActive, termsAndConditions: form.paymentTerms || undefined, legalFooter: form.notes || undefined, components: { formDefaults: { paymentTerms: form.paymentTerms, notes: form.notes, items } } };
+      if (modal?.mode === 'create') await financialDocumentsApi.createTemplate(payload);
+      else if (modal?.id) await financialDocumentsApi.updateTemplate(modal.id, payload);
       setModal(null); await load();
     } catch (e: any) { setError(e?.response?.data?.message || e?.message || 'Save failed.'); }
     finally { setBusy(false); }
@@ -543,6 +545,9 @@ function TemplatesTab() {
           </Field>
         </div>
         <Field label="Description"><input style={inputStyle} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
+        <Field label="Default payment terms" hint="Applied automatically when this template is selected in a quotation or invoice."><textarea style={{ ...inputStyle, minHeight: 60 }} value={form.paymentTerms || ''} onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })} /></Field>
+        <Field label="Default notes"><textarea style={{ ...inputStyle, minHeight: 60 }} value={form.notes || ''} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
+        <Field label="Default line items" hint="One per line: Item name | Description | Quantity | Unit price"><textarea style={{ ...inputStyle, minHeight: 90, fontFamily: 'monospace' }} value={form.itemsText || ''} onChange={(e) => setForm({ ...form, itemsText: e.target.value })} placeholder="Annual platform subscription | Platform access and support | 1 | 25000" /></Field>
         <div style={{ display: 'flex', gap: '18px', marginBottom: '16px' }}>
           <label style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} /> Active</label>
           <label style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={form.isDefault} onChange={(e) => setForm({ ...form, isDefault: e.target.checked })} /> Default</label>

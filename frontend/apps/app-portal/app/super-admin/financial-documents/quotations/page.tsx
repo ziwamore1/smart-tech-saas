@@ -5,7 +5,7 @@ import { financialDocumentsApi } from '@/lib/api';
 import {
   Card, PageHeader, Loading, Empty, ErrorBox, StatusBadge, Modal, Field,
   inputStyle, primaryBtn, ghostBtn, dangerBtn,
-  formatMoney, formatDate, C, QUOTATION_STATUSES, CURRENCIES,
+  formatMoney, formatDate, C, QUOTATION_STATUSES, CURRENCIES, responseItems,
 } from '../_shared';
 
 interface ItemRow { itemName: string; description?: string; quantity: number; unit?: string; unitPrice: number; discount?: number; taxRate?: number }
@@ -24,6 +24,8 @@ export default function QuotationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [templateId, setTemplateId] = useState('');
   const [newOpen, setNewOpen] = useState(false);
   const [convertTarget, setConvertTarget] = useState<Quotation | null>(null);
   const [convertDue, setConvertDue] = useState('');
@@ -51,14 +53,14 @@ export default function QuotationsPage() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    financialDocumentsApi.listCustomers({ pageSize: 100 })
-      .then((res: any) => setCustomers(res.data?.items || res.data || []))
+    Promise.all([financialDocumentsApi.listCustomers({ pageSize: 100 }), financialDocumentsApi.listTemplates('QUOTATION')])
+      .then(([customersRes, templatesRes]: any[]) => { setCustomers(responseItems(customersRes)); setTemplates(responseItems(templatesRes)); })
       .catch(() => {});
   }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1') {
-      setForm(emptyForm());
+      setForm(emptyForm()); setTemplateId('');
       setNewOpen(true);
     }
   }, []);
@@ -87,6 +89,7 @@ export default function QuotationsPage() {
     if (form.items.some((it) => !it.itemName || it.quantity <= 0 || it.unitPrice < 0)) { setError('Each line item needs a name, positive quantity and price.'); return; }
     await run(() => financialDocumentsApi.createQuotation({
       customerId: form.customerId,
+      templateId: templateId || undefined,
       currency: form.currency,
       quotationDate: form.quotationDate || undefined,
       validUntil: form.validUntil || undefined,
@@ -111,11 +114,17 @@ export default function QuotationsPage() {
     return { line, discounted, tax, total: discounted + tax };
   };
   const grandTotal = form.items.reduce((acc, it) => acc + itemTotals(it).total, 0);
+  const applyTemplate = (id: string) => {
+    setTemplateId(id);
+    const template = templates.find((item) => item.id === id);
+    const defaults = template?.components?.formDefaults || {};
+    if (template) setForm((current) => ({ ...current, paymentTerms: defaults.paymentTerms || template.termsAndConditions || current.paymentTerms, notes: defaults.notes || template.legalFooter || current.notes, items: defaults.items?.length ? defaults.items : current.items }));
+  };
 
   return (
     <div>
       <PageHeader title="Quotations" subtitle={`${total} quotation${total !== 1 ? 's' : ''}`} actions={
-        <button style={primaryBtn} onClick={() => { setForm(emptyForm()); setNewOpen(true); }}><i className="fa fa-plus"></i> New Quotation</button>
+         <button style={primaryBtn} onClick={() => { setForm(emptyForm()); setTemplateId(''); setNewOpen(true); }}><i className="fa fa-plus"></i> New Quotation</button>
       } />
 
       <Card style={{ marginBottom: '16px', padding: '14px 16px' }}>
@@ -188,10 +197,16 @@ export default function QuotationsPage() {
       {/* New quotation */}
       <Modal open={newOpen} onClose={() => setNewOpen(false)} title="New Quotation" width={860}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-          <Field label="Customer *">
+         <Field label="Customer *">
             <select style={inputStyle} value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })}>
               <option value="">Select customer…</option>
               {customers.filter((c) => c.isActive !== false).map((c) => <option key={c.id} value={c.id}>{c.name || c.legalName}</option>)}
+            </select>
+          </Field>
+          <Field label="Reusable template" hint="Applies saved terms, notes and line items. You can edit them before saving.">
+            <select style={inputStyle} value={templateId} onChange={(e) => applyTemplate(e.target.value)}>
+              <option value="">Start without a template</option>
+              {templates.filter((template) => template.isActive !== false).map((template) => <option key={template.id} value={template.id}>{template.name}{template.isDefault ? ' · Default' : ''}</option>)}
             </select>
           </Field>
           <Field label="Currency">

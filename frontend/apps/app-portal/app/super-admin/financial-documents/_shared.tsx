@@ -22,6 +22,16 @@ export function formatMoney(n: number | string | null | undefined, currency?: st
   }
 }
 
+export function responsePayload(response: any): any {
+  const payload = response?.data ?? response;
+  return payload?.data ?? payload;
+}
+
+export function responseItems(response: any): any[] {
+  const payload = responsePayload(response);
+  return Array.isArray(payload) ? payload : payload?.items || payload?.customers || payload?.templates || [];
+}
+
 export function formatDate(input: string | Date | null | undefined): string {
   if (!input) return '—';
   try {

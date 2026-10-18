@@ -5,7 +5,7 @@ import { financialDocumentsApi } from '@/lib/api';
 import {
   Card, PageHeader, Loading, Empty, ErrorBox, StatusBadge, Modal, Field,
   inputStyle, primaryBtn, ghostBtn, dangerBtn,
-  formatMoney, formatDate, C, INVOICE_STATUSES, PAYMENT_METHODS, CURRENCIES,
+  formatMoney, formatDate, C, INVOICE_STATUSES, PAYMENT_METHODS, CURRENCIES, responseItems,
 } from '../_shared';
 
 interface ItemRow {
@@ -74,6 +74,8 @@ export default function InvoicesPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [taxConfigs, setTaxConfigs] = useState<any[]>([]);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [templateId, setTemplateId] = useState('');
 
   const [newOpen, setNewOpen] = useState(false);
   const [detail, setDetail] = useState<Invoice | null>(null);
@@ -107,14 +109,15 @@ export default function InvoicesPage() {
 
   const loadOptions = useCallback(async () => {
     try {
-      const [cRes, tRes, bRes] = await Promise.all([
+      const [cRes, tRes, bRes, templateRes] = await Promise.all([
         financialDocumentsApi.listCustomers({ pageSize: 100 }),
         financialDocumentsApi.listTaxConfigs(),
-        financialDocumentsApi.listBankAccounts(),
+        financialDocumentsApi.listBankAccounts(), financialDocumentsApi.listTemplates('INVOICE'),
       ]);
-      setCustomers((cRes as any).data?.items || (cRes as any).data || []);
-      setTaxConfigs((tRes as any).data || []);
-      setBankAccounts((bRes as any).data || []);
+      setCustomers(responseItems(cRes));
+      setTaxConfigs(responseItems(tRes));
+      setBankAccounts(responseItems(bRes));
+      setTemplates(responseItems(templateRes));
     } catch { /* options are optional */ }
   }, []);
 
@@ -122,7 +125,7 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1') {
-      setForm(emptyForm());
+      setForm(emptyForm()); setTemplateId('');
       setNewOpen(true);
     }
   }, []);
@@ -148,6 +151,7 @@ export default function InvoicesPage() {
 
   const openNew = () => {
     setForm(emptyForm());
+    setTemplateId('');
     setNewOpen(true);
   };
 
@@ -182,6 +186,7 @@ export default function InvoicesPage() {
     };
     if (form.taxConfigurationId) payload.taxConfigurationId = form.taxConfigurationId;
     if (form.bankAccountId) payload.bankAccountId = form.bankAccountId;
+    if (templateId) payload.templateId = templateId;
     await run(() => financialDocumentsApi.createInvoice(payload), 'Invoice created.');
   };
 
@@ -204,6 +209,12 @@ export default function InvoicesPage() {
   };
 
   const grandTotal = form.items.reduce((acc, it) => acc + itemTotals(it).total, 0);
+  const applyTemplate = (id: string) => {
+    setTemplateId(id);
+    const template = templates.find((item) => item.id === id);
+    const defaults = template?.components?.formDefaults || {};
+    if (template) setForm((current) => ({ ...current, paymentTerms: defaults.paymentTerms || template.termsAndConditions || current.paymentTerms, notes: defaults.notes || template.legalFooter || current.notes, items: defaults.items?.length ? defaults.items : current.items }));
+  };
 
   return (
     <div>
@@ -309,6 +320,12 @@ export default function InvoicesPage() {
           <Field label="Currency">
             <select style={inputStyle} value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
               {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </Field>
+          <Field label="Reusable template" hint="Applies saved terms, notes and line items. You can edit them before saving.">
+            <select style={inputStyle} value={templateId} onChange={(e) => applyTemplate(e.target.value)}>
+              <option value="">Start without a template</option>
+              {templates.filter((template) => template.isActive !== false).map((template) => <option key={template.id} value={template.id}>{template.name}{template.isDefault ? ' · Default' : ''}</option>)}
             </select>
           </Field>
           <Field label="Invoice date"><input type="date" style={inputStyle} value={form.invoiceDate} onChange={(e) => setForm({ ...form, invoiceDate: e.target.value })} /></Field>
