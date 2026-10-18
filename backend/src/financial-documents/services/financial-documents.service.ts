@@ -76,8 +76,8 @@ export class FinancialDocumentsService {
   async readiness() {
     const [profile, bank, tax, templates, sequences] = await Promise.all([
       this.prisma.companyProfile.findUnique({ where: { id: 'company' } }),
-      this.prisma.bankAccount.findFirst({ where: { isDefault: true, isActive: true } }),
-      this.prisma.taxConfiguration.findFirst({ where: { isDefault: true, isActive: true } }),
+      this.prisma.bankAccount.findFirst({ where: { isActive: true }, orderBy: [{ isDefault: 'desc' }, { displayOrder: 'asc' }] }),
+      this.prisma.taxConfiguration.findFirst({ where: { isActive: true }, orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }] }),
       this.prisma.financialDocumentTemplate.findMany({ where: { isActive: true }, select: { docType: true, id: true } }),
       this.prisma.financialDocumentSequence.findMany({ select: { documentType: true, prefix: true } }),
     ]);
@@ -115,13 +115,13 @@ export class FinancialDocumentsService {
     });
     const types = [FinancialDocumentType.QUOTATION, FinancialDocumentType.INVOICE, FinancialDocumentType.PAYMENT_RECEIPT];
     for (const t of types) {
-      const hasTemplate = templates.some((tpl) => tpl.docType === t);
+       const hasTemplate = templates.some((tpl) => tpl.docType === t && tpl.isActive !== false);
       const hasSequence = sequences.some((s) => s.documentType === t);
       checks.push({
         key: `template-${t}`,
-        label: `${t.replace('_', ' ')} — Default Template`,
+         label: `${t.replace('_', ' ')} — Template`,
         ok: hasTemplate,
-        message: hasTemplate ? `Default ${t} template configured.` : `No default ${t} template configured yet.`,
+         message: hasTemplate ? `${t} template configured.` : `No active ${t} template configured yet.`,
       });
       checks.push({
         key: `sequence-${t}`,

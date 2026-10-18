@@ -105,7 +105,7 @@ export class TaxConfigurationService {
   }
 
   async getDefault() {
-    return this.prisma.taxConfiguration.findFirst({ where: { isDefault: true, isActive: true } });
+    return this.prisma.taxConfiguration.findFirst({ where: { isActive: true }, orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }] });
   }
 
   private validate(input: TaxConfigurationInput) {

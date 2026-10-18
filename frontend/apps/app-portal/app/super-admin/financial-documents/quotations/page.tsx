@@ -27,6 +27,7 @@ export default function QuotationsPage() {
   const [institutions, setInstitutions] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [templateId, setTemplateId] = useState('');
+  const [companyDefaults, setCompanyDefaults] = useState({ paymentTerms: '', notes: '' });
   const [newOpen, setNewOpen] = useState(false);
   const [convertTarget, setConvertTarget] = useState<Quotation | null>(null);
   const [convertDue, setConvertDue] = useState('');
@@ -54,14 +55,14 @@ export default function QuotationsPage() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    Promise.all([financialDocumentsApi.listCustomers({ pageSize: 100 }), financialDocumentsApi.listTemplates('QUOTATION'), superAdminApi.getSchools().catch(() => null)])
-      .then(([customersRes, templatesRes, schoolsRes]: any[]) => { setCustomers(responseItems(customersRes)); setTemplates(responseItems(templatesRes)); const schoolsPayload = schoolsRes?.data?.data || schoolsRes?.data || schoolsRes; setInstitutions(schoolsPayload?.data || schoolsPayload || []); })
+    Promise.all([financialDocumentsApi.listCustomers({ pageSize: 100 }), financialDocumentsApi.listTemplates('QUOTATION'), superAdminApi.getSchools().catch(() => null), financialDocumentsApi.getCompanyProfile().catch(() => null)])
+      .then(([customersRes, templatesRes, schoolsRes, profileRes]: any[]) => { setCustomers(responseItems(customersRes)); setTemplates(responseItems(templatesRes)); const schoolsPayload = schoolsRes?.data?.data || schoolsRes?.data || schoolsRes; setInstitutions(schoolsPayload?.data || schoolsPayload || []); const profile = profileRes?.data || profileRes || {}; setCompanyDefaults({ paymentTerms: profile.defaultPaymentTerms || '', notes: profile.defaultNotes || profile.defaultTerms || '' }); })
       .catch(() => {});
   }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1') {
-      setForm(emptyForm()); setTemplateId('');
+      setForm({ ...emptyForm(), paymentTerms: companyDefaults.paymentTerms, notes: companyDefaults.notes }); setTemplateId('');
       setNewOpen(true);
     }
   }, []);
@@ -70,7 +71,7 @@ export default function QuotationsPage() {
     setBusy(true); setError(null);
     try {
       await fn(); await load();
-      setConfirmAction(null); setNewOpen(false); setDetail(null); setConvertTarget(null); setPayModal(null);
+      setConfirmAction(null); setNewOpen(false); setDetail(null); setConvertTarget(null);
       window.alert(okMsg);
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Operation failed.');
@@ -137,7 +138,7 @@ export default function QuotationsPage() {
   return (
     <div>
       <PageHeader title="Quotations" subtitle={`${total} quotation${total !== 1 ? 's' : ''}`} actions={
-         <button style={primaryBtn} onClick={() => { setForm(emptyForm()); setTemplateId(''); setNewOpen(true); }}><i className="fa fa-plus"></i> New Quotation</button>
+         <button style={primaryBtn} onClick={() => { setForm({ ...emptyForm(), paymentTerms: companyDefaults.paymentTerms, notes: companyDefaults.notes }); setTemplateId(''); setNewOpen(true); }}><i className="fa fa-plus"></i> New Quotation</button>
       } />
 
       <Card style={{ marginBottom: '16px', padding: '14px 16px' }}>

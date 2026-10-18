@@ -176,7 +176,7 @@ function CompanyProfileTab() {
         authorizedContactRole: d.authorizedContactRole || '', authorizedContactEmail: d.authorizedContactEmail || '',
         authorizedContactPhone: d.authorizedContactPhone || '', authorizedSignatoryName: d.authorizedSignatoryName || '',
         authorizedSignatoryRole: d.authorizedSignatoryRole || '', primaryColor: d.primaryColor || '#ea6645', secondaryColor: d.secondaryColor || '#f59e0b',
-        watermarkText: d.watermarkText || '', defaultTerms: d.defaultTerms || '', defaultPaymentTerms: d.defaultPaymentTerms || '', defaultNotes: d.defaultNotes || '',
+        watermarkText: d.watermarkText || '', defaultTerms: d.defaultTerms || 'All goods and services are subject to the terms stated on this document.', defaultPaymentTerms: d.defaultPaymentTerms || 'Payment due within 14 days of invoice date.', defaultNotes: d.defaultNotes || 'Thank you for your business.',
       });
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Failed to load company profile.');
@@ -201,7 +201,8 @@ function CompanyProfileTab() {
     try {
       const res: any = await financialDocumentsApi.uploadCompanyMedia(file, kind);
       const result = res.data || res;
-      const url = result?.url || result?.[kind + 'Url'] || '';
+      const company = result?.company || result;
+      const url = company?.[kind + 'Url'] || result?.upload?.secureUrl || result?.url || '';
       setForm((f: any) => ({ ...f, [kind + 'Url']: url }));
       window.alert(`${kind} uploaded.`);
     } catch (e: any) {

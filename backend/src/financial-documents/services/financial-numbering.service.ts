@@ -85,7 +85,7 @@ export class FinancialNumberingService {
     const sequence = result.sequence;
     const formatted = pattern
       .replace('{PREFIX}', result.prefix)
-      .replace('{SEPARATOR}', result.separator)
+      .replaceAll('{SEPARATOR}', result.separator)
       .replace('{YEAR}', String(numberYear))
       .replace('{SEQ}', String(sequence).padStart(result.sequenceLength, '0'));
 

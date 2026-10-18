@@ -77,6 +77,7 @@ export default function InvoicesPage() {
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [templateId, setTemplateId] = useState('');
+  const [companyDefaults, setCompanyDefaults] = useState({ paymentTerms: '', notes: '' });
 
   const [newOpen, setNewOpen] = useState(false);
   const [detail, setDetail] = useState<Invoice | null>(null);
@@ -110,11 +111,12 @@ export default function InvoicesPage() {
 
   const loadOptions = useCallback(async () => {
     try {
-      const [cRes, tRes, bRes, templateRes, schoolsRes] = await Promise.all([
+      const [cRes, tRes, bRes, templateRes, schoolsRes, profileRes] = await Promise.all([
         financialDocumentsApi.listCustomers({ pageSize: 100 }),
         financialDocumentsApi.listTaxConfigs(),
         financialDocumentsApi.listBankAccounts(), financialDocumentsApi.listTemplates('INVOICE'),
         superAdminApi.getSchools().catch(() => null),
+        financialDocumentsApi.getCompanyProfile().catch(() => null),
       ]);
       setCustomers(responseItems(cRes));
       setTaxConfigs(responseItems(tRes));
@@ -122,6 +124,8 @@ export default function InvoicesPage() {
       setTemplates(responseItems(templateRes));
       const schoolsPayload = (schoolsRes as any)?.data?.data || (schoolsRes as any)?.data || schoolsRes;
       setInstitutions(schoolsPayload?.data || schoolsPayload || []);
+      const profile = (profileRes as any)?.data || profileRes || {};
+      setCompanyDefaults({ paymentTerms: profile.defaultPaymentTerms || '', notes: profile.defaultNotes || profile.defaultTerms || '' });
     } catch { /* options are optional */ }
   }, []);
 
@@ -129,7 +133,7 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1') {
-      setForm(emptyForm()); setTemplateId('');
+      setForm({ ...emptyForm(), paymentTerms: companyDefaults.paymentTerms, notes: companyDefaults.notes }); setTemplateId('');
       setNewOpen(true);
     }
   }, []);
@@ -154,7 +158,7 @@ export default function InvoicesPage() {
   };
 
   const openNew = () => {
-    setForm(emptyForm());
+    setForm({ ...emptyForm(), paymentTerms: companyDefaults.paymentTerms, notes: companyDefaults.notes });
     setTemplateId('');
     setNewOpen(true);
   };
