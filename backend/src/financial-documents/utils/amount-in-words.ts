@@ -46,7 +46,8 @@ export function numberToWordsInt(value: number): string {
 }
 
 export function amountInWords(amount: number, currency: string = 'ZMW'): string {
-  const safe = Number.isFinite(amount) ? amount : 0;
+  const numericAmount = Number(amount);
+  const safe = Number.isFinite(numericAmount) ? numericAmount : 0;
   const major = Math.floor(Math.abs(safe));
   const minor = Math.round((Math.abs(safe) - major) * 100);
   const names = CURRENCY_NAMES[currency] || { major: currency, minor: 'Cent' };
@@ -65,7 +66,8 @@ export function amountInWords(amount: number, currency: string = 'ZMW'): string 
 }
 
 export function formatAmount(amount: number, currency: string = 'ZMW'): string {
-  const safe = Number.isFinite(amount) ? amount : 0;
+  const numericAmount = Number(amount);
+  const safe = Number.isFinite(numericAmount) ? numericAmount : 0;
   return new Intl.NumberFormat('en-ZM', {
     style: 'currency',
     currency,
@@ -75,6 +77,7 @@ export function formatAmount(amount: number, currency: string = 'ZMW'): string {
 }
 
 export function roundMoney(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return Math.round((value + Number.EPSILON) * 100) / 100;
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return 0;
+  return Math.round((numericValue + Number.EPSILON) * 100) / 100;
 }

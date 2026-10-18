@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { financialDocumentsApi } from '@/lib/api';
+import { FinancialDocumentViewer } from '@/components/financial-document-viewer';
 import {
   Card, PageHeader, Loading, Empty, ErrorBox, StatusBadge, Modal, Field,
   inputStyle, primaryBtn, ghostBtn, dangerBtn,
@@ -22,6 +23,7 @@ export default function ReceiptsPage() {
   const [payments, setPayments] = useState<any[]>([]);
   const [selectedPayment, setSelectedPayment] = useState('');
   const [detail, setDetail] = useState<Receipt | null>(null);
+  const [pdfTarget, setPdfTarget] = useState<Receipt | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ label: string; run: () => Promise<any> } | null>(null);
   const [reason, setReason] = useState('');
 
@@ -119,7 +121,7 @@ export default function ReceiptsPage() {
                   <td style={{ padding: '10px', textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                       <button title="View" style={iconBtn} onClick={() => openDetail(r.id)}><i className="fa fa-eye"></i></button>
-                      <a title="PDF" href={financialDocumentsApi.receiptPdfUrl(r.id)} target="_blank" rel="noreferrer" style={{ ...iconBtn, textDecoration: 'none' }}><i className="fa fa-file-pdf"></i></a>
+                       <button title="PDF" style={iconBtn} onClick={() => setPdfTarget(r)}><i className="fa fa-file-pdf"></i></button>
                       {r.status === 'ISSUED' && <button title="Void" style={{ ...iconBtn, color: '#dc2626' }} onClick={() => { setReason(''); setConfirmAction({ label: 'Void this receipt?', run: () => financialDocumentsApi.voidReceipt(r.id, reason || 'Voided from platform') }); }}><i className="fa fa-ban"></i></button>}
                     </div>
                   </td>
@@ -188,6 +190,7 @@ export default function ReceiptsPage() {
           <button style={dangerBtn} disabled={busy} onClick={() => confirmAction && run(confirmAction.run, 'Done.')}>{busy ? 'Working…' : 'Confirm'}</button>
         </div>
       </Modal>
+      {pdfTarget && <FinancialDocumentViewer title={`Receipt ${pdfTarget.receiptNumber || ''}`.trim()} fileName={`SMART_TECH_Receipt_${pdfTarget.receiptNumber || pdfTarget.id}.pdf`} download={() => financialDocumentsApi.downloadReceiptPdf(pdfTarget.id)} onClose={() => setPdfTarget(null)} />}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { financialDocumentsApi, superAdminApi } from '@/lib/api';
+import { FinancialDocumentViewer } from '@/components/financial-document-viewer';
 import {
   Card, PageHeader, Loading, Empty, ErrorBox, StatusBadge, Modal, Field,
   inputStyle, primaryBtn, ghostBtn, dangerBtn,
@@ -33,6 +34,7 @@ export default function QuotationsPage() {
   const [convertDue, setConvertDue] = useState('');
   const [confirmAction, setConfirmAction] = useState<{ label: string; run: () => Promise<any> } | null>(null);
   const [detail, setDetail] = useState<Quotation | null>(null);
+  const [pdfTarget, setPdfTarget] = useState<Quotation | null>(null);
   const [form, setForm] = useState(emptyForm());
 
   const pageSize = 20;
@@ -287,9 +289,9 @@ export default function QuotationsPage() {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <StatusBadge status={detail.effectiveStatus || detail.status} />
-              <a href={financialDocumentsApi.quotationPdfUrl(detail.id)} target="_blank" rel="noreferrer" style={{ ...primaryBtn, textDecoration: 'none' }}>
-                <i className="fa fa-file-pdf"></i> View PDF
-              </a>
+               <button onClick={() => setPdfTarget(detail)} style={primaryBtn}>
+                 <i className="fa fa-file-pdf"></i> View PDF
+              </button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px', marginBottom: '14px' }}>
               <div><div style={{ fontSize: '12px', color: C.light }}>Customer</div><div style={{ fontWeight: 600 }}>{detail.customer?.name || '—'}</div></div>
@@ -341,6 +343,7 @@ export default function QuotationsPage() {
           <button style={dangerBtn} disabled={busy} onClick={() => confirmAction && run(confirmAction.run, 'Done.')}>{busy ? 'Working…' : 'Confirm'}</button>
         </div>
       </Modal>
+      {pdfTarget && <FinancialDocumentViewer title={`Quotation ${pdfTarget.quotationNumber || ''}`.trim()} fileName={`SMART_TECH_Quotation_${pdfTarget.quotationNumber || pdfTarget.id}.pdf`} download={() => financialDocumentsApi.downloadQuotationPdf(pdfTarget.id)} onClose={() => setPdfTarget(null)} />}
     </div>
   );
 }

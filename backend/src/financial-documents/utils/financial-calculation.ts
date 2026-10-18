@@ -41,10 +41,14 @@ export function computeItems(
 ): { items: CalcItemResult[]; totals: TotalsResult } {
   const baseRate = globalTaxRate ?? 0;
   const lineResults: CalcItemResult[] = (items || []).map((raw, index) => {
-    const quantity = Number.isFinite(raw.quantity) ? raw.quantity : 1;
-    const unitPrice = Number.isFinite(raw.unitPrice) ? raw.unitPrice : 0;
-    const discount = Number.isFinite(raw.discount) ? raw.discount : 0;
-    const rate = raw.taxRate != null ? raw.taxRate : baseRate;
+    const numericQuantity = Number(raw.quantity);
+    const numericUnitPrice = Number(raw.unitPrice);
+    const numericDiscount = Number(raw.discount ?? 0);
+    const numericRate = raw.taxRate != null ? Number(raw.taxRate) : baseRate;
+    const quantity = Number.isFinite(numericQuantity) ? numericQuantity : 1;
+    const unitPrice = Number.isFinite(numericUnitPrice) ? numericUnitPrice : 0;
+    const discount = Number.isFinite(numericDiscount) ? numericDiscount : 0;
+    const rate = Number.isFinite(numericRate) ? numericRate : 0;
     const subtotal = roundMoney(quantity * unitPrice);
     const netBeforeTax = roundMoney(subtotal - discount);
     let taxAmount = 0;

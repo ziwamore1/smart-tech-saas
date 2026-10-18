@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { financialDocumentsApi, superAdminApi } from '@/lib/api';
+import { FinancialDocumentViewer } from '@/components/financial-document-viewer';
 import {
   Card, PageHeader, Loading, Empty, ErrorBox, StatusBadge, Modal, Field,
   inputStyle, primaryBtn, ghostBtn, dangerBtn,
@@ -81,6 +82,7 @@ export default function InvoicesPage() {
 
   const [newOpen, setNewOpen] = useState(false);
   const [detail, setDetail] = useState<Invoice | null>(null);
+  const [pdfTarget, setPdfTarget] = useState<Invoice | null>(null);
   const [payModal, setPayModal] = useState<any>(null);
   const [confirmAction, setConfirmAction] = useState<{ label: string; run: () => Promise<any>; note?: string } | null>(null);
   const [form, setForm] = useState(emptyForm());
@@ -407,9 +409,9 @@ export default function InvoicesPage() {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
               <StatusBadge status={detail.effectiveStatus || detail.status} />
-              <a href={financialDocumentsApi.invoicePdfUrl(detail.id)} target="_blank" rel="noreferrer" style={{ ...primaryBtn, textDecoration: 'none' }}>
+              <button onClick={() => setPdfTarget(detail)} style={primaryBtn}>
                 <i className="fa fa-file-pdf"></i> View PDF
-              </a>
+              </button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px', marginBottom: '14px' }}>
               <DetailItem label="Customer" value={`${detail.customer?.name || ''}${detail.customer?.email ? ` · ${detail.customer.email}` : ''}`} />
@@ -523,6 +525,7 @@ export default function InvoicesPage() {
           </button>
         </div>
       </Modal>
+      {pdfTarget && <FinancialDocumentViewer title={`Invoice ${pdfTarget.invoiceNumber || ''}`.trim()} fileName={`SMART_TECH_Invoice_${pdfTarget.invoiceNumber || pdfTarget.id}.pdf`} download={() => financialDocumentsApi.downloadInvoicePdf(pdfTarget.id)} onClose={() => setPdfTarget(null)} />}
     </div>
   );
 }

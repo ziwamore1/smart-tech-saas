@@ -653,6 +653,7 @@ export const financialDocumentsApi = {
   transitionQuotation: (id: string, to: string, reason?: string) => api.post(`/financial-documents/quotations/${id}/transition`, { to, reason }),
   convertQuotation: (id: string, data?: any) => api.post(`/financial-documents/quotations/${id}/convert`, data || {}),
   quotationPdfUrl: (id: string) => authedUrl(`/financial-documents/quotations/${id}/pdf`),
+  downloadQuotationPdf: (id: string) => api.get(`/financial-documents/quotations/${id}/pdf`, { responseType: 'blob' }),
 
   // Invoices
   listInvoices: (params?: Record<string, any>) => api.get('/financial-documents/invoices', { params }),
@@ -667,6 +668,7 @@ export const financialDocumentsApi = {
   recordPayment: (id: string, data: any) => api.post(`/financial-documents/invoices/${id}/payments`, data),
   invoicePayments: (id: string) => api.get(`/financial-documents/invoices/${id}/payments`),
   invoicePdfUrl: (id: string) => authedUrl(`/financial-documents/invoices/${id}/pdf`),
+  downloadInvoicePdf: (id: string) => api.get(`/financial-documents/invoices/${id}/pdf`, { responseType: 'blob' }),
 
   // Payments
   listPayments: (params?: Record<string, any>) => api.get('/financial-documents/payments', { params }),
@@ -680,6 +682,7 @@ export const financialDocumentsApi = {
   issueReceipt: (paymentId: string) => api.post('/financial-documents/receipts', { paymentId }),
   voidReceipt: (id: string, reason?: string) => api.post(`/financial-documents/receipts/${id}/void`, { reason }),
   receiptPdfUrl: (id: string) => authedUrl(`/financial-documents/receipts/${id}/pdf`),
+  downloadReceiptPdf: (id: string) => api.get(`/financial-documents/receipts/${id}/pdf`, { responseType: 'blob' }),
 
   // Sequences, numbering and settings
   listSequences: () => api.get('/financial-documents/sequences'),
