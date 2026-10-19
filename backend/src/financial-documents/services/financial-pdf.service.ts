@@ -320,6 +320,46 @@ export class FinancialPdfService {
     });
   }
 
+  private stampVisual(company: PdfCompany, stampDateTime?: Date | string | null, verification?: PdfVerification): string {
+    const date = stampDateTime ? new Date(stampDateTime) : null;
+    const stampDate = date && !Number.isNaN(date.getTime())
+      ? date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()
+      : '';
+    const stampTime = date && !Number.isNaN(date.getTime())
+      ? date.toLocaleTimeString('en-GB', { hour12: false })
+      : '';
+    const timezoneLabel = date && !Number.isNaN(date.getTime())
+      ? new Intl.DateTimeFormat('en-GB', { timeZoneName: 'short' }).formatToParts(date).find(part => part.type === 'timeZoneName')?.value || ''
+      : '';
+    const serialNumber = verification?.verificationCode || '';
+
+    if (company.stampTemplateConfig) {
+      const svg = this.stampRenderer.render(company.stampTemplateConfig, {
+        stampDate,
+        stampTime,
+        timezoneLabel,
+        serialNumber,
+        assets: {},
+      });
+      return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+    }
+
+    // Older settings stored the designer's preview SVG as stampUrl. Replace its
+    // preview context so existing profiles do not remain permanently generic.
+    if (company.stampUrl?.startsWith('data:image/svg+xml')) {
+      const [header, payload = ''] = company.stampUrl.split(',', 2);
+      const isBase64 = /;base64$/i.test(header);
+      let svg = isBase64 ? Buffer.from(payload, 'base64').toString('utf8') : decodeURIComponent(payload);
+      svg = svg
+        .replaceAll('01 JAN 2030', stampDate)
+        .replaceAll('00:00:00 CAT', `${stampTime}${timezoneLabel ? ` ${timezoneLabel}` : ''}`)
+        .replaceAll('STS-PREVIEW', serialNumber);
+      return `${header},${isBase64 ? Buffer.from(svg).toString('base64') : encodeURIComponent(svg)}`;
+    }
+
+    return company.stampUrl || '';
+  }
+
   private companyLegalBlock(c: PdfCompany): string {
     const known = [
       c.companyRegistrationNumber ? ['Registration No.', c.companyRegistrationNumber] : null,
@@ -626,15 +666,7 @@ export class FinancialPdfService {
     const c = input.company;
     let block = '';
     if (c.signatureUrl || c.authorizedSignatoryName || c.stampUrl || c.stampTemplateConfig) {
-      const stampSvg = c.stampTemplateConfig
-        ? this.stampRenderer.render(c.stampTemplateConfig, {
-            stampDate: input.stampDateTime ? new Date(input.stampDateTime).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase() : '',
-            stampTime: input.stampDateTime ? new Date(input.stampDateTime).toLocaleTimeString('en-GB', { hour12: false }) : '',
-            timezoneLabel: input.stampDateTime ? new Intl.DateTimeFormat('en-GB', { timeZoneName: 'short' }).formatToParts(new Date(input.stampDateTime)).find(part => part.type === 'timeZoneName')?.value : '',
-            assets: {},
-          })
-        : '';
-      const stampVisual = stampSvg ? `data:image/svg+xml;base64,${Buffer.from(stampSvg).toString('base64')}` : c.stampUrl;
+      const stampVisual = this.stampVisual(c, input.stampDateTime, input.verification);
       block += `<div class="approval-area">
         <div class="stamp-zone">
           ${stampVisual ? `<img class="stamp-img" src="${stampVisual}" alt="Company stamp" />` : ''}
