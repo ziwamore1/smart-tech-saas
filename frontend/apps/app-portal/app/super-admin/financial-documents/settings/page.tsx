@@ -74,6 +74,7 @@ function PlatformBrandingTab() {
   const [stamps, setStamps] = useState<any[]>([]);
   const [signatureUrl, setSignatureUrl] = useState('');
   const [stampUrl, setStampUrl] = useState('');
+  const [stampTemplateConfig, setStampTemplateConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,16 +94,20 @@ function PlatformBrandingTab() {
       const profile = profileRes.data || profileRes || {};
       setSignatureUrl(profile.signatureUrl || '');
       setStampUrl(profile.stampUrl || '');
+      setStampTemplateConfig(profile.stampTemplateConfig || null);
       setSignatures(signatureRes.data?.signatures || signatureRes.data || []);
       const digitalStamps = stampRes.data?.stamps || stampRes.data || [];
       const platformTemplates = (platformStampRes.data?.templates || []).filter((template: any) => template.status === 'PUBLISHED' && template.marketplace?.status === 'PUBLISHED');
       const renderedPlatformStamps = await Promise.all(platformTemplates.map(async (template: any) => {
         try {
           const preview = await stampEngineApi.renderPreview(template.configJson, []);
-          return { id: `platform-${template.id}`, name: template.name, type: 'PLATFORM TEMPLATE', svgContent: preview.data?.svg || '' };
+           return { id: `platform-${template.id}`, name: template.name, type: 'PLATFORM TEMPLATE', svgContent: preview.data?.svg || '', configJson: template.configJson };
         } catch { return null; }
       }));
-      setStamps([...digitalStamps, ...renderedPlatformStamps.filter(Boolean)]);
+      const availableStamps = [...digitalStamps, ...renderedPlatformStamps.filter(Boolean)];
+      const selectedTemplate = availableStamps.find(stamp => stamp.configJson && JSON.stringify(stamp.configJson) === JSON.stringify(profile.stampTemplateConfig));
+      if (selectedTemplate) setStampUrl(stampVisualUrl(selectedTemplate));
+      setStamps(availableStamps);
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Could not load platform signatures and stamps.');
     } finally { setLoading(false); }
@@ -113,7 +118,7 @@ function PlatformBrandingTab() {
   const save = async () => {
     setSaving(true); setError(null);
     try {
-      await financialDocumentsApi.updateCompanyProfile({ signatureUrl: signatureUrl || null, stampUrl: stampUrl || null });
+       await financialDocumentsApi.updateCompanyProfile({ signatureUrl: signatureUrl || null, stampUrl: stampTemplateConfig ? null : (stampUrl || null), stampTemplateConfig });
       window.alert('Platform signature and stamp settings saved.');
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Could not save signature and stamp settings.');
@@ -139,7 +144,12 @@ function PlatformBrandingTab() {
         </div>
         <div>
           <Field label="Platform digital stamp">
-            <select style={inputStyle} value={stampUrl} onChange={e => setStampUrl(e.target.value)}>
+             <select style={inputStyle} value={stampUrl} onChange={e => {
+               const value = e.target.value;
+               const selected = stamps.find(stamp => stampVisualUrl(stamp) === value);
+               setStampUrl(value);
+               setStampTemplateConfig(selected?.configJson || null);
+             }}>
               <option value="">No platform stamp</option>
               {stamps.map(stamp => <option key={stamp.id} value={stampVisualUrl(stamp)}>{stamp.name}{stamp.type ? ` — ${stamp.type}` : ''}</option>)}
             </select>

@@ -7334,6 +7334,7 @@ model CompanyProfile {
   signaturePublicId         String?
   stampUrl                  String?
   stampPublicId             String?
+  stampTemplateConfig       Json?
   primaryColor              String   @default("#1e3a5f")
   secondaryColor            String   @default("#c0a030")
   headerLayout              String   @default("logo-left")

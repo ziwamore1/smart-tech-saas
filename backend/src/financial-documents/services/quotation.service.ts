@@ -370,6 +370,7 @@ export class QuotationService {
     meta?: { action: string; toStatus: QuotationStatus },
   ) {
     const company = await this.companyProfile.requireProfile();
+    const issuedAt = new Date();
     const verification = await this.verification.generateVerification({
       documentType: FinancialDocumentType.QUOTATION,
       documentId: q.id,
@@ -377,13 +378,13 @@ export class QuotationService {
       totalAmount: q.totalAmount,
       currency: q.currency,
       customerName: q.customer?.name,
-      issuedAt: new Date().toISOString(),
+      issuedAt: issuedAt.toISOString(),
     });
     const bank = q.bankAccount || (await this.bankAccounts.getDefault());
     const rendered = await this.pdf.renderQuotation({
       number,
       status: QuotationStatus.ISSUED,
-      issuedAt: new Date(),
+       issuedAt,
       validUntil: q.validUntil,
       reference: q.reference,
       customerReference: q.customerReference,
@@ -413,7 +414,7 @@ export class QuotationService {
       data: {
         quotationNumber: number,
         status: meta?.toStatus ?? QuotationStatus.ISSUED,
-        issueDate: new Date(),
+         issueDate: issuedAt,
         issuedById: userId ?? undefined,
         pdfUrl: rendered.url,
         pdfPublicId: rendered.publicId,

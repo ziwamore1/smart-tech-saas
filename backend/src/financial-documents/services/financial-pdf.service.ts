@@ -6,6 +6,8 @@ import * as path from 'path';
 import { CloudinaryService } from '../../cloudinary/cloudinary.service';
 import { FINANCIAL_DOCUMENTS_FOLDER } from '../constants';
 import { amountInWords, formatAmount, roundMoney } from '../utils/amount-in-words';
+import { StampRendererService } from '../../stamp-engine/stamp-renderer.service';
+import { StampTemplateConfig } from '../../stamp-engine/stamp-engine.types';
 
 export interface PdfCompany {
   legalName?: string | null;
@@ -26,6 +28,7 @@ export interface PdfCompany {
   watermarkText?: string | null;
   signatureUrl?: string | null;
   stampUrl?: string | null;
+  stampTemplateConfig?: StampTemplateConfig | null;
   defaultTerms?: string | null;
   defaultPaymentTerms?: string | null;
   authorizedSignatoryName?: string | null;
@@ -85,7 +88,10 @@ export interface PdfRenderResult {
 export class FinancialPdfService {
   private readonly logger = new Logger(FinancialPdfService.name);
 
-  constructor(private readonly cloudinary: CloudinaryService) {}
+  constructor(
+    private readonly cloudinary: CloudinaryService,
+    private readonly stampRenderer: StampRendererService,
+  ) {}
 
   async renderQuotation(input: {
     number: string;
@@ -128,6 +134,7 @@ export class FinancialPdfService {
       }),
       verification: input.verification,
       watermark: input.company.watermarkText,
+      stampDateTime: input.issuedAt,
     });
     return this.renderToPdf(html, `SMART_TECH_Quotation_${input.number}.pdf`);
   }
@@ -178,6 +185,7 @@ export class FinancialPdfService {
       }),
       verification: input.verification,
       watermark: input.company.watermarkText,
+      stampDateTime: input.invoiceDate,
     });
     return this.renderToPdf(html, `SMART_TECH_Invoice_${input.number}.pdf`);
   }
@@ -228,8 +236,9 @@ export class FinancialPdfService {
       }),
       bankBlock: '',
       notesBlock: '',
-verification: input.verification,
+      verification: input.verification,
       watermark: input.company.watermarkText,
+      stampDateTime: input.receiptDate,
     });
     return this.renderToPdf(html, `SMART_TECH_Receipt_${input.number}.pdf`);
   }
@@ -293,6 +302,13 @@ verification: input.verification,
   private addressBlock(c: PdfCompany): string {
     const lines = [c.physicalAddress, c.postalAddress, [c.city, c.province].filter(Boolean).join(', '), c.country].filter((l: any) => l);
     return lines.map((l: any) => this.escapeHtml(l)).join('<br/>');
+  }
+
+  private stampDateTime(value?: Date | string | null): string {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'medium', timeZoneName: 'short' });
   }
 
   private companyLegalBlock(c: PdfCompany): string {
@@ -450,6 +466,7 @@ verification: input.verification,
     notesBlock: string;
     verification?: PdfVerification;
     watermark?: string | null;
+    stampDateTime?: Date | string | null;
   }): string {
     const c = input.company;
     const primary = c.primaryColor || '#1e3a5f';
@@ -529,6 +546,8 @@ verification: input.verification,
         .approval-area { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-top: 18px; padding-top: 12px; border-top: 1px solid #dfe4ec; min-height: 105px; page-break-inside: avoid; }
         .stamp-zone { flex: 1; text-align: left; min-height: 90px; display: flex; align-items: center; }
         .stamp-img { max-height: 90px; max-width: 180px; object-fit: contain; }
+        .stamp-date { margin-left: 8px; font-size: 8.5px; line-height: 1.4; color: #475569; }
+        .stamp-date strong { color: ${primary}; font-size: 8px; letter-spacing: 0.5px; }
         .signature-zone { flex: 1; text-align: center; max-width: 45%; min-height: 90px; }
         .signature-img { max-height: 58px; max-width: 170px; object-fit: contain; }
         .signatory-placeholder { border-bottom: 1px solid #333; width: 160px; height: 34px; margin: 0 auto; }
@@ -597,9 +616,21 @@ verification: input.verification,
   private signatureAndVerification(input: any): string {
     const c = input.company;
     let block = '';
-    if (c.signatureUrl || c.authorizedSignatoryName || c.stampUrl) {
+    if (c.signatureUrl || c.authorizedSignatoryName || c.stampUrl || c.stampTemplateConfig) {
+      const stampSvg = c.stampTemplateConfig
+        ? this.stampRenderer.render(c.stampTemplateConfig, {
+            stampDate: input.stampDateTime ? new Date(input.stampDateTime).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase() : '',
+            stampTime: input.stampDateTime ? new Date(input.stampDateTime).toLocaleTimeString('en-GB', { hour12: false }) : '',
+            timezoneLabel: input.stampDateTime ? new Intl.DateTimeFormat('en-GB', { timeZoneName: 'short' }).formatToParts(new Date(input.stampDateTime)).find(part => part.type === 'timeZoneName')?.value : '',
+            assets: {},
+          })
+        : '';
+      const stampVisual = stampSvg ? `data:image/svg+xml;base64,${Buffer.from(stampSvg).toString('base64')}` : c.stampUrl;
       block += `<div class="approval-area">
-        <div class="stamp-zone">${c.stampUrl ? `<img class="stamp-img" src="${c.stampUrl}" alt="Company stamp" />` : ''}</div>
+        <div class="stamp-zone">
+          ${stampVisual ? `<img class="stamp-img" src="${stampVisual}" alt="Company stamp" />` : ''}
+          ${!c.stampTemplateConfig && input.stampDateTime ? `<div class="stamp-date"><strong>DIGITALLY STAMPED</strong><br/>${this.escapeHtml(this.stampDateTime(input.stampDateTime))}</div>` : ''}
+        </div>
         <div class="signature-zone">
           <div style="font-size:9px;font-weight:800;color:#667;letter-spacing:1px;margin-bottom:4px;">AUTHORIZED SIGNATURE</div>
           ${c.signatureUrl ? `<img class="signature-img" src="${c.signatureUrl}" alt="Signature" />` : `<div class="signatory-placeholder"></div>`}

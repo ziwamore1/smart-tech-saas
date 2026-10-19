@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { QrModule } from '../qr-service/qr.module';
+import { StampEngineModule } from '../stamp-engine/stamp-engine.module';
 import { FinancialDocumentsController } from './financial-documents.controller';
 import { PublicFinancialVerificationController } from './public/public-financial-verification.controller';
 import { FinancialNumberingService } from './services/financial-numbering.service';
@@ -19,7 +20,7 @@ import { FinancialReceiptService } from './services/financial-receipt.service';
 import { FinancialDocumentsService } from './services/financial-documents.service';
 
 @Module({
-  imports: [QrModule],
+  imports: [QrModule, StampEngineModule],
   controllers: [FinancialDocumentsController, PublicFinancialVerificationController],
   providers: [
     FinancialNumberingService,

@@ -393,6 +393,7 @@ export class InvoiceService {
   private async finalizeIssue(inv: any, userId?: string | null, userEmail?: string | null) {
     const num = await this.numbering.nextNumber(FinancialDocumentType.INVOICE);
     const company = await this.companyProfile.requireProfile();
+    const issuedAt = new Date();
     const verification = await this.verification.generateVerification({
       documentType: FinancialDocumentType.INVOICE,
       documentId: inv.id,
@@ -400,13 +401,13 @@ export class InvoiceService {
       totalAmount: inv.totalAmount,
       currency: inv.currency,
       customerName: inv.customer?.name,
-      issuedAt: new Date().toISOString(),
+      issuedAt: issuedAt.toISOString(),
     });
     const bank = inv.bankAccount || (await this.bankAccounts.getDefault());
     const rendered = await this.pdf.renderInvoice({
       number: num.number,
       status: InvoiceStatus.ISSUED,
-      invoiceDate: new Date(),
+       invoiceDate: issuedAt,
       dueDate: inv.dueDate,
       orderReference: inv.orderReference,
       purchaseReference: inv.purchaseReference,
@@ -437,7 +438,7 @@ export class InvoiceService {
       data: {
         invoiceNumber: num.number,
         status: InvoiceStatus.ISSUED,
-        issueDate: new Date(),
+         issueDate: issuedAt,
         issuedById: userId ?? undefined,
         pdfUrl: rendered.url,
         pdfPublicId: rendered.publicId,

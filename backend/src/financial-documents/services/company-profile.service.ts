@@ -32,6 +32,7 @@ export interface CompanyProfileUpdateInput {
   signaturePublicId?: string;
   stampUrl?: string;
   stampPublicId?: string;
+  stampTemplateConfig?: Record<string, any>;
   primaryColor?: string;
   secondaryColor?: string;
   headerLayout?: string;
@@ -104,6 +105,7 @@ export class CompanyProfileService {
         signaturePublicId: input.signaturePublicId,
         stampUrl: input.stampUrl,
         stampPublicId: input.stampPublicId,
+        stampTemplateConfig: input.stampTemplateConfig,
         primaryColor: input.primaryColor || '#1e3a5f',
         secondaryColor: input.secondaryColor || '#c0a030',
         headerLayout: input.headerLayout || 'logo-left',
@@ -145,6 +147,7 @@ export class CompanyProfileService {
         ...(input.signaturePublicId !== undefined ? { signaturePublicId: input.signaturePublicId } : {}),
         ...(input.stampUrl !== undefined ? { stampUrl: input.stampUrl } : {}),
         ...(input.stampPublicId !== undefined ? { stampPublicId: input.stampPublicId } : {}),
+        ...(input.stampTemplateConfig !== undefined ? { stampTemplateConfig: input.stampTemplateConfig } : {}),
         ...(input.primaryColor !== undefined ? { primaryColor: input.primaryColor } : {}),
         ...(input.secondaryColor !== undefined ? { secondaryColor: input.secondaryColor } : {}),
         ...(input.headerLayout !== undefined ? { headerLayout: input.headerLayout } : {}),
