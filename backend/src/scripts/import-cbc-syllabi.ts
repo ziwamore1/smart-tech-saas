@@ -3,7 +3,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const prisma = new PrismaClient();
-const root = path.resolve(process.cwd(), '..');
+const root = fs.existsSync(path.join(process.cwd(), 'CBC_SYLLABI'))
+  ? process.cwd()
+  : path.resolve(process.cwd(), '..');
 
 const syllabusFiles: Array<{ file: string; code: string; name: string }> = [
   { file: 'AGRICULTURAL-SCIENCE-O-LEVEL-SYLLABUS-FORM-1-4.pdf', code: '4018', name: 'Agricultural Science' },
@@ -85,6 +87,11 @@ async function main() {
         filePath: path.relative(process.cwd(), filePath), fileSize: fs.statSync(filePath).size, fileType: 'application/pdf', isProcessed: rows.length > 0,
         metadata: { source: 'CBC_SYLLABI', extractedAt: new Date().toISOString(), extractedRows: rows.length }, schoolId: school!.id,
       },
+    });
+    await prisma.syllabusDocumentSubject.upsert({
+      where: { documentId_subjectId: { documentId: document.id, subjectId: subject.id } },
+      update: { subjectCode: item.code },
+      create: { documentId: document.id, subjectId: subject.id, subjectCode: item.code },
     });
     if (rows.length === 0) {
       console.warn(`${item.name}: no numbered syllabus rows detected; source document retained for OCR/font-aware extraction`);

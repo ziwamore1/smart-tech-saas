@@ -47,6 +47,9 @@ RUN npm ci --legacy-peer-deps && npm cache clean --force
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/CBC_SYLLABI ./CBC_SYLLABI
+COPY --from=builder "/app/Competence Based Curriculum Assessment Guideline (CBC)" "/app/Competence Based Curriculum Assessment Guideline (CBC)"
+COPY --from=builder /app/src/scripts ./src/scripts
 
 # Copy Handlebars templates for report card generation
 COPY --from=builder /app/src/templates ./src/templates
@@ -77,4 +80,4 @@ USER nodejs
 # Run migrations on startup, then start the application. Supabase recommends a
 # direct database connection for migrations; keep DATABASE_URL as the fallback
 # for deployments that only provide the shared pooler connection.
-CMD ["sh", "-c", "set -eu; migration_url=\"${DIRECT_URL:-${DATABASE_URL:-}}\"; if [ -z \"$migration_url\" ]; then echo 'DATABASE_URL or DIRECT_URL is required'; exit 1; fi; attempt=1; while [ \"$attempt\" -le 5 ]; do echo \"Running migrations (attempt $attempt/5)...\"; if DATABASE_URL=\"$migration_url\" npx prisma migrate deploy --schema=./prisma/schema.prisma; then echo 'Migrations OK'; break; fi; if [ \"$attempt\" -eq 5 ]; then echo 'Migration failed after 5 attempts'; exit 1; fi; delay=$((attempt * 5)); echo \"Database unavailable; retrying in ${delay}s...\"; sleep \"$delay\"; attempt=$((attempt + 1)); done; node dist/main.js"]
+CMD ["sh", "-c", "set -eu; migration_url=\"${DIRECT_URL:-${DATABASE_URL:-}}\"; if [ -z \"$migration_url\" ]; then echo 'DATABASE_URL or DIRECT_URL is required'; exit 1; fi; attempt=1; while [ \"$attempt\" -le 5 ]; do echo \"Running migrations (attempt $attempt/5)...\"; if DATABASE_URL=\"$migration_url\" npx prisma migrate deploy --schema=./prisma/schema.prisma; then echo 'Migrations OK'; break; fi; if [ \"$attempt\" -eq 5 ]; then echo 'Migration failed after 5 attempts'; exit 1; fi; delay=$((attempt * 5)); echo \"Database unavailable; retrying in ${delay}s...\"; sleep \"$delay\"; attempt=$((attempt + 1)); done; echo 'Importing CBC syllabus source data...'; npm run import:cbc-syllabi || echo 'CBC syllabus import incomplete; source documents remain available for retry'; node dist/main.js"]

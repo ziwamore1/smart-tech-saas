@@ -53,6 +53,19 @@ export default function TopicsPage() {
 
   const topics = Array.isArray(topicsResponse) ? topicsResponse : [];
 
+  const { data: subjectTreeResponse } = useQuery({
+    queryKey: ['cie-subject-tree', selectedSubjectId],
+    queryFn: async () => {
+      if (!selectedSubjectId) return null;
+      const res = await curriculumIntelligenceApi.getSubjectTree(selectedSubjectId);
+      return res.data?.data || res.data || null;
+    },
+    enabled: !!selectedSubjectId,
+  });
+  const syllabusEntries = Array.isArray(subjectTreeResponse?.SyllabusEntry)
+    ? subjectTreeResponse.SyllabusEntry
+    : [];
+
   const { data: subtopicsData } = useQuery({
     queryKey: ['subtopics', expandedTopicId],
     queryFn: async () => {
@@ -318,6 +331,20 @@ export default function TopicsPage() {
           <p className="text-gray-500 mb-4">
             {searchTerm ? 'Try a different search term.' : `No topics defined for ${selectedSubject?.name}.`}
           </p>
+          {syllabusEntries.length > 0 && (
+            <div className="mt-6 text-left max-w-2xl mx-auto border rounded-xl bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-slate-700 mb-3">Syllabus source outline</p>
+              <div className="space-y-2 max-h-72 overflow-y-auto">
+                {Array.from(new Map(syllabusEntries.map((entry: any) => [entry.topic, entry])).values()).map((entry: any) => (
+                  <div key={`${entry.unitCode}-${entry.topic}`} className="flex gap-3 text-sm">
+                    <span className="font-mono text-slate-500 min-w-12">{entry.unitCode || '—'}</span>
+                    <span className="text-slate-800">{entry.topic}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500 mt-3">These rows come directly from the attached CBC syllabus and are read-only until normalized into Topics.</p>
+            </div>
+          )}
           {!searchTerm && (
             <button onClick={() => {
               setTopicForm({ name: '', code: '', description: '', sortOrder: 1 });
