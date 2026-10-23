@@ -29,6 +29,7 @@
         "seed:grading:supabase": "dotenv -e .env.production -- npx tsx prisma/seed-grading.ts",
         "seed:cie": "npx tsx prisma/seed-cie.ts",
         "seed:cie:supabase": "dotenv -e .env.production -- npx tsx prisma/seed-cie-direct.ts",
+        "import:cbc-syllabi": "npx tsx src/scripts/import-cbc-syllabi.ts",
         "seed:g7-rules": "npx tsx prisma/seed-g7-rules.ts",
         "seed:g7-rules:supabase": "dotenv -e .env.production -- npx tsx prisma/seed-g7-rules.ts",
         "migrate:cloudinary": "npx tsx prisma/migrate-cloudinary.ts",

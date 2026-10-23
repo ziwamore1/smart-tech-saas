@@ -15,6 +15,7 @@ export class AiContextService {
           include: { subtopics: true, competencies: true, learningOutcomes: true },
           orderBy: { sortOrder: 'asc' },
         },
+        SyllabusEntry: { orderBy: [{ formNumber: 'asc' }, { sourcePage: 'asc' }] },
       },
     });
 
@@ -51,6 +52,18 @@ export class AiContextService {
         competencies: currentTopic.competencies.map(c => ({ name: c.name, description: c.description, bloomLevel: c.bloomLevel })),
         outcomes: currentTopic.learningOutcomes.map(o => ({ name: o.name, bloomLevel: o.bloomLevel })),
       } : null,
+      syllabusEntries: subject?.SyllabusEntry?.map((entry: any) => ({
+        form: entry.formNumber,
+        unitCode: entry.unitCode,
+        subUnitCode: entry.subUnitCode,
+        competencyCode: entry.competencyCode,
+        topic: entry.topic,
+        subtopic: entry.subtopic,
+        competency: entry.competency,
+        learningActivities: entry.learningActivities,
+        expectedStandard: entry.expectedStandard,
+        sourcePage: entry.sourcePage,
+      })) || [],
     };
   }
 

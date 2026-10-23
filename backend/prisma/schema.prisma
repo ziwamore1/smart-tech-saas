@@ -691,6 +691,7 @@ model Subject {
   LearningOutcome            LearningOutcome[]
   AssessmentObjective        AssessmentObjective[]
   SyllabusDocumentSubject    SyllabusDocumentSubject[]
+  SyllabusEntry              SyllabusEntry[]
   SbaTask                    SbaTask[]
   CurriculumLessonPlan       CurriculumLessonPlan[]
   CurriculumCoverage         CurriculumCoverage[]
@@ -6203,6 +6204,7 @@ model SyllabusDocument {
   isProcessed      Boolean                   @default(false) // Has PDF been parsed?
   metadata         Json? // Extracted metadata
   subjects         SyllabusDocumentSubject[]
+  entries          SyllabusEntry[]
   schoolId         String?
   school           School?                   @relation(fields: [schoolId], references: [id])
   createdAt        DateTime                  @default(now())
@@ -6211,6 +6213,35 @@ model SyllabusDocument {
   @@index([documentType])
   @@index([curriculum])
   @@index([educationLevelId])
+}
+
+// One authoritative row from a CBC syllabus table. This keeps the source
+// numbering and practical activities intact instead of reducing the syllabus
+// to a topic name only.
+model SyllabusEntry {
+  id              String           @id @default(uuid())
+  documentId      String
+  document        SyllabusDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  subjectId       String
+  subject         Subject          @relation(fields: [subjectId], references: [id])
+  formNumber      Int?
+  unitCode        String?
+  subUnitCode     String?
+  competencyCode  String?
+  topic           String
+  subtopic        String?
+  competency      String?
+  learningActivities Json?
+  expectedStandard String?
+  sourcePage      Int?
+  rawText         String?
+  metadata        Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([documentId, subjectId, formNumber, competencyCode, topic, subtopic])
+  @@index([subjectId, formNumber])
+  @@index([documentId])
 }
 
 model SyllabusDocumentSubject {

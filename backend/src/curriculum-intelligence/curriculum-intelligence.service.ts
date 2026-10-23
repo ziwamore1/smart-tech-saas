@@ -209,6 +209,7 @@ export class CurriculumIntelligenceService {
           },
           orderBy: { sortOrder: 'asc' },
         },
+        SyllabusEntry: { orderBy: [{ formNumber: 'asc' }, { sourcePage: 'asc' }] },
       },
     });
   }
