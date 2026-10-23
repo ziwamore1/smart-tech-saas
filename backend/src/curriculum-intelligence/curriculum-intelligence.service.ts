@@ -190,12 +190,12 @@ export class CurriculumIntelligenceService {
   // ===================== FULL SUBJECT TREE =====================
 
   async getFullSubjectTree(subjectId: string) {
-    return this.prisma.subject.findUnique({
+    const subject = await this.prisma.subject.findUnique({
       where: { id: subjectId },
       include: {
         conversionRules: true,
         subjectGroupLinks: { include: { subjectGroup: true } },
-        topics: {
+        Topic: {
           include: {
             subtopics: {
               include: {
@@ -212,6 +212,9 @@ export class CurriculumIntelligenceService {
         SyllabusEntry: { orderBy: [{ formNumber: 'asc' }, { sourcePage: 'asc' }] },
       },
     });
+    if (!subject) return subject;
+    const { Topic, ...subjectWithoutRelationAlias } = subject;
+    return { ...subjectWithoutRelationAlias, topics: Topic };
   }
 
   async getFullSubjectTreeByCode(code: string, schoolId: string) {

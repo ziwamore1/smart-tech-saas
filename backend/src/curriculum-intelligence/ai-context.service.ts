@@ -11,7 +11,7 @@ export class AiContextService {
     const subject = await this.prisma.subject.findUnique({
       where: { id: subjectId },
       include: {
-        topics: {
+        Topic: {
           include: { subtopics: true, competencies: true, learningOutcomes: true },
           orderBy: { sortOrder: 'asc' },
         },
@@ -41,7 +41,7 @@ export class AiContextService {
       subject: { id: subject?.id, name: subject?.name, code: subject?.code },
       eocs: eocs.map(e => ({ id: e.id, name: e.name, description: e.description, competencies: e.competencies.map(c => c.name) })),
       assessmentObjectives: assessmentObjectives.map(a => ({ name: a.name, weight: a.weight })),
-      topics: subject?.topics.map(t => ({
+      topics: subject?.Topic.map(t => ({
         id: t.id, name: t.name, subtopics: t.subtopics.map(s => s.name),
         competencies: t.competencies.map(c => c.name),
         outcomes: t.learningOutcomes.map(o => o.name),

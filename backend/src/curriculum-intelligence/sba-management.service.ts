@@ -48,20 +48,20 @@ export class SbaManagementService {
   async generateSbaTemplate(subjectId: string, academicStageId?: string) {
     const subject = await this.prisma.subject.findUnique({
       where: { id: subjectId },
-      include: { topics: { include: { competencies: true } } },
+      include: { Topic: { include: { competencies: true } } },
     });
 
     const documentSubject = await this.prisma.syllabusDocumentSubject.findFirst({
       where: { subjectId },
     });
 
-    const sbaTasks = (subject?.topics || []).slice(0, documentSubject?.sbaTasks || 10).map((topic, i) => ({
+    const sbaTasks = (subject?.Topic || []).slice(0, documentSubject?.sbaTasks || 10).map((topic, i) => ({
       taskNumber: i + 1,
       title: `${topic.name} Assessment Task`,
       subjectId,
       academicStageId,
       maxMarks: 20,
-      weight: Math.round(100 / Math.min(subject?.topics.length || 10, documentSubject?.sbaTasks || 10)),
+      weight: Math.round(100 / Math.min(subject?.Topic.length || 10, documentSubject?.sbaTasks || 10)),
       competencyId: topic.competencies[0]?.id || null,
     }));
 
