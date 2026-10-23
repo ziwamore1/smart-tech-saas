@@ -86,8 +86,12 @@ async function main() {
       console.log(`${item.name}: ${rows.length} numbered rows detected${rows.length === 0 ? ' (needs OCR/font decoding)' : ''}`);
       continue;
     }
-    const subject = await prisma.subject.findFirst({ where: { schoolId: school!.id, code: item.code } });
-    if (!subject) throw new Error(`Subject ${item.name} (${item.code}) is not seeded for this school`);
+    const subjects = await prisma.subject.findMany({ where: { code: item.code } });
+    if (!subjects.length) {
+      console.warn(`${item.name}: no subject records found; source document was not projected`);
+      continue;
+    }
+    for (const subject of subjects) {
     const document = await prisma.syllabusDocument.upsert({
       where: { id: `cbc-syllabus-${item.code}` },
       update: { filePath: path.relative(process.cwd(), filePath), fileSize: fs.statSync(filePath).size, isProcessed: rows.length > 0, metadata: { source: 'CBC_SYLLABI', extractedAt: new Date().toISOString(), extractedRows: rows.length } },
@@ -110,15 +114,15 @@ async function main() {
           topicRecord = await prisma.topic.create({ data: { name: topic.name, code: topic.code, description: `CBC syllabus Form ${topic.form} topic (TOC source)`, subjectId: subject.id, sortOrder: Number(topic.code.split('.')[1]), schoolId: school!.id } });
         }
         await prisma.syllabusEntry.upsert({
-          where: { id: `cbc-entry-${item.code}-${topic.code}` },
+          where: { id: `cbc-entry-${subject.id}-${item.code}-${topic.code}` },
           update: { topic: topic.name, unitCode: topic.code, formNumber: topic.form, metadata: { extractionMethod: 'toc-fallback' } },
-          create: { id: `cbc-entry-${item.code}-${topic.code}`, documentId: document.id, subjectId: subject.id, topic: topic.name, unitCode: topic.code, formNumber: topic.form, rawText: topic.name, metadata: { extractionMethod: 'toc-fallback' } },
+          create: { id: `cbc-entry-${subject.id}-${item.code}-${topic.code}`, documentId: document.id, subjectId: subject.id, topic: topic.name, unitCode: topic.code, formNumber: topic.form, rawText: topic.name, metadata: { extractionMethod: 'toc-fallback' } },
         });
       }
-      await prisma.syllabusDocument.update({ where: { id: document.id }, data: { metadata: { source: 'CBC_SYLLABI', extractedRows: 0, extractionStatus: fallback.length ? 'TOC_FALLBACK' : 'OCR_REQUIRED' } } });
-      console.warn(`${item.name}: ${fallback.length ? `${fallback.length} TOC topics imported; competency rows require OCR/font-aware extraction` : 'no numbered syllabus rows detected; source document retained for OCR/font-aware extraction'}`);
-      continue;
-    }
+        await prisma.syllabusDocument.update({ where: { id: document.id }, data: { metadata: { source: 'CBC_SYLLABI', extractedRows: 0, extractionStatus: fallback.length ? 'TOC_FALLBACK' : 'OCR_REQUIRED' } } });
+        console.warn(`${item.name} (${subject.schoolId}): ${fallback.length ? `${fallback.length} TOC topics imported; competency rows require OCR/font-aware extraction` : 'no numbered syllabus rows detected; source document retained for OCR/font-aware extraction'}`);
+        continue;
+      }
 
     // Numbered syllabus rows are retained verbatim. Follow-up enrichment can
     // replace text-only rows with table-cell extraction without losing source auditability.
@@ -153,13 +157,14 @@ async function main() {
         });
       }
       await prisma.syllabusEntry.upsert({
-        where: { id: `cbc-entry-${item.code}-${index}` },
+        where: { id: `cbc-entry-${subject.id}-${item.code}-${index}` },
         update: { topic: currentTopic, subtopic: currentSubtopic, competencyCode: codeDepth >= 4 ? code : null, competency: codeDepth >= 4 ? label : null, rawText: match[0], formNumber: form },
-        create: { id: `cbc-entry-${item.code}-${index}`, documentId: document.id, subjectId: subject.id, topic: currentTopic, subtopic: currentSubtopic, competencyCode: codeDepth >= 4 ? code : null, competency: codeDepth >= 4 ? label : null, rawText: match[0], formNumber: form, unitCode: codeDepth === 2 ? code : code.split('.').slice(0, 2).join('.'), subUnitCode: codeDepth >= 3 ? code : null },
+        create: { id: `cbc-entry-${subject.id}-${item.code}-${index}`, documentId: document.id, subjectId: subject.id, topic: currentTopic, subtopic: currentSubtopic, competencyCode: codeDepth >= 4 ? code : null, competency: codeDepth >= 4 ? label : null, rawText: match[0], formNumber: form, unitCode: codeDepth === 2 ? code : code.split('.').slice(0, 2).join('.'), subUnitCode: codeDepth >= 3 ? code : null },
       });
     }
     await prisma.syllabusDocument.update({ where: { id: document.id }, data: { metadata: { source: 'CBC_SYLLABI', extractedRows: rows.length } } });
-    console.log(`${item.name}: ${rows.length} numbered rows imported`);
+      console.log(`${item.name} (${subject.schoolId}): ${rows.length} numbered rows imported`);
+    }
   }
 }
 
