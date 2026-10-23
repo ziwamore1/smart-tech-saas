@@ -64,7 +64,7 @@ async function main() {
     || await prisma.school.findFirst();
   if (!dryRun && !school) throw new Error('Create a school before importing CBC syllabi');
 
-  const assessmentPath = path.join(root, 'Competence Based Curriculum Assessment Guideline (CBC)', 'ECSEOL Assessment Schemes_22_4_2026.pdf');
+  const assessmentPath = path.join(root, 'CBC_ASSESSMENT_GUIDELINE', 'ECSEOL Assessment Schemes_22_4_2026.pdf');
   if (!dryRun && fs.existsSync(assessmentPath)) {
     await prisma.syllabusDocument.upsert({
       where: { id: 'cbc-assessment-guideline-2026' },

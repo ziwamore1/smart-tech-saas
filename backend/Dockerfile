@@ -48,7 +48,7 @@ RUN npm ci --legacy-peer-deps && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/CBC_SYLLABI ./CBC_SYLLABI
-COPY --from=builder "/app/Competence Based Curriculum Assessment Guideline (CBC)" "/app/Competence Based Curriculum Assessment Guideline (CBC)"
+COPY --from=builder /app/CBC_ASSESSMENT_GUIDELINE ./CBC_ASSESSMENT_GUIDELINE
 COPY --from=builder /app/src/scripts ./src/scripts
 
 # Copy Handlebars templates for report card generation
