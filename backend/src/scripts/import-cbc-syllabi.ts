@@ -23,6 +23,15 @@ const syllabusFiles: Array<{ file: string; code: string; name: string }> = [
   { file: 'PHYSICS-SYLLABUS-O-LEVEL-FORM-1-4-CAMERA-READY.pdf', code: '4016', name: 'Physics' },
 ];
 
+const tocFallbacks: Record<string, Array<{ code: string; name: string; form: number }>> = {
+  '4014': [
+    ['1.1', 'Introduction to Chemistry', 1], ['1.2', 'Matter', 1], ['1.3', 'Elements, Compounds and Mixtures', 1], ['1.4', 'Atomic Structure', 1],
+    ['2.1', 'Bonding', 2], ['2.2', 'Chemical Reactions', 2], ['2.3', 'Acids, Bases and Salts', 2], ['2.4', 'Chemical Kinetics', 2], ['2.5', 'Redox Reactions', 2],
+    ['3.1', 'Stoichiometry and Mole Concept', 3], ['3.2', 'Thermochemistry', 3], ['3.3', 'Chemical Equilibria', 3], ['3.4', 'Electrochemistry', 3], ['3.5', 'Periodicity', 3],
+    ['4.1', 'Metallurgy', 4], ['4.2', 'Non-Metals', 4], ['4.3', 'Organic Chemistry', 4], ['4.4', 'Environmental Chemistry', 4],
+  ].map(([code, name, form]) => ({ code: code as string, name: name as string, form: form as number })),
+};
+
 function clean(value: string) {
   return value.replace(/[.\u0000-\u001f]+$/g, '').replace(/\s+/g, ' ').trim();
 }
@@ -94,7 +103,20 @@ async function main() {
       create: { documentId: document.id, subjectId: subject.id, subjectCode: item.code },
     });
     if (rows.length === 0) {
-      console.warn(`${item.name}: no numbered syllabus rows detected; source document retained for OCR/font-aware extraction`);
+      const fallback = tocFallbacks[item.code] || [];
+      for (const topic of fallback) {
+        let topicRecord = await prisma.topic.findFirst({ where: { name: topic.name, subjectId: subject.id, academicStageId: null } });
+        if (!topicRecord) {
+          topicRecord = await prisma.topic.create({ data: { name: topic.name, code: topic.code, description: `CBC syllabus Form ${topic.form} topic (TOC source)`, subjectId: subject.id, sortOrder: Number(topic.code.split('.')[1]), schoolId: school!.id } });
+        }
+        await prisma.syllabusEntry.upsert({
+          where: { id: `cbc-entry-${item.code}-${topic.code}` },
+          update: { topic: topic.name, unitCode: topic.code, formNumber: topic.form, metadata: { extractionMethod: 'toc-fallback' } },
+          create: { id: `cbc-entry-${item.code}-${topic.code}`, documentId: document.id, subjectId: subject.id, topic: topic.name, unitCode: topic.code, formNumber: topic.form, rawText: topic.name, metadata: { extractionMethod: 'toc-fallback' } },
+        });
+      }
+      await prisma.syllabusDocument.update({ where: { id: document.id }, data: { metadata: { source: 'CBC_SYLLABI', extractedRows: 0, extractionStatus: fallback.length ? 'TOC_FALLBACK' : 'OCR_REQUIRED' } } });
+      console.warn(`${item.name}: ${fallback.length ? `${fallback.length} TOC topics imported; competency rows require OCR/font-aware extraction` : 'no numbered syllabus rows detected; source document retained for OCR/font-aware extraction'}`);
       continue;
     }
 
