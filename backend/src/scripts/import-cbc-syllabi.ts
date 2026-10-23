@@ -111,7 +111,7 @@ async function main() {
       for (const topic of fallback) {
         let topicRecord = await prisma.topic.findFirst({ where: { name: topic.name, subjectId: subject.id, academicStageId: null } });
         if (!topicRecord) {
-          topicRecord = await prisma.topic.create({ data: { name: topic.name, code: topic.code, description: `CBC syllabus Form ${topic.form} topic (TOC source)`, subjectId: subject.id, sortOrder: Number(topic.code.split('.')[1]), schoolId: school!.id } });
+          topicRecord = await prisma.topic.create({ data: { name: topic.name, code: topic.code, description: `CBC syllabus Form ${topic.form} topic (TOC source)`, subjectId: subject.id, sortOrder: Number(topic.code.split('.')[1]), schoolId: subject.schoolId } });
         }
         await prisma.syllabusEntry.upsert({
           where: { id: `cbc-entry-${subject.id}-${item.code}-${topic.code}` },
@@ -139,21 +139,21 @@ async function main() {
       const form = formFromCode(code);
       let topicRecord = await prisma.topic.findFirst({ where: { name: currentTopic, subjectId: subject.id, academicStageId: null } });
       if (!topicRecord) {
-        topicRecord = await prisma.topic.create({ data: { name: currentTopic, code: code.split('.').slice(0, 2).join('.'), description: `CBC syllabus unit ${code.split('.').slice(0, 2).join('.')}`, subjectId: subject.id, sortOrder: Number(code.split('.')[1]) || index, schoolId: school.id } });
+        topicRecord = await prisma.topic.create({ data: { name: currentTopic, code: code.split('.').slice(0, 2).join('.'), description: `CBC syllabus unit ${code.split('.').slice(0, 2).join('.')}`, subjectId: subject.id, sortOrder: Number(code.split('.')[1]) || index, schoolId: subject.schoolId } });
       }
       let subtopicRecord: { id: string } | undefined;
       if (currentSubtopic) {
         subtopicRecord = await prisma.subtopic.upsert({
           where: { name_topicId: { name: currentSubtopic, topicId: topicRecord.id } },
           update: { code: codeDepth === 3 ? code : undefined, sortOrder: Number(code.split('.')[2]) || index },
-          create: { name: currentSubtopic, code: code.split('.').slice(0, 3).join('.'), topicId: topicRecord.id, sortOrder: Number(code.split('.')[2]) || index, schoolId: school.id },
+          create: { name: currentSubtopic, code: code.split('.').slice(0, 3).join('.'), topicId: topicRecord.id, sortOrder: Number(code.split('.')[2]) || index, schoolId: subject.schoolId },
         });
       }
       if (codeDepth >= 4) {
         await prisma.competency.upsert({
           where: { name_topicId_subjectId: { name: label, topicId: topicRecord.id, subjectId: subject.id } },
           update: { code, subtopicId: subtopicRecord?.id, description: `CBC competency ${code}` },
-          create: { name: label, code, topicId: topicRecord.id, subtopicId: subtopicRecord?.id, subjectId: subject.id, description: `CBC competency ${code}`, schoolId: school.id },
+          create: { name: label, code, topicId: topicRecord.id, subtopicId: subtopicRecord?.id, subjectId: subject.id, description: `CBC competency ${code}`, schoolId: subject.schoolId },
         });
       }
       await prisma.syllabusEntry.upsert({
