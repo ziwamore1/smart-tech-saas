@@ -53,7 +53,7 @@ export default function TopicsPage() {
 
   const topics = Array.isArray(topicsResponse) ? topicsResponse : [];
 
-  const { data: subjectTreeResponse } = useQuery({
+  const { data: subjectTreeResponse, isLoading: subjectTreeLoading } = useQuery({
     queryKey: ['cie-subject-tree', selectedSubjectId],
     queryFn: async () => {
       if (!selectedSubjectId) return null;
@@ -65,6 +65,12 @@ export default function TopicsPage() {
   const syllabusEntries = Array.isArray(subjectTreeResponse?.SyllabusEntry)
     ? subjectTreeResponse.SyllabusEntry
     : [];
+  const treeTopics = Array.isArray(subjectTreeResponse?.topics)
+    ? subjectTreeResponse.topics
+    : Array.isArray(subjectTreeResponse?.Topic)
+      ? subjectTreeResponse.Topic
+      : [];
+  const curriculumTopics = topics.length > 0 ? topics : treeTopics;
 
   const { data: subtopicsData } = useQuery({
     queryKey: ['subtopics', expandedTopicId],
@@ -79,7 +85,7 @@ export default function TopicsPage() {
 
   const subtopics = Array.isArray(subtopicsData) ? subtopicsData : [];
 
-  const filteredTopics = topics.filter((t: any) =>
+  const filteredTopics = curriculumTopics.filter((t: any) =>
     searchTerm === '' ||
     t.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (t.code && t.code.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -302,7 +308,7 @@ export default function TopicsPage() {
           <div className="flex items-end justify-end">
             {selectedSubjectId && (
               <button onClick={() => {
-                setTopicForm({ name: '', code: '', description: '', sortOrder: topics.length + 1 });
+                setTopicForm({ name: '', code: '', description: '', sortOrder: curriculumTopics.length + 1 });
                 setShowAddTopicModal(true);
               }}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
@@ -319,7 +325,7 @@ export default function TopicsPage() {
           <h3 className="text-xl font-semibold text-gray-900 mb-2">Select a Subject</h3>
           <p className="text-gray-500">Choose a subject above to view its topics and subtopics.</p>
         </div>
-      ) : topicsLoading ? (
+      ) : topicsLoading || subjectTreeLoading ? (
         <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
           <p className="text-gray-500">Loading topics...</p>
