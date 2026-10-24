@@ -117,7 +117,8 @@ async function main() {
       const minimumEntries = minimumEntryCounts[item.code] || 1;
       const counts = await Promise.all(existingSubjects.map(async subject => ({
         subject,
-        count: await prisma.syllabusEntry.count({ where: { subjectId: subject.id, documentId: `cbc-syllabus-${item.code}` } }),
+        // Older imports used generated document IDs; subject scope is stable.
+        count: await prisma.syllabusEntry.count({ where: { subjectId: subject.id } }),
       })));
       subjects = counts.filter(({ count }) => count < minimumEntries).map(({ subject }) => subject);
       if (!subjects.length) {
