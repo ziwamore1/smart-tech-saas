@@ -32,6 +32,22 @@ const tocFallbacks: Record<string, Array<{ code: string; name: string; form: num
   ].map(([code, name, form]) => ({ code: code as string, name: name as string, form: form as number })),
 };
 
+const minimumEntryCounts: Record<string, number> = {
+  '4018': 195,
+  '4012': 198,
+  '1025': 32,
+  '4014': 18,
+  '7015': 301,
+  '6012': 191,
+  '4016': 161,
+  '3011': 10,
+  '8015': 10,
+  '2021': 10,
+  '6014': 10,
+  '3014': 10,
+  '3013': 10,
+};
+
 function clean(value: string) {
   return value.replace(/[.\u0000-\u001f]+$/g, '').replace(/\s+/g, ' ').trim();
 }
@@ -95,16 +111,29 @@ async function main() {
   for (const item of syllabusFiles) {
     const filePath = path.join(root, 'CBC_SYLLABI', item.file);
     if (!fs.existsSync(filePath)) throw new Error(`Missing syllabus: ${filePath}`);
+    let subjects: any[] = [];
+    if (!dryRun) {
+      const existingSubjects = await prisma.subject.findMany({ where: { code: item.code } });
+      const minimumEntries = minimumEntryCounts[item.code] || 1;
+      const counts = await Promise.all(existingSubjects.map(async subject => ({
+        subject,
+        count: await prisma.syllabusEntry.count({ where: { subjectId: subject.id, documentId: `cbc-syllabus-${item.code}` } }),
+      })));
+      subjects = counts.filter(({ count }) => count < minimumEntries).map(({ subject }) => subject);
+      if (!subjects.length) {
+        console.log(`${item.name}: already complete; skipping`);
+        continue;
+      }
+      if (!existingSubjects.length) {
+        console.warn(`${item.name}: no subject records found; source document was not projected`);
+        continue;
+      }
+    }
     const text = await extract(filePath);
     const rows = extractRows(text);
     const usableRows = item.code === '4014' ? rows.length > 10 : rows.length > 0;
     if (dryRun) {
       console.log(`${item.name}: ${rows.length} numbered rows detected${!usableRows ? ' (needs OCR/font decoding)' : ''}`);
-      continue;
-    }
-    const subjects = await prisma.subject.findMany({ where: { code: item.code } });
-    if (!subjects.length) {
-      console.warn(`${item.name}: no subject records found; source document was not projected`);
       continue;
     }
     for (const subject of subjects) {
