@@ -21,6 +21,8 @@ const syllabusFiles: Array<{ file: string; code: string; name: string }> = [
   { file: 'GEOGRAPHY-SYLLABUS-5-02-2024-FINAL-CORRECTED-FOR-PRINTING.pdf', code: '3014', name: 'Geography' },
   { file: 'HISTORY-SYLLABUS-FORMS-1-4.pdf', code: '3013', name: 'History' },
   { file: 'PHYSICS-SYLLABUS-O-LEVEL-FORM-1-4-CAMERA-READY.pdf', code: '4016', name: 'Physics' },
+  { file: 'MATHEMATICS-II-SYLLABUS.pdf', code: '2025', name: 'Mathematics II' },
+  { file: 'RELIGIOUS-EDUCATION-SYLLABUS.pdf', code: '3012', name: 'Religious Education' },
 ];
 
 const tocFallbacks: Record<string, Array<{ code: string; name: string; form: number }>> = {
@@ -43,6 +45,8 @@ const minimumEntryCounts: Record<string, number> = {
   '3011': 10,
   '8015': 10,
   '2021': 10,
+  '2025': 10,
+  '3012': 10,
   '6014': 10,
   '3014': 10,
   '3013': 10,
