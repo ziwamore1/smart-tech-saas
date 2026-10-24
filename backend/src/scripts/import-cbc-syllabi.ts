@@ -97,8 +97,9 @@ async function main() {
     if (!fs.existsSync(filePath)) throw new Error(`Missing syllabus: ${filePath}`);
     const text = await extract(filePath);
     const rows = extractRows(text);
+    const usableRows = item.code === '4014' ? rows.length > 10 : rows.length > 0;
     if (dryRun) {
-      console.log(`${item.name}: ${rows.length} numbered rows detected${rows.length === 0 ? ' (needs OCR/font decoding)' : ''}`);
+      console.log(`${item.name}: ${rows.length} numbered rows detected${!usableRows ? ' (needs OCR/font decoding)' : ''}`);
       continue;
     }
     const subjects = await prisma.subject.findMany({ where: { code: item.code } });
@@ -109,10 +110,10 @@ async function main() {
     for (const subject of subjects) {
     const document = await prisma.syllabusDocument.upsert({
       where: { id: `cbc-syllabus-${item.code}` },
-      update: { filePath: path.relative(process.cwd(), filePath), fileSize: fs.statSync(filePath).size, isProcessed: rows.length > 0, metadata: { source: 'CBC_SYLLABI', extractedAt: new Date().toISOString(), extractedRows: rows.length } },
+      update: { filePath: path.relative(process.cwd(), filePath), fileSize: fs.statSync(filePath).size, isProcessed: usableRows, metadata: { source: 'CBC_SYLLABI', extractedAt: new Date().toISOString(), extractedRows: rows.length } },
       create: {
         id: `cbc-syllabus-${item.code}`, title: `${item.name} CBC Syllabus Form 1-4`, documentType: 'SYLLABUS', curriculum: 'ECZ',
-        filePath: path.relative(process.cwd(), filePath), fileSize: fs.statSync(filePath).size, fileType: 'application/pdf', isProcessed: rows.length > 0,
+        filePath: path.relative(process.cwd(), filePath), fileSize: fs.statSync(filePath).size, fileType: 'application/pdf', isProcessed: usableRows,
         metadata: { source: 'CBC_SYLLABI', extractedAt: new Date().toISOString(), extractedRows: rows.length }, schoolId: school!.id,
       },
     });
@@ -121,7 +122,7 @@ async function main() {
       update: { subjectCode: item.code },
       create: { documentId: document.id, subjectId: subject.id, subjectCode: item.code },
     });
-    if (rows.length === 0) {
+    if (!usableRows) {
       const fallback = tocFallbacks[item.code] || [];
       for (const topic of fallback) {
         let topicRecord = await prisma.topic.findFirst({ where: { name: topic.name, subjectId: subject.id, academicStageId: null } });
