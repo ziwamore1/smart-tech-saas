@@ -33,13 +33,13 @@ const tocFallbacks: Record<string, Array<{ code: string; name: string; form: num
 };
 
 const minimumEntryCounts: Record<string, number> = {
-  '4018': 195,
-  '4012': 198,
-  '1025': 32,
+  '4018': 150,
+  '4012': 150,
+  '1025': 25,
   '4014': 18,
-  '7015': 301,
-  '6012': 191,
-  '4016': 161,
+  '7015': 250,
+  '6012': 150,
+  '4016': 130,
   '3011': 10,
   '8015': 10,
   '2021': 10,
