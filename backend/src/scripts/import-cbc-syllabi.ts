@@ -45,6 +45,21 @@ function depth(code: string) {
   return code.split('.').length;
 }
 
+function extractRows(text: string) {
+  const rows = [...text.matchAll(/(?:^|\n)\s*(\d+(?:\.\d+)+)\s+([^\n]+)/g)]
+    .map(match => ({ code: match[1], label: match[2], raw: match[0] }));
+  const lines = text.split(/\r?\n/);
+  for (let index = 0; index < lines.length - 1; index += 1) {
+    const code = lines[index].trim().match(/^(\d+(?:\.\d+)*)$/)?.[1];
+    const label = lines[index + 1].trim();
+    if (!code || !label || label.length > 300 || /^\d/.test(label) || /\.{4,}/.test(label)) continue;
+    if (!rows.some(row => row.code === code && row.label.trim() === label)) {
+      rows.push({ code, label, raw: `${lines[index]}\n${lines[index + 1]}` });
+    }
+  }
+  return rows;
+}
+
 async function extract(filePath: string) {
   // pdf-parse v2 loads browser canvas globals during module initialisation.
   // Text extraction does not need rendering, so lightweight globals are enough.
@@ -81,7 +96,7 @@ async function main() {
     const filePath = path.join(root, 'CBC_SYLLABI', item.file);
     if (!fs.existsSync(filePath)) throw new Error(`Missing syllabus: ${filePath}`);
     const text = await extract(filePath);
-    const rows = [...text.matchAll(/(?:^|\n)\s*(\d+(?:\.\d+)+)\s+([^\n]+)/g)];
+    const rows = extractRows(text);
     if (dryRun) {
       console.log(`${item.name}: ${rows.length} numbered rows detected${rows.length === 0 ? ' (needs OCR/font decoding)' : ''}`);
       continue;
@@ -129,8 +144,8 @@ async function main() {
     let currentTopic = '';
     let currentSubtopic: string | undefined;
     for (const [index, match] of rows.entries()) {
-      const code = match[1];
-      const label = clean(match[2]);
+      const code = match.code;
+      const label = clean(match.label);
       if (!label || label.length > 300) continue;
       const codeDepth = depth(code);
       if (codeDepth === 2) { currentTopic = label; currentSubtopic = undefined; }
@@ -158,8 +173,8 @@ async function main() {
       }
       await prisma.syllabusEntry.upsert({
         where: { id: `cbc-entry-${subject.id}-${item.code}-${index}` },
-        update: { topic: currentTopic, subtopic: currentSubtopic, competencyCode: codeDepth >= 4 ? code : null, competency: codeDepth >= 4 ? label : null, rawText: match[0], formNumber: form },
-        create: { id: `cbc-entry-${subject.id}-${item.code}-${index}`, documentId: document.id, subjectId: subject.id, topic: currentTopic, subtopic: currentSubtopic, competencyCode: codeDepth >= 4 ? code : null, competency: codeDepth >= 4 ? label : null, rawText: match[0], formNumber: form, unitCode: codeDepth === 2 ? code : code.split('.').slice(0, 2).join('.'), subUnitCode: codeDepth >= 3 ? code : null },
+        update: { topic: currentTopic, subtopic: currentSubtopic, competencyCode: codeDepth >= 4 ? code : null, competency: codeDepth >= 4 ? label : null, rawText: match.raw, formNumber: form },
+        create: { id: `cbc-entry-${subject.id}-${item.code}-${index}`, documentId: document.id, subjectId: subject.id, topic: currentTopic, subtopic: currentSubtopic, competencyCode: codeDepth >= 4 ? code : null, competency: codeDepth >= 4 ? label : null, rawText: match.raw, formNumber: form, unitCode: codeDepth === 2 ? code : code.split('.').slice(0, 2).join('.'), subUnitCode: codeDepth >= 3 ? code : null },
       });
     }
     await prisma.syllabusDocument.update({ where: { id: document.id }, data: { metadata: { source: 'CBC_SYLLABI', extractedRows: rows.length } } });
