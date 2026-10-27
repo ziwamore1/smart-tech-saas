@@ -1,5 +1,5 @@
 # Backend Dockerfile
-FROM public.ecr.aws/docker/library/node:20-alpine AS builder
+FROM public.ecr.aws/docker/library/node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -25,7 +25,7 @@ RUN node --max-old-space-size=1024 ./node_modules/@nestjs/cli/bin/nest.js build 
     (echo "=== BUILD FAILED ===" && ls -la /app/ && exit 1)
 
 # Production stage
-FROM public.ecr.aws/docker/library/node:20-alpine
+FROM public.ecr.aws/docker/library/node:22-alpine
 
 WORKDIR /app
 
@@ -80,4 +80,4 @@ USER nodejs
 # Run migrations on startup, then start the application. Supabase recommends a
 # direct database connection for migrations; keep DATABASE_URL as the fallback
 # for deployments that only provide the shared pooler connection.
-CMD ["sh", "-c", "set -eu; migration_url=\"${DIRECT_URL:-${DATABASE_URL:-}}\"; if [ -z \"$migration_url\" ]; then echo 'DATABASE_URL or DIRECT_URL is required'; exit 1; fi; attempt=1; while [ \"$attempt\" -le 5 ]; do echo \"Running migrations (attempt $attempt/5)...\"; if DATABASE_URL=\"$migration_url\" npx prisma migrate deploy --schema=./prisma/schema.prisma; then echo 'Migrations OK'; break; fi; if [ \"$attempt\" -eq 5 ]; then echo 'Migration failed after 5 attempts'; exit 1; fi; delay=$((attempt * 5)); echo \"Database unavailable; retrying in ${delay}s...\"; sleep \"$delay\"; attempt=$((attempt + 1)); done; if [ \"${IMPORT_CBC_SYLLABI:-false}\" = 'true' ]; then echo 'Importing CBC syllabus source data...'; npm run import:cbc-syllabi || echo 'CBC syllabus import incomplete; source documents remain available for retry'; else echo 'Skipping CBC syllabus import (set IMPORT_CBC_SYLLABI=true for a one-time import)'; fi; node dist/main.js"]
+CMD ["sh", "-c", "set -eu; migration_url=\"${DIRECT_URL:-${DATABASE_URL:-}}\"; if [ -z \"$migration_url\" ]; then echo 'DATABASE_URL or DIRECT_URL is required'; exit 1; fi; attempt=1; while [ \"$attempt\" -le 5 ]; do echo \"Running migrations (attempt $attempt/5)...\"; if DATABASE_URL=\"$migration_url\" npx prisma migrate deploy --schema=./prisma/schema.prisma; then echo 'Migrations OK'; break; fi; if [ \"$attempt\" -eq 5 ]; then echo 'Migration failed after 5 attempts'; exit 1; fi; delay=$((attempt * 5)); echo \"Database unavailable; retrying in ${delay}s...\"; sleep \"$delay\"; attempt=$((attempt + 1)); done; if [ \"${IMPORT_CBC_SYLLABI:-true}\" = 'true' ]; then echo 'Importing CBC syllabus source data...'; npm run import:cbc-syllabi || echo 'CBC syllabus import incomplete; source documents remain available for retry'; else echo 'Skipping CBC syllabus import (set IMPORT_CBC_SYLLABI=false to disable)'; fi; node dist/main.js"]

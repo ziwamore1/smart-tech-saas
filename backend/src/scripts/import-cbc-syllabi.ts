@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
+import { spawnSync } from 'child_process';
 
 const prisma = new PrismaClient();
 const root = fs.existsSync(path.join(process.cwd(), 'CBC_SYLLABI'))
@@ -80,17 +81,48 @@ function extractRows(text: string) {
   return rows;
 }
 
+function normalizeOcrText(text: string) {
+  return text.replace(/(\d)\s+\.\s+(\d)/g, '$1.$2').replace(/(\d)\s*\.\s*(\d)/g, '$1.$2');
+}
+
 async function extract(filePath: string) {
   // pdf-parse v2 loads browser canvas globals during module initialisation.
   // Text extraction does not need rendering, so lightweight globals are enough.
   const globals = globalThis as any;
   globals.DOMMatrix ||= class {};
-  globals.Path2D ||= class {};
+  // PDF.js text extraction only needs the constructor, but OCR rendering
+  // later needs the path methods to exist when the same process is reused.
+  globals.Path2D ||= class {
+    addPath() {}
+    closePath() {}
+    moveTo() {}
+    lineTo() {}
+    bezierCurveTo() {}
+    quadraticCurveTo() {}
+    rect() {}
+    arc() {}
+    ellipse() {}
+  };
+  for (const method of ['addPath', 'closePath', 'moveTo', 'lineTo', 'bezierCurveTo', 'quadraticCurveTo', 'rect', 'arc', 'ellipse']) {
+    globals.Path2D.prototype[method] ||= function () {};
+  }
   globals.ImageData ||= class {};
   const { PDFParse } = await import('pdf-parse');
   const parser = new PDFParse({ data: fs.readFileSync(filePath) });
   const result = await parser.getText();
   return result.text;
+}
+
+async function extractWithOcr(filePath: string) {
+  const scriptPath = path.join(__dirname, 'cbc-ocr.mjs');
+  const result = spawnSync(process.execPath, [scriptPath, filePath], {
+    encoding: 'utf8',
+    maxBuffer: 50 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`OCR process exited with status ${result.status}`);
+  return JSON.parse(result.stdout);
 }
 
 async function main() {
@@ -123,8 +155,12 @@ async function main() {
         subject,
         // Older imports used generated document IDs; subject scope is stable.
         count: await prisma.syllabusEntry.count({ where: { subjectId: subject.id } }),
+        topics: await prisma.topic.count({ where: { subjectId: subject.id } }),
+        subtopics: await prisma.subtopic.count({ where: { topic: { subjectId: subject.id } } }),
       })));
-      subjects = counts.filter(({ count }) => count < minimumEntries).map(({ subject }) => subject);
+      subjects = counts
+        .filter(({ count, topics, subtopics }) => count < minimumEntries || topics === 0 || subtopics === 0)
+        .map(({ subject }) => subject);
       if (!subjects.length) {
         console.log(`${item.name}: already complete; skipping`);
         continue;
@@ -135,8 +171,18 @@ async function main() {
       }
     }
     const text = await extract(filePath);
-    const rows = extractRows(text);
-    const usableRows = item.code === '4014' ? rows.length > 10 : rows.length > 0;
+    let rows = extractRows(text);
+    let extractionMethod = 'pdf-text';
+    if (rows.length < 10) {
+      console.log(`${item.name}: ${rows.length} numbered rows detected; starting OCR fallback`);
+      const ocrText = normalizeOcrText(await extractWithOcr(filePath));
+      const ocrRows = extractRows(ocrText);
+      if (ocrRows.length > rows.length) {
+        rows = ocrRows;
+        extractionMethod = 'ocr';
+      }
+    }
+    const usableRows = rows.length > 0;
     if (dryRun) {
       console.log(`${item.name}: ${rows.length} numbered rows detected${!usableRows ? ' (needs OCR/font decoding)' : ''}`);
       continue;
@@ -144,11 +190,11 @@ async function main() {
     for (const subject of subjects) {
     const document = await prisma.syllabusDocument.upsert({
       where: { id: `cbc-syllabus-${item.code}` },
-      update: { filePath: path.relative(process.cwd(), filePath), fileSize: fs.statSync(filePath).size, isProcessed: usableRows, metadata: { source: 'CBC_SYLLABI', extractedAt: new Date().toISOString(), extractedRows: rows.length } },
+       update: { filePath: path.relative(process.cwd(), filePath), fileSize: fs.statSync(filePath).size, isProcessed: usableRows, metadata: { source: 'CBC_SYLLABI', extractedAt: new Date().toISOString(), extractedRows: rows.length, extractionMethod } },
       create: {
         id: `cbc-syllabus-${item.code}`, title: `${item.name} CBC Syllabus Form 1-4`, documentType: 'SYLLABUS', curriculum: 'ECZ',
         filePath: path.relative(process.cwd(), filePath), fileSize: fs.statSync(filePath).size, fileType: 'application/pdf', isProcessed: usableRows,
-        metadata: { source: 'CBC_SYLLABI', extractedAt: new Date().toISOString(), extractedRows: rows.length }, schoolId: school!.id,
+         metadata: { source: 'CBC_SYLLABI', extractedAt: new Date().toISOString(), extractedRows: rows.length, extractionMethod }, schoolId: school!.id,
       },
     });
     await prisma.syllabusDocumentSubject.upsert({
@@ -178,41 +224,69 @@ async function main() {
     // replace text-only rows with table-cell extraction without losing source auditability.
     let currentTopic = '';
     let currentSubtopic: string | undefined;
+    const seenEntryKeys = new Set<string>();
     for (const [index, match] of rows.entries()) {
       const code = match.code;
       const label = clean(match.label);
       if (!label || label.length > 300) continue;
-      const codeDepth = depth(code);
+      // Some CBC PDFs encode a topic as 1.1.0 rather than 1.1.
+      const normalizedCode = code.replace(/(?:\.0)+$/, '');
+      const codeDepth = depth(normalizedCode);
       if (codeDepth === 2) { currentTopic = label; currentSubtopic = undefined; }
       else if (codeDepth === 3) currentSubtopic = label;
       if (!currentTopic) continue;
-      const form = formFromCode(code);
+      const form = formFromCode(normalizedCode);
+      const entryKey = [form ?? '', codeDepth >= 4 ? normalizedCode : '', currentTopic, currentSubtopic || ''].join('|');
+      if (seenEntryKeys.has(entryKey)) continue;
+      seenEntryKeys.add(entryKey);
       let topicRecord = await prisma.topic.findFirst({ where: { name: currentTopic, subjectId: subject.id, academicStageId: null } });
       if (!topicRecord) {
-        topicRecord = await prisma.topic.create({ data: { name: currentTopic, code: code.split('.').slice(0, 2).join('.'), description: `CBC syllabus unit ${code.split('.').slice(0, 2).join('.')}`, subjectId: subject.id, sortOrder: Number(code.split('.')[1]) || index, schoolId: subject.schoolId } });
+        topicRecord = await prisma.topic.create({ data: { name: currentTopic, code: normalizedCode.split('.').slice(0, 2).join('.'), description: `CBC syllabus unit ${normalizedCode.split('.').slice(0, 2).join('.')}`, subjectId: subject.id, sortOrder: Number(normalizedCode.split('.')[1]) || index, schoolId: subject.schoolId } });
       }
       let subtopicRecord: { id: string } | undefined;
       if (currentSubtopic) {
         subtopicRecord = await prisma.subtopic.upsert({
           where: { name_topicId: { name: currentSubtopic, topicId: topicRecord.id } },
-          update: { code: codeDepth === 3 ? code : undefined, sortOrder: Number(code.split('.')[2]) || index },
-          create: { name: currentSubtopic, code: code.split('.').slice(0, 3).join('.'), topicId: topicRecord.id, sortOrder: Number(code.split('.')[2]) || index, schoolId: subject.schoolId },
+          update: { code: codeDepth === 3 ? normalizedCode : undefined, sortOrder: Number(normalizedCode.split('.')[2]) || index },
+          create: { name: currentSubtopic, code: normalizedCode.split('.').slice(0, 3).join('.'), topicId: topicRecord.id, sortOrder: Number(normalizedCode.split('.')[2]) || index, schoolId: subject.schoolId },
         });
       }
       if (codeDepth >= 4) {
         await prisma.competency.upsert({
           where: { name_topicId_subjectId: { name: label, topicId: topicRecord.id, subjectId: subject.id } },
-          update: { code, subtopicId: subtopicRecord?.id, description: `CBC competency ${code}` },
-          create: { name: label, code, topicId: topicRecord.id, subtopicId: subtopicRecord?.id, subjectId: subject.id, description: `CBC competency ${code}`, schoolId: subject.schoolId },
+          update: { code: normalizedCode, subtopicId: subtopicRecord?.id, description: `CBC competency ${normalizedCode}` },
+          create: { name: label, code: normalizedCode, topicId: topicRecord.id, subtopicId: subtopicRecord?.id, subjectId: subject.id, description: `CBC competency ${normalizedCode}`, schoolId: subject.schoolId },
         });
       }
-      await prisma.syllabusEntry.upsert({
-        where: { id: `cbc-entry-${subject.id}-${item.code}-${index}` },
-        update: { topic: currentTopic, subtopic: currentSubtopic, competencyCode: codeDepth >= 4 ? code : null, competency: codeDepth >= 4 ? label : null, rawText: match.raw, formNumber: form },
-        create: { id: `cbc-entry-${subject.id}-${item.code}-${index}`, documentId: document.id, subjectId: subject.id, topic: currentTopic, subtopic: currentSubtopic, competencyCode: codeDepth >= 4 ? code : null, competency: codeDepth >= 4 ? label : null, rawText: match.raw, formNumber: form, unitCode: codeDepth === 2 ? code : code.split('.').slice(0, 2).join('.'), subUnitCode: codeDepth >= 3 ? code : null },
+      const entryData = {
+        topic: currentTopic,
+        subtopic: currentSubtopic,
+        competencyCode: codeDepth >= 4 ? normalizedCode : null,
+        competency: codeDepth >= 4 ? label : null,
+        rawText: match.raw,
+        formNumber: form,
+        unitCode: codeDepth === 2 ? normalizedCode : normalizedCode.split('.').slice(0, 2).join('.'),
+        subUnitCode: codeDepth >= 3 ? normalizedCode : null,
+      };
+      const existingEntry = await prisma.syllabusEntry.findFirst({
+        where: {
+          documentId: document.id,
+          subjectId: subject.id,
+          formNumber: form ?? null,
+          competencyCode: codeDepth >= 4 ? normalizedCode : null,
+          topic: currentTopic,
+          subtopic: currentSubtopic || null,
+        },
       });
+      if (existingEntry) {
+        await prisma.syllabusEntry.update({ where: { id: existingEntry.id }, data: entryData });
+      } else {
+        await prisma.syllabusEntry.create({
+          data: { id: `cbc-entry-${subject.id}-${item.code}-${index}`, documentId: document.id, subjectId: subject.id, ...entryData },
+        });
+      }
     }
-    await prisma.syllabusDocument.update({ where: { id: document.id }, data: { metadata: { source: 'CBC_SYLLABI', extractedRows: rows.length } } });
+    await prisma.syllabusDocument.update({ where: { id: document.id }, data: { metadata: { source: 'CBC_SYLLABI', extractedRows: rows.length, extractionMethod } } });
       console.log(`${item.name} (${subject.schoolId}): ${rows.length} numbered rows imported`);
     }
   }
