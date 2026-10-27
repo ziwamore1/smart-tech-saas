@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawnSync } from 'child_process';
+import { createHash } from 'crypto';
 
 const prisma = new PrismaClient();
 const root = fs.existsSync(path.join(process.cwd(), 'CBC_SYLLABI'))
@@ -268,6 +269,16 @@ async function main() {
         unitCode: codeDepth === 2 ? normalizedCode : normalizedCode.split('.').slice(0, 2).join('.'),
         subUnitCode: codeDepth >= 3 ? normalizedCode : null,
       };
+      const entryId = `cbc-entry-${createHash('sha1').update([
+        subject.id,
+        item.code,
+        form ?? '',
+        normalizedCode,
+        currentTopic,
+        currentSubtopic || '',
+        label,
+        index,
+      ].join('|')).digest('hex')}`;
       const existingEntry = await prisma.syllabusEntry.findFirst({
         where: {
           documentId: document.id,
@@ -282,7 +293,7 @@ async function main() {
         await prisma.syllabusEntry.update({ where: { id: existingEntry.id }, data: entryData });
       } else {
         await prisma.syllabusEntry.create({
-          data: { id: `cbc-entry-${subject.id}-${item.code}-${index}`, documentId: document.id, subjectId: subject.id, ...entryData },
+          data: { id: entryId, documentId: document.id, subjectId: subject.id, ...entryData },
         });
       }
     }
