@@ -25,6 +25,7 @@ const syllabusFiles: Array<{ file: string; code: string; name: string }> = [
   { file: 'PHYSICS-SYLLABUS-O-LEVEL-FORM-1-4-CAMERA-READY.pdf', code: '4016', name: 'Physics' },
   { file: 'MATHEMATICS-II-SYLLABUS.pdf', code: '2025', name: 'Mathematics II' },
   { file: 'RELIGIOUS-EDUCATION-SYLLABUS.pdf', code: '3012', name: 'Religious Education' },
+  { file: 'ICT_ORDINARY-LEVEL-SYLLABUS-FORMS-1-4.pdf', code: '8011', name: 'Information and Communications Technology' },
 ];
 
 const tocFallbacks: Record<string, Array<{ code: string; name: string; form: number }>> = {
@@ -52,6 +53,7 @@ const minimumEntryCounts: Record<string, number> = {
   '6014': 10,
   '3014': 10,
   '3013': 10,
+  '8011': 10,
 };
 
 function clean(value: string) {
@@ -128,6 +130,9 @@ async function extractWithOcr(filePath: string) {
 
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
+  const requestedCode = process.argv.find(argument => argument.startsWith('--code='))?.slice('--code='.length);
+  const filesToImport = requestedCode ? syllabusFiles.filter(item => item.code === requestedCode) : syllabusFiles;
+  if (requestedCode && !filesToImport.length) throw new Error(`Unknown syllabus code: ${requestedCode}`);
   const school = dryRun ? null : await prisma.school.findFirst({ where: { name: { contains: 'Demo' } } })
     || await prisma.school.findFirst();
   if (!dryRun && !school) throw new Error('Create a school before importing CBC syllabi');
@@ -145,7 +150,7 @@ async function main() {
     });
   }
 
-  for (const item of syllabusFiles) {
+  for (const item of filesToImport) {
     const filePath = path.join(root, 'CBC_SYLLABI', item.file);
     if (!fs.existsSync(filePath)) throw new Error(`Missing syllabus: ${filePath}`);
     let subjects: any[] = [];

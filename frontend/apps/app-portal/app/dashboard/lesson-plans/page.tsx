@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { lessonPlansApi, classApi as classesApi, subjectApi as subjectsApi } from '@/lib/api';
+import { lessonPlansApi, classApi as classesApi, subjectApi as subjectsApi, classSubjectApi } from '@/lib/api';
 import { CbcLessonPlanner } from '@/components/cbc-lesson-planner/CbcLessonPlanner';
 
 interface LessonPlan {
@@ -50,6 +50,7 @@ export default function LessonPlansPage() {
   const [plans, setPlans] = useState<LessonPlan[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [classSubjects, setClassSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
@@ -93,6 +94,30 @@ export default function LessonPlansPage() {
       loadData();
     }
   }, [isAuthenticated, selectedClass, selectedSubject]);
+
+  useEffect(() => {
+    if (!newPlan.classId) {
+      setClassSubjects([]);
+      setNewPlan(current => ({ ...current, subjectId: '' }));
+      return;
+    }
+
+    classSubjectApi.getByClass(newPlan.classId)
+      .then(response => {
+        const data = response.data?.data || response.data || [];
+        const assigned = Array.isArray(data) ? data.map((item: any) => item.subject || item).filter((subject: any) => subject?.id) : [];
+        setClassSubjects(assigned);
+        setNewPlan(current => assigned.some((subject: Subject) => subject.id === current.subjectId)
+          ? current
+          : { ...current, subjectId: '' });
+      })
+      .catch(() => {
+        setClassSubjects([]);
+        setNewPlan(current => ({ ...current, subjectId: '' }));
+      });
+  }, [newPlan.classId]);
+
+  const createSubjects = newPlan.classId ? classSubjects : subjects;
 
   const loadData = async () => {
     try {
@@ -453,7 +478,7 @@ export default function LessonPlansPage() {
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>Class *</label>
                   <select
                     value={newPlan.classId}
-                    onChange={(e) => setNewPlan({ ...newPlan, classId: e.target.value })}
+                    onChange={(e) => setNewPlan({ ...newPlan, classId: e.target.value, subjectId: '' })}
                   >
                     <option value="">Select Class</option>
                     {classes.map(c => (
@@ -468,7 +493,7 @@ export default function LessonPlansPage() {
                     onChange={(e) => setNewPlan({ ...newPlan, subjectId: e.target.value })}
                   >
                     <option value="">Select Subject</option>
-                    {subjects.map(s => (
+                    {createSubjects.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { curriculumIntelligenceApi, subjectApi, classApi } from '@/lib/api';
+import { curriculumIntelligenceApi, subjectApi, classApi, classSubjectApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
 type Props = { onClose: () => void };
@@ -18,6 +18,7 @@ function List({ items }: { items?: any[] }) {
 export function CbcLessonPlanner({ onClose }: Props) {
   const { user } = useAuth();
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [classSubjects, setClassSubjects] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [tree, setTree] = useState<any>(null);
   const [subjectId, setSubjectId] = useState('');
@@ -52,6 +53,27 @@ export function CbcLessonPlanner({ onClose }: Props) {
     setTree(null);
     setTopicId('');
     setSubtopicId('');
+    setSubjectId('');
+    if (!classId) {
+      setClassSubjects([]);
+      return;
+    }
+
+    classSubjectApi.getByClass(classId)
+      .then(response => {
+        const assigned = unwrap(response);
+        setClassSubjects(Array.isArray(assigned?.data) ? assigned.data : Array.isArray(assigned) ? assigned : []);
+      })
+      .catch(() => {
+        setClassSubjects([]);
+        setError('Unable to load subjects assigned to the selected class.');
+      });
+  }, [classId]);
+
+  useEffect(() => {
+    setTree(null);
+    setTopicId('');
+    setSubtopicId('');
     if (!subjectId) return;
     curriculumIntelligenceApi.getSubjectTree(subjectId)
       .then(response => setTree(unwrap(response)))
@@ -60,7 +82,10 @@ export function CbcLessonPlanner({ onClose }: Props) {
 
   const topics = Array.isArray(tree?.topics) ? tree.topics : Array.isArray(tree?.Topic) ? tree.Topic : [];
   const selectedTopic = topics.find((topic: any) => topic.id === topicId);
-  const subtopics = selectedTopic?.subtopics || [];
+  const subtopics = selectedTopic?.subtopics || selectedTopic?.Subtopic || [];
+  const availableSubjects = classId
+    ? classSubjects.map(item => item.subject || item).filter((subject: any) => subject?.id)
+    : subjects;
 
   async function generate() {
     if (!subjectId || !topicId || !classId) {
@@ -137,7 +162,7 @@ export function CbcLessonPlanner({ onClose }: Props) {
         <div className="cbc-form">
           <label>Subject<select value={subjectId} onChange={event => setSubjectId(event.target.value)} disabled={loadingOptions}>
             <option value="">Select subject</option>
-            {subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name} {subject.code ? `(${subject.code})` : ''}</option>)}
+            {availableSubjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name} {subject.code ? `(${subject.code})` : ''}</option>)}
           </select></label>
           <label>Class<select value={classId} onChange={event => setClassId(event.target.value)}>
             <option value="">Select class</option>
