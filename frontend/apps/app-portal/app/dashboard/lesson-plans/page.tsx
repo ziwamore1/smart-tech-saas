@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { lessonPlansApi, classApi as classesApi, subjectApi as subjectsApi } from '@/lib/api';
+import { CbcLessonPlanner } from '@/components/cbc-lesson-planner/CbcLessonPlanner';
 
 interface LessonPlan {
   id: string;
@@ -54,6 +55,7 @@ export default function LessonPlansPage() {
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showCbcPlanner, setShowCbcPlanner] = useState(false);
   const [expandedPlan, setExpandedPlan] = useState<string | null>(null);
 
   const [newPlan, setNewPlan] = useState({
@@ -243,6 +245,12 @@ export default function LessonPlansPage() {
           </h1>
           <p style={{ color: '#6b7280', marginTop: '4px', fontSize: '14px' }}>Create and manage lesson plans for your classes</p>
         </div>
+        <button
+          onClick={() => setShowCbcPlanner(true)}
+          style={{ padding: '10px 20px', background: '#172033', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '600', boxShadow: '0 4px 12px rgba(23, 32, 51, 0.24)' }}
+        >
+          <i className="fa fa-magic"></i> CBC AI Planner
+        </button>
         <button
           onClick={() => setShowAddModal(true)}
           style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '600', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)' }}
@@ -616,6 +624,7 @@ export default function LessonPlansPage() {
           </div>
         </div>
       )}
+      {showCbcPlanner && <CbcLessonPlanner onClose={() => { setShowCbcPlanner(false); loadData(); }} />}
     </div>
   );
 }

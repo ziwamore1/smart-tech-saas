@@ -6318,8 +6318,14 @@ model CurriculumLessonPlan {
   objectives        String?
   materials         String?
   assessmentMethods String?
+  planData          Json?
   activities        CurriculumLessonPlanActivity[]
   isGenerated       Boolean                        @default(false)
+  version           Int                            @default(1)
+  generationInstruction String?
+  reusedFromId      String?
+  reusedFrom        CurriculumLessonPlan?          @relation("CurriculumLessonPlanRevisions", fields: [reusedFromId], references: [id], onDelete: SetNull)
+  revisions         CurriculumLessonPlan[]         @relation("CurriculumLessonPlanRevisions")
   schoolId          String?
   school            School?                        @relation(fields: [schoolId], references: [id])
   createdAt         DateTime                       @default(now())
@@ -6330,6 +6336,7 @@ model CurriculumLessonPlan {
   @@index([classId])
   @@index([teacherId])
   @@index([termId])
+  @@index([reusedFromId])
 }
 
 model CurriculumLessonPlanActivity {

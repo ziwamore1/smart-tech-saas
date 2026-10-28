@@ -328,8 +328,8 @@ export class CurriculumIntelligenceController {
   @Post('lesson-plans/generate')
   @UseGuards(AuthGuard('jwt'))
   generateLessonPlan(@Body() body: {
-    subjectId: string; topicId: string; classId?: string; teacherId?: string;
-    duration?: number; weekNumber?: number; termId?: string; academicYearId?: string; schoolId?: string;
+    subjectId: string; topicId: string; subtopicId?: string; classId?: string; teacherId?: string;
+    duration?: number; weekNumber?: number; termId?: string; academicYearId?: string; schoolId?: string; lessonDate?: string; instruction?: string; sourceLessonPlanId?: string;
   }) {
     return this.lessonPlanning.generateFromCurriculum(body);
   }
@@ -344,6 +344,12 @@ export class CurriculumIntelligenceController {
   @UseGuards(AuthGuard('jwt'))
   getLessonPlan(@Param('id') id: string) {
     return this.lessonPlanning.getLessonPlan(id);
+  }
+
+  @Get('lesson-plans/:id/revisions')
+  @UseGuards(AuthGuard('jwt'))
+  getLessonPlanRevisions(@Param('id') id: string) {
+    return this.lessonPlanning.getLessonPlanRevisions(id);
   }
 
   @Patch('lesson-plans/:id')

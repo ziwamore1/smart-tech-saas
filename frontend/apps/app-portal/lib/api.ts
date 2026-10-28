@@ -2651,6 +2651,10 @@ export const curriculumIntelligenceApi = {
 
   // Lesson Plans
   getLessonPlans: (subjectId?: string) => api.get('/curriculum-intelligence/lesson-plans', { params: { subjectId } }),
+  generateLessonPlan: (data: { subjectId: string; topicId: string; subtopicId?: string; classId?: string; teacherId?: string; duration?: number; weekNumber?: number; termId?: string; academicYearId?: string; schoolId?: string; lessonDate?: string; instruction?: string; sourceLessonPlanId?: string }) =>
+    api.post('/curriculum-intelligence/lesson-plans/generate', data),
+  getLessonPlan: (id: string) => api.get(`/curriculum-intelligence/lesson-plans/${id}`),
+  getLessonPlanRevisions: (id: string) => api.get(`/curriculum-intelligence/lesson-plans/${id}/revisions`),
 
   // Curriculum Coverage
   getCoverage: (params?: { classId?: string; subjectId?: string }) =>
