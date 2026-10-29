@@ -52,18 +52,29 @@ export class EnrollmentService {
             where: { studentId: data.studentId, academicYearId: data.academicYearId },
           });
 
-          if (existing) throw new ForbiddenException('Student already enrolled in this academic year');
+          if (existing?.status === EnrollmentStatus.ACTIVE) {
+            if (existing.classId === data.classId) {
+              throw new ForbiddenException('Student is already enrolled in this class for the selected academic year');
+            }
+            throw new ConflictException('Student is already enrolled in another class for the selected academic year. Transfer the student instead.');
+          }
 
-          const enrollment = await tx.enrollment.create({
-            data: {
-              studentId: data.studentId,
-              classId: data.classId,
-              academicYearId: data.academicYearId,
-              schoolId: data.schoolId,
-              streamId: data.streamId,
-              status: EnrollmentStatus.ACTIVE,
-            },
-          });
+          const previousClassId = existing?.classId;
+          const enrollment = existing
+            ? await tx.enrollment.update({
+              where: { id: existing.id },
+              data: { classId: data.classId, streamId: data.streamId, status: EnrollmentStatus.ACTIVE },
+            })
+            : await tx.enrollment.create({
+              data: {
+                studentId: data.studentId,
+                classId: data.classId,
+                academicYearId: data.academicYearId,
+                schoolId: data.schoolId,
+                streamId: data.streamId,
+                status: EnrollmentStatus.ACTIVE,
+              },
+            });
 
           await this.admissionNumberService.resequenceClassInTransaction(
             tx, data.schoolId, data.academicYearId, data.classId,
@@ -79,6 +90,12 @@ export class EnrollmentService {
               ...(student.status !== StudentStatus.ACTIVE ? { status: StudentStatus.ACTIVE } : {}),
             },
           });
+
+          if (previousClassId && previousClassId !== data.classId) {
+            await this.admissionNumberService.resequenceClassInTransaction(
+              tx, data.schoolId, data.academicYearId, previousClassId,
+            );
+          }
 
           return enrollment;
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
