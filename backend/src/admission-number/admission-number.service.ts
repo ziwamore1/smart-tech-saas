@@ -114,9 +114,13 @@ export class AdmissionNumberService {
     academicYearId: string,
     classId: string,
   ): Promise<void> {
-    const academicYear = await tx.academicYear.findUnique({
-      where: { id: academicYearId },
+    const academicYears = await tx.academicYear.findMany({
+      where: { schoolId },
+      select: { id: true, startDate: true, isCurrent: true },
+      orderBy: { startDate: 'desc' },
     });
+
+    const academicYear = academicYears.find((candidate) => candidate.id === academicYearId);
 
     if (!academicYear) {
       throw new Error(`Academic year ${academicYearId} not found`);
@@ -124,12 +128,7 @@ export class AdmissionNumberService {
 
     const year = academicYear.startDate.getFullYear();
     const prefix = `ST-${year}-`;
-    const latestAcademicYear = await tx.academicYear.findFirst({
-      where: { schoolId },
-      orderBy: { startDate: 'desc' },
-      select: { id: true },
-    });
-    const isVisibleRegister = academicYear.isCurrent || latestAcademicYear?.id === academicYearId;
+    const isVisibleRegister = academicYear.isCurrent || academicYears[0]?.id === academicYearId;
 
     const enrollments = await tx.enrollment.findMany({
       where: {
@@ -152,46 +151,63 @@ export class AdmissionNumberService {
       return admissionCompare || a.studentId.localeCompare(b.studentId);
     });
 
-    // Clear positions before assigning the contiguous range so the unique
-    // register constraint cannot collide with an existing position.
     await tx.enrollment.updateMany({
       where: { classId, academicYearId, schoolId, status: 'ACTIVE' },
       data: { sequenceNumber: null },
     });
 
-    const attachedStudents = isVisibleRegister
-      ? await tx.student.findMany({ where: { classId }, select: { id: true, admissionNumber: true } })
-      : [];
-    const originalNumbers = new Map(attachedStudents.map((student) => [student.id, student.admissionNumber]));
-    for (const student of attachedStudents) {
-      await tx.student.update({ where: { id: student.id }, data: { admissionNumber: `TMP-${student.id.slice(0, 12)}` } });
-    }
-
-    for (let i = 0; i < orderedEnrollments.length; i++) {
-      const enrollment = orderedEnrollments[i];
-      await tx.enrollment.update({
-        where: { id: enrollment.id },
-        data: { sequenceNumber: i + 1 },
-      });
-      if (isVisibleRegister) {
-        await tx.student.update({
-          where: { id: enrollment.student.id },
-          data: { admissionNumber: `${prefix}${String(i + 1).padStart(3, '0')}` },
-        });
-      }
-    }
-
-    const activeStudentIds = new Set(orderedEnrollments.map((enrollment) => enrollment.student.id));
-    for (const student of attachedStudents) {
-      if (activeStudentIds.has(student.id)) continue;
-      const original = originalNumbers.get(student.id)!;
-      const isUsedByActive = orderedEnrollments.some((enrollment, index) =>
-        `ST-${year}-${String(index + 1).padStart(3, '0')}` === original,
+    if (orderedEnrollments.length > 0) {
+      const sequenceRows = Prisma.join(
+        orderedEnrollments.map((enrollment, index) => Prisma.sql`(${enrollment.id}::text, ${index + 1}::int)`),
       );
-      await tx.student.update({
-        where: { id: student.id },
-        data: { admissionNumber: isUsedByActive ? `HIST-${student.id.slice(0, 12)}` : original },
+      await tx.$executeRaw`
+        UPDATE "Enrollment" AS e
+        SET "sequenceNumber" = v.rn
+        FROM (VALUES ${sequenceRows}) AS v(id, rn)
+        WHERE e."id" = v.id
+      `;
+    }
+
+    if (isVisibleRegister) {
+      const attachedStudents = await tx.student.findMany({
+        where: { classId },
+        select: { id: true, admissionNumber: true },
       });
+
+      if (attachedStudents.length > 0) {
+        await tx.$executeRaw`
+          UPDATE "Student"
+          SET "admissionNumber" = 'TMP-' || "id"
+          WHERE "classId" = ${classId}
+        `;
+      }
+
+      const finalNumbers = new Map<string, string>();
+      orderedEnrollments.forEach((enrollment, index) => {
+        finalNumbers.set(enrollment.student.id, `${prefix}${String(index + 1).padStart(3, '0')}`);
+      });
+
+      const activeStudentIds = new Set(orderedEnrollments.map((enrollment) => enrollment.student.id));
+      const assignedNumbers = new Set(finalNumbers.values());
+      for (const student of attachedStudents) {
+        if (activeStudentIds.has(student.id)) continue;
+        finalNumbers.set(
+          student.id,
+          assignedNumbers.has(student.admissionNumber) ? `HIST-${student.id}` : student.admissionNumber,
+        );
+      }
+
+      if (finalNumbers.size > 0) {
+        const studentRows = Prisma.join(
+          Array.from(finalNumbers, ([id, admissionNumber]) => Prisma.sql`(${id}::text, ${admissionNumber}::text)`),
+        );
+        await tx.$executeRaw`
+          UPDATE "Student" AS s
+          SET "admissionNumber" = v."admissionNumber"
+          FROM (VALUES ${studentRows}) AS v(id, "admissionNumber")
+          WHERE s."id" = v.id
+        `;
+      }
     }
 
     await tx.admissionSequence.upsert({

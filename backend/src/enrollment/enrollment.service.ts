@@ -19,9 +19,11 @@ export class EnrollmentService {
     schoolId: string;
     streamId?: string;
   }) {
-    const student = await this.prisma.student.findUnique({
-      where: { id: data.studentId },
-    });
+    const [student, academicYear, classEntity] = await Promise.all([
+      this.prisma.student.findUnique({ where: { id: data.studentId } }),
+      this.prisma.academicYear.findUnique({ where: { id: data.academicYearId } }),
+      this.prisma.class.findUnique({ where: { id: data.classId } }),
+    ]);
 
     if (!student) throw new NotFoundException('Student not found');
     if (student.schoolId !== data.schoolId) throw new ForbiddenException('Invalid student');
@@ -30,16 +32,8 @@ export class EnrollmentService {
       throw new ForbiddenException('Cannot enroll a transferred student. Reactivate first.');
     }
 
-    const academicYear = await this.prisma.academicYear.findUnique({
-      where: { id: data.academicYearId },
-    });
-
     if (!academicYear) throw new NotFoundException('Academic year not found');
     if (academicYear.schoolId !== data.schoolId) throw new ForbiddenException('Invalid academic year');
-
-    const classEntity = await this.prisma.class.findUnique({
-      where: { id: data.classId },
-    });
 
     if (!classEntity) throw new NotFoundException('Class not found');
     if (classEntity.schoolId !== data.schoolId) throw new ForbiddenException('Invalid class');
