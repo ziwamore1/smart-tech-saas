@@ -15,6 +15,8 @@ export default function EnrollmentsPage() {
   const [showNewStudentForm, setShowNewStudentForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClassId, setSelectedClassId] = useState('');
+  const [highlightedStudentId, setHighlightedStudentId] = useState<string | null>(null);
+  const [enrollmentOutcome, setEnrollmentOutcome] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [enrollForm, setEnrollForm] = useState({
     admissionNumber: '',
@@ -74,7 +76,11 @@ export default function EnrollmentsPage() {
 
   const { data: existingStudents } = useQuery({
     queryKey: ['all-students'],
-    queryFn: () => studentApi.getAll({ limit: 500 }).then(res => res.data),
+    queryFn: async () => {
+      const res = await studentApi.getAll({ limit: 500 });
+      const data = res.data?.data || res.data?.students || res.data;
+      return Array.isArray(data) ? data : [];
+    },
   });
 
   const classes = Array.isArray(classesResponse) ? classesResponse : [];
@@ -107,55 +113,45 @@ export default function EnrollmentsPage() {
       queryClient.invalidateQueries({ queryKey: ['all-students'] });
       queryClient.invalidateQueries({ queryKey: ['class-students'] });
       setTransferForm({ ...transferForm, studentId: '' });
-      setMessage({ type: 'success', text: 'Student enrolled successfully!' });
-      setTimeout(() => setMessage(null), 3000);
+      setEnrollmentOutcome({ type: 'success', text: `Student successfully enrolled in ${selectedClassObj?.name || 'your class'}.` });
+      setMessage({ type: 'success', text: 'Student enrolled successfully.' });
     },
     onError: (error: any) => {
-      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to enroll student' });
-      setTimeout(() => setMessage(null), 5000);
+      setEnrollmentOutcome({ type: 'error', text: error.response?.data?.message || 'Enrollment failed. The student was not enrolled.' });
     },
   });
 
   const createAndEnrollMutation = useMutation({
-    mutationFn: (data: any) => studentApi.create(data),
-    onSuccess: (response) => {
+    mutationFn: async (data: any) => {
+      const response = await studentApi.create(data);
       const studentId = response.data?.id || response.data?.data?.id;
-      if (studentId) {
-        enrollmentApi.create({
-          studentId,
-          classId: classId!,
-          academicYearId: currentAcademicYear?.id,
-        }).then(() => {
-          queryClient.invalidateQueries({ queryKey: ['all-students'] });
-          queryClient.invalidateQueries({ queryKey: ['class-students'] });
-          setShowNewStudentForm(false);
-          setEnrollForm({
-            admissionNumber: '',
-            firstName: '',
-            lastName: '',
-            dateOfBirth: '',
-            gender: '',
-            email: '',
-            phone: '',
-            address: '',
-            parentName: '',
-            parentPhone: '',
-            parentEmail: '',
-            academicYearId: '',
-          });
-          setMessage({ type: 'success', text: 'New student created and enrolled successfully!' });
-          setTimeout(() => setMessage(null), 3000);
-        }).catch((error: any) => {
-          setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to enroll student' });
-          setTimeout(() => setMessage(null), 5000);
-        });
-      } else {
-        throw new Error('Failed to get student ID');
-      }
+      if (!studentId) throw new Error('The student was created but no student ID was returned.');
+      await enrollmentApi.create({ studentId, classId: classId!, academicYearId: currentAcademicYear?.id });
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-students'] });
+      queryClient.invalidateQueries({ queryKey: ['class-students'] });
+      setShowNewStudentForm(false);
+      setEnrollForm({
+        admissionNumber: '', firstName: '', lastName: '', dateOfBirth: '', gender: '', email: '', phone: '', address: '',
+        parentName: '', parentPhone: '', parentEmail: '', academicYearId: '',
+      });
+      setEnrollmentOutcome({ type: 'success', text: `New student successfully created and enrolled in ${selectedClassObj?.name || 'your class'}.` });
+      setMessage({ type: 'success', text: 'New student created and enrolled successfully.' });
     },
     onError: (error: any) => {
-      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to create student' });
-      setTimeout(() => setMessage(null), 5000);
+      const payload = error.response?.data || {};
+      if (error.response?.status === 409 && payload.studentId) {
+        setShowNewStudentForm(false);
+        setActiveTab('enroll');
+        setSearchQuery(`${enrollForm.firstName} ${enrollForm.lastName}`.trim());
+        setHighlightedStudentId(payload.studentId);
+        setEnrollmentOutcome({ type: 'error', text: `${payload.message || 'This student is already in the system.'} Select the highlighted Ungrouped student below and click Enroll.` });
+        queryClient.invalidateQueries({ queryKey: ['all-students'] });
+        return;
+      }
+      setEnrollmentOutcome({ type: 'error', text: payload.message || 'Registration or enrollment failed. No student was successfully enrolled.' });
     },
   });
 
@@ -173,6 +169,32 @@ export default function EnrollmentsPage() {
     createAndEnrollMutation.mutate(enrollForm);
   };
 
+  const students = Array.isArray(existingStudents) ? existingStudents : [];
+  const enrolledStudentIds = new Set(
+    students
+      .filter((s: any) => s.enrollments?.some((e: any) => e.classId === classId && e.isActive))
+      .map((s: any) => s.id)
+  );
+  const availableStudents = students.filter((s: any) => {
+    if (enrolledStudentIds.has(s.id)) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (s.firstName?.toLowerCase() || '').includes(q)
+      || (s.lastName?.toLowerCase() || '').includes(q)
+      || (s.admissionNumber?.toLowerCase() || '').includes(q);
+  }).sort((a: any, b: any) => {
+    const aUngrouped = !a.enrollments?.some((e: any) => e.status === 'ACTIVE' || e.isActive);
+    const bUngrouped = !b.enrollments?.some((e: any) => e.status === 'ACTIVE' || e.isActive);
+    if (aUngrouped !== bUngrouped) return aUngrouped ? -1 : 1;
+    return `${a.lastName || ''} ${a.firstName || ''}`.localeCompare(`${b.lastName || ''} ${b.firstName || ''}`);
+  });
+
+  useEffect(() => {
+    if (!highlightedStudentId) return;
+    const timer = setTimeout(() => document.getElementById(`student-${highlightedStudentId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+    return () => clearTimeout(timer);
+  }, [highlightedStudentId, students.length]);
+
   if (!isClassTeacher) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -186,21 +208,6 @@ export default function EnrollmentsPage() {
       </div>
     );
   }
-
-  const students = existingStudents?.data || existingStudents?.students || [];
-  const enrolledStudentIds = new Set(
-    students
-      .filter((s: any) => s.enrollments?.some((e: any) => e.classId === classId && e.isActive))
-      .map((s: any) => s.id)
-  );
-  const availableStudents = students.filter((s: any) => {
-    if (enrolledStudentIds.has(s.id)) return false;
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (s.firstName?.toLowerCase() || '').includes(q)
-      || (s.lastName?.toLowerCase() || '').includes(q)
-      || (s.admissionNumber?.toLowerCase() || '').includes(q);
-  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -276,6 +283,12 @@ export default function EnrollmentsPage() {
         {activeTab === 'enroll' && !showNewStudentForm && (
           <div className="mt-6">
             <h3 className="text-lg font-semibold mb-4">Select Existing Student to Enroll</h3>
+
+            {enrollmentOutcome && (
+              <div className={`mb-4 rounded-lg border px-4 py-3 text-sm font-medium ${enrollmentOutcome.type === 'success' ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-300 bg-amber-50 text-amber-900'}`}>
+                {enrollmentOutcome.text}
+              </div>
+            )}
             
             <div className="mb-4">
               <input
@@ -311,10 +324,11 @@ export default function EnrollmentsPage() {
                   </thead>
                   <tbody>
                     {availableStudents.slice(0, 50).map((student: any) => (
-                      <tr key={student.id} className="border-t hover:bg-gray-50">
+                      <tr id={`student-${student.id}`} key={student.id} className={`border-t hover:bg-gray-50 ${highlightedStudentId === student.id ? 'bg-amber-100 ring-2 ring-inset ring-amber-400' : ''}`}>
                         <td className="py-3 px-4 font-mono text-sm">{student.admissionNumber}</td>
                         <td className="py-3 px-4 font-medium">
                           {student.firstName} {student.lastName}
+                          {!student.enrollments?.some((e: any) => e.status === 'ACTIVE' || e.isActive) && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Ungrouped</span>}
                         </td>
                         <td className="py-3 px-4">{student.gender || '-'}</td>
                         <td className="py-3 px-4">
@@ -357,6 +371,11 @@ export default function EnrollmentsPage() {
             </div>
 
             <div className="space-y-6">
+              {enrollmentOutcome && (
+                <div className={`rounded-lg border px-4 py-3 text-sm font-medium ${enrollmentOutcome.type === 'success' ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
+                  {enrollmentOutcome.text}
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

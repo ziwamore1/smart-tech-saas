@@ -16,7 +16,7 @@ export default function TeacherDashboardPage() {
 }
 
 function TeacherDashboardContent() {
-  const { user } = useAuth();
+  const { user, isClassTeacher } = useAuth();
 
   const { data: schoolProfile } = useQuery({
     queryKey: ['school-profile'],
@@ -101,25 +101,29 @@ function TeacherDashboardContent() {
   const analyticsTerm = teacherOverview?.dashboardAnalyticsTerm || teacherSummary?.term;
   const showingPreviousTerm = Boolean(analyticsTerm?.id && analyticsTerm.id !== currentTerm?.id);
 
+  const studentActions = [
+    { name: 'My Classes', href: '/teacher/class', icon: 'fa-school', desc: 'View assigned classes and students', color: '#8b5cf6' },
+    ...(isClassTeacher ? [{ name: 'Enrollments', href: '/teacher/enrollments', icon: 'fa-user-plus', desc: 'Find and enroll ungrouped students', color: '#d97706' }] : []),
+    { name: 'Students Register', href: '/dashboard/students', icon: 'fa-user-graduate', desc: 'Search student records and classes', color: '#3b82f6' },
+    { name: 'Class List', href: '/dashboard/class-list', icon: 'fa-list-alt', desc: 'View student enrollment', color: '#06b6d4' },
+  ];
+
   const teachingActions = [
     { name: 'Results', href: '/dashboard/results', icon: 'fa-chart-bar', desc: 'View and manage school results', color: '#2563eb' },
     { name: 'Result Entry', href: '/dashboard/results-management/result-entry', icon: 'fa-edit', desc: 'Enter assessment & final scores', color: '#059669' },
     { name: 'Attendance Register', href: '/dashboard/attendance-register', icon: 'fa-clipboard-list', desc: 'Take daily attendance', color: '#059669' },
     { name: 'Results Management', href: '/dashboard/results-management', icon: 'fa-file-alt', desc: 'Manage class results', color: '#ea6645' },
-    { name: 'Report Cards', href: '/dashboard/report-cards', icon: 'fa-file-text', desc: 'Generate report cards', color: '#0891b2' },
-    { name: 'Report Hub', href: '/dashboard/report-hub', icon: 'fa-print', desc: 'Generate certificates and reports', color: '#3b82f6' },
-    { name: 'Student Awards', href: '/dashboard/student-awards', icon: 'fa-medal', desc: 'Record leadership and sports evidence', color: '#d97706' },
+    { name: 'Lesson Plans', href: '/dashboard/lesson-plans', icon: 'fa-clipboard-list', desc: 'Plan and manage lessons', color: '#f59e0b' },
+    { name: 'SBA Tasks', href: '/dashboard/sba-tasks', icon: 'fa-tasks', desc: 'School-based assessment tasks', color: '#22c55e' },
     { name: 'Online Exams', href: '/dashboard/exams', icon: 'fa-file-signature', desc: 'Create and manage exams', color: '#dc2626' },
   ];
 
-  const classroomActions = [
-    { name: 'My Classes', href: '/teacher/class', icon: 'fa-school', desc: 'View your assigned classes', color: '#8b5cf6' },
-    { name: 'Lesson Plans', href: '/dashboard/lesson-plans', icon: 'fa-clipboard-list', desc: 'Plan and manage lessons', color: '#f59e0b' },
-    { name: 'Class List', href: '/dashboard/class-list', icon: 'fa-list-alt', desc: 'View student enrollment', color: '#06b6d4' },
-    { name: 'SBA Tasks', href: '/dashboard/sba-tasks', icon: 'fa-tasks', desc: 'School-based assessment tasks', color: '#22c55e' },
+  const professionalActions = [
+    { name: 'Report Cards', href: '/dashboard/report-cards', icon: 'fa-file-text', desc: 'Generate report cards', color: '#0891b2' },
+    { name: 'Report Hub', href: '/dashboard/report-hub', icon: 'fa-print', desc: 'Generate certificates and reports', color: '#3b82f6' },
+    { name: 'Student Awards', href: '/dashboard/student-awards', icon: 'fa-medal', desc: 'Record leadership and sports evidence', color: '#d97706' },
     { name: 'Digital Stamps', href: '/dashboard/digital-stamps', icon: 'fa-stamp', desc: 'Digital stamps', color: '#7c3aed' },
     { name: 'My Digital Signature', href: '/dashboard/digital-signatures', icon: 'fa-signature', desc: 'Create your official signature', color: '#0e7490' },
-    { name: 'Students', href: '/dashboard/students', icon: 'fa-user-graduate', desc: 'Student records', color: '#3b82f6' },
     { name: 'Library', href: '/dashboard/library', icon: 'fa-book-open', desc: 'Library resources', color: '#0d9488' },
   ];
 
@@ -218,6 +222,25 @@ function TeacherDashboardContent() {
 
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-3">
+          <i className="fa fa-users mr-2" style={{ color: '#8b5cf6' }}></i>
+          Students & Classes
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {studentActions.map((action) => (
+            <Link key={action.name} href={action.href} className="block">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-gray-200 transition-all cursor-pointer group h-full">
+                <div className="flex items-center gap-3">
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: `${action.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: action.color, fontSize: '18px' }}><i className={`fa ${action.icon}`}></i></div>
+                  <div><h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors text-sm">{action.name}</h3><p className="text-xs text-gray-500 mt-0.5">{action.desc}</p></div>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">
           <i className="fa fa-tasks mr-2" style={{ color: '#2563eb' }}></i>
           Teaching & Assessment
         </h2>
@@ -295,11 +318,11 @@ function TeacherDashboardContent() {
 
       <div>
         <h2 className="text-lg font-semibold text-gray-900 mb-3">
-          <i className="fa fa-door-open mr-2" style={{ color: '#8b5cf6' }}></i>
-          Classroom Tools
+          <i className="fa fa-toolbox mr-2" style={{ color: '#0e7490' }}></i>
+          Documents & Professional Tools
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {classroomActions.map((action) => (
+          {professionalActions.map((action) => (
             <Link key={action.name} href={action.href} className="block">
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-gray-200 transition-all cursor-pointer group h-full">
                 <div className="flex items-center gap-3">

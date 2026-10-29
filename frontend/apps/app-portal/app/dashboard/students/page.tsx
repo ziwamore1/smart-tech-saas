@@ -17,7 +17,7 @@ const gradPurpleLight = 'linear-gradient(135deg, #f3e8ff, #e9d5ff)';
 const gradOrangeLight = 'linear-gradient(135deg, #ffedd5, #fed7aa)';
 
 export default function StudentsPage() {
-  const { user } = useAuth();
+  const { user, isClassTeacher } = useAuth();
   const queryClient = useQueryClient();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEnrollmentModal, setShowEnrollmentModal] = useState(false);
@@ -33,6 +33,10 @@ export default function StudentsPage() {
   const [selectedParentId, setSelectedParentId] = useState('');
   const [statusModalStudent, setStatusModalStudent] = useState<any>(null);
   const [newStatus, setNewStatus] = useState('ACTIVE');
+  const [duplicateHandoff, setDuplicateHandoff] = useState<any>(null);
+  const [enrollmentFormMessage, setEnrollmentFormMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [returnToRegistration, setReturnToRegistration] = useState(false);
+  const [classTeacherDefaultApplied, setClassTeacherDefaultApplied] = useState(false);
 
   const { data: parentsData } = useQuery({
     queryKey: ['parents-search', linkParentSearch],
@@ -76,7 +80,7 @@ export default function StudentsPage() {
   });
 
   const { data: studentsData, isLoading: studentsLoading, error: studentsError } = useQuery({
-    queryKey: ['students'],
+    queryKey: ['students', filterClass, filterStatus, includeInactive, isClassTeacher],
     retry: 2,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
@@ -86,7 +90,9 @@ export default function StudentsPage() {
       const params: any = {};
       if (includeInactive) params.includeInactive = 'true';
       if (filterStatus) params.status = filterStatus;
-      if (filterClass) params.classId = filterClass;
+      // Class teachers need the ungrouped students alongside their class so a
+      // duplicate registration can be resolved without leaving this page.
+      if (filterClass && !isClassTeacher) params.classId = filterClass;
       const res = await api.get('/student', { params });
       console.log('Students API response:', res.data);
       console.log('Response status:', res.status);
@@ -216,6 +222,17 @@ export default function StudentsPage() {
     }
   }, [showAddModal, showEnrollmentModal, user?.classTeacherOf, classes, user?.id]);
 
+  const classTeacherClassId = user?.classTeacherOf
+    || classes.find((c: any) => c.classTeacher?.id === user?.id)?.id
+    || '';
+
+  useEffect(() => {
+    if (isClassTeacher && classTeacherClassId && !classTeacherDefaultApplied) {
+      setFilterClass(classTeacherClassId);
+      setClassTeacherDefaultApplied(true);
+    }
+  }, [isClassTeacher, classTeacherClassId, classTeacherDefaultApplied]);
+
   const [editForm, setEditForm] = useState<any>({
     firstName: '',
     lastName: '',
@@ -337,12 +354,24 @@ export default function StudentsPage() {
     },
     onError: (error: any) => {
       console.error('Failed to create student:', error);
+      const duplicate = error?.response?.data;
+      const duplicateStudent = duplicate?.student || null;
+      if (error?.response?.status === 409 && duplicate?.studentId) {
+        setDuplicateHandoff({
+          student: duplicateStudent || { id: duplicate.studentId },
+          message: duplicate.message || 'This student is already in the system.',
+        });
+        setShowAddModal(false);
+        setFilterClass(classTeacherClassId || '');
+        setSearchTerm('');
+        setHighlightedStudentId(duplicate.studentId);
+        queryClient.invalidateQueries({ queryKey: ['students'] });
+        return;
+      }
       setFormMessage({
         type: 'error',
         text:
-          error?.response?.status === 409
-            ? `DUPLICATE PREVENTED: ${error?.response?.data?.message || 'This student appears to be already registered.'}`
-            : error?.response?.data?.message || 'Failed to register student. Please try again.',
+          error?.response?.data?.message || 'Failed to register student. Please try again.',
       });
       setTimeout(() => setFormMessage(null), 12000);
     },
@@ -421,20 +450,16 @@ export default function StudentsPage() {
     onSuccess: (_res, variables) => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
-      setMessage({ type: 'success', text: 'Student enrolled successfully!' });
-      setTimeout(() => setMessage(null), 3000);
-      setShowEnrollmentModal(false);
+      setEnrollmentFormMessage({ type: 'success', text: `Student successfully enrolled in ${classes.find((c: any) => c.id === variables.classId)?.name || 'the selected class'}.` });
+      setMessage({ type: 'success', text: 'Student enrolled successfully.' });
       const enrolledId = variables?.studentId;
-      setSelectedStudent(null);
-      setEnrollmentForm({ classId: '', termId: '', academicYearId: currentAcademicYear?.id || '' });
       if (enrolledId) {
         setHighlightedStudentId(enrolledId);
         setTimeout(() => setHighlightedStudentId(null), 180000);
       }
     },
     onError: (error: any) => {
-      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to enroll student.' });
-      setTimeout(() => setMessage(null), 5000);
+      setEnrollmentFormMessage({ type: 'error', text: error?.response?.data?.message || 'Enrollment failed. The student was not enrolled.' });
     },
   });
 
@@ -458,7 +483,9 @@ export default function StudentsPage() {
       student.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.admissionNumber?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesClass = filterClass === '' || student.enrollments?.some((e: any) => e.classId === filterClass && (includeInactive || e.status?.toUpperCase() === 'ACTIVE'));
+    const hasSelectedClass = student.enrollments?.some((e: any) => e.classId === filterClass && (includeInactive || e.status?.toUpperCase() === 'ACTIVE'));
+    const isUngrouped = !student.enrollments?.some((e: any) => includeInactive || e.status?.toUpperCase() === 'ACTIVE');
+    const matchesClass = filterClass === '' || hasSelectedClass || (isClassTeacher && filterClass === classTeacherClassId && isUngrouped);
     const matchesStatus = filterStatus === '' || student.status === filterStatus;
     return matchesSearch && matchesClass && matchesStatus;
   });
@@ -475,7 +502,7 @@ export default function StudentsPage() {
   }, {});
 
   const sortedClassGroups = Object.entries(groupedByClass).sort(([a], [b]) =>
-    a === 'Ungrouped' ? 1 : b === 'Ungrouped' ? -1 : a.localeCompare(b)
+    a === 'Ungrouped' ? -1 : b === 'Ungrouped' ? 1 : a.localeCompare(b)
   );
 
   sortedClassGroups.forEach(([, group]) => {
@@ -581,6 +608,25 @@ export default function StudentsPage() {
     });
   });
 
+  const openDuplicateEnrollment = () => {
+    const student = duplicateHandoff?.student || students.find((item: any) => item.id === duplicateHandoff?.student?.id);
+    if (!student?.id) return;
+    setSelectedStudent(student);
+    setEnrollmentForm({ classId: classTeacherClassId, termId: '', academicYearId: currentAcademicYear?.id || '' });
+    setEnrollmentFormMessage(null);
+    setReturnToRegistration(true);
+    setShowEnrollmentModal(true);
+  };
+
+  const closeEnrollment = () => {
+    setShowEnrollmentModal(false);
+    setSelectedStudent(null);
+    setEnrollmentFormMessage(null);
+    setEnrollmentForm({ classId: '', termId: '', academicYearId: currentAcademicYear?.id || '' });
+    setReturnToRegistration(false);
+    setDuplicateHandoff(null);
+  };
+
   return (
     <div className="space-y-6">
       <ReadOnlyBanner managePermission="students.manage" />
@@ -593,6 +639,21 @@ export default function StudentsPage() {
           <span className="text-lg font-bold">{message.type === 'success' ? '✓' : '✕'}</span>
           <span className="flex-1 text-sm">{message.text}</span>
           <button onClick={() => setMessage(null)} className="text-white/80 hover:text-white font-bold text-lg leading-none">✕</button>
+        </div>
+      )}
+
+      {duplicateHandoff && (
+        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-5 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="font-bold text-amber-900">Existing student found</p>
+              <p className="mt-1 text-sm text-amber-800">{duplicateHandoff.message}</p>
+              <p className="mt-1 text-sm font-medium text-amber-900">Find this student in the Ungrouped section and enroll the existing record into your class.</p>
+            </div>
+            <button onClick={openDuplicateEnrollment} className="shrink-0 rounded-lg bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-700">
+              Enroll existing student
+            </button>
+          </div>
         </div>
       )}
 
@@ -1119,18 +1180,28 @@ export default function StudentsPage() {
                 </select>
               </div>
 
+              {enrollmentFormMessage && (
+                <div className={`rounded-lg border px-4 py-3 text-sm font-medium ${enrollmentFormMessage.type === 'success' ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
+                  {enrollmentFormMessage.text}
+                </div>
+              )}
+
               <div className="flex gap-3 justify-end pt-4">
                 <button
-                  onClick={() => {
-                    setShowEnrollmentModal(false);
-                    setSelectedStudent(null);
-                    setEnrollmentForm({ classId: '', termId: '', academicYearId: currentAcademicYear?.id || '' });
-                  }}
+                  onClick={closeEnrollment}
                   className="px-4 py-2 border rounded-lg hover:bg-gray-50"
                 >
-                  Cancel
+                  {enrollmentFormMessage?.type === 'success' ? 'Done for now' : 'Cancel'}
                 </button>
-                <button
+                {enrollmentFormMessage?.type === 'success' && returnToRegistration && (
+                  <button
+                    onClick={() => { closeEnrollment(); setShowAddModal(true); resetForNextStudent(); }}
+                    className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                  >
+                    Continue registration
+                  </button>
+                )}
+                {enrollmentFormMessage?.type !== 'success' && <button
                   onClick={() => {
                     if (!enrollmentForm.classId || !enrollmentForm.academicYearId) {
                       setMessage({ type: 'error', text: 'Please select a class and academic year' });
@@ -1147,7 +1218,7 @@ export default function StudentsPage() {
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
                 >
                   {enrollStudentMutation.isPending ? 'Enrolling...' : 'Enroll Student'}
-                </button>
+                </button>}
               </div>
             </div>
           </div>

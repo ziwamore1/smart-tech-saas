@@ -77,6 +77,15 @@ export default function MyClassPage() {
     enabled: !!classId,
   });
 
+  const { data: allStudentsData } = useQuery({
+    queryKey: ['teacher-unassigned-students'],
+    queryFn: () => studentApi.getAll({ limit: 500 }).then(res => {
+      const data = res.data?.data || res.data?.students || res.data || [];
+      return Array.isArray(data) ? data : [];
+    }),
+    enabled: !!classId,
+  });
+
   const updateStudentMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => studentApi.update(id, data),
     onSuccess: () => {
@@ -107,6 +116,9 @@ export default function MyClassPage() {
   });
 
   const students = studentsData || [];
+  const ungroupedStudents = (allStudentsData || []).filter((student: any) =>
+    !student.enrollments?.some((enrollment: any) => enrollment.status === 'ACTIVE' || enrollment.isActive)
+  );
   const filteredStudents = students.filter((student: any) => {
     return searchTerm === '' ||
       student.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -207,6 +219,28 @@ export default function MyClassPage() {
             className="w-full md:w-80 px-4 py-2 border rounded-lg"
           />
         </div>
+      </div>
+
+      <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="font-semibold text-amber-900">Students waiting for a class</h2>
+            <p className="mt-1 text-sm text-amber-800">{ungroupedStudents.length} ungrouped student{ungroupedStudents.length === 1 ? '' : 's'} are available to enroll into {selectedClassObj?.name || 'your class'}.</p>
+          </div>
+          <Link href="/teacher/enrollments" className="shrink-0 rounded-lg bg-amber-600 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-amber-700">
+            Open enrollment register
+          </Link>
+        </div>
+        {ungroupedStudents.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {ungroupedStudents.slice(0, 8).map((student: any) => (
+              <span key={student.id} className="rounded-full border border-amber-200 bg-white px-3 py-1.5 text-sm text-amber-900">
+                {student.firstName} {student.lastName} <span className="text-xs text-amber-700">{student.admissionNumber || ''}</span>
+              </span>
+            ))}
+            {ungroupedStudents.length > 8 && <span className="px-2 py-1.5 text-sm text-amber-800">+{ungroupedStudents.length - 8} more</span>}
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">

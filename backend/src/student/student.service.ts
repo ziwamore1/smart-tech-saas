@@ -60,7 +60,12 @@ export class StudentService {
 
     if (existing) {
       throw new ConflictException(
-        `A student with the name "${existing.firstName} ${existing.lastName}" and date of birth ${dto.dateOfBirth} already exists (Admission: ${existing.admissionNumber}, Status: ${existing.status.toLowerCase()}). Please verify before registering.`
+        {
+          code: 'STUDENT_ALREADY_EXISTS',
+          studentId: existing.id,
+          student: existing,
+          message: `A student with the name "${existing.firstName} ${existing.lastName}" and date of birth ${dto.dateOfBirth} already exists (Admission: ${existing.admissionNumber}, Status: ${existing.status.toLowerCase()}). Please enroll the existing student instead of registering a duplicate.`,
+        },
       );
     }
 
@@ -88,10 +93,15 @@ export class StudentService {
 
         if (!dobProvided || dobMatches || !sameClassDuplicate.dateOfBirth) {
           throw new ConflictException(
-            `"${sameClassDuplicate.firstName} ${sameClassDuplicate.lastName}" is already registered in this class (Admission ${sameClassDuplicate.admissionNumber}). ` +
-              (dobProvided
-                ? 'A student with this name and date of birth already exists — no duplicate was created.'
-                : 'If this is genuinely a DIFFERENT student with the same name, enter their date of birth to register them.')
+            {
+              code: 'STUDENT_ALREADY_ENROLLED',
+              studentId: sameClassDuplicate.id,
+              student: sameClassDuplicate,
+              message: `"${sameClassDuplicate.firstName} ${sameClassDuplicate.lastName}" is already registered in this class (Admission ${sameClassDuplicate.admissionNumber}). ` +
+                (dobProvided
+                  ? 'A student with this name and date of birth already exists — no duplicate was created.'
+                  : 'If this is genuinely a DIFFERENT student with the same name, enter their date of birth to register them.'),
+            },
           );
         }
       }
