@@ -36,6 +36,7 @@ interface AuthContextType {
   switchToSchool: (schoolId: string) => Promise<void>;
   switchToSuperAdmin: () => void;
   isImpersonating: boolean;
+  canReturnToSuperAdmin: boolean;
   isAuthenticated: boolean;
 }
 
@@ -59,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasSuperAdminSession, setHasSuperAdminSession] = useState(false);
 
   useEffect(() => {
     const storedToken = localStorage.getItem('auth_token');
@@ -70,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       document.cookie = 'institution_type=;path=/;max-age=0';
       setToken(null);
       setUser(null);
+      setHasSuperAdminSession(false);
       setIsLoading(false);
       return;
     }
@@ -78,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
+      setHasSuperAdminSession(!!localStorage.getItem('sa_token'));
       setIsLoading(false);
     } catch (e) {
       localStorage.removeItem('auth_token');
@@ -86,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('sa_user');
       setToken(null);
       setUser(null);
+      setHasSuperAdminSession(false);
       setIsLoading(false);
     }
   }, []);
@@ -113,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let userData: User;
       if (isSuperAdmin || payload.type === 'super_admin') {
         localStorage.setItem('sa_token', access_token);
+        setHasSuperAdminSession(true);
         userData = {
           id: payload.sub,
           email: responseData?.user?.email || identifier,
@@ -126,6 +132,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         localStorage.setItem('sa_user', JSON.stringify(userData));
       } else {
+        localStorage.removeItem('sa_token');
+        localStorage.removeItem('sa_user');
+        setHasSuperAdminSession(false);
         userData = {
           id: payload.sub,
           email: responseData?.user?.email || identifier,
@@ -167,6 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     document.cookie = 'institution_type=;path=/;max-age=0';
     setToken(null);
     setUser(null);
+    setHasSuperAdminSession(false);
     setTimeout(() => {
       window.location.href = '/login';
     }, 50);
@@ -179,12 +189,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('No SuperAdmin token available. Please log in as Super Admin first.');
     }
 
+    if (!localStorage.getItem('sa_user') && user) {
+      localStorage.setItem('sa_user', JSON.stringify(user));
+    }
+
     const response = await authApi.switchIdentity(schoolId);
     const data = response.data?.data || response.data;
     if (!data?.access_token) throw new Error('Failed to switch identity');
 
     localStorage.setItem('auth_token', data.access_token);
     localStorage.setItem('user', JSON.stringify(data.user));
+    setHasSuperAdminSession(true);
+    document.cookie = `auth_token=${data.access_token};path=/;max-age=${7 * 24 * 60 * 60};SameSite=Lax`;
+    const instType = data.user?.institutionType || '';
+    document.cookie = `institution_type=${instType};path=/;max-age=${7 * 24 * 60 * 60};SameSite=Lax`;
     window.location.href = '/dashboard';
   };
 
@@ -197,13 +215,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     localStorage.setItem('auth_token', saToken);
     localStorage.setItem('user', saUser);
-    window.location.reload();
+    document.cookie = `auth_token=${saToken};path=/;max-age=${7 * 24 * 60 * 60};SameSite=Lax`;
+    document.cookie = 'institution_type=;path=/;max-age=0';
+    window.location.href = '/super-admin';
   };
 
   const allRoles = mergeAllRoles(user);
   const isSuperAdmin = allRoles.includes('SuperAdmin');
   const isPureSuperAdmin = isSuperAdmin && !user?.schoolId;
   const isImpersonating = isSuperAdmin && !!user?.schoolId;
+  const canReturnToSuperAdmin = hasSuperAdminSession && !!user?.schoolId;
   const isDirector = allRoles.includes('Director') || allRoles.includes('SuperAdmin');
   const isTeacher = allRoles.includes('Teacher') || allRoles.includes('Class Teacher') || allRoles.includes('ClassTeacher');
   const isClassTeacher = allRoles.includes('Class Teacher') || allRoles.includes('ClassTeacher') || !!user?.classTeacherOf;
@@ -225,6 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         switchToSchool,
         switchToSuperAdmin,
         isImpersonating,
+        canReturnToSuperAdmin,
         isAuthenticated: !!token && !!user,
       }}
     >

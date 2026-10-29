@@ -849,7 +849,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, isLoading, user, allRoles, logout } = useAuth();
+  const { isAuthenticated, isLoading, user, allRoles, logout, switchToSuperAdmin, canReturnToSuperAdmin } = useAuth();
   const isSuperAdmin = useIsSuperAdmin();
   const isPureSuperAdmin = useIsPureSuperAdmin();
   const isDirector = useIsDirector();
@@ -1187,6 +1187,33 @@ export default function DashboardLayout({
                   </p>
                 </div>
               </div>
+              {canReturnToSuperAdmin && (
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    switchToSuperAdmin();
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    marginBottom: '8px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: '#1d4ed8',
+                    background: '#eff6ff',
+                    border: '1px solid #93c5fd',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <i className="fa fa-arrow-left"></i>
+                  <span>Back to Super Admin</span>
+                </button>
+              )}
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
@@ -1398,6 +1425,31 @@ export default function DashboardLayout({
                 </div>
               )}
             </div>
+            {canReturnToSuperAdmin && (
+              <button
+                onClick={switchToSuperAdmin}
+                style={{
+                  width: sidebarCollapsed ? '100%' : 'auto',
+                  padding: sidebarCollapsed ? '10px' : '8px 16px',
+                  marginBottom: '8px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: '#1d4ed8',
+                  background: '#eff6ff',
+                  border: '1px solid #93c5fd',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <i className="fa fa-arrow-left"></i>
+                {!sidebarCollapsed && <span>Back to Super Admin</span>}
+              </button>
+            )}
             <button
               onClick={() => {
                 logout();
@@ -1468,6 +1520,28 @@ export default function DashboardLayout({
                 </p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {canReturnToSuperAdmin && (
+                  <button
+                    onClick={switchToSuperAdmin}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 16px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: '#1d4ed8',
+                      background: '#eff6ff',
+                      border: '1px solid #93c5fd',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <i className="fa fa-arrow-left"></i>
+                    Back to Super Admin
+                  </button>
+                )}
                 <Link 
                   href="/" 
                   style={{
