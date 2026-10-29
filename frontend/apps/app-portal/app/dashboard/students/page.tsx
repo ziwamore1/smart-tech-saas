@@ -494,6 +494,15 @@ export default function StudentsPage() {
   const maleStudents = filteredStudents.filter((s: any) => s.gender?.toUpperCase() === 'MALE').length;
   const femaleStudents = filteredStudents.filter((s: any) => s.gender?.toUpperCase() === 'FEMALE').length;
 
+  const missingDetails = (student: any) => {
+    const linkedParent = student.parents?.some((item: any) => item.parent?.firstName || item.parent?.phone || item.parent?.email);
+    return [
+      !student.dateOfBirth ? 'date of birth' : '',
+      !student.gender ? 'gender' : '',
+      !linkedParent && !student.parentName && !student.parentPhone && !student.parentEmail ? 'parent/guardian' : '',
+    ].filter(Boolean);
+  };
+
   const groupedByClass = filteredStudents.reduce((acc: Record<string, any[]>, s: any) => {
     const key = s.className || 'Ungrouped';
     if (!acc[key]) acc[key] = [];
@@ -536,6 +545,7 @@ export default function StudentsPage() {
                 {(student.firstName?.[0] || '?')}{(student.lastName?.[0] || '?')}
               </div>
               <div className="font-medium text-gray-900">{student.firstName} {student.lastName}</div>
+              {missingDetails(student).length > 0 && <div className="mt-1 text-xs font-medium text-amber-700">Missing: {missingDetails(student).join(', ')}</div>}
             </div>
           </td>
           <td className="py-4 px-6 border border-gray-200">

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, ConflictException, Logger, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException, ServiceUnavailableException, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
@@ -747,10 +747,21 @@ export class StudentService {
       data.dateOfBirth = new Date(dto.dateOfBirth);
     }
 
-    const updated = await this.prisma.student.update({
-      where: { id },
-      data,
-    });
+    let updated;
+    try {
+      updated = await this.prisma.student.update({
+        where: { id },
+        data,
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002' && error?.meta?.target?.includes('admissionNumber')) {
+        throw new ConflictException('This admission number is already used by another student in the same class. Enter a unique admission number and try again.');
+      }
+      if (error?.code === 'P2024') {
+        throw new ServiceUnavailableException('The database is busy. No student details were changed. Please wait a moment and try again.');
+      }
+      throw error;
+    }
 
     if (dto.admissionNumber && dto.admissionNumber !== student.admissionNumber) {
       await this.createAuditLog(userId, student.schoolId, 'ADMISSION_OVERRIDDEN', 'Student', student.id, {

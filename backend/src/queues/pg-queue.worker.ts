@@ -9,6 +9,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 @Injectable()
 export class PgQueueWorker {
   private readonly logger = new Logger(PgQueueWorker.name);
+  private queueTaskRunning = false;
 
   constructor(
     private readonly emailQueue: EmailQueueService,
@@ -20,49 +21,34 @@ export class PgQueueWorker {
 
   @Cron('0/3 * * * *')
   async processEmailQueue() {
-    try {
-      const count = await this.emailQueue.processBatch();
-      if (count > 0) {
-        this.logger.log(`Processed ${count} email jobs`);
-      }
-    } catch (error: any) {
-      this.logger.error(`Email queue processing failed: ${error.message}`);
-    }
+    await this.runQueueTask('email', () => this.emailQueue.processBatch());
   }
 
   @Cron('1/3 * * * *')
   async processNotificationQueue() {
-    try {
-      const count = await this.notificationsService.processPendingBatch();
-      if (count > 0) {
-        this.logger.log(`Processed ${count} notification jobs`);
-      }
-    } catch (error: any) {
-      this.logger.error(`Notification queue processing failed: ${error.message}`);
-    }
+    await this.runQueueTask('notification', () => this.notificationsService.processPendingBatch());
   }
 
   @Cron('2/3 * * * *')
   async processSmsQueue() {
-    try {
-      const count = await this.smsQueue.processBatch();
-      if (count > 0) {
-        this.logger.log(`Processed ${count} SMS jobs`);
-      }
-    } catch (error: any) {
-      this.logger.error(`SMS queue processing failed: ${error.message}`);
-    }
+    await this.runQueueTask('SMS', () => this.smsQueue.processBatch());
   }
 
   @Cron('3/3 * * * *')
   async processWhatsAppQueue() {
+    await this.runQueueTask('WhatsApp', () => this.whatsAppQueue.processBatch());
+  }
+
+  private async runQueueTask(label: string, task: () => Promise<number>) {
+    if (this.queueTaskRunning) return;
+    this.queueTaskRunning = true;
     try {
-      const count = await this.whatsAppQueue.processBatch();
-      if (count > 0) {
-        this.logger.log(`Processed ${count} WhatsApp jobs`);
-      }
+      const count = await task();
+      if (count > 0) this.logger.log(`Processed ${count} ${label} jobs`);
     } catch (error: any) {
-      this.logger.error(`WhatsApp queue processing failed: ${error.message}`);
+      this.logger.error(`${label} queue processing failed: ${error.message}`);
+    } finally {
+      this.queueTaskRunning = false;
     }
   }
 

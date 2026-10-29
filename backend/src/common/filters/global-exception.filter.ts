@@ -23,6 +23,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
     let errors: string[] | undefined;
+    let exceptionMetadata: Record<string, unknown> = {};
 
     if (exception instanceof HttpException) {
       status = (exception as HttpException).getStatus();
@@ -35,6 +36,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
         const resp = exceptionResponse as Record<string, unknown>;
         message = (resp.message as string) || (exception as Error).message;
+        exceptionMetadata = Object.fromEntries(
+          ['code', 'studentId', 'student'].filter((key) => resp[key] !== undefined).map((key) => [key, resp[key]]),
+        );
         if (Array.isArray(resp.message)) {
           errors = resp.message;
           message = message || 'Validation error';
@@ -43,7 +47,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         message = (exception as Error).message;
       }
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-      status = HttpStatus.BAD_REQUEST;
+      status = exception.code === 'P2024' ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.BAD_REQUEST;
       message = this.handlePrismaError(exception);
     } else if (exception instanceof Prisma.PrismaClientValidationError) {
       status = HttpStatus.BAD_REQUEST;
@@ -76,6 +80,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       statusCode: status,
       message,
       timestamp: new Date().toISOString(),
+      ...exceptionMetadata,
     };
 
     if (errors) {
@@ -99,6 +104,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     switch (exception.code) {
       case 'P2002':
         return 'A record with this value already exists';
+      case 'P2024':
+        return 'The database is busy processing other requests. Please wait a moment and try again.';
       case 'P2025':
         return 'Record not found';
       case 'P2003':

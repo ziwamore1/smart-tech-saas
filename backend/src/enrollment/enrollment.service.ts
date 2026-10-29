@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger, ConflictException, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdmissionNumberService } from '../admission-number/admission-number.service';
 import { EnrollmentStatus, Prisma, StudentStatus } from '@prisma/client';
@@ -65,6 +65,13 @@ export class EnrollmentService {
             },
           });
 
+          await this.admissionNumberService.resequenceClassInTransaction(
+            tx, data.schoolId, data.academicYearId, data.classId,
+          );
+
+          // Re-sequencing assigns the student's final class admission number
+          // before classId is changed. This avoids colliding with an existing
+          // student's admissionNumber/classId pair during the update.
           await tx.student.update({
             where: { id: data.studentId },
             data: {
@@ -72,10 +79,6 @@ export class EnrollmentService {
               ...(student.status !== StudentStatus.ACTIVE ? { status: StudentStatus.ACTIVE } : {}),
             },
           });
-
-          await this.admissionNumberService.resequenceClassInTransaction(
-            tx, data.schoolId, data.academicYearId, data.classId,
-          );
 
           return enrollment;
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
@@ -86,6 +89,12 @@ export class EnrollmentService {
           this.logger.warn(`Enrollment transaction conflict on attempt ${attempt}, retrying...`);
           await new Promise(r => setTimeout(r, 200 * attempt));
           continue;
+        }
+        if (error?.code === 'P2002' && error?.meta?.target?.includes('admissionNumber')) {
+          throw new ConflictException('The student could not be enrolled because the class register is being updated. Please refresh the register and try again.');
+        }
+        if (error?.code === 'P2024') {
+          throw new ServiceUnavailableException('The database is busy. No enrollment was completed. Please wait a moment and try again.');
         }
         throw error;
       }
