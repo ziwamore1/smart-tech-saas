@@ -458,7 +458,25 @@ export default function StudentsPage() {
         setTimeout(() => setHighlightedStudentId(null), 180000);
       }
     },
-    onError: (error: any) => {
+    onError: async (error: any, variables) => {
+      const transientFailure = !error?.response || error?.code === 'ECONNABORTED' || error?.message?.toLowerCase?.().includes('timeout') || [502, 503, 504].includes(error?.response?.status);
+      if (transientFailure && variables?.studentId) {
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            await new Promise(resolve => setTimeout(resolve, attempt === 0 ? 1500 : 2500));
+            const response = await studentApi.getById(variables.studentId);
+            const student = response.data?.data || response.data;
+            const enrolled = student?.enrollments?.some((item: any) => item.classId === variables.classId && item.status === 'ACTIVE');
+            if (enrolled) {
+              queryClient.invalidateQueries({ queryKey: ['students'] });
+              setEnrollmentFormMessage({ type: 'success', text: `Student successfully enrolled in ${classes.find((c: any) => c.id === variables.classId)?.name || 'the selected class'}.` });
+              setMessage({ type: 'success', text: 'Student enrolled successfully.' });
+              return;
+            }
+          } catch {
+          }
+        }
+      }
       setEnrollmentFormMessage({ type: 'error', text: error?.response?.data?.message || 'Enrollment failed. The student was not enrolled.' });
     },
   });

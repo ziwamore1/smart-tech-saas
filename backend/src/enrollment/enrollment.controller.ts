@@ -29,6 +29,7 @@ export class EnrollmentController {
       });
     } catch (error) {
       console.error('Enrollment error:', error);
+      if (error instanceof HttpException) throw error;
       throw new HttpException(error.message || 'Enrollment failed', HttpStatus.BAD_REQUEST);
     }
   }
