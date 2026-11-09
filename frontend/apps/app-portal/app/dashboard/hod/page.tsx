@@ -63,6 +63,7 @@ function HODDashboardContent() {
   ];
 
   const oversightActions = [
+    { name: 'Department Teachers', href: '/dashboard/teachers', icon: 'fa-chalkboard-teacher', desc: 'View teachers in your department', color: '#10b981' },
     { name: 'Assessment Oversight', href: '/dashboard/assessment-oversight', icon: 'fa-eye', desc: 'Monitor assessment completion', color: '#7c3aed' },
     { name: 'Teacher Performance', href: '/dashboard/teacher-performance', icon: 'fa-chart-bar', desc: 'Department teacher evaluations', color: '#0891b2' },
     { name: 'Results Analytics', href: '/dashboard/result-analytics', icon: 'fa-chart-line', desc: 'Subject performance analytics', color: '#059669' },

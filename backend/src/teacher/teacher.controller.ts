@@ -39,9 +39,20 @@ export class TeacherController {
   }
 
   @Get()
-  @Roles('Director', 'Deputy Director', 'SuperAdmin', 'Head Teacher', 'Deputy Head', 'Deputy')
-  findAll(@Query('schoolId') schoolId?: string, @Req() req?: any) {
+  @Roles('Director', 'Deputy Director', 'SuperAdmin', 'Head Teacher', 'Deputy Head', 'Deputy', 'HOD')
+  async findAll(@Query('schoolId') schoolId?: string, @Req() req?: any) {
     const targetSchoolId = schoolId || req?.user?.schoolId;
+    const roles: string[] = req?.user?.roles || [];
+    const normalized = roles.map((role) => role.toLowerCase().replace(/[\s_-]+/g, ''));
+    const globalViewers = ['director', 'deputydirector', 'superadmin', 'headteacher', 'deputyhead', 'deputy'];
+    const isHodOnly = normalized.includes('hod') && !normalized.some((role) => globalViewers.includes(role));
+
+    // HODs can view teacher records, scoped to their own department when known.
+    if (isHodOnly) {
+      const departmentId = await this.teacherService.resolveDepartmentForUser(req.user.id, targetSchoolId);
+      return this.teacherService.findAll(targetSchoolId, departmentId || undefined);
+    }
+
     return this.teacherService.findAll(targetSchoolId);
   }
 

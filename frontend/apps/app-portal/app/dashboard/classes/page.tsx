@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { classApi, levelTypeApi, enrollmentApi, studentApi, subjectApi, classSubjectApi, gradingSystemApi, api, classTeacherAssignmentApi, academicYearApi, studentSubjectApi } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permission-context';
 import TooltipWrap from '@/components/ui/TooltipWrap';
 
@@ -18,8 +19,12 @@ const PRESET_LEVELS: Record<LevelCategory, string[]> = {
 
 export default function ClassesPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { can } = usePermissions();
   const canManageClasses = can('classes.manage');
+  const isTeacher = (user?.roles || []).some(
+    (role: string) => role.toLowerCase().replace(/\s+/g, '') === 'teacher'
+  );
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterLevel, setFilterLevel] = useState('');
@@ -555,7 +560,7 @@ export default function ClassesPage() {
                   >
                     📚
                   </button>
-                  {(canManageClasses || user?.role === 'TEACHER') && (
+                  {(canManageClasses || isTeacher) && (
                   <TooltipWrap text="Assign subjects to individual students">
                   <button 
                     onClick={() => {

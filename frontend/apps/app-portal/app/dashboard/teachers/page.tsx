@@ -496,18 +496,27 @@ export default function TeachersPage() {
         </div>
       )}
 
+      {!canManageStaff && canViewStaff && (
+        <div className="px-4 py-3 rounded-lg bg-gray-50 text-gray-700 border border-gray-200 flex items-center gap-2">
+          <i className="fa fa-lock" />
+          <span>Read-only view. You can browse teacher records but cannot add, edit, or delete them.</span>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Staff Register</h1>
           <p className="text-gray-600 mt-1">Manage teacher profiles and staff information</p>
         </div>
         <div className="flex gap-2">
+          {canManageStaff && (
           <a
             href="/dashboard/users"
             className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors"
           >
             Manage Roles
           </a>
+          )}
           {canManageStaff && (
           <>
           <button
@@ -634,11 +643,11 @@ export default function TeachersPage() {
               <button onClick={() => queryClient.invalidateQueries({ queryKey: ['teachers'] })} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
                 Retry
               </button>
-            ) : (
+            ) : canManageStaff ? (
               <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
                 + Add Teacher
               </button>
-            )}
+            ) : null}
           </div>
         ) : (
           <div className="overflow-x-auto">

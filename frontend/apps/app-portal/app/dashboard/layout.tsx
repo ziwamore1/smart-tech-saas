@@ -110,6 +110,20 @@ const regularNav: NavItem[] = [
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
   {
+    name: 'My Dashboard',
+    href: '/dashboard/hod',
+    icon: 'fa-user-tie',
+    color: '#7c3aed',
+    typeRoles: {
+      PRIMARY_SCHOOL: [],
+      SECONDARY_SCHOOL: ['HOD'],
+      ADVANCED_SECONDARY: ['HOD'],
+      COLLEGE: [],
+      UNIVERSITY: [],
+    },
+    institutionTypes: ['SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
+  },
+  {
     name: 'Advanced Staff Profile',
     href: '/teacher/profile?section=advanced',
     icon: 'fa-id-card',
@@ -1132,9 +1146,9 @@ export default function DashboardLayout({
                 <i className="fa fa-times" style={{ fontSize: '14px', color: '#6b7280' }}></i>
               </button>
             </div>
-            {navigation.map((item) => (
+            {navigation.map((item, index) => (
               <Link
-                key={item.name}
+                key={`${item.href}-${index}`}
                 href={item.href}
                 onClick={() => setMobileMenuOpen(false)}
                 aria-current={isNavigationItemActive(item.href) ? 'page' : undefined}
@@ -1311,9 +1325,9 @@ export default function DashboardLayout({
                 {isPureSuperAdmin ? 'Administration' : 'Management'}
               </div>
             )}
-            {navigation.map((item) => (
+            {navigation.map((item, index) => (
               <Link
-                key={item.name}
+                key={`${item.href}-${index}`}
                 href={item.href}
                 aria-current={isNavigationItemActive(item.href) ? 'page' : undefined}
                 className={`sidebar-link ${isNavigationItemActive(item.href) ? 'active' : ''} transition-all active:scale-[0.98]`}

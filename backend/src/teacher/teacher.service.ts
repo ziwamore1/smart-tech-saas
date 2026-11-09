@@ -28,10 +28,13 @@ export class TeacherService {
     @Optional() private readonly activityService?: SchoolActivityService,
   ) {}
 
-  async findAll(schoolId?: string) {
-    this.logger.log(`findAll called with schoolId=${schoolId}`);
+  async findAll(schoolId?: string, departmentId?: string) {
+    this.logger.log(`findAll called with schoolId=${schoolId}, departmentId=${departmentId}`);
+    const where: any = {};
+    if (schoolId) where.schoolId = schoolId;
+    if (departmentId) where.departmentId = departmentId;
     const teachers = await this.prisma.teacher.findMany({
-      where: schoolId ? { schoolId } : undefined,
+      where: Object.keys(where).length ? where : undefined,
       include: { 
         user: {
           include: { userRoles: { include: { role: true } } }
@@ -41,6 +44,35 @@ export class TeacherService {
     });
     this.logger.log(`findAll returned ${teachers.length} teachers`);
     return teachers;
+  }
+
+  /**
+   * Resolves the department a user supervises. Used to scope HOD teacher lists.
+   * Checks the teacher profile first, then any active HOD acting position.
+   */
+  async resolveDepartmentForUser(userId: string, schoolId?: string): Promise<string | null> {
+    const teacher = await this.prisma.teacher.findFirst({
+      where: schoolId ? { userId, schoolId } : { userId },
+      select: { id: true, departmentId: true, department: true },
+    });
+    if (!teacher) return null;
+    if (teacher.departmentId) return teacher.departmentId;
+
+    const position = await this.prisma.actingPosition.findFirst({
+      where: { teacherId: teacher.id, isActive: true, positionType: 'HOD', departmentId: { not: null } },
+      select: { departmentId: true },
+    });
+    if (position?.departmentId) return position.departmentId;
+
+    if (teacher.department) {
+      const dept = await this.prisma.department.findFirst({
+        where: { schoolId: schoolId || undefined, name: teacher.department },
+        select: { id: true },
+      });
+      if (dept?.id) return dept.id;
+    }
+
+    return null;
   }
 
   async findOne(id: string) {
