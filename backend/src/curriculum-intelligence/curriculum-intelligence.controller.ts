@@ -13,6 +13,7 @@ import { SbaManagementService } from './sba-management.service';
 import { LessonPlanningService } from './lesson-planning.service';
 import { AnalyticsService } from './analytics.service';
 import { BloomLevel, QuestionType } from '@prisma/client';
+import { AiExaminorRequest, AiExaminorService } from './ai-examinor.service';
 
 @Controller('curriculum-intelligence')
 export class CurriculumIntelligenceController {
@@ -24,6 +25,7 @@ export class CurriculumIntelligenceController {
     private readonly sbaManagement: SbaManagementService,
     private readonly lessonPlanning: LessonPlanningService,
     private readonly analytics: AnalyticsService,
+    private readonly aiExaminor: AiExaminorService,
   ) {}
 
   // ===================== TOPICS =====================
@@ -275,6 +277,13 @@ export class CurriculumIntelligenceController {
     includeEocs?: string[]; includeTopics?: string[]; difficultyDistribution?: any;
   }) {
     return this.examGenerator.generateExamPaper(body);
+  }
+
+  @Post('ai-examinor/generate')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
+  generateWithAiExaminor(@Body() body: AiExaminorRequest) {
+    return this.aiExaminor.generate(body);
   }
 
   // ===================== SBA MANAGEMENT =====================

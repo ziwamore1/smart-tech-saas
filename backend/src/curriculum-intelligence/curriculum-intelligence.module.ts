@@ -9,6 +9,7 @@ import { SbaManagementService } from './sba-management.service';
 import { LessonPlanningService } from './lesson-planning.service';
 import { AnalyticsService } from './analytics.service';
 import { CieAdaptiveService } from './cie-adaptive.service';
+import { AiExaminorService } from './ai-examinor.service';
 
 @Module({
   imports: [PrismaModule],
@@ -22,6 +23,7 @@ import { CieAdaptiveService } from './cie-adaptive.service';
     LessonPlanningService,
     AnalyticsService,
     CieAdaptiveService,
+    AiExaminorService,
   ],
   exports: [
     CurriculumIntelligenceService,
@@ -31,6 +33,7 @@ import { CieAdaptiveService } from './cie-adaptive.service';
     LessonPlanningService,
     AnalyticsService,
     CieAdaptiveService,
+    AiExaminorService,
   ],
 })
 export class CurriculumIntelligenceModule {}
