@@ -2943,6 +2943,26 @@ export const teacherAnalyticsApi = {
     api.get(`/teacher-analytics/teacher/${teacherId}/mark-schedules`, { params: opts, timeout: 120000 }),
 };
 
+export const examAuthoringApi = {
+  dashboard: () => api.get('/exam-authoring/dashboard'),
+  providers: () => api.get('/exam-authoring/providers'),
+  listBlueprints: (params?: { subjectId?: string; status?: string }) => api.get('/exam-authoring/blueprints', { params }),
+  getBlueprint: (id: string) => api.get(`/exam-authoring/blueprints/${id}`),
+  createBlueprint: (data: any) => api.post('/exam-authoring/blueprints', data),
+  approveBlueprint: (id: string) => api.patch(`/exam-authoring/blueprints/${id}/approve`),
+  generate: (data: any) => api.post('/exam-authoring/generate', data),
+  createDraft: (data: any) => api.post('/exam-authoring/drafts', data),
+  getVersion: (id: string) => api.get(`/exam-authoring/versions/${id}`),
+  duplicateVersion: (id: string, restore = false) => api.post(`/exam-authoring/versions/${id}/duplicate`, { restore }),
+  updateQuestion: (id: string, data: any) => api.patch(`/exam-authoring/questions/${id}`, data),
+  updateMarkingEntry: (id: string, data: any) => api.patch(`/exam-authoring/marking-entries/${id}`, data),
+  validateVersion: (id: string) => api.post(`/exam-authoring/versions/${id}/validate`),
+  submitForModeration: (id: string) => api.post(`/exam-authoring/versions/${id}/submit-moderation`),
+  moderate: (id: string, data: { decision: 'APPROVED' | 'REJECTED'; comments?: string }) => api.post(`/exam-authoring/versions/${id}/moderate`, data),
+  exportVersion: (id: string, type: string) => api.post(`/exam-authoring/versions/${id}/export`, { type }),
+  artifactUrl: (id: string) => authedUrl(`/exam-authoring/artifacts/${id}`),
+};
+
 export const studentAwardsApi = {
   catalog: () => api.get('/student-awards/catalog'),
   addLeadershipRole: (data: { title: string; minimumPoints: number }) =>

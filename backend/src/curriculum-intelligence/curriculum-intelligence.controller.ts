@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuards, UploadedFile, UseInterceptors,
+  Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, Request, UseGuards, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -282,8 +282,8 @@ export class CurriculumIntelligenceController {
   @Post('ai-examinor/generate')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
-  generateWithAiExaminor(@Body() body: AiExaminorRequest) {
-    return this.aiExaminor.generate(body);
+  generateWithAiExaminor(@Request() req: any, @Body() body: AiExaminorRequest) {
+    return this.aiExaminor.generate({ ...body, schoolId: req.user.schoolId });
   }
 
   // ===================== SBA MANAGEMENT =====================

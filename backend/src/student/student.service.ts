@@ -13,7 +13,7 @@ import { SchoolActivityService } from '../common/services/school-activity.servic
 import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
-import { normalizeZambianPhone } from '../common/utils/phone.util';
+import { normalizeZambianPhone, validateZambianPhone } from '../common/utils/phone.util';
 
 @Injectable()
 export class StudentService {
@@ -714,6 +714,7 @@ export class StudentService {
     const student = await this.prisma.student.findUnique({ where: { id }, select: {
       id: true, admissionNumber: true, studentUuid: true, status: true, schoolId: true,
       firstName: true, lastName: true, gender: true,
+      user: { select: { id: true, email: true, phone: true } },
     }});
     if (!student) throw new NotFoundException('Student not found');
 
@@ -761,6 +762,23 @@ export class StudentService {
         throw new ServiceUnavailableException('The database is busy. No student details were changed. Please wait a moment and try again.');
       }
       throw error;
+    }
+
+    if (student.user && (dto.email !== undefined || dto.phone !== undefined)) {
+      try {
+        await this.prisma.user.update({
+          where: { id: student.user.id },
+          data: {
+            ...(dto.email !== undefined ? { email: dto.email.trim().toLowerCase() } : {}),
+            ...(dto.phone !== undefined ? { phone: dto.phone.trim() || null } : {}),
+          },
+        });
+      } catch (error: any) {
+        if (error?.code === 'P2002') {
+          throw new ConflictException('This student email is already in use. Enter a unique email address.');
+        }
+        throw error;
+      }
     }
 
     if (dto.admissionNumber && dto.admissionNumber !== student.admissionNumber) {

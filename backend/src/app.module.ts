@@ -44,6 +44,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { FirebaseModule } from './firebase/firebase.module';
 import { MobileModule } from './mobile/mobile.module';
 import { ExamModule } from './exam/exam.module';
+import { ExamAuthoringModule } from './exam-authoring/exam-authoring.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { LibraryModule } from './library/library.module';
 import { GalleryModule } from './gallery/gallery.module';
@@ -154,6 +155,7 @@ import { getRedisConnectionOptions } from './queues/redis.config';
     FirebaseModule,
     MobileModule,
     ExamModule,
+    ExamAuthoringModule,
     MessagingModule,
     LibraryModule,
     GalleryModule,

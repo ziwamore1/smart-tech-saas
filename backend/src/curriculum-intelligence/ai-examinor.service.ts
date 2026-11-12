@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,6 +13,7 @@ export interface AiExaminorSectionRequest {
 }
 
 export interface AiExaminorRequest {
+  schoolId?: string;
   subjectId: string;
   academicStageId?: string;
   totalMarks?: number;
@@ -41,7 +42,12 @@ export class AiExaminorService {
     if (apiKey) this.openai = new OpenAI({ apiKey, timeout: 30000, maxRetries: 0 });
   }
 
-  async generate(request: AiExaminorRequest) {
+  getProviderStatus() {
+    return { providers: [{ id: 'openai', name: 'OpenAI', configured: Boolean(this.openai), model: this.config.get<string>('OPENAI_EXAMINOR_MODEL') || 'gpt-4o' }], generationAvailable: Boolean(this.openai) };
+  }
+
+  async generate(request: AiExaminorRequest, options: { requireProvider?: boolean } = {}) {
+    if (options.requireProvider && !this.openai) throw new ServiceUnavailableException('AI-EXAMINOR generation requires a configured AI provider');
     const blueprint = this.normaliseBlueprint(request);
     const curriculum = await this.loadCurriculum(request);
     if (!curriculum.subject) throw new BadRequestException('Subject not found');
@@ -79,7 +85,7 @@ export class AiExaminorService {
   }
 
   private async loadCurriculum(request: AiExaminorRequest) {
-    const subject = await this.prisma.subject.findUnique({ where: { id: request.subjectId }, include: { Topic: { include: { competencies: true, learningOutcomes: true }, orderBy: { sortOrder: 'asc' } }, SyllabusEntry: { orderBy: [{ formNumber: 'asc' }, { sourcePage: 'asc' }] } } });
+    const subject = await this.prisma.subject.findFirst({ where: { id: request.subjectId, ...(request.schoolId ? { schoolId: request.schoolId } : {}) }, include: { Topic: { include: { competencies: true, learningOutcomes: true }, orderBy: { sortOrder: 'asc' } }, SyllabusEntry: { orderBy: [{ formNumber: 'asc' }, { sourcePage: 'asc' }] } } });
     const eocs = await this.prisma.elementOfConstruct.findMany({ where: { subjectId: request.subjectId, ...(request.includeEocs?.length ? { id: { in: request.includeEocs } } : {}) }, include: { competencies: true }, orderBy: { sortOrder: 'asc' } });
     const topics = (subject?.Topic || []).filter(topic => !request.includeTopics?.length || request.includeTopics.includes(topic.id));
     return { subject: subject ? { id: subject.id, name: subject.name, code: subject.code } : null, topics: topics.map(topic => ({ id: topic.id, name: topic.name, competencies: topic.competencies.map(c => ({ id: c.id, name: c.name, description: c.description, bloomLevel: c.bloomLevel })) })), eocs: eocs.map(eoc => ({ id: eoc.id, name: eoc.name, competencies: eoc.competencies.map(c => c.name) })), syllabusEntries: (subject?.SyllabusEntry || []).map(entry => ({ code: entry.competencyCode, topic: entry.topic, competency: entry.competency, standard: entry.expectedStandard, sourcePage: entry.sourcePage })) };

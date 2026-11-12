@@ -87,7 +87,17 @@ export default function MyClassPage() {
   });
 
   const updateStudentMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => studentApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: any }) => studentApi.update(id, {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      dateOfBirth: data.dateOfBirth,
+      gender: data.gender,
+      email: data.email,
+      phone: data.phone,
+      parentName: data.parentName,
+      parentPhone: data.parentPhone,
+      parentEmail: data.parentEmail,
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['class-students'] });
       setShowEditModal(false);

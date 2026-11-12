@@ -218,8 +218,8 @@ export class CurriculumIntelligenceService {
   }
 
   async getFullSubjectTreeByCode(code: string, schoolId: string) {
-    const subject = await this.prisma.subject.findUnique({
-      where: { name_schoolId: { name: code, schoolId } },
+    const subject = await this.prisma.subject.findFirst({
+      where: { name: code, schoolId },
     });
     if (!subject) throw new NotFoundException(`Subject ${code} not found`);
     return this.getFullSubjectTree(subject.id);

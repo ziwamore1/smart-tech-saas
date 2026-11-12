@@ -1,0 +1,106 @@
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query, Request, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
+import { AuthGuard } from '@nestjs/passport';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { CreateBlueprintInput, ExamAuthoringService } from './exam-authoring.service';
+import { ExamArtifactType } from '@prisma/client';
+import { ExamExportService } from './exam-export.service';
+import { DiagramInput, ExamDiagramService } from './exam-diagram.service';
+import { AiExaminorService } from '../curriculum-intelligence/ai-examinor.service';
+
+const AUTHORING_ROLES = ['Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher'];
+
+@Controller('exam-authoring')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+export class ExamAuthoringController {
+  constructor(private readonly service: ExamAuthoringService, private readonly aiExaminor: AiExaminorService, private readonly exportService: ExamExportService, private readonly diagrams: ExamDiagramService) {}
+
+  @Get('dashboard')
+  getDashboard(@Request() req: any) { return this.service.getDashboard(req.user.schoolId); }
+
+  @Get('providers')
+  getProviders() { return this.aiExaminor.getProviderStatus(); }
+
+  @Get('blueprints')
+  listBlueprints(@Request() req: any, @Query('subjectId') subjectId?: string, @Query('status') status?: string) { return this.service.listBlueprints(req.user.schoolId, { subjectId, status }); }
+
+  @Get('blueprints/:id')
+  getBlueprint(@Request() req: any, @Param('id') id: string) { return this.service.getBlueprint(req.user.schoolId, id); }
+
+  @Post('blueprints')
+  @Roles(...AUTHORING_ROLES)
+  createBlueprint(@Request() req: any, @Body() body: CreateBlueprintInput) { return this.service.createBlueprint(req.user.schoolId, req.user.id, body); }
+
+  @Patch('blueprints/:id/approve')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD')
+  approveBlueprint(@Request() req: any, @Param('id') id: string) { return this.service.approveBlueprint(req.user.schoolId, id); }
+
+  @Post('drafts')
+  @Roles(...AUTHORING_ROLES)
+  createDraft(@Request() req: any, @Body() body: any) { return this.service.createExamDraft({ ...body, schoolId: req.user.schoolId, createdById: req.user.id }); }
+
+  @Post('generate')
+  @Roles(...AUTHORING_ROLES)
+  async generateDraft(@Request() req: any, @Body() body: any) {
+    const blueprint = await this.service.getBlueprint(req.user.schoolId, body.blueprintId);
+    if (!blueprint.isApproved) throw new ForbiddenException('An approved examination blueprint is required');
+    const structure = blueprint.structure as any;
+    const job = await this.service.startGenerationJob(req.user.schoolId, req.user.id, { ...body, subjectId: blueprint.subjectId, blueprintId: blueprint.id });
+    try {
+      const artifact = await this.aiExaminor.generate({ ...body, subjectId: blueprint.subjectId, totalMarks: structure.totalMarks, durationMinutes: structure.durationMinutes, sections: structure.sections }, { requireProvider: true });
+      const exam = await this.service.createExamDraft({ ...body, blueprintId: blueprint.id, subjectId: blueprint.subjectId, schoolId: req.user.schoolId, createdById: req.user.id, generationJobId: job.id, artifact });
+      await this.service.finishGenerationJob(job.id, { versionId: exam?.versions?.[0]?.id, examId: exam?.id });
+      return exam;
+    } catch (error) {
+      await this.service.finishGenerationJob(job.id, undefined, (error as Error).message);
+      throw error;
+    }
+  }
+
+  @Get('versions/:id')
+  getVersion(@Request() req: any, @Param('id') id: string) { return this.service.getVersion(req.user.schoolId, id); }
+
+  @Post('versions/:id/duplicate')
+  @Roles(...AUTHORING_ROLES)
+  duplicateVersion(@Request() req: any, @Param('id') id: string, @Body('restore') restore?: boolean) { return this.service.duplicateVersion(req.user.schoolId, id, req.user.id, Boolean(restore)); }
+
+  @Patch('questions/:id')
+  @Roles(...AUTHORING_ROLES)
+  updateQuestion(@Request() req: any, @Param('id') id: string, @Body() body: any) { return this.service.updateQuestion(req.user.schoolId, id, req.user.id, body); }
+
+  @Patch('marking-entries/:id')
+  @Roles(...AUTHORING_ROLES)
+  updateMarkingEntry(@Request() req: any, @Param('id') id: string, @Body() body: any) { return this.service.updateMarkingEntry(req.user.schoolId, id, req.user.id, body); }
+
+  @Post('versions/:id/validate')
+  @Roles(...AUTHORING_ROLES)
+  validateVersion(@Request() req: any, @Param('id') id: string) { return this.service.validateVersion(req.user.schoolId, id, req.user.id); }
+
+  @Post('versions/:id/submit-moderation')
+  @Roles(...AUTHORING_ROLES)
+  submitForModeration(@Request() req: any, @Param('id') id: string) { return this.service.submitForModeration(req.user.schoolId, id, req.user.id); }
+
+  @Post('versions/:id/moderate')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD')
+  moderate(@Request() req: any, @Param('id') id: string, @Body() body: { decision: 'APPROVED' | 'REJECTED'; comments?: string }) { return this.service.moderate(req.user.schoolId, id, req.user.id, body.decision, body.comments); }
+
+  @Post('versions/:id/export')
+  @Roles(...AUTHORING_ROLES)
+  exportVersion(@Request() req: any, @Param('id') id: string, @Body('type') type: ExamArtifactType) { return this.exportService.exportVersion(req.user.schoolId, id, type || ExamArtifactType.CANDIDATE_PDF); }
+
+  @Post('versions/:id/diagrams')
+  @Roles(...AUTHORING_ROLES)
+  createDiagram(@Request() req: any, @Param('id') id: string, @Body() body: DiagramInput) { return this.diagrams.create(req.user.schoolId, id, body); }
+
+  @Patch('diagrams/:id')
+  @Roles(...AUTHORING_ROLES)
+  updateDiagram(@Request() req: any, @Param('id') id: string, @Body('definition') definition: any) { return this.diagrams.update(req.user.schoolId, id, definition); }
+
+  @Get('artifacts/:id')
+  async downloadArtifact(@Request() req: any, @Param('id') id: string, @Res() response: Response) {
+    const result = await this.exportService.getArtifact(req.user.schoolId, id);
+    if (result.artifact.downloadUrl) return response.redirect(result.artifact.downloadUrl);
+    response.type(result.artifact.mimeType).send(result.buffer);
+  }
+}

@@ -382,7 +382,11 @@ export class ResultsManagementService {
           },
         },
       },
-      orderBy: { student: { lastName: 'asc' } },
+      orderBy: [
+        { student: { lastName: 'asc' } },
+        { student: { firstName: 'asc' } },
+        { student: { id: 'asc' } },
+      ],
     });
 
     let students = enrollments.map((e) => e.student);
@@ -407,6 +411,11 @@ export class ResultsManagementService {
           },
         },
         distinct: ['studentId'],
+        orderBy: [
+          { student: { lastName: 'asc' } },
+          { student: { firstName: 'asc' } },
+          { student: { id: 'asc' } },
+        ],
       });
       students = resultsWithStudents.map((r) => r.student).filter(Boolean);
     }

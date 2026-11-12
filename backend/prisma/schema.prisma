@@ -217,6 +217,11 @@ model School {
   dashboardConfigs               DashboardConfig?
   enrollments                    Enrollment[]
   exams                          Exam[]
+  examBlueprints                 ExamBlueprint[]
+  examinationVersions            ExaminationVersion[]           @relation("VersionSchool")
+  examinationArtifacts           ExaminationArtifact[]
+  examinationAuditLogs           ExaminationAuditLog[]
+  aiGenerationJobs               AiGenerationJob[]
   FeeCategory                    FeeCategory[]
   FeePayment                     FeePayment[]
   galleries                      Gallery[]
@@ -342,8 +347,8 @@ model School {
   calendarActivityTimelines      CalendarActivityTimeline[]
   financialCustomers             FinancialCustomer[]
   studentLeadershipRoles         StudentLeadershipRole[]
-  studentLeadershipAppointments StudentLeadershipAppointment[]
-  studentSportsParticipations   StudentSportsParticipation[]
+  studentLeadershipAppointments  StudentLeadershipAppointment[]
+  studentSportsParticipations    StudentSportsParticipation[]
 
   @@index([institutionTypeId])
   @@index([isActive])
@@ -503,6 +508,12 @@ model User {
   deviceTokens                   DeviceToken[]
   notificationDevices            NotificationDevice[]
   createdExams                   Exam[]
+  createdExamBlueprints          ExamBlueprint[]
+  createdExaminationVersions     ExaminationVersion[]           @relation("VersionCreatedBy")
+  approvedExaminationVersions    ExaminationVersion[]           @relation("VersionApprovedBy")
+  reviewedExaminations           ExaminationModerationRecord[]
+  examinationAuditLogs           ExaminationAuditLog[]
+  aiGenerationJobs               AiGenerationJob[]
   createdTemplates               ExamTemplate[]
   createdBankQuestions           QuestionBank[]
   uploadedExams                  UploadedExam[]
@@ -604,47 +615,47 @@ model AgeBand {
 }
 
 model Class {
-  id                      String                        @id @default(uuid())
-  name                    String
-  capacity                Int?
-  schoolId                String
-  levelTypeId             String
-  gradingSystemId         String?
-  reportTemplateId        String?
-  order                   Int
-  classTeacherId          String?
-  includeDigitalStamp     Boolean?
-  includeDigitalSignature Boolean?
-  levelType               LevelType                     @relation(fields: [levelTypeId], references: [id])
-  gradingSystem           GradingSystem?                @relation(fields: [gradingSystemId], references: [id])
-  reportTemplate          ReportTemplate?               @relation(fields: [reportTemplateId], references: [id], onDelete: SetNull)
-  school                  School                        @relation(fields: [schoolId], references: [id])
-  classTeacher            User?                         @relation(fields: [classTeacherId], references: [id])
-  classSubjects           ClassSubject[]
-  enrollments             Enrollment[]
-  exams                   Exam[]
-  homeworks               Homework[]
-  lessonPlans             LessonPlan[]
-  lessonRequirements      LessonRequirement[]
-  resultPublications      ResultPublication[]
-  teachingAssignments     TeachingAssignment[]
-  timetables              Timetable[]
-  uploadedExams           UploadedExam[]
-  actingPositions         ActingPosition[]
-  assessmentConfigs       TermAssessmentConfiguration[]
-  assessmentResults       StudentAssessmentResult[]
-  assessmentBatches       AssessmentBatch[]
-  computedResults         ComputedResult[]
-  resultSheets            ResultSheet[]
-  classGradingPolicies    ClassGradingPolicy[]
-  termSummaries           TermSummary[]
-  longitudinalRecords     LongitudinalRecord[]
-  CurriculumLessonPlan    CurriculumLessonPlan[]
-  businessCalendars       SchoolBusinessCalendar[]
-  CurriculumCoverage      CurriculumCoverage[]
-  classTeacherAssignments ClassTeacherAssignment[]
-  studentSubjects         StudentSubject[]
-  ResultEntryPermission   ResultEntryPermission[]
+  id                            String                         @id @default(uuid())
+  name                          String
+  capacity                      Int?
+  schoolId                      String
+  levelTypeId                   String
+  gradingSystemId               String?
+  reportTemplateId              String?
+  order                         Int
+  classTeacherId                String?
+  includeDigitalStamp           Boolean?
+  includeDigitalSignature       Boolean?
+  levelType                     LevelType                      @relation(fields: [levelTypeId], references: [id])
+  gradingSystem                 GradingSystem?                 @relation(fields: [gradingSystemId], references: [id])
+  reportTemplate                ReportTemplate?                @relation(fields: [reportTemplateId], references: [id], onDelete: SetNull)
+  school                        School                         @relation(fields: [schoolId], references: [id])
+  classTeacher                  User?                          @relation(fields: [classTeacherId], references: [id])
+  classSubjects                 ClassSubject[]
+  enrollments                   Enrollment[]
+  exams                         Exam[]
+  homeworks                     Homework[]
+  lessonPlans                   LessonPlan[]
+  lessonRequirements            LessonRequirement[]
+  resultPublications            ResultPublication[]
+  teachingAssignments           TeachingAssignment[]
+  timetables                    Timetable[]
+  uploadedExams                 UploadedExam[]
+  actingPositions               ActingPosition[]
+  assessmentConfigs             TermAssessmentConfiguration[]
+  assessmentResults             StudentAssessmentResult[]
+  assessmentBatches             AssessmentBatch[]
+  computedResults               ComputedResult[]
+  resultSheets                  ResultSheet[]
+  classGradingPolicies          ClassGradingPolicy[]
+  termSummaries                 TermSummary[]
+  longitudinalRecords           LongitudinalRecord[]
+  CurriculumLessonPlan          CurriculumLessonPlan[]
+  businessCalendars             SchoolBusinessCalendar[]
+  CurriculumCoverage            CurriculumCoverage[]
+  classTeacherAssignments       ClassTeacherAssignment[]
+  studentSubjects               StudentSubject[]
+  ResultEntryPermission         ResultEntryPermission[]
   studentLeadershipAppointments StudentLeadershipAppointment[]
 
   @@index([reportTemplateId])
@@ -676,6 +687,7 @@ model Subject {
   questionBankCategories     QuestionBankCategory[]
   questionBankQuestions      QuestionBank[]
   examTemplates              ExamTemplate[]
+  examBlueprints             ExamBlueprint[]
   assessmentConfigs          TermAssessmentConfiguration[]
   assessmentResults          StudentAssessmentResult[]
   assessmentBatches          AssessmentBatch[]
@@ -693,6 +705,7 @@ model Subject {
   SyllabusDocumentSubject    SyllabusDocumentSubject[]
   SyllabusEntry              SyllabusEntry[]
   SbaTask                    SbaTask[]
+  aiGenerationJobs           AiGenerationJob[]
   CurriculumLessonPlan       CurriculumLessonPlan[]
   CurriculumCoverage         CurriculumCoverage[]
   compositeSubjectComponents CompositeSubjectComponent[]
@@ -1234,47 +1247,47 @@ model ActingPosition {
 }
 
 model Student {
-  id                   String                    @id @default(uuid())
-  admissionNumber      String
-  studentUuid          String                    @default(uuid())
-  status               StudentStatus             @default(ACTIVE)
-  dateOfBirth          DateTime?
-  schoolId             String
-  classId              String?
-  firstName            String
-  lastName             String
-  gender               String?
-  grade                String?
-  className            String?
-  photoUrl             String?
-  photoPublicId        String?
-  adaptiveTestSessions AdaptiveTestSession[]
-  aiTutorSessions      AiTutorSession[]
-  assessmentScores     AssessmentScore[]
-  attendances          Attendance[]
-  behavioralRecords    BehavioralRecord[]
-  competencyScores     CompetencyScore[]
-  enrollments          Enrollment[]
-  exams                ExamAttempt[]
-  FeePayment           FeePayment[]
-  homeworkSubmissions  HomeworkSubmission[]
-  learningStyleProfile LearningStyleProfile?
-  parents              ParentStudent[]
-  results              Result[]
-  school               School                    @relation(fields: [schoolId], references: [id])
-  studentGrowthRecords StudentGrowthRecord[]
-  studentInterventions StudentIntervention[]
-  studentPhotos        StudentPhoto[]
-  user                 User?
-  assessmentResults    StudentAssessmentResult[]
-  computedResults      ComputedResult[]
-  termSummaries        TermSummary[]
-  longitudinalRecords  LongitudinalRecord[]
-  aiContextMemories    AiContextMemory[]
-  aiRecommendations    AiRecommendation[]
-  aiTopicMasteries     AiTopicMastery[]
-  grade7Results        Grade7Result[]
-  studentSubjects      StudentSubject[]
+  id                     String                         @id @default(uuid())
+  admissionNumber        String
+  studentUuid            String                         @default(uuid())
+  status                 StudentStatus                  @default(ACTIVE)
+  dateOfBirth            DateTime?
+  schoolId               String
+  classId                String?
+  firstName              String
+  lastName               String
+  gender                 String?
+  grade                  String?
+  className              String?
+  photoUrl               String?
+  photoPublicId          String?
+  adaptiveTestSessions   AdaptiveTestSession[]
+  aiTutorSessions        AiTutorSession[]
+  assessmentScores       AssessmentScore[]
+  attendances            Attendance[]
+  behavioralRecords      BehavioralRecord[]
+  competencyScores       CompetencyScore[]
+  enrollments            Enrollment[]
+  exams                  ExamAttempt[]
+  FeePayment             FeePayment[]
+  homeworkSubmissions    HomeworkSubmission[]
+  learningStyleProfile   LearningStyleProfile?
+  parents                ParentStudent[]
+  results                Result[]
+  school                 School                         @relation(fields: [schoolId], references: [id])
+  studentGrowthRecords   StudentGrowthRecord[]
+  studentInterventions   StudentIntervention[]
+  studentPhotos          StudentPhoto[]
+  user                   User?
+  assessmentResults      StudentAssessmentResult[]
+  computedResults        ComputedResult[]
+  termSummaries          TermSummary[]
+  longitudinalRecords    LongitudinalRecord[]
+  aiContextMemories      AiContextMemory[]
+  aiRecommendations      AiRecommendation[]
+  aiTopicMasteries       AiTopicMastery[]
+  grade7Results          Grade7Result[]
+  studentSubjects        StudentSubject[]
   leadershipAppointments StudentLeadershipAppointment[]
   sportsParticipations   StudentSportsParticipation[]
 
@@ -1303,66 +1316,66 @@ model StudentPhoto {
 }
 
 model StudentLeadershipAppointment {
-  id             String   @id @default(uuid())
-  schoolId       String
-  studentId      String
-  classId        String?
-  roleCode       String
-  roleTitle      String
-  institutionTier String  @default("SECONDARY_SCHOOL")
-  startDate      DateTime
-  endDate        DateTime?
-  status         String   @default("ACTIVE")
-  appointedBy    String
-  recommendation String?
-  totalPoints    Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  school         School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  student        Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  class          Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
-  duties         StudentLeadershipDuty[]
+  id              String                  @id @default(uuid())
+  schoolId        String
+  studentId       String
+  classId         String?
+  roleCode        String
+  roleTitle       String
+  institutionTier String                  @default("SECONDARY_SCHOOL")
+  startDate       DateTime
+  endDate         DateTime?
+  status          String                  @default("ACTIVE")
+  appointedBy     String
+  recommendation  String?
+  totalPoints     Int                     @default(0)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  school          School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student         Student                 @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class           Class?                  @relation(fields: [classId], references: [id], onDelete: SetNull)
+  duties          StudentLeadershipDuty[]
 
   @@index([schoolId, roleCode, status])
   @@index([studentId, startDate])
 }
 
 model StudentLeadershipDuty {
-  id             String   @id @default(uuid())
+  id             String                       @id @default(uuid())
   appointmentId  String
   title          String
   description    String?
-  pointsPossible Int      @default(10)
-  pointsAwarded  Int      @default(0)
-  status         String   @default("PENDING")
+  pointsPossible Int                          @default(10)
+  pointsAwarded  Int                          @default(0)
+  status         String                       @default("PENDING")
   completedAt    DateTime?
   verifiedBy     String?
   evidence       String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
   appointment    StudentLeadershipAppointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
 
   @@index([appointmentId, status])
 }
 
 model StudentSportsParticipation {
-  id                String   @id @default(uuid())
-  schoolId          String
-  studentId         String
-  sportCategory     String
-  eventLevel        String   @default("SCHOOL")
-  startDate         DateTime
-  endDate           DateTime?
-  status            String   @default("ACTIVE")
-  teacherRecommended Boolean  @default(false)
-  recommendedBy    String?
-  recommendation    String?
-  pointsAwarded     Int      @default(0)
-  evidence          String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  school            School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  student           Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  id                 String    @id @default(uuid())
+  schoolId           String
+  studentId          String
+  sportCategory      String
+  eventLevel         String    @default("SCHOOL")
+  startDate          DateTime
+  endDate            DateTime?
+  status             String    @default("ACTIVE")
+  teacherRecommended Boolean   @default(false)
+  recommendedBy      String?
+  recommendation     String?
+  pointsAwarded      Int       @default(0)
+  evidence           String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  school             School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student            Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([schoolId, sportCategory, status])
   @@index([studentId, teacherRecommended])
@@ -2883,35 +2896,35 @@ model TemplateComponent {
 }
 
 model CertificateTemplate {
-  id              String          @id @default(uuid())
-  templateId      String          @unique
-  certificateType CertificateType @default(ACADEMIC_EXCELLENCE)
-  audience        String          @default("STUDENT")
-  awardCategory   String          @default("OVERALL_AVERAGE")
+  id               String          @id @default(uuid())
+  templateId       String          @unique
+  certificateType  CertificateType @default(ACADEMIC_EXCELLENCE)
+  audience         String          @default("STUDENT")
+  awardCategory    String          @default("OVERALL_AVERAGE")
   eligibilityRules Json            @default("{}")
-  subjectId       String?
-  borderStyle     String          @default("classic")
-  borderColor     String          @default("#1a365d")
-  sealUrl         String?
-  showQrCode      Boolean         @default(true)
-  autoNumbering   Boolean         @default(true)
-  nextNumber      Int             @default(1)
-  showPhoto       Boolean         @default(true)
-  signature1Label String          @default("Head Teacher")
-  signature1Name  String?
-  signature1Title String?
-  signature2Label String?
-  signature2Name  String?
-  signature2Title String?
-  awardText       String          @default("This certificate is awarded to")
-  showBadge       Boolean         @default(true)
-  badgeStyle      String          @default("star")
-  showWatermark   Boolean         @default(false)
-  watermarkText   String?
-  layoutJson      Json?           @default("{}")
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  template        ReportTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  subjectId        String?
+  borderStyle      String          @default("classic")
+  borderColor      String          @default("#1a365d")
+  sealUrl          String?
+  showQrCode       Boolean         @default(true)
+  autoNumbering    Boolean         @default(true)
+  nextNumber       Int             @default(1)
+  showPhoto        Boolean         @default(true)
+  signature1Label  String          @default("Head Teacher")
+  signature1Name   String?
+  signature1Title  String?
+  signature2Label  String?
+  signature2Name   String?
+  signature2Title  String?
+  awardText        String          @default("This certificate is awarded to")
+  showBadge        Boolean         @default(true)
+  badgeStyle       String          @default("star")
+  showWatermark    Boolean         @default(false)
+  watermarkText    String?
+  layoutJson       Json?           @default("{}")
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  template         ReportTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@index([certificateType])
   @@index([audience, awardCategory])
@@ -3427,44 +3440,48 @@ model NotificationJob {
 }
 
 model Exam {
-  id               String         @id @default(uuid())
+  id               String               @id @default(uuid())
   title            String
   description      String?
-  type             ExamType       @default(EXAM)
+  type             ExamType             @default(EXAM)
   classId          String
   subjectId        String
   termId           String
   schoolId         String
   templateId       String?
+  blueprintId      String?
   duration         Int
   totalScore       Float
-  passingScore     Float          @default(50)
+  passingScore     Float                @default(50)
   instructions     String?
-  shuffleQuestions Boolean        @default(false)
-  showResults      Boolean        @default(true)
-  maxAttempts      Int            @default(1)
-  allowReview      Boolean        @default(true)
-  randomizeOrder   Boolean        @default(false)
-  autoGrade        Boolean        @default(true)
+  shuffleQuestions Boolean              @default(false)
+  showResults      Boolean              @default(true)
+  maxAttempts      Int                  @default(1)
+  allowReview      Boolean              @default(true)
+  randomizeOrder   Boolean              @default(false)
+  autoGrade        Boolean              @default(true)
   markingKeyUrl    String?
   answerKeyUrl     String?
   scheduledAt      DateTime?
   startsAt         DateTime
   endsAt           DateTime
-  isPublished      Boolean        @default(false)
-  status           String         @default("draft")
+  isPublished      Boolean              @default(false)
+  status           String               @default("draft")
+  authoringStatus  ExamAuthoringStatus  @default(DRAFT)
   createdById      String?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  class            Class          @relation(fields: [classId], references: [id])
-  createdBy        User?          @relation(fields: [createdById], references: [id])
-  school           School         @relation(fields: [schoolId], references: [id])
-  subject          Subject        @relation(fields: [subjectId], references: [id])
-  term             Term           @relation(fields: [termId], references: [id])
-  template         ExamTemplate?  @relation(fields: [templateId], references: [id])
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  class            Class                @relation(fields: [classId], references: [id])
+  createdBy        User?                @relation(fields: [createdById], references: [id])
+  school           School               @relation(fields: [schoolId], references: [id])
+  subject          Subject              @relation(fields: [subjectId], references: [id])
+  term             Term                 @relation(fields: [termId], references: [id])
+  template         ExamTemplate?        @relation(fields: [templateId], references: [id])
+  blueprint        ExamBlueprint?       @relation(fields: [blueprintId], references: [id])
   attempts         ExamAttempt[]
   questions        ExamQuestion[]
   sections         ExamSection[]
+  versions         ExaminationVersion[]
 
   @@index([classId])
   @@index([subjectId])
@@ -3472,33 +3489,257 @@ model Exam {
   @@index([schoolId])
   @@index([startsAt])
   @@index([status])
+  @@index([blueprintId])
+  @@index([authoringStatus])
 }
 
 model ExamQuestion {
-  id              String          @id @default(uuid())
+  id              String                    @id @default(uuid())
   examId          String
   sectionId       String?
   question        String
-  questionType    QuestionType    @default(MULTIPLE_CHOICE)
+  questionType    QuestionType              @default(MULTIPLE_CHOICE)
   options         Json?
   correctAnswer   String?
   explanation     String?
   score           Float
-  difficulty      DifficultyLevel @default(MEDIUM)
+  difficulty      DifficultyLevel           @default(MEDIUM)
   competencyId    String?
   topic           String?
   tags            String[]
-  partialScoring  Boolean         @default(false)
-  negativeMarking Float           @default(0)
+  partialScoring  Boolean                   @default(false)
+  negativeMarking Float                     @default(0)
   order           Int
   attachmentUrl   String?
   metadata        Json?
-  exam            Exam            @relation(fields: [examId], references: [id], onDelete: Cascade)
-  section         ExamSection?    @relation(fields: [sectionId], references: [id])
+  exam            Exam                      @relation(fields: [examId], references: [id], onDelete: Cascade)
+  section         ExamSection?              @relation(fields: [sectionId], references: [id])
+  diagrams        ExaminationDiagram[]
+  markingEntries  ExaminationMarkingEntry[]
 
   @@index([examId])
   @@index([sectionId])
   @@index([difficulty])
+}
+
+model ExamBlueprint {
+  id              String               @id @default(uuid())
+  name            String
+  description     String?
+  schoolId        String
+  subjectId       String
+  academicStageId String?
+  version         Int                  @default(1)
+  status          String               @default("DRAFT")
+  isApproved      Boolean              @default(false)
+  structure       Json
+  createdById     String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  school          School               @relation(fields: [schoolId], references: [id])
+  subject         Subject              @relation(fields: [subjectId], references: [id])
+  createdBy       User?                @relation(fields: [createdById], references: [id])
+  exams           Exam[]
+  versions        ExaminationVersion[]
+  aiGenerationJobs AiGenerationJob[]
+
+  @@index([schoolId])
+  @@index([subjectId])
+  @@index([status])
+}
+
+model ExaminationVersion {
+  id             String                        @id @default(uuid())
+  examId         String
+  blueprintId    String?
+  generationJobId String?
+  schoolId       String
+  version        Int
+  status         ExamAuthoringStatus           @default(DRAFT)
+  snapshot       Json
+  contentHash    String?
+  changeSummary  String?
+  createdById    String?
+  approvedById   String?
+  createdAt      DateTime                      @default(now())
+  approvedAt     DateTime?
+  exam           Exam                          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  blueprint      ExamBlueprint?                @relation(fields: [blueprintId], references: [id])
+  generationJob  AiGenerationJob?              @relation(fields: [generationJobId], references: [id])
+  school         School                        @relation("VersionSchool", fields: [schoolId], references: [id])
+  createdBy      User?                         @relation("VersionCreatedBy", fields: [createdById], references: [id])
+  approvedBy     User?                         @relation("VersionApprovedBy", fields: [approvedById], references: [id])
+  markingScheme  ExaminationMarkingScheme?
+  validationRuns ExaminationValidationRun[]
+  moderation     ExaminationModerationRecord[]
+  diagrams       ExaminationDiagram[]
+  artifacts      ExaminationArtifact[]
+  auditLogs      ExaminationAuditLog[]
+
+  @@unique([examId, version])
+  @@index([schoolId, status])
+  @@index([contentHash])
+}
+
+model ExaminationMarkingScheme {
+  id            String                    @id @default(uuid())
+  versionId     String                    @unique
+  schemeVersion Int                       @default(1)
+  status        String                    @default("DRAFT")
+  instructions  String?
+  version       ExaminationVersion        @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  entries       ExaminationMarkingEntry[]
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+}
+
+model ExaminationMarkingEntry {
+  id                  String                   @id @default(uuid())
+  schemeId            String
+  questionId          String
+  taskLabel           String?
+  expectedAnswer      String
+  solution            String?
+  criteria            Json
+  alternatives        Json?
+  commonErrors        Json?
+  specialInstructions String?
+  marks               Float
+  scheme              ExaminationMarkingScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  question            ExamQuestion             @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  @@index([schemeId])
+  @@index([questionId])
+}
+
+model ExaminationDiagram {
+  id                    String              @id @default(uuid())
+  questionId            String?
+  versionId             String?
+  name                  String
+  diagramType           String
+  schemaVersion         Int                 @default(1)
+  definition            Json
+  renderedSvg           String?
+  assetUrl              String?
+  contentHash           String?
+  isTechnicallyVerified Boolean             @default(false)
+  question              ExamQuestion?       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  version               ExaminationVersion? @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@index([questionId])
+  @@index([versionId])
+}
+
+model ExaminationValidationRun {
+  id               String                         @id @default(uuid())
+  versionId        String
+  status           String                         @default("IN_PROGRESS")
+  validatorVersion String?
+  summary          Json?
+  startedAt        DateTime                       @default(now())
+  completedAt      DateTime?
+  version          ExaminationVersion             @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  findings         ExaminationValidationFinding[]
+
+  @@index([versionId, status])
+}
+
+model ExaminationValidationFinding {
+  id         String                   @id @default(uuid())
+  runId      String
+  severity   ExamValidationSeverity
+  code       String
+  message    String
+  location   String?
+  suggestion String?
+  isResolved Boolean                  @default(false)
+  run        ExaminationValidationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  createdAt  DateTime                 @default(now())
+
+  @@index([runId, severity])
+}
+
+model ExaminationModerationRecord {
+  id         String             @id @default(uuid())
+  versionId  String
+  reviewerId String
+  decision   String
+  comments   String?
+  createdAt  DateTime           @default(now())
+  version    ExaminationVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  reviewer   User               @relation(fields: [reviewerId], references: [id])
+
+  @@index([versionId])
+  @@index([reviewerId])
+}
+
+model ExaminationArtifact {
+  id          String             @id @default(uuid())
+  versionId   String
+  schoolId    String
+  type        ExamArtifactType
+  storageKey  String
+  downloadUrl String?
+  mimeType    String
+  byteSize    Int?
+  contentHash String
+  createdAt   DateTime           @default(now())
+  version     ExaminationVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  school      School             @relation(fields: [schoolId], references: [id])
+
+  @@unique([versionId, type])
+  @@index([schoolId])
+}
+
+model ExaminationAuditLog {
+  id        String              @id @default(uuid())
+  versionId String?
+  schoolId  String
+  userId    String?
+  action    ExamAuditAction
+  details   Json?
+  createdAt DateTime            @default(now())
+  version   ExaminationVersion? @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  school    School              @relation(fields: [schoolId], references: [id])
+  user      User?               @relation(fields: [userId], references: [id])
+
+  @@index([schoolId, createdAt])
+  @@index([versionId])
+}
+
+model AiGenerationJob {
+  id              String             @id @default(uuid())
+  schoolId        String
+  subjectId       String
+  blueprintId     String?
+  requestedById   String?
+  provider        String
+  model           String?
+  status          AiGenerationStatus @default(QUEUED)
+  request         Json
+  response        Json?
+  error           String?
+  inputTokens     Int?
+  outputTokens    Int?
+  estimatedCost   Float?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  school          School             @relation(fields: [schoolId], references: [id])
+  subject         Subject            @relation(fields: [subjectId], references: [id])
+  blueprint       ExamBlueprint?     @relation(fields: [blueprintId], references: [id])
+  requestedBy     User?              @relation(fields: [requestedById], references: [id])
+  versions        ExaminationVersion[]
+
+  @@index([schoolId, status])
+  @@index([subjectId])
+  @@index([blueprintId])
 }
 
 model ExamAttempt {
@@ -4213,6 +4454,61 @@ enum ExamSectionType {
   FILL_BLANKS
 }
 
+enum ExamAuthoringStatus {
+  DRAFT
+  GENERATED
+  VALIDATION_IN_PROGRESS
+  PASSED_WITH_WARNINGS
+  PASSED
+  MODERATION
+  APPROVED
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+enum ExamValidationSeverity {
+  INFO
+  WARNING
+  ERROR
+}
+
+enum ExamArtifactType {
+  CANDIDATE_PDF
+  EXAMINER_PDF
+  COMBINED_PDF
+  CANDIDATE_DOCX
+  EXAMINER_DOCX
+  ANSWER_BOOKLET_PDF
+}
+
+enum ExamAuditAction {
+  CREATED
+  UPDATED
+  GENERATED
+  DUPLICATED
+  VERSION_CREATED
+  QUESTION_UPDATED
+  MARKING_KEY_UPDATED
+  VALIDATION_STARTED
+  VALIDATION_COMPLETED
+  SUBMITTED_FOR_MODERATION
+  MODERATION_COMMENTED
+  APPROVED
+  REJECTED
+  PUBLISHED
+  ARCHIVED
+  EXPORTED
+}
+
+enum AiGenerationStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
 enum QuestionType {
   MULTIPLE_CHOICE
   TRUE_FALSE
@@ -4261,26 +4557,26 @@ enum MessageStatus {
 }
 
 model TemplateMarketplace {
-  id           String         @id @default(uuid())
-  templateId   String         @unique
-  schoolId     String?
-  documentType DocumentType   @default(ACADEMIC_REPORT)
-  recipientType String        @default("STUDENT")
+  id            String         @id @default(uuid())
+  templateId    String         @unique
+  schoolId      String?
+  documentType  DocumentType   @default(ACADEMIC_REPORT)
+  recipientType String         @default("STUDENT")
   awardCategory String?
-  title        String
-  description  String?
-  category     String?
-  tags         String[]
-  previewUrl   String?
-  downloads    Int            @default(0)
-  likes        Int            @default(0)
-  featured     Boolean        @default(false)
-  verified     Boolean        @default(false)
-  price        Float?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  template     ReportTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  school       School?        @relation(fields: [schoolId], references: [id])
+  title         String
+  description   String?
+  category      String?
+  tags          String[]
+  previewUrl    String?
+  downloads     Int            @default(0)
+  likes         Int            @default(0)
+  featured      Boolean        @default(false)
+  verified      Boolean        @default(false)
+  price         Float?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  template      ReportTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  school        School?        @relation(fields: [schoolId], references: [id])
 
   @@index([category])
   @@index([featured])
@@ -5169,18 +5465,18 @@ model StudentAcademicYearSummary {
 }
 
 model ProgressBackfillJob {
-  id          String    @id @default(uuid())
-  schoolId    String
-  status      String    @default("QUEUED")
-  total       Int       @default(0)
-  processed   Int       @default(0)
-  evidence    Int       @default(0)
-  snapshots   Int       @default(0)
+  id           String    @id @default(uuid())
+  schoolId     String
+  status       String    @default("QUEUED")
+  total        Int       @default(0)
+  processed    Int       @default(0)
+  evidence     Int       @default(0)
+  snapshots    Int       @default(0)
   errorMessage String?
-  startedAt   DateTime?
-  completedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([schoolId, status])
   @@index([createdAt])
@@ -6219,25 +6515,25 @@ model SyllabusDocument {
 // numbering and practical activities intact instead of reducing the syllabus
 // to a topic name only.
 model SyllabusEntry {
-  id              String           @id @default(uuid())
-  documentId      String
-  document        SyllabusDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  subjectId       String
-  subject         Subject          @relation(fields: [subjectId], references: [id])
-  formNumber      Int?
-  unitCode        String?
-  subUnitCode     String?
-  competencyCode  String?
-  topic           String
-  subtopic        String?
-  competency      String?
+  id                 String           @id @default(uuid())
+  documentId         String
+  document           SyllabusDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  subjectId          String
+  subject            Subject          @relation(fields: [subjectId], references: [id])
+  formNumber         Int?
+  unitCode           String?
+  subUnitCode        String?
+  competencyCode     String?
+  topic              String
+  subtopic           String?
+  competency         String?
   learningActivities Json?
-  expectedStandard String?
-  sourcePage      Int?
-  rawText         String?
-  metadata        Json?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  expectedStandard   String?
+  sourcePage         Int?
+  rawText            String?
+  metadata           Json?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   @@unique([documentId, subjectId, formNumber, competencyCode, topic, subtopic])
   @@index([subjectId, formNumber])
@@ -6296,40 +6592,40 @@ model SbaTask {
 }
 
 model CurriculumLessonPlan {
-  id                String                         @id @default(uuid())
-  title             String
-  subjectId         String
-  subject           Subject                        @relation(fields: [subjectId], references: [id])
-  topicId           String?
-  topic             Topic?                         @relation(fields: [topicId], references: [id])
-  subtopicId        String?
-  subtopic          Subtopic?                      @relation(fields: [subtopicId], references: [id])
-  classId           String?
-  class             Class?                         @relation(fields: [classId], references: [id])
-  teacherId         String?
-  teacher           Teacher?                       @relation(fields: [teacherId], references: [id])
-  duration          Int?
-  weekNumber        Int?
-  termId            String?
-  term              Term?                          @relation(fields: [termId], references: [id])
-  academicYearId    String?
-  academicYear      AcademicYear?                  @relation(fields: [academicYearId], references: [id])
-  status            LessonPlanStatus               @default(DRAFT)
-  objectives        String?
-  materials         String?
-  assessmentMethods String?
-  planData          Json?
-  activities        CurriculumLessonPlanActivity[]
-  isGenerated       Boolean                        @default(false)
-  version           Int                            @default(1)
+  id                    String                         @id @default(uuid())
+  title                 String
+  subjectId             String
+  subject               Subject                        @relation(fields: [subjectId], references: [id])
+  topicId               String?
+  topic                 Topic?                         @relation(fields: [topicId], references: [id])
+  subtopicId            String?
+  subtopic              Subtopic?                      @relation(fields: [subtopicId], references: [id])
+  classId               String?
+  class                 Class?                         @relation(fields: [classId], references: [id])
+  teacherId             String?
+  teacher               Teacher?                       @relation(fields: [teacherId], references: [id])
+  duration              Int?
+  weekNumber            Int?
+  termId                String?
+  term                  Term?                          @relation(fields: [termId], references: [id])
+  academicYearId        String?
+  academicYear          AcademicYear?                  @relation(fields: [academicYearId], references: [id])
+  status                LessonPlanStatus               @default(DRAFT)
+  objectives            String?
+  materials             String?
+  assessmentMethods     String?
+  planData              Json?
+  activities            CurriculumLessonPlanActivity[]
+  isGenerated           Boolean                        @default(false)
+  version               Int                            @default(1)
   generationInstruction String?
-  reusedFromId      String?
-  reusedFrom        CurriculumLessonPlan?          @relation("CurriculumLessonPlanRevisions", fields: [reusedFromId], references: [id], onDelete: SetNull)
-  revisions         CurriculumLessonPlan[]         @relation("CurriculumLessonPlanRevisions")
-  schoolId          String?
-  school            School?                        @relation(fields: [schoolId], references: [id])
-  createdAt         DateTime                       @default(now())
-  updatedAt         DateTime                       @updatedAt
+  reusedFromId          String?
+  reusedFrom            CurriculumLessonPlan?          @relation("CurriculumLessonPlanRevisions", fields: [reusedFromId], references: [id], onDelete: SetNull)
+  revisions             CurriculumLessonPlan[]         @relation("CurriculumLessonPlanRevisions")
+  schoolId              String?
+  school                School?                        @relation(fields: [schoolId], references: [id])
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
 
   @@index([subjectId])
   @@index([topicId])

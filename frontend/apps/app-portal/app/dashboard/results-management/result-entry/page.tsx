@@ -359,6 +359,12 @@ export default function ResultEntryPage() {
           gender: student.gender,
           results: [],
         };
+      }).sort((a: any, b: any) => {
+        const lastName = (a.lastName || '').localeCompare(b.lastName || '', undefined, { sensitivity: 'base' });
+        if (lastName !== 0) return lastName;
+        const firstName = (a.firstName || '').localeCompare(b.firstName || '', undefined, { sensitivity: 'base' });
+        if (firstName !== 0) return firstName;
+        return String(a.id || '').localeCompare(String(b.id || ''));
       });
     },
     enabled: !!selectedClass && !!selectedTerm && !!selectedExamType,

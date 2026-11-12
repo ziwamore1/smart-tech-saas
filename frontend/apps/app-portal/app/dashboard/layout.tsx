@@ -501,6 +501,14 @@ const regularNav: NavItem[] = [
     typeRoles: ROLE_MAP.teaching,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
   },
+  {
+    name: 'AI-EXAMINOR',
+    href: '/dashboard/ai-examinor',
+    icon: 'fa-wand-magic-sparkles',
+    color: '#4f46e5',
+    typeRoles: ROLE_MAP.teaching,
+    institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY']
+  },
   { 
     name: 'Fees',
     href: '/dashboard/fees', 

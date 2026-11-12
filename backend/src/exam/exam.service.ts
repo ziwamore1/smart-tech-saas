@@ -226,6 +226,7 @@ export class ExamService {
     if (!question) {
       throw new NotFoundException('Question not found');
     }
+    await this.assertExamEditable(question.examId);
 
     const updateData: any = { ...data };
     if (data.questionType) {
@@ -239,8 +240,16 @@ export class ExamService {
   }
 
   async deleteQuestion(questionId: string) {
+    const question = await this.prisma.examQuestion.findUnique({ where: { id: questionId }, select: { examId: true } });
+    if (!question) throw new NotFoundException('Question not found');
+    await this.assertExamEditable(question.examId);
     await this.prisma.examQuestion.delete({ where: { id: questionId } });
     return { success: true };
+  }
+
+  private async assertExamEditable(examId: string) {
+    const lockedVersion = await this.prisma.examinationVersion.findFirst({ where: { examId, status: { in: ['APPROVED', 'PUBLISHED'] } }, select: { id: true, version: true } });
+    if (lockedVersion) throw new ForbiddenException(`Version ${lockedVersion.version} is approved and immutable. Create a new version before editing.`);
   }
 
   async startAttempt(examId: string, studentId: string, ipAddress?: string, userAgent?: string) {
