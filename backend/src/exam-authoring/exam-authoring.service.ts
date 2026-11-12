@@ -207,8 +207,28 @@ export class ExamAuthoringService {
     const actualTotal = (snapshot?.sections || []).reduce((sum: number, section: any) => sum + (section.questions || []).reduce((sectionSum: number, question: any) => sectionSum + Number(question.marks || 0), 0), 0);
     if (actualTotal !== expectedTotal) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'MARK_TOTAL_MISMATCH', message: `Question marks total ${actualTotal}; expected ${expectedTotal}.`, suggestion: 'Rebalance question or task marks before moderation.' });
     if (!snapshot?.sections?.length) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'SECTIONS_MISSING', message: 'The examination has no sections.' });
+    const blueprintSections = blueprintStructure?.sections || [];
+    const seenStems = new Map<string, number>();
+    if (blueprintSections.length && snapshot?.sections?.length !== blueprintSections.length) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'SECTION_COUNT_DRIFT', message: 'Generated sections do not match the approved blueprint.' });
+    for (let sectionIndex = 0; sectionIndex < (snapshot?.sections || []).length; sectionIndex++) {
+      const section = snapshot.sections[sectionIndex];
+      const blueprintSection = blueprintSections[sectionIndex];
+      if (blueprintSection) {
+        const sectionMarks = (section.questions || []).reduce((sum: number, question: any) => sum + Number(question.marks || 0), 0);
+        if (sectionMarks !== Number(blueprintSection.totalMarks)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'SECTION_MARK_DRIFT', message: `Section ${blueprintSection.code} has ${sectionMarks} marks; expected ${blueprintSection.totalMarks}.`, location: `section:${blueprintSection.code}` });
+        if ((section.questions || []).length !== Number(blueprintSection.itemCount)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'SECTION_ITEM_COUNT_DRIFT', message: `Section ${blueprintSection.code} has an unexpected number of items.`, location: `section:${blueprintSection.code}` });
+        const requiredInstruction = blueprintSection.answerRule === 'ONE' ? 'one' : blueprintSection.answerRule === 'ANY' ? 'required' : 'all';
+        if (!String(section.instructions || '').toLowerCase().includes(requiredInstruction)) findings.push({ severity: ExamValidationSeverity.WARNING, code: 'SECTION_INSTRUCTION_DRIFT', message: `Section ${blueprintSection.code} instructions may not reflect the ${blueprintSection.answerRule} answer rule.`, location: `section:${blueprintSection.code}`, suggestion: `State clearly whether candidates must answer ${requiredInstruction} items.` });
+      }
+    }
     for (const section of snapshot?.sections || []) {
       for (const question of section.questions || []) {
+        const normalizedStem = String(question.stem || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        if (normalizedStem) {
+          const previous = seenStems.get(normalizedStem);
+          if (previous) findings.push({ severity: ExamValidationSeverity.WARNING, code: 'DUPLICATE_QUESTION_STEM', message: `Question ${question.number} duplicates question ${previous}.`, location: `question:${question.number}`, suggestion: 'Review repeated content or regenerate the affected question.' });
+          else seenStems.set(normalizedStem, Number(question.number));
+        }
         const taskMarks = (question.tasks || []).reduce((sum: number, task: any) => sum + Number(task.marks || 0), 0);
         const keyMarks = (question.markingKey || []).reduce((sum: number, key: any) => sum + (key.markAllocation || []).reduce((inner: number, mark: any) => inner + Number(mark.marks || 0), 0), 0);
         if (taskMarks !== Number(question.marks)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'TASK_MARK_MISMATCH', message: `Question ${question.number} task marks do not equal its total.`, location: `question:${question.number}` });
