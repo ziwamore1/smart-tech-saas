@@ -25,6 +25,12 @@ export class ExamAuthoringController {
   @Get('blueprints')
   listBlueprints(@Request() req: any, @Query('subjectId') subjectId?: string, @Query('status') status?: string) { return this.service.listBlueprints(req.user.schoolId, { subjectId, status }); }
 
+  @Get('examinations')
+  listExaminations(@Request() req: any, @Query() query: { search?: string; status?: any; subjectId?: string; page?: number; limit?: number }) { return this.service.listExaminations(req.user.schoolId, query); }
+
+  @Get('examinations/:id/versions')
+  listVersions(@Request() req: any, @Param('id') id: string) { return this.service.listVersions(req.user.schoolId, id); }
+
   @Get('blueprints/:id')
   getBlueprint(@Request() req: any, @Param('id') id: string) { return this.service.getBlueprint(req.user.schoolId, id); }
 

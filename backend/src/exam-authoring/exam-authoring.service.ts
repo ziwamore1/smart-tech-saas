@@ -62,6 +62,28 @@ export class ExamAuthoringService {
     return { totals: { totalExams, approvedExams, draftExams, moderationExams, rejectedExams, markingKeys, questions, subjects, versions, outstandingFindings }, recentVersions };
   }
 
+  async listExaminations(schoolId: string, filters: { search?: string; status?: ExamAuthoringStatus; subjectId?: string; page?: number; limit?: number } = {}) {
+    const page = Math.max(1, Number(filters.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(filters.limit) || 20));
+    const where: any = {
+      schoolId,
+      ...(filters.status ? { authoringStatus: filters.status } : {}),
+      ...(filters.subjectId ? { subjectId: filters.subjectId } : {}),
+      ...(filters.search ? { title: { contains: filters.search, mode: 'insensitive' } } : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.exam.findMany({ where, include: { subject: { select: { id: true, name: true, code: true } }, blueprint: { select: { id: true, name: true } }, versions: { orderBy: { version: 'desc' }, take: 1, select: { id: true, version: true, status: true, createdAt: true } }, _count: { select: { questions: true, versions: true } } }, orderBy: { updatedAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
+      this.prisma.exam.count({ where }),
+    ]);
+    return { items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async listVersions(schoolId: string, examId: string) {
+    const exam = await this.prisma.exam.findFirst({ where: { id: examId, schoolId }, select: { id: true, title: true } });
+    if (!exam) throw new NotFoundException('Examination not found');
+    return this.prisma.examinationVersion.findMany({ where: { examId, schoolId }, include: { validationRuns: { orderBy: { startedAt: 'desc' }, take: 1, include: { findings: true } }, moderation: { orderBy: { createdAt: 'desc' } }, artifacts: true }, orderBy: { version: 'desc' } });
+  }
+
   async getBlueprint(schoolId: string, id: string) {
     const blueprint = await this.prisma.examBlueprint.findFirst({ where: { id, schoolId }, include: { subject: { select: { id: true, name: true, code: true } } } });
     if (!blueprint) throw new NotFoundException('Examination blueprint not found');
