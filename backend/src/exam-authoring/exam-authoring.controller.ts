@@ -92,6 +92,28 @@ export class ExamAuthoringController {
     return this.service.replaceGeneratedQuestion(req.user.schoolId, id, Number(questionNumber), req.user.id, artifact.sections[0].questions[0]);
   }
 
+  @Post('versions/:id/regenerate')
+  @Roles(...AUTHORING_ROLES)
+  async regenerateVersion(@Request() req: any, @Param('id') id: string, @Body() body: { instruction?: string }) {
+    const version = await this.service.getVersion(req.user.schoolId, id);
+    const blueprint = version.exam?.blueprintId ? await this.service.getBlueprint(req.user.schoolId, version.exam.blueprintId) : null;
+    if (!blueprint?.isApproved) throw new ForbiddenException('An approved blueprint is required before regenerating the draft');
+    const structure: any = blueprint.structure;
+    const artifact = await this.aiExaminor.generate({
+      schoolId: req.user.schoolId,
+      subjectId: version.exam.subjectId,
+      totalMarks: structure.totalMarks,
+      durationMinutes: structure.durationMinutes,
+      title: version.exam.title,
+      sections: structure.sections,
+      topicPlan: structure.topicPlan,
+      cognitiveDistribution: structure.cognitiveDistribution,
+      difficultyDistribution: structure.difficultyDistribution,
+      instruction: `Regenerate the complete examination draft. Preserve the approved section structure and mark budget. Replace weak, duplicated or incomplete items with candidate-ready tasks and a complete marking scheme. ${body?.instruction || ''}`.trim(),
+    });
+    return this.service.regenerateVersion(req.user.schoolId, id, req.user.id, artifact, 'Full draft regenerated after validation findings; validation rerun.');
+  }
+
   @Post('versions/:id/validate')
   @Roles(...AUTHORING_ROLES)
   validateVersion(@Request() req: any, @Param('id') id: string) { return this.service.validateVersion(req.user.schoolId, id, req.user.id); }

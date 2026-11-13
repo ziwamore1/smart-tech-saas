@@ -2959,6 +2959,7 @@ export const examAuthoringApi = {
   updateQuestion: (id: string, data: any) => api.patch(`/exam-authoring/questions/${id}`, data),
   updateMarkingEntry: (id: string, data: any) => api.patch(`/exam-authoring/marking-entries/${id}`, data),
   regenerateQuestion: (versionId: string, questionNumber: number, data?: { instruction?: string; topic?: string }) => api.post(`/exam-authoring/versions/${versionId}/questions/${questionNumber}/regenerate`, data || {}),
+  regenerateVersion: (id: string, data?: { instruction?: string }) => api.post(`/exam-authoring/versions/${id}/regenerate`, data || {}),
   validateVersion: (id: string) => api.post(`/exam-authoring/versions/${id}/validate`),
   submitForModeration: (id: string) => api.post(`/exam-authoring/versions/${id}/submit-moderation`),
   moderate: (id: string, data: { decision: 'APPROVED' | 'REJECTED'; comments?: string }) => api.post(`/exam-authoring/versions/${id}/moderate`, data),

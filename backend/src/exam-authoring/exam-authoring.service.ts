@@ -124,13 +124,17 @@ export class ExamAuthoringService {
     return this.prisma.$transaction(async tx => {
       const exam = await tx.exam.create({ data: { title: input.title, type: 'EXAM', classId: input.classId, subjectId: input.subjectId, termId: input.termId, schoolId: input.schoolId, blueprintId: blueprint.id, duration: input.artifact.durationMinutes, totalScore: input.artifact.totalMarks, startsAt, endsAt, createdById: input.createdById, authoringStatus: ExamAuthoringStatus.GENERATED, status: 'draft', instructions: 'Follow the instructions in each section. Show all necessary working.' } });
       const questionIds: Array<{ id: string; question: any }> = [];
+      const blueprintSections = (blueprint.structure as any).sections || [];
+      let questionOrder = 0;
       for (let sectionIndex = 0; sectionIndex < input.artifact.sections.length; sectionIndex++) {
         const section = input.artifact.sections[sectionIndex];
-        const dbSection = await tx.examSection.create({ data: { examId: exam.id, title: section.title, instructions: section.instructions, type: section.questions.some((q: any) => q.type === 'ESSAY') ? 'ESSAY' : 'STRUCTURED', totalMarks: section.questions.reduce((sum: number, q: any) => sum + Number(q.marks), 0), order: sectionIndex } });
+        const sectionMarks = blueprintSections[sectionIndex]?.answerRule === 'ONE' ? Number(section.questions[0]?.marks || 0) : section.questions.reduce((sum: number, q: any) => sum + Number(q.marks), 0);
+        const dbSection = await tx.examSection.create({ data: { examId: exam.id, title: section.title, instructions: section.instructions, type: section.questions.some((q: any) => q.type === 'ESSAY') ? 'ESSAY' : 'STRUCTURED', totalMarks: sectionMarks, order: sectionIndex } });
         for (let questionIndex = 0; questionIndex < section.questions.length; questionIndex++) {
           const question = section.questions[questionIndex];
-          const dbQuestion = await tx.examQuestion.create({ data: { examId: exam.id, sectionId: dbSection.id, question: question.stem, questionType: this.questionType(question.type), options: question.options || undefined, score: Number(question.marks), difficulty: this.difficulty(question.difficulty), topic: question.topic || undefined, tags: ['AI-EXAMINOR'], metadata: { tasks: question.tasks, traceability: question.traceability, bloomLevel: question.bloomLevel, source: 'AI-EXAMINOR' }, order: questionIndex } });
+          const dbQuestion = await tx.examQuestion.create({ data: { examId: exam.id, sectionId: dbSection.id, question: question.stem, questionType: this.questionType(question.type), options: question.options || undefined, score: Number(question.marks), difficulty: this.difficulty(question.difficulty), topic: question.topic || undefined, tags: ['AI-EXAMINOR'], metadata: { tasks: question.tasks, traceability: question.traceability, bloomLevel: question.bloomLevel, source: 'AI-EXAMINOR' }, order: questionOrder } });
           questionIds.push({ id: dbQuestion.id, question });
+          questionOrder += 1;
         }
       }
       const version = await tx.examinationVersion.create({ data: { examId: exam.id, blueprintId: blueprint.id, generationJobId: input.generationJobId, schoolId: input.schoolId, version: 1, status: ExamAuthoringStatus.GENERATED, snapshot: input.artifact, contentHash: createHash('sha256').update(JSON.stringify(input.artifact)).digest('hex'), createdById: input.createdById, markingScheme: { create: { status: 'DRAFT', entries: { create: questionIds.flatMap(item => (item.question.markingKey || []).map((key: any) => ({ questionId: item.id, taskLabel: key.task, expectedAnswer: key.answer || '', solution: key.solution, criteria: key.markAllocation || [], alternatives: key.acceptableAlternatives || [], marks: (key.markAllocation || []).reduce((sum: number, mark: any) => sum + Number(mark.marks || 0), 0) }))) } } } } });
@@ -195,7 +199,7 @@ export class ExamAuthoringService {
     const snapshot: any = JSON.parse(JSON.stringify(version.snapshot));
     const snapshotQuestion = (snapshot.sections || []).flatMap((section: any) => section.questions || []).find((item: any) => Number(item.number) === Number(questionNumber));
     if (!snapshotQuestion) throw new NotFoundException(`Question ${questionNumber} was not found in this version`);
-    const dbQuestion = (version.exam?.sections || []).flatMap((section: any) => section.questions || []).find((item: any) => Number(item.order) + 1 === Number(questionNumber));
+    const dbQuestion = await this.prisma.examQuestion.findFirst({ where: { examId: version.examId, order: Number(questionNumber) - 1 } });
     if (!dbQuestion) throw new NotFoundException(`Stored question ${questionNumber} was not found`);
     snapshotQuestion.stem = question.stem; snapshotQuestion.tasks = question.tasks; snapshotQuestion.markingKey = question.markingKey; snapshotQuestion.topic = question.topic; snapshotQuestion.competency = question.competency; snapshotQuestion.bloomLevel = question.bloomLevel; snapshotQuestion.difficulty = question.difficulty;
     return this.prisma.$transaction(async tx => {
@@ -208,6 +212,127 @@ export class ExamAuthoringService {
       await tx.examinationAuditLog.create({ data: { versionId, schoolId, userId, action: ExamAuditAction.QUESTION_UPDATED, details: { questionNumber, action: 'REGENERATED' } } });
       return tx.examinationVersion.findUnique({ where: { id: versionId }, include: { markingScheme: { include: { entries: true } } } });
     }, { maxWait: 10000, timeout: 30000 });
+  }
+
+  async regenerateVersion(schoolId: string, versionId: string, userId: string, artifact: any, summary = 'Full draft regenerated from the approved blueprint.') {
+    const version = await this.getVersion(schoolId, versionId);
+    if ([ExamAuthoringStatus.APPROVED, ExamAuthoringStatus.PUBLISHED, ExamAuthoringStatus.MODERATION].includes(version.status)) {
+      throw new ForbiddenException('Only draft or rejected examination versions can be regenerated.');
+    }
+    const blueprint = version.exam?.blueprintId ? await this.prisma.examBlueprint.findFirst({ where: { id: version.exam.blueprintId, schoolId } }) : null;
+    if (!blueprint?.isApproved) throw new ForbiddenException('An approved examination blueprint is required before regenerating the draft');
+    const structure: any = blueprint.structure;
+    if (!artifact?.sections || artifact.sections.length !== (structure.sections || []).length || Number(artifact.totalMarks) !== Number(structure.totalMarks)) {
+      throw new BadRequestException('The regenerated paper does not match the approved blueprint');
+    }
+
+    await this.prisma.$transaction(async tx => {
+      const previousQuestions = await tx.examQuestion.findMany({ where: { examId: version.examId }, select: { id: true } });
+      const previousQuestionIds = previousQuestions.map(question => question.id);
+      if (previousQuestionIds.length) {
+        await tx.examinationMarkingEntry.deleteMany({ where: { questionId: { in: previousQuestionIds } } });
+        await tx.examinationDiagram.deleteMany({ where: { questionId: { in: previousQuestionIds } } });
+      }
+      await tx.examinationDiagram.deleteMany({ where: { versionId } });
+      await tx.examQuestion.deleteMany({ where: { examId: version.examId } });
+      await tx.examSection.deleteMany({ where: { examId: version.examId } });
+      const previousRuns = await tx.examinationValidationRun.findMany({ where: { versionId }, select: { id: true } });
+      if (previousRuns.length) {
+        await tx.examinationValidationFinding.updateMany({ where: { runId: { in: previousRuns.map(run => run.id) }, isResolved: false }, data: { isResolved: true } });
+      }
+      await tx.examinationArtifact.deleteMany({ where: { versionId } });
+
+      const questionIds: Array<{ id: string; question: any }> = [];
+      const blueprintSections = structure.sections || [];
+      for (let sectionIndex = 0; sectionIndex < artifact.sections.length; sectionIndex++) {
+        const section = artifact.sections[sectionIndex];
+        const blueprintSection = blueprintSections[sectionIndex];
+        const sectionMarks = blueprintSection?.answerRule === 'ONE'
+          ? Number(section.questions?.[0]?.marks || 0)
+          : (section.questions || []).reduce((sum: number, question: any) => sum + Number(question.marks || 0), 0);
+        const dbSection = await tx.examSection.create({
+          data: {
+            examId: version.examId,
+            title: section.title || blueprintSection?.title || `Section ${blueprintSection?.code || sectionIndex + 1}`,
+            instructions: section.instructions,
+            type: (section.questions || []).some((question: any) => question.type === 'ESSAY') ? 'ESSAY' : 'STRUCTURED',
+            totalMarks: sectionMarks,
+            order: sectionIndex,
+          },
+        });
+        for (let questionIndex = 0; questionIndex < (section.questions || []).length; questionIndex++) {
+          const question = section.questions[questionIndex];
+          const dbQuestion = await tx.examQuestion.create({
+            data: {
+              examId: version.examId,
+              sectionId: dbSection.id,
+              question: question.stem,
+              questionType: this.questionType(question.type),
+              options: question.options || undefined,
+              score: Number(question.marks),
+              difficulty: this.difficulty(question.difficulty),
+              topic: question.topic || undefined,
+              tags: ['AI-EXAMINOR', 'REGENERATED'],
+              metadata: { tasks: question.tasks, traceability: question.traceability, bloomLevel: question.bloomLevel, source: 'AI-EXAMINOR regeneration' },
+              order: questionIds.length,
+            },
+          });
+          questionIds.push({ id: dbQuestion.id, question });
+        }
+      }
+
+      const markingEntries = questionIds.flatMap(item => (item.question.markingKey || []).map((key: any) => ({
+        questionId: item.id,
+        taskLabel: key.task,
+        expectedAnswer: key.answer || '',
+        solution: key.solution,
+        criteria: key.markAllocation || [],
+        alternatives: key.acceptableAlternatives || [],
+        marks: (key.markAllocation || []).reduce((sum: number, mark: any) => sum + Number(mark.marks || 0), 0),
+      })));
+      const scheme = await tx.examinationMarkingScheme.findUnique({ where: { versionId } });
+      if (scheme) {
+        await tx.examinationMarkingScheme.update({
+          where: { id: scheme.id },
+          data: { status: 'DRAFT', schemeVersion: { increment: 1 }, instructions: 'Regenerated marking scheme; examiner review required.', entries: { create: markingEntries } },
+        });
+      } else {
+        await tx.examinationMarkingScheme.create({
+          data: { versionId, status: 'DRAFT', instructions: 'Regenerated marking scheme; examiner review required.', entries: { create: markingEntries } },
+        });
+      }
+
+      await tx.examinationVersion.update({
+        where: { id: versionId },
+        data: {
+          snapshot: artifact,
+          contentHash: createHash('sha256').update(JSON.stringify(artifact)).digest('hex'),
+          status: ExamAuthoringStatus.GENERATED,
+          changeSummary: summary,
+        },
+      });
+      await tx.exam.update({
+        where: { id: version.examId },
+        data: {
+          duration: Number(artifact.durationMinutes || structure.durationMinutes),
+          totalScore: Number(artifact.totalMarks),
+          authoringStatus: ExamAuthoringStatus.GENERATED,
+          status: 'draft',
+        },
+      });
+      await tx.examinationAuditLog.create({
+        data: {
+          versionId,
+          schoolId,
+          userId,
+          action: ExamAuditAction.GENERATED,
+          details: { regenerated: true, blueprintId: blueprint.id, questionCount: questionIds.length, changeSummary: summary },
+        },
+      });
+    }, { maxWait: 10000, timeout: 30000 });
+
+    await this.validateVersion(schoolId, versionId, userId);
+    return this.getVersion(schoolId, versionId);
   }
 
   async updateMarkingEntry(schoolId: string, entryId: string, userId: string, data: { expectedAnswer?: string; solution?: string; criteria?: any; alternatives?: any; commonErrors?: any; specialInstructions?: string; marks?: number }) {
@@ -261,7 +386,20 @@ export class ExamAuthoringService {
         if (taskMarks !== Number(question.marks)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'TASK_MARK_MISMATCH', message: `Question ${question.number} task marks do not equal its total.`, location: `question:${question.number}` });
         if (keyMarks !== Number(question.marks)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'MARKING_KEY_MISMATCH', message: `Question ${question.number} marking-key marks do not equal its total.`, location: `question:${question.number}` });
         if (!question.stem || !question.markingKey?.length) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'QUESTION_INCOMPLETE', message: `Question ${question.number} is missing content or a marking key.`, location: `question:${question.number}` });
-        for (const task of question.tasks || []) if (String(task.prompt || '').trim().toLowerCase() === normalizedStem) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'PARENT_TASK_DUPLICATION', message: `Question ${question.number} repeats its parent text as a task.`, location: `question:${question.number}.${task.label || 'task'}`, suggestion: 'Replace the repeated task with an independently assessable instruction.' });
+        if (Number(question.marks) >= 10 && (question.tasks || []).length < 2) findings.push({ severity: ExamValidationSeverity.WARNING, code: 'QUESTION_TASK_DEPTH', message: `Question ${question.number} carries ${question.marks} marks in fewer than two tasks.`, location: `question:${question.number}`, suggestion: 'Split the item into independently assessable tasks with their own mark tariffs.' });
+        if (!question.topic) findings.push({ severity: ExamValidationSeverity.WARNING, code: 'QUESTION_TOPIC_MISSING', message: `Question ${question.number} is not mapped to a syllabus topic.`, location: `question:${question.number}` });
+        const taskPrompts = new Set<string>();
+        for (const task of question.tasks || []) {
+          const normalizedPrompt = String(task.prompt || '').trim().toLowerCase().replace(/\s+/g, ' ');
+          if (normalizedPrompt && taskPrompts.has(normalizedPrompt)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'DUPLICATE_TASK_PROMPT', message: `Question ${question.number} contains a repeated task instruction.`, location: `question:${question.number}.${task.label || 'task'}`, suggestion: 'Replace the duplicate task with a different assessment demand.' });
+          taskPrompts.add(normalizedPrompt);
+          if (normalizedPrompt === normalizedStem) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'PARENT_TASK_DUPLICATION', message: `Question ${question.number} repeats its parent text as a task.`, location: `question:${question.number}.${task.label || 'task'}`, suggestion: 'Replace the repeated task with an independently assessable instruction.' });
+        }
+        const taskLabels = new Set((question.tasks || []).filter((task: any) => String(task.label || '').trim()).map((task: any) => String(task.label).trim().toLowerCase()));
+        for (const key of question.markingKey || []) {
+          const keyLabel = String(key.task || '').trim().toLowerCase();
+          if (taskLabels.size && !taskLabels.has(keyLabel)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'MARKING_KEY_TASK_GAP', message: `Question ${question.number} marking key refers to task ${key.task || '(unlabelled)'} which is not in the candidate paper.`, location: `question:${question.number}`, suggestion: 'Match each marking-key entry to a candidate task label.' });
+        }
       }
     }
     const topicPlan = blueprintStructure?.topicPlan || [];

@@ -29,8 +29,9 @@ describe('AiExaminorService', () => {
     expect(result.sections[0].questions.reduce((sum: number, q: any) => sum + q.marks, 0)).toBe(80);
     expect(result.sections[1].questions.every((q: any) => q.marks === 20)).toBe(true);
     expect(result.sections.reduce((sum: number, section: any) => sum + (section.answerRule === 'ONE' ? section.questions[0].marks : section.questions.reduce((inner: number, q: any) => inner + q.marks, 0)), 0)).toBe(100);
-    expect(result.sections.flatMap((section: any) => section.questions).every((q: any) => q.tasks.every((task: any) => task.prompt !== q.stem))).toBe(true);
-    expect(result.markingKey).toHaveLength(6);
+    expect(result.sections.flatMap((section: any) => section.questions).every((q: any) => q.tasks.length >= 2 && q.tasks.every((task: any) => task.prompt !== q.stem))).toBe(true);
+    expect(result.sections.flatMap((section: any) => section.questions).every((q: any) => q.tasks.reduce((sum: number, task: any) => sum + task.marks, 0) === q.marks)).toBe(true);
+    expect(result.markingKey).toHaveLength(result.sections.flatMap((section: any) => section.questions).reduce((sum: number, q: any) => sum + q.tasks.length, 0));
     expect(result.metadata.generatedBy).toBe('AI-EXAMINOR');
   });
 

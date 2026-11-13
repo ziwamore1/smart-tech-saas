@@ -27,6 +27,9 @@ export default function ValidationCentrePage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(false);
+  const [previewMode, setPreviewMode] = useState<"candidate" | "examiner">(
+    "candidate",
+  );
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [comments, setComments] = useState("");
@@ -145,6 +148,29 @@ export default function ValidationCentrePage() {
       setBusy(false);
     }
   };
+  const regenerateDraft = async () => {
+    if (
+      !window.confirm(
+        "Regenerate the complete draft? This replaces the current questions, marking scheme and exports for this version.",
+      )
+    )
+      return;
+    setBusy(true);
+    setError("");
+    setNotice("Regenerating and validating the complete draft...");
+    try {
+      await examAuthoringApi.regenerateVersion(params.versionId);
+      setPreview(false);
+      setNotice(
+        "Draft regenerated and validated. Review the updated findings before moderation.",
+      );
+      await load();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Draft regeneration failed."));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (loading)
     return (
@@ -169,12 +195,27 @@ export default function ValidationCentrePage() {
   const warnings = findings.filter(
     (finding: any) => finding.severity === "WARNING",
   );
+  const invalid =
+    errors.length > 0 ||
+    version.status === "REJECTED" ||
+    latestRun?.status === "FAILED";
   const sections = version.snapshot?.sections || [];
   const questionCount = sections.reduce(
     (sum: number, section: any) => sum + (section.questions || []).length,
     0,
   );
   const quality = latestRun?.summary?.quality;
+  const candidateInstructions = [
+    sections.some((section: any) => section.answerRule === "ALL")
+      ? "Answer all items in Section A."
+      : "",
+    sections.some((section: any) => section.answerRule === "ONE")
+      ? "Answer one item in Section B."
+      : "",
+    "Write all answers in the spaces provided. The number of marks is given in brackets at the end of each task.",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <main className="min-h-screen bg-[#f5f7fb] text-slate-900">
@@ -275,7 +316,7 @@ export default function ValidationCentrePage() {
         )}
         <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_.8fr]">
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 className="font-semibold">Validation findings</h2>
                 <p className="mt-1 text-sm text-slate-500">
@@ -283,13 +324,24 @@ export default function ValidationCentrePage() {
                   version.
                 </p>
               </div>
-              <button
-                disabled={busy}
-                onClick={runValidation}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"
-              >
-                <RefreshCw size={14} /> Run again
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {invalid && (
+                  <button
+                    disabled={busy}
+                    onClick={regenerateDraft}
+                    className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+                  >
+                    <RefreshCw size={14} /> Regenerate invalid draft
+                  </button>
+                )}
+                <button
+                  disabled={busy}
+                  onClick={runValidation}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"
+                >
+                  <RefreshCw size={14} /> Run again
+                </button>
+              </div>
             </div>
             <div className="mt-5 space-y-3">
               {findings.length ? (
@@ -334,15 +386,23 @@ export default function ValidationCentrePage() {
               <div className="mt-4 grid gap-2">
                 <button
                   disabled={busy}
-                  onClick={() => setPreview(true)}
+                  onClick={() => {
+                    setPreviewMode("candidate");
+                    setPreview(true);
+                  }}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white"
                 >
                   <Eye size={16} /> Preview candidate paper
                 </button>
                 <button
-                  disabled={busy}
+                  disabled={busy || invalid}
+                  title={
+                    invalid
+                      ? "Resolve validation errors or regenerate the draft before moderation."
+                      : "Submit this version for moderation."
+                  }
                   onClick={submit}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <ShieldCheck size={16} /> Submit for moderation
                 </button>
@@ -413,10 +473,28 @@ export default function ValidationCentrePage() {
           <div className="mx-auto max-w-4xl rounded-2xl bg-white shadow-2xl">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
               <div>
-                <h2 className="font-semibold">Candidate paper preview</h2>
+                <h2 className="font-semibold">
+                  {previewMode === "candidate"
+                    ? "Candidate paper preview"
+                    : "Examiner marking scheme"}
+                </h2>
                 <p className="text-xs text-slate-500">
                   Review only. No file has been downloaded.
                 </p>
+                <div className="mt-3 inline-flex rounded-lg bg-slate-100 p-1 text-xs font-semibold">
+                  <button
+                    onClick={() => setPreviewMode("candidate")}
+                    className={`rounded-md px-3 py-1.5 ${previewMode === "candidate" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                  >
+                    Candidate view
+                  </button>
+                  <button
+                    onClick={() => setPreviewMode("examiner")}
+                    className={`rounded-md px-3 py-1.5 ${previewMode === "examiner" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                  >
+                    Marking scheme
+                  </button>
+                </div>
               </div>
               <button
                 onClick={() => setPreview(false)}
@@ -448,10 +526,25 @@ export default function ValidationCentrePage() {
                   marks
                 </p>
               </header>
+              <div className="mt-5 border border-slate-300 p-4 text-sm leading-6">
+                <strong>Instructions to candidates</strong>
+                <p className="mt-1">{candidateInstructions}</p>
+              </div>
               {sections.map((section: any) => (
                 <section key={section.code || section.title} className="mt-8">
                   <h3 className="text-lg font-bold">
                     {section.title || `Section ${section.code}`}
+                    {section.answerRule
+                      ? ` · ${
+                          section.answerRule === "ONE"
+                            ? Number(section.questions?.[0]?.marks || 0)
+                            : (section.questions || []).reduce(
+                                (sum: number, question: any) =>
+                                  sum + Number(question.marks || 0),
+                                0,
+                              )
+                        } marks`
+                      : ""}
                   </h3>
                   <p className="mt-1 text-sm italic">{section.instructions}</p>
                   <div className="mt-5 space-y-7">
@@ -462,9 +555,11 @@ export default function ValidationCentrePage() {
                           <p className="whitespace-pre-wrap leading-7">
                             {question.stem}
                           </p>
-                          <span className="ml-auto shrink-0 font-semibold">
-                            [{question.marks}]
-                          </span>
+                          {!(question.tasks || []).length && (
+                            <span className="ml-auto shrink-0 font-semibold">
+                              [{question.marks}]
+                            </span>
+                          )}
                         </div>
                         {(question.tasks || []).map((task: any) => (
                           <div
@@ -478,6 +573,42 @@ export default function ValidationCentrePage() {
                             </span>
                           </div>
                         ))}
+                        {previewMode === "examiner" && (
+                          <div className="ml-8 mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs">
+                            <div className="font-bold uppercase tracking-wide text-slate-500">
+                              Marking key · Question {question.number}
+                            </div>
+                            {(question.markingKey || []).map(
+                              (key: any, keyIndex: number) => (
+                                <div
+                                  key={`${question.number}-${keyIndex}`}
+                                  className="rounded-lg bg-white p-3"
+                                >
+                                  <div className="font-semibold">
+                                    {key.task || "Answer"}
+                                  </div>
+                                  <p className="mt-1 text-slate-700">
+                                    {key.answer || "No expected answer recorded."}
+                                  </p>
+                                  <div className="mt-2 text-slate-600">
+                                    {(key.markAllocation || [])
+                                      .map(
+                                        (mark: any) =>
+                                          `${mark.marks} mark${Number(mark.marks) === 1 ? "" : "s"}: ${mark.criterion || "criterion"}`,
+                                      )
+                                      .join(" · ")}
+                                  </div>
+                                  {key.acceptableAlternatives?.length ? (
+                                    <div className="mt-2 text-slate-500">
+                                      Accept:{" "}
+                                      {key.acceptableAlternatives.join("; ")}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ),
+                            )}
+                          </div>
+                        )}
                         <button
                           disabled={busy}
                           onClick={() => regenerateQuestion(question.number)}
