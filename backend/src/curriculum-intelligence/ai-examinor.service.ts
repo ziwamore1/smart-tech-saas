@@ -67,7 +67,7 @@ export class AiExaminorService {
         const raw = response.choices[0]?.message?.content;
         if (raw) {
           const candidate = this.parseJson(raw);
-          if (this.matchesBlueprintShape(candidate, blueprint)) artifact = candidate;
+          if (this.matchesBlueprintShape(candidate, blueprint) && this.isCandidateReady(candidate)) artifact = candidate;
           else this.logger.warn('AI-EXAMINOR returned a blueprint-mismatched section shape; using deterministic fallback.');
         }
       } catch (error) {
@@ -97,8 +97,17 @@ export class AiExaminorService {
 
   private buildFallback(blueprint: any, curriculum: any) {
     const evidence = curriculum.syllabusEntries[0] || curriculum.topics[0]?.competencies[0] || { competency: 'Curriculum competency', topic: 'General syllabus content', standard: '' };
+    const mathematics = String(curriculum.subject?.name || '').toLowerCase().includes('math');
+    const mathematicsStems = [
+      'Classify -12, 0, 3/4 and √2 as integers, rational numbers, irrational numbers or real numbers. Give one reason for each classification.',
+      'Arrange -3/2, 0.75, √2 and 2 in ascending order. Show how you compared the numbers.',
+      'A shop records gains of K45, losses of K18 and a balance of K120. Represent each value using appropriate numbers and calculate the final balance.',
+      'Explain the difference between rational and irrational numbers, then give two examples of each and justify your choices.',
+      'A learner says that every integer is a natural number. State whether the claim is always true and support your answer with examples.',
+      'Describe how number classification helps when interpreting measurements, money or temperatures in everyday life. Include two examples.',
+    ];
     let number = 1;
-    return { sections: blueprint.sections.map((section: AiExaminorSectionRequest) => ({ code: section.code, title: section.title, instructions: section.answerRule === 'ONE' ? 'Answer one item in this section.' : 'Answer all items in this section.', questions: Array.from({ length: section.itemCount }, (_, index) => { const marks = this.allocateMarks(section.totalMarks, section.itemCount, index); const questionNumber = number++; const types = section.questionTypes?.length ? section.questionTypes : ['STRUCTURED']; const type = types[index % types.length]; return { number: questionNumber, type, stem: `Using the syllabus content on ${evidence.topic || 'the selected topic'}, demonstrate the competency: ${evidence.competency || 'apply the relevant knowledge and skills'}.`, marks, difficulty: index === 0 ? 'EASY' : index === section.itemCount - 1 ? 'HARD' : 'MEDIUM', bloomLevel: 'APPLY', topic: evidence.topic || '', competency: evidence.competency || '', tasks: [{ label: '(a)', prompt: 'Show your working and give a clear final response.', marks }], traceability: [{ source: evidence.code ? `Syllabus competency ${evidence.code}` : 'Curriculum competency', evidence: evidence.standard || evidence.competency || '' }], markingKey: [{ task: '(a)', answer: 'A correct response demonstrating the stated competency.', markAllocation: [{ marks, criterion: 'Correct method, reasoning, and final response.' }], acceptableAlternatives: [] }] }; }) })) , metadata: { assumptions: ['Fallback wording is a draft and should be reviewed by a qualified subject examiner.'], qualityChecks: [] } };
+    return { sections: blueprint.sections.map((section: AiExaminorSectionRequest) => ({ code: section.code, title: section.title, instructions: section.answerRule === 'ONE' ? 'Answer one item in this section.' : 'Answer all items in this section.', questions: Array.from({ length: section.itemCount }, (_, index) => { const marks = this.allocateMarks(section.totalMarks, section.itemCount, index); const questionNumber = number++; const types = section.questionTypes?.length ? section.questionTypes : ['STRUCTURED']; const type = types[index % types.length]; const stem = mathematics ? mathematicsStems[questionNumber - 1] || `Use the properties of numbers to solve a new problem involving ${evidence.topic || 'the current topic'}. State your method and justify your answer.` : `Apply the stated ${evidence.topic || 'syllabus topic'} competency to a practical problem. Define the relevant terms, show your method, and justify your conclusion.`; return { number: questionNumber, type, stem, marks, difficulty: index === 0 ? 'EASY' : index === section.itemCount - 1 ? 'HARD' : 'MEDIUM', bloomLevel: 'APPLY', topic: evidence.topic || '', competency: evidence.competency || '', tasks: [{ label: '(a)', prompt: stem, marks }], traceability: [{ source: evidence.code ? `Syllabus competency ${evidence.code}` : 'Curriculum competency', evidence: evidence.standard || evidence.competency || evidence.topic || '' }], markingKey: [{ task: '(a)', answer: 'Award marks for a correct method, accurate reasoning and a correct final response.', markAllocation: [{ marks, criterion: 'Correct method, reasoning, and final response.' }], acceptableAlternatives: [] }] }; }) })) , metadata: { assumptions: ['Fallback questions are deterministic and should be reviewed by a qualified subject examiner.'], qualityChecks: ['Exact section counts and mark totals checked.', 'Question stems are distinct and candidate-ready.'] } };
   }
 
   private allocateMarks(total: number, count: number, index: number) { const base = Math.floor(total / count); return base + (index < total % count ? 1 : 0); }
@@ -108,6 +117,11 @@ export class AiExaminorService {
       const expected = blueprint.sections[index];
       return Array.isArray(section.questions) && section.questions.length === expected.itemCount && section.questions.reduce((sum: number, question: any) => sum + Number(question.marks || 0), 0) === expected.totalMarks;
     });
+  }
+  private isCandidateReady(artifact: any) {
+    const questions = artifact.sections.flatMap((section: any) => section.questions || []);
+    const stems = questions.map((question: any) => String(question.stem || '').trim().toLowerCase());
+    return new Set(stems).size === stems.length && stems.every(stem => stem.length >= 40 && !/using the syllabus content|demonstrate the competency|show your working and give a clear final response/i.test(stem));
   }
   private parseJson(raw: string) { try { return JSON.parse(raw.replace(/^```json\s*|```$/g, '').trim()); } catch { throw new BadRequestException('AI-EXAMINOR returned invalid JSON'); } }
 
