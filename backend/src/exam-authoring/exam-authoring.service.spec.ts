@@ -28,4 +28,17 @@ describe('ExamAuthoringService', () => {
 
     expect(findings.filter(finding => finding.severity === ExamValidationSeverity.ERROR)).toHaveLength(0);
   });
+
+  it('rejects a topic plan whose marks do not cover the advertised paper', () => {
+    const service = new ExamAuthoringService({} as any);
+    const findings = service.validateBlueprint({
+      totalMarks: 100,
+      durationMinutes: 150,
+      sections: [{ code: 'A', title: 'Section A', totalMarks: 100, itemCount: 5, answerRule: 'ALL' }],
+      topicPlan: [{ topic: 'Algebra', marks: 40 }, { topic: 'Geometry', marks: 20 }],
+    });
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'BLUEPRINT_TOPIC_MARK_MISMATCH', severity: ExamValidationSeverity.ERROR }),
+    ]));
+  });
 });

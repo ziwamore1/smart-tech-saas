@@ -1,10 +1,22 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Download, Eye, FileCheck2, KeyRound, RefreshCw, ShieldCheck, X, XCircle } from 'lucide-react';
-import Link from 'next/link';
-import { examAuthoringApi, getApiErrorMessage } from '@/lib/api';
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  Download,
+  Eye,
+  FileCheck2,
+  KeyRound,
+  RefreshCw,
+  ShieldCheck,
+  X,
+  XCircle,
+} from "lucide-react";
+import Link from "next/link";
+import { examAuthoringApi, getApiErrorMessage } from "@/lib/api";
 
 const unwrap = (response: any) => response?.data?.data ?? response?.data;
 
@@ -15,39 +27,481 @@ export default function ValidationCentrePage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [comments, setComments] = useState('');
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [comments, setComments] = useState("");
 
   const load = async () => {
-    setLoading(true); setError('');
-    try { setVersion(unwrap(await examAuthoringApi.getVersion(params.versionId))); }
-    catch (err) { setError(getApiErrorMessage(err, 'Unable to load this examination version.')); }
-    finally { setLoading(false); }
+    setLoading(true);
+    setError("");
+    try {
+      setVersion(unwrap(await examAuthoringApi.getVersion(params.versionId)));
+    } catch (err) {
+      setError(
+        getApiErrorMessage(err, "Unable to load this examination version."),
+      );
+    } finally {
+      setLoading(false);
+    }
   };
-  useEffect(() => { if (params.versionId) load(); }, [params.versionId]);
+  useEffect(() => {
+    if (params.versionId) load();
+  }, [params.versionId]);
 
-  const runValidation = async () => { setBusy(true); setError(''); try { await examAuthoringApi.validateVersion(params.versionId); setNotice('Validation completed.'); await load(); } catch (err) { setError(getApiErrorMessage(err, 'Validation failed.')); } finally { setBusy(false); } };
-  const submit = async () => { setBusy(true); setError(''); try { await examAuthoringApi.submitForModeration(params.versionId); setNotice('Submitted for moderation.'); await load(); } catch (err) { setError(getApiErrorMessage(err, 'Submission failed.')); } finally { setBusy(false); } };
-  const moderate = async (decision: 'APPROVED' | 'REJECTED') => { setBusy(true); setError(''); try { await examAuthoringApi.moderate(params.versionId, { decision, comments }); setNotice(`Version ${decision.toLowerCase()}.`); await load(); } catch (err) { setError(getApiErrorMessage(err, 'Moderation action failed.')); } finally { setBusy(false); } };
-  const exportDocument = async (type: string) => { setBusy(true); setError(''); try { const artifact = unwrap(await examAuthoringApi.exportVersion(params.versionId, type)); setNotice('Export created and stored.'); if (artifact?.downloadUrl) window.open(artifact.downloadUrl, '_blank', 'noopener,noreferrer'); else if (artifact?.id) window.open(examAuthoringApi.artifactUrl(artifact.id), '_blank', 'noopener,noreferrer'); } catch (err) { setError(getApiErrorMessage(err, 'Export failed.')); } finally { setBusy(false); } };
-  const duplicate = async (restore: boolean) => { setBusy(true); setError(''); try { const result = unwrap(await examAuthoringApi.duplicateVersion(params.versionId, restore)); const nextVersion = result?.versions?.[0]; if (nextVersion) router.push(`/dashboard/ai-examinor/validation/${nextVersion.id}`); else setNotice('Working copy created.'); } catch (err) { setError(getApiErrorMessage(err, 'Working copy could not be created.')); } finally { setBusy(false); } };
+  const runValidation = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await examAuthoringApi.validateVersion(params.versionId);
+      setNotice("Validation completed.");
+      await load();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Validation failed."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const submit = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await examAuthoringApi.submitForModeration(params.versionId);
+      setNotice("Submitted for moderation.");
+      await load();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Submission failed."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const moderate = async (decision: "APPROVED" | "REJECTED") => {
+    setBusy(true);
+    setError("");
+    try {
+      await examAuthoringApi.moderate(params.versionId, { decision, comments });
+      setNotice(`Version ${decision.toLowerCase()}.`);
+      await load();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Moderation action failed."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const exportDocument = async (type: string) => {
+    setBusy(true);
+    setError("");
+    try {
+      const artifact = unwrap(
+        await examAuthoringApi.exportVersion(params.versionId, type),
+      );
+      setNotice("Export created and stored.");
+      if (artifact?.downloadUrl)
+        window.open(artifact.downloadUrl, "_blank", "noopener,noreferrer");
+      else if (artifact?.id)
+        window.open(
+          examAuthoringApi.artifactUrl(artifact.id),
+          "_blank",
+          "noopener,noreferrer",
+        );
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Export failed."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const duplicate = async (restore: boolean) => {
+    setBusy(true);
+    setError("");
+    try {
+      const result = unwrap(
+        await examAuthoringApi.duplicateVersion(params.versionId, restore),
+      );
+      const nextVersion = result?.versions?.[0];
+      if (nextVersion)
+        router.push(`/dashboard/ai-examinor/validation/${nextVersion.id}`);
+      else setNotice("Working copy created.");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Working copy could not be created."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const regenerateQuestion = async (questionNumber: number) => {
+    setBusy(true);
+    setError("");
+    setNotice("Regenerating the selected question and marking scheme...");
+    try {
+      await examAuthoringApi.regenerateQuestion(
+        params.versionId,
+        questionNumber,
+      );
+      setNotice(
+        `Question ${questionNumber} regenerated. Run validation again before approval.`,
+      );
+      await load();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Question regeneration failed."));
+    } finally {
+      setBusy(false);
+    }
+  };
 
-  if (loading) return <div className="min-h-screen bg-[#f5f7fb] p-8 text-slate-500">Loading validation centre...</div>;
-  if (!version) return <div className="min-h-screen bg-[#f5f7fb] p-8"><Link href="/dashboard/ai-examinor" className="text-sm text-indigo-600">Back to AI-EXAMINOR</Link><p className="mt-6 text-rose-700">{error || 'Version not found.'}</p></div>;
+  if (loading)
+    return (
+      <div className="min-h-screen bg-[#f5f7fb] p-8 text-slate-500">
+        Loading validation centre...
+      </div>
+    );
+  if (!version)
+    return (
+      <div className="min-h-screen bg-[#f5f7fb] p-8">
+        <Link href="/dashboard/ai-examinor" className="text-sm text-indigo-600">
+          Back to AI-EXAMINOR
+        </Link>
+        <p className="mt-6 text-rose-700">{error || "Version not found."}</p>
+      </div>
+    );
   const latestRun = version.validationRuns?.[0];
   const findings = latestRun?.findings || [];
-  const errors = findings.filter((finding: any) => finding.severity === 'ERROR');
-  const warnings = findings.filter((finding: any) => finding.severity === 'WARNING');
+  const errors = findings.filter(
+    (finding: any) => finding.severity === "ERROR",
+  );
+  const warnings = findings.filter(
+    (finding: any) => finding.severity === "WARNING",
+  );
   const sections = version.snapshot?.sections || [];
-  const questionCount = sections.reduce((sum: number, section: any) => sum + (section.questions || []).length, 0);
+  const questionCount = sections.reduce(
+    (sum: number, section: any) => sum + (section.questions || []).length,
+    0,
+  );
+  const quality = latestRun?.summary?.quality;
 
-  return <main className="min-h-screen bg-[#f5f7fb] text-slate-900"><div className="mx-auto max-w-7xl px-5 py-8 lg:px-8"><Link href="/dashboard/ai-examinor" className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600"><ArrowLeft size={16} /> AI-EXAMINOR workspace</Link><header className="mt-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><div className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">Validation centre</div><h1 className="text-3xl font-semibold">{version.exam?.title || 'Examination version'}</h1><p className="mt-2 text-sm text-slate-500">Version {version.version} · {questionCount} questions · {version.snapshot?.totalMarks || version.exam?.totalScore} marks</p></div><span className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white">{version.status}</span></header>
-    {notice && <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div>}{error && <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div>}
-    <section className="mt-8 grid gap-4 md:grid-cols-3"><div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><FileCheck2 className="text-indigo-600" size={20} /><div className="mt-4 text-2xl font-semibold">{latestRun ? latestRun.status : 'Not run'}</div><div className="mt-1 text-sm text-slate-500">Validation status</div></div><div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><XCircle className="text-rose-600" size={20} /><div className="mt-4 text-2xl font-semibold">{errors.length}</div><div className="mt-1 text-sm text-slate-500">Blocking errors</div></div><div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><AlertTriangle className="text-amber-600" size={20} /><div className="mt-4 text-2xl font-semibold">{warnings.length}</div><div className="mt-1 text-sm text-slate-500">Warnings</div></div></section>
-    <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_.8fr]"><div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center justify-between"><div><h2 className="font-semibold">Validation findings</h2><p className="mt-1 text-sm text-slate-500">Structural and marking integrity checks from the stored version.</p></div><button disabled={busy} onClick={runValidation} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"><RefreshCw size={14} /> Run again</button></div><div className="mt-5 space-y-3">{findings.length ? findings.map((finding: any) => <div key={finding.id} className={`rounded-xl border p-4 ${finding.severity === 'ERROR' ? 'border-rose-200 bg-rose-50' : finding.severity === 'WARNING' ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}><div className="flex items-start gap-3">{finding.severity === 'ERROR' ? <XCircle className="mt-0.5 text-rose-600" size={17} /> : <AlertTriangle className="mt-0.5 text-amber-600" size={17} />}<div><div className="text-sm font-semibold">{finding.code}</div><div className="mt-1 text-sm">{finding.message}</div>{finding.suggestion && <div className="mt-2 text-xs text-slate-600">Suggested correction: {finding.suggestion}</div>}</div></div></div>) : <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">No validation run exists yet.</div>}</div></div>
-      <div className="space-y-6"><div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><h2 className="font-semibold">Lifecycle actions</h2><div className="mt-4 grid gap-2"><button disabled={busy} onClick={() => setPreview(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white"><Eye size={16} /> Preview candidate paper</button><button disabled={busy} onClick={submit} className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white"><ShieldCheck size={16} /> Submit for moderation</button><textarea value={comments} onChange={event => setComments(event.target.value)} placeholder="Moderator comments" className="min-h-24 rounded-xl border border-slate-200 p-3 text-sm" /><div className="grid grid-cols-2 gap-2"><button disabled={busy} onClick={() => moderate('APPROVED')} className="rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-semibold text-white"><CheckCircle2 className="mr-1 inline" size={14} /> Approve</button><button disabled={busy} onClick={() => moderate('REJECTED')} className="rounded-xl bg-rose-600 px-3 py-2.5 text-xs font-semibold text-white"><XCircle className="mr-1 inline" size={14} /> Reject</button></div><button disabled={busy} onClick={() => duplicate(true)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold">Restore as new working copy</button></div></div><div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><h2 className="font-semibold">Exports</h2><p className="mt-1 text-sm text-slate-500">Create separate candidate and examiner artifacts from this immutable version.</p><div className="mt-4 grid gap-2"><button disabled={busy} onClick={() => exportDocument('CANDIDATE_PDF')} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold"><Download size={15} /> Candidate PDF</button><button disabled={busy} onClick={() => exportDocument('EXAMINER_PDF')} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold"><KeyRound size={15} /> Examiner PDF</button></div></div></div></section>
-    </div>
-    {preview && <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 p-4 sm:p-8" role="dialog" aria-modal="true" aria-label="Candidate paper preview"><div className="mx-auto max-w-4xl rounded-2xl bg-white shadow-2xl"><div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4"><div><h2 className="font-semibold">Candidate paper preview</h2><p className="text-xs text-slate-500">Review only. No file has been downloaded.</p></div><button onClick={() => setPreview(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Close preview"><X size={20} /></button></div><article className="p-6 text-slate-900 sm:p-10"><header className="border-b-2 border-slate-900 pb-5 text-center"><h1 className="text-2xl font-bold uppercase">{version.exam?.title || version.snapshot?.title || 'Examination Paper'}</h1><p className="mt-2 text-sm">{version.snapshot?.subject?.name || version.exam?.subject?.name || 'Subject'} · {version.exam?.duration || version.snapshot?.durationMinutes || 0} minutes · {version.snapshot?.totalMarks || version.exam?.totalScore || 0} marks</p></header>{sections.map((section: any) => <section key={section.code || section.title} className="mt-8"><h3 className="text-lg font-bold">{section.title || `Section ${section.code}`}</h3><p className="mt-1 text-sm italic">{section.instructions}</p><div className="mt-5 space-y-7">{(section.questions || []).map((question: any) => <div key={question.number} className="break-inside-avoid"><div className="flex gap-3"><strong>{question.number}.</strong><p className="whitespace-pre-wrap leading-7">{question.stem}</p><span className="ml-auto shrink-0 font-semibold">[{question.marks}]</span></div>{(question.tasks || []).map((task: any) => <div key={task.label} className="ml-8 mt-3 flex gap-3 text-sm"><span>{task.label}</span><span>{task.prompt}</span><span className="ml-auto shrink-0">[{task.marks}]</span></div>)}</div>)}</div></section>)}</article><div className="border-t border-slate-200 px-5 py-4 text-right"><button onClick={() => setPreview(false)} className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Close preview</button></div></div></div>}
-  </main>;
+  return (
+    <main className="min-h-screen bg-[#f5f7fb] text-slate-900">
+      <div className="mx-auto max-w-7xl px-5 py-8 lg:px-8">
+        <Link
+          href="/dashboard/ai-examinor"
+          className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600"
+        >
+          <ArrowLeft size={16} /> AI-EXAMINOR workspace
+        </Link>
+        <header className="mt-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
+              Validation centre
+            </div>
+            <h1 className="text-3xl font-semibold">
+              {version.exam?.title || "Examination version"}
+            </h1>
+            <p className="mt-2 text-sm text-slate-500">
+              Version {version.version} · {questionCount} questions ·{" "}
+              {version.snapshot?.totalMarks || version.exam?.totalScore} marks
+            </p>
+          </div>
+          <span className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white">
+            {version.status}
+          </span>
+        </header>
+        {notice && (
+          <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            {notice}
+          </div>
+        )}
+        {error && (
+          <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            {error}
+          </div>
+        )}
+        <section className="mt-8 grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <FileCheck2 className="text-indigo-600" size={20} />
+            <div className="mt-4 text-2xl font-semibold">
+              {latestRun ? latestRun.status : "Not run"}
+            </div>
+            <div className="mt-1 text-sm text-slate-500">Validation status</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <XCircle className="text-rose-600" size={20} />
+            <div className="mt-4 text-2xl font-semibold">{errors.length}</div>
+            <div className="mt-1 text-sm text-slate-500">Blocking errors</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <AlertTriangle className="text-amber-600" size={20} />
+            <div className="mt-4 text-2xl font-semibold">{warnings.length}</div>
+            <div className="mt-1 text-sm text-slate-500">Warnings</div>
+          </div>
+        </section>
+        {quality && (
+          <section className="mt-6 rounded-2xl border border-indigo-100 bg-indigo-50/70 p-6">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">
+                  AI-EXAMINOR quality report
+                </div>
+                <h2 className="mt-1 text-xl font-semibold text-indigo-950">
+                  {quality.status === "NOT_READY"
+                    ? "Not ready"
+                    : quality.status === "READY"
+                      ? "Ready for review"
+                      : "Review required"}
+                </h2>
+              </div>
+              <div className="text-3xl font-bold text-indigo-950">
+                {quality.score}
+                <span className="text-base font-medium text-indigo-600">
+                  /{quality.maximum}
+                </span>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2 text-xs text-indigo-950 sm:grid-cols-3 lg:grid-cols-6">
+              {Object.entries(quality.dimensions || {}).map(
+                ([label, value]: [string, any]) => (
+                  <div key={label} className="rounded-xl bg-white/70 p-3">
+                    <div className="capitalize text-indigo-700">
+                      {label.replace(/([A-Z])/g, " $1")}
+                    </div>
+                    <strong className="mt-1 block text-lg">{value}</strong>
+                  </div>
+                ),
+              )}
+            </div>
+            {quality.criticalFailure && (
+              <p className="mt-4 text-xs font-semibold text-rose-700">
+                Critical validation failures always block approval, regardless
+                of the score.
+              </p>
+            )}
+          </section>
+        )}
+        <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_.8fr]">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold">Validation findings</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Structural and marking integrity checks from the stored
+                  version.
+                </p>
+              </div>
+              <button
+                disabled={busy}
+                onClick={runValidation}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"
+              >
+                <RefreshCw size={14} /> Run again
+              </button>
+            </div>
+            <div className="mt-5 space-y-3">
+              {findings.length ? (
+                findings.map((finding: any) => (
+                  <div
+                    key={finding.id}
+                    className={`rounded-xl border p-4 ${finding.severity === "ERROR" ? "border-rose-200 bg-rose-50" : finding.severity === "WARNING" ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      {finding.severity === "ERROR" ? (
+                        <XCircle className="mt-0.5 text-rose-600" size={17} />
+                      ) : (
+                        <AlertTriangle
+                          className="mt-0.5 text-amber-600"
+                          size={17}
+                        />
+                      )}
+                      <div>
+                        <div className="text-sm font-semibold">
+                          {finding.code}
+                        </div>
+                        <div className="mt-1 text-sm">{finding.message}</div>
+                        {finding.suggestion && (
+                          <div className="mt-2 text-xs text-slate-600">
+                            Suggested correction: {finding.suggestion}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+                  No validation run exists yet.
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="font-semibold">Lifecycle actions</h2>
+              <div className="mt-4 grid gap-2">
+                <button
+                  disabled={busy}
+                  onClick={() => setPreview(true)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white"
+                >
+                  <Eye size={16} /> Preview candidate paper
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={submit}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white"
+                >
+                  <ShieldCheck size={16} /> Submit for moderation
+                </button>
+                <textarea
+                  value={comments}
+                  onChange={(event) => setComments(event.target.value)}
+                  placeholder="Moderator comments"
+                  className="min-h-24 rounded-xl border border-slate-200 p-3 text-sm"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    disabled={busy}
+                    onClick={() => moderate("APPROVED")}
+                    className="rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-semibold text-white"
+                  >
+                    <CheckCircle2 className="mr-1 inline" size={14} /> Approve
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() => moderate("REJECTED")}
+                    className="rounded-xl bg-rose-600 px-3 py-2.5 text-xs font-semibold text-white"
+                  >
+                    <XCircle className="mr-1 inline" size={14} /> Reject
+                  </button>
+                </div>
+                <button
+                  disabled={busy}
+                  onClick={() => duplicate(true)}
+                  className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold"
+                >
+                  Restore as new working copy
+                </button>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="font-semibold">Exports</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Create separate candidate and examiner artifacts from this
+                immutable version.
+              </p>
+              <div className="mt-4 grid gap-2">
+                <button
+                  disabled={busy}
+                  onClick={() => exportDocument("CANDIDATE_PDF")}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold"
+                >
+                  <Download size={15} /> Candidate PDF
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() => exportDocument("EXAMINER_PDF")}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold"
+                >
+                  <KeyRound size={15} /> Examiner PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+      {preview && (
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 p-4 sm:p-8"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Candidate paper preview"
+        >
+          <div className="mx-auto max-w-4xl rounded-2xl bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+              <div>
+                <h2 className="font-semibold">Candidate paper preview</h2>
+                <p className="text-xs text-slate-500">
+                  Review only. No file has been downloaded.
+                </p>
+              </div>
+              <button
+                onClick={() => setPreview(false)}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                aria-label="Close preview"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <article className="p-6 text-slate-900 sm:p-10">
+              <header className="border-b-2 border-slate-900 pb-5 text-center">
+                <h1 className="text-2xl font-bold uppercase">
+                  {version.exam?.title ||
+                    version.snapshot?.title ||
+                    "Examination Paper"}
+                </h1>
+                <p className="mt-2 text-sm">
+                  {version.snapshot?.subject?.name ||
+                    version.exam?.subject?.name ||
+                    "Subject"}{" "}
+                  ·{" "}
+                  {version.exam?.duration ||
+                    version.snapshot?.durationMinutes ||
+                    0}{" "}
+                  minutes ·{" "}
+                  {version.snapshot?.totalMarks ||
+                    version.exam?.totalScore ||
+                    0}{" "}
+                  marks
+                </p>
+              </header>
+              {sections.map((section: any) => (
+                <section key={section.code || section.title} className="mt-8">
+                  <h3 className="text-lg font-bold">
+                    {section.title || `Section ${section.code}`}
+                  </h3>
+                  <p className="mt-1 text-sm italic">{section.instructions}</p>
+                  <div className="mt-5 space-y-7">
+                    {(section.questions || []).map((question: any) => (
+                      <div key={question.number} className="break-inside-avoid">
+                        <div className="flex gap-3">
+                          <strong>{question.number}.</strong>
+                          <p className="whitespace-pre-wrap leading-7">
+                            {question.stem}
+                          </p>
+                          <span className="ml-auto shrink-0 font-semibold">
+                            [{question.marks}]
+                          </span>
+                        </div>
+                        {(question.tasks || []).map((task: any) => (
+                          <div
+                            key={task.label}
+                            className="ml-8 mt-3 flex gap-3 text-sm"
+                          >
+                            <span>{task.label}</span>
+                            <span>{task.prompt}</span>
+                            <span className="ml-auto shrink-0">
+                              [{task.marks}]
+                            </span>
+                          </div>
+                        ))}
+                        <button
+                          disabled={busy}
+                          onClick={() => regenerateQuestion(question.number)}
+                          className="mt-3 text-xs font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+                        >
+                          Regenerate this question
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </article>
+            <div className="border-t border-slate-200 px-5 py-4 text-right">
+              <button
+                onClick={() => setPreview(false)}
+                className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
+              >
+                Close preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
 }

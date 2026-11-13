@@ -12,6 +12,9 @@ export interface CreateBlueprintInput {
     totalMarks: number;
     durationMinutes: number;
     sections: Array<{ code: string; title: string; totalMarks: number; itemCount: number; answerRule: 'ALL' | 'ONE' | 'ANY'; questionTypes?: string[] }>;
+    topicPlan?: Array<{ topic: string; marks: number; questionCount?: number }>;
+    cognitiveDistribution?: Record<string, number>;
+    difficultyDistribution?: Record<string, number>;
   };
 }
 
@@ -102,7 +105,10 @@ export class ExamAuthoringService {
     for (const section of structure?.sections || []) {
       if (!section.code || !section.title || section.itemCount <= 0 || section.totalMarks <= 0) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'BLUEPRINT_SECTION_INVALID', message: `Section ${section.code || '(unnamed)'} has invalid metadata.` });
       if (section.answerRule === 'ONE' && section.itemCount < 2) findings.push({ severity: ExamValidationSeverity.WARNING, code: 'BLUEPRINT_OPTIONAL_COUNT', message: `Section ${section.code} allows one answer but contains fewer than two items.` });
+      if (section.answerRule === 'ONE' && section.totalMarks <= 0) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'BLUEPRINT_OPTIONAL_MARKS_INVALID', message: `Section ${section.code} must define the marks awarded for the selected optional item.` });
     }
+    const topicPlanMarks = (structure?.topicPlan || []).reduce((sum, item) => sum + Number(item.marks || 0), 0);
+    if (structure?.topicPlan?.length && topicPlanMarks !== Number(structure.totalMarks || 0)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'BLUEPRINT_TOPIC_MARK_MISMATCH', message: 'Topic-plan marks must equal the advertised examination marks.' });
     return findings;
   }
 
@@ -183,6 +189,27 @@ export class ExamAuthoringService {
     });
   }
 
+  async replaceGeneratedQuestion(schoolId: string, versionId: string, questionNumber: number, userId: string, question: any) {
+    const version = await this.getVersion(schoolId, versionId);
+    if ([ExamAuthoringStatus.APPROVED, ExamAuthoringStatus.PUBLISHED].includes(version.status)) throw new ForbiddenException('Approved examination versions are immutable. Create a working copy before regenerating a question.');
+    const snapshot: any = JSON.parse(JSON.stringify(version.snapshot));
+    const snapshotQuestion = (snapshot.sections || []).flatMap((section: any) => section.questions || []).find((item: any) => Number(item.number) === Number(questionNumber));
+    if (!snapshotQuestion) throw new NotFoundException(`Question ${questionNumber} was not found in this version`);
+    const dbQuestion = (version.exam?.sections || []).flatMap((section: any) => section.questions || []).find((item: any) => Number(item.order) + 1 === Number(questionNumber));
+    if (!dbQuestion) throw new NotFoundException(`Stored question ${questionNumber} was not found`);
+    snapshotQuestion.stem = question.stem; snapshotQuestion.tasks = question.tasks; snapshotQuestion.markingKey = question.markingKey; snapshotQuestion.topic = question.topic; snapshotQuestion.competency = question.competency; snapshotQuestion.bloomLevel = question.bloomLevel; snapshotQuestion.difficulty = question.difficulty;
+    return this.prisma.$transaction(async tx => {
+      await tx.examQuestion.update({ where: { id: dbQuestion.id }, data: { question: question.stem, score: Number(question.marks), difficulty: this.difficulty(question.difficulty), topic: question.topic || undefined, metadata: { tasks: question.tasks, traceability: question.traceability, bloomLevel: question.bloomLevel, source: 'AI-EXAMINOR regeneration' } } });
+      await tx.examinationMarkingEntry.deleteMany({ where: { questionId: dbQuestion.id } });
+      const scheme = await tx.examinationMarkingScheme.findUnique({ where: { versionId } });
+      if (scheme) await tx.examinationMarkingEntry.createMany({ data: (question.markingKey || []).map((key: any) => ({ schemeId: scheme.id, questionId: dbQuestion.id, taskLabel: key.task, expectedAnswer: key.answer || '', solution: key.solution, criteria: key.markAllocation || [], alternatives: key.acceptableAlternatives || [], marks: (key.markAllocation || []).reduce((sum: number, mark: any) => sum + Number(mark.marks || 0), 0) })) });
+      await tx.examinationVersion.update({ where: { id: versionId }, data: { snapshot, status: ExamAuthoringStatus.DRAFT, changeSummary: `Question ${questionNumber} regenerated; validation required.` } });
+      await tx.examinationMarkingScheme.updateMany({ where: { versionId }, data: { status: 'REVIEW_REQUIRED', schemeVersion: { increment: 1 } } });
+      await tx.examinationAuditLog.create({ data: { versionId, schoolId, userId, action: ExamAuditAction.QUESTION_UPDATED, details: { questionNumber, action: 'REGENERATED' } } });
+      return tx.examinationVersion.findUnique({ where: { id: versionId }, include: { markingScheme: { include: { entries: true } } } });
+    }, { maxWait: 10000, timeout: 30000 });
+  }
+
   async updateMarkingEntry(schoolId: string, entryId: string, userId: string, data: { expectedAnswer?: string; solution?: string; criteria?: any; alternatives?: any; commonErrors?: any; specialInstructions?: string; marks?: number }) {
     const entry = await this.prisma.examinationMarkingEntry.findUnique({ where: { id: entryId }, include: { scheme: { include: { version: true } } } });
     if (!entry || entry.scheme.version.schoolId !== schoolId) throw new NotFoundException('Marking-key entry not found');
@@ -202,10 +229,10 @@ export class ExamAuthoringService {
     const blueprint = version.exam?.blueprintId ? await this.prisma.examBlueprint.findFirst({ where: { id: version.exam.blueprintId, schoolId } }) : null;
     const blueprintStructure = blueprint?.structure as any;
     const expectedTotal = Number(blueprintStructure?.totalMarks ?? snapshot?.totalMarks ?? 0);
-    const actualTotal = (snapshot?.sections || []).reduce((sum: number, section: any) => sum + (section.questions || []).reduce((sectionSum: number, question: any) => sectionSum + Number(question.marks || 0), 0), 0);
+    const blueprintSections = blueprintStructure?.sections || [];
+    const actualTotal = (snapshot?.sections || []).reduce((sum: number, section: any, index: number) => { const sectionMarks = (section.questions || []).reduce((sectionSum: number, question: any) => sectionSum + Number(question.marks || 0), 0); return sum + (blueprintSections[index]?.answerRule === 'ONE' ? Number(section.questions?.[0]?.marks || 0) : sectionMarks); }, 0);
     if (actualTotal !== expectedTotal) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'MARK_TOTAL_MISMATCH', message: `Question marks total ${actualTotal}; expected ${expectedTotal}.`, suggestion: 'Rebalance question or task marks before moderation.' });
     if (!snapshot?.sections?.length) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'SECTIONS_MISSING', message: 'The examination has no sections.' });
-    const blueprintSections = blueprintStructure?.sections || [];
     const seenStems = new Map<string, number>();
     if (blueprintSections.length && snapshot?.sections?.length !== blueprintSections.length) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'SECTION_COUNT_DRIFT', message: 'Generated sections do not match the approved blueprint.' });
     for (let sectionIndex = 0; sectionIndex < (snapshot?.sections || []).length; sectionIndex++) {
@@ -213,7 +240,9 @@ export class ExamAuthoringService {
       const blueprintSection = blueprintSections[sectionIndex];
       if (blueprintSection) {
         const sectionMarks = (section.questions || []).reduce((sum: number, question: any) => sum + Number(question.marks || 0), 0);
-        if (sectionMarks !== Number(blueprintSection.totalMarks)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'SECTION_MARK_DRIFT', message: `Section ${blueprintSection.code} has ${sectionMarks} marks; expected ${blueprintSection.totalMarks}.`, location: `section:${blueprintSection.code}` });
+        const candidateSectionMarks = blueprintSection.answerRule === 'ONE' ? Number((section.questions || [])[0]?.marks || 0) : sectionMarks;
+        if (candidateSectionMarks !== Number(blueprintSection.totalMarks)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'SECTION_MARK_DRIFT', message: `Section ${blueprintSection.code} contributes ${candidateSectionMarks} candidate marks; expected ${blueprintSection.totalMarks}.`, location: `section:${blueprintSection.code}` });
+        if (blueprintSection.answerRule === 'ONE' && (section.questions || []).some((question: any) => Number(question.marks || 0) !== Number(blueprintSection.totalMarks))) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'OPTIONAL_ITEM_MARK_DRIFT', message: `Every optional item in Section ${blueprintSection.code} must be worth ${blueprintSection.totalMarks} marks.`, location: `section:${blueprintSection.code}` });
         if ((section.questions || []).length !== Number(blueprintSection.itemCount)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'SECTION_ITEM_COUNT_DRIFT', message: `Section ${blueprintSection.code} has an unexpected number of items.`, location: `section:${blueprintSection.code}` });
         const requiredInstruction = blueprintSection.answerRule === 'ONE' ? 'one' : blueprintSection.answerRule === 'ANY' ? 'required' : 'all';
         if (!String(section.instructions || '').toLowerCase().includes(requiredInstruction)) findings.push({ severity: ExamValidationSeverity.WARNING, code: 'SECTION_INSTRUCTION_DRIFT', message: `Section ${blueprintSection.code} instructions may not reflect the ${blueprintSection.answerRule} answer rule.`, location: `section:${blueprintSection.code}`, suggestion: `State clearly whether candidates must answer ${requiredInstruction} items.` });
@@ -224,7 +253,7 @@ export class ExamAuthoringService {
         const normalizedStem = String(question.stem || '').trim().toLowerCase().replace(/\s+/g, ' ');
         if (normalizedStem) {
           const previous = seenStems.get(normalizedStem);
-          if (previous) findings.push({ severity: ExamValidationSeverity.WARNING, code: 'DUPLICATE_QUESTION_STEM', message: `Question ${question.number} duplicates question ${previous}.`, location: `question:${question.number}`, suggestion: 'Review repeated content or regenerate the affected question.' });
+          if (previous) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'DUPLICATE_QUESTION_STEM', message: `Question ${question.number} duplicates question ${previous}.`, location: `question:${question.number}`, suggestion: 'Regenerate the affected question before approval.' });
           else seenStems.set(normalizedStem, Number(question.number));
         }
         const taskMarks = (question.tasks || []).reduce((sum: number, task: any) => sum + Number(task.marks || 0), 0);
@@ -232,18 +261,44 @@ export class ExamAuthoringService {
         if (taskMarks !== Number(question.marks)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'TASK_MARK_MISMATCH', message: `Question ${question.number} task marks do not equal its total.`, location: `question:${question.number}` });
         if (keyMarks !== Number(question.marks)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'MARKING_KEY_MISMATCH', message: `Question ${question.number} marking-key marks do not equal its total.`, location: `question:${question.number}` });
         if (!question.stem || !question.markingKey?.length) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'QUESTION_INCOMPLETE', message: `Question ${question.number} is missing content or a marking key.`, location: `question:${question.number}` });
+        for (const task of question.tasks || []) if (String(task.prompt || '').trim().toLowerCase() === normalizedStem) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'PARENT_TASK_DUPLICATION', message: `Question ${question.number} repeats its parent text as a task.`, location: `question:${question.number}.${task.label || 'task'}`, suggestion: 'Replace the repeated task with an independently assessable instruction.' });
+      }
+    }
+    const topicPlan = blueprintStructure?.topicPlan || [];
+    if (topicPlan.length) {
+      const questions = (snapshot?.sections || []).flatMap((section: any) => section.questions || []);
+      for (const target of topicPlan) {
+        const coveredMarks = questions.filter((question: any) => String(question.topic || '').toLowerCase().includes(String(target.topic).toLowerCase())).reduce((sum: number, question: any) => sum + Number(question.marks || 0), 0);
+        if (coveredMarks < Number(target.marks)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'TOPIC_COVERAGE_GAP', message: `Topic ${target.topic} has ${coveredMarks} mapped marks; expected ${target.marks}.`, location: `topic:${target.topic}`, suggestion: 'Regenerate or edit a question mapped to this approved topic.' });
       }
     }
     if (!blueprint) findings.push({ severity: ExamValidationSeverity.WARNING, code: 'BLUEPRINT_NOT_FOUND', message: 'The version has no accessible blueprint snapshot.', suggestion: 'Attach an approved blueprint before moderation.' });
     const hasErrors = findings.some(finding => finding.severity === ExamValidationSeverity.ERROR);
     const status = hasErrors ? ExamAuthoringStatus.REJECTED : findings.length ? ExamAuthoringStatus.PASSED_WITH_WARNINGS : ExamAuthoringStatus.PASSED;
+    const quality = this.buildQualityReport(snapshot, blueprintStructure, findings);
     return this.prisma.$transaction(async tx => {
-      const run = await tx.examinationValidationRun.create({ data: { versionId, status: hasErrors ? 'FAILED' : findings.length ? 'PASSED_WITH_WARNINGS' : 'PASSED', validatorVersion: 'ai-examinor-1', summary: { findingCount: findings.length, errorCount: findings.filter(f => f.severity === ExamValidationSeverity.ERROR).length }, completedAt: new Date(), findings: { create: findings } }, include: { findings: true } });
+      const run = await tx.examinationValidationRun.create({ data: { versionId, status: hasErrors ? 'FAILED' : findings.length ? 'PASSED_WITH_WARNINGS' : 'PASSED', validatorVersion: 'ai-examinor-2', summary: { findingCount: findings.length, errorCount: findings.filter(f => f.severity === ExamValidationSeverity.ERROR).length, quality }, completedAt: new Date(), findings: { create: findings } }, include: { findings: true } });
       await tx.examinationVersion.update({ where: { id: versionId }, data: { status } });
       await tx.exam.update({ where: { id: version.examId }, data: { authoringStatus: status } });
       await tx.examinationAuditLog.create({ data: { versionId, schoolId, userId, action: ExamAuditAction.VALIDATION_COMPLETED, details: { validationRunId: run.id, status, findingCount: findings.length } } });
       return run;
     });
+  }
+
+  buildQualityReport(snapshot: any, blueprint: any, findings: Array<{ severity: ExamValidationSeverity }> = []) {
+    const questions = (snapshot?.sections || []).flatMap((section: any) => section.questions || []);
+    const topicCount = new Set(questions.map((question: any) => question.topic).filter(Boolean)).size;
+    const demandCount = new Set(questions.map((question: any) => question.bloomLevel || question.difficulty).filter(Boolean)).size;
+    const dimensions = {
+      structuralIntegrity: questions.length && (snapshot?.sections || []).length === (blueprint?.sections || snapshot?.sections || []).length ? 20 : 0,
+      markAllocation: findings.some(finding => String(finding.severity) === ExamValidationSeverity.ERROR) ? 0 : 20,
+      topicCoverage: Math.min(15, topicCount * 5),
+      assessmentDepth: Math.min(15, demandCount * 5),
+      markingScheme: questions.length && questions.every((question: any) => question.markingKey?.length) ? 20 : 0,
+      presentation: snapshot?.title && snapshot?.durationMinutes ? 10 : 0,
+    };
+    const score = Object.values(dimensions).reduce((sum, value) => sum + value, 0);
+    return { score, maximum: 100, dimensions, status: findings.some(finding => String(finding.severity) === ExamValidationSeverity.ERROR) ? 'NOT_READY' : score >= 80 ? 'READY' : 'REVIEW_REQUIRED', criticalFailure: findings.some(finding => String(finding.severity) === ExamValidationSeverity.ERROR) };
   }
 
   async submitForModeration(schoolId: string, versionId: string, userId: string) {

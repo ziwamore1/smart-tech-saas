@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, ServiceUnavailableException } 
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { PrismaService } from '../prisma/prisma.service';
+import { MarkAllocationEngine } from '../exam-authoring/mark-allocation.engine';
 
 export interface AiExaminorSectionRequest {
   code: string;
@@ -23,17 +24,20 @@ export interface AiExaminorRequest {
   includeTopics?: string[];
   includeEocs?: string[];
   difficultyDistribution?: Record<string, number>;
+  cognitiveDistribution?: Record<string, number>;
+  topicPlan?: Array<{ topic: string; marks: number; questionCount?: number }>;
   instruction?: string;
 }
 
 const SYSTEM_PROMPT = `You are AI-EXAMINOR, the examination authoring and marking-key specialist for Zambia CBC/ECZ examinations.
 Create a fair, syllabus-grounded examination for any subject. Use only the supplied curriculum evidence. Do not invent syllabus codes or claim alignment that is not present.
-Respect every section's answer rule and exact mark budget. Questions must be candidate-ready, culturally appropriate, unambiguous, and use measurable command verbs. Structured questions must have tasks with marks. The marking key must show the expected answer and mark allocation for every task, including acceptable alternatives and method marks where relevant.
+Respect every section's answer rule and exact mark budget. Questions must be candidate-ready, culturally appropriate, unambiguous, and use measurable command verbs. A question stem is an introduction or scenario, not a duplicate of its tasks. Each task must be independently assessable, have a unique label and marks, and never repeat the parent stem. Use multiple meaningful tasks when the marks and assessment demand justify them; use one task without an artificial subpart when they do not. Distribute the section's marks across tasks and provide method, accuracy, reasoning, interpretation or communication marks where appropriate. The marking key must show the expected answer and mark allocation for every task, including acceptable alternatives and method marks where relevant.
 Return JSON only with: {"sections":[{"code":"","title":"","instructions":"","questions":[{"number":1,"type":"STRUCTURED","stem":"","marks":0,"difficulty":"MEDIUM","bloomLevel":"APPLY","topic":"","competency":"","tasks":[{"label":"(a)","prompt":"","marks":0}],"traceability":[{"source":"","evidence":""}],"markingKey":[{"task":"(a)","answer":"","markAllocation":[{"marks":1,"criterion":""}],"acceptableAlternatives":[]}]}]}],"metadata":{"assumptions":[],"qualityChecks":[]}}
-Do not include answers in the candidate stem. Keep markingKey examiner-only.`;
+Do not include answers in the candidate stem. Keep markingKey examiner-only. Return topic and Bloom/difficulty metadata for every question. Cover the supplied topic plan instead of reusing one topic for the whole paper.`;
 
 @Injectable()
 export class AiExaminorService {
+  private readonly markAllocation = new MarkAllocationEngine();
   private readonly logger = new Logger(AiExaminorService.name);
   private readonly openai?: OpenAI;
 
@@ -85,7 +89,7 @@ export class AiExaminorService {
     const totalMarks = request.totalMarks ?? sections.reduce((sum, section) => sum + section.totalMarks, 0);
     if (totalMarks <= 0 || sections.some(section => section.totalMarks <= 0 || section.itemCount <= 0)) throw new BadRequestException('Exam marks and item counts must be positive');
     if (sections.reduce((sum, section) => sum + section.totalMarks, 0) !== totalMarks) throw new BadRequestException('Section marks must add up to totalMarks');
-    return { title: request.title || 'CBC Examination Paper', totalMarks, durationMinutes: request.durationMinutes || 150, sections, difficultyDistribution: request.difficultyDistribution || { EASY: 0.2, MEDIUM: 0.5, HARD: 0.3 } };
+    return { title: request.title || 'CBC Examination Paper', totalMarks, durationMinutes: request.durationMinutes || 150, sections, topicPlan: request.topicPlan || [], cognitiveDistribution: request.cognitiveDistribution || {}, difficultyDistribution: request.difficultyDistribution || { EASY: 0.2, MEDIUM: 0.5, HARD: 0.3 } };
   }
 
   private async loadCurriculum(request: AiExaminorRequest) {
@@ -107,28 +111,29 @@ export class AiExaminorService {
       'Describe how number classification helps when interpreting measurements, money or temperatures in everyday life. Include two examples.',
     ];
     let number = 1;
-    return { sections: blueprint.sections.map((section: AiExaminorSectionRequest) => ({ code: section.code, title: section.title, instructions: section.answerRule === 'ONE' ? 'Answer one item in this section.' : 'Answer all items in this section.', questions: Array.from({ length: section.itemCount }, (_, index) => { const marks = this.allocateMarks(section.totalMarks, section.itemCount, index); const questionNumber = number++; const types = section.questionTypes?.length ? section.questionTypes : ['STRUCTURED']; const type = types[index % types.length]; const stem = mathematics ? mathematicsStems[questionNumber - 1] || `Use the properties of numbers to solve a new problem involving ${evidence.topic || 'the current topic'}. State your method and justify your answer.` : `Apply the stated ${evidence.topic || 'syllabus topic'} competency to a practical problem. Define the relevant terms, show your method, and justify your conclusion.`; return { number: questionNumber, type, stem, marks, difficulty: index === 0 ? 'EASY' : index === section.itemCount - 1 ? 'HARD' : 'MEDIUM', bloomLevel: 'APPLY', topic: evidence.topic || '', competency: evidence.competency || '', tasks: [{ label: '(a)', prompt: stem, marks }], traceability: [{ source: evidence.code ? `Syllabus competency ${evidence.code}` : 'Curriculum competency', evidence: evidence.standard || evidence.competency || evidence.topic || '' }], markingKey: [{ task: '(a)', answer: 'Award marks for a correct method, accurate reasoning and a correct final response.', markAllocation: [{ marks, criterion: 'Correct method, reasoning, and final response.' }], acceptableAlternatives: [] }] }; }) })) , metadata: { assumptions: ['Fallback questions are deterministic and should be reviewed by a qualified subject examiner.'], qualityChecks: ['Exact section counts and mark totals checked.', 'Question stems are distinct and candidate-ready.'] } };
+    return { sections: blueprint.sections.map((section: AiExaminorSectionRequest) => ({ code: section.code, title: section.title, instructions: section.answerRule === 'ONE' ? 'Answer one item in this section.' : 'Answer all items in this section.', questions: Array.from({ length: section.itemCount }, (_, index) => { const marks = this.allocateMarks(section.totalMarks, section.itemCount, index, section.answerRule); const questionNumber = number++; const types = section.questionTypes?.length ? section.questionTypes : ['STRUCTURED']; const type = types[index % types.length]; const stem = mathematics ? mathematicsStems[questionNumber - 1] || `Use the properties of numbers to solve a new problem involving ${evidence.topic || 'the current topic'}. State your method and justify your answer.` : `Apply the stated ${evidence.topic || 'syllabus topic'} competency to a practical problem. Define the relevant terms, show your method, and justify your conclusion.`; const taskPrompt = mathematics ? 'Show the method, calculations and justification needed to answer the question.' : 'State the answer and justify your conclusion using the information in the question.'; return { number: questionNumber, type, stem, marks, difficulty: index === 0 ? 'EASY' : index === section.itemCount - 1 ? 'HARD' : 'MEDIUM', bloomLevel: 'APPLY', topic: evidence.topic || '', competency: evidence.competency || '', tasks: [{ label: '', prompt: taskPrompt, marks }], traceability: [{ source: evidence.code ? `Syllabus competency ${evidence.code}` : 'Curriculum competency', evidence: evidence.standard || evidence.competency || evidence.topic || '' }], markingKey: [{ task: '', answer: 'Award marks for a correct method, accurate reasoning and a correct final response.', markAllocation: [{ marks, criterion: 'Correct method, reasoning, and final response.' }], acceptableAlternatives: [] }] }; }) })) , metadata: { assumptions: ['Fallback questions are deterministic and should be reviewed by a qualified subject examiner.'], qualityChecks: ['Exact section counts and mark totals checked.', 'Question stems are distinct and candidate-ready.'] } };
   }
 
-  private allocateMarks(total: number, count: number, index: number) { const base = Math.floor(total / count); return base + (index < total % count ? 1 : 0); }
+  private allocateMarks(total: number, count: number, index: number, answerRule = 'ALL') { if (answerRule === 'ONE') return total; return this.markAllocation.allocate(total, Array.from({ length: count }, (_, item) => ({ id: String(item), weight: 1 })))[index].marks; }
   private matchesBlueprintShape(artifact: any, blueprint: any) {
     if (!artifact || !Array.isArray(artifact.sections) || artifact.sections.length !== blueprint.sections.length) return false;
     return artifact.sections.every((section: any, index: number) => {
       const expected = blueprint.sections[index];
-      return Array.isArray(section.questions) && section.questions.length === expected.itemCount && section.questions.reduce((sum: number, question: any) => sum + Number(question.marks || 0), 0) === expected.totalMarks;
+      return Array.isArray(section.questions) && section.questions.length === expected.itemCount && (expected.answerRule === 'ONE' ? section.questions.every((question: any) => Number(question.marks || 0) === expected.totalMarks) : section.questions.reduce((sum: number, question: any) => sum + Number(question.marks || 0), 0) === expected.totalMarks);
     });
   }
   private isCandidateReady(artifact: any) {
     const questions = artifact.sections.flatMap((section: any) => section.questions || []);
     const stems = questions.map((question: any) => String(question.stem || '').trim().toLowerCase());
-    return new Set(stems).size === stems.length && stems.every(stem => stem.length >= 40 && !/using the syllabus content|demonstrate the competency|show your working and give a clear final response/i.test(stem));
+    return new Set(stems).size === stems.length && stems.every((stem, index) => { const tasks = questions[index]?.tasks || []; return stem.length >= 40 && tasks.length > 0 && tasks.every((task: any) => String(task.prompt || '').trim().toLowerCase() !== stem && String(task.prompt || '').trim().length >= 12) && !/using the syllabus content|demonstrate the competency|show your working and give a clear final response/i.test(stem); });
   }
   private parseJson(raw: string) { try { return JSON.parse(raw.replace(/^```json\s*|```$/g, '').trim()); } catch { throw new BadRequestException('AI-EXAMINOR returned invalid JSON'); } }
 
   private validateArtifact(artifact: any, blueprint: any, curriculum: any) {
     if (!artifact || !Array.isArray(artifact.sections) || artifact.sections.length !== blueprint.sections.length) throw new BadRequestException('Generated paper does not match its section blueprint');
-    const questions = artifact.sections.flatMap((section: any, index: number) => { const expected = blueprint.sections[index]; if (!Array.isArray(section.questions) || section.questions.length !== expected.itemCount) throw new BadRequestException(`Section ${expected.code} has an invalid item count`); if (section.questions.reduce((sum: number, q: any) => sum + Number(q.marks || 0), 0) !== expected.totalMarks) throw new BadRequestException(`Section ${expected.code} marks do not match its blueprint`); return section.questions; });
-    for (const question of questions) { if (!question.stem || !question.markingKey?.length || !question.tasks?.length) throw new BadRequestException('Every generated question requires tasks and a marking key'); const taskMarks = question.tasks.reduce((sum: number, task: any) => sum + Number(task.marks || 0), 0); const keyMarks = question.markingKey.reduce((sum: number, key: any) => sum + (key.markAllocation || []).reduce((inner: number, mark: any) => inner + Number(mark.marks || 0), 0), 0); if (taskMarks !== Number(question.marks) || keyMarks !== taskMarks) throw new BadRequestException('Question tasks and marking-key allocations must equal question marks'); }
-    return { title: blueprint.title, subject: curriculum.subject, durationMinutes: blueprint.durationMinutes, totalMarks: blueprint.totalMarks, sections: artifact.sections, markingKey: questions.flatMap((question: any) => question.markingKey.map((key: any) => ({ questionNumber: question.number, ...key }))), metadata: { ...artifact.metadata, generatedBy: 'AI-EXAMINOR', aiEnriched: Boolean(this.openai), blueprint } };
+    const questions = artifact.sections.flatMap((section: any, index: number) => { const expected = blueprint.sections[index]; if (!Array.isArray(section.questions) || section.questions.length !== expected.itemCount) throw new BadRequestException(`Section ${expected.code} has an invalid item count`); const sectionMarks = section.questions.reduce((sum: number, q: any) => sum + Number(q.marks || 0), 0); if (expected.answerRule === 'ONE' ? section.questions.some((q: any) => Number(q.marks || 0) !== expected.totalMarks) : sectionMarks !== expected.totalMarks) throw new BadRequestException(`Section ${expected.code} marks do not match its blueprint`); return section.questions; });
+    const stems = new Set<string>();
+    for (const question of questions) { if (!question.stem || !question.markingKey?.length || !question.tasks?.length) throw new BadRequestException('Every generated question requires tasks and a marking key'); const normalizedStem = String(question.stem).trim().toLowerCase().replace(/\s+/g, ' '); if (stems.has(normalizedStem)) throw new BadRequestException(`Duplicate question text detected for question ${question.number}`); stems.add(normalizedStem); const taskMarks = question.tasks.reduce((sum: number, task: any) => sum + Number(task.marks || 0), 0); const keyMarks = question.markingKey.reduce((sum: number, key: any) => sum + (key.markAllocation || []).reduce((inner: number, mark: any) => inner + Number(mark.marks || 0), 0), 0); if (question.tasks.some((task: any) => String(task.prompt || '').trim().toLowerCase() === normalizedStem)) throw new BadRequestException(`Question ${question.number} repeats its parent text as a task`); if (taskMarks !== Number(question.marks) || keyMarks !== taskMarks) throw new BadRequestException(`Question ${question.number} marking allocations do not equal its marks`); }
+    return { title: blueprint.title, subject: curriculum.subject, durationMinutes: blueprint.durationMinutes, totalMarks: blueprint.totalMarks, sections: artifact.sections.map((section: any, index: number) => ({ ...section, answerRule: blueprint.sections[index].answerRule })), markingKey: questions.flatMap((question: any) => question.markingKey.map((key: any) => ({ questionNumber: question.number, ...key }))), metadata: { ...artifact.metadata, generatedBy: 'AI-EXAMINOR', aiEnriched: Boolean(this.openai), blueprint } };
   }
 }

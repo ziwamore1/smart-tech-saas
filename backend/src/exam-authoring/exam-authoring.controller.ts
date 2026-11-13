@@ -54,7 +54,7 @@ export class ExamAuthoringController {
     const structure = blueprint.structure as any;
     const job = await this.service.startGenerationJob(req.user.schoolId, req.user.id, { ...body, subjectId: blueprint.subjectId, blueprintId: blueprint.id });
     try {
-      const artifact = await this.aiExaminor.generate({ ...body, subjectId: blueprint.subjectId, totalMarks: structure.totalMarks, durationMinutes: structure.durationMinutes, sections: structure.sections }, { requireProvider: true });
+      const artifact = await this.aiExaminor.generate({ ...body, subjectId: blueprint.subjectId, totalMarks: structure.totalMarks, durationMinutes: structure.durationMinutes, sections: structure.sections, topicPlan: structure.topicPlan, cognitiveDistribution: structure.cognitiveDistribution, difficultyDistribution: structure.difficultyDistribution }, { requireProvider: true });
       const exam = await this.service.createExamDraft({ ...body, blueprintId: blueprint.id, subjectId: blueprint.subjectId, schoolId: req.user.schoolId, createdById: req.user.id, generationJobId: job.id, artifact });
       await this.service.finishGenerationJob(job.id, { versionId: exam?.versions?.[0]?.id, examId: exam?.id });
       return exam;
@@ -78,6 +78,19 @@ export class ExamAuthoringController {
   @Patch('marking-entries/:id')
   @Roles(...AUTHORING_ROLES)
   updateMarkingEntry(@Request() req: any, @Param('id') id: string, @Body() body: any) { return this.service.updateMarkingEntry(req.user.schoolId, id, req.user.id, body); }
+
+  @Post('versions/:id/questions/:questionNumber/regenerate')
+  @Roles(...AUTHORING_ROLES)
+  async regenerateQuestion(@Request() req: any, @Param('id') id: string, @Param('questionNumber') questionNumber: string, @Body() body: { instruction?: string; topic?: string }) {
+    const version = await this.service.getVersion(req.user.schoolId, id);
+    const blueprint = version.exam?.blueprintId ? await this.service.getBlueprint(req.user.schoolId, version.exam.blueprintId) : null;
+    if (!blueprint?.isApproved) throw new ForbiddenException('An approved blueprint is required before regenerating a question');
+    const question = (version.snapshot as any)?.sections?.flatMap((section: any) => section.questions || []).find((item: any) => Number(item.number) === Number(questionNumber));
+    if (!question) throw new ForbiddenException(`Question ${questionNumber} was not found`);
+    const structure: any = blueprint.structure;
+    const artifact = await this.aiExaminor.generate({ subjectId: blueprint.subjectId, totalMarks: Number(question.marks), durationMinutes: structure.durationMinutes, title: version.exam.title, sections: [{ code: 'R', title: 'Regenerated item', totalMarks: Number(question.marks), itemCount: 1, answerRule: 'ALL', questionTypes: [question.type || 'STRUCTURED'] }], includeTopics: body.topic ? [body.topic] : undefined, instruction: `Regenerate only question ${questionNumber}. Preserve its marks (${question.marks}) and create a new, non-duplicated assessment task. ${body.instruction || ''}` }, { requireProvider: true });
+    return this.service.replaceGeneratedQuestion(req.user.schoolId, id, Number(questionNumber), req.user.id, artifact.sections[0].questions[0]);
+  }
 
   @Post('versions/:id/validate')
   @Roles(...AUTHORING_ROLES)
