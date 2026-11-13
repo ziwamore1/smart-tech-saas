@@ -65,7 +65,11 @@ export class AiExaminorService {
           ],
         });
         const raw = response.choices[0]?.message?.content;
-        if (raw) artifact = this.parseJson(raw);
+        if (raw) {
+          const candidate = this.parseJson(raw);
+          if (this.matchesBlueprintShape(candidate, blueprint)) artifact = candidate;
+          else this.logger.warn('AI-EXAMINOR returned a blueprint-mismatched section shape; using deterministic fallback.');
+        }
       } catch (error) {
         this.logger.warn(`AI-EXAMINOR enrichment failed; using validated fallback: ${(error as Error).message}`);
       }
@@ -98,6 +102,13 @@ export class AiExaminorService {
   }
 
   private allocateMarks(total: number, count: number, index: number) { const base = Math.floor(total / count); return base + (index < total % count ? 1 : 0); }
+  private matchesBlueprintShape(artifact: any, blueprint: any) {
+    if (!artifact || !Array.isArray(artifact.sections) || artifact.sections.length !== blueprint.sections.length) return false;
+    return artifact.sections.every((section: any, index: number) => {
+      const expected = blueprint.sections[index];
+      return Array.isArray(section.questions) && section.questions.length === expected.itemCount && section.questions.reduce((sum: number, question: any) => sum + Number(question.marks || 0), 0) === expected.totalMarks;
+    });
+  }
   private parseJson(raw: string) { try { return JSON.parse(raw.replace(/^```json\s*|```$/g, '').trim()); } catch { throw new BadRequestException('AI-EXAMINOR returned invalid JSON'); } }
 
   private validateArtifact(artifact: any, blueprint: any, curriculum: any) {

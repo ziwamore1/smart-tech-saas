@@ -37,9 +37,13 @@ export default function AiExaminorPage() {
   const load = async () => {
     setError('');
     try {
-      const [dash, providerResponse, blueprintResponse, examinationResponse, subjectResponse, classResponse, termResponse] = await Promise.all([
-        examAuthoringApi.dashboard(), examAuthoringApi.providers(), examAuthoringApi.listBlueprints(), examAuthoringApi.listExaminations({ limit: 10 }), subjectApi.getAll(), classApi.getAll(), termApi.getAll(),
-      ]);
+      const dash = await examAuthoringApi.dashboard();
+      const providerResponse = await examAuthoringApi.providers();
+      const blueprintResponse = await examAuthoringApi.listBlueprints();
+      const examinationResponse = await examAuthoringApi.listExaminations({ limit: 10 });
+      const subjectResponse = await subjectApi.getAll();
+      const classResponse = await classApi.getAll();
+      const termResponse = await termApi.getAll();
       setDashboard(unwrap(dash));
       setProviders(unwrap(providerResponse));
       setBlueprints(unwrap(blueprintResponse));

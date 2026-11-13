@@ -46,19 +46,17 @@ export class ExamAuthoringService {
   }
 
   async getDashboard(schoolId: string) {
-    const [totalExams, approvedExams, draftExams, moderationExams, rejectedExams, markingKeys, questions, subjects, versions, recentVersions, outstandingFindings] = await Promise.all([
-      this.prisma.exam.count({ where: { schoolId } }),
-      this.prisma.exam.count({ where: { schoolId, authoringStatus: { in: [ExamAuthoringStatus.APPROVED, ExamAuthoringStatus.PUBLISHED] } } }),
-      this.prisma.exam.count({ where: { schoolId, authoringStatus: { in: [ExamAuthoringStatus.DRAFT, ExamAuthoringStatus.GENERATED] } } }),
-      this.prisma.exam.count({ where: { schoolId, authoringStatus: ExamAuthoringStatus.MODERATION } }),
-      this.prisma.exam.count({ where: { schoolId, authoringStatus: ExamAuthoringStatus.REJECTED } }),
-      this.prisma.examinationMarkingScheme.count({ where: { version: { schoolId } } }),
-      this.prisma.questionBank.count({ where: { schoolId } }),
-      this.prisma.subject.count({ where: { schoolId } }),
-      this.prisma.examinationVersion.count({ where: { schoolId } }),
-      this.prisma.examinationVersion.findMany({ where: { schoolId }, include: { exam: { select: { id: true, title: true, authoringStatus: true } } }, orderBy: { createdAt: 'desc' }, take: 8 }),
-      this.prisma.examinationValidationFinding.count({ where: { isResolved: false, severity: ExamValidationSeverity.ERROR, run: { version: { schoolId } } } }),
-    ]);
+    const totalExams = await this.prisma.exam.count({ where: { schoolId } });
+    const approvedExams = await this.prisma.exam.count({ where: { schoolId, authoringStatus: { in: [ExamAuthoringStatus.APPROVED, ExamAuthoringStatus.PUBLISHED] } } });
+    const draftExams = await this.prisma.exam.count({ where: { schoolId, authoringStatus: { in: [ExamAuthoringStatus.DRAFT, ExamAuthoringStatus.GENERATED] } } });
+    const moderationExams = await this.prisma.exam.count({ where: { schoolId, authoringStatus: ExamAuthoringStatus.MODERATION } });
+    const rejectedExams = await this.prisma.exam.count({ where: { schoolId, authoringStatus: ExamAuthoringStatus.REJECTED } });
+    const markingKeys = await this.prisma.examinationMarkingScheme.count({ where: { version: { schoolId } } });
+    const questions = await this.prisma.questionBank.count({ where: { schoolId } });
+    const subjects = await this.prisma.subject.count({ where: { schoolId } });
+    const versions = await this.prisma.examinationVersion.count({ where: { schoolId } });
+    const recentVersions = await this.prisma.examinationVersion.findMany({ where: { schoolId }, include: { exam: { select: { id: true, title: true, authoringStatus: true } } }, orderBy: { createdAt: 'desc' }, take: 8 });
+    const outstandingFindings = await this.prisma.examinationValidationFinding.count({ where: { isResolved: false, severity: ExamValidationSeverity.ERROR, run: { version: { schoolId } } } });
     return { totals: { totalExams, approvedExams, draftExams, moderationExams, rejectedExams, markingKeys, questions, subjects, versions, outstandingFindings }, recentVersions };
   }
 
