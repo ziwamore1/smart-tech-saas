@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { PrismaService } from '../prisma/prisma.service';
 import { ExaminationComposer } from '../exam-authoring/examination-composer';
+import { renderDiagramSvg } from '../exam-authoring/exam-diagram-renderer';
 
 export interface AiExaminorSectionRequest {
   code: string;
@@ -34,7 +35,9 @@ Create a fair, syllabus-grounded examination for any subject. Use only the suppl
 Respect every section's answer rule and exact mark budget. Questions must be candidate-ready, culturally appropriate, unambiguous, and use measurable command verbs.
 Follow ECZ item conventions: a question stem introduces one coherent scenario or data set; the tasks beneath it are separately labelled subquestions such as (a), (b), (c). Each task must be independently assessable, carry its own bracketed mark tariff, and never repeat the parent stem. A 10-mark or 20-mark structured item should normally have two or more meaningful tasks unless the assessment demand genuinely justifies one task. Use contexts that require method, accuracy, reasoning, interpretation or communication marks where appropriate. Distribute the section's marks across tasks.
 The marking key must show the expected answer and mark allocation for every task, including method marks, acceptable alternatives and common errors where relevant. Keep marking keys examiner-only.
-Return JSON only with: {"sections":[{"code":"","title":"","instructions":"","questions":[{"number":1,"type":"STRUCTURED","stem":"","marks":0,"difficulty":"MEDIUM","bloomLevel":"APPLY","topic":"","competency":"","tasks":[{"label":"(a)","prompt":"","marks":0}],"traceability":[{"source":"","evidence":""}],"markingKey":[{"task":"(a)","answer":"","markAllocation":[{"marks":1,"criterion":""}],"acceptableAlternatives":[]}]}]}],"metadata":{"assumptions":[],"qualityChecks":[]}}
+When a task asks the candidate to draw, plot, sketch or construct a graph, diagram or scale drawing, the marking key for that task must include a machine-renderable "diagram" object, not a verbal description. Use one of these types: VENN_3_SET, CARTESIAN_GRAPH, SPEED_TIME_GRAPH, DISTANCE_TIME_GRAPH, HISTOGRAM, TRIANGLE_CONSTRUCTION.
+Diagram fields: VENN_3_SET {labels:[3 labels], regionValues:{onlyA,onlyB,onlyC,onlyAB,onlyAC,onlyBC,abc,outside}}; CARTESIAN_GRAPH/SPEED_TIME_GRAPH/DISTANCE_TIME_GRAPH {xMin,xMax,yMin,yMax,xLabel,yLabel,lines:[{from:{x,y},to:{x,y},label,dashed}],segments:[{points:[{x,y}],label}],shadedRegion:[{x,y}],points:[{x,y,label,highlight}]}; HISTOGRAM {classes:[{label,frequency}],frequencyPolygon:true}; TRIANGLE_CONSTRUCTION {sideAB,sideAC,angleA,units,scaleLabel,showCircumcircle,showHeight,showConstructionArcs}.
+Return JSON only with: {"sections":[{"code":"","title":"","instructions":"","questions":[{"number":1,"type":"STRUCTURED","stem":"","marks":0,"difficulty":"MEDIUM","bloomLevel":"APPLY","topic":"","competency":"","tasks":[{"label":"(a)","prompt":"","marks":0}],"traceability":[{"source":"","evidence":""}],"markingKey":[{"task":"(a)","answer":"","markAllocation":[{"marks":1,"criterion":""}],"acceptableAlternatives":[],"diagram":{}}]}]}],"metadata":{"assumptions":[],"qualityChecks":[]}}
 Do not include answers in the candidate stem. Cover the supplied topic plan and cognitive distribution instead of reusing one topic or one command verb for the whole paper.`;
 
 @Injectable()
@@ -156,7 +159,7 @@ export class AiExaminorService {
       if (prompts.some(prompt => prompt.length < 12 || prompt === stem || this.isPlaceholderPrompt(prompt))) return false;
       const taskMarks = tasks.reduce((sum: number, task: any) => sum + Number(task.marks || 0), 0);
       if (taskMarks !== Number(question.marks || 0)) return false;
-      return this.markingKeyCoversTasks(question, tasks);
+      return this.markingKeyCoversTasks(question, tasks) && this.diagramsCoverTasks(question, tasks);
     });
   }
 
@@ -172,6 +175,32 @@ export class AiExaminorService {
     const keys = Array.isArray(question.markingKey) ? question.markingKey : [];
     if (!keys.length) return false;
     return tasks.every((task: any) => keys.some((key: any) => this.normalise(key.task) === this.normalise(task.label)));
+  }
+
+  private diagramsCoverTasks(question: any, tasks: any[]) {
+    const keys = Array.isArray(question.markingKey) ? question.markingKey : [];
+    return tasks.every((task: any) => {
+      if (!this.requiresDiagram(task.prompt)) return true;
+      const key = keys.find((item: any) => this.normalise(item.task) === this.normalise(task.label));
+      return this.hasRenderableDiagram(key);
+    });
+  }
+
+  private requiresDiagram(prompt: string) {
+    const value = this.normalise(prompt);
+    const drawing = /\b(draw|construct|plot|sketch|represent|illustrate)\b/.test(value);
+    const diagram = /\b(venn|diagram|graph|histogram|frequency polygon|frequency curve|cartesian|feasible region|circumcircle|scale drawing|scale model|construction)\b/.test(value);
+    return drawing && diagram;
+  }
+
+  private hasRenderableDiagram(key: any) {
+    if (!key?.diagram || typeof key.diagram !== 'object') return false;
+    try {
+      const svg = renderDiagramSvg(key.diagram);
+      return Boolean(svg && svg.includes('<svg'));
+    } catch {
+      return false;
+    }
   }
 
   private parseJson(raw: string) {
@@ -208,7 +237,13 @@ export class AiExaminorService {
       const keyMarks = question.markingKey.reduce((sum: number, key: any) => sum + (key.markAllocation || []).reduce((inner: number, mark: any) => inner + Number(mark.marks || 0), 0), 0);
       if (tasks.some((task: any) => this.normalise(task.prompt) === normalizedStem)) throw new BadRequestException(`Question ${question.number} repeats its parent text as a task`);
       if (!this.markingKeyCoversTasks(question, tasks)) throw new BadRequestException(`Question ${question.number} marking key does not cover every task`);
+      if (!this.diagramsCoverTasks(question, tasks)) throw new BadRequestException(`Question ${question.number} is missing a required marking-key diagram`);
       if (taskMarks !== Number(question.marks) || keyMarks !== taskMarks) throw new BadRequestException(`Question ${question.number} marking allocations do not equal its marks`);
+      question.markingKey = (question.markingKey || []).map((key: any) => {
+        const diagramSvg = key.diagram ? renderDiagramSvg(key.diagram) : key.diagramSvg;
+        if (key.diagram && !diagramSvg) throw new BadRequestException(`Question ${question.number} contains an invalid marking-key diagram`);
+        return { ...key, diagramSvg };
+      });
     }
     return {
       title: blueprint.title,

@@ -1,4 +1,5 @@
 import { MarkAllocationEngine } from './mark-allocation.engine';
+import { DiagramSpec, renderDiagramSvg } from './exam-diagram-renderer';
 
 interface ComposerSection {
   code: string;
@@ -33,6 +34,7 @@ interface ComposedTask {
   answer: string;
   criterion: string;
   alternatives?: string[];
+  diagram?: DiagramSpec;
 }
 
 interface QuestionTemplate {
@@ -60,6 +62,8 @@ interface ComposedQuestion {
     answer: string;
     markAllocation: Array<{ marks: number; criterion: string }>;
     acceptableAlternatives: string[];
+    diagram?: DiagramSpec;
+    diagramSvg?: string;
   }>;
 }
 
@@ -208,6 +212,8 @@ export class ExaminationComposer {
         answer: task.answer,
         markAllocation: [{ marks: tasks[index].marks, criterion: task.criterion }],
         acceptableAlternatives: task.alternatives || [],
+        diagram: task.diagram,
+        diagramSvg: task.diagram ? renderDiagramSvg(task.diagram) : undefined,
       })),
     };
   }
@@ -309,6 +315,128 @@ export class ExaminationComposer {
     };
   }
 
+  private distanceTimeDiagram(): DiagramSpec {
+    return {
+      type: 'DISTANCE_TIME_GRAPH',
+      xMin: 0,
+      xMax: 70,
+      yMin: 0,
+      yMax: 280,
+      xLabel: 'Time (s)',
+      yLabel: 'Distance (m)',
+      title: 'Distance-time graph for the cyclist and the runner',
+      caption: 'Cyclist: 0–30 s to 240 m, then stationary to 60 s. Runner: 40–60 s to 180 m.',
+      segments: [
+        { points: [{ x: 0, y: 0 }, { x: 30, y: 240 }, { x: 60, y: 240 }], label: 'Cyclist' },
+        { points: [{ x: 40, y: 0 }, { x: 60, y: 180 }], label: 'Runner' },
+      ],
+      points: [
+        { x: 30, y: 240, label: '(30, 240)' },
+        { x: 60, y: 180, label: '(60, 180)' },
+      ],
+    };
+  }
+
+  private vennDiagram(): DiagramSpec {
+    return {
+      type: 'VENN_3_SET',
+      labels: ['M', 'G', 'S'],
+      universalLabel: 'ξ',
+      title: 'Members growing maize (M), groundnuts (G) and soya beans (S)',
+      caption: 'M = maize, G = groundnuts, S = soya beans. The universal set has 80 members.',
+      regionValues: {
+        onlyA: 14,
+        onlyB: 16,
+        onlyC: 14,
+        onlyAB: 8,
+        onlyAC: 4,
+        onlyBC: 6,
+        abc: 4,
+        outside: 14,
+      },
+    };
+  }
+
+  private histogramDiagram(): DiagramSpec {
+    return {
+      type: 'HISTOGRAM',
+      classes: [
+        { label: '30–39', frequency: 1 },
+        { label: '40–49', frequency: 9 },
+        { label: '50–59', frequency: 12 },
+        { label: '60–69', frequency: 11 },
+        { label: '70–79', frequency: 11 },
+        { label: '80–89', frequency: 6 },
+      ],
+      xLabel: 'Scores',
+      yLabel: 'Frequency',
+      frequencyPolygon: true,
+      title: 'Histogram and frequency polygon of the 50 scores',
+      caption: 'Bars show the histogram; the red line is the frequency polygon plotted at class midpoints.',
+    };
+  }
+
+  private linearProgrammingDiagram(highlightOptimal = false): DiagramSpec {
+    const vertices = [
+      { x: 30, y: 40, label: '(30, 40)' },
+      { x: 40, y: 40, label: '(40, 40)' },
+      { x: 60, y: 60, label: '(60, 60)' },
+      { x: 30, y: 90, label: highlightOptimal ? 'Optimal (30, 90)' : '(30, 90)', highlight: highlightOptimal },
+    ];
+    return {
+      type: 'CARTESIAN_GRAPH',
+      xMin: 0,
+      xMax: 140,
+      yMin: 0,
+      yMax: 140,
+      xLabel: 'Bags of maize meal (x)',
+      yLabel: 'Bags of rice (y)',
+      title: 'Feasible region for the trader’s constraints',
+      caption: 'Shaded region: x + y ≤ 120, x ≥ 30, y ≥ 40 and y ≥ x. Vertices are labelled.',
+      shadedRegion: [
+        { x: 30, y: 40 },
+        { x: 40, y: 40 },
+        { x: 60, y: 60 },
+        { x: 30, y: 90 },
+      ],
+      lines: [
+        { from: { x: 0, y: 120 }, to: { x: 120, y: 0 }, label: 'x + y = 120' },
+        { from: { x: 30, y: 0 }, to: { x: 30, y: 140 }, label: 'x = 30', dashed: true },
+        { from: { x: 0, y: 40 }, to: { x: 140, y: 40 }, label: 'y = 40', dashed: true },
+        { from: { x: 0, y: 0 }, to: { x: 140, y: 140 }, label: 'y = x', dashed: true },
+      ],
+      points: vertices,
+    };
+  }
+
+  private constructionDiagram(showCircumcircle: boolean, showHeight = false): DiagramSpec {
+    return {
+      type: 'TRIANGLE_CONSTRUCTION',
+      sideAB: 9,
+      sideAC: 7,
+      angleA: 65,
+      units: 'cm',
+      sideABLabel: '9 cm (90 m)',
+      sideACLabel: '7 cm (70 m)',
+      sideBCLabel: '8.8 cm (88 m)',
+      scaleLabel: 'Scale: 1 cm : 10 m',
+      labels: { A: 'A', B: 'B', C: 'C' },
+      showConstructionArcs: !showCircumcircle && !showHeight,
+      showCircumcircle,
+      showHeight,
+      title: showCircumcircle
+        ? 'Circumcircle through the three vertices'
+        : showHeight
+          ? 'Height of the triangular garden'
+          : 'Scale construction of the triangular garden',
+      caption: showCircumcircle
+        ? 'The perpendicular bisectors meet at O. Measure OA, convert using the scale, then use C = 2πR.'
+        : showHeight
+          ? 'The perpendicular from C to AB is the shortest distance from the opposite corner to the 90 m side.'
+          : 'Draw AB = 9 cm, construct 65° at A, mark AC = 7 cm and join BC.',
+    };
+  }
+
   private mathematicsTemplates(): QuestionTemplate[] {
     return [
       {
@@ -325,13 +453,13 @@ export class ExaminationComposer {
         ],
       },
       {
-        stem: 'A cyclist and a runner train on a straight road. The cyclist travels at a constant speed of 8 m/s for 30 seconds and then rests for 10 seconds. The runner starts from the same point at the 40th second and covers 180 m by the 60th second.',
+        stem: 'A cyclist and a runner train on a straight road. The cyclist travels at a constant speed of 8 m/s for 30 seconds, rests for 10 seconds and then remains at that position until the 60th second. The runner starts from the same point at the 40th second and covers 180 m by the 60th second.',
         topic: 'Relations, functions and graphs',
         competency: 'Interpret motion using distance-time graphs and calculate speed',
         difficulty: 'MEDIUM',
         bloomLevel: 'ANALYSE',
         tasks: [
-          { label: '', prompt: 'Draw a distance-time graph representing the movement of the cyclist and the runner.', marks: 5, answer: 'Axes correctly labelled with appropriate scales; cyclist rises to 240 m at 30 s, remains flat to 40 s; runner starts at 40 s and reaches 180 m at 60 s.', criterion: 'Correct axes, scales, plotted segments and labels.' },
+          { label: '', prompt: 'Draw a distance-time graph representing the movement of the cyclist and the runner.', marks: 5, answer: 'Axes correctly labelled with appropriate scales; cyclist rises to 240 m at 30 s and remains flat to 60 s; runner starts at 40 s and reaches 180 m at 60 s.', criterion: 'Correct axes, scales, plotted segments and labels.', diagram: this.distanceTimeDiagram() },
           { label: '', prompt: 'Calculate the total distance covered by the cyclist before resting.', marks: 4, answer: 'Distance = speed × time = 8 × 30 = 240 m.', criterion: 'Correct formula, substitution and answer with unit.' },
           { label: '', prompt: 'Using the graph, determine the speed of the runner.', marks: 3, answer: 'Speed = 180 ÷ 20 = 9 m/s.', criterion: 'Correct reading of time interval and correct gradient/speed.' },
           { label: '', prompt: 'Calculate the average speed of the cyclist over the 60-second period and state the runner’s displacement vector at 60 seconds.', marks: 4, answer: 'Cyclist average speed = 240 ÷ 60 = 4 m/s. Runner displacement = 180 m in the direction of motion.', criterion: 'Correct average speed and correct magnitude and direction of displacement.' },
@@ -345,7 +473,7 @@ export class ExaminationComposer {
         difficulty: 'HARD',
         bloomLevel: 'ANALYSE',
         tasks: [
-          { label: '', prompt: 'Draw a suitable Venn diagram and determine the number of members who grow exactly two crops.', marks: 4, answer: 'Exactly two = (12−4) + (10−4) + (8−4) = 18 members.', criterion: 'Correct Venn regions, correct subtraction of the triple intersection and correct total.' },
+          { label: '', prompt: 'Draw a suitable Venn diagram and determine the number of members who grow exactly two crops.', marks: 4, answer: 'Exactly two = (12−4) + (10−4) + (8−4) = 18 members. The completed regions are 14, 16, 14, 8, 4, 6 and 4, with 14 outside the three sets.', criterion: 'Correct Venn regions, correct subtraction of the triple intersection and correct total.', diagram: this.vennDiagram() },
           { label: '', prompt: 'Determine the number of members who grow at least one of the three crops.', marks: 3, answer: 'At least one = 30 + 34 + 28 − 12 − 10 − 8 + 4 = 66 members.', criterion: 'Correct inclusion–exclusion substitution and answer.' },
           { label: '', prompt: 'Calculate the input budget when 60 members are active.', marks: 4, answer: 'B = kS; 16 000 = 40k, so k = 400. For 60 members, B = 400 × 60 = K24 000.', criterion: 'Correct constant of variation, equation and budget.' },
           { label: '', prompt: 'Find the number of each type of fertiliser bag the trader can buy.', marks: 5, answer: 'Let heavy = x and standard = y. x + y = 16 and 800x + 500y = 11 000. Solving gives x = 10 and y = 6.', criterion: 'Correct equations, valid solution method and correct values.' },
@@ -359,10 +487,10 @@ export class ExaminationComposer {
         difficulty: 'MEDIUM',
         bloomLevel: 'ANALYSE',
         tasks: [
-          { label: '', prompt: 'Represent the scores in a suitable grouped frequency table.', marks: 4, answer: 'A grouped table with equal class widths, correct tallies and frequencies totalling 50.', criterion: 'Suitable classes, correct tallying and frequencies totalling 50.' },
-          { label: '', prompt: 'Determine the modal class.', marks: 2, answer: 'The class with the highest frequency, correctly identified from the table.', criterion: 'Correct identification of the class with the highest frequency.' },
-          { label: '', prompt: 'Draw a histogram or frequency polygon to represent the distribution.', marks: 6, answer: 'Correct axes, scales, bar heights or plotted midpoints, and labels.', criterion: 'Correct scales, frequencies, shape and labelling.' },
-          { label: '', prompt: 'Find the 50th percentile score.', marks: 4, answer: 'The median class and interpolation must produce the score at the 25th ordered position.', criterion: 'Correct ordered position, median class and interpolated value.' },
+          { label: '', prompt: 'Represent the scores in a suitable grouped frequency table.', marks: 4, answer: 'Classes 30–39: 1; 40–49: 9; 50–59: 12; 60–69: 11; 70–79: 11; 80–89: 6. The frequencies total 50.', criterion: 'Suitable classes, correct tallying and frequencies totalling 50.' },
+          { label: '', prompt: 'Determine the modal class.', marks: 2, answer: '50–59, with frequency 12.', criterion: 'Correct identification of the class with the highest frequency.' },
+          { label: '', prompt: 'Draw a histogram or frequency polygon to represent the distribution.', marks: 6, answer: 'Correct axes and scales; contiguous bars with heights 1, 9, 12, 11, 11 and 6; a frequency polygon through the class midpoints; correct labels.', criterion: 'Correct scales, frequencies, shape and labelling.', diagram: this.histogramDiagram() },
+          { label: '', prompt: 'Find the 50th percentile score.', marks: 4, answer: 'The 25th value lies in the 60–69 class. Median ≈ 59.5 + ((25 − 22)/11) × 10 ≈ 62.3.', criterion: 'Correct ordered position, median class and interpolated value.' },
           { label: '', prompt: 'Find the probability that two learners selected at random without replacement both scored 70 or more.', marks: 4, answer: '17 learners scored 70 or more. Probability = (17/50) × (16/49) = 272/2450 ≈ 0.111.', criterion: 'Correct count, correct without-replacement product and simplified probability.' },
         ],
       },
@@ -374,9 +502,9 @@ export class ExaminationComposer {
         bloomLevel: 'EVALUATE',
         tasks: [
           { label: '', prompt: 'Write mathematical statements to represent the relationships between the number of bags of maize meal and rice.', marks: 6, answer: 'Let maize meal = x and rice = y. x + y ≤ 120; x ≥ 30; y ≥ 40; y ≥ x; x ≥ 0; y ≥ 0.', criterion: 'Correct variables, all constraints, inequality directions and non-negativity conditions.' },
-          { label: '', prompt: 'Represent the feasible region on the Cartesian plane.', marks: 8, answer: 'Correct boundary lines, intercepts, shading for the intersection of all constraints, and a clearly labelled feasible region.', criterion: 'Correct lines, intercepts, shading, feasible region and labels.' },
-          { label: '', prompt: 'Determine the number of each type of bag the trader should carry to obtain maximum profit.', marks: 4, answer: 'Evaluate the vertices of the feasible region. The maximum occurs at x = 60 and y = 60.', criterion: 'Correct vertices, objective-function values and optimal point.' },
-          { label: '', prompt: 'Find the maximum profit.', marks: 2, answer: 'Maximum profit = 20 × 60 + 30 × 60 = K3 000.', criterion: 'Correct substitution and correct maximum profit.' },
+          { label: '', prompt: 'Represent the feasible region on the Cartesian plane.', marks: 8, answer: 'Correct boundary lines, intercepts, shading for the intersection of all constraints, and a clearly labelled feasible region.', criterion: 'Correct lines, intercepts, shading, feasible region and labels.', diagram: this.linearProgrammingDiagram() },
+          { label: '', prompt: 'Determine the number of each type of bag the trader should carry to obtain maximum profit.', marks: 4, answer: 'Vertices: (30, 40), (40, 40), (60, 60) and (30, 90). Profits: K1 800, K2 000, K3 000 and K3 300. The maximum occurs at x = 30 and y = 90.', criterion: 'Correct vertices, objective-function values and optimal point.', diagram: this.linearProgrammingDiagram(true) },
+          { label: '', prompt: 'Find the maximum profit.', marks: 2, answer: 'Maximum profit = 20 × 30 + 30 × 90 = K3 300.', criterion: 'Correct substitution and correct maximum profit.' },
         ],
       },
       {
@@ -386,11 +514,11 @@ export class ExaminationComposer {
         difficulty: 'HARD',
         bloomLevel: 'APPLY',
         tasks: [
-          { label: '', prompt: 'Construct a scale model of the triangular garden using 1 cm to represent 10 m.', marks: 5, answer: 'Correct 9 cm and 7 cm sides with a 65° included angle, accurately constructed and labelled.', criterion: 'Correct scale, angle, side lengths, construction accuracy and labels.' },
+          { label: '', prompt: 'Construct a scale model of the triangular garden using 1 cm to represent 10 m.', marks: 5, answer: 'Correct 9 cm and 7 cm sides with a 65° included angle, accurately constructed and labelled.', criterion: 'Correct scale, angle, side lengths, construction accuracy and labels.', diagram: this.constructionDiagram(false) },
           { label: '', prompt: 'Using calculations, find the third side of the garden to the nearest metre.', marks: 5, answer: 'c² = 90² + 70² − 2(90)(70)cos 65°. c ≈ 88 m.', criterion: 'Correct cosine rule, substitution, evaluation and rounding.' },
           { label: '', prompt: 'Determine the area of the garden.', marks: 2, answer: 'Area = ½ × 90 × 70 × sin 65° ≈ 2 855 m².', criterion: 'Correct area formula, substitution and answer.' },
-          { label: '', prompt: 'Find the shortest distance from the 90 m side to the opposite corner.', marks: 3, answer: 'Use area = ½ × base × height: 2 855 = ½ × 90 × h, so h ≈ 63 m.', criterion: 'Correct height relationship, substitution and answer.' },
-          { label: '', prompt: 'Measure the distance from the centre of the circular fence to a vertex and use calculations to find the circumference of the fence.', marks: 5, answer: 'The measured circumradius should be checked against R = a/(2 sin A). Circumference = 2πR, with consistent units.', criterion: 'Valid measurement, correct radius relationship, correct circumference and units.' },
+          { label: '', prompt: 'Find the shortest distance from the 90 m side to the opposite corner.', marks: 3, answer: 'Use area = ½ × base × height: 2 855 = ½ × 90 × h, so h ≈ 63 m.', criterion: 'Correct height relationship, substitution and answer.', diagram: this.constructionDiagram(false, true) },
+          { label: '', prompt: 'Measure the distance from the centre of the circular fence to a vertex and use calculations to find the circumference of the fence.', marks: 5, answer: 'The circumcentre O is the intersection of the perpendicular bisectors. R = abc/(4Δ) ≈ 48.3 m, which is about 4.8 cm on the scale drawing. Circumference = 2πR ≈ 304 m.', criterion: 'Valid measurement, correct radius relationship, correct circumference and units.', diagram: this.constructionDiagram(true) },
         ],
       },
     ];

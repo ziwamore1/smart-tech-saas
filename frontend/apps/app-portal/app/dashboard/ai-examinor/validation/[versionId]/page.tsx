@@ -613,6 +613,20 @@ export default function ValidationCentrePage() {
                                       {key.acceptableAlternatives.join("; ")}
                                     </div>
                                   ) : null}
+                                  {key.diagramSvg ? (
+                                    <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white p-2">
+                                      <div
+                                        dangerouslySetInnerHTML={{
+                                          __html: key.diagramSvg,
+                                        }}
+                                      />
+                                      {key.diagram?.caption ? (
+                                        <p className="mt-1 text-[10px] italic text-slate-500">
+                                          {key.diagram.caption}
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
                                 </div>
                               ),
                             )}

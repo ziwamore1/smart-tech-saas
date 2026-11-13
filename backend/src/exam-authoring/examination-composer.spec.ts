@@ -41,6 +41,22 @@ describe('ExaminationComposer', () => {
     expect(result.sections[1].instructions).toContain('one');
   });
 
+  it('attaches renderable marking-key diagrams for drawing tasks', () => {
+    const result = new ExaminationComposer().compose(blueprint, curriculum);
+    const questions = result.sections.flatMap((section: any) => section.questions);
+    const keys = questions.flatMap((question: any) => question.markingKey);
+    const diagramKeys = keys.filter((key: any) => key.diagram);
+
+    expect(diagramKeys.length).toBeGreaterThanOrEqual(5);
+    expect(diagramKeys.every((key: any) => String(key.diagramSvg || '').includes('<svg'))).toBe(true);
+    expect(diagramKeys.some((key: any) => key.diagram.type === 'VENN_3_SET')).toBe(true);
+    expect(diagramKeys.some((key: any) => key.diagram.type === 'HISTOGRAM')).toBe(true);
+    expect(diagramKeys.some((key: any) => key.diagram.type === 'DISTANCE_TIME_GRAPH')).toBe(true);
+    expect(diagramKeys.some((key: any) => key.diagram.type === 'TRIANGLE_CONSTRUCTION')).toBe(true);
+    const linearProgramming = questions.find((question: any) => question.topic === 'Linear programming');
+    expect(linearProgramming.markingKey[2].answer).toContain('K3 300');
+  });
+
   it('maps requested topic-plan topics into the composed paper', () => {
     const topicPlan = [
       { topic: 'Number and financial mathematics', marks: 20 },
