@@ -195,7 +195,13 @@ export default function ValidationCentrePage() {
   const warnings = findings.filter(
     (finding: any) => finding.severity === "WARNING",
   );
+  const unvalidated = !latestRun;
+  const regenerable =
+    version.status !== "APPROVED" &&
+    version.status !== "PUBLISHED" &&
+    version.status !== "MODERATION";
   const invalid =
+    unvalidated ||
     errors.length > 0 ||
     version.status === "REJECTED" ||
     latestRun?.status === "FAILED";
@@ -325,13 +331,14 @@ export default function ValidationCentrePage() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {invalid && (
+                {regenerable && (
                   <button
                     disabled={busy}
                     onClick={regenerateDraft}
                     className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
                   >
-                    <RefreshCw size={14} /> Regenerate invalid draft
+                    <RefreshCw size={14} />{" "}
+                    {invalid ? "Regenerate invalid draft" : "Regenerate draft"}
                   </button>
                 )}
                 <button
@@ -398,7 +405,9 @@ export default function ValidationCentrePage() {
                   disabled={busy || invalid}
                   title={
                     invalid
-                      ? "Resolve validation errors or regenerate the draft before moderation."
+                      ? unvalidated
+                        ? "Run validation before moderation."
+                        : "Resolve validation errors or regenerate the draft before moderation."
                       : "Submit this version for moderation."
                   }
                   onClick={submit}

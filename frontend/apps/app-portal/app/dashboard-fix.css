@@ -63,9 +63,9 @@ input[type="checkbox"]:checked {
   background: #3b82f6;
 }
 
-/* Card styles */
-div[class*="rounded-xl"],
-div[class*="rounded-lg"] {
+/* Card styles - only legacy cards without an explicit background utility */
+div[class*="rounded-xl"]:not([class*="bg-"]),
+div[class*="rounded-lg"]:not([class*="bg-"]) {
   background: var(--bg-white);
   border-radius: 12px;
 }
@@ -320,8 +320,8 @@ tr:hover {
   animation: highlightFade 1.5s ease-in-out 3;
 }
 
-/* Card containers - exclude toast notifications */
-div[class*="rounded-lg shadow"]:not(.fixed):not([style*="position: fixed"]) {
+/* Card containers - exclude toast notifications and explicit backgrounds */
+div[class*="rounded-lg shadow"]:not(.fixed):not([style*="position: fixed"]):not([class*="bg-"]) {
   background: var(--bg-white);
   border-radius: 12px;
   border: 1px solid var(--border-gray-200);

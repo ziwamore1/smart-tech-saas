@@ -199,6 +199,33 @@ export default function AiExaminorPage() {
     }
   };
 
+  const regenerateDraftVersion = async (versionId: string) => {
+    if (
+      !window.confirm(
+        "Regenerate this complete draft? This replaces its questions, marking scheme and exports for this version.",
+      )
+    )
+      return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await examAuthoringApi.regenerateVersion(versionId);
+      setMessage(
+        "Draft regenerated and validated. Review the updated findings before moderation.",
+      );
+      await load();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "The draft could not be regenerated."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const canRegenerate = (version: any) =>
+    Boolean(version?.id) &&
+    !["APPROVED", "PUBLISHED", "MODERATION"].includes(version?.status);
+
   if (isLoading || !isAuthenticated)
     return (
       <div className="min-h-screen bg-[#f5f7fb] p-8 text-slate-500">
@@ -502,16 +529,29 @@ export default function AiExaminorPage() {
                         {exam._count?.versions || 0}
                       </td>
                       <td className="py-3">
-                        <Link
-                          href={
-                            exam.versions?.[0]?.id
-                              ? `/dashboard/ai-examinor/validation/${exam.versions[0].id}`
-                              : "/dashboard/exams"
-                          }
-                          className="font-semibold text-indigo-600 hover:text-indigo-800"
-                        >
-                          Open
-                        </Link>
+                        <div className="flex items-center gap-3">
+                          <Link
+                            href={
+                              exam.versions?.[0]?.id
+                                ? `/dashboard/ai-examinor/validation/${exam.versions[0].id}`
+                                : "/dashboard/exams"
+                            }
+                            className="font-semibold text-indigo-600 hover:text-indigo-800"
+                          >
+                            Open
+                          </Link>
+                          {canRegenerate(exam.versions?.[0]) && (
+                            <button
+                              disabled={busy}
+                              onClick={() =>
+                                regenerateDraftVersion(exam.versions[0].id)
+                              }
+                              className="inline-flex items-center gap-1 font-semibold text-amber-600 hover:text-amber-800 disabled:opacity-50"
+                            >
+                              <RefreshCw size={13} /> Regenerate
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
