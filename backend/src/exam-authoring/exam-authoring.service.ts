@@ -130,7 +130,7 @@ export class ExamAuthoringService {
       const version = await tx.examinationVersion.create({ data: { examId: exam.id, blueprintId: blueprint.id, generationJobId: input.generationJobId, schoolId: input.schoolId, version: 1, status: ExamAuthoringStatus.GENERATED, snapshot: input.artifact, contentHash: createHash('sha256').update(JSON.stringify(input.artifact)).digest('hex'), createdById: input.createdById, markingScheme: { create: { status: 'DRAFT', entries: { create: questionIds.flatMap(item => (item.question.markingKey || []).map((key: any) => ({ questionId: item.id, taskLabel: key.task, expectedAnswer: key.answer || '', solution: key.solution, criteria: key.markAllocation || [], alternatives: key.acceptableAlternatives || [], marks: (key.markAllocation || []).reduce((sum: number, mark: any) => sum + Number(mark.marks || 0), 0) }))) } } } } });
       await tx.examinationAuditLog.create({ data: { versionId: version.id, schoolId: input.schoolId, userId: input.createdById, action: ExamAuditAction.GENERATED, details: { blueprintId: blueprint.id, questionCount: questionIds.length } } });
       return tx.exam.findUnique({ where: { id: exam.id }, include: { sections: { include: { questions: true }, orderBy: { order: 'asc' } }, versions: { include: { markingScheme: { include: { entries: true } } } } } });
-    });
+    }, { maxWait: 10000, timeout: 30000 });
   }
 
   async startGenerationJob(schoolId: string, userId: string, input: any) {
