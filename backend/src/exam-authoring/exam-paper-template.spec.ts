@@ -61,4 +61,29 @@ describe('exam paper HTML template', () => {
     expect(html).toContain('<circle');
     expect(html).not.toContain('window.print');
   });
+
+  it('gives every labeled task its own full-width drawing area', () => {
+    const html = renderExamPaperHtml({
+      version: 1,
+      title: 'Drawing Paper',
+      subjectName: 'Mathematics',
+      className: 'Grade 12',
+      durationMinutes: 60,
+      totalMarks: 20,
+      school: { name: 'Sample Academy' },
+      snapshot: {
+        sections: [{ title: 'Section A', answerRule: 'ALL', questions: [{ number: 1, stem: 'Draw the required figures.', marks: 20, tasks: [
+          { label: '(a)', prompt: 'Draw a graph.', marks: 8 },
+          { label: '(b)', prompt: 'Draw a suitable Venn diagram.', marks: 6 },
+          { label: '(c)', prompt: 'Construct the triangle.', marks: 6 },
+        ] }] }],
+      },
+      includeAnswers: false,
+    });
+
+    expect((html.match(/class="task-block"/g) || []).length).toBe(3);
+    expect((html.match(/graph-answer-space/g) || []).length).toBe(1);
+    expect((html.match(/venn-answer-space/g) || []).length).toBe(1);
+    expect((html.match(/construction-answer-space/g) || []).length).toBe(1);
+  });
 });
