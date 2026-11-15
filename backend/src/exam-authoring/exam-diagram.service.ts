@@ -35,7 +35,9 @@ export class ExamDiagramService {
   private render(type: DiagramInput['diagramType'], definition: any): string {
     if (type === 'SVG') {
       if (!definition?.svg) throw new BadRequestException('SVG diagrams require an svg definition');
-      return String(definition.svg);
+      const svg = renderDiagramSvg({ type: 'SVG', svg: String(definition.svg) });
+      if (!svg) throw new BadRequestException('SVG diagram definition could not be rendered');
+      return svg;
     }
     const spec = { ...definition, type } as DiagramSpec;
     const svg = renderDiagramSvg(spec);

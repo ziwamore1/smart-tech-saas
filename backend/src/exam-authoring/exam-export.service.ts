@@ -7,14 +7,14 @@ import puppeteer from 'puppeteer';
 import { ExamArtifactType } from '@prisma/client';
 import { CloudinaryService, FOLDERS } from '../cloudinary/cloudinary.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { renderDiagramSvg } from './exam-diagram-renderer';
+import { renderExamPaperHtml } from './exam-paper-template';
 
 @Injectable()
 export class ExamExportService {
   constructor(private readonly prisma: PrismaService, private readonly cloudinary: CloudinaryService) {}
 
   async exportVersion(schoolId: string, versionId: string, type: ExamArtifactType) {
-    const version = await this.prisma.examinationVersion.findFirst({ where: { id: versionId, schoolId }, include: { exam: { include: { subject: true, class: true } } } });
+    const version = await this.prisma.examinationVersion.findFirst({ where: { id: versionId, schoolId }, include: { exam: { include: { subject: true, class: true, school: true, term: { include: { academicYear: true } } } } } });
     if (!version) throw new NotFoundException('Examination version not found');
     const examiner = type === ExamArtifactType.EXAMINER_PDF || type === ExamArtifactType.EXAMINER_DOCX || type === ExamArtifactType.COMBINED_PDF;
     const html = this.renderHtml(version, examiner);
@@ -38,42 +38,50 @@ export class ExamExportService {
   }
 
   async getArtifact(schoolId: string, artifactId: string) {
-    const artifact = await this.prisma.examinationArtifact.findFirst({ where: { id: artifactId, schoolId } });
+    const artifact = await this.prisma.examinationArtifact.findFirst({
+      where: { id: artifactId, schoolId },
+      include: { version: { select: { version: true, exam: { select: { title: true } } } } },
+    });
     if (!artifact) throw new NotFoundException('Examination artifact not found');
-    if (artifact.downloadUrl) return { artifact, buffer: null };
+    if (artifact.downloadUrl) {
+      const remote = await fetch(artifact.downloadUrl);
+      if (!remote.ok) throw new NotFoundException('Stored examination artifact could not be retrieved');
+      return { artifact, buffer: Buffer.from(await remote.arrayBuffer()) };
+    }
     return { artifact, buffer: await fs.readFile(join(process.cwd(), artifact.storageKey)) };
   }
 
   private renderHtml(version: any, includeAnswers: boolean) {
     const snapshot = version.snapshot as any;
-    const rules = (snapshot.sections || []).map((section: any) => {
-      if (section.answerRule === 'ONE') return `Answer one item in ${section.title}.`;
-      if (section.answerRule === 'ANY') return `Answer the required number of items in ${section.title}.`;
-      if (section.answerRule === 'ALL') return `Answer all items in ${section.title}.`;
-      return '';
-    }).filter(Boolean);
-    const sections = (snapshot.sections || []).map((section: any) => {
-      const candidateMarks = section.answerRule === 'ONE'
-        ? Number(section.questions?.[0]?.marks || 0)
-        : (section.questions || []).reduce((sum: number, question: any) => sum + Number(question.marks || 0), 0);
-      return `<section><h2>${this.escape(section.title)}${section.answerRule ? `: ${candidateMarks} Marks` : ''}</h2><p class="section-instructions">${this.escape(section.instructions || '')}</p>${(section.questions || []).map((question: any) => `<article><div class="question"><strong>${question.number}.</strong> ${this.escape(question.stem)}${(question.tasks || []).length ? '' : ` <span>[${question.marks}]</span>`}</div>${(question.tasks || []).map((task: any) => `<div class="task"><strong>${this.escape(task.label || '')}</strong> ${this.escape(task.prompt || '')} <span>[${task.marks}]</span></div>`).join('')}${includeAnswers ? `<div class="answer"><strong>Marking key</strong>${(question.markingKey || []).map((key: any) => this.renderMarkingKey(key)).join('')}</div>` : '<div class="answer-space"></div>'}</article>`).join('')}</section>`;
-    }).join('');
-    const instructions = includeAnswers
-      ? 'Examiner edition. Apply the marking key consistently and award method marks where the candidate demonstrates valid reasoning.'
-      : `${rules.length ? `${rules.join(' ')} ` : ''}Write all answers in the spaces provided. The number of marks is given in brackets at the end of each task.`;
-    return `<!doctype html><html><head><meta charset="utf-8"><style>@page{size:A4;margin:18mm 16mm}body{font-family:Arial,sans-serif;color:#111;font-size:11pt;line-height:1.45}.header{text-align:center;border-bottom:1px solid #111;padding-bottom:12px;margin-bottom:20px}h1{font-size:18pt;margin:0 0 5px}h2{font-size:13pt;border-bottom:1px solid #777;padding-bottom:4px;margin-top:24px}.meta{font-size:10pt}.instructions{font-size:9.5pt;border:1px solid #aaa;padding:8px 12px;margin-bottom:18px}.section-instructions{font-style:italic}.question{margin-top:14px}.question span,.task span{float:right;font-weight:bold}.task{margin:8px 0 8px 22px}.answer{border-left:3px solid #334155;background:#f1f5f9;padding:8px 12px;margin:10px 0;font-size:9pt}.answer-space{height:42px;border-bottom:1px dotted #aaa;margin:12px 0 20px}.marking-key-item{margin-bottom:10px;page-break-inside:avoid}.diagram{margin:8px 0;padding:8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;page-break-inside:avoid}.diagram svg{display:block;width:100%;max-width:150mm;height:auto;margin:0 auto}.diagram-caption{font-size:8pt;color:#475569;margin-top:4px;font-style:italic}.footer{margin-top:28px;border-top:1px solid #999;padding-top:6px;font-size:8pt}</style></head><body><header class="header"><h1>${this.escape(version.exam.title)}</h1><div class="meta">${this.escape(version.exam.subject?.name || '')} · ${this.escape(version.exam.class?.name || '')} · ${snapshot.durationMinutes || version.exam.duration} minutes · ${snapshot.totalMarks || version.exam.totalScore} marks</div></header><div class="instructions"><strong>${includeAnswers ? 'Instructions to examiners' : 'Instructions to candidates'}</strong><br/>${this.escape(instructions)}</div>${sections}<div class="footer">Examination version ${version.version} · ${includeAnswers ? 'Examiner edition' : 'Candidate edition'}</div></body></html>`;
-  }
-
-  private renderMarkingKey(key: any) {
-    const diagramSvg = key.diagram ? renderDiagramSvg(key.diagram) : '';
-    const caption = key.diagram?.caption ? `<div class="diagram-caption">${this.escape(key.diagram.caption)}</div>` : '';
-    const diagram = diagramSvg ? `<div class="diagram">${diagramSvg}${caption}</div>` : '';
-    return `<div class="marking-key-item"><p><b>${this.escape(key.task || 'Answer')}</b>: ${this.escape(key.answer || '')}<br/>${(key.markAllocation || []).map((item: any) => `${item.marks} ${this.escape(item.criterion || '')}`).join('; ')}${key.acceptableAlternatives?.length ? `<br/>Accept: ${this.escape(key.acceptableAlternatives.join('; '))}` : ''}</p>${diagram}</div>`;
+    return renderExamPaperHtml({
+      version: Number(version.version || 1),
+      title: version.exam.title,
+      subjectName: version.exam.subject?.name || snapshot.subject?.name || 'Examination',
+      className: version.exam.class?.name || 'Class',
+      termName: version.exam.term?.name,
+      academicYearName: version.exam.term?.academicYear?.name,
+      durationMinutes: Number(snapshot.durationMinutes || version.exam.duration || 0),
+      totalMarks: Number(snapshot.totalMarks || version.exam.totalScore || 0),
+      school: { ...version.exam.school, logoUrl: version.exam.school.logoUrl || version.exam.school.logo },
+      snapshot,
+      includeAnswers,
+    });
   }
 
   private async createPdf(html: string) {
     const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-    try { const page = await browser.newPage(); await page.setContent(html, { waitUntil: 'load' }); return Buffer.from(await page.pdf({ format: 'A4', printBackground: true, displayHeaderFooter: false })); }
+     try {
+       const page = await browser.newPage();
+       await page.setContent(html, { waitUntil: 'load' });
+       return Buffer.from(await page.pdf({
+         format: 'A4',
+         printBackground: true,
+         displayHeaderFooter: true,
+         margin: { top: '20mm', bottom: '18mm', left: '16mm', right: '16mm' },
+         headerTemplate: '<div></div>',
+         footerTemplate: '<div style="width:100%;font-family:Arial,sans-serif;font-size:8px;color:#526174;text-align:center;border-top:1px solid #cbd5e1;padding-top:4px"><span class="pageNumber"></span> / <span class="totalPages"></span></div>',
+       }));
+     }
     finally { await browser.close(); }
   }
 

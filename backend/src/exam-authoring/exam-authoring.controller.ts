@@ -141,7 +141,12 @@ export class ExamAuthoringController {
   @Get('artifacts/:id')
   async downloadArtifact(@Request() req: any, @Param('id') id: string, @Res() response: Response) {
     const result = await this.exportService.getArtifact(req.user.schoolId, id);
-    if (result.artifact.downloadUrl) return response.redirect(result.artifact.downloadUrl);
-    response.type(result.artifact.mimeType).send(result.buffer);
+    const extension = result.artifact.mimeType.includes('wordprocessingml') ? 'docx' : 'pdf';
+    const title = result.artifact.version?.exam?.title || 'examination-paper';
+    const filename = `${title.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'examination-paper'}-v${result.artifact.version?.version || 1}.${extension}`;
+    response.setHeader('Content-Type', result.artifact.mimeType);
+    response.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    response.setHeader('Content-Length', String(result.buffer?.length || 0));
+    response.send(result.buffer);
   }
 }

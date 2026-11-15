@@ -70,4 +70,12 @@ describe('exam diagram renderer', () => {
   it('returns an empty string for an unknown diagram type', () => {
     expect(renderDiagramSvg({ type: 'UNKNOWN' } as any)).toBe('');
   });
+
+  it('sanitizes static subject-specific SVG illustrations', () => {
+    const svg = renderDiagramSvg({ type: 'SVG', svg: '<svg><script>alert(1)</script><circle cx="10" cy="10" r="5" onclick="bad()"/></svg>' });
+
+    expect(svg).toContain('<circle');
+    expect(svg).not.toContain('<script');
+    expect(svg).not.toContain('onclick');
+  });
 });

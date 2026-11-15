@@ -98,14 +98,22 @@ export default function ValidationCentrePage() {
         await examAuthoringApi.exportVersion(params.versionId, type),
       );
       setNotice("Export created and stored.");
-      if (artifact?.downloadUrl)
-        window.open(artifact.downloadUrl, "_blank", "noopener,noreferrer");
-      else if (artifact?.id)
-        window.open(
-          examAuthoringApi.artifactUrl(artifact.id),
-          "_blank",
-          "noopener,noreferrer",
-        );
+      if (artifact?.id) {
+        const response = await examAuthoringApi.downloadArtifact(artifact.id);
+        const blob = response.data instanceof Blob
+          ? response.data
+          : new Blob([response.data], { type: "application/pdf" });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        const artifactType = String(artifact.type || type);
+        const extension = artifactType.includes("DOCX") ? "docx" : "pdf";
+        link.download = `${artifactType.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.${extension}`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      }
     } catch (err) {
       setError(getApiErrorMessage(err, "Export failed."));
     } finally {

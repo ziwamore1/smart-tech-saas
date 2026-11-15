@@ -2964,6 +2964,7 @@ export const examAuthoringApi = {
   submitForModeration: (id: string) => api.post(`/exam-authoring/versions/${id}/submit-moderation`),
   moderate: (id: string, data: { decision: 'APPROVED' | 'REJECTED'; comments?: string }) => api.post(`/exam-authoring/versions/${id}/moderate`, data),
   exportVersion: (id: string, type: string) => api.post(`/exam-authoring/versions/${id}/export`, { type }, { timeout: 120000 }),
+  downloadArtifact: (id: string) => api.get(`/exam-authoring/artifacts/${id}`, { responseType: "blob", timeout: 120000 }),
   artifactUrl: (id: string) => authedUrl(`/exam-authoring/artifacts/${id}`),
 };
 

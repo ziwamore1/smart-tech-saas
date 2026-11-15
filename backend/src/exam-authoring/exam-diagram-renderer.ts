@@ -83,12 +83,20 @@ export interface TriangleDiagramSpec {
   caption?: string;
 }
 
+export interface SvgDiagramSpec {
+  type: 'SVG';
+  svg: string;
+  title?: string;
+  caption?: string;
+}
+
 export type DiagramSpec =
   | VennDiagramSpec
   | CartesianDiagramSpec
   | HistogramDiagramSpec
   | TriangleConstructionSpec
-  | TriangleDiagramSpec;
+  | TriangleDiagramSpec
+  | SvgDiagramSpec;
 
 const esc = (value: unknown) =>
   String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
@@ -139,8 +147,20 @@ export function renderDiagramSvg(spec: DiagramSpec | null | undefined): string {
   if (spec.type === 'HISTOGRAM') return renderHistogram(spec);
   if (spec.type === 'TRIANGLE_CONSTRUCTION') return renderTriangleConstruction(spec);
   if (spec.type === 'TRIANGLE') return renderTrianglePoints(spec);
+  if (spec.type === 'SVG') return sanitizeSvg(spec.svg);
   if (spec.type === 'CARTESIAN_GRAPH' || spec.type === 'SPEED_TIME_GRAPH' || spec.type === 'DISTANCE_TIME_GRAPH') return renderCartesian(spec);
   return '';
+}
+
+function sanitizeSvg(value: unknown) {
+  const source = String(value || '').trim();
+  if (!/^<svg(?:\s|>)/i.test(source)) return '';
+  return source
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, '')
+    .replace(/\s(on[a-z]+|style)\s*=\s*(["']).*?\2/gi, '')
+    .replace(/\s(?:href|xlink:href)\s*=\s*(["'])\s*javascript:[\s\S]*?\1/gi, '')
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '');
 }
 
 function collectPoints(spec: CartesianDiagramSpec): DiagramPoint[] {

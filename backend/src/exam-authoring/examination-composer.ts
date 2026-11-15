@@ -86,6 +86,7 @@ export class ExaminationComposer {
       return {
         code: section.code,
         title: section.title,
+        answerRule: section.answerRule,
         instructions: this.instructions(section.answerRule),
         questions,
       };
