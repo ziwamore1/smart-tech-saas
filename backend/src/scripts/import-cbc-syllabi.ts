@@ -57,7 +57,7 @@ const minimumEntryCounts: Record<string, number> = {
 };
 
 function clean(value: string) {
-  return value.replace(/[.\u0000-\u001f]+$/g, '').replace(/\s+/g, ' ').trim();
+  return value.replace(/\s*(?:(?:[.·…]\s*){3,})\d+\s*$/g, '').replace(/[.\u0000-\u001f]+$/g, '').replace(/\s+/g, ' ').trim();
 }
 
 function formFromCode(code: string) {

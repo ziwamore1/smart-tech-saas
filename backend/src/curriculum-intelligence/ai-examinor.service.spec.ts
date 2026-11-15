@@ -4,6 +4,8 @@ import { AiExaminorService } from './ai-examinor.service';
 describe('AiExaminorService', () => {
   const prisma = {
     subject: { findFirst: jest.fn() },
+    class: { findFirst: jest.fn() },
+    syllabusEntry: { findMany: jest.fn() },
     elementOfConstruct: { findMany: jest.fn() },
   } as any;
   const config = { get: jest.fn().mockReturnValue(undefined) } as any;
@@ -16,6 +18,10 @@ describe('AiExaminorService', () => {
       ],
     });
     prisma.elementOfConstruct.findMany.mockResolvedValue([]);
+    prisma.class.findFirst.mockResolvedValue({ id: 'class-1', name: 'Form 2', levelType: { name: 'Secondary' } });
+    prisma.syllabusEntry.findMany.mockResolvedValue([
+      { topic: 'Cell Biology', unitCode: '2.1', subtopic: 'Cell structure', subUnitCode: '2.1.1', competency: 'Identify cell structures', competencyCode: '2.1.1.1', expectedStandard: 'Correctly identifies cell structures' },
+    ]);
   });
 
   it('generates the ECZ-style 80/20 paper and a complete marking key', async () => {
@@ -41,5 +47,17 @@ describe('AiExaminorService', () => {
       subjectId: 'subject-1', totalMarks: 100,
       sections: [{ code: 'A', title: 'Section A', totalMarks: 90, itemCount: 1, answerRule: 'ALL' }],
     })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('returns class-specific syllabus topics, subtopics, competencies and standards', async () => {
+    const service = new AiExaminorService(prisma, config);
+    const result = await service.getCurriculumOptions('subject-1', 'class-1', 'school-1');
+
+    expect(result.class.formNumber).toBe(2);
+    expect(result.topics[0].name).toBe('Cell Biology');
+    expect(result.topics[0].subtopics[0].name).toBe('Cell structure');
+    expect(result.topics[0].subtopics[0].competencies[0].name).toBe('Identify cell structures');
+    expect(result.topics[0].expectedStandards).toContain('Correctly identifies cell structures');
+    expect(prisma.syllabusEntry.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { subjectId: 'subject-1', formNumber: 2 } }));
   });
 });

@@ -2944,6 +2944,7 @@ export const teacherAnalyticsApi = {
 };
 
 export const examAuthoringApi = {
+  getCurriculumOptions: (subjectId: string, classId: string) => api.get('/exam-authoring/curriculum-options', { params: { subjectId, classId } }),
   dashboard: () => api.get('/exam-authoring/dashboard'),
   providers: () => api.get('/exam-authoring/providers'),
   listExaminations: (params?: Record<string, string | number | undefined>) => api.get('/exam-authoring/examinations', { params }),

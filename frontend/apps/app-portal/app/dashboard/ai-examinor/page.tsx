@@ -59,6 +59,8 @@ export default function AiExaminorPage() {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [terms, setTerms] = useState<any[]>([]);
+  const [curriculumOptions, setCurriculumOptions] = useState<any>(null);
+  const [selectedTopicNames, setSelectedTopicNames] = useState<string[]>([]);
   const [selectedBlueprint, setSelectedBlueprint] = useState<any>(null);
   const [activeVersion, setActiveVersion] = useState<any>(null);
   const [busy, setBusy] = useState(false);
@@ -76,6 +78,25 @@ export default function AiExaminorPage() {
     startsAt: "",
     endsAt: "",
   });
+  const selectedSubjectId = selectedBlueprint?.subjectId || selectedBlueprint?.subject?.id || "";
+
+  useEffect(() => {
+    if (!selectedSubjectId || !generationForm.classId) {
+      setCurriculumOptions(null);
+      setSelectedTopicNames([]);
+      return;
+    }
+    let active = true;
+    examAuthoringApi.getCurriculumOptions(selectedSubjectId, generationForm.classId)
+      .then(response => {
+        if (!active) return;
+        const data = unwrap(response);
+        setCurriculumOptions(data);
+        setSelectedTopicNames((data.topics || []).map((topic: any) => topic.name));
+      })
+      .catch(() => { if (active) setCurriculumOptions(null); });
+    return () => { active = false; };
+  }, [selectedSubjectId, generationForm.classId]);
 
   const load = async () => {
     setError("");
@@ -146,6 +167,8 @@ export default function AiExaminorPage() {
     event.preventDefault();
     if (!selectedBlueprint)
       return setError("Select an approved blueprint first.");
+    if (curriculumOptions?.topics?.length && !selectedTopicNames.length)
+      return setError("Select at least one syllabus topic for this examination.");
     setBusy(true);
     setError("");
     setMessage("AI-EXAMINOR is generating and storing a reviewable draft...");
@@ -153,6 +176,7 @@ export default function AiExaminorPage() {
       const response = await examAuthoringApi.generate({
         ...generationForm,
         blueprintId: selectedBlueprint.id,
+        includeTopics: selectedTopicNames,
       });
       const exam = unwrap(response);
       setActiveVersion(exam?.versions?.[0] || null);
@@ -462,7 +486,7 @@ export default function AiExaminorPage() {
                     value={subject.id}
                     className="text-slate-900"
                   >
-                    {subject.name}
+                    {subject.name}{subject.code ? ` (${subject.code})` : ""}
                   </option>
                 ))}
               </select>
@@ -484,6 +508,37 @@ export default function AiExaminorPage() {
               {busy ? "Working..." : "Create draft blueprint"}
             </button>
           </form>
+          {selectedBlueprint && generationForm.classId && (
+            <div className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-indigo-950">Syllabus coverage for selected class</h3>
+                  <p className="mt-1 text-xs text-indigo-700">
+                    {curriculumOptions?.class?.name || "Selected class"} · {curriculumOptions?.subject?.name || selectedBlueprint.subject?.name || "Subject"}{curriculumOptions?.subject?.code ? ` (${curriculumOptions.subject.code})` : ""} · Form {curriculumOptions?.class?.formNumber || "not detected"}
+                  </p>
+                </div>
+                <span className="text-xs font-medium text-indigo-700">Select topics to assess</span>
+              </div>
+              {curriculumOptions?.topics?.length ? (
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {curriculumOptions.topics.map((topic: any) => {
+                    const selected = selectedTopicNames.includes(topic.name);
+                    return (
+                      <label key={topic.name} className={`cursor-pointer rounded-lg border px-3 py-2 text-xs ${selected ? "border-indigo-400 bg-white" : "border-indigo-100 bg-indigo-50"}`}>
+                        <input type="checkbox" checked={selected} onChange={() => setSelectedTopicNames(current => selected ? current.filter(name => name !== topic.name) : [...current, topic.name])} className="mr-2" />
+                        <strong>{topic.code ? `${topic.code} · ` : ""}{topic.name}</strong>
+                        {topic.subtopics?.length ? <span className="mt-1 block pl-5 text-indigo-700">{topic.subtopics.map((item: any) => item.name).join(" · ")}</span> : null}
+                        {topic.competencies?.length ? <span className="mt-1 block pl-5 text-slate-500">Competence: {topic.competencies.slice(0, 2).map((item: any) => item.name).join("; ")}</span> : null}
+                        {topic.expectedStandards?.length ? <span className="mt-1 block pl-5 text-slate-500">Standard: {topic.expectedStandards[0]}</span> : null}
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-amber-700">{curriculumOptions?.source || "Select a subject and class to load the form-specific syllabus topics."}</p>
+              )}
+            </div>
+          )}
         </section>
 
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -599,7 +654,7 @@ export default function AiExaminorPage() {
                   .filter((item) => item.isApproved)
                   .map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.name} · {item.subject?.name}
+                      {item.name} · {item.subject?.name}{item.subject?.code ? ` (${item.subject.code})` : ""}
                     </option>
                   ))}
               </select>

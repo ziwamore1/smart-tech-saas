@@ -190,7 +190,8 @@ export class ExaminationComposer {
   }
 
   private composeQuestion(template: QuestionTemplate, number: number, marks: number, curriculum: ComposerCurriculum): ComposedQuestion {
-    const selectedTasks = template.tasks.length <= marks ? template.tasks : template.tasks.slice(0, Math.max(1, marks));
+    const taskCount = Math.min(template.tasks.length, Math.max(1, Math.ceil(marks / 4)));
+    const selectedTasks = template.tasks.slice(0, taskCount);
     const allocations = this.markAllocation.allocate(marks, selectedTasks.map((task, index) => ({ id: String(index), weight: task.marks })));
     const tasks = selectedTasks.map((task, index) => ({ label: this.taskLabel(index, selectedTasks.length), prompt: task.prompt, marks: allocations[index].marks }));
     const evidence = this.findEvidence(curriculum, template.topic);

@@ -87,4 +87,24 @@ describe('ExaminationComposer', () => {
     expect(new Set(questions.map((question: any) => question.stem)).size).toBe(questions.length);
     expect(questions.every((question: any) => question.tasks.length >= 2)).toBe(true);
   });
+
+  it('keeps non-mathematics questions distinct and distributes available syllabus topics', () => {
+    const result = new ExaminationComposer().compose({
+      ...blueprint,
+      sections: [{ code: 'A', title: 'Section A', totalMarks: 100, itemCount: 6, answerRule: 'ALL' as const }],
+      topicPlan: [
+        { topic: 'Cells', marks: 17 }, { topic: 'Nutrition', marks: 17 }, { topic: 'Ecology', marks: 17 },
+        { topic: 'Genetics', marks: 17 }, { topic: 'Reproduction', marks: 16 }, { topic: 'Health', marks: 16 },
+      ],
+    }, {
+      subject: { id: 'biology', name: 'Biology', code: '4012' },
+      topics: ['Cells', 'Nutrition', 'Ecology', 'Genetics', 'Reproduction', 'Health'].map((name, index) => ({ id: `topic-${index}`, name, competencies: [{ id: `competency-${index}`, name: `Apply ${name}` }] })),
+      eocs: [],
+      syllabusEntries: [],
+    });
+    const questions = result.sections[0].questions;
+
+    expect(new Set(questions.map((question: any) => question.stem)).size).toBe(6);
+    expect(new Set(questions.map((question: any) => question.topic)).size).toBe(6);
+  });
 });

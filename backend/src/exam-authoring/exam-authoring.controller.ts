@@ -22,6 +22,12 @@ export class ExamAuthoringController {
   @Get('providers')
   getProviders() { return this.aiExaminor.getProviderStatus(); }
 
+  @Get('curriculum-options')
+  getCurriculumOptions(@Request() req: any, @Query('subjectId') subjectId: string, @Query('classId') classId: string) {
+    if (!subjectId || !classId) throw new ForbiddenException('Subject and class are required');
+    return this.aiExaminor.getCurriculumOptions(subjectId, classId, req.user.schoolId);
+  }
+
   @Get('blueprints')
   listBlueprints(@Request() req: any, @Query('subjectId') subjectId?: string, @Query('status') status?: string) { return this.service.listBlueprints(req.user.schoolId, { subjectId, status }); }
 
@@ -54,7 +60,7 @@ export class ExamAuthoringController {
     const structure = blueprint.structure as any;
     const job = await this.service.startGenerationJob(req.user.schoolId, req.user.id, { ...body, subjectId: blueprint.subjectId, blueprintId: blueprint.id });
     try {
-      const artifact = await this.aiExaminor.generate({ ...body, subjectId: blueprint.subjectId, totalMarks: structure.totalMarks, durationMinutes: structure.durationMinutes, sections: structure.sections, topicPlan: structure.topicPlan, cognitiveDistribution: structure.cognitiveDistribution, difficultyDistribution: structure.difficultyDistribution }, { requireProvider: true });
+      const artifact = await this.aiExaminor.generate({ ...body, schoolId: req.user.schoolId, classId: body.classId, subjectId: blueprint.subjectId, totalMarks: structure.totalMarks, durationMinutes: structure.durationMinutes, sections: structure.sections, topicPlan: body.topicPlan || structure.topicPlan, cognitiveDistribution: structure.cognitiveDistribution, difficultyDistribution: structure.difficultyDistribution }, { requireProvider: true });
       const exam = await this.service.createExamDraft({ ...body, blueprintId: blueprint.id, subjectId: blueprint.subjectId, schoolId: req.user.schoolId, createdById: req.user.id, generationJobId: job.id, artifact });
       await this.service.finishGenerationJob(job.id, { versionId: exam?.versions?.[0]?.id, examId: exam?.id });
       return exam;
@@ -88,7 +94,7 @@ export class ExamAuthoringController {
     const question = (version.snapshot as any)?.sections?.flatMap((section: any) => section.questions || []).find((item: any) => Number(item.number) === Number(questionNumber));
     if (!question) throw new ForbiddenException(`Question ${questionNumber} was not found`);
     const structure: any = blueprint.structure;
-    const artifact = await this.aiExaminor.generate({ subjectId: blueprint.subjectId, totalMarks: Number(question.marks), durationMinutes: structure.durationMinutes, title: version.exam.title, sections: [{ code: 'R', title: 'Regenerated item', totalMarks: Number(question.marks), itemCount: 1, answerRule: 'ALL', questionTypes: [question.type || 'STRUCTURED'] }], includeTopics: body.topic ? [body.topic] : undefined, instruction: `Regenerate only question ${questionNumber}. Preserve its marks (${question.marks}) and create a new, non-duplicated assessment task. ${body.instruction || ''}` }, { requireProvider: true });
+    const artifact = await this.aiExaminor.generate({ schoolId: req.user.schoolId, classId: version.exam.classId, subjectId: blueprint.subjectId, totalMarks: Number(question.marks), durationMinutes: structure.durationMinutes, title: version.exam.title, sections: [{ code: 'R', title: 'Regenerated item', totalMarks: Number(question.marks), itemCount: 1, answerRule: 'ALL', questionTypes: [question.type || 'STRUCTURED'] }], includeTopics: body.topic ? [body.topic] : undefined, instruction: `Regenerate only question ${questionNumber}. Preserve its marks (${question.marks}) and create a new, non-duplicated assessment task. ${body.instruction || ''}` }, { requireProvider: true });
     return this.service.replaceGeneratedQuestion(req.user.schoolId, id, Number(questionNumber), req.user.id, artifact.sections[0].questions[0]);
   }
 
@@ -101,6 +107,7 @@ export class ExamAuthoringController {
     const structure: any = blueprint.structure;
     const artifact = await this.aiExaminor.generate({
       schoolId: req.user.schoolId,
+      classId: version.exam.classId,
       subjectId: version.exam.subjectId,
       totalMarks: structure.totalMarks,
       durationMinutes: structure.durationMinutes,

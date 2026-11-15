@@ -17,6 +17,7 @@ export interface AiExaminorSectionRequest {
 export interface AiExaminorRequest {
   schoolId?: string;
   subjectId: string;
+  classId?: string;
   academicStageId?: string;
   totalMarks?: number;
   durationMinutes?: number;
@@ -58,11 +59,69 @@ export class AiExaminorService {
     };
   }
 
+  async getCurriculumOptions(subjectId: string, classId: string, schoolId?: string) {
+    const [subject, classRecord] = await Promise.all([
+      this.prisma.subject.findFirst({
+        where: { id: subjectId, ...(schoolId ? { schoolId } : {}) },
+        select: { id: true, name: true, code: true },
+      }),
+      this.prisma.class.findFirst({
+        where: { id: classId, ...(schoolId ? { schoolId } : {}) },
+        include: { levelType: { select: { name: true } } },
+      }),
+    ]);
+    if (!subject) throw new BadRequestException('Subject not found');
+    if (!classRecord) throw new BadRequestException('Class not found');
+
+    const formNumber = this.classFormNumber(classRecord.name, classRecord.levelType?.name);
+    const entries = await this.prisma.syllabusEntry.findMany({
+      where: { subjectId, ...(formNumber ? { formNumber } : {}) },
+      orderBy: [{ formNumber: 'asc' }, { sourcePage: 'asc' }, { unitCode: 'asc' }],
+    });
+    const topics = new Map<string, any>();
+    for (const entry of entries) {
+      const topicName = this.cleanEvidenceText(entry.topic);
+      const topic = topics.get(topicName) || {
+        name: topicName,
+        code: entry.unitCode,
+        subtopics: new Map<string, any>(),
+        competencies: [],
+        expectedStandards: [],
+      };
+      if (entry.subtopic) {
+        const subtopicName = this.cleanEvidenceText(entry.subtopic);
+        const subtopic = topic.subtopics.get(subtopicName) || { name: subtopicName, code: entry.subUnitCode, competencies: [], expectedStandards: [] };
+        if (entry.competency) subtopic.competencies.push({ code: entry.competencyCode, name: this.cleanEvidenceText(entry.competency) });
+        if (entry.expectedStandard) subtopic.expectedStandards.push(this.cleanEvidenceText(entry.expectedStandard));
+        topic.subtopics.set(subtopicName, subtopic);
+      }
+      if (entry.competency) topic.competencies.push({ code: entry.competencyCode, name: this.cleanEvidenceText(entry.competency) });
+      if (entry.expectedStandard) topic.expectedStandards.push(this.cleanEvidenceText(entry.expectedStandard));
+      topics.set(topicName, topic);
+    }
+    return {
+      subject,
+      class: { id: classRecord.id, name: classRecord.name, formNumber },
+      topics: Array.from(topics.values()).map(topic => ({
+        ...topic,
+        subtopics: Array.from(topic.subtopics.values()),
+        competencies: this.uniqueEvidence(topic.competencies),
+        expectedStandards: [...new Set(topic.expectedStandards)],
+      })),
+      source: entries.length ? 'CBC syllabus entries' : 'No form-specific syllabus entries found',
+    };
+  }
+
   async generate(request: AiExaminorRequest, options: { requireProvider?: boolean } = {}) {
     if (options.requireProvider && !this.openai) throw new ServiceUnavailableException('AI-EXAMINOR generation requires a configured AI provider');
     const blueprint = this.normaliseBlueprint(request);
     const curriculum = await this.loadCurriculum(request);
     if (!curriculum.subject) throw new BadRequestException('Subject not found');
+    if (!blueprint.topicPlan.length && request.includeTopics?.length) {
+      const selected = curriculum.topics.filter(topic => request.includeTopics!.some(value => value === topic.id || this.normalise(value) === this.normalise(topic.name)));
+      const topics = selected.length ? selected : curriculum.topics;
+      blueprint.topicPlan = topics.map(topic => ({ topic: topic.name, marks: blueprint.totalMarks / Math.max(1, topics.length) }));
+    }
     let artifact = this.buildFallback(blueprint, curriculum);
 
     if (this.openai) {
@@ -109,11 +168,15 @@ export class AiExaminorService {
   }
 
   private async loadCurriculum(request: AiExaminorRequest) {
+    const classRecord = request.classId
+      ? await this.prisma.class.findFirst({ where: { id: request.classId, ...(request.schoolId ? { schoolId: request.schoolId } : {}) }, include: { levelType: { select: { name: true } } } })
+      : null;
+    const formNumber = classRecord ? this.classFormNumber(classRecord.name, classRecord.levelType?.name) : undefined;
     const subject = await this.prisma.subject.findFirst({
       where: { id: request.subjectId, ...(request.schoolId ? { schoolId: request.schoolId } : {}) },
       include: {
         Topic: { include: { competencies: true, learningOutcomes: true }, orderBy: { sortOrder: 'asc' } },
-        SyllabusEntry: { orderBy: [{ formNumber: 'asc' }, { sourcePage: 'asc' }] },
+        SyllabusEntry: { where: formNumber ? { formNumber } : undefined, orderBy: [{ formNumber: 'asc' }, { sourcePage: 'asc' }] },
       },
     });
     const eocs = await this.prisma.elementOfConstruct.findMany({
@@ -121,13 +184,27 @@ export class AiExaminorService {
       include: { competencies: true },
       orderBy: { sortOrder: 'asc' },
     });
-    const topics = (subject?.Topic || []).filter(topic => !request.includeTopics?.length || request.includeTopics.includes(topic.id));
+    const topics = (subject?.Topic || []).filter(topic => !request.includeTopics?.length || request.includeTopics.includes(topic.id) || request.includeTopics.some(value => this.normalise(value) === this.normalise(this.cleanEvidenceText(topic.name))));
     return {
       subject: subject ? { id: subject.id, name: subject.name, code: subject.code } : null,
-      topics: topics.map(topic => ({ id: topic.id, name: topic.name, competencies: topic.competencies.map(c => ({ id: c.id, name: c.name, description: c.description, bloomLevel: c.bloomLevel })) })),
+      topics: topics.map(topic => ({ id: topic.id, name: this.cleanEvidenceText(topic.name), competencies: topic.competencies.map(c => ({ id: c.id, name: this.cleanEvidenceText(c.name), description: c.description, bloomLevel: c.bloomLevel })) })),
       eocs: eocs.map(eoc => ({ id: eoc.id, name: eoc.name, competencies: eoc.competencies.map(c => c.name) })),
-      syllabusEntries: (subject?.SyllabusEntry || []).map(entry => ({ code: entry.competencyCode, topic: entry.topic, competency: entry.competency, standard: entry.expectedStandard, sourcePage: entry.sourcePage })),
+      syllabusEntries: (subject?.SyllabusEntry || []).map(entry => ({ code: entry.competencyCode, topic: this.cleanEvidenceText(entry.topic), subtopic: entry.subtopic ? this.cleanEvidenceText(entry.subtopic) : undefined, competency: entry.competency ? this.cleanEvidenceText(entry.competency) : undefined, standard: entry.expectedStandard ? this.cleanEvidenceText(entry.expectedStandard) : undefined, sourcePage: entry.sourcePage, formNumber: entry.formNumber })),
+      formNumber,
     };
+  }
+
+  private classFormNumber(...labels: Array<string | null | undefined>) {
+    const match = labels.join(' ').match(/(?:form|grade|year|level)\s*([1-4])(?:\b|[a-z])/i);
+    return match ? Number(match[1]) : undefined;
+  }
+
+  private uniqueEvidence(items: Array<{ code?: string | null; name: string }>) {
+    return Array.from(new Map(items.map(item => [`${item.code || ''}:${item.name}`, item])).values());
+  }
+
+  private cleanEvidenceText(value: string | null | undefined) {
+    return String(value || '').replace(/\s*(?:(?:[.·…]\s*){3,})\d+\s*$/, '').replace(/\s+/g, ' ').trim();
   }
 
   private buildFallback(blueprint: any, curriculum: any) {
