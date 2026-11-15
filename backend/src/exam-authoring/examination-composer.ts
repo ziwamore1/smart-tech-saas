@@ -293,28 +293,79 @@ export class ExaminationComposer {
         return entryTopic && (entryTopic.includes(normalizedPlanned) || normalizedPlanned.includes(entryTopic));
       }) || curriculum.syllabusEntries[offset % Math.max(1, curriculum.syllabusEntries.length)]
       : curriculum.syllabusEntries[offset % Math.max(1, curriculum.syllabusEntries.length)];
+    const subjectName = curriculum.subject?.name || 'the subject';
     const topicName = plannedTopic || topic?.name || syllabus?.topic || 'the selected curriculum topic';
-    const competency = topic?.competencies?.[0]?.name || syllabus?.competency || `Apply ${topicName} to a practical situation`;
-    const scenarios = [
-      'A school improvement team is reviewing a practical issue linked to',
-      'A community committee has gathered evidence about a local challenge involving',
-      'A small enterprise must make a defensible decision about',
-      'A public service team is evaluating competing proposals linked to',
-    ];
-    const scenario = scenarios[Math.abs(variant) % scenarios.length];
+    const matchingEvidence = curriculum.syllabusEntries
+      .filter(entry => this.normaliseText(entry.topic || '') === this.normaliseText(topicName) || this.normaliseText(entry.topic || '').includes(this.normaliseText(topicName)))
+      .filter(entry => entry.subtopic || entry.competency || entry.standard);
+    const evidence = matchingEvidence[Math.abs(variant) % Math.max(1, matchingEvidence.length)];
+    const subtopic = evidence?.subtopic || topicName;
+    const competency = topic?.competencies?.[variant % Math.max(1, topic?.competencies?.length || 1)]?.name || evidence?.competency || `Apply knowledge of ${subtopic}`;
+    const standard = evidence?.standard || `demonstrate the expected competence in ${subtopic}`;
+    const contexts = this.subjectContexts(subjectName, topicName, subtopic);
+    const context = contexts[Math.abs(variant) % contexts.length];
+    const tasks = this.subjectTasks(subjectName, topicName, subtopic, competency);
     return {
-      stem: `${scenario} ${topicName}. The team has collected information from a recent activity and must present a defensible recommendation to management. Use your knowledge of ${topicName} to analyse the issue.`,
+      stem: `${context} The evidence is intended to assess whether the learner can ${competency.toLowerCase()} and ${standard.toLowerCase()}.`,
       topic: topicName,
       competency,
       difficulty: offset % 3 === 0 ? 'EASY' : offset % 3 === 1 ? 'MEDIUM' : 'HARD',
       bloomLevel: offset % 3 === 0 ? 'UNDERSTAND' : offset % 3 === 1 ? 'APPLY' : 'EVALUATE',
-      tasks: [
-        { label: '', prompt: `Define the key terms associated with ${topicName} and state the principle that applies to this situation.`, marks: 4, answer: 'Award marks for accurate definitions and a relevant principle.', criterion: 'Accurate terminology and relevant principle.' },
-        { label: '', prompt: `Apply ${topicName} to the information in the scenario and show the reasoning that leads to your answer.`, marks: 8, answer: 'Award marks for a correct procedure, accurate reasoning and a supported response.', criterion: 'Correct application, reasoning and response.' },
-        { label: '', prompt: `Evaluate the recommendation and explain one limitation or assumption in your analysis.`, marks: 5, answer: 'Award marks for a justified evaluation and a relevant limitation or assumption.', criterion: 'Justified evaluation and valid limitation.' },
-        { label: '', prompt: `Communicate the final recommendation clearly using appropriate subject vocabulary.`, marks: 3, answer: 'Award marks for a clear, well-organised and subject-appropriate recommendation.', criterion: 'Clarity, organisation and vocabulary.' },
-      ],
+      tasks,
     };
+  }
+
+  private subjectContexts(subjectName: string, topic: string, subtopic: string) {
+    const subject = subjectName.toLowerCase();
+    if (/biology/.test(subject)) return [
+      `A Form learner examines ${subtopic} during a Biology practical on ${topic}. The learner records observations in a labelled table and compares them with the expected result.`,
+      `A health or environment investigation uses ${subtopic} to explain a change observed in a local population. The observations are linked to ${topic}.`,
+      `A teacher provides specimens, a simple apparatus or a data table for a study of ${subtopic}. The class must use the evidence to explain ${topic}.`,
+      `A field study records an observation related to ${subtopic}. The findings must be interpreted using the biological ideas in ${topic}.`,
+    ];
+    if (/chemistry/.test(subject)) return [
+      `In a Chemistry practical, learners test a sample while studying ${subtopic} under ${topic}. Their observations include a visible change and a measured result.`,
+      `A laboratory technician compares two substances using the principles of ${subtopic}. The results must be explained using ${topic}.`,
+      `A class investigates a reaction involving ${subtopic}. The learners must connect the observations to the expected chemical behaviour in ${topic}.`,
+    ];
+    if (/physics/.test(subject)) return [
+      `During a Physics investigation of ${subtopic}, learners take repeated measurements and record the results in a table. The investigation tests ${topic}.`,
+      `An engineer applies ${subtopic} to a device or motion problem. The available measurements must be interpreted using ${topic}.`,
+      `A class sets up an apparatus to investigate ${subtopic}. The evidence must be used to explain the physical relationship represented by ${topic}.`,
+    ];
+    if (/geography/.test(subject)) return [
+      `A fieldwork team collects observations about ${subtopic} in an area being studied under ${topic}. The evidence must be presented and interpreted geographically.`,
+      `A map, photograph or data table describes ${subtopic}. Use the evidence to explain the geographical pattern associated with ${topic}.`,
+      `A community is affected by a process related to ${subtopic}. A Geography learner must analyse the evidence and propose a justified response using ${topic}.`,
+    ];
+    if (/history/.test(subject)) return [
+      `Two historical sources describe an event or development related to ${subtopic} under ${topic}. A learner must test the evidence before forming a conclusion.`,
+      `A museum record and an oral account provide evidence about ${subtopic}. Use the sources to explain the historical significance of ${topic}.`,
+      `A historian is preparing a short account of ${subtopic}. The account must distinguish evidence, interpretation and consequence within ${topic}.`,
+    ];
+    return [
+      `A classroom or community case study provides evidence about ${subtopic} within ${topic}. The learner must apply the ideas of ${subjectName} to the evidence.`,
+      `A source, record or practical example focuses on ${subtopic}. Analyse it using the knowledge and skills required for ${topic} in ${subjectName}.`,
+      `Learners receive a short data set or source concerning ${subtopic}. Their response must demonstrate the assessed competence in ${topic}.`,
+      `A real-world example illustrates ${subtopic}. Use appropriate ${subjectName} concepts to explain the evidence and reach a supported conclusion.`,
+    ];
+  }
+
+  private subjectTasks(subjectName: string, topic: string, subtopic: string, competency: string): ComposedTask[] {
+    const subject = subjectName.toLowerCase();
+    const first = /biology/.test(subject)
+      ? `Identify and describe the structures, process or observation involved in ${subtopic}.`
+      : /chemistry/.test(subject)
+        ? `State the relevant chemical terms, symbols or equation for ${subtopic}.`
+        : /physics/.test(subject)
+          ? `State the physical law or relationship needed for ${subtopic} and define the quantities used.`
+          : `Define the key terms in ${subtopic} and state the relevant ${subjectName} principle.`;
+    return [
+      { label: '', prompt: first, marks: 4, answer: `Award marks for accurate subject knowledge about ${subtopic}.`, criterion: `Accurate knowledge of ${subtopic}.` },
+      { label: '', prompt: `Use the evidence provided to demonstrate how to ${competency.toLowerCase()}. Show all relevant working, observations or source references.`, marks: 8, answer: 'Award method marks for a valid procedure and accuracy marks for the supported result.', criterion: 'Correct application supported by evidence.' },
+      { label: '', prompt: `Explain the result and relate it to the wider idea of ${topic}.`, marks: 5, answer: `Award marks for an accurate explanation linking the evidence to ${topic}.`, criterion: `Explanation linked to ${topic}.` },
+      { label: '', prompt: `State one limitation of the evidence or method and describe one improvement.`, marks: 3, answer: 'Award marks for a relevant limitation and a feasible improvement.', criterion: 'Relevant limitation and improvement.' },
+    ];
   }
 
   private distanceTimeDiagram(): DiagramSpec {

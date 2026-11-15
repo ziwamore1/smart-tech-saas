@@ -138,7 +138,7 @@ export class AiExaminorService {
         const raw = response.choices[0]?.message?.content;
         if (raw) {
           const candidate = this.parseJson(raw);
-          if (this.matchesBlueprintShape(candidate, blueprint) && this.isCandidateReady(candidate)) artifact = candidate;
+           if (this.matchesBlueprintShape(candidate, blueprint) && this.isCandidateReady(candidate) && this.hasTopicCoverage(candidate, curriculum)) artifact = candidate;
           else this.logger.warn('AI-EXAMINOR returned an incomplete or blueprint-mismatched paper; using deterministic composer.');
         }
       } catch (error) {
@@ -184,10 +184,22 @@ export class AiExaminorService {
       include: { competencies: true },
       orderBy: { sortOrder: 'asc' },
     });
-    const topics = (subject?.Topic || []).filter(topic => !request.includeTopics?.length || request.includeTopics.includes(topic.id) || request.includeTopics.some(value => this.normalise(value) === this.normalise(this.cleanEvidenceText(topic.name))));
+    const topicRecords = (subject?.Topic || []).map(topic => ({
+      id: topic.id,
+      name: this.cleanEvidenceText(topic.name),
+      competencies: topic.competencies.map(c => ({ id: c.id, name: this.cleanEvidenceText(c.name), description: c.description, bloomLevel: c.bloomLevel })),
+    }));
+    const knownTopicNames = new Set(topicRecords.map(topic => this.normalise(topic.name)));
+    const syllabusTopicRecords = (subject?.SyllabusEntry || []).reduce((records: any[], entry) => {
+      const name = this.cleanEvidenceText(entry.topic);
+      if (!name || knownTopicNames.has(this.normalise(name)) || records.some(topic => this.normalise(topic.name) === this.normalise(name))) return records;
+      records.push({ id: `syllabus-${this.normalise(name).replace(/[^a-z0-9]+/g, '-')}`, name, competencies: [] });
+      return records;
+    }, []);
+    const topics = [...topicRecords, ...syllabusTopicRecords].filter(topic => !request.includeTopics?.length || request.includeTopics.includes(topic.id) || request.includeTopics.some(value => this.normalise(value) === this.normalise(topic.name)));
     return {
       subject: subject ? { id: subject.id, name: subject.name, code: subject.code } : null,
-      topics: topics.map(topic => ({ id: topic.id, name: this.cleanEvidenceText(topic.name), competencies: topic.competencies.map(c => ({ id: c.id, name: this.cleanEvidenceText(c.name), description: c.description, bloomLevel: c.bloomLevel })) })),
+      topics,
       eocs: eocs.map(eoc => ({ id: eoc.id, name: eoc.name, competencies: eoc.competencies.map(c => c.name) })),
       syllabusEntries: (subject?.SyllabusEntry || []).map(entry => ({ code: entry.competencyCode, topic: this.cleanEvidenceText(entry.topic), subtopic: entry.subtopic ? this.cleanEvidenceText(entry.subtopic) : undefined, competency: entry.competency ? this.cleanEvidenceText(entry.competency) : undefined, standard: entry.expectedStandard ? this.cleanEvidenceText(entry.expectedStandard) : undefined, sourcePage: entry.sourcePage, formNumber: entry.formNumber })),
       formNumber,
@@ -231,6 +243,7 @@ export class AiExaminorService {
       const stem = stems[index];
       const tasks = Array.isArray(question.tasks) ? question.tasks : [];
       if (stem.length < 40 || tasks.length < this.minimumTaskCount(question)) return false;
+      if (this.isGenericScaffold(stem, tasks.map((task: any) => this.normalise(task.prompt)))) return false;
       const prompts = tasks.map((task: any) => this.normalise(task.prompt));
       if (new Set(prompts).size !== prompts.length) return false;
       if (prompts.some(prompt => prompt.length < 12 || prompt === stem || this.isPlaceholderPrompt(prompt))) return false;
@@ -246,6 +259,28 @@ export class AiExaminorService {
 
   private isPlaceholderPrompt(prompt: string) {
     return /using the syllabus content|demonstrate the competency|show your working and give a clear final response|show the method, calculations and justification needed to answer the question|state the answer and justify your conclusion/i.test(prompt);
+  }
+
+  private isGenericScaffold(stem: string, prompts: string[]) {
+    const scaffoldMarkers = [
+      'school improvement team',
+      'community committee',
+      'small enterprise',
+      'public service team',
+      'defensible recommendation',
+      'key terms associated with',
+      'information in the scenario',
+      'communicate the final recommendation',
+    ];
+    const markerCount = scaffoldMarkers.filter(marker => stem.includes(marker) || prompts.some(prompt => prompt.includes(marker))).length;
+    return markerCount >= 2;
+  }
+
+  private hasTopicCoverage(artifact: any, curriculum: any) {
+    const available = new Set((curriculum.topics || []).map((topic: any) => this.normalise(topic.name)));
+    if (available.size <= 1) return true;
+    const generated = new Set(artifact.sections.flatMap((section: any) => section.questions || []).map((question: any) => this.normalise(question.topic)));
+    return generated.size >= Math.min(available.size, artifact.sections.flatMap((section: any) => section.questions || []).length);
   }
 
   private markingKeyCoversTasks(question: any, tasks: any[]) {
@@ -297,6 +332,11 @@ export class AiExaminorService {
       if (expected.answerRule === 'ONE' ? section.questions.some((question: any) => Number(question.marks || 0) !== expected.totalMarks) : sectionMarks !== expected.totalMarks) throw new BadRequestException(`Section ${expected.code} marks do not match its blueprint`);
       return section.questions;
     });
+    const syllabusTopicCount = new Set(curriculum.topics.map((topic: any) => this.normalise(topic.name))).size;
+    const generatedTopicCount = new Set(questions.map((question: any) => this.normalise(question.topic))).size;
+    if (syllabusTopicCount > 1 && generatedTopicCount < Math.min(syllabusTopicCount, questions.length)) {
+      throw new BadRequestException('Generated paper does not distribute questions across the selected syllabus topics');
+    }
     const stems = new Set<string>();
     for (const question of questions) {
       if (!question.stem || !question.markingKey?.length || !question.tasks?.length) throw new BadRequestException('Every generated question requires tasks and a marking key');

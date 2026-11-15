@@ -60,4 +60,18 @@ describe('AiExaminorService', () => {
     expect(result.topics[0].expectedStandards).toContain('Correctly identifies cell structures');
     expect(prisma.syllabusEntry.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { subjectId: 'subject-1', formNumber: 2 } }));
   });
+
+  it('uses subject-aware fallback questions instead of the generic recommendation scaffold', async () => {
+    prisma.subject.findFirst.mockResolvedValue({
+      id: 'subject-1', name: 'Biology', code: '4012',
+      Topic: ['Cell Biology', 'Nutrition', 'Ecology', 'Genetics', 'Reproduction', 'Health'].map((name, index) => ({ id: `topic-${index}`, name, competencies: [{ id: `competency-${index}`, name: `Explain ${name}` }] })),
+      SyllabusEntry: [],
+    });
+    const service = new AiExaminorService(prisma, config);
+    const result = await service.generate({ subjectId: 'subject-1' });
+    const questions = result.sections.flatMap((section: any) => section.questions);
+
+    expect(questions.every((question: any) => !question.stem.includes('defensible recommendation'))).toBe(true);
+    expect(new Set(questions.map((question: any) => question.topic)).size).toBeGreaterThanOrEqual(5);
+  });
 });
