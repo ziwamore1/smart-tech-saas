@@ -86,6 +86,17 @@ export class AiContextService {
           context += `Competencies: ${subjectTree.currentTopic.competencies.map(c => `${c.name} (${c.bloomLevel || 'N/A'})`).join(', ')}\n`;
         }
       }
+      const syllabusEntries = (subjectTree.syllabusEntries || []).filter((entry: any) => !body.topicId || !subjectTree.currentTopic || entry.topic === subjectTree.currentTopic.name);
+      if (syllabusEntries.length) {
+        context += `Syllabus evidence (use only this evidence for curriculum-specific answers):\n${syllabusEntries.map((entry: any) => [
+          [entry.form ? `Form ${entry.form}` : '', entry.unitCode, entry.subUnitCode, entry.competencyCode].filter(Boolean).join(' · '),
+          `Topic: ${entry.topic || '—'}`,
+          `Sub-topic: ${entry.subtopic || '—'}`,
+          `Specific competence: ${entry.competency || '—'}`,
+          `Learning activities: ${Array.isArray(entry.learningActivities) ? entry.learningActivities.join('; ') : entry.learningActivities || '—'}`,
+          `Expected standard: ${entry.expectedStandard || '—'}`,
+        ].join(' | ')).join('\n')}\n`;
+      }
     }
 
     return {

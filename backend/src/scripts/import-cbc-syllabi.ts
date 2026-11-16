@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { spawnSync } from 'child_process';
 import { createHash } from 'crypto';
+import { extractStructuredSyllabusRows, syllabusRowCompleteness, type ExtractedSyllabusRow } from './cbc-syllabus-extractor';
 
 const prisma = new PrismaClient();
 const root = fs.existsSync(path.join(process.cwd(), 'CBC_SYLLABI'))
@@ -128,8 +129,48 @@ async function extractWithOcr(filePath: string) {
   return JSON.parse(result.stdout);
 }
 
+async function seedStructuredRows(subject: any, document: any, rows: ExtractedSyllabusRow[]) {
+  for (const row of rows) {
+    let topic = await prisma.topic.findFirst({ where: { name: row.concept, subjectId: subject.id, academicStageId: null } });
+    if (topic) topic = await prisma.topic.update({ where: { id: topic.id }, data: { code: row.conceptCode, description: `CBC concept ${row.conceptCode}` } });
+    else topic = await prisma.topic.create({ data: { name: row.concept, code: row.conceptCode, description: `CBC concept ${row.conceptCode}`, subjectId: subject.id, sortOrder: Number(row.conceptCode?.split('.')[1]) || 0, schoolId: subject.schoolId } });
+    const subtopic = await prisma.subtopic.upsert({
+      where: { name_topicId: { name: row.subtopic, topicId: topic.id } },
+      update: { code: row.subtopicCode },
+      create: { name: row.subtopic, code: row.subtopicCode, topicId: topic.id, schoolId: subject.schoolId },
+    });
+    await prisma.competency.upsert({
+      where: { name_topicId_subjectId: { name: row.competency, topicId: topic.id, subjectId: subject.id } },
+      update: { code: row.competencyCode, subtopicId: subtopic.id, description: row.competency },
+      create: { name: row.competency, code: row.competencyCode, topicId: topic.id, subtopicId: subtopic.id, subjectId: subject.id, description: row.competency, schoolId: subject.schoolId },
+    });
+    const entryData = {
+      documentId: document.id,
+      subjectId: subject.id,
+      formNumber: row.formNumber,
+      unitCode: row.conceptCode,
+      subUnitCode: row.subtopicCode,
+      competencyCode: row.competencyCode,
+      topic: row.concept,
+      subtopic: row.subtopic,
+      competency: row.competency,
+      learningActivities: row.learningActivities,
+      expectedStandard: row.expectedStandard,
+      sourcePage: row.sourcePage,
+      rawText: row.rawText,
+      metadata: { extractionMethod: 'pdf-coordinate-table', conceptCode: row.conceptCode, subtopicCode: row.subtopicCode },
+    };
+    const existing = await prisma.syllabusEntry.findFirst({ where: { documentId: document.id, subjectId: subject.id, formNumber: row.formNumber ?? null, competencyCode: row.competencyCode, topic: row.concept, subtopic: row.subtopic } });
+    if (existing) await prisma.syllabusEntry.update({ where: { id: existing.id }, data: entryData });
+    else await prisma.syllabusEntry.create({ data: { id: `cbc-entry-${createHash('sha1').update([subject.id, document.id, row.formNumber ?? '', row.competencyCode, row.concept, row.subtopic].join('|')).digest('hex')}`, ...entryData } });
+  }
+}
+
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
+  const useOcr = process.argv.includes('--ocr');
+  const reportArgument = process.argv.find(argument => argument.startsWith('--report='));
+  const report: any[] = [];
   const requestedCode = process.argv.find(argument => argument.startsWith('--code='))?.slice('--code='.length);
   const filesToImport = requestedCode ? syllabusFiles.filter(item => item.code === requestedCode) : syllabusFiles;
   if (requestedCode && !filesToImport.length) throw new Error(`Unknown syllabus code: ${requestedCode}`);
@@ -161,11 +202,12 @@ async function main() {
         subject,
         // Older imports used generated document IDs; subject scope is stable.
         count: await prisma.syllabusEntry.count({ where: { subjectId: subject.id } }),
+        richRows: await prisma.syllabusEntry.count({ where: { subjectId: subject.id, learningActivities: { not: null }, expectedStandard: { not: null }, rawText: { not: null } } }),
         topics: await prisma.topic.count({ where: { subjectId: subject.id } }),
         subtopics: await prisma.subtopic.count({ where: { topic: { subjectId: subject.id } } }),
       })));
       subjects = counts
-        .filter(({ count, topics, subtopics }) => count < minimumEntries || topics === 0 || subtopics === 0)
+        .filter(({ count, richRows, topics, subtopics }) => count < minimumEntries || richRows < Math.min(count, minimumEntries) || topics === 0 || subtopics === 0)
         .map(({ subject }) => subject);
       if (!subjects.length) {
         console.log(`${item.name}: already complete; skipping`);
@@ -178,8 +220,14 @@ async function main() {
     }
     const text = await extract(filePath);
     let rows = extractRows(text);
+    let structuredRows: ExtractedSyllabusRow[] = [];
+    try {
+      structuredRows = await extractStructuredSyllabusRows(filePath);
+    } catch (error) {
+      console.warn(`${item.name}: coordinate extraction failed; using text extraction: ${(error as Error).message}`);
+    }
     let extractionMethod = 'pdf-text';
-    if (rows.length < 10) {
+    if (!structuredRows.length && rows.length < 10 && useOcr) {
       console.log(`${item.name}: ${rows.length} numbered rows detected; starting OCR fallback`);
       const ocrText = normalizeOcrText(await extractWithOcr(filePath));
       const ocrRows = extractRows(ocrText);
@@ -190,7 +238,15 @@ async function main() {
     }
     const usableRows = rows.length > 0;
     if (dryRun) {
-      console.log(`${item.name}: ${rows.length} numbered rows detected${!usableRows ? ' (needs OCR/font decoding)' : ''}`);
+      if (structuredRows.length) {
+        const complete = structuredRows.filter(syllabusRowCompleteness).length;
+        const forms = [...new Set(structuredRows.map(row => row.formNumber).filter(Boolean))];
+        report.push({ code: item.code, subject: item.name, file: item.file, extractionMethod: 'pdf-coordinate-table', rows: structuredRows.length, completeRows: complete, forms, missingActivities: structuredRows.filter(row => !row.learningActivities.length).length, missingStandards: structuredRows.filter(row => !row.expectedStandard).length });
+        console.log(`${item.name}: ${structuredRows.length} structured syllabus rows; ${complete} complete five-column rows; Forms ${forms.join(', ') || 'unknown'}`);
+      } else {
+        report.push({ code: item.code, subject: item.name, file: item.file, extractionMethod: useOcr ? 'text-or-ocr' : 'text-only', rows: rows.length, completeRows: 0, forms: [], needsOcr: !usableRows });
+        console.log(`${item.name}: ${rows.length} numbered rows detected${!usableRows ? ' (needs OCR/font decoding)' : ''}`);
+      }
       continue;
     }
     for (const subject of subjects) {
@@ -208,6 +264,12 @@ async function main() {
       update: { subjectCode: item.code },
       create: { documentId: document.id, subjectId: subject.id, subjectCode: item.code },
     });
+    if (structuredRows.length) {
+      await seedStructuredRows(subject, document, structuredRows);
+      await prisma.syllabusDocument.update({ where: { id: document.id }, data: { isProcessed: true, metadata: { source: 'CBC_SYLLABI', extractedRows: structuredRows.length, extractionMethod: 'pdf-coordinate-table', columns: ['concept', 'subtopic', 'competency', 'learningActivities', 'expectedStandard'] } } });
+      console.log(`${item.name} (${subject.schoolId}): ${structuredRows.length} structured syllabus rows imported`);
+      continue;
+    }
     if (!usableRows) {
       const fallback = tocFallbacks[item.code] || [];
       for (const topic of fallback) {
@@ -305,6 +367,9 @@ async function main() {
     await prisma.syllabusDocument.update({ where: { id: document.id }, data: { metadata: { source: 'CBC_SYLLABI', extractedRows: rows.length, extractionMethod } } });
       console.log(`${item.name} (${subject.schoolId}): ${rows.length} numbered rows imported`);
     }
+  }
+  if (reportArgument) {
+    fs.writeFileSync(reportArgument.slice('--report='.length), JSON.stringify({ generatedAt: new Date().toISOString(), subjects: report }, null, 2));
   }
 }
 
