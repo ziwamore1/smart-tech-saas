@@ -33,18 +33,28 @@ const defaultBlueprint = {
   sections: [
     {
       code: "A",
+      id: "section-a",
       title: "Section A",
       totalMarks: 80,
       itemCount: 4,
       answerRule: "ALL",
+      responseType: "STRUCTURED",
+      taskPattern: "MULTI_TASK",
+      markingMethod: "ANALYTIC",
+      candidateAnswerSpace: "LINED",
       questionTypes: ["STRUCTURED"],
     },
     {
       code: "B",
+      id: "section-b",
       title: "Section B",
       totalMarks: 20,
       itemCount: 2,
       answerRule: "ONE",
+      responseType: "ESSAY",
+      taskPattern: "MULTI_TASK",
+      markingMethod: "ANALYTIC",
+      candidateAnswerSpace: "LINED",
       questionTypes: ["STRUCTURED", "ESSAY"],
     },
   ],
@@ -69,7 +79,8 @@ export default function AiExaminorPage() {
   const [blueprintForm, setBlueprintForm] = useState({
     name: "ECZ CBC Examination Blueprint",
     subjectId: "",
-    description: "",
+  description: "",
+    structure: defaultBlueprint,
   });
   const [generationForm, setGenerationForm] = useState({
     classId: "",
@@ -79,6 +90,43 @@ export default function AiExaminorPage() {
     endsAt: "",
   });
   const selectedSubjectId = selectedBlueprint?.subjectId || selectedBlueprint?.subject?.id || "";
+  const blueprintStructure = blueprintForm.structure;
+  const sectionMarks = blueprintStructure.sections.reduce((sum, section) => sum + Number(section.totalMarks || 0), 0);
+
+  const updateSection = (index: number, patch: Record<string, any>) => {
+    setBlueprintForm(current => ({
+      ...current,
+      structure: {
+        ...current.structure,
+        ...(() => {
+          const sections = current.structure.sections.map((section, sectionIndex) => sectionIndex === index ? { ...section, ...patch } : section);
+          return { sections, totalMarks: sections.reduce((sum, section) => sum + Number(section.totalMarks || 0), 0) };
+        })(),
+      },
+    }));
+  };
+
+  const addSection = () => {
+    setBlueprintForm(current => {
+      const index = current.structure.sections.length;
+      const code = String.fromCharCode(65 + index);
+      return {
+        ...current,
+        structure: {
+          ...current.structure,
+          sections: [...current.structure.sections, { id: `section-${code.toLowerCase()}`, code, title: `Section ${code}`, totalMarks: 10, itemCount: 2, answerRule: "ALL", responseType: "STRUCTURED", taskPattern: "MULTI_TASK", markingMethod: "ANALYTIC", candidateAnswerSpace: "LINED", questionTypes: ["STRUCTURED"] }],
+          totalMarks: current.structure.totalMarks + 10,
+        },
+      };
+    });
+  };
+
+  const removeSection = (index: number) => {
+    setBlueprintForm(current => {
+      const sections = current.structure.sections.filter((_, sectionIndex) => sectionIndex !== index);
+      return { ...current, structure: { ...current.structure, sections, totalMarks: sections.reduce((sum, section) => sum + Number(section.totalMarks || 0), 0) } };
+    });
+  };
 
   useEffect(() => {
     if (!selectedSubjectId || !generationForm.classId) {
@@ -136,7 +184,7 @@ export default function AiExaminorPage() {
     try {
       await examAuthoringApi.createBlueprint({
         ...blueprintForm,
-        structure: defaultBlueprint,
+        structure: { ...blueprintStructure, totalMarks: sectionMarks },
       });
       setMessage(
         "Blueprint created as a draft. Approve it before generating a stored examination.",
@@ -491,15 +539,38 @@ export default function AiExaminorPage() {
                 ))}
               </select>
             </label>
-            <div className="mb-5 grid grid-cols-2 gap-3 text-xs">
-              <div className="rounded-xl bg-white/10 p-3">
-                <div className="text-slate-400">Structure</div>
-                <strong className="text-slate-100">4 + 2 items</strong>
+            <div className="mb-5 grid grid-cols-2 gap-3">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Total marks<input type="number" min="1" value={sectionMarks} readOnly className="mt-2 w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2.5 text-sm text-white" /></label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Duration (minutes)<input type="number" min="1" value={blueprintStructure.durationMinutes} onChange={e => setBlueprintForm(current => ({ ...current, structure: { ...current.structure, durationMinutes: Number(e.target.value) } }))} className="mt-2 w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2.5 text-sm text-white" /></label>
+            </div>
+            <div className="mb-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Sections</div>
+                  <div className={`text-xs ${sectionMarks === Number(blueprintStructure.totalMarks) ? "text-emerald-300" : "text-amber-300"}`}>
+                    {sectionMarks} of {blueprintStructure.totalMarks} marks allocated
+                  </div>
+                </div>
+                <button type="button" onClick={addSection} className="rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/20">Add section</button>
               </div>
-              <div className="rounded-xl bg-white/10 p-3">
-                <div className="text-slate-400">Allocation</div>
-                <strong className="text-slate-100">80 / 20 marks</strong>
-              </div>
+              {blueprintStructure.sections.map((section, index) => (
+                <div key={section.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <div className="grid gap-2 sm:grid-cols-[70px_1fr_90px_80px]">
+                    <label className="text-[10px] uppercase tracking-wide text-slate-400">Code<input value={section.code} onChange={e => updateSection(index, { code: e.target.value })} className="mt-1 w-full rounded-lg bg-white/10 px-2 py-2 text-sm text-white" /></label>
+                    <label className="text-[10px] uppercase tracking-wide text-slate-400">Title<input value={section.title} onChange={e => updateSection(index, { title: e.target.value })} className="mt-1 w-full rounded-lg bg-white/10 px-2 py-2 text-sm text-white" /></label>
+                    <label className="text-[10px] uppercase tracking-wide text-slate-400">Marks<input type="number" min="1" value={section.totalMarks} onChange={e => updateSection(index, { totalMarks: Number(e.target.value) })} className="mt-1 w-full rounded-lg bg-white/10 px-2 py-2 text-sm text-white" /></label>
+                    <label className="text-[10px] uppercase tracking-wide text-slate-400">Items<input type="number" min="1" value={section.itemCount} onChange={e => updateSection(index, { itemCount: Number(e.target.value) })} className="mt-1 w-full rounded-lg bg-white/10 px-2 py-2 text-sm text-white" /></label>
+                  </div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-6">
+                    <select value={section.answerRule} onChange={e => updateSection(index, { answerRule: e.target.value })} className="rounded-lg bg-white/10 px-2 py-2 text-xs text-white"><option value="ALL" className="text-slate-900">Answer all</option><option value="ONE" className="text-slate-900">Answer one</option><option value="ANY" className="text-slate-900">Answer required number</option></select>
+                    <select value={section.responseType} onChange={e => updateSection(index, { responseType: e.target.value })} className="rounded-lg bg-white/10 px-2 py-2 text-xs text-white"><option value="STRUCTURED" className="text-slate-900">Structured</option><option value="ESSAY" className="text-slate-900">Essay</option><option value="OBJECTIVE" className="text-slate-900">Objective</option><option value="PRACTICAL" className="text-slate-900">Practical</option><option value="DRAWING" className="text-slate-900">Drawing</option></select>
+                    <select value={section.taskPattern} onChange={e => updateSection(index, { taskPattern: e.target.value })} className="rounded-lg bg-white/10 px-2 py-2 text-xs text-white"><option value="MULTI_TASK" className="text-slate-900">Multiple tasks</option><option value="SINGLE_TASK" className="text-slate-900">Single task</option></select>
+                    <select value={section.markingMethod} onChange={e => updateSection(index, { markingMethod: e.target.value })} className="rounded-lg bg-white/10 px-2 py-2 text-xs text-white"><option value="ANALYTIC" className="text-slate-900">Analytic marking</option><option value="HOLISTIC" className="text-slate-900">Holistic marking</option><option value="OBJECTIVE_KEY" className="text-slate-900">Objective key</option></select>
+                    <select value={section.candidateAnswerSpace} onChange={e => updateSection(index, { candidateAnswerSpace: e.target.value })} className="rounded-lg bg-white/10 px-2 py-2 text-xs text-white"><option value="LINED" className="text-slate-900">Lined answer</option><option value="GRID" className="text-slate-900">Grid answer</option><option value="DIAGRAM" className="text-slate-900">Diagram space</option><option value="NONE" className="text-slate-900">No answer space</option></select>
+                    <button type="button" disabled={blueprintStructure.sections.length <= 1} onClick={() => removeSection(index)} className="rounded-lg border border-red-300/20 px-2 py-2 text-xs font-semibold text-red-200 disabled:opacity-40">Remove section</button>
+                  </div>
+                </div>
+              ))}
             </div>
             <button
               disabled={busy}

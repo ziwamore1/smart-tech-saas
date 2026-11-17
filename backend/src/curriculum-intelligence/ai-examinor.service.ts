@@ -4,13 +4,20 @@ import OpenAI from 'openai';
 import { PrismaService } from '../prisma/prisma.service';
 import { ExaminationComposer } from '../exam-authoring/examination-composer';
 import { renderDiagramSvg } from '../exam-authoring/exam-diagram-renderer';
+import { normalizeBlueprintStructure } from '../exam-authoring/blueprint.types';
 
 export interface AiExaminorSectionRequest {
+  id?: string;
   code: string;
   title: string;
+  instructions?: string;
   totalMarks: number;
   itemCount: number;
   answerRule: 'ALL' | 'ONE' | 'ANY';
+  responseType?: string;
+  taskPattern?: string;
+  markingMethod?: string;
+  candidateAnswerSpace?: string;
   questionTypes?: string[];
 }
 
@@ -162,7 +169,7 @@ export class AiExaminorService {
       title: request.title || 'CBC Examination Paper',
       totalMarks,
       durationMinutes: request.durationMinutes || 150,
-      sections,
+      sections: normalizeBlueprintStructure({ totalMarks, durationMinutes: request.durationMinutes || 150, sections }).sections,
       topicPlan: request.topicPlan || [],
       cognitiveDistribution: request.cognitiveDistribution || {},
       difficultyDistribution: request.difficultyDistribution || { EASY: 0.2, MEDIUM: 0.5, HARD: 0.3 },

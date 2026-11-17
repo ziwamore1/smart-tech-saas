@@ -41,4 +41,21 @@ describe('ExamAuthoringService', () => {
       expect.objectContaining({ code: 'BLUEPRINT_TOPIC_MARK_MISMATCH', severity: ExamValidationSeverity.ERROR }),
     ]));
   });
+
+  it('rejects duplicate section identifiers and unsupported response settings', () => {
+    const service = new ExamAuthoringService({} as any);
+    const findings = service.validateBlueprint({
+      totalMarks: 40,
+      durationMinutes: 60,
+      sections: [
+        { id: 'shared', code: 'A', title: 'Section A', totalMarks: 20, itemCount: 2, answerRule: 'ALL', responseType: 'UNKNOWN' as any },
+        { id: 'shared', code: 'B', title: 'Section B', totalMarks: 20, itemCount: 2, answerRule: 'ALL' },
+      ],
+    });
+
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'BLUEPRINT_SECTION_ID_DUPLICATE', severity: ExamValidationSeverity.ERROR }),
+      expect.objectContaining({ code: 'BLUEPRINT_RESPONSE_TYPE_INVALID', severity: ExamValidationSeverity.ERROR }),
+    ]));
+  });
 });

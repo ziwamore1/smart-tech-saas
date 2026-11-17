@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { createHash } from 'crypto';
 import { AiGenerationStatus, DifficultyLevel, ExamAuthoringStatus, ExamAuditAction, ExamValidationSeverity, QuestionType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { BlueprintStructureInput, normalizeBlueprintStructure } from './blueprint.types';
 
 export interface CreateBlueprintInput {
   name: string;
@@ -11,7 +12,7 @@ export interface CreateBlueprintInput {
   structure: {
     totalMarks: number;
     durationMinutes: number;
-    sections: Array<{ code: string; title: string; totalMarks: number; itemCount: number; answerRule: 'ALL' | 'ONE' | 'ANY'; questionTypes?: string[] }>;
+    sections: BlueprintStructureInput['sections'];
     topicPlan?: Array<{ topic: string; marks: number; questionCount?: number }>;
     cognitiveDistribution?: Record<string, number>;
     difficultyDistribution?: Record<string, number>;
@@ -39,9 +40,10 @@ export class ExamAuthoringService {
   async createBlueprint(schoolId: string, createdById: string, input: CreateBlueprintInput) {
     const subject = await this.prisma.subject.findFirst({ where: { id: input.subjectId, schoolId }, select: { id: true } });
     if (!subject) throw new BadRequestException('Subject does not belong to this school');
-    const findings = this.validateBlueprint(input.structure);
+    const structure = normalizeBlueprintStructure(input.structure);
+    const findings = this.validateBlueprint(structure);
     if (findings.some(finding => finding.severity === ExamValidationSeverity.ERROR)) throw new BadRequestException({ message: 'Blueprint is invalid', findings });
-    return this.prisma.examBlueprint.create({ data: { name: input.name, description: input.description, subjectId: input.subjectId, academicStageId: input.academicStageId, schoolId, createdById, structure: input.structure } });
+    return this.prisma.examBlueprint.create({ data: { name: input.name, description: input.description, subjectId: input.subjectId, academicStageId: input.academicStageId, schoolId, createdById, structure } });
   }
 
   async listBlueprints(schoolId: string, filters?: { subjectId?: string; status?: string }) {
@@ -97,13 +99,20 @@ export class ExamAuthoringService {
   }
 
   validateBlueprint(structure: CreateBlueprintInput['structure']) {
+    structure = normalizeBlueprintStructure(structure);
     const findings: Array<{ severity: ExamValidationSeverity; code: string; message: string }> = [];
     if (!structure || structure.totalMarks <= 0 || structure.durationMinutes <= 0) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'BLUEPRINT_META_INVALID', message: 'Total marks and duration must be positive.' });
     if (!structure?.sections?.length) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'BLUEPRINT_SECTIONS_REQUIRED', message: 'At least one examination section is required.' });
     const sectionMarks = (structure?.sections || []).reduce((sum, section) => sum + Number(section.totalMarks || 0), 0);
     if (sectionMarks !== Number(structure?.totalMarks || 0)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'BLUEPRINT_MARK_TOTAL_MISMATCH', message: 'Section marks must equal total examination marks.' });
+    const sectionIds = new Set<string>();
     for (const section of structure?.sections || []) {
       if (!section.code || !section.title || section.itemCount <= 0 || section.totalMarks <= 0) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'BLUEPRINT_SECTION_INVALID', message: `Section ${section.code || '(unnamed)'} has invalid metadata.` });
+      if (sectionIds.has(section.id)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'BLUEPRINT_SECTION_ID_DUPLICATE', message: `Section ${section.code || section.id} has a duplicate stable identifier.` });
+      sectionIds.add(section.id);
+      if (!['ALL', 'ONE', 'ANY'].includes(section.answerRule)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'BLUEPRINT_ANSWER_RULE_INVALID', message: `Section ${section.code} has an unsupported answer rule.` });
+      if (!['STRUCTURED', 'ESSAY', 'OBJECTIVE', 'PRACTICAL', 'DRAWING'].includes(section.responseType)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'BLUEPRINT_RESPONSE_TYPE_INVALID', message: `Section ${section.code} has an unsupported response type.` });
+      if (!['SINGLE_TASK', 'MULTI_TASK'].includes(section.taskPattern)) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'BLUEPRINT_TASK_PATTERN_INVALID', message: `Section ${section.code} has an unsupported task pattern.` });
       if (section.answerRule === 'ONE' && section.itemCount < 2) findings.push({ severity: ExamValidationSeverity.WARNING, code: 'BLUEPRINT_OPTIONAL_COUNT', message: `Section ${section.code} allows one answer but contains fewer than two items.` });
       if (section.answerRule === 'ONE' && section.totalMarks <= 0) findings.push({ severity: ExamValidationSeverity.ERROR, code: 'BLUEPRINT_OPTIONAL_MARKS_INVALID', message: `Section ${section.code} must define the marks awarded for the selected optional item.` });
     }
