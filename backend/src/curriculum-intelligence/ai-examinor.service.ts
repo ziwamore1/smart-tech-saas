@@ -117,10 +117,12 @@ export class AiExaminorService {
     const blueprint = this.normaliseBlueprint(request);
     const curriculum = await this.loadCurriculum(request);
     if (!curriculum.subject) throw new BadRequestException('Subject not found');
-    if (!blueprint.topicPlan.length && request.includeTopics?.length) {
-      const selected = curriculum.topics.filter(topic => request.includeTopics!.some(value => value === topic.id || this.normalise(value) === this.normalise(topic.name)));
+    if (!blueprint.topicPlan.length) {
+      const selected = request.includeTopics?.length
+        ? curriculum.topics.filter(topic => request.includeTopics!.some(value => value === topic.id || this.normalise(value) === this.normalise(topic.name)))
+        : curriculum.topics;
       const topics = selected.length ? selected : curriculum.topics;
-      blueprint.topicPlan = topics.map(topic => ({ topic: topic.name, marks: blueprint.totalMarks / Math.max(1, topics.length) }));
+      if (topics.length) blueprint.topicPlan = topics.map(topic => ({ topic: topic.name, marks: blueprint.totalMarks / topics.length }));
     }
     let artifact = this.buildFallback(blueprint, curriculum);
 
@@ -346,6 +348,7 @@ export class AiExaminorService {
       const tasks = question.tasks;
       if (tasks.length < this.minimumTaskCount(question)) throw new BadRequestException(`Question ${question.number} needs more than one independently assessable task for its mark tariff`);
       const prompts = tasks.map((task: any) => this.normalise(task.prompt));
+      if (this.isGenericScaffold(normalizedStem, prompts)) throw new BadRequestException(`Question ${question.number} uses the legacy generic examination scaffold`);
       if (new Set(prompts).size !== prompts.length) throw new BadRequestException(`Question ${question.number} contains duplicate task prompts`);
       if (tasks.some((task: any) => Number(task.marks || 0) <= 0)) throw new BadRequestException(`Question ${question.number} has a task with invalid marks`);
       const labels = tasks.filter((task: any) => String(task.label || '').trim()).map((task: any) => this.normalise(task.label));

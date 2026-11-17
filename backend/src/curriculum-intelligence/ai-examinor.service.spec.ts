@@ -39,6 +39,7 @@ describe('AiExaminorService', () => {
     expect(result.sections.flatMap((section: any) => section.questions).every((q: any) => q.tasks.reduce((sum: number, task: any) => sum + task.marks, 0) === q.marks)).toBe(true);
     expect(result.markingKey).toHaveLength(result.sections.flatMap((section: any) => section.questions).reduce((sum: number, q: any) => sum + q.tasks.length, 0));
     expect(result.metadata.generatedBy).toBe('AI-EXAMINOR');
+    expect(result.sections.flatMap((section: any) => section.questions).every((q: any) => !q.stem.includes('defensible recommendation'))).toBe(true);
   });
 
   it('rejects a blueprint whose section marks do not add up', async () => {
@@ -73,5 +74,13 @@ describe('AiExaminorService', () => {
 
     expect(questions.every((question: any) => !question.stem.includes('defensible recommendation'))).toBe(true);
     expect(new Set(questions.map((question: any) => question.topic)).size).toBeGreaterThanOrEqual(5);
+  });
+
+  it('rejects the legacy scaffold marker during artifact validation', () => {
+    const service = new AiExaminorService(prisma, config);
+    expect((service as any).isGenericScaffold(
+      'a school improvement team is reviewing a practical issue linked to biology',
+      ['define the key terms associated with biology', 'communicate the final recommendation clearly'],
+    )).toBe(true);
   });
 });
