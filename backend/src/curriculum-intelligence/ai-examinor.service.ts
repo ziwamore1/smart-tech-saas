@@ -140,7 +140,7 @@ export class AiExaminorService {
         const raw = response.choices[0]?.message?.content;
         if (raw) {
           const candidate = this.parseJson(raw);
-           if (this.matchesBlueprintShape(candidate, blueprint) && this.isCandidateReady(candidate) && this.hasTopicCoverage(candidate, curriculum)) artifact = candidate;
+           if (this.matchesBlueprintShape(candidate, blueprint) && this.isCandidateReady(candidate) && this.hasTopicCoverage(candidate, curriculum, blueprint)) artifact = candidate;
           else this.logger.warn('AI-EXAMINOR returned an incomplete or blueprint-mismatched paper; using deterministic composer.');
         }
       } catch (error) {
@@ -278,11 +278,12 @@ export class AiExaminorService {
     return markerCount >= 2;
   }
 
-  private hasTopicCoverage(artifact: any, curriculum: any) {
-    const available = new Set((curriculum.topics || []).map((topic: any) => this.normalise(topic.name)));
-    if (available.size <= 1) return true;
-    const generated = new Set(artifact.sections.flatMap((section: any) => section.questions || []).map((question: any) => this.normalise(question.topic)));
-    return generated.size >= Math.min(available.size, artifact.sections.flatMap((section: any) => section.questions || []).length);
+  private hasTopicCoverage(artifact: any, curriculum: any, blueprint: any) {
+    const questions = artifact.sections.flatMap((section: any) => section.questions || []);
+    const generated = questions.map((question: any) => this.normalise(question.topic));
+    const selected = (blueprint.topicPlan?.length ? blueprint.topicPlan : curriculum.topics || []).map((topic: any) => this.normalise(topic.topic || topic.name || topic));
+    if (selected.length <= 1) return true;
+    return selected.slice(0, questions.length).every(topic => generated.some(value => value.includes(topic) || topic.includes(value)));
   }
 
   private markingKeyCoversTasks(question: any, tasks: any[]) {
@@ -334,9 +335,13 @@ export class AiExaminorService {
       if (expected.answerRule === 'ONE' ? section.questions.some((question: any) => Number(question.marks || 0) !== expected.totalMarks) : sectionMarks !== expected.totalMarks) throw new BadRequestException(`Section ${expected.code} marks do not match its blueprint`);
       return section.questions;
     });
-    const syllabusTopicCount = new Set(curriculum.topics.map((topic: any) => this.normalise(topic.name))).size;
-    const generatedTopicCount = new Set(questions.map((question: any) => this.normalise(question.topic))).size;
-    if (syllabusTopicCount > 1 && generatedTopicCount < Math.min(syllabusTopicCount, questions.length)) {
+    const plannedTopics = (blueprint.topicPlan || []).map((item: any) => this.normalise(item.topic)).filter(Boolean);
+    const availableTopics = plannedTopics.length
+      ? plannedTopics
+      : curriculum.topics.map((topic: any) => this.normalise(topic.name));
+    const generatedTopics = questions.map((question: any) => this.normalise(question.topic));
+    const requiredTopics = availableTopics.slice(0, questions.length);
+    if (requiredTopics.length > 1 && !requiredTopics.every(topic => generatedTopics.some(value => value.includes(topic) || topic.includes(value)))) {
       throw new BadRequestException('Generated paper does not distribute questions across the selected syllabus topics');
     }
     const stems = new Set<string>();

@@ -83,4 +83,21 @@ describe('AiExaminorService', () => {
       ['define the key terms associated with biology', 'communicate the final recommendation clearly'],
     )).toBe(true);
   });
+
+  it('validates the selected topic plan instead of requiring every syllabus topic', async () => {
+    prisma.subject.findFirst.mockResolvedValue({
+      id: 'subject-1', name: 'Biology', code: '4012',
+      Topic: ['Cell Biology', 'Nutrition', 'Ecology', 'Genetics', 'Reproduction', 'Health'].map((name, index) => ({ id: `topic-${index}`, name, competencies: [{ id: `competency-${index}`, name: `Explain ${name}` }] })),
+      SyllabusEntry: [],
+    });
+    const service = new AiExaminorService(prisma, config);
+    const result = await service.generate({
+      subjectId: 'subject-1',
+      topicPlan: [{ topic: 'Cell Biology', marks: 50 }, { topic: 'Ecology', marks: 50 }],
+    });
+    const topics = result.sections.flatMap((section: any) => section.questions).map((question: any) => question.topic);
+
+    expect(topics.some((topic: string) => topic.includes('Cell Biology'))).toBe(true);
+    expect(topics.some((topic: string) => topic.includes('Ecology'))).toBe(true);
+  });
 });
