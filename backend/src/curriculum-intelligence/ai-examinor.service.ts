@@ -226,7 +226,11 @@ export class AiExaminorService {
   }
 
   private cleanEvidenceText(value: string | null | undefined) {
-    return String(value || '').replace(/\s*(?:(?:[.·…]\s*){3,})\d+\s*$/, '').replace(/\s+/g, ' ').trim();
+    return String(value || '')
+      .replace(/\s*(?:(?:[.·…]\s*){3,})\d+\s*$/, '')
+      .replace(/\s+(?:and|in|of|the|a|an)\s*$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private buildFallback(blueprint: any, curriculum: any) {
@@ -274,6 +278,8 @@ export class AiExaminorService {
     if (!questions.length) return false;
     const stems = questions.map((question: any) => this.normalise(question.stem));
     if (new Set(stems).size !== stems.length) return false;
+    const firstTaskPrompts = questions.map((question: any) => this.normalise(question.tasks?.[0]?.prompt));
+    if (questions.length > 1 && new Set(firstTaskPrompts).size < Math.min(questions.length, 3)) return false;
     return questions.every((question: any, index: number) => {
       const stem = stems[index];
       const tasks = Array.isArray(question.tasks) ? question.tasks : [];
@@ -376,6 +382,10 @@ export class AiExaminorService {
     const requiredTopics = availableTopics.slice(0, questions.length);
     if (requiredTopics.length > 1 && !requiredTopics.every(topic => generatedTopics.some(value => value.includes(topic) || topic.includes(value)))) {
       throw new BadRequestException('Generated paper does not distribute questions across the selected syllabus topics');
+    }
+    const firstTaskPrompts = questions.map((question: any) => this.normalise(question.tasks?.[0]?.prompt));
+    if (questions.length > 1 && new Set(firstTaskPrompts).size < Math.min(questions.length, 3)) {
+      throw new BadRequestException('Generated paper repeats the same assessment demand across questions');
     }
     const stems = new Set<string>();
     for (const question of questions) {

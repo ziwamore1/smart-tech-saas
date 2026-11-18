@@ -307,7 +307,7 @@ export class ExaminationComposer {
     const standard = evidence?.standard || `demonstrate the expected competence in ${subtopic}`;
     const contexts = this.subjectContexts(subjectName, topicName, subtopic);
     const context = contexts[Math.abs(variant) % contexts.length];
-    const tasks = this.subjectTasks(subjectName, topicName, subtopic, competency);
+    const tasks = this.subjectTasks(subjectName, topicName, subtopic, competency, variant);
     return {
       stem: `${context} The evidence is intended to assess whether the learner can ${competency.toLowerCase()} and ${standard.toLowerCase()}.`,
       topic: topicName,
@@ -354,19 +354,60 @@ export class ExaminationComposer {
     ];
   }
 
-  private subjectTasks(subjectName: string, topic: string, subtopic: string, competency: string): ComposedTask[] {
+  private subjectTasks(subjectName: string, topic: string, subtopic: string, competency: string, variant: number): ComposedTask[] {
     const subject = subjectName.toLowerCase();
-    const first = /biology/.test(subject)
-      ? `Identify and describe the structures, process or observation involved in ${subtopic}.`
+    const knowledgePrompts = /biology/.test(subject)
+      ? [
+        `Name one structure, process or observation associated with ${subtopic}.`,
+        `State one function or importance of ${subtopic}.`,
+        `Describe one characteristic of ${subtopic}.`,
+        `State one relationship between ${subtopic} and the organism or environment.`,
+        `Give one example that demonstrates ${subtopic}.`,
+        `State one condition needed for ${subtopic} to occur or function effectively.`,
+      ]
       : /chemistry/.test(subject)
-        ? `State the relevant chemical terms, symbols or equation for ${subtopic}.`
+        ? [
+          `State one chemical term, symbol or equation associated with ${subtopic}.`,
+          `Name one observable property or test used when studying ${subtopic}.`,
+          `Describe one change or reaction associated with ${subtopic}.`,
+          `State one condition that affects ${subtopic}.`,
+          `Give one practical application of ${subtopic}.`,
+          `Distinguish between two relevant substances or processes in ${subtopic}.`,
+        ]
         : /physics/.test(subject)
-          ? `State the physical law or relationship needed for ${subtopic} and define the quantities used.`
-          : `Define the key terms in ${subtopic} and state the relevant ${subjectName} principle.`;
+          ? [
+            `State the physical law or relationship used in ${subtopic}.`,
+            `Define one quantity measured when studying ${subtopic}.`,
+            `State one factor that affects ${subtopic}.`,
+            `Describe one practical application of ${subtopic}.`,
+            `Give the unit used for one quantity in ${subtopic}.`,
+            `State one safety or measurement precaution for ${subtopic}.`,
+          ]
+          : [
+            `Define ${subtopic} using the accepted ${subjectName} terminology.`,
+            `State one feature or function of ${subtopic}.`,
+            `Describe one process or relationship within ${subtopic}.`,
+            `Give one example that illustrates ${subtopic}.`,
+            `State one cause or consequence associated with ${subtopic}.`,
+            `Distinguish between two ideas relevant to ${subtopic}.`,
+          ];
+    const first = knowledgePrompts[Math.abs(variant) % knowledgePrompts.length];
+    const applicationPrompts = [
+      `Apply the evidence provided to ${competency.toLowerCase()} and state the conclusion.`,
+      `Interpret the observations or source provided using ${subtopic}.`,
+      `Use the information provided to explain how ${competency.toLowerCase()}.`,
+      `Analyse the evidence and give one justified finding about ${subtopic}.`,
+    ];
+    const explanationPrompts = [
+      `Explain how the finding relates to ${topic}.`,
+      `Explain the cause, effect or significance of the result in ${subtopic}.`,
+      `Compare the result with the expected outcome for ${subtopic}.`,
+      `Explain why the evidence supports the conclusion about ${topic}.`,
+    ];
     return [
       { label: '', prompt: first, marks: 4, answer: `Award marks for accurate subject knowledge about ${subtopic}.`, criterion: `Accurate knowledge of ${subtopic}.` },
-      { label: '', prompt: `Use the evidence provided to demonstrate how to ${competency.toLowerCase()}. Show all relevant working, observations or source references.`, marks: 8, answer: 'Award method marks for a valid procedure and accuracy marks for the supported result.', criterion: 'Correct application supported by evidence.' },
-      { label: '', prompt: `Explain the result and relate it to the wider idea of ${topic}.`, marks: 5, answer: `Award marks for an accurate explanation linking the evidence to ${topic}.`, criterion: `Explanation linked to ${topic}.` },
+      { label: '', prompt: `${applicationPrompts[Math.abs(variant) % applicationPrompts.length]} Show relevant working, observations or source references.`, marks: 8, answer: 'Award method marks for a valid procedure and accuracy marks for the supported result.', criterion: 'Correct application supported by evidence.' },
+      { label: '', prompt: explanationPrompts[Math.abs(variant) % explanationPrompts.length], marks: 5, answer: `Award marks for an accurate explanation linking the evidence to ${topic}.`, criterion: `Explanation linked to ${topic}.` },
       { label: '', prompt: `State one limitation of the evidence or method and describe one improvement.`, marks: 3, answer: 'Award marks for a relevant limitation and a feasible improvement.', criterion: 'Relevant limitation and improvement.' },
     ];
   }
