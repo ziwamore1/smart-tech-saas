@@ -356,6 +356,7 @@ export class ExaminationComposer {
 
   private subjectTasks(subjectName: string, topic: string, subtopic: string, competency: string, standard: string, variant: number): ComposedTask[] {
     const subject = subjectName.toLowerCase();
+    const expectedAnswers = this.subjectExpectedAnswers(subject, topic, subtopic, competency);
     const knowledgePrompts = /biology/.test(subject)
       ? [
         `Name one structure, process or observation associated with ${subtopic}.`,
@@ -392,10 +393,11 @@ export class ExaminationComposer {
             `Distinguish between two ideas relevant to ${subtopic}.`,
           ];
     const first = knowledgePrompts[Math.abs(variant) % knowledgePrompts.length];
+    const action = competency.replace(/^(apply|analyse|analyze|describe|explain)\s+/i, '');
     const applicationPrompts = [
-      `Apply the evidence provided to ${competency.toLowerCase()} and state the conclusion.`,
+      `Use the evidence provided to demonstrate ${action} and state the conclusion.`,
       `Interpret the observations or source provided using ${subtopic}.`,
-      `Use the information provided to explain how ${competency.toLowerCase()}.`,
+      `Use the information provided to demonstrate ${action}.`,
       `Analyse the evidence and give one justified finding about ${subtopic}.`,
     ];
     const explanationPrompts = [
@@ -404,11 +406,90 @@ export class ExaminationComposer {
       `Compare the result with the expected outcome for ${subtopic}.`,
       `Explain why the evidence supports the conclusion about ${topic}.`,
     ];
+    const expected = (index: number) => expectedAnswers[Math.abs(index) % expectedAnswers.length];
     return [
-      { label: '', prompt: first, marks: 4, answer: `Expected answer: ${competency}.`, criterion: `The response must identify or state an accurate fact about ${subtopic}; syllabus standard: ${standard}.` },
-      { label: '', prompt: `${applicationPrompts[Math.abs(variant) % applicationPrompts.length]} Show relevant working, observations or source references.`, marks: 8, answer: `Expected answer: Apply ${competency.toLowerCase()} to the supplied evidence and state a conclusion supported by the observations or sources.`, criterion: 'Correct application supported by the supplied evidence.' },
-      { label: '', prompt: explanationPrompts[Math.abs(variant) % explanationPrompts.length], marks: 5, answer: `Expected answer: ${standard}. The explanation must connect the finding to ${topic}.`, criterion: `Explanation linked to ${topic} and supported by the evidence.` },
+      { label: '', prompt: first, marks: 4, answer: `Expected answer: ${expected(variant)}.`, criterion: `The response must identify or state an accurate fact about ${subtopic}; syllabus standard: ${standard}.` },
+      { label: '', prompt: `${applicationPrompts[Math.abs(variant) % applicationPrompts.length]} Show relevant working, observations or source references.`, marks: 8, answer: `Expected answer: Use the evidence to ${action.toLowerCase()}; an acceptable conclusion is: ${expected(variant + 1)}.`, criterion: 'Correct application supported by the supplied evidence.' },
+      { label: '', prompt: explanationPrompts[Math.abs(variant) % explanationPrompts.length], marks: 5, answer: `Expected answer: ${expected(variant + 2)} Explain how this finding is supported by the evidence and relates to ${topic}.`, criterion: `Explanation linked to ${topic} and supported by the evidence.` },
       { label: '', prompt: `State one limitation of the evidence or method and describe one improvement.`, marks: 3, answer: 'Expected answer: Identify one specific limitation in the evidence or method and give a feasible improvement that would reduce its effect.', criterion: 'Relevant limitation with a feasible improvement.' },
+    ];
+  }
+
+  private subjectExpectedAnswers(subject: string, topic: string, subtopic: string, competency: string) {
+    const text = `${topic} ${subtopic}`.toLowerCase();
+    if (/biology/.test(subject)) {
+      if (/concept|method|practical|investigat/.test(text)) return [
+        'A microscope is used to observe specimens that cannot be seen clearly with the unaided eye',
+        'A control variable is kept constant so that the effect of the independent variable can be measured fairly',
+        'An observation is a record made directly using the senses or measuring instruments',
+        'A hypothesis is a testable prediction about the relationship between variables',
+        'A labelled biological drawing uses clear single lines and labels the relevant structures',
+        'Repeating measurements improves reliability by reducing the effect of random error',
+      ];
+      if (/cell|cellular|speciali/.test(text)) return [
+        'The cell membrane controls the movement of substances into and out of the cell',
+        'The nucleus contains genetic material and controls the activities of the cell',
+        'A red blood cell is specialised for oxygen transport by its biconcave shape and haemoglobin',
+        'A root-hair cell is specialised for absorption by having a long extension and a large surface area',
+        'Osmosis is the movement of water through a selectively permeable membrane from higher to lower water potential',
+        'Cells become specialised when different genes are expressed to produce structures suited to particular functions',
+      ];
+      if (/reproduc/.test(text)) return [
+        'Fertilisation is the fusion of the male and female gamete nuclei to form a zygote',
+        'Pollination is the transfer of pollen from anther to stigma',
+        'Asexual reproduction produces genetically identical offspring from one parent',
+        'Sexual reproduction produces variation because genetic material from two parents is combined',
+        'A seed requires water, oxygen and a suitable temperature for germination',
+        'Reproduction maintains the continuity of a species by producing new individuals',
+      ];
+      if (/coord|response|nerv|hormon/.test(text)) return [
+        'A receptor detects a stimulus and sends information to a coordinating centre',
+        'A reflex action is a rapid automatic response that protects the body from harm',
+        'A stimulus is a change in the internal or external environment detected by a receptor',
+        'A sensory neurone carries impulses from a receptor to the central nervous system',
+        'Hormones are chemical messengers transported in the blood to target organs',
+        'Coordination enables an organism to detect changes and produce an appropriate response',
+      ];
+      if (/ecolog|evolution|relationship|environment/.test(text)) return [
+        'Competition occurs when organisms require the same limited resource',
+        'Predation is an interaction in which one organism kills and eats another',
+        'An adaptation is an inherited feature that improves survival and reproduction in an environment',
+        'Natural selection increases the frequency of advantageous inherited characteristics over generations',
+        'Mutualism is a relationship in which both participating organisms benefit',
+        'Food chains show the transfer of energy from producers to consumers',
+      ];
+      if (/maint|nutrition|transport|excret|respir|homeostas/.test(text)) return [
+        'Homeostasis is the maintenance of a stable internal environment despite external change',
+        'Respiration releases energy from glucose for use in cellular activities',
+        'Excretion removes toxic metabolic waste products from the body',
+        'A balanced diet supplies carbohydrates, proteins, fats, vitamins, minerals, fibre and water',
+        'The circulatory system transports oxygen, nutrients and waste products around the body',
+        'Plants require water, mineral ions, carbon dioxide and light for healthy growth',
+      ];
+    }
+    if (/chemistry/.test(subject)) return [
+      'An acid has a pH below 7 and produces hydrogen ions in aqueous solution',
+      'A base neutralises an acid to form a salt and water',
+      'A chemical equation shows the reactants, products and relative amounts in a reaction',
+      'The rate of a reaction increases when temperature or concentration is increased',
+      'Electrolysis uses electrical energy to decompose an ionic compound',
+      'A catalyst increases reaction rate without being consumed',
+    ];
+    if (/physics/.test(subject)) return [
+      'Speed is distance travelled divided by time taken, measured in metres per second',
+      'The resultant force equals mass multiplied by acceleration, F = ma',
+      'Work is done when a force moves an object through a distance in the direction of the force',
+      'Current is the rate of flow of electric charge, measured in amperes',
+      'Energy cannot be created or destroyed, but it can be transferred between forms',
+      'Wave frequency is the number of complete waves passing a point each second',
+    ];
+    return [
+      `${competency} is demonstrated by correctly identifying and explaining ${subtopic}`,
+      `${subtopic} is important because it provides evidence for the stated ${subject} conclusion`,
+      `A correct example of ${subtopic} must include the relevant terms and relationship shown in the syllabus`,
+      `The evidence should be interpreted by linking ${subtopic} to its stated cause, process or consequence`,
+      `A valid response about ${subtopic} must use the accepted ${subject} terminology`,
+      `The expected conclusion about ${subtopic} is the one supported by the supplied evidence and syllabus standard`,
     ];
   }
 
