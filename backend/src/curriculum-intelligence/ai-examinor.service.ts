@@ -46,7 +46,7 @@ The marking key must show the expected answer and mark allocation for every task
 When a task asks the candidate to draw, plot, sketch or construct a graph, diagram or scale drawing, the marking key for that task must include a machine-renderable "diagram" object, not a verbal description. Use one of these types: VENN_3_SET, CARTESIAN_GRAPH, SPEED_TIME_GRAPH, DISTANCE_TIME_GRAPH, HISTOGRAM, TRIANGLE_CONSTRUCTION, or SVG for a subject-specific labelled illustration. SVG must contain only static, self-contained drawing elements; never include scripts, event handlers, external resources or executable URLs.
 Diagram fields: VENN_3_SET {labels:[3 labels], regionValues:{onlyA,onlyB,onlyC,onlyAB,onlyAC,onlyBC,abc,outside}}; CARTESIAN_GRAPH/SPEED_TIME_GRAPH/DISTANCE_TIME_GRAPH {xMin,xMax,yMin,yMax,xLabel,yLabel,lines:[{from:{x,y},to:{x,y},label,dashed}],segments:[{points:[{x,y}],label}],shadedRegion:[{x,y}],points:[{x,y,label,highlight}]}; HISTOGRAM {classes:[{label,frequency}],frequencyPolygon:true}; TRIANGLE_CONSTRUCTION {sideAB,sideAC,angleA,units,scaleLabel,showCircumcircle,showHeight,showConstructionArcs}; SVG {svg,title,caption}.
 Return JSON only with: {"sections":[{"code":"","title":"","instructions":"","questions":[{"number":1,"type":"STRUCTURED","stem":"","marks":0,"difficulty":"MEDIUM","bloomLevel":"APPLY","topic":"","competency":"","tasks":[{"label":"(a)","prompt":"","marks":0}],"traceability":[{"source":"","evidence":""}],"markingKey":[{"task":"(a)","answer":"","markAllocation":[{"marks":1,"criterion":""}],"acceptableAlternatives":[],"diagram":{}}]}]}],"metadata":{"assumptions":[],"qualityChecks":[]}}
-Do not include answers in the candidate stem. Cover the supplied topic plan and cognitive distribution instead of reusing one topic or one command verb for the whole paper.`;
+Do not include answers in the candidate stem. Every marking-key answer must state the expected answer explicitly for its task; never write only instructions such as "Award marks for...". If a task requires a diagram, include a complete machine-renderable diagram specification with every expected label, axis, legend, class or construction annotation. Cover the supplied topic plan and cognitive distribution instead of reusing one topic or one command verb for the whole paper.`;
 
 @Injectable()
 export class AiExaminorService {
@@ -328,7 +328,12 @@ export class AiExaminorService {
   private markingKeyCoversTasks(question: any, tasks: any[]) {
     const keys = Array.isArray(question.markingKey) ? question.markingKey : [];
     if (!keys.length) return false;
-    return tasks.every((task: any) => keys.some((key: any) => this.normalise(key.task) === this.normalise(task.label)));
+    return tasks.every((task: any) => keys.some((key: any) => this.normalise(key.task) === this.normalise(task.label) && this.hasExplicitAnswer(key.answer)));
+  }
+
+  private hasExplicitAnswer(answer: any) {
+    const value = this.normalise(answer);
+    return value.length >= 3 && !/^award marks?\b/.test(value) && !/^mark(s)? should be awarded\b/.test(value);
   }
 
   private diagramsCoverTasks(question: any, tasks: any[]) {
@@ -349,8 +354,13 @@ export class AiExaminorService {
 
   private hasRenderableDiagram(key: any) {
     if (!key?.diagram || typeof key.diagram !== 'object') return false;
+    const diagram = key.diagram;
+    if (diagram.type === 'VENN_3_SET' && (!Array.isArray(diagram.labels) || diagram.labels.length !== 3)) return false;
+    if (['CARTESIAN_GRAPH', 'SPEED_TIME_GRAPH', 'DISTANCE_TIME_GRAPH'].includes(diagram.type) && (!diagram.xLabel || !diagram.yLabel)) return false;
+    if (diagram.type === 'HISTOGRAM' && (!Array.isArray(diagram.classes) || diagram.classes.some((item: any) => !item.label))) return false;
+    if (diagram.type === 'TRIANGLE_CONSTRUCTION' && (!diagram.units || !diagram.scaleLabel)) return false;
     try {
-      const svg = renderDiagramSvg(key.diagram);
+      const svg = renderDiagramSvg(diagram);
       return Boolean(svg && svg.includes('<svg'));
     } catch {
       return false;

@@ -272,10 +272,10 @@ export class ExaminationComposer {
       difficulty: offset % 3 === 0 ? 'EASY' : offset % 3 === 1 ? 'MEDIUM' : 'HARD',
       bloomLevel: offset % 3 === 0 ? 'APPLY' : offset % 3 === 1 ? 'ANALYSE' : 'EVALUATE',
       tasks: [
-        { label: '', prompt: `State the formula or principle for ${plannedTopic} that is needed in this situation.`, marks: 4, answer: `Award marks for the correct formula or principle and correctly identified variables for ${plannedTopic}.`, criterion: 'Correct formula or principle and defined variables.' },
-        { label: '', prompt: `Apply ${plannedTopic} to the information given and show each step of your working.`, marks: 7, answer: 'Award method marks for correct substitution and procedure, and accuracy marks for the final result.', criterion: 'Correct method, substitution and accuracy.' },
-        { label: '', prompt: `Interpret your result and explain what it means for the decision described in the scenario.`, marks: 5, answer: 'Award marks for a valid interpretation linked to the scenario and the calculated result.', criterion: 'Valid interpretation linked to the context.' },
-        { label: '', prompt: `State one assumption or limitation of your calculation and explain how it could affect the recommendation.`, marks: 4, answer: 'Award marks for a relevant assumption or limitation and a valid explanation of its effect.', criterion: 'Relevant limitation with valid effect.' },
+        { label: '', prompt: `State the formula or principle for ${plannedTopic} that is needed in this situation.`, marks: 4, answer: `Expected answer: State the correct formula or principle for ${plannedTopic} and define each variable used.`, criterion: 'Correct formula or principle and defined variables.' },
+        { label: '', prompt: `Apply ${plannedTopic} to the information given and show each step of your working.`, marks: 7, answer: 'Expected answer: Substitute the supplied values into the correct method, show the procedure and give the accurate final result with units.', criterion: 'Correct method, substitution and accuracy.' },
+        { label: '', prompt: `Interpret your result and explain what it means for the decision described in the scenario.`, marks: 5, answer: 'Expected answer: Interpret the calculated result in the context of the scenario and state the resulting decision.', criterion: 'Valid interpretation linked to the context.' },
+        { label: '', prompt: `State one assumption or limitation of your calculation and explain how it could affect the recommendation.`, marks: 4, answer: 'Expected answer: State one relevant assumption or limitation and explain its effect on the recommendation.', criterion: 'Relevant limitation with valid effect.' },
       ],
     };
   }
@@ -307,7 +307,7 @@ export class ExaminationComposer {
     const standard = evidence?.standard || `demonstrate the expected competence in ${subtopic}`;
     const contexts = this.subjectContexts(subjectName, topicName, subtopic);
     const context = contexts[Math.abs(variant) % contexts.length];
-    const tasks = this.subjectTasks(subjectName, topicName, subtopic, competency, variant);
+    const tasks = this.subjectTasks(subjectName, topicName, subtopic, competency, standard, variant);
     return {
       stem: `${context} The evidence is intended to assess whether the learner can ${competency.toLowerCase()} and ${standard.toLowerCase()}.`,
       topic: topicName,
@@ -354,7 +354,7 @@ export class ExaminationComposer {
     ];
   }
 
-  private subjectTasks(subjectName: string, topic: string, subtopic: string, competency: string, variant: number): ComposedTask[] {
+  private subjectTasks(subjectName: string, topic: string, subtopic: string, competency: string, standard: string, variant: number): ComposedTask[] {
     const subject = subjectName.toLowerCase();
     const knowledgePrompts = /biology/.test(subject)
       ? [
@@ -405,10 +405,10 @@ export class ExaminationComposer {
       `Explain why the evidence supports the conclusion about ${topic}.`,
     ];
     return [
-      { label: '', prompt: first, marks: 4, answer: `Award marks for accurate subject knowledge about ${subtopic}.`, criterion: `Accurate knowledge of ${subtopic}.` },
-      { label: '', prompt: `${applicationPrompts[Math.abs(variant) % applicationPrompts.length]} Show relevant working, observations or source references.`, marks: 8, answer: 'Award method marks for a valid procedure and accuracy marks for the supported result.', criterion: 'Correct application supported by evidence.' },
-      { label: '', prompt: explanationPrompts[Math.abs(variant) % explanationPrompts.length], marks: 5, answer: `Award marks for an accurate explanation linking the evidence to ${topic}.`, criterion: `Explanation linked to ${topic}.` },
-      { label: '', prompt: `State one limitation of the evidence or method and describe one improvement.`, marks: 3, answer: 'Award marks for a relevant limitation and a feasible improvement.', criterion: 'Relevant limitation and improvement.' },
+      { label: '', prompt: first, marks: 4, answer: `Expected answer: ${competency}.`, criterion: `The response must identify or state an accurate fact about ${subtopic}; syllabus standard: ${standard}.` },
+      { label: '', prompt: `${applicationPrompts[Math.abs(variant) % applicationPrompts.length]} Show relevant working, observations or source references.`, marks: 8, answer: `Expected answer: Apply ${competency.toLowerCase()} to the supplied evidence and state a conclusion supported by the observations or sources.`, criterion: 'Correct application supported by the supplied evidence.' },
+      { label: '', prompt: explanationPrompts[Math.abs(variant) % explanationPrompts.length], marks: 5, answer: `Expected answer: ${standard}. The explanation must connect the finding to ${topic}.`, criterion: `Explanation linked to ${topic} and supported by the evidence.` },
+      { label: '', prompt: `State one limitation of the evidence or method and describe one improvement.`, marks: 3, answer: 'Expected answer: Identify one specific limitation in the evidence or method and give a feasible improvement that would reduce its effect.', criterion: 'Relevant limitation with a feasible improvement.' },
     ];
   }
 
