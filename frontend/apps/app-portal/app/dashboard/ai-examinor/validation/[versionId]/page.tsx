@@ -220,12 +220,13 @@ export default function ValidationCentrePage() {
   );
   const quality = latestRun?.summary?.quality;
   const candidateInstructions = [
-    sections.some((section: any) => section.answerRule === "ALL")
-      ? "Answer all items in Section A."
-      : "",
-    sections.some((section: any) => section.answerRule === "ONE")
-      ? "Answer one item in Section B."
-      : "",
+    ...sections.map((section: any) => {
+      const sectionName = section.title || `Section ${section.code}`;
+      if (section.answerRule === "ONE") return `Answer one item in ${sectionName}.`;
+      if (section.answerRule === "ANY") return `Answer the required number of items in ${sectionName}.`;
+      if (section.answerRule === "ALL") return `Answer all items in ${sectionName}.`;
+      return "";
+    }),
     "Write all answers in the spaces provided. The number of marks is given in brackets at the end of each task.",
   ]
     .filter(Boolean)

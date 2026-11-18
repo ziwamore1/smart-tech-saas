@@ -184,12 +184,23 @@ export class ExaminationComposer {
   private applyPlannedTopic(template: QuestionTemplate, plannedTopic: string): QuestionTemplate {
     const actual = this.normaliseText(template.topic);
     const planned = this.normaliseText(plannedTopic);
-    if (!planned || actual.includes(planned) || planned.includes(actual)) return template;
+    if (!planned || actual.includes(planned) || planned.includes(actual) || this.isAbbreviatedLabel(plannedTopic, template.topic) || this.isAbbreviatedLabel(template.topic, plannedTopic)) return template;
     return { ...template, topic: `${plannedTopic} — ${template.topic}` };
   }
 
   private normaliseText(value: string) {
     return value.trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  private isAbbreviatedLabel(value: string, fullLabel: string) {
+    const labelTokens = this.normaliseText(value).split(' ').filter(Boolean).map(token => token.replace(/ies$/, 'y').replace(/s$/, ''));
+    const fullTokens = this.normaliseText(fullLabel).split(' ').filter(Boolean).map(token => token.replace(/ies$/, 'y').replace(/s$/, ''));
+    return value !== fullLabel && labelTokens.length > 0 && labelTokens.length <= fullTokens.length && labelTokens.every((token, index) => token === fullTokens[index]);
+  }
+
+  private sentence(value: string) {
+    const trimmed = String(value || '').trim().replace(/\s+/g, ' ');
+    return /\.$/.test(trimmed) ? trimmed : `${trimmed}.`;
   }
 
   private composeQuestion(template: QuestionTemplate, number: number, marks: number, curriculum: ComposerCurriculum): ComposedQuestion {
@@ -287,22 +298,24 @@ export class ExaminationComposer {
       ? topics.find(item => this.normaliseText(item.name) === normalizedPlanned)
         || topics.find(item => {
           const name = this.normaliseText(item.name);
-          return name.includes(normalizedPlanned) || normalizedPlanned.includes(name);
+          return name.includes(normalizedPlanned) || normalizedPlanned.includes(name) || this.isAbbreviatedLabel(plannedTopic || '', item.name);
         })
       : topics[offset % topics.length];
     const syllabus = normalizedPlanned
       ? curriculum.syllabusEntries.find(entry => {
         const entryTopic = this.normaliseText(String(entry.topic || ''));
-        return entryTopic && (entryTopic.includes(normalizedPlanned) || normalizedPlanned.includes(entryTopic));
+        return entryTopic && (entryTopic.includes(normalizedPlanned) || normalizedPlanned.includes(entryTopic) || this.isAbbreviatedLabel(plannedTopic || '', entry.topic || '') || this.isAbbreviatedLabel(entry.topic || '', plannedTopic || ''));
       }) || curriculum.syllabusEntries[offset % Math.max(1, curriculum.syllabusEntries.length)]
       : curriculum.syllabusEntries[offset % Math.max(1, curriculum.syllabusEntries.length)];
     const subjectName = curriculum.subject?.name || 'the subject';
-    const topicName = plannedTopic || topic?.name || syllabus?.topic || 'the selected curriculum topic';
+    const canonicalTopic = topic?.name || plannedTopic || syllabus?.topic || 'the selected curriculum topic';
+    const topicName = plannedTopic && this.isAbbreviatedLabel(plannedTopic, canonicalTopic) ? canonicalTopic : plannedTopic || canonicalTopic;
     const matchingEvidence = curriculum.syllabusEntries
-      .filter(entry => this.normaliseText(entry.topic || '') === this.normaliseText(topicName) || this.normaliseText(entry.topic || '').includes(this.normaliseText(topicName)))
+      .filter(entry => this.normaliseText(entry.topic || '') === this.normaliseText(topicName) || this.normaliseText(entry.topic || '').includes(this.normaliseText(topicName)) || this.isAbbreviatedLabel(entry.topic || '', topicName))
       .filter(entry => entry.subtopic || entry.competency || entry.standard);
     const evidence = matchingEvidence[Math.abs(variant) % Math.max(1, matchingEvidence.length)];
-    const subtopic = evidence?.subtopic || topicName;
+    const rawSubtopic = evidence?.subtopic || topicName;
+    const subtopic = this.isAbbreviatedLabel(rawSubtopic, topicName) ? topicName : rawSubtopic;
     const competency = topic?.competencies?.[variant % Math.max(1, topic?.competencies?.length || 1)]?.name || evidence?.competency || `Apply knowledge of ${subtopic}`;
     const standard = evidence?.standard || `demonstrate the expected competence in ${subtopic}`;
     const contexts = this.subjectContexts(subjectName, topicName, subtopic);
@@ -393,11 +406,10 @@ export class ExaminationComposer {
             `Distinguish between two ideas relevant to ${subtopic}.`,
           ];
     const first = knowledgePrompts[Math.abs(variant) % knowledgePrompts.length];
-    const action = competency.replace(/^(apply|analyse|analyze|describe|explain)\s+/i, '');
     const applicationPrompts = [
-      `Use the evidence provided to demonstrate ${action} and state the conclusion.`,
+      `Use the evidence provided to test the stated claim about ${subtopic} and state a conclusion.`,
       `Interpret the observations or source provided using ${subtopic}.`,
-      `Use the information provided to demonstrate ${action}.`,
+      `Use the information provided to draw a justified conclusion about ${subtopic}.`,
       `Analyse the evidence and give one justified finding about ${subtopic}.`,
     ];
     const explanationPrompts = [
@@ -406,11 +418,11 @@ export class ExaminationComposer {
       `Compare the result with the expected outcome for ${subtopic}.`,
       `Explain why the evidence supports the conclusion about ${topic}.`,
     ];
-    const expected = (index: number) => expectedAnswers[Math.abs(index) % expectedAnswers.length];
+    const expected = (index: number) => this.sentence(expectedAnswers[Math.abs(index) % expectedAnswers.length]);
     return [
-      { label: '', prompt: first, marks: 4, answer: `Expected answer: ${expected(variant)}.`, criterion: `The response must identify or state an accurate fact about ${subtopic}; syllabus standard: ${standard}.` },
-      { label: '', prompt: `${applicationPrompts[Math.abs(variant) % applicationPrompts.length]} Show relevant working, observations or source references.`, marks: 8, answer: `Expected answer: Use the evidence to ${action.toLowerCase()}; an acceptable conclusion is: ${expected(variant + 1)}.`, criterion: 'Correct application supported by the supplied evidence.' },
-      { label: '', prompt: explanationPrompts[Math.abs(variant) % explanationPrompts.length], marks: 5, answer: `Expected answer: ${expected(variant + 2)} Explain how this finding is supported by the evidence and relates to ${topic}.`, criterion: `Explanation linked to ${topic} and supported by the evidence.` },
+      { label: '', prompt: first, marks: 4, answer: `Expected answer: ${expected(variant)}`, criterion: `The response must answer the task using accepted ${subjectName} terminology; syllabus standard: ${standard}.` },
+      { label: '', prompt: `${applicationPrompts[Math.abs(variant) % applicationPrompts.length]} Show relevant working, observations or source references.`, marks: 8, answer: `Expected answer: ${expected(variant + 1)} Support this conclusion with the supplied evidence and link it to ${subtopic}.`, criterion: 'Correct application supported by the supplied evidence.' },
+      { label: '', prompt: explanationPrompts[Math.abs(variant) % explanationPrompts.length], marks: 5, answer: `Expected answer: ${expected(variant + 2)} Explain how this finding is supported by ${topic} and the supplied evidence.`, criterion: `Explanation linked to ${topic} and supported by the evidence.` },
       { label: '', prompt: `State one limitation of the evidence or method and describe one improvement.`, marks: 3, answer: 'Expected answer: Identify one specific limitation in the evidence or method and give a feasible improvement that would reduce its effect.', criterion: 'Relevant limitation with a feasible improvement.' },
     ];
   }
@@ -424,7 +436,7 @@ export class ExaminationComposer {
         'An observation is a record made directly using the senses or measuring instruments',
         'A hypothesis is a testable prediction about the relationship between variables',
         'A labelled biological drawing uses clear single lines and labels the relevant structures',
-        'Repeating measurements improves reliability by reducing the effect of random error',
+        'A fair test changes one independent variable while keeping all other variables constant',
       ];
       if (/cell|cellular|speciali/.test(text)) return [
         'The cell membrane controls the movement of substances into and out of the cell',
@@ -436,34 +448,34 @@ export class ExaminationComposer {
       ];
       if (/reproduc/.test(text)) return [
         'Fertilisation is the fusion of the male and female gamete nuclei to form a zygote',
-        'Pollination is the transfer of pollen from anther to stigma',
-        'Asexual reproduction produces genetically identical offspring from one parent',
-        'Sexual reproduction produces variation because genetic material from two parents is combined',
-        'A seed requires water, oxygen and a suitable temperature for germination',
         'Reproduction maintains the continuity of a species by producing new individuals',
+        'Sexual reproduction produces variation because genetic material from two parents is combined',
+        'Pollination transfers pollen from anther to stigma, enabling fertilisation in flowering plants',
+        'Asexual reproduction produces genetically identical offspring from one parent',
+        'A seed requires water, oxygen and a suitable temperature for germination',
       ];
       if (/coord|response|nerv|hormon/.test(text)) return [
         'A receptor detects a stimulus and sends information to a coordinating centre',
+        'Coordination enables an organism to detect changes and produce an appropriate response',
         'A reflex action is a rapid automatic response that protects the body from harm',
-        'A stimulus is a change in the internal or external environment detected by a receptor',
         'A sensory neurone carries impulses from a receptor to the central nervous system',
         'Hormones are chemical messengers transported in the blood to target organs',
-        'Coordination enables an organism to detect changes and produce an appropriate response',
+        'A reflex arc requires a receptor, sensory neurone, coordinator, motor neurone and effector',
       ];
       if (/ecolog|evolution|relationship|environment/.test(text)) return [
         'Competition occurs when organisms require the same limited resource',
-        'Predation is an interaction in which one organism kills and eats another',
-        'An adaptation is an inherited feature that improves survival and reproduction in an environment',
-        'Natural selection increases the frequency of advantageous inherited characteristics over generations',
-        'Mutualism is a relationship in which both participating organisms benefit',
         'Food chains show the transfer of energy from producers to consumers',
+        'An adaptation is an inherited feature that improves survival and reproduction in an environment',
+        'Predation is an interaction in which one organism kills and eats another',
+        'Mutualism is a relationship in which both participating organisms benefit',
+        'Natural selection requires heritable variation, differential survival and reproduction over generations',
       ];
       if (/maint|nutrition|transport|excret|respir|homeostas/.test(text)) return [
         'Homeostasis is the maintenance of a stable internal environment despite external change',
         'Respiration releases energy from glucose for use in cellular activities',
         'Excretion removes toxic metabolic waste products from the body',
-        'A balanced diet supplies carbohydrates, proteins, fats, vitamins, minerals, fibre and water',
         'The circulatory system transports oxygen, nutrients and waste products around the body',
+        'A balanced diet supplies carbohydrates, proteins, fats, vitamins, minerals, fibre and water',
         'Plants require water, mineral ions, carbon dioxide and light for healthy growth',
       ];
     }

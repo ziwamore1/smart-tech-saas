@@ -333,7 +333,11 @@ export class AiExaminorService {
 
   private hasExplicitAnswer(answer: any) {
     const value = this.normalise(answer);
-    return value.length >= 3 && !/^award marks?\b/.test(value) && !/^mark(s)? should be awarded\b/.test(value);
+    if (value.length < 3) return false;
+    if (/^award marks?\b/.test(value) || /^mark(s)? should be awarded\b/.test(value)) return false;
+    if (/^expected answer:\s*apply (knowledge|understanding) of\b/.test(value)) return false;
+    if (/use the evidence to (knowledge|understanding)\b/.test(value)) return false;
+    return true;
   }
 
   private diagramsCoverTasks(question: any, tasks: any[]) {

@@ -107,4 +107,38 @@ describe('ExaminationComposer', () => {
     expect(new Set(questions.map((question: any) => question.stem)).size).toBe(6);
     expect(new Set(questions.map((question: any) => question.topic)).size).toBe(6);
   });
+
+  it('uses full curriculum topic labels and grammatical marking keys for abbreviated biology plans', () => {
+    const biologyCurriculum = {
+      subject: { id: 'biology', name: 'Biology', code: '4021' },
+      topics: [
+        { id: 'topic-1', name: 'Concepts and Methods in Biology', competencies: [{ id: 'competency-1', name: 'Apply knowledge of concepts and methods in biology' }] },
+        { id: 'topic-2', name: 'Principles of Cellular Life', competencies: [{ id: 'competency-2', name: 'Apply knowledge of principles of cellular life' }] },
+      ],
+      eocs: [],
+      syllabusEntries: [
+        { code: 'B1', topic: 'Concepts and Method in Biology', subtopic: 'Concepts and Methods in Biology', competency: 'Apply knowledge of concepts and methods in biology', standard: 'demonstrate the expected competence in concepts and methods in biology', sourcePage: 1 },
+        { code: 'B2', topic: 'Principles of Cellular', subtopic: 'Principles of Cellular', competency: 'Apply knowledge of principles of cellular life', standard: 'demonstrate the expected competence in principles of cellular life', sourcePage: 2 },
+      ],
+    };
+    const result = new ExaminationComposer().compose({
+      ...blueprint,
+      sections: [{ code: 'A', title: 'Section A', totalMarks: 100, itemCount: 4, answerRule: 'ALL' as const }],
+      topicPlan: [
+        { topic: 'Concepts and Method in Biology', marks: 50 },
+        { topic: 'Principles of Cellular', marks: 50 },
+      ],
+    }, biologyCurriculum);
+    const questions = result.sections[0].questions;
+    const paperText = questions.map((question: any) => `${question.topic} ${question.stem}`).join(' ');
+    const answers = questions.flatMap((question: any) => question.markingKey.map((key: any) => key.answer)).join('\n');
+
+    expect(paperText).toContain('Concepts and Methods in Biology');
+    expect(paperText).toContain('Principles of Cellular Life');
+    expect(paperText).not.toMatch(/Concepts and Method(?!s)/);
+    expect(paperText).not.toMatch(/Principles of Cellular(?! Life)/);
+    expect(answers).not.toContain('Use the evidence to knowledge');
+    expect(answers).not.toContain('benefit Explain');
+    expect(answers).toContain('Expected answer: A microscope is used');
+  });
 });
