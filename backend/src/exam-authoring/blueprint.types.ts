@@ -1,5 +1,5 @@
 export type BlueprintAnswerRule = 'ALL' | 'ONE' | 'ANY';
-export type BlueprintResponseType = 'STRUCTURED' | 'ESSAY' | 'OBJECTIVE' | 'PRACTICAL' | 'DRAWING';
+export type BlueprintResponseType = 'STRUCTURED' | 'ESSAY' | 'OBJECTIVE' | 'MULTIPLE_CHOICE' | 'PRACTICAL' | 'DRAWING';
 export type BlueprintTaskPattern = 'SINGLE_TASK' | 'MULTI_TASK';
 export type BlueprintMarkingMethod = 'ANALYTIC' | 'HOLISTIC' | 'OBJECTIVE_KEY';
 
@@ -51,7 +51,9 @@ export function normalizeBlueprintStructure(input: any): BlueprintStructure {
     taskPattern: section.taskPattern || 'MULTI_TASK',
     markingMethod: section.markingMethod || 'ANALYTIC',
     candidateAnswerSpace: section.candidateAnswerSpace || 'LINED',
-    questionTypes: Array.isArray(section.questionTypes) ? section.questionTypes : undefined,
+    questionTypes: Array.isArray(section.questionTypes)
+      ? section.questionTypes
+      : section.responseType === 'MULTIPLE_CHOICE' ? ['MULTIPLE_CHOICE'] : undefined,
   }));
 
   return {

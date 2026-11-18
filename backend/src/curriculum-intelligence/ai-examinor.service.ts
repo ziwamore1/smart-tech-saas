@@ -131,6 +131,7 @@ export class AiExaminorService {
       const topics = selected.length ? selected : curriculum.topics;
       if (topics.length) blueprint.topicPlan = topics.map(topic => ({ topic: topic.name, marks: blueprint.totalMarks / topics.length }));
     }
+    blueprint.topicPlan = this.assignTopicQuestionCounts(blueprint.topicPlan, blueprint.sections);
     let artifact = this.buildFallback(blueprint, curriculum);
 
     if (this.openai) {
@@ -232,6 +233,31 @@ export class AiExaminorService {
     return this.composer.compose(blueprint, curriculum);
   }
 
+  private assignTopicQuestionCounts(topicPlan: Array<{ topic: string; marks: number; questionCount?: number }>, sections: any[]) {
+    const plan = topicPlan.filter(item => String(item.topic || '').trim() && Number(item.marks) > 0);
+    if (!plan.length) return [];
+    const slots = sections.reduce((sum, section) => sum + Number(section.itemCount || 0), 0);
+    const counts = plan.map(() => 0);
+    if (slots >= plan.length) plan.forEach((_, index) => { counts[index] = 1; });
+
+    const remaining = slots - counts.reduce((sum, count) => sum + count, 0);
+    const totalMarks = plan.reduce((sum, item) => sum + Number(item.marks), 0);
+    for (let index = 0; index < Math.max(0, remaining); index += 1) {
+      const target = plan.reduce((best, item, itemIndex) => {
+        const desired = (slots * Number(item.marks)) / totalMarks;
+        const score = desired - counts[itemIndex];
+        return score > best.score ? { itemIndex, score } : best;
+      }, { itemIndex: 0, score: Number.NEGATIVE_INFINITY });
+      counts[target.itemIndex] += 1;
+    }
+
+    if (slots < plan.length) {
+      counts.fill(0);
+      for (let index = 0; index < slots; index += 1) counts[Math.floor((index * plan.length) / slots)] = 1;
+    }
+    return plan.map((item, index) => ({ ...item, questionCount: counts[index] }));
+  }
+
   private matchesBlueprintShape(artifact: any, blueprint: any) {
     if (!artifact || !Array.isArray(artifact.sections) || artifact.sections.length !== blueprint.sections.length) return false;
     return artifact.sections.every((section: any, index: number) => {
@@ -288,7 +314,7 @@ export class AiExaminorService {
   private hasTopicCoverage(artifact: any, curriculum: any, blueprint: any) {
     const questions = artifact.sections.flatMap((section: any) => section.questions || []);
     const generated = questions.map((question: any) => this.normalise(question.topic));
-    const selected = (blueprint.topicPlan?.length ? blueprint.topicPlan : curriculum.topics || []).map((topic: any) => this.normalise(topic.topic || topic.name || topic));
+    const selected = (blueprint.topicPlan?.length ? blueprint.topicPlan.filter((topic: any) => topic.questionCount !== 0) : curriculum.topics || []).map((topic: any) => this.normalise(topic.topic || topic.name || topic));
     if (selected.length <= 1) return true;
     return selected.slice(0, questions.length).every(topic => generated.some(value => value.includes(topic) || topic.includes(value)));
   }
@@ -342,7 +368,7 @@ export class AiExaminorService {
       if (expected.answerRule === 'ONE' ? section.questions.some((question: any) => Number(question.marks || 0) !== expected.totalMarks) : sectionMarks !== expected.totalMarks) throw new BadRequestException(`Section ${expected.code} marks do not match its blueprint`);
       return section.questions;
     });
-    const plannedTopics = (blueprint.topicPlan || []).map((item: any) => this.normalise(item.topic)).filter(Boolean);
+    const plannedTopics = (blueprint.topicPlan || []).filter((item: any) => item.questionCount !== 0).map((item: any) => this.normalise(item.topic)).filter(Boolean);
     const availableTopics = plannedTopics.length
       ? plannedTopics
       : curriculum.topics.map((topic: any) => this.normalise(topic.name));

@@ -29,6 +29,17 @@ describe('ExamAuthoringService', () => {
     expect(findings.filter(finding => finding.severity === ExamValidationSeverity.ERROR)).toHaveLength(0);
   });
 
+  it('accepts multiple-choice response sections', () => {
+    const service = new ExamAuthoringService({} as any);
+    const findings = service.validateBlueprint({
+      totalMarks: 20,
+      durationMinutes: 30,
+      sections: [{ code: 'A', title: 'Multiple Choice', totalMarks: 20, itemCount: 20, answerRule: 'ALL', responseType: 'MULTIPLE_CHOICE' as any }],
+    });
+
+    expect(findings.filter(finding => finding.severity === ExamValidationSeverity.ERROR)).toHaveLength(0);
+  });
+
   it('rejects a topic plan whose marks do not cover the advertised paper', () => {
     const service = new ExamAuthoringService({} as any);
     const findings = service.validateBlueprint({

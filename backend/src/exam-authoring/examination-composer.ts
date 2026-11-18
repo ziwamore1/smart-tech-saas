@@ -117,7 +117,7 @@ export class ExaminationComposer {
       Array.from({ length: section.itemCount }, (_, index) => ({ section, index })));
     const plan = (blueprint.topicPlan || [])
       .filter(target => String(target.topic || '').trim() && Number(target.marks) > 0)
-      .map(target => ({ topic: String(target.topic).trim(), remaining: Number(target.marks) }));
+      .map(target => ({ topic: String(target.topic).trim(), remaining: Number(target.marks), questionCount: target.questionCount }));
     const usedStems = new Set<string>();
 
     return slots.map((slot, offset) => {
@@ -127,13 +127,16 @@ export class ExaminationComposer {
           ? mathematicsTemplates[offset % mathematicsTemplates.length]
           : this.genericTemplate(curriculum, offset);
       } else {
-        const target = plan.find(item => item.remaining > 0) || plan[offset % plan.length];
+        const target = plan.some(item => item.questionCount !== undefined)
+          ? plan.find(item => Number(item.questionCount) > 0) || plan[offset % plan.length]
+          : plan.find(item => item.remaining > 0) || plan[offset % plan.length];
         template = mathematics
           ? this.matchMathematicsTemplate(target.topic, mathematicsTemplates, usedStems)
             || this.mathematicsGenericTemplate(curriculum, target.topic, offset)
           : this.genericTemplate(curriculum, offset, target.topic, offset);
         template = this.applyPlannedTopic(template, target.topic);
         target.remaining = Math.max(0, target.remaining - this.questionMarks(slot.section, slot.index));
+        if (target.questionCount !== undefined) target.questionCount = Math.max(0, Number(target.questionCount) - 1);
       }
 
       template = this.ensureUniqueTemplate(template, curriculum, mathematics, offset, usedStems);
