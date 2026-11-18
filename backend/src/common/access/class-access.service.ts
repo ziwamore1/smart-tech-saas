@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import pLimit from 'p-limit';
 import { PrismaService } from '../../prisma/prisma.service';
 import { getDefaultPermissions, normalizeRole, Permission, PERMISSIONS } from './permission-registry';
 
@@ -11,6 +12,10 @@ type AccessUser = {
 
 @Injectable()
 export class ClassAccessService {
+  // This endpoint fans out several reads per class; keep it below the small
+  // production connection pool instead of queueing every class at once.
+  private readonly completionClassLimit = pLimit(1);
+
   constructor(private readonly prisma: PrismaService) {}
 
   private roles(user: AccessUser): string[] {
@@ -342,7 +347,7 @@ export class ClassAccessService {
       select: { id: true, name: true, classSubjects: { select: { subjectId: true, subject: { select: { id: true, name: true, code: true } } } } },
       orderBy: { name: 'asc' },
     });
-    return Promise.all(classes.map(async (classEntity) => {
+    return Promise.all(classes.map((classEntity) => this.completionClassLimit(async () => {
       const enrolled = await this.prisma.enrollment.count({ where: { schoolId: user.schoolId, classId: classEntity.id, academicYearId: term.academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } } });
       const enrolledFallback = await this.prisma.computedResult.findMany({ where: { schoolId: user.schoolId, classId: classEntity.id, termId: term.id, finalPercentage: { not: null }, student: { status: 'ACTIVE' } }, select: { studentId: true }, distinct: ['studentId'] }).then(r => r.length);
       const effectiveEnrolled = enrolled || enrolledFallback;
@@ -358,7 +363,7 @@ export class ClassAccessService {
       }));
       const completeSubjects = subjects.filter((subject) => subject.complete).length;
       return { classId: classEntity.id, className: classEntity.name, totalStudents: effectiveEnrolled, totalSubjects: subjects.length, completeSubjects, completionRate: subjects.length ? Math.round((subjects.reduce((sum, subject) => sum + subject.completionRate, 0) / subjects.length)) : 0, complete: subjects.length > 0 && completeSubjects === subjects.length, subjects };
-    }));
+    })));
   }
 
   async getUserAccess(actor: AccessUser, userId: string) {
