@@ -6,6 +6,20 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { identityApi, premiumStaffRecordsApi } from '@/lib/api';
 
+function apiErrorMessage(error: any, fallback: string): string {
+  const message = error?.response?.data?.message;
+  return Array.isArray(message) ? message.join('; ') : (message || fallback);
+}
+
+function passwordValidationMessage(value: string): string {
+  const errors: string[] = [];
+  if (value.length < 8) errors.push('at least 8 characters');
+  if (!/[A-Z]/.test(value)) errors.push('one uppercase letter');
+  if (!/[a-z]/.test(value)) errors.push('one lowercase letter');
+  if (!/[0-9]/.test(value)) errors.push('one number');
+  return errors.length ? `Password must contain ${errors.join(', ')}.` : '';
+}
+
 const ADVANCED_FIELDS = [
   { key: 'gender', label: 'Gender', category: 'GENDER' },
   { key: 'dateOfBirth', label: 'Date of Birth', type: 'date' },
@@ -83,8 +97,9 @@ function TeacherProfilePageContent() {
     try {
       setLoading(true);
       const response = await identityApi.getAccountCenter();
-      const data = response.data?.data || response.data || {};
-      setAccountInfo(data);
+      const envelope = response.data?.data || response.data || {};
+      const data = envelope.profile || envelope;
+      setAccountInfo({ ...data, roles: data.roles || [] });
       setProfile({
         firstName: data.firstName || user?.firstName || '',
         lastName: data.lastName || user?.lastName || '',
@@ -102,11 +117,13 @@ function TeacherProfilePageContent() {
   const handleProfileUpdate = async () => {
     try {
       setSaving(true);
-      await identityApi.updateProfile({ firstName: profile.firstName, lastName: profile.lastName, email: profile.email, phone: profile.phone });
+      const response = await identityApi.updateProfile({ firstName: profile.firstName, lastName: profile.lastName, email: profile.email, phone: profile.phone });
+      const updated = response.data?.data || response.data || {};
+      setAccountInfo(current => ({ ...current, ...updated, fullName: `${updated.firstName || profile.firstName} ${updated.lastName || profile.lastName}`.trim() }));
       setMessage({ type: 'success', text: 'Profile updated successfully!' });
       setTimeout(() => setMessage(null), 3000);
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update profile' });
+    } catch (error: any) {
+      setMessage({ type: 'error', text: apiErrorMessage(error, 'Failed to update profile') });
       setTimeout(() => setMessage(null), 3000);
     } finally { setSaving(false); }
   };
@@ -117,8 +134,9 @@ function TeacherProfilePageContent() {
       setTimeout(() => setMessage(null), 3000);
       return;
     }
-    if (password.newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'Password must be at least 6 characters' });
+    const passwordError = passwordValidationMessage(password.newPassword);
+    if (passwordError) {
+      setMessage({ type: 'error', text: passwordError });
       setTimeout(() => setMessage(null), 3000);
       return;
     }
@@ -128,8 +146,8 @@ function TeacherProfilePageContent() {
       setMessage({ type: 'success', text: 'Password changed successfully!' });
       setPassword({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setTimeout(() => setMessage(null), 3000);
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to change password. Check your current password.' });
+    } catch (error: any) {
+      setMessage({ type: 'error', text: apiErrorMessage(error, 'Failed to change password. Check your current password.') });
       setTimeout(() => setMessage(null), 3000);
     } finally { setSaving(false); }
   };
@@ -246,12 +264,14 @@ function TeacherProfilePageContent() {
               onFocus={e => e.target.style.borderColor = '#10b981'} onBlur={e => e.target.style.borderColor = '#e8ddd0'} />
           </div>
 
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>New Password</label>
-            <input type="password" value={password.newPassword} onChange={e => setPassword({ ...password, newPassword: e.target.value })}
-              style={{ width: '100%', padding: '10px 14px', border: '1px solid #e8ddd0', borderRadius: '10px', fontSize: '14px', outline: 'none', background: 'white', boxSizing: 'border-box' }}
-              onFocus={e => e.target.style.borderColor = '#10b981'} onBlur={e => e.target.style.borderColor = '#e8ddd0'} />
-          </div>
+           <div style={{ marginBottom: '16px' }}>
+             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>New Password</label>
+             <input type="password" value={password.newPassword} onChange={e => setPassword({ ...password, newPassword: e.target.value })}
+               style={{ width: '100%', padding: '10px 14px', border: '1px solid #e8ddd0', borderRadius: '10px', fontSize: '14px', outline: 'none', background: 'white', boxSizing: 'border-box' }}
+               onFocus={e => e.target.style.borderColor = '#10b981'} onBlur={e => e.target.style.borderColor = '#e8ddd0'} />
+             <p style={{ fontSize: '12px', color: '#6b7280', margin: '6px 0 0', lineHeight: 1.4 }}>Use at least 8 characters with one uppercase letter, one lowercase letter, and one number.</p>
+             {password.newPassword && passwordValidationMessage(password.newPassword) && <p style={{ fontSize: '12px', color: '#b45309', margin: '4px 0 0' }}>{passwordValidationMessage(password.newPassword)}</p>}
+           </div>
 
           <div style={{ marginBottom: '24px' }}>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>Confirm New Password</label>

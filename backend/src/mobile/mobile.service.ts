@@ -1030,6 +1030,7 @@ export class MobileService {
       admissionNumber: s.admissionNumber,
       email: s.user?.email || null,
       isActive: s.user?.isActive ?? true,
+      status: s.status,
       class: s.enrollments[0]?.class?.name || 'Not assigned',
       classId: s.enrollments[0]?.class?.id || null,
       enrollmentId: s.enrollments[0]?.id || null,

@@ -63,7 +63,7 @@ const ALL_PERMISSIONS: Permission[] = [
   'grading-policies.manage',
 ];
 
-export type RoleKey = 'Director' | 'Deputy Director' | 'Head Teacher' | 'Deputy Head' | 'HOD' | 'Teacher' | 'Class Teacher' | 'Lower Primary Senior Teacher' | 'Upper Primary Senior Teacher';
+export type RoleKey = 'Director' | 'Deputy Director' | 'Head Teacher' | 'Deputy Head Teacher' | 'Deputy Head' | 'HOD' | 'Teacher' | 'Class Teacher' | 'Lower Primary Senior Teacher' | 'Upper Primary Senior Teacher';
 
 const VIEW_ONLY: Permission[] = ALL_PERMISSIONS.filter(p => p.endsWith('.view') || p === 'analytics.view');
 
@@ -72,12 +72,24 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   'Deputy Director': [...ALL_PERMISSIONS],
   'Head Teacher': [
     ...VIEW_ONLY,
+    'students.manage',
     'assessments.create', 'assessments.view', 'attendance.manage',
     'results.view', 'communications.view', 'lesson-plans.view',
     'stamps.view', 'library.view', 'gallery.view',
   ],
+  'Deputy Head Teacher': [
+    ...VIEW_ONLY,
+    'students.manage',
+    'assessments.create', 'assessments.view', 'attendance.manage',
+    'results.view', 'results.manage', 'reports.view', 'reports.manage',
+    'staff.view', 'staff.manage', 'classes.view', 'subjects.view',
+    'analytics.view', 'exams.view', 'exams.manage',
+    'communications.view', 'communications.send',
+    'lesson-plans.view', 'lesson-plans.manage',
+  ],
   'Deputy Head': [
     ...VIEW_ONLY,
+    'students.manage',
     'assessments.create', 'assessments.view', 'attendance.manage',
     'results.view', 'communications.view', 'lesson-plans.view',
   ],
@@ -127,7 +139,14 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
 export function getDefaultPermissions(roles: string[]): Permission[] {
   const perms = new Set<Permission>();
   for (const role of roles) {
-    const defaults = DEFAULT_ROLE_PERMISSIONS[role];
+    const compact = role.toLowerCase().replace(/[\s_-]/g, '');
+    const canonical = compact === 'classteacher' ? 'Class Teacher'
+      : compact === 'deputydirector' ? 'Deputy Director'
+      : compact === 'headteacher' ? 'Head Teacher'
+      : compact === 'deputyheadteacher' ? 'Deputy Head Teacher'
+      : compact === 'deputyhead' ? 'Deputy Head'
+      : role;
+    const defaults = DEFAULT_ROLE_PERMISSIONS[canonical];
     if (defaults) defaults.forEach(p => perms.add(p));
   }
   return Array.from(perms);

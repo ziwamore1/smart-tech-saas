@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderBar, WidgetCard } from '../../components';
 import { colors, spacing, borderRadius, shadows } from '../../theme';
@@ -23,6 +23,10 @@ export const DirectorStudentsScreen: React.FC<DirectorStudentsProps> = ({ onTogg
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [intakeFilter, setIntakeFilter] = useState<'all' | 'pre-school' | 'grade1' | 'transfers'>('all');
+  const [statusStudent, setStatusStudent] = useState<any>(null);
+  const [changingStatus, setChangingStatus] = useState(false);
+
+  const STATUS_OPTIONS = ['ACTIVE', 'INACTIVE', 'TRANSFERRED', 'GRADUATED', 'WITHDRAWN', 'SUSPENDED'];
 
   const intakeTabs = [
     { key: 'all' as const, label: 'All Pupils', icon: '👨‍🎓' },
@@ -48,6 +52,20 @@ export const DirectorStudentsScreen: React.FC<DirectorStudentsProps> = ({ onTogg
   const handleRefresh = () => {
     setRefreshing(true);
     loadStudents();
+  };
+
+  const applyStatusChange = async (status: string) => {
+    if (!statusStudent) return;
+    setChangingStatus(true);
+    try {
+      await apiService.changeStudentStatus(statusStudent.id, status);
+      setStudents(prev => prev.map(s => s.id === statusStudent.id ? { ...s, status, isActive: status === 'ACTIVE' } : s));
+      setStatusStudent(null);
+    } catch (err: any) {
+      console.error('Failed to change student status:', err);
+    } finally {
+      setChangingStatus(false);
+    }
   };
 
   const filtered = students.filter((s) => {
@@ -108,7 +126,7 @@ export const DirectorStudentsScreen: React.FC<DirectorStudentsProps> = ({ onTogg
 
         <WidgetCard title={isPrimary ? `${intakeFilter === 'all' ? 'All Pupils' : intakeFilter === 'pre-school' ? 'Pre-School' : intakeFilter === 'grade1' ? 'Grade 1 Intake' : 'Transfers'} (${filtered.length})` : `All Students (${filtered.length})`}>
           {filtered.map((student) => (
-            <TouchableOpacity key={student.id} style={styles.studentCard}>
+            <View key={student.id} style={styles.studentCard}>
               <View style={styles.studentAvatar}>
                 <Text style={styles.studentAvatarText}>{student.firstName.charAt(0)}{student.lastName.charAt(0)}</Text>
               </View>
@@ -116,8 +134,14 @@ export const DirectorStudentsScreen: React.FC<DirectorStudentsProps> = ({ onTogg
                 <Text style={styles.studentName}>{student.firstName} {student.lastName}</Text>
                 <Text style={styles.studentClass}>{student.class}{student.admissionNumber ? ` • ${student.admissionNumber}` : ''}</Text>
               </View>
-              <View style={[styles.statusDot, student.isActive ? styles.statusActive : styles.statusInactive]} />
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.statusPill}
+                onPress={() => setStatusStudent(student)}
+                disabled={changingStatus}
+              >
+                <Text style={styles.statusPillText}>{student.status || (student.isActive ? 'ACTIVE' : 'INACTIVE')}</Text>
+              </TouchableOpacity>
+            </View>
           ))}
           {filtered.length === 0 && !loading && (
             <View style={styles.emptyState}>
@@ -129,6 +153,29 @@ export const DirectorStudentsScreen: React.FC<DirectorStudentsProps> = ({ onTogg
 
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
+
+      <Modal visible={!!statusStudent} transparent animationType="fade" onRequestClose={() => !changingStatus && setStatusStudent(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Change Student Status</Text>
+            <Text style={styles.modalSubtitle}>{statusStudent ? `${statusStudent.firstName} ${statusStudent.lastName}` : ''}</Text>
+            {changingStatus && <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.sm }} />}
+            {STATUS_OPTIONS.map(option => (
+              <TouchableOpacity
+                key={option}
+                style={styles.statusOption}
+                onPress={() => applyStatusChange(option)}
+                disabled={changingStatus}
+              >
+                <Text style={styles.statusOptionText}>{option}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={styles.modalCancel} onPress={() => setStatusStudent(null)} disabled={changingStatus}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -151,9 +198,16 @@ const styles = StyleSheet.create({
   studentInfo: { flex: 1 },
   studentName: { fontSize: 15, fontWeight: '600', color: colors.text },
   studentClass: { fontSize: 13, color: colors.textLight, marginTop: 2 },
-  statusDot: { width: 10, height: 10, borderRadius: 5 },
-  statusActive: { backgroundColor: colors.success },
-  statusInactive: { backgroundColor: colors.textMuted },
+  statusPill: { paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: borderRadius.full, backgroundColor: colors.success + '20', marginLeft: spacing.sm },
+  statusPillText: { fontSize: 10, fontWeight: '700', color: colors.success },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: spacing.lg },
+  modalCard: { backgroundColor: colors.white, borderRadius: borderRadius.lg, padding: spacing.lg },
+  modalTitle: { fontSize: 17, fontWeight: '700', color: colors.text, textAlign: 'center' },
+  modalSubtitle: { fontSize: 13, color: colors.textLight, textAlign: 'center', marginTop: spacing.xs, marginBottom: spacing.md },
+  statusOption: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.background, marginBottom: spacing.xs, borderWidth: 1, borderColor: colors.border },
+  statusOptionText: { fontSize: 14, fontWeight: '600', color: colors.text, textAlign: 'center' },
+  modalCancel: { paddingVertical: spacing.sm, alignItems: 'center' },
+  modalCancelText: { fontSize: 14, fontWeight: '600', color: colors.textLight },
   emptyState: { alignItems: 'center', paddingVertical: spacing.xl },
   emptyIcon: { fontSize: 40, marginBottom: spacing.sm },
   emptyText: { fontSize: 14, color: colors.textLight },

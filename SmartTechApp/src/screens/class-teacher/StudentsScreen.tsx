@@ -69,7 +69,7 @@ export const ClassTeacherStudentsScreen: React.FC<Props> = ({ onToggleDrawer, on
                 className: cls.name || cls.className,
                 classId: cls.id,
                 enrollmentId: s.enrollmentId,
-                status: s.status,
+                status: s.status || 'ACTIVE',
                 score: s.averageScore,
                 grade: s.grade,
                 attendance: s.attendanceRate,
@@ -89,6 +89,7 @@ export const ClassTeacherStudentsScreen: React.FC<Props> = ({ onToggleDrawer, on
             admissionNumber: s.admissionNumber,
             className: s.className || s.class,
             enrollmentId: s.enrollmentId,
+            status: s.status || (s.isActive ? 'ACTIVE' : 'INACTIVE'),
             score: s.averageScore,
             grade: s.grade,
             attendance: s.attendanceRate,
@@ -319,6 +320,9 @@ export const ClassTeacherStudentsScreen: React.FC<Props> = ({ onToggleDrawer, on
                     <Text style={styles.studentMeta}>
                       {student.className ? `${student.className} • ` : ''}Attendance: {student.attendance ?? '—'}%
                     </Text>
+                    <Text style={[styles.statusLabel, student.status !== 'ACTIVE' && styles.statusLabelInactive]}>
+                      ● {student.status || 'ACTIVE'}
+                    </Text>
                   </View>
                   <View style={styles.scoreArea}>
                     <Text style={[styles.score, { color: statusColors[status] }]}>
@@ -333,7 +337,7 @@ export const ClassTeacherStudentsScreen: React.FC<Props> = ({ onToggleDrawer, on
                   <TouchableOpacity
                     style={styles.statusBtn}
                     onPress={() => setStatusStudent({ ...student, status: student.status || 'ACTIVE' })}
-                    disabled={actionLoading}
+                    disabled={changingStatus}
                   >
                     <Text style={styles.statusBtnText}>🔁</Text>
                   </TouchableOpacity>
@@ -429,6 +433,8 @@ const styles = StyleSheet.create({
   studentInfo: { flex: 1 },
   studentName: { fontSize: 15, fontWeight: '600', color: colors.text },
   studentMeta: { fontSize: 12, color: colors.textLight, marginTop: 2 },
+  statusLabel: { fontSize: 11, fontWeight: '600', color: colors.success, marginTop: 2 },
+  statusLabelInactive: { color: colors.error },
   scoreArea: { alignItems: 'flex-end' },
   score: { fontSize: 16, fontWeight: '700' },
   gradeBadge: { fontSize: 11, fontWeight: '700', paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.sm, marginTop: 2, overflow: 'hidden' },

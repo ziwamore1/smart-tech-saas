@@ -8,6 +8,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
+import { ChangeStudentStatusDto } from './dto/change-student-status.dto';
 import { AdmissionNumberService } from '../admission-number/admission-number.service';
 
 @Controller('student')
@@ -108,13 +109,26 @@ export class StudentController {
   }
 
   @Post(':id/status')
-  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
+  @Roles(
+    'Director',
+    'Deputy Director',
+    'Head Teacher',
+    'Deputy Head Teacher',
+    'Deputy Head',
+    'Deputy',
+    'HOD',
+    'Teacher',
+    'Class Teacher',
+    'HeadTeacher',
+    'DeputyHeadTeacher',
+    'ClassTeacher',
+  )
   changeStatus(
     @Param('id') id: string,
-    @Body() body: { status: string },
+    @Body() dto: ChangeStudentStatusDto,
     @Req() req: any,
   ) {
-    return this.service.changeStatus(id, body.status as any, req.user.id);
+    return this.service.changeStatus(id, dto.status, req.user.id, req.user.schoolId);
   }
 
   @Get(':id/status-history')

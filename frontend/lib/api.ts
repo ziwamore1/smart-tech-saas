@@ -878,6 +878,13 @@ export const attendanceApi = {
     api.get('/attendance/punctuality-trends', { params: { classId, termId } }),
 };
 
+export const classListApi = {
+  downloadExcel: (classId: string, timeout?: number) =>
+    api.get(`/attendance/class-list/${classId}/excel`, { responseType: 'blob', ...(timeout ? { timeout } : {}) }),
+  downloadPdf: (classId: string, timeout?: number) =>
+    api.get(`/attendance/class-list/${classId}/pdf`, { responseType: 'blob', ...(timeout ? { timeout } : {}) }),
+};
+
 export const homeworkApi = {
   getAll: (params?: { classId?: string; subjectId?: string; dueDate?: string; status?: string }) =>
     api.get('/homework', { params }),

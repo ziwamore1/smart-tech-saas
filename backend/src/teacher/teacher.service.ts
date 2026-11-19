@@ -524,7 +524,7 @@ export class TeacherService {
               student: {
                 select: {
                   id: true, firstName: true, lastName: true, gender: true,
-                  admissionNumber: true, photoUrl: true,
+                  admissionNumber: true, photoUrl: true, status: true,
                 },
               },
             },
@@ -543,6 +543,7 @@ export class TeacherService {
           firstName: e.student.firstName,
           lastName: e.student.lastName,
           admissionNumber: e.student.admissionNumber,
+          status: e.student.status,
         }));
         return {
           id: c.id,

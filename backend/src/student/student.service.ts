@@ -1019,47 +1019,105 @@ export class StudentService {
     return promotions;
   }
 
-  async changeStatus(studentId: string, newStatus: StudentStatus, userId: string) {
-    const student = await this.prisma.student.findUnique({ where: { id: studentId }, select: {
-      id: true, admissionNumber: true, studentUuid: true, status: true, schoolId: true,
-      firstName: true, lastName: true, gender: true, photoUrl: true,
-    }});
+  async changeStatus(
+    studentId: string,
+    newStatus: StudentStatus,
+    userId: string,
+    schoolId?: string,
+  ) {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, ...(schoolId ? { schoolId } : {}) },
+      select: {
+        id: true, admissionNumber: true, studentUuid: true, status: true, schoolId: true,
+        firstName: true, lastName: true, gender: true, photoUrl: true,
+      },
+    });
     if (!student) throw new NotFoundException('Student not found');
 
     const oldStatus = student.status;
+    const effectiveSchoolId = student.schoolId;
+    let updated: any = null;
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const result = await tx.student.update({
-        where: { id: studentId },
-        data: { status: newStatus },
-      });
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        updated = await this.prisma.$transaction(async (tx) => {
+          const result = await tx.student.update({
+            where: { id: studentId },
+            data: { status: newStatus },
+          });
 
-      if (newStatus !== StudentStatus.ACTIVE) {
-        const activeEnrollments = await tx.enrollment.findMany({
-          where: { studentId, status: EnrollmentStatus.ACTIVE },
-          select: { schoolId: true, academicYearId: true, classId: true },
-        });
-        await tx.enrollment.updateMany({
-          where: { studentId, status: EnrollmentStatus.ACTIVE },
-          data: { status: EnrollmentStatus.INACTIVE },
-        });
-        for (const enrollment of activeEnrollments) {
-          await this.admissionNumberService.resequenceClassInTransaction(
-            tx, enrollment.schoolId, enrollment.academicYearId, enrollment.classId,
-          );
-        }
+          if (newStatus !== StudentStatus.ACTIVE) {
+            const activeEnrollments = await tx.enrollment.findMany({
+              where: { studentId, status: EnrollmentStatus.ACTIVE },
+              select: { schoolId: true, academicYearId: true, classId: true },
+            });
+            await tx.enrollment.updateMany({
+              where: { studentId, status: EnrollmentStatus.ACTIVE },
+              data: { status: EnrollmentStatus.INACTIVE },
+            });
+            for (const enrollment of activeEnrollments) {
+              await this.admissionNumberService.resequenceClassInTransaction(
+                tx, enrollment.schoolId, enrollment.academicYearId, enrollment.classId,
+              );
+            }
+          } else if (oldStatus !== StudentStatus.ACTIVE) {
+            const inactiveEnrollments = await tx.enrollment.findMany({
+              where: { studentId, status: EnrollmentStatus.INACTIVE },
+              include: { academicYear: { select: { startDate: true } } },
+              orderBy: { academicYear: { startDate: 'desc' } },
+            });
+            const latestAcademicYearId = inactiveEnrollments[0]?.academicYearId;
+            const reactivated = inactiveEnrollments.filter(
+              (enrollment) => enrollment.academicYearId === latestAcademicYearId,
+            );
+
+            if (reactivated.length > 0) {
+              await tx.enrollment.updateMany({
+                where: { id: { in: reactivated.map((enrollment) => enrollment.id) } },
+                data: { status: EnrollmentStatus.ACTIVE, sequenceNumber: null },
+              });
+              await tx.student.update({
+                where: { id: studentId },
+                data: { classId: reactivated[0].classId },
+              });
+              const resequenced = new Set<string>();
+              for (const enrollment of reactivated) {
+                const key = `${enrollment.academicYearId}:${enrollment.classId}`;
+                if (resequenced.has(key)) continue;
+                resequenced.add(key);
+                await this.admissionNumberService.resequenceClassInTransaction(
+                  tx, enrollment.schoolId, enrollment.academicYearId, enrollment.classId,
+                );
+              }
+            }
+          }
+
+          return result;
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
+        break;
+      } catch (error: any) {
+        const message = String(error?.message || '').toLowerCase();
+        const retryable = error?.code === 'P2034' || error?.code === 'P2024'
+          || message.includes('write conflict') || message.includes('deadlock');
+        if (!retryable || attempt === 3) throw error;
+        this.logger.warn(`Retrying status change for student ${studentId} after transaction conflict (attempt ${attempt + 1}/3)`);
+        await new Promise((resolve) => setTimeout(resolve, attempt * 500));
       }
-
-      return result;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
+    }
 
     if (oldStatus !== newStatus) {
-      await this.createAuditLog(userId, student.schoolId, 'STATUS_CHANGED', 'Student', student.id, {
+      await this.createAuditLog(userId, effectiveSchoolId, 'STATUS_CHANGED', 'Student', student.id, {
         oldStatus,
         newStatus,
         changedBy: userId,
       });
     }
+
+    this.schoolEvents?.emitStudentStatusChanged(effectiveSchoolId, {
+      studentId,
+      status: newStatus,
+      previousStatus: oldStatus,
+    });
 
     return updated;
   }

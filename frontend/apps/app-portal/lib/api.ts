@@ -1036,6 +1036,13 @@ export const attendanceApi = {
     api.get(`/attendance/student/${studentId}/pdf`, { params, responseType: 'blob' }),
 };
 
+export const classListApi = {
+  downloadExcel: (classId: string, timeout?: number) =>
+    api.get(`/attendance/class-list/${classId}/excel`, { responseType: 'blob', ...(timeout ? { timeout } : {}) }),
+  downloadPdf: (classId: string, timeout?: number) =>
+    api.get(`/attendance/class-list/${classId}/pdf`, { responseType: 'blob', ...(timeout ? { timeout } : {}) }),
+};
+
 export const homeworkApi = {
   getAll: (params?: { classId?: string; subjectId?: string; dueDate?: string; status?: string }) =>
     api.get('/homework', { params }),

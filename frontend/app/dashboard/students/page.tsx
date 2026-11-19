@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { studentApi, classApi, termApi, enrollmentApi, academicYearApi, parentApi, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useSchoolSocket } from '@/lib/use-school-socket';
 import { ReadOnlyBanner } from '@/components/permissions/ReadOnlyBanner';
 
 const gradBlue = 'linear-gradient(135deg, #3b82f6, #2563eb)';
@@ -19,6 +20,15 @@ const gradOrangeLight = 'linear-gradient(135deg, #ffedd5, #fed7aa)';
 export default function StudentsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  useSchoolSocket({
+    'student:status-changed': () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['class-students'] });
+      queryClient.invalidateQueries({ queryKey: ['school-stats'] });
+    },
+  });
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEnrollmentModal, setShowEnrollmentModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -33,6 +43,7 @@ export default function StudentsPage() {
   const [selectedParentId, setSelectedParentId] = useState('');
   const [statusModalStudent, setStatusModalStudent] = useState<any>(null);
   const [newStatus, setNewStatus] = useState('ACTIVE');
+  const [statusModalMessage, setStatusModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const { data: parentsData } = useQuery({
     queryKey: ['parents-search', linkParentSearch],
@@ -403,16 +414,30 @@ export default function StudentsPage() {
 
   const changeStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => studentApi.changeStatus(id, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['students'] });
-      queryClient.invalidateQueries({ queryKey: ['school-stats'] });
-      setStatusModalStudent(null);
-      setMessage({ type: 'success', text: 'Student status updated. Non-ACTIVE students are excluded from exams, assessments, analytics and results.' });
-      setTimeout(() => setMessage(null), 5000);
+    onMutate: async ({ id, status }) => {
+      const previous = queryClient.getQueriesData({ queryKey: ['students'] });
+      queryClient.setQueriesData({ queryKey: ['students'] }, (old: any) => {
+        const updateStudent = (student: any) => student?.id === id ? { ...student, status } : student;
+        if (Array.isArray(old)) return old.map(updateStudent);
+        if (old && Array.isArray(old.data)) return { ...old, data: old.data.map(updateStudent) };
+        return old;
+      });
+      return { previous };
     },
-    onError: (error: any) => {
-      setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to update student status.' });
-      setTimeout(() => setMessage(null), 5000);
+    onSuccess: (_response, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['class-students'] });
+      queryClient.invalidateQueries({ queryKey: ['school-stats'] });
+      setStatusModalStudent((current: any) => current?.id === variables.id ? { ...current, status: variables.status } : current);
+      setNewStatus(variables.status);
+      setStatusModalMessage({ type: 'success', text: 'Status updated successfully. Non-ACTIVE students are excluded from exams, assessments, analytics and results.' });
+    },
+    onError: (error: any, _variables, context: any) => {
+      context?.previous?.forEach(([key, data]: [any, any]) => queryClient.setQueryData(key, data));
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['class-students'] });
+      queryClient.invalidateQueries({ queryKey: ['school-stats'] });
+      setStatusModalMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to update student status.' });
     },
   });
 
@@ -539,7 +564,7 @@ export default function StudentsPage() {
               <button onClick={() => { setSelectedStudent(student); setEditStatus(null); const parent = student.parents?.[0]?.parent; setEditForm({ firstName: student.firstName || '', lastName: student.lastName || '', admissionNumber: student.admissionNumber || '', dateOfBirth: student.dateOfBirth ? student.dateOfBirth.split('T')[0] : '', gender: student.gender || '', email: student.email || '', phone: student.phone || '', address: student.address || '', parentName: parent ? `${parent.firstName || ''} ${parent.lastName || ''}`.trim() : '', parentPhone: parent?.phone || '', parentEmail: parent?.email || '', }); setShowEditModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors">✏️ Edit</button>
               <button onClick={() => { setSelectedStudent(student); setShowEnrollmentModal(true); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-50 text-green-600 hover:bg-green-100 transition-colors">📚 Enroll</button>
               <button onClick={() => { setSelectedStudent(student); setShowLinkParentModal(true); setSelectedParentId(''); setLinkParentSearch(''); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-pink-50 text-pink-600 hover:bg-pink-100 transition-colors">👪 Parent</button>
-              <button onClick={() => { setStatusModalStudent(student); setNewStatus(student.status || 'ACTIVE'); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors">🔁 Status</button>
+              <button onClick={() => { setStatusModalStudent(student); setNewStatus(student.status || 'ACTIVE'); setStatusModalMessage(null); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors">🔁 Status</button>
               <button
                 onClick={() => {
                   const enrollmentId = student.enrollments?.[0]?.id;
@@ -1615,8 +1640,14 @@ export default function StudentsPage() {
                   {statusModalStudent.admissionNumber ? ` (${statusModalStudent.admissionNumber})` : ''}
                 </p>
               </div>
-              <button onClick={() => setStatusModalStudent(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => { setStatusModalStudent(null); setStatusModalMessage(null); }} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
+
+            {statusModalMessage && (
+              <div className={`mb-4 rounded-lg border px-3 py-2 text-sm ${statusModalMessage.type === 'success' ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-800'}`} role="alert">
+                {statusModalMessage.text}
+              </div>
+            )}
 
             <div className="space-y-4">
               <div>
@@ -1645,7 +1676,7 @@ export default function StudentsPage() {
 
               <div className="flex justify-end gap-2 pt-2">
                 <button
-                  onClick={() => setStatusModalStudent(null)}
+                  onClick={() => { setStatusModalStudent(null); setStatusModalMessage(null); }}
                   className="px-4 py-2 border rounded-lg hover:bg-gray-50"
                 >
                   Cancel

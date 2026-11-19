@@ -2,8 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api, classApi, studentApi, academicYearApi } from '@/lib/api';
-import { useAuth } from '@/lib/auth-context';
+import { classApi, classListApi, studentApi, academicYearApi } from '@/lib/api';
 
 function calculateAge(dob: string): number {
   const birth = new Date(dob);
@@ -14,34 +13,61 @@ function calculateAge(dob: string): number {
   return age;
 }
 
-function exportToCSV(rows: Array<Record<string, any>>, filename: string) {
-  if (rows.length === 0) return;
-  const headers = Object.keys(rows[0]);
-  const csvContent = [
-    headers.join(','),
-    ...rows.map(row =>
-      headers.map(h => {
-        const val = row[h]?.toString() || '';
-        return val.includes(',') || val.includes('"') ? `"${val.replace(/"/g, '""')}"` : val;
-      }).join(',')
-    ),
-  ].join('\n');
+function sanitizeClassFileName(name?: string | null): string {
+  const sanitized = (name || 'Class').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
+  return sanitized || 'Class';
+}
 
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+function parseNameParts(student: any): { firstName: string; lastName: string } {
+  const firstName = (student.firstName || '').trim();
+  const lastName = (student.lastName || '').trim();
+  if (firstName || lastName) return { firstName, lastName };
+  const raw = (student.name || student.fullName || '').trim();
+  if (!raw) return { firstName: '', lastName: '' };
+  const parts = raw.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return { firstName: parts[0], lastName: '' };
+  return { firstName: parts.slice(0, -1).join(' '), lastName: parts[parts.length - 1] };
+}
+
+async function getBlobErrorMessage(data: any, fallback: string): Promise<string> {
+  if (data instanceof Blob) {
+    try {
+      const text = await data.text();
+      try {
+        const parsed = JSON.parse(text);
+        const msg = parsed?.message || parsed?.error;
+        if (Array.isArray(msg)) return msg.join(', ');
+        if (typeof msg === 'string' && msg) return msg;
+      } catch {
+        if (text) return text;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  if (data && typeof data === 'object') {
+    const msg = (data as any).message || (data as any).error;
+    if (Array.isArray(msg)) return msg.join(', ');
+    if (typeof msg === 'string' && msg) return msg;
+  }
+  return fallback;
+}
+
+function saveBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${filename}.csv`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
 
 export default function ClassListPage() {
-  const { user } = useAuth();
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [genderFilter, setGenderFilter] = useState<string>('all');
-  const [downloading, setDownloading] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadingExcel, setDownloadingExcel] = useState(false);
 
   const { data: classesData } = useQuery({
     queryKey: ['classes'],
@@ -86,17 +112,25 @@ export default function ClassListPage() {
   const students = useMemo<StudentRow[]>(() => {
     if (!studentsData) return [];
     const raw = Array.isArray(studentsData) ? studentsData : (studentsData.students || []);
-    return raw.map((s: any) => ({
-      id: s.id || s.studentId,
-      admissionNumber: s.admissionNumber || '-',
-      firstName: s.firstName || '',
-      lastName: s.lastName || '',
-      fullName: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
-      gender: s.gender || 'Not Specified',
-      dateOfBirth: s.dateOfBirth || null,
-      age: s.dateOfBirth ? calculateAge(s.dateOfBirth) : null,
-      status: s.enrollments?.[0]?.status || 'ACTIVE',
-    }));
+    return raw.map((s: any) => {
+      const { firstName, lastName } = parseNameParts(s);
+      const fullName = `${firstName} ${lastName}`.trim() || (s.fullName || s.name || '').trim();
+      return {
+        id: s.id || s.studentId,
+        admissionNumber: s.admissionNumber || '-',
+        firstName,
+        lastName,
+        fullName,
+        gender: s.gender || 'Not Specified',
+        dateOfBirth: s.dateOfBirth || null,
+        age: s.dateOfBirth ? calculateAge(s.dateOfBirth) : null,
+        status: s.enrollments?.[0]?.status || 'ACTIVE',
+      };
+    }).sort((a, b) => {
+      const ln = a.lastName.localeCompare(b.lastName, undefined, { sensitivity: 'base' });
+      if (ln !== 0) return ln;
+      return a.firstName.localeCompare(b.firstName, undefined, { sensitivity: 'base' });
+    });
   }, [studentsData]);
 
   const filteredStudents = useMemo(() => {
@@ -124,46 +158,44 @@ export default function ClassListPage() {
     return { male, female, unspecified, unknown, total: students.length };
   }, [students]);
 
-  const csvData = useMemo(() => {
-    return filteredStudents.map((s, i) => ({
-      '#': i + 1,
-      'Admission No': s.admissionNumber,
-      'First Name': s.firstName,
-      'Last Name': s.lastName,
-      'Gender': s.gender,
-      'Date of Birth': s.dateOfBirth ? new Date(s.dateOfBirth).toLocaleDateString() : '-',
-      'Age': s.age !== null ? s.age : '-',
-      'Status': s.status,
-    }));
-  }, [filteredStudents]);
-
   const handleDownloadPdf = async () => {
-    if (!selectedClassId || !user?.schoolId) return;
-    setDownloading(true);
+    if (!selectedClassId) return;
+    setDownloadingPdf(true);
     try {
-      const response = await api.get(`/attendance/class-list/${selectedClassId}/pdf`, {
-        params: { schoolId: user.schoolId },
-        responseType: 'blob',
-      });
-      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Class_List_${selectedClass?.name?.replace(/\s+/g, '_') || 'Report'}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const response = await classListApi.downloadPdf(selectedClassId, 120000);
+      const contentType = String(response.headers?.['content-type'] || '').toLowerCase();
+      if (!contentType.includes('application/pdf')) {
+        throw new Error('Invalid PDF response received from server.');
+      }
+      const filename = `Class_List_${sanitizeClassFileName(selectedClass?.name)}.pdf`;
+      saveBlob(new Blob([response.data], { type: 'application/pdf' }), filename);
     } catch (err: any) {
       console.error('PDF download failed:', err);
-      alert('Failed to generate PDF. Please ensure the report service is running.');
+      const msg = await getBlobErrorMessage(err?.response?.data, err?.message || 'Failed to generate PDF.');
+      alert(msg);
     } finally {
-      setDownloading(false);
+      setDownloadingPdf(false);
     }
   };
 
-  const handleExportExcel = () => {
-    const filename = `Class_List_${selectedClass?.name || 'All'}`
-      .replace(/\s+/g, '_')
-      .replace(/[^a-zA-Z0-9_-]/g, '');
-    exportToCSV(csvData, filename);
+  const handleExportExcel = async () => {
+    if (!selectedClassId) return;
+    setDownloadingExcel(true);
+    try {
+      const response = await classListApi.downloadExcel(selectedClassId, 120000);
+      const contentType = String(response.headers?.['content-type'] || '').toLowerCase();
+      if (!contentType.includes('spreadsheetml') && !contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') && !contentType.includes('application/octet-stream')) {
+        throw new Error('Invalid Excel response received from server.');
+      }
+      const filename = `Class_List_${sanitizeClassFileName(selectedClass?.name)}.xlsx`;
+      saveBlob(response.data instanceof Blob ? response.data : new Blob([response.data]), filename);
+    } catch (err: any) {
+      console.error('Excel download failed:', err);
+      const msg = await getBlobErrorMessage(err?.response?.data, err?.message || 'Failed to export Excel.');
+      alert(msg);
+    } finally {
+      setDownloadingExcel(false);
+    }
   };
 
   return (
@@ -182,18 +214,18 @@ export default function ClassListPage() {
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700, color: '#1f2937', margin: 0 }}>Class List</h1>
-          <p style={{ color: '#6b7280', fontSize: 14, margin: '4px 0 0' }}>View and export student class lists with gender breakdown</p>
+          <p style={{ color: '#6b7280', fontSize: 14, margin: '4px 0 0' }}>View and export student class lists with gender breakdown. Exports include the full active class list.</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={handleDownloadPdf} disabled={downloading || !selectedClassId}
-            style={{ padding: '10px 20px', fontSize: 13, fontWeight: 600, border: '1px solid #d1d5db', borderRadius: 8, background: '#fefcf9', color: downloading ? '#9ca3af' : '#374151', cursor: downloading || !selectedClassId ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button onClick={handleDownloadPdf} disabled={downloadingPdf || !selectedClassId} title="Exports full active class list"
+            style={{ padding: '10px 20px', fontSize: 13, fontWeight: 600, border: '1px solid #d1d5db', borderRadius: 8, background: '#fefcf9', color: downloadingPdf ? '#9ca3af' : '#374151', cursor: downloadingPdf || !selectedClassId ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
             <i className="fa fa-file-pdf" style={{ color: '#dc2626' }}></i>
-            {downloading ? 'Generating...' : 'Download PDF'}
+            {downloadingPdf ? 'Generating...' : 'Download PDF'}
           </button>
-          <button onClick={handleExportExcel}
-            style={{ padding: '10px 20px', fontSize: 13, fontWeight: 600, border: '1px solid #d1d5db', borderRadius: 8, background: '#fefcf9', color: '#374151', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button onClick={handleExportExcel} disabled={downloadingExcel || !selectedClassId} title="Exports full active class list"
+            style={{ padding: '10px 20px', fontSize: 13, fontWeight: 600, border: '1px solid #d1d5db', borderRadius: 8, background: '#fefcf9', color: downloadingExcel ? '#9ca3af' : '#374151', cursor: downloadingExcel || !selectedClassId ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
             <i className="fa fa-file-excel" style={{ color: '#059669' }}></i>
-            Export Excel
+            {downloadingExcel ? 'Exporting...' : 'Export Excel'}
           </button>
         </div>
       </div>

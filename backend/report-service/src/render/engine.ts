@@ -63,6 +63,12 @@ export class ReportRenderer {
 
     Handlebars.registerHelper('json', (context: any) => JSON.stringify(context));
 
+    Handlebars.registerHelper('initials', (firstName: any, lastName: any) => {
+      const first = String(firstName || '').trim().charAt(0);
+      const last = String(lastName || '').trim().charAt(0);
+      return `${first}${last}`.toUpperCase() || '—';
+    });
+
     Handlebars.registerHelper('range', (start: number, end: number) => {
       const result: number[] = [];
       for (let i = start; i <= end; i++) result.push(i);
@@ -163,6 +169,43 @@ export class ReportRenderer {
     return template;
   }
 
+  verifyTemplates(): string[] {
+    const types: ReportType[] = [
+      'report-card',
+      'transcript',
+      'analytics-summary',
+      'performance-profile',
+      'class-list',
+      'attendance-register',
+      'student-attendance',
+    ];
+    return types.map((type) => {
+      this.loadTemplate(type);
+      return type;
+    });
+  }
+
+  private async blockRemoteImages(page: any): Promise<void> {
+    await page.setRequestInterception(true);
+    page.on('request', (request: any) => {
+      const url = String(request.url() || '');
+      if (/^https?:/i.test(url) && request.resourceType() === 'image') {
+        request.abort().catch(() => undefined);
+      } else {
+        request.continue().catch(() => undefined);
+      }
+    });
+  }
+
+  private classListOrientation(data: any): 'portrait' | 'landscape' {
+    const requested = data?.layout?.orientation || data?.orientation;
+    if (requested === 'portrait' || requested === 'landscape') return requested;
+
+    const columns = Array.isArray(data?.columns) ? data.columns.length : 9;
+    const students = Array.isArray(data?.students) ? data.students.length : 0;
+    return columns > 8 || students > 40 ? 'landscape' : 'portrait';
+  }
+
   private async getBrowser(): Promise<Browser> {
     if (this.browser && this.browser.connected) return this.browser;
     if (this.browser && !this.browser.connected) {
@@ -192,7 +235,7 @@ export class ReportRenderer {
     const page = await browser.newPage();
     page.setDefaultTimeout(60000);
 
-    await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     const pdf = await page.pdf({
       format: 'A4',
@@ -241,26 +284,29 @@ export class ReportRenderer {
     const html = template(data);
 
     const page = await browser.newPage();
-    page.setDefaultTimeout(60000);
+    try {
+      page.setDefaultTimeout(60000);
+      await this.blockRemoteImages(page);
+      await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
+      const pdf = await page.pdf({
+        format: 'A4',
+        landscape: this.classListOrientation(data) === 'landscape',
+        margin: { top: '15mm', bottom: '15mm', left: '10mm', right: '10mm' },
+        printBackground: true,
+        displayHeaderFooter: true,
+        headerTemplate: '<div></div>',
+        footerTemplate: `
+          <div style="width:100%;font-size:8px;color:#6b7280;text-align:center;padding:4px 15mm;border-top:1px solid #e5e7eb;">
+            <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+          </div>
+        `,
+      });
 
-    const pdf = await page.pdf({
-      format: 'A4',
-      landscape: true,
-      margin: { top: '15mm', bottom: '15mm', left: '10mm', right: '10mm' },
-      printBackground: true,
-      displayHeaderFooter: true,
-      headerTemplate: '<div></div>',
-      footerTemplate: `
-        <div style="width:100%;font-size:8px;color:#6b7280;text-align:center;padding:4px 15mm;border-top:1px solid #e5e7eb;">
-          <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
-        </div>
-      `,
-    });
-
-    await page.close();
-    return Buffer.from(pdf);
+      return Buffer.from(pdf);
+    } finally {
+      await page.close().catch(() => undefined);
+    }
   }
 
   async renderAttendanceRegister(data: any): Promise<Buffer> {
@@ -271,7 +317,7 @@ export class ReportRenderer {
     const page = await browser.newPage();
     page.setDefaultTimeout(60000);
 
-    await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     const pdf = await page.pdf({
       format: 'A4',
@@ -299,7 +345,7 @@ export class ReportRenderer {
     const page = await browser.newPage();
     page.setDefaultTimeout(60000);
 
-    await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     const pdf = await page.pdf({
       format: 'A4',

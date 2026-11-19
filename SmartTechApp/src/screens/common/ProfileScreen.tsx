@@ -41,6 +41,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation, onTogg
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const passwordRequirements = [
+    { label: 'At least 8 characters', valid: newPassword.length >= 8 },
+    { label: 'One uppercase letter', valid: /[A-Z]/.test(newPassword) },
+    { label: 'One lowercase letter', valid: /[a-z]/.test(newPassword) },
+    { label: 'One number', valid: /[0-9]/.test(newPassword) },
+  ];
 
   const fetchLatestProfile = useCallback(async () => {
     try {
@@ -192,8 +198,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation, onTogg
       Alert.alert('Validation Error', 'Current password is required');
       return;
     }
-    if (newPassword.length < 8) {
-      Alert.alert('Validation Error', 'New password must be at least 8 characters');
+    const missingRequirements = passwordRequirements.filter(requirement => !requirement.valid).map(requirement => requirement.label.toLowerCase());
+    if (missingRequirements.length > 0) {
+      Alert.alert('Password Requirements', `Please add: ${missingRequirements.join(', ')}.`);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -383,6 +390,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation, onTogg
                 placeholder="Enter new password (min 8 chars)"
                 secureTextEntry
               />
+              <Text style={styles.passwordHint}>Use at least 8 characters with uppercase, lowercase, and a number.</Text>
+              {newPassword.length > 0 && passwordRequirements.map(requirement => (
+                <Text key={requirement.label} style={[styles.passwordRequirement, requirement.valid ? styles.passwordRequirementValid : styles.passwordRequirementMissing]}>
+                  {requirement.valid ? '✓' : '•'} {requirement.label}
+                </Text>
+              ))}
             </View>
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Confirm New Password</Text>
@@ -584,6 +597,22 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     fontSize: 15,
     color: colors.text,
+  },
+  passwordHint: {
+    color: colors.textLight,
+    fontSize: 12,
+    marginTop: spacing.xs,
+    lineHeight: 17,
+  },
+  passwordRequirement: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  passwordRequirementValid: {
+    color: colors.success,
+  },
+  passwordRequirementMissing: {
+    color: colors.error,
   },
   passwordButton: {
     marginTop: spacing.sm,

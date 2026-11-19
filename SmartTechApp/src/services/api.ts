@@ -313,7 +313,7 @@ class ApiService {
   }
 
   async getTeacherClasses() {
-    const response = await this.client.get('/classes/teaching');
+    const response = await this.client.get('/teacher/classes');
     return response.data;
   }
 
@@ -587,12 +587,12 @@ class ApiService {
   }
 
   async changeStudentStatus(studentId: string, status: string) {
-    const response = await this.client.post(`/students/${studentId}/status`, { status });
+    const response = await this.client.post(`/student/${studentId}/status`, { status });
     return response.data;
   }
 
   async getStudentStatusHistory(studentId: string) {
-    const response = await this.client.get(`/students/${studentId}/status-history`);
+    const response = await this.client.get(`/student/${studentId}/status-history`);
     return response.data;
   }
 

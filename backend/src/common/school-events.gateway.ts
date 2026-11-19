@@ -121,7 +121,7 @@ export class SchoolEventsGateway implements OnGatewayInit, OnGatewayConnection, 
     this.emitToSchool(schoolId, 'student:enrolled', data);
   }
 
-  emitStudentStatusChanged(schoolId: string, data: { studentId: string; status: string }) {
+  emitStudentStatusChanged(schoolId: string, data: { studentId: string; status: string; previousStatus?: string }) {
     this.emitToSchool(schoolId, 'student:status-changed', data);
   }
 

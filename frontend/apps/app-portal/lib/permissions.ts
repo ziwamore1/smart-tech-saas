@@ -203,10 +203,11 @@ export const PERMISSION_CATEGORIES: Record<string, { label: string; permissions:
 export const ALL_PERMISSIONS: Permission[] = Object.values(PERMISSION_CATEGORIES)
   .flatMap(c => c.permissions) as Permission[];
 
-type RoleKey = 'SuperAdmin' | 'Director' | 'Deputy Director' | 'Head Teacher' | 'Deputy Head' | 'Deputy' | 'HOD' | 'Teacher' | 'Class Teacher' | 'Lower Primary Senior Teacher' | 'Upper Primary Senior Teacher';
+type RoleKey = 'SuperAdmin' | 'Director' | 'Deputy Director' | 'Head Teacher' | 'Deputy Head Teacher' | 'Deputy Head' | 'Deputy' | 'HOD' | 'Teacher' | 'Class Teacher' | 'Lower Primary Senior Teacher' | 'Upper Primary Senior Teacher';
 
 export function isRoleKey(role: string): role is RoleKey {
-  return ['SuperAdmin', 'Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'].includes(role);
+  const normalized = normalizeRoleName(role);
+  return ['SuperAdmin', 'Director', 'Deputy Director', 'Head Teacher', 'Deputy Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'].includes(normalized);
 }
 
 const ALL: Permission[] = ALL_PERMISSIONS;
@@ -223,6 +224,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
   ],
   'Head Teacher': [
     ...VIEW_ONLY,
+    'students.manage',
     'assessments.create',
     'assessments.view',
     'attendance.manage',
@@ -232,6 +234,28 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
     'stamps.view',
     'library.view',
     'gallery.view',
+  ],
+  'Deputy Head Teacher': [
+    ...VIEW_ONLY,
+    'students.manage',
+    'assessments.create',
+    'assessments.view',
+    'attendance.manage',
+    'results.view',
+    'results.manage',
+    'reports.view',
+    'reports.manage',
+    'staff.view',
+    'staff.manage',
+    'classes.view',
+    'subjects.view',
+    'analytics.view',
+    'exams.view',
+    'exams.manage',
+    'communications.view',
+    'communications.send',
+    'lesson-plans.view',
+    'lesson-plans.manage',
   ],
   'Deputy Head': [
     ...VIEW_ONLY,
@@ -373,8 +397,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
 export function getDefaultPermissions(roles: string[]): Permission[] {
   const permissions = new Set<Permission>();
   for (const role of roles) {
-    if (isRoleKey(role)) {
-      for (const p of DEFAULT_ROLE_PERMISSIONS[role]) {
+    const normalized = normalizeRoleName(role);
+    if (isRoleKey(normalized)) {
+      for (const p of DEFAULT_ROLE_PERMISSIONS[normalized]) {
         permissions.add(p);
       }
     }
@@ -390,7 +415,7 @@ export function getMergedRoles(source: RoleSource): string[] {
     const normalized = normalizeRoleName(role);
     if (!seen.has(normalized)) {
       seen.add(normalized);
-      merged.push(role);
+      merged.push(normalized);
     }
   };
 
@@ -402,12 +427,13 @@ export function getMergedRoles(source: RoleSource): string[] {
 }
 
 function normalizeRoleName(role: string): string {
-  const lower = role.toLowerCase();
-  if (lower === 'classteacher' || lower === 'class teacher') return 'ClassTeacher';
-  if (lower === 'deputydirector' || lower === 'deputy director') return 'DeputyDirector';
-  if (lower === 'headteacher' || lower === 'head teacher') return 'HeadTeacher';
-  if (lower === 'deputyhead' || lower === 'deputy head') return 'DeputyHead';
-  return lower;
+  const compact = role.toLowerCase().replace(/[\s_-]/g, '');
+  if (compact === 'classteacher') return 'Class Teacher';
+  if (compact === 'deputydirector') return 'Deputy Director';
+  if (compact === 'headteacher') return 'Head Teacher';
+  if (compact === 'deputyheadteacher') return 'Deputy Head Teacher';
+  if (compact === 'deputyhead') return 'Deputy Head';
+  return role;
 }
 
 export function hasPermission(user: { roles?: string[]; platformRoles?: string[]; schoolRoles?: string[] } | null | undefined, permission: Permission): boolean {

@@ -5,6 +5,7 @@ import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { HolidayService } from '../holiday/holiday.service';
 import { SchoolActivityService } from '../common/services/school-activity.service';
 import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
+import { DEFAULT_AGE_BANDS } from '../class/age-band.defaults';
 
 @Injectable()
 export class AttendanceService {
@@ -1051,62 +1052,197 @@ export class AttendanceService {
     };
   }
 
+  private calculateAge(dob: Date | string | null | undefined, reference = new Date()): number | null {
+    if (!dob) return null;
+    const birth = new Date(dob);
+    if (Number.isNaN(birth.getTime())) return null;
+    let age = reference.getFullYear() - birth.getFullYear();
+    const monthDiff = reference.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && reference.getDate() < birth.getDate())) age -= 1;
+    return age >= 0 ? age : 0;
+  }
+
+  private normalizeGender(gender?: string | null): 'male' | 'female' | 'other' {
+    const value = String(gender || '').trim().toLowerCase();
+    if (value === 'male' || value === 'm') return 'male';
+    if (value === 'female' || value === 'f') return 'female';
+    return 'other';
+  }
+
   async getClassListData(classId: string, schoolId: string) {
-    const classData = await this.prisma.class.findUnique({
-      where: { id: classId },
-      include: { levelType: true, school: true },
+    if (!classId || !schoolId) throw new NotFoundException('Class not found');
+
+    const classData = await this.prisma.class.findFirst({
+      where: { id: classId, schoolId },
+      include: {
+        levelType: true,
+        school: true,
+        classTeacher: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
     });
 
     if (!classData) throw new NotFoundException('Class not found');
 
-    const enrollments = await this.prisma.enrollment.findMany({
-      where: { classId, schoolId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
-      include: {
-        student: true,
-      },
+    const now = new Date();
+    const currentAcademicYear = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      orderBy: { startDate: 'desc' },
     });
 
-    const students = enrollments.map(e => {
-      const s = e.student;
-      const dob = s.dateOfBirth;
-      const age = dob ? Math.floor((new Date().getTime() - new Date(dob).getTime()) / 31557600000) : null;
-      const genderRaw = s.gender || '';
-      const isMale = genderRaw.toLowerCase() === 'male' || genderRaw === 'M';
-      const isFemale = genderRaw.toLowerCase() === 'female' || genderRaw === 'F';
+    const currentTerm = await this.prisma.term.findFirst({
+      where: {
+        isCurrent: true,
+        academicYear: currentAcademicYear ? { schoolId, id: currentAcademicYear.id } : { schoolId, isCurrent: true },
+      },
+      include: { academicYear: true },
+      orderBy: { startDate: 'desc' },
+    }) ?? await this.prisma.term.findFirst({
+      where: {
+        academicYear: { schoolId },
+        startDate: { lte: now },
+        endDate: { gte: now },
+      },
+      include: { academicYear: true },
+      orderBy: { startDate: 'desc' },
+    });
+
+    const academicYear = currentAcademicYear || currentTerm?.academicYear || null;
+
+    let ageBands = await this.prisma.ageBand.findMany({
+      where: { schoolId, isActive: true },
+      orderBy: [{ order: 'asc' }, { minAge: 'asc' }],
+    });
+    if (ageBands.length === 0) {
+      ageBands = DEFAULT_AGE_BANDS.map((band, index) => ({
+        id: `default-${index}`,
+        schoolId,
+        label: band.label,
+        minAge: band.minAge,
+        maxAgeExclusive: band.maxAgeExclusive,
+        order: band.order,
+        isActive: true,
+      })) as any;
+    }
+
+    const enrollmentWhere = {
+      classId,
+      schoolId,
+      status: 'ACTIVE' as const,
+      student: { status: 'ACTIVE' as const },
+    };
+    const enrollmentOrderBy: any[] = [
+      { student: { lastName: 'asc' } },
+      { student: { firstName: 'asc' } },
+      { student: { id: 'asc' } },
+    ];
+
+    let enrollments = await this.prisma.enrollment.findMany({
+      where: { ...enrollmentWhere, ...(academicYear ? { academicYearId: academicYear.id } : {}) },
+      include: { student: true },
+      orderBy: enrollmentOrderBy,
+    });
+    if (enrollments.length === 0 && academicYear) {
+      enrollments = await this.prisma.enrollment.findMany({
+        where: enrollmentWhere,
+        include: { student: true },
+        orderBy: enrollmentOrderBy,
+      });
+    }
+
+    const bandStats = ageBands.map((band) => ({
+      label: band.label,
+      minAge: band.minAge,
+      maxAgeExclusive: band.maxAgeExclusive,
+      male: 0,
+      female: 0,
+      other: 0,
+      total: 0,
+    }));
+    let missingDob = 0;
+
+    const students = enrollments.map((enrollment, index) => {
+      const student = enrollment.student;
+      const age = this.calculateAge(student.dateOfBirth, now);
+      const gender = this.normalizeGender(student.gender);
+      if (age === null) {
+        missingDob += 1;
+      } else {
+        const band = bandStats.find((item) => item.minAge <= age && (item.maxAgeExclusive == null || age < item.maxAgeExclusive));
+        if (band) {
+          band[gender] += 1;
+          band.total += 1;
+        } else {
+          missingDob += 1;
+        }
+      }
+
+      const fullName = `${student.firstName} ${student.lastName}`;
+      const formattedDob = student.dateOfBirth
+        ? student.dateOfBirth.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+        : '-';
 
       return {
-        admNo: s.admissionNumber,
-        name: `${s.firstName} ${s.lastName}`,
-        photoUrl: s.photoUrl || '',
-        genderClass: isMale ? 'male' : isFemale ? 'female' : '',
-        genderLabel: isMale ? 'Male' : isFemale ? 'Female' : s.gender || 'N/A',
-        dob: dob ? dob.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '-',
+        id: student.id,
+        rowNumber: index + 1,
+        admNo: student.admissionNumber,
+        admissionNumber: student.admissionNumber,
+        lastName: student.lastName,
+        firstName: student.firstName,
+        name: fullName,
+        fullName,
+        photoUrl: student.photoUrl || '',
+        genderClass: gender === 'other' ? '' : gender,
+        genderLabel: gender === 'male' ? 'Male' : gender === 'female' ? 'Female' : student.gender || 'N/A',
+        dob: formattedDob,
+        dateOfBirth: formattedDob,
         age: age !== null ? age : '-',
-        status: e.status,
-        statusClass: e.status === 'ACTIVE' ? 'active' : 'inactive',
+        ageYears: age,
+        status: enrollment.status,
+        statusClass: enrollment.status === 'ACTIVE' ? 'active' : 'inactive',
       };
     });
 
-    const male = students.filter(s => s.genderClass === 'male').length;
-    const female = students.filter(s => s.genderClass === 'female').length;
     const total = students.length;
+    const male = students.filter((student) => student.genderClass === 'male').length;
+    const female = students.filter((student) => student.genderClass === 'female').length;
+    const other = total - male - female;
+    const percentage = (value: number) => (total > 0 ? Math.round((value / total) * 1000) / 10 : 0);
+    const classTeacher = classData.classTeacher
+      ? `${classData.classTeacher.firstName} ${classData.classTeacher.lastName}`.trim()
+      : 'N/A';
 
     return {
       school: {
         name: classData.school.name,
         address: classData.school.address || '',
-        logo: classData.school.logo || '',
+        contact: [classData.school.phone, classData.school.email].filter(Boolean).join(' | '),
+        phone: classData.school.phone || '',
+        email: classData.school.email || '',
+        logo: classData.school.logoUrl || '',
       },
       className: classData.name,
       levelType: classData.levelType?.name || '',
-      generatedAt: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      currentTerm: currentTerm?.name || '',
+      academicYear: academicYear?.name || '',
+      currentTermName: currentTerm?.name || '',
+      academicYearName: academicYear?.name || '',
+      classTeacher,
+      generatedAt: now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      generatedAtIso: now.toISOString(),
       summary: {
         total,
         male,
         female,
+        other,
+        unspecified: other,
         capacity: classData.capacity || null,
-        maleRatio: total > 0 ? male : 0,
-        femaleRatio: total > 0 ? female : 0,
+        malePercent: percentage(male),
+        femalePercent: percentage(female),
+        otherPercent: percentage(other),
+        maleRatio: male,
+        femaleRatio: female,
+        ageBands: bandStats,
+        missingDob,
       },
       students,
       primaryColor: '#ea6645',

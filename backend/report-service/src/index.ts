@@ -119,6 +119,10 @@ async function main() {
   console.log(`   Redis: ${redisUrl ? (() => { const u = new URL(redisUrl); return `${u.protocol}//${u.hostname}:${u.port || 6379}`; })() : 'not configured'}`);
   console.log(`   Queue: ${config.queue.name}`);
 
+  renderer = new ReportRenderer();
+  const loadedTemplates = renderer.verifyTemplates();
+  console.log(`✅ Templates loaded: ${loadedTemplates.join(', ')}`);
+
   const redisOk = await checkRedis();
 
   if (!redisOk) {

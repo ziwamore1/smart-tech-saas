@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { teacherApi, studentApi } from '@/lib/api';
-import { socket } from '@/lib/socket';
+import { useSchoolSocket } from '@/lib/use-school-socket';
 
 export default function MyClassPage() {
   const { user, isClassTeacher } = useAuth();
@@ -28,16 +28,13 @@ export default function MyClassPage() {
     parentEmail: '',
   });
 
-  useEffect(() => {
-    const schoolId = user?.schoolId;
-    if (!schoolId) return;
-    const eventName = `student:updated:${schoolId}`;
-    const handler = () => {
+  useSchoolSocket({
+    'student:status-changed': () => {
       queryClient.invalidateQueries({ queryKey: ['class-students'] });
-    };
-    socket.on(eventName, handler);
-    return () => { socket.off(eventName, handler); };
-  }, [user?.schoolId, queryClient]);
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['school-stats'] });
+    },
+  });
 
   const { data: classesResponse } = useQuery({
     queryKey: ['teacher-classes'],
@@ -112,10 +109,12 @@ export default function MyClassPage() {
   });
 
   const deactivateMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => 
-      studentApi.update(id, { status }),
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      studentApi.changeStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['class-students'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['school-stats'] });
       setMessage({ type: 'success', text: 'Student status updated!' });
       setTimeout(() => setMessage(null), 3000);
     },
