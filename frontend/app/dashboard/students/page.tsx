@@ -37,7 +37,7 @@ export default function StudentsPage() {
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterClass, setFilterClass] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [filterStatus, setFilterStatus] = useState('ACTIVE');
   const [includeInactive, setIncludeInactive] = useState(false);
   const [linkParentSearch, setLinkParentSearch] = useState('');
   const [selectedParentId, setSelectedParentId] = useState('');

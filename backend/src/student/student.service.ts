@@ -1053,7 +1053,7 @@ export class StudentService {
             });
             await tx.enrollment.updateMany({
               where: { studentId, status: EnrollmentStatus.ACTIVE },
-              data: { status: EnrollmentStatus.INACTIVE },
+              data: { status: EnrollmentStatus.INACTIVE, sequenceNumber: null },
             });
             for (const enrollment of activeEnrollments) {
               await this.admissionNumberService.resequenceClassInTransaction(

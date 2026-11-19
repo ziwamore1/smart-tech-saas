@@ -1,6 +1,6 @@
 import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { EnrollmentStatus, Prisma } from '@prisma/client';
 
 @Injectable()
 export class AdmissionNumberService {
@@ -153,6 +153,13 @@ export class AdmissionNumberService {
 
     await tx.enrollment.updateMany({
       where: { classId, academicYearId, schoolId, status: 'ACTIVE' },
+      data: { sequenceNumber: null },
+    });
+
+    // Inactive enrollments must not reserve sequence numbers. The unique
+    // constraint covers all enrollments, not only the active register.
+    await tx.enrollment.updateMany({
+      where: { classId, academicYearId, schoolId, status: { not: EnrollmentStatus.ACTIVE } },
       data: { sequenceNumber: null },
     });
 
