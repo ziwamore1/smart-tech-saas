@@ -13,17 +13,6 @@ function calculateAge(dob: string): number {
   return age;
 }
 
-function getLevelLabel(levelTypeName?: string | null, className?: string | null): string {
-  const configuredName = levelTypeName?.trim();
-  if (configuredName && /\d/.test(configuredName)) return configuredName;
-
-  const source = `${configuredName || ''} ${className || ''}`;
-  const match = source.match(/\b(form|grade)\s*[- ]?\s*(\d+)\b/i);
-  if (match) return `${match[1][0].toUpperCase()}${match[1].slice(1).toLowerCase()} ${match[2]}`;
-
-  return configuredName || className || 'Level';
-}
-
 function sanitizeClassFileName(name?: string | null): string {
   const sanitized = (name || 'Class').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
   return sanitized || 'Class';
@@ -108,24 +97,12 @@ export default function ClassListPage() {
     return classes.find((c: any) => c.id === selectedClassId) || null;
   }, [classes, selectedClassId]);
 
-  const levelLabel = getLevelLabel(selectedClass?.levelType?.name, selectedClass?.name);
-
   const { data: studentsData, isLoading } = useQuery({
     queryKey: ['class-students-list', selectedClassId],
     queryFn: async () => {
       if (!selectedClassId) return [];
       const res = await studentApi.getAll({ classId: selectedClassId });
       return res.data?.data || res.data || [];
-    },
-    enabled: !!selectedClassId,
-  });
-
-  const { data: ageSummaryData, isLoading: ageSummaryLoading } = useQuery({
-    queryKey: ['class-age-summary', selectedClassId],
-    queryFn: async () => {
-      if (!selectedClassId) return null;
-      const res = await classApi.getAgeSummary(selectedClassId);
-      return res.data;
     },
     enabled: !!selectedClassId,
   });
@@ -333,60 +310,6 @@ export default function ClassListPage() {
             {genderSummary.total > 0 && (
               <span><strong>M:F Ratio:</strong> {genderSummary.male}:{genderSummary.female} ({(genderSummary.male / genderSummary.total * 100).toFixed(0)}% / {(genderSummary.female / genderSummary.total * 100).toFixed(0)}%)</span>
             )}
-          </div>
-
-          <div style={{ background: '#fefcf9', borderRadius: 12, border: '1px solid #e8ddd0', marginBottom: 16, overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e8ddd0' }}>
-              <h2 style={{ margin: 0, fontSize: 16, color: '#1f2937' }}>Age Distribution by Gender: {levelLabel}</h2>
-              <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>
-                 Based on students' dates of birth. {levelLabel} totals combine all classes under this level.
-              </p>
-            </div>
-            {ageSummaryLoading ? (
-              <div style={{ padding: 28, textAlign: 'center', color: '#9ca3af' }}>Loading age totals...</div>
-            ) : ageSummaryData ? (
-              <div style={{ overflowX: 'auto' }}>
-                <table className="class-list-table" style={{ width: '100%', fontSize: 13 }}>
-                   <thead>
-                     <tr>
-                       <th style={{ textAlign: 'left' }}>Years</th>
-                       <th style={{ textAlign: 'center', color: '#2563eb' }}>Class Male</th>
-                       <th style={{ textAlign: 'center', color: '#db2777' }}>Class Female</th>
-                       <th style={{ textAlign: 'center' }}>Class Other</th>
-                       <th style={{ textAlign: 'center' }}>Class Total</th>
-                       <th style={{ textAlign: 'center', color: '#2563eb' }}>{levelLabel} Male</th>
-                       <th style={{ textAlign: 'center', color: '#db2777' }}>{levelLabel} Female</th>
-                       <th style={{ textAlign: 'center' }}>{levelLabel} Other</th>
-                       <th style={{ textAlign: 'center' }}>{levelLabel} Total</th>
-                     </tr>
-                   </thead>
-                   <tbody>
-                     {ageSummaryData.bands.map((band: any, index: number) => {
-                       const classBand = ageSummaryData.class.bands[index] || {};
-                       const levelBand = ageSummaryData.level.bands[index] || {};
-                       return (
-                         <tr key={band.id || band.label}>
-                           <td style={{ fontWeight: 600, color: '#374151' }}>{band.label}</td>
-                           <td style={{ textAlign: 'center' }}>{classBand.male || 0}</td>
-                           <td style={{ textAlign: 'center' }}>{classBand.female || 0}</td>
-                           <td style={{ textAlign: 'center' }}>{classBand.other || 0}</td>
-                           <td style={{ textAlign: 'center', fontWeight: 700 }}>{classBand.total || 0}</td>
-                           <td style={{ textAlign: 'center' }}>{levelBand.male || 0}</td>
-                           <td style={{ textAlign: 'center' }}>{levelBand.female || 0}</td>
-                           <td style={{ textAlign: 'center' }}>{levelBand.other || 0}</td>
-                           <td style={{ textAlign: 'center', fontWeight: 700 }}>{levelBand.total || 0}</td>
-                         </tr>
-                       );
-                     })}
-                     <tr style={{ background: '#f9fafb', fontWeight: 700 }}>
-                       <td>Total / Missing DOB</td>
-                       <td colSpan={4} style={{ textAlign: 'center' }}>{ageSummaryData.class.totalStudents} total, {ageSummaryData.class.missingDob} missing DOB</td>
-                       <td colSpan={4} style={{ textAlign: 'center' }}>{ageSummaryData.level.totalStudents} total, {ageSummaryData.level.missingDob} missing DOB</td>
-                     </tr>
-                   </tbody>
-                </table>
-              </div>
-            ) : null}
           </div>
 
           <div style={{ background: '#fefcf9', borderRadius: 12, border: '1px solid #e8ddd0', overflow: 'hidden' }}>

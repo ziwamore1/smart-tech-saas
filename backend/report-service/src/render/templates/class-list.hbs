@@ -34,7 +34,6 @@
 
   .stats-line { margin-bottom: 10px; padding: 7px 9px; background: #f3f4f6; border: 1px solid #d1d5db; font-size: 10px; color: #374151; overflow-wrap: anywhere; word-break: break-word; white-space: normal; page-break-inside: avoid; }
   .stats-line strong { color: #111827; }
-  .age-band-line { margin-bottom: 10px; padding: 7px 9px; background: {{secondaryColor}}; border: 1px solid #d1d5db; font-size: 10px; color: #374151; overflow-wrap: anywhere; word-break: break-word; white-space: normal; page-break-inside: avoid; }
 
   table.students { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 4px; }
   table.students th { background: #1f2937; color: #ffffff; padding: 6px 5px; font-size: 9px; font-weight: 700; text-align: center; text-transform: uppercase; letter-spacing: 0.3px; border: 1px solid #111827; overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
@@ -108,15 +107,6 @@
   <strong>Gender distribution:</strong> Male {{summary.male}} ({{summary.malePercent}}%) | Female {{summary.female}} ({{summary.femalePercent}}%) |
   Other / Unspecified {{summary.other}} ({{summary.otherPercent}}%) | <strong>M:F ratio:</strong> {{summary.maleRatio}}:{{summary.femaleRatio}}
   {{#if summary.capacity}} | <strong>Capacity:</strong> {{summary.capacity}}{{/if}}
-</div>
-
-<div class="age-band-line">
-  <strong>Age bands:</strong>
-  {{#each summary.ageBands}}
-    {{label}}: {{total}} (M {{male}}, F {{female}}, O {{other}}){{#unless @last}} |{{/unless}}
-  {{else}}
-    No age band data available
-  {{/each}}
 </div>
 
 <table class="students">

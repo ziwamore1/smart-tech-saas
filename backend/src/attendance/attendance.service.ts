@@ -5,7 +5,6 @@ import { SchoolEventsGateway } from '../common/school-events.gateway';
 import { HolidayService } from '../holiday/holiday.service';
 import { SchoolActivityService } from '../common/services/school-activity.service';
 import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
-import { DEFAULT_AGE_BANDS } from '../class/age-band.defaults';
 
 @Injectable()
 export class AttendanceService {
@@ -1108,22 +1107,6 @@ export class AttendanceService {
 
     const academicYear = currentAcademicYear || currentTerm?.academicYear || null;
 
-    let ageBands = await this.prisma.ageBand.findMany({
-      where: { schoolId, isActive: true },
-      orderBy: [{ order: 'asc' }, { minAge: 'asc' }],
-    });
-    if (ageBands.length === 0) {
-      ageBands = DEFAULT_AGE_BANDS.map((band, index) => ({
-        id: `default-${index}`,
-        schoolId,
-        label: band.label,
-        minAge: band.minAge,
-        maxAgeExclusive: band.maxAgeExclusive,
-        order: band.order,
-        isActive: true,
-      })) as any;
-    }
-
     const enrollmentWhere = {
       classId,
       schoolId,
@@ -1149,15 +1132,6 @@ export class AttendanceService {
       });
     }
 
-    const bandStats = ageBands.map((band) => ({
-      label: band.label,
-      minAge: band.minAge,
-      maxAgeExclusive: band.maxAgeExclusive,
-      male: 0,
-      female: 0,
-      other: 0,
-      total: 0,
-    }));
     let missingDob = 0;
 
     const students = enrollments.map((enrollment, index) => {
@@ -1166,14 +1140,6 @@ export class AttendanceService {
       const gender = this.normalizeGender(student.gender);
       if (age === null) {
         missingDob += 1;
-      } else {
-        const band = bandStats.find((item) => item.minAge <= age && (item.maxAgeExclusive == null || age < item.maxAgeExclusive));
-        if (band) {
-          band[gender] += 1;
-          band.total += 1;
-        } else {
-          missingDob += 1;
-        }
       }
 
       const fullName = `${student.firstName} ${student.lastName}`;
@@ -1241,7 +1207,6 @@ export class AttendanceService {
         otherPercent: percentage(other),
         maleRatio: male,
         femaleRatio: female,
-        ageBands: bandStats,
         missingDob,
       },
       students,
