@@ -89,6 +89,12 @@ export class StudentController {
     return this.service.findByParent(parentId, req.user.id);
   }
 
+  @Get('recycle-bin')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
+  getRecycleBin(@Req() req: any) {
+    return this.service.getRecycleBin(req.user.schoolId);
+  }
+
   @Get(':id')
   @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
   findOne(@Param('id') id: string) {
@@ -105,7 +111,13 @@ export class StudentController {
   @Delete(':id')
   @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
   delete(@Param('id') id: string, @Req() req: any) {
-    return this.service.delete(id, req.user.schoolId);
+    return this.service.delete(id, req.user.schoolId, req.user.id);
+  }
+
+  @Post(':id/restore')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
+  restore(@Param('id') id: string, @Req() req: any) {
+    return this.service.restore(id, req.user.schoolId);
   }
 
   @Post(':id/status')

@@ -39,6 +39,18 @@ export class EnrollmentController {
     return this.enrollmentService.getActiveEnrollmentsByClass(classId);
   }
 
+  @Get('recycle-bin')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
+  getRecycleBin(@Req() req: any) {
+    return this.enrollmentService.getRecycleBin(req.user.schoolId);
+  }
+
+  @Post(':id/restore')
+  @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
+  restore(@Param('id') id: string, @Req() req: any) {
+    return this.enrollmentService.restoreEnrollment(id, req.user.schoolId);
+  }
+
   @Delete(':id')
   @Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
   removeFromClass(@Param('id') id: string, @Req() req: any) {

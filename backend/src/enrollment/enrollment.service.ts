@@ -174,12 +174,7 @@ export class EnrollmentService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
   }
 
-  /**
-   * Removes a student from a single class. The student record, its other
-   * enrollments and its login credentials are all preserved — only the given
-   * enrollment is deleted. The class admission sequence is then automatically
-   * reset so the remaining students stay contiguously numbered.
-   */
+  /** Moves a class enrollment to the recycle bin without deleting the student. */
   async removeEnrollment(enrollmentId: string, schoolId: string) {
     const enrollment = await this.prisma.enrollment.findUnique({
       where: { id: enrollmentId },
@@ -189,7 +184,10 @@ export class EnrollmentService {
     if (enrollment.schoolId !== schoolId) throw new ForbiddenException('Invalid enrollment');
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.enrollment.delete({ where: { id: enrollmentId } });
+      await tx.enrollment.update({
+        where: { id: enrollmentId },
+        data: { status: EnrollmentStatus.INACTIVE, sequenceNumber: null },
+      });
 
       const remainingActive = await tx.enrollment.findMany({
         where: {
@@ -223,6 +221,42 @@ export class EnrollmentService {
       }
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
 
-    return { message: 'Student removed from class successfully' };
+    return { message: 'Student enrollment moved to the recycle bin. It can be restored.' };
+  }
+
+  async getRecycleBin(schoolId: string) {
+    return this.prisma.enrollment.findMany({
+      where: { schoolId, status: EnrollmentStatus.INACTIVE, student: { deletedAt: null } },
+      orderBy: { student: { lastName: 'asc' } },
+      include: {
+        student: { select: { id: true, firstName: true, lastName: true, admissionNumber: true, status: true } },
+        class: { select: { id: true, name: true } },
+        academicYear: { select: { id: true, name: true } },
+      },
+    });
+  }
+
+  async restoreEnrollment(enrollmentId: string, schoolId: string) {
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: { id: enrollmentId, schoolId, status: EnrollmentStatus.INACTIVE, student: { deletedAt: null } },
+      select: { id: true, studentId: true, classId: true, academicYearId: true, schoolId: true },
+    });
+    if (!enrollment) throw new NotFoundException('Enrollment is not in the recycle bin');
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.enrollment.update({
+        where: { id: enrollment.id },
+        data: { status: EnrollmentStatus.ACTIVE, sequenceNumber: null },
+      });
+      await tx.student.update({
+        where: { id: enrollment.studentId },
+        data: { classId: enrollment.classId, status: 'ACTIVE' },
+      });
+      await this.admissionNumberService.resequenceClassInTransaction(
+        tx, enrollment.schoolId, enrollment.academicYearId, enrollment.classId,
+      );
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
+
+    return { message: 'Student enrollment restored successfully' };
   }
 }

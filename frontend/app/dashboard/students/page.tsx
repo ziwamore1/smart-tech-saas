@@ -39,6 +39,28 @@ export default function StudentsPage() {
   const [filterClass, setFilterClass] = useState('');
   const [filterStatus, setFilterStatus] = useState('ACTIVE');
   const [includeInactive, setIncludeInactive] = useState(false);
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
+
+  const { data: recycleBinData } = useQuery({
+    queryKey: ['student-recycle-bin'],
+    queryFn: async () => {
+      const [studentsRes, enrollmentsRes] = await Promise.all([studentApi.getRecycleBin(), enrollmentApi.getRecycleBin()]);
+      return { students: studentsRes.data || [], enrollments: enrollmentsRes.data || [] };
+    },
+    enabled: showRecycleBin,
+  });
+
+  const restoreStudentMutation = useMutation({
+    mutationFn: (id: string) => studentApi.restore(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['student-recycle-bin'] }); queryClient.invalidateQueries({ queryKey: ['students'] }); setMessage({ type: 'success', text: 'Student restored successfully.' }); },
+    onError: (error: any) => setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to restore student.' }),
+  });
+
+  const restoreEnrollmentMutation = useMutation({
+    mutationFn: (id: string) => enrollmentApi.restore(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['student-recycle-bin'] }); queryClient.invalidateQueries({ queryKey: ['students'] }); setMessage({ type: 'success', text: 'Enrollment restored successfully.' }); },
+    onError: (error: any) => setMessage({ type: 'error', text: error?.response?.data?.message || 'Failed to restore enrollment.' }),
+  });
   const [linkParentSearch, setLinkParentSearch] = useState('');
   const [selectedParentId, setSelectedParentId] = useState('');
   const [statusModalStudent, setStatusModalStudent] = useState<any>(null);
@@ -383,7 +405,7 @@ export default function StudentsPage() {
       setPendingDeleteId(null);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
-      setMessage({ type: 'success', text: 'Student deleted successfully!' });
+       setMessage({ type: 'success', text: 'Student moved to the recycle bin.' });
       setTimeout(() => setMessage(null), 3000);
     },
     onError: (error: any) => {
@@ -402,7 +424,7 @@ export default function StudentsPage() {
       queryClient.invalidateQueries({ queryKey: ['school-stats'] });
       setShowViewModal(false);
       setSelectedStudent(null);
-      setMessage({ type: 'success', text: 'Student removed from class. Class register re-sequenced automatically.' });
+       setMessage({ type: 'success', text: 'Enrollment moved to the recycle bin. Class register re-sequenced automatically.' });
       setTimeout(() => setMessage(null), 5000);
     },
     onError: (error: any) => {
@@ -588,7 +610,7 @@ export default function StudentsPage() {
                 ) : '↩️ Remove'}
               </button>
               <button
-                onClick={() => { if (confirm(`Delete ${student.firstName} ${student.lastName}? This will permanently remove them and all their records.`)) { deleteStudentMutation.mutate(student.id); } }}
+                 onClick={() => { if (confirm(`Move ${student.firstName} ${student.lastName} to the recycle bin? Their records can be restored.`)) { deleteStudentMutation.mutate(student.id); } }}
                 disabled={pendingDeleteId === student.id}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -626,13 +648,26 @@ export default function StudentsPage() {
           <h1 className="text-3xl font-bold text-gray-900">Students Register</h1>
           <p className="text-gray-600 mt-1">Manage student records and enrollments</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          + Add Student
-        </button>
-      </div>
+         <div className="flex gap-2">
+           <button onClick={() => setShowRecycleBin((open) => !open)} className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900">
+             {showRecycleBin ? 'Hide Recycle Bin' : 'Recycle Bin'}
+           </button>
+           <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+             + Add Student
+           </button>
+         </div>
+       </div>
+
+       {showRecycleBin && (
+         <div className="bg-gray-900 text-white rounded-2xl p-5 shadow-lg">
+           <div className="flex items-center justify-between mb-4"><div><h2 className="text-lg font-semibold">Recycle Bin</h2><p className="text-sm text-gray-300">Deleted students and removed class enrollments can be restored.</p></div><span className="text-sm text-gray-300">{(recycleBinData?.students?.length || 0) + (recycleBinData?.enrollments?.length || 0)} items</span></div>
+           <div className="space-y-2">
+             {recycleBinData?.students?.map((student: any) => <div key={`student-${student.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-gray-800 px-4 py-3"><div><span className="font-medium">{student.firstName} {student.lastName}</span><span className="ml-3 text-sm text-gray-400">Student · {student.admissionNumber || 'No admission number'}</span></div><button onClick={() => restoreStudentMutation.mutate(student.id)} className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm hover:bg-emerald-700">Restore student</button></div>)}
+             {recycleBinData?.enrollments?.map((enrollment: any) => <div key={`enrollment-${enrollment.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-gray-800 px-4 py-3"><div><span className="font-medium">{enrollment.student?.firstName} {enrollment.student?.lastName}</span><span className="ml-3 text-sm text-gray-400">Enrollment · {enrollment.class?.name || 'Unknown class'} · {enrollment.academicYear?.name || 'Unknown year'}</span></div><button onClick={() => restoreEnrollmentMutation.mutate(enrollment.id)} className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm hover:bg-emerald-700">Restore enrollment</button></div>)}
+             {recycleBinData && !recycleBinData.students?.length && !recycleBinData.enrollments?.length && <p className="text-sm text-gray-400">Recycle bin is empty.</p>}
+           </div>
+         </div>
+       )}
 
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">

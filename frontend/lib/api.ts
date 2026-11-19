@@ -291,6 +291,8 @@ export const studentApi = {
   create: (data: any) => api.post('/student', data),
   update: (id: string, data: any) => api.patch(`/student/${id}`, data),
   delete: (id: string) => api.delete(`/student/${id}`, { timeout: 120000 }),
+  getRecycleBin: () => api.get('/student/recycle-bin'),
+  restore: (id: string) => api.post(`/student/${id}/restore`),
   changeStatus: (id: string, status: string) =>
     api.post(`/student/${id}/status`, { status }),
   getStatusHistory: (id: string) => api.get(`/student/${id}/status-history`),
@@ -673,6 +675,8 @@ export const enrollmentApi = {
   update: (id: string, data: any) => api.patch(`/enrollments/${id}`, data),
   delete: (id: string) => api.delete(`/enrollments/${id}`),
   removeFromClass: (enrollmentId: string) => api.delete(`/enrollments/${enrollmentId}`),
+  getRecycleBin: () => api.get('/enrollments/recycle-bin'),
+  restore: (id: string) => api.post(`/enrollments/${id}/restore`),
 };
 
 export const levelTypeApi = {

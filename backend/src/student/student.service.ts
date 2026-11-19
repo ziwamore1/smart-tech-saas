@@ -482,10 +482,13 @@ export class StudentService {
       limit?: number;
     },
   ) {
-    const where: Prisma.StudentWhereInput = { schoolId };
+    const where: Prisma.StudentWhereInput = { schoolId, deletedAt: null };
+    const requestedStatus = options?.status?.toUpperCase();
+    const activeEnrollmentOnly = !options?.includeInactive
+      && (!requestedStatus || requestedStatus === StudentStatus.ACTIVE);
 
-    if (options?.status) {
-      where.status = options.status as StudentStatus;
+    if (requestedStatus) {
+      where.status = requestedStatus as StudentStatus;
     } else if (!options?.includeInactive) {
       where.status = StudentStatus.ACTIVE;
     }
@@ -494,7 +497,7 @@ export class StudentService {
       where.enrollments = {
         some: {
           classId: options.classId,
-          ...(options.includeInactive ? {} : { status: EnrollmentStatus.ACTIVE }),
+          ...(activeEnrollmentOnly ? { status: EnrollmentStatus.ACTIVE } : {}),
         },
       };
     }
@@ -526,9 +529,9 @@ export class StudentService {
             where: options?.classId
               ? {
                   classId: options.classId,
-                  ...(options.includeInactive ? {} : { status: EnrollmentStatus.ACTIVE }),
-                }
-              : options?.includeInactive ? undefined : { status: EnrollmentStatus.ACTIVE },
+                   ...(activeEnrollmentOnly ? { status: EnrollmentStatus.ACTIVE } : {}),
+                 }
+               : activeEnrollmentOnly ? { status: EnrollmentStatus.ACTIVE } : undefined,
             take: 1,
             orderBy: options?.classId
               ? [{ sequenceNumber: 'asc' as const }, { academicYear: { startDate: 'desc' as const } }]
@@ -575,7 +578,7 @@ export class StudentService {
 
   async findOne(id: string) {
     const student = await this.prisma.student.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
       select: {
         id: true, admissionNumber: true, studentUuid: true, status: true,
         dateOfBirth: true, schoolId: true, firstName: true, lastName: true,
@@ -876,8 +879,8 @@ export class StudentService {
     return oldPublicId;
   }
 
-  async delete(id: string, schoolId?: string) {
-    const student = await this.prisma.student.findUnique({ where: { id }, select: {
+  async delete(id: string, schoolId?: string, deletedById?: string) {
+    const student = await this.prisma.student.findFirst({ where: { id, deletedAt: null }, select: {
       id: true, admissionNumber: true, studentUuid: true, status: true, schoolId: true,
       firstName: true, lastName: true, gender: true, photoUrl: true,
     }});
@@ -891,36 +894,21 @@ export class StudentService {
       select: { classId: true, academicYearId: true, schoolId: true },
     });
 
-    // Deleting one student touches every table that references them (~20 queries).
-    // On slow connections (e.g. Supabase pooler) that exceeds Prisma's default
-    // 5s interactive-transaction timeout and silently rolls the delete back,
-    // so give the transaction generous time to finish.
     await this.prisma.$transaction(
       async (tx) => {
-      // Detach any linked login account without deleting it, so the student's
-      // original credentials survive re-registration under a new student number.
-      await tx.user.updateMany({
-        where: { studentId: id },
-        data: { studentId: null },
-      });
-      await tx.parentStudent.deleteMany({ where: { studentId: id } });
-      await tx.enrollment.deleteMany({ where: { studentId: id } });
-      await tx.studentAssessmentResult.deleteMany({ where: { studentId: id } });
-      await tx.computedResult.deleteMany({ where: { studentId: id } });
-      await tx.termSummary.deleteMany({ where: { studentId: id } });
-      await tx.attendance.deleteMany({ where: { studentId: id } });
-      await tx.studentSubject.deleteMany({ where: { studentId: id } });
-      await tx.result.deleteMany({ where: { studentId: id } });
-      await tx.resultAuditLog.deleteMany({ where: { studentId: id } });
-      await tx.feePayment.deleteMany({ where: { studentId: id } });
-      await tx.homeworkSubmission.deleteMany({ where: { studentId: id } });
-      await tx.assessmentScore.deleteMany({ where: { studentId: id } });
-      await tx.examAttempt.deleteMany({ where: { studentId: id } });
-      await tx.longitudinalRecord.deleteMany({ where: { studentId: id } });
-      await tx.grade7Result.deleteMany({ where: { studentId: id } });
-      await tx.resultSmsLog.deleteMany({ where: { studentId: id } });
-      await tx.generatedReport.deleteMany({ where: { studentId: id } });
-      await tx.student.delete({ where: { id } });
+        await tx.student.update({
+          where: { id },
+          data: {
+            deletedAt: new Date(),
+            deletedById: deletedById || null,
+            status: StudentStatus.INACTIVE,
+            classId: null,
+          },
+        });
+        await tx.enrollment.updateMany({
+          where: { studentId: id },
+          data: { status: EnrollmentStatus.INACTIVE, sequenceNumber: null },
+        });
     },
       { timeout: 120000, maxWait: 10000 },
     );
@@ -941,7 +929,58 @@ export class StudentService {
       }
     }
 
-    return { message: 'Student deleted successfully' };
+    return { message: 'Student moved to the recycle bin. Records can be restored.' };
+  }
+
+  async getRecycleBin(schoolId: string) {
+    return this.prisma.student.findMany({
+      where: { schoolId, deletedAt: { not: null } },
+      orderBy: { deletedAt: 'desc' },
+      select: {
+        id: true,
+        admissionNumber: true,
+        firstName: true,
+        lastName: true,
+        status: true,
+        deletedAt: true,
+        enrollments: {
+          include: { class: { select: { id: true, name: true } }, academicYear: { select: { id: true, name: true, startDate: true } } },
+          orderBy: { academicYear: { startDate: 'desc' } },
+        },
+      },
+    });
+  }
+
+  async restore(id: string, schoolId: string) {
+    const student = await this.prisma.student.findFirst({
+      where: { id, schoolId, deletedAt: { not: null } },
+      include: { enrollments: { include: { academicYear: true }, orderBy: { academicYear: { startDate: 'desc' } } } },
+    });
+    if (!student) throw new NotFoundException('Student is not in the recycle bin');
+
+    const enrollment = student.enrollments[0];
+    await this.prisma.$transaction(async (tx) => {
+      await tx.student.update({
+        where: { id },
+        data: {
+          deletedAt: null,
+          deletedById: null,
+          status: StudentStatus.ACTIVE,
+          classId: enrollment?.classId || null,
+        },
+      });
+      if (enrollment) {
+        await tx.enrollment.update({
+          where: { id: enrollment.id },
+          data: { status: EnrollmentStatus.ACTIVE, sequenceNumber: null },
+        });
+        await this.admissionNumberService.resequenceClassInTransaction(
+          tx, enrollment.schoolId, enrollment.academicYearId, enrollment.classId,
+        );
+      }
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120000, maxWait: 10000 });
+
+    return { message: 'Student restored successfully' };
   }
 
   async enroll(studentId: string, academicYearId: string, classId: string, schoolId: string) {

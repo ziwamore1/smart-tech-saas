@@ -1251,6 +1251,8 @@ model Student {
   admissionNumber        String
   studentUuid            String                         @default(uuid())
   status                 StudentStatus                  @default(ACTIVE)
+  deletedAt              DateTime?
+  deletedById            String?
   dateOfBirth            DateTime?
   schoolId               String
   classId                String?
@@ -1294,6 +1296,7 @@ model Student {
   @@unique([admissionNumber, classId])
   @@unique([studentUuid])
   @@index([schoolId])
+  @@index([schoolId, deletedAt])
   @@index([classId])
   @@index([status])
   @@index([gender])
