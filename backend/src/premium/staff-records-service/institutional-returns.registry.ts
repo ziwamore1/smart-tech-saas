@@ -7,6 +7,7 @@ export interface CanonicalField {
 }
 
 const staffFields: CanonicalField[] = [
+  { key: 'staff.fullName', label: 'Full Name', scope: 'staff', type: 'text', aliases: ['staff name', 'teacher name'] },
   { key: 'staff.surname', label: 'Surname', scope: 'staff', type: 'text', aliases: ['last name'] },
   { key: 'staff.firstName', label: 'First Name', scope: 'staff', type: 'text', aliases: ['given name'] },
   { key: 'staff.nrcNumber', label: 'NRC Number', scope: 'staff', type: 'text', aliases: ['nrc', 'nrc no.'] },
@@ -35,6 +36,7 @@ const staffFields: CanonicalField[] = [
   { key: 'staff.subjectQualifiedToTeachB', label: 'Subject Qualified to Teach (B)', scope: 'staff', type: 'lookup', aliases: [] },
   { key: 'staff.numberOfDaysAbsent', label: 'Number of Days Absent', scope: 'staff', type: 'number', aliases: ['days absent'] },
   { key: 'staff.phoneNumber', label: 'Contact Phone Number', scope: 'staff', type: 'text', aliases: ['phone', 'mobile', 'contact number'] },
+  { key: 'staff.emailAddress', label: 'Email Address', scope: 'staff', type: 'text', aliases: ['email', 'email address'] },
   { key: 'staff.highestAcademicQualification', label: 'Highest Academic Qualification', scope: 'staff', type: 'lookup', aliases: ['academic qualification'] },
 ];
 
@@ -66,6 +68,12 @@ export function detectCanonicalField(label: string): { field: CanonicalField; co
     if (confidence > (best?.confidence || 0)) best = { field, confidence };
   }
   return best?.confidence ? best : null;
+}
+
+export function resolveCanonicalFieldKey(column: { columnName?: string; columnLabel?: string; validationRules?: any }): string {
+  const configuredSource = column.validationRules?.source;
+  if (typeof configuredSource === 'string' && configuredSource && !configuredSource.startsWith('unmapped.')) return configuredSource;
+  return detectCanonicalField(String(column.columnLabel || column.columnName || ''))?.field.key || String(column.columnName || '');
 }
 
 export const MOE_TEACHING_FIELDS = [

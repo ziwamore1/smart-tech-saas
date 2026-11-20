@@ -405,14 +405,16 @@ export class StaffExcelService {
     for (let rowIndex = 1; rowIndex <= this.schoolHeaderRows; rowIndex++) {
       worksheet.mergeCells(rowIndex, 1, rowIndex, columnCount);
       const row = worksheet.getRow(rowIndex);
+      row.hidden = false;
+      row.outlineLevel = 0;
       row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       row.getCell(1).border = { bottom: { style: rowIndex === this.schoolHeaderRows ? 'medium' : 'thin', color: { argb: accentColor } } };
     }
 
     const schoolTitleCell = worksheet.getCell(1, 1);
     schoolTitleCell.value = title.toLocaleUpperCase();
-    schoolTitleCell.font = { name: 'Arial', size: 18, bold: true, color: { argb: 'FFFFFF' } };
-    schoolTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: brandColor } };
+    schoolTitleCell.font = { name: 'Arial', size: 18, bold: true, color: { argb: brandColor } };
+    schoolTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8E8' } };
     worksheet.getRow(1).height = 34;
 
     const detailsText = detailParts.join('   |   ') || 'School details';

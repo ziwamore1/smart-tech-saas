@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CANONICAL_HR_FIELDS, detectCanonicalField, MOE_NON_TEACHING_HEADERS, INSTITUTIONAL_LOOKUP_SEEDS, ZAMBIA_GEOGRAPHY_SEEDS } from './institutional-returns.registry';
+import { CANONICAL_HR_FIELDS, detectCanonicalField, resolveCanonicalFieldKey, MOE_NON_TEACHING_HEADERS, INSTITUTIONAL_LOOKUP_SEEDS, ZAMBIA_GEOGRAPHY_SEEDS } from './institutional-returns.registry';
 
 @Injectable()
 export class StaffTemplateService {
@@ -110,6 +110,7 @@ export class StaffTemplateService {
     const school = await this.prisma.school.findUnique({ where: { id: data.schoolId } });
     if (!school) throw new NotFoundException('School profile not found');
     const staffType = config.staffType || 'TEACHING';
+    await this.ensureStaffProfilesFromTeachers(data.schoolId);
     const profiles = await this.prisma.staffHrProfile.findMany({
       where: {
         schoolId: data.schoolId,
@@ -119,6 +120,10 @@ export class StaffTemplateService {
       include: { qualifications: true, positions: true }, orderBy: { teacherName: 'asc' },
     });
     const teacherIds = profiles.map((profile: any) => profile.staffId).filter(Boolean);
+    const teacherDirectory = teacherIds.length
+      ? await this.prisma.teacher.findMany({ where: { id: { in: teacherIds } }, include: { user: true } })
+      : [];
+    const teacherById = new Map(teacherDirectory.map((teacher: any) => [teacher.id, teacher]));
     const subjectAssignments = teacherIds.length
       ? await this.prisma.teachingAssignment.findMany({
           where: {
@@ -155,7 +160,9 @@ export class StaffTemplateService {
     for (const grades of assignedGradesByTeacher.values()) grades.sort((a, b) => a.localeCompare(b));
 
     const rows = profiles.map((profile: any, index) => {
-      const name = String(profile.teacherName || '').trim().split(/\s+/);
+      const teacher = teacherById.get(profile.staffId) as any;
+      const teacherName = profile.teacherName || `${teacher?.user?.firstName || ''} ${teacher?.user?.lastName || ''}`.trim();
+      const name = String(teacherName || '').trim().split(/\s+/);
       const assignedSubjects = assignedSubjectsByTeacher.get(profile.staffId) || [];
       const assignedGrades = assignedGradesByTeacher.get(profile.staffId) || [];
       const hasAssignedSubjects = assignedSubjects.length > 0;
@@ -175,7 +182,9 @@ export class StaffTemplateService {
         'staff.subjectQualifiedToTeachA': hasAssignedSubjects ? assignedSubjects[0] : profile.dynamicFields?.subjectQualifiedToTeachA,
         'staff.subjectQualifiedToTeachB': hasAssignedSubjects ? assignedSubjects[1] || '' : profile.dynamicFields?.subjectQualifiedToTeachB,
         'staff.numberOfDaysAbsent': profile.dynamicFields?.numberOfDaysAbsent ?? 0,
-        'staff.phoneNumber': profile.phoneNumber,
+        'staff.phoneNumber': profile.phoneNumber || teacher?.user?.phone,
+        'staff.emailAddress': profile.emailAddress || teacher?.user?.email,
+        'staff.fullName': teacherName,
         'staff.highestAcademicQualification': profile.academicQualification,
         'school.name': school.name, 'school.province': school.province, 'school.district': school.district,
         'school.constituency': (school as any).constituency, 'school.ward': (school as any).ward, 'school.zone': (school as any).zone,
@@ -184,9 +193,13 @@ export class StaffTemplateService {
         'school.distanceFromDebOffice': (school as any).distanceFromDebOffice, 'return.serialNumber': index + 1,
       };
       const values: Record<string, any> = {};
-      for (const column of template.columns) values[column.columnName] = canonical[column.columnName] ?? '';
+      for (const column of template.columns) {
+        const sourceKey = resolveCanonicalFieldKey(column);
+        const dynamicKey = sourceKey.replace(/^staff\./, '');
+        values[column.columnName] = canonical[sourceKey] ?? profile.dynamicFields?.[dynamicKey] ?? profile.dynamicFields?.[column.columnName] ?? '';
+      }
       const missing = template.columns.filter((column) => column.isRequired && (values[column.columnName] === '' || values[column.columnName] === null || values[column.columnName] === undefined)).map((column) => ({ key: column.columnName, label: column.columnLabel }));
-      return { staffId: profile.staffId, staffName: profile.teacherName || 'Staff member', status: missing.length ? 'INCOMPLETE' : 'COMPLETE', missing, values };
+      return { staffId: profile.staffId, staffName: teacherName || 'Staff member', status: missing.length ? 'INCOMPLETE' : 'COMPLETE', missing, values };
     });
     const duplicateIssues = this.findDuplicateIdentityIssues(profiles);
     const snapshot = { templateId: template.id, templateCode: template.templateCode, templateVersion: template.version, period: data.period, school, generatedAt: new Date().toISOString(), generatedBy: data.performedBy, staffPopulation: rows.map((row) => row.staffId), validationIssues: duplicateIssues, rows };
@@ -195,6 +208,37 @@ export class StaffTemplateService {
     });
     await this.createAuditLog({ submissionId: submission.id, schoolId: data.schoolId, action: 'QUICK_COMPILE', entityType: 'INSTITUTIONAL_RETURN', entityId: submission.id, performedBy: data.performedBy, metadata: { templateVersion: template.version, detectedStaff: rows.length, missingFields: rows.reduce((count, row) => count + row.missing.length, 0) } });
     return { ...submission, summary: { detected: rows.length, complete: rows.filter((row) => row.status === 'COMPLETE').length, incomplete: rows.filter((row) => row.status === 'INCOMPLETE').length, invalid: duplicateIssues.length }, validationIssues: duplicateIssues };
+  }
+
+  private async ensureStaffProfilesFromTeachers(schoolId: string) {
+    const teachers = await this.prisma.teacher.findMany({ where: { schoolId }, include: { user: true } });
+    for (const teacher of teachers) {
+      const existing = await this.prisma.staffHrProfile.findUnique({ where: { staffId: teacher.id } });
+      if (existing) continue;
+      const teacherName = `${teacher.user?.firstName || ''} ${teacher.user?.lastName || ''}`.trim() || 'Unnamed staff';
+      try {
+        await this.prisma.staffHrProfile.create({
+          data: {
+            staffId: teacher.id,
+            schoolId,
+            teacherName,
+            employeeNumber: teacher.employeeNo || null,
+            gender: teacher.gender || null,
+            emailAddress: teacher.user?.email || null,
+            phoneNumber: teacher.user?.phone || null,
+            substantivePosition: teacher.department || null,
+            academicQualification: teacher.qualification || null,
+            specialization: teacher.specialization || null,
+            employmentStatus: 'ACTIVE',
+            employmentType: teacher.staffType === 'NON_TEACHING' ? 'NON_TEACHING' : 'TEACHING',
+            syncStatus: 'SYNCED',
+            lastSyncedAt: new Date(),
+          },
+        });
+      } catch (error: any) {
+        this.logger.warn(`Could not load teacher ${teacher.id} into Staff Return profiles: ${error?.message || error}`);
+      }
+    }
   }
 
   private findDuplicateIdentityIssues(profiles: any[]) {
@@ -612,6 +656,7 @@ export class StaffTemplateService {
     if (!row) throw new NotFoundException('Staff member is not part of this return snapshot');
     const column = submission.template.columns.find((candidate) => candidate.columnName === key);
     if (!column) throw new BadRequestException('Field is not configured for this return template');
+    const sourceKey = resolveCanonicalFieldKey(column);
     const oldValue = row.values?.[key] ?? '';
     row.values = { ...(row.values || {}), [key]: value ?? '' };
     row.missing = (row.missing || []).filter((missing: any) => missing.key !== key);
@@ -619,7 +664,7 @@ export class StaffTemplateService {
       row.missing.push({ key, label: column.columnLabel });
     }
     row.status = row.missing.length ? 'INCOMPLETE' : 'COMPLETE';
-    await this.updateCanonicalField(staffId, submission.schoolId, key, value);
+    await this.updateCanonicalField(staffId, submission.schoolId, sourceKey, value);
     const updated = await this.prisma.staffReturnSubmission.update({
       where: { id },
       data: { data: rows as any, snapshot: { ...((submission.snapshot as any) || {}), rows } as any, status: 'DRAFT' },
@@ -643,7 +688,7 @@ export class StaffTemplateService {
       oldValues[key] = row.values?.[key] ?? '';
       row.values = { ...(row.values || {}), [key]: value ?? '' };
     }
-    row.missing = submission.template.columns.filter((column) => column.isRequired && !row.values?.[column.columnName]).map((column) => ({ key: column.columnName, label: column.columnLabel }));
+    row.missing = submission.template.columns.filter((column) => column.isRequired && (row.values?.[column.columnName] === null || row.values?.[column.columnName] === undefined || row.values?.[column.columnName] === '')).map((column) => ({ key: column.columnName, label: column.columnLabel }));
     row.status = row.missing.length ? 'INCOMPLETE' : 'COMPLETE';
 
     const profile = await this.prisma.staffHrProfile.findFirst({ where: { staffId, schoolId: submission.schoolId } });
@@ -653,28 +698,32 @@ export class StaffTemplateService {
       'staff.maritalStatus': 'maritalStatus', 'staff.nationality': 'nationality', 'staff.substantivePosition': 'substantivePosition',
       'staff.currentPosition': 'currentPosition', 'staff.highestLevelOfEducation': 'academicQualification', 'staff.highestAcademicQualification': 'academicQualification',
       'staff.highestTeacherQualification': 'professionalQualification', 'staff.employmentStatus': 'employmentStatus', 'staff.mainGradeTaught': 'gradeLevel',
-      'staff.dateOfBirth': 'dateOfBirth', 'staff.firstAppointmentDate': 'dateOfFirstAppointment', 'staff.currentPostAppointmentDate': 'dateOfPresentAppointment', 'staff.phoneNumber': 'phoneNumber',
+      'staff.dateOfBirth': 'dateOfBirth', 'staff.firstAppointmentDate': 'dateOfFirstAppointment', 'staff.currentPostAppointmentDate': 'dateOfPresentAppointment', 'staff.phoneNumber': 'phoneNumber', 'staff.emailAddress': 'emailAddress',
     };
     const profileData: Record<string, any> = {};
     const dynamicFields = { ...((profile.dynamicFields as any) || {}) };
     const schoolData: Record<string, any> = {};
+    let firstName: any;
+    let surname: any;
     for (const [key, value] of Object.entries(fields)) {
-      if (key === 'staff.surname' || key === 'staff.firstName') continue;
-      if (directFields[key]) {
-        const field = directFields[key];
+      const sourceKey = resolveCanonicalFieldKey(columns.get(key) || { columnName: key });
+      if (sourceKey === 'staff.surname') { surname = value; continue; }
+      if (sourceKey === 'staff.firstName') { firstName = value; continue; }
+      if (sourceKey === 'staff.fullName') {
+        profileData.teacherName = value || null;
+      } else if (directFields[sourceKey]) {
+        const field = directFields[sourceKey];
         profileData[field] = field === 'phoneNumber' ? this.normalizeZambianPhone(value) : ['dateOfBirth', 'dateOfFirstAppointment', 'dateOfPresentAppointment'].includes(field) && value ? new Date(value) : value || null;
-      } else if (key.startsWith('school.')) {
+      } else if (sourceKey.startsWith('school.')) {
         const schoolField: Record<string, string> = { 'school.province': 'province', 'school.district': 'district', 'school.constituency': 'constituency', 'school.ward': 'ward', 'school.zone': 'zone', 'school.location': 'locationType', 'school.runningAgency': 'runningAgency', 'school.type': 'schoolType', 'school.emisNumber': 'emisNumber', 'school.distanceFromDebOffice': 'distanceFromDebOffice' };
-        if (schoolField[key]) schoolData[schoolField[key]] = key === 'school.distanceFromDebOffice' && value !== '' ? Number(value) : value || null;
+        if (schoolField[sourceKey]) schoolData[schoolField[sourceKey]] = sourceKey === 'school.distanceFromDebOffice' && value !== '' ? Number(value) : value || null;
       } else {
-        dynamicFields[key.replace(/^staff\./, '')] = value ?? null;
+        dynamicFields[sourceKey.replace(/^staff\./, '')] = value ?? null;
       }
     }
-    if (fields['staff.surname'] !== undefined || fields['staff.firstName'] !== undefined) {
+    if (firstName !== undefined || surname !== undefined) {
       const currentName = String(profile.teacherName || '').trim().split(/\s+/);
-      const firstName = fields['staff.firstName'] ?? currentName.slice(0, -1).join(' ');
-      const surname = fields['staff.surname'] ?? currentName[currentName.length - 1] ?? '';
-      profileData.teacherName = `${firstName} ${surname}`.trim();
+      profileData.teacherName = `${firstName ?? currentName.slice(0, -1).join(' ')} ${surname ?? currentName[currentName.length - 1] ?? ''}`.trim();
     }
     profileData.dynamicFields = dynamicFields;
     await this.prisma.staffHrProfile.update({ where: { staffId }, data: profileData });
@@ -696,7 +745,7 @@ export class StaffTemplateService {
       'staff.highestTeacherQualification': 'professionalQualification', 'staff.employmentStatus': 'employmentStatus',
       'staff.mainGradeTaught': 'gradeLevel', 'staff.dateOfBirth': 'dateOfBirth',
       'staff.firstAppointmentDate': 'dateOfFirstAppointment', 'staff.currentPostAppointmentDate': 'dateOfPresentAppointment',
-      'staff.phoneNumber': 'phoneNumber',
+      'staff.phoneNumber': 'phoneNumber', 'staff.emailAddress': 'emailAddress',
     };
     if (key.startsWith('school.')) {
       const schoolField: Record<string, string> = {
@@ -713,6 +762,10 @@ export class StaffTemplateService {
       const dateField = ['dateOfBirth', 'dateOfFirstAppointment', 'dateOfPresentAppointment'].includes(field);
       const normalizedValue = field === 'phoneNumber' ? this.normalizeZambianPhone(value) : value;
       await this.prisma.staffHrProfile.update({ where: { staffId }, data: { [field]: dateField && value ? new Date(value) : normalizedValue || null } });
+      return;
+    }
+    if (key === 'staff.fullName') {
+      await this.prisma.staffHrProfile.update({ where: { staffId }, data: { teacherName: String(value || '').trim() } });
       return;
     }
     if (key === 'staff.surname' || key === 'staff.firstName') {

@@ -1180,6 +1180,7 @@ function SubmissionsGrid({ templates, refreshVersion }: { templates: any[]; refr
   const [loading, setLoading] = useState(false);
   const [subLoading, setSubLoading] = useState<Record<string, boolean>>({});
   const [staffPage, setStaffPage] = useState(1);
+  const [saveNotice, setSaveNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const staffPageSize = 25;
 
   const withSubLoading = async (key: string, fn: () => Promise<void>) => {
@@ -1274,20 +1275,25 @@ function SubmissionsGrid({ templates, refreshVersion }: { templates: any[]; refr
   const saveMissingFields = () => {
     if (!selectedSub?.id || !editingStaff) return;
     withSubLoading(`save_${editingStaff.staffId}`, async () => {
-      const fields: Record<string, any> = {};
-      for (const field of editingStaff.fields || editingStaff.missing || []) {
-        const key = field.key || field.columnName;
-        const category = lookupCategory(key);
-        const current = lookupValues.find(option => option.category === category && option.label.toLowerCase() === String(editingValues[key] || '').trim().toLowerCase());
-        if (category && editingValues[key] && !current) {
-          await premiumStaffRecordsApi.addInstitutionalLookup({ category, label: editingValues[key], parentCode: category === 'DISTRICT' ? String(editingValues['school.province'] || '').toUpperCase().replace(/[^A-Z0-9]+/g, '_') : undefined });
+      try {
+        const fields: Record<string, any> = {};
+        for (const field of editingStaff.fields || editingStaff.missing || []) {
+          const key = field.key || field.columnName;
+          const category = lookupCategory(key);
+          const current = lookupValues.find(option => option.category === category && option.label.toLowerCase() === String(editingValues[key] || '').trim().toLowerCase());
+          if (category && editingValues[key] && !current) {
+            await premiumStaffRecordsApi.addInstitutionalLookup({ category, label: editingValues[key], parentCode: category === 'DISTRICT' ? String(editingValues['school.province'] || '').toUpperCase().replace(/[^A-Z0-9]+/g, '_') : undefined });
+          }
+          fields[key] = editingValues[key] ?? '';
         }
-        fields[key] = editingValues[key] ?? '';
+        await premiumStaffRecordsApi.updateSubmissionStaffFields(selectedSub.id, editingStaff.staffId, fields);
+        setEditingStaff(null);
+        await handleView(selectedSub.id);
+        fetchSubmissions(selectedTemplate || undefined);
+        setSaveNotice({ type: 'success', text: 'Staff record saved and updated successfully.' });
+      } catch (error: any) {
+        setSaveNotice({ type: 'error', text: error?.response?.data?.message || 'Staff record could not be saved.' });
       }
-      await premiumStaffRecordsApi.updateSubmissionStaffFields(selectedSub.id, editingStaff.staffId, fields);
-      setEditingStaff(null);
-      await handleView(selectedSub.id);
-      fetchSubmissions(selectedTemplate || undefined);
     });
   };
 
@@ -1399,7 +1405,8 @@ function SubmissionsGrid({ templates, refreshVersion }: { templates: any[]; refr
             <strong style={{ color: '#111827' }}>Return Details</strong>
             <button onClick={() => setSelectedSub(null)} style={{ border: '1px solid #94a3b8', background: '#fff', color: '#111827', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>Close</button>
           </div>
-          <p style={{ color: '#374151', marginTop: 8 }}>Status: {selectedSub.status || 'DRAFT'} · Records: {subData.length}</p>
+           <p style={{ color: '#374151', marginTop: 8 }}>Status: {selectedSub.status || 'DRAFT'} · Records: {subData.length}</p>
+           {saveNotice && <div role={saveNotice.type === 'success' ? 'status' : 'alert'} style={{ marginTop: 10, padding: '9px 12px', borderRadius: 6, background: saveNotice.type === 'success' ? '#dcfce7' : '#fee2e2', color: saveNotice.type === 'success' ? '#166534' : '#991b1b', fontSize: 13 }}>{saveNotice.text}</div>}
           {subData.length > 0 && (
             <div style={{ overflowX: 'auto', marginTop: 10 }}>
               <table className="hr-returns-table" style={{ fontSize: 13 }}>

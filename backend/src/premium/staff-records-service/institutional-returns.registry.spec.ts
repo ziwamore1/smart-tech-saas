@@ -1,4 +1,4 @@
-import { CANONICAL_HR_FIELDS, detectCanonicalField } from './institutional-returns.registry';
+import { CANONICAL_HR_FIELDS, detectCanonicalField, resolveCanonicalFieldKey } from './institutional-returns.registry';
 
 describe('institutional returns field registry', () => {
   it('maps semantic aliases to canonical staff fields', () => {
@@ -13,5 +13,10 @@ describe('institutional returns field registry', () => {
     expect(first).toBe('staff.surname');
     expect(second).toBe(first);
     expect(CANONICAL_HR_FIELDS.some((field) => field.key === 'school.distanceFromDebOffice')).toBe(true);
+  });
+
+  it('maps renamed configured headers to canonical fields', () => {
+    expect(resolveCanonicalFieldKey({ columnName: 'field_1', columnLabel: 'Full Name' })).toBe('staff.fullName');
+    expect(resolveCanonicalFieldKey({ columnName: 'field_2', columnLabel: 'Email Address' })).toBe('staff.emailAddress');
   });
 });

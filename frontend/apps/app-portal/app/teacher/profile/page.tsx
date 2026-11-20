@@ -399,7 +399,8 @@ function AdvancedStaffProfileCard() {
       });
       setProfile(value);
       setLookups(grouped);
-      setForm({ ...(value.profile || {}), dynamicFields: { ...((value.profile?.dynamicFields as any) || {}) } });
+      const returnFields = Object.fromEntries((value.draftReturns || []).flatMap((draft: any) => (draft.fields || []).map((field: any) => [field.columnName, field.value ?? ''])));
+      setForm({ ...(value.profile || {}), dynamicFields: { ...((value.profile?.dynamicFields as any) || {}) }, returnFields });
     } catch (error: any) {
       setMessage({ type: 'error', text: error?.response?.data?.message || 'Advanced Staff Profile could not be loaded.' });
     } finally { setLoading(false); }
@@ -418,6 +419,8 @@ function AdvancedStaffProfileCard() {
     else setForm((current: any) => ({ ...current, [key]: value }));
   };
 
+  const setReturnValue = (key: string, value: any) => setForm((current: any) => ({ ...current, returnFields: { ...(current.returnFields || {}), [key]: value } }));
+
   const save = async () => {
     try {
       setSaving(true);
@@ -425,7 +428,7 @@ function AdvancedStaffProfileCard() {
       const response = await premiumStaffRecordsApi.updateMyAdvancedProfile(payload);
       const result = response.data?.data || response.data || {};
       setProfile((current: any) => ({ ...current, profile: result.profile || current.profile, editable: result.editable, syncedDraftReturns: result.syncedDraftReturns }));
-      setForm({ ...(result.profile || form), dynamicFields: { ...((result.profile?.dynamicFields as any) || form.dynamicFields || {}) } });
+       setForm({ ...(result.profile || form), dynamicFields: { ...((result.profile?.dynamicFields as any) || form.dynamicFields || {}) }, returnFields: form.returnFields || {} });
       setMessage({ type: 'success', text: `Your details have been saved and synced to the Main Staff Return Hub${result.syncedDraftReturns ? ` (${result.syncedDraftReturns} open return${result.syncedDraftReturns === 1 ? '' : 's'})` : ''}.` });
     } catch (error: any) {
       setMessage({ type: 'error', text: error?.response?.data?.message || 'Advanced Staff Profile could not be saved.' });
@@ -444,6 +447,29 @@ function AdvancedStaffProfileCard() {
   );
 
   const editable = Boolean(profile.editable);
+  const configuredFields = Array.from(new Map((profile.draftReturns || []).flatMap((draft: any) => (draft.fields || []).map((field: any) => [field.columnName, field]))).values());
+  const returnCategory = (sourceKey: string) => {
+    if (sourceKey === 'staff.gender') return 'GENDER';
+    if (sourceKey === 'staff.maritalStatus') return 'MARITAL_STATUS';
+    if (sourceKey === 'staff.nationality') return 'NATIONALITY';
+    if (sourceKey === 'staff.employmentStatus') return 'EMPLOYMENT_STATUS';
+    if (sourceKey.includes('Position')) return 'POSITION';
+    if (sourceKey.includes('Qualification')) return sourceKey.includes('Teacher') ? 'TEACHER_QUALIFICATION' : 'QUALIFICATION';
+    if (sourceKey.includes('Subject')) return 'SUBJECT';
+    if (sourceKey === 'staff.mainGradeTaught') return 'MAIN_GRADE_TAUGHT';
+    if (sourceKey === 'staff.staffPresence') return 'STAFF_PRESENCE';
+    if (sourceKey === 'staff.employer') return 'EMPLOYER';
+    return null;
+  };
+  const renderConfiguredInput = (field: any) => {
+    const key = field.columnName;
+    const sourceKey = field.sourceKey || key;
+    const category = returnCategory(sourceKey);
+    const options = category ? lookups[category] || [] : [];
+    const inputType = String(field.dataType || '').toLowerCase() === 'date' || sourceKey.toLowerCase().includes('date') ? 'date' : String(field.dataType || '').toLowerCase() === 'number' ? 'number' : 'text';
+    const disabled = !editable || saving || sourceKey.startsWith('school.');
+    return <div key={key}><label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>{field.columnLabel || key}</label>{options.length ? <><input list={`return-lookup-${key}`} disabled={disabled} type={inputType} value={form.returnFields?.[key] || ''} onChange={e => setReturnValue(key, e.target.value)} style={{ width: '100%', padding: '9px 10px', border: '1px solid #d1d5db', borderRadius: 7, background: disabled ? '#f3f4f6' : '#fff', color: '#1f2937', boxSizing: 'border-box' }} /><datalist id={`return-lookup-${key}`}>{options.map((option: any) => <option key={option.id} value={option.label} />)}</datalist></> : <input disabled={disabled} type={inputType} value={form.returnFields?.[key] || ''} onChange={e => setReturnValue(key, e.target.value)} placeholder={`Enter ${field.columnLabel || key}`} style={{ width: '100%', padding: '9px 10px', border: '1px solid #d1d5db', borderRadius: 7, background: disabled ? '#f3f4f6' : '#fff', color: '#1f2937', boxSizing: 'border-box' }} />}</div>;
+  };
   const renderInput = (field: any, dynamic = false) => {
     const options = field.category ? lookups[field.category] || [] : [];
     const value = valueFor({ key: field.key, dynamic });
@@ -514,8 +540,9 @@ function AdvancedStaffProfileCard() {
             <div style={{ padding: 22, overflowY: 'auto' }}>
               <h4 style={{ margin: '0 0 12px', color: '#374151' }}>Identity and Employment Details</h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>{ADVANCED_FIELDS.map(field => renderInput(field))}</div>
-              <h4 style={{ margin: '24px 0 12px', color: '#374151' }}>Staff Return Guidance Fields</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>{ADVANCED_DYNAMIC_FIELDS.map(field => renderInput(field, true))}</div>
+               <h4 style={{ margin: '24px 0 12px', color: '#374151' }}>Staff Return Guidance Fields</h4>
+               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>{ADVANCED_DYNAMIC_FIELDS.map(field => renderInput(field, true))}</div>
+               {configuredFields.length > 0 && <><h4 style={{ margin: '24px 0 12px', color: '#374151' }}>Current Staff Return Template Fields</h4><p style={{ margin: '0 0 12px', color: '#6b7280', fontSize: 12 }}>These fields come directly from the open DRAFT template. Existing staff information is prefilled where available.</p><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>{configuredFields.map(renderConfiguredInput)}</div></>}
             </div>
             <div style={{ padding: '12px 22px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button onClick={() => setOpen(false)} style={{ padding: '9px 16px', border: '1px solid #d1d5db', background: '#fff', borderRadius: 7, cursor: 'pointer' }}>Close</button>

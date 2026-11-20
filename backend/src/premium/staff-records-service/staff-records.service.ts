@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, Logger, BadRequestException } from '@nes
 import { PrismaService } from '../../prisma/prisma.service';
 import { StaffSyncEngineService } from '../../shared/staff-sync-engine/staff-sync-engine.service';
 import { v4 as uuidv4 } from 'uuid';
+import { resolveCanonicalFieldKey } from './institutional-returns.registry';
 
 @Injectable()
 export class StaffRecordsService {
@@ -129,10 +130,24 @@ export class StaffRecordsService {
     if (!profile) throw new NotFoundException('Advanced Staff Profile is not available');
 
     const draftReturns = await this.findDraftReturnsForStaff(staffId, schoolId);
+    const canonicalValues = this.profileToReturnValues(profile);
     return {
       profile,
       editable: draftReturns.length > 0,
-      draftReturns: draftReturns.map((submission: any) => ({ id: submission.id, name: submission.template.name, period: submission.period, status: submission.status })),
+      draftReturns: draftReturns.map((submission: any) => {
+        const row = ((submission.data as any[]) || []).find((candidate) => candidate.staffId === staffId);
+        return {
+          id: submission.id,
+          name: submission.template.name,
+          period: submission.period,
+          status: submission.status,
+          fields: submission.template.columns.map((column: any) => ({
+            ...column,
+            sourceKey: resolveCanonicalFieldKey(column),
+            value: row?.values?.[column.columnName] ?? canonicalValues[resolveCanonicalFieldKey(column)] ?? '',
+          })),
+        };
+      }),
       guidance: {
         message: draftReturns.length
           ? 'Complete the fields you know from the lookup choices and your official records. Fields not available to you can be completed by the Staff Return Hub administrator.'
@@ -158,13 +173,34 @@ export class StaffRecordsService {
       'dateOfFirstAppointment', 'dateOfPresentAppointment', 'dateOfActingAppointment', 'confirmed',
       'expectedConfirmationDate', 'academicQualification', 'professionalQualification', 'yearOfQualification',
       'specialization', 'nationality', 'emailAddress', 'phoneNumber', 'currentPosition', 'gradeLevel',
-      'nextOfKin', 'nextOfKinContact', 'nextOfKinRelationship', 'dynamicFields',
+      'nextOfKin', 'nextOfKinContact', 'nextOfKinRelationship', 'dynamicFields', 'returnFields',
     ]);
     const safeData = Object.fromEntries(Object.entries(data || {}).filter(([key]) => allowed.has(key)));
     if (!Object.keys(safeData).length) throw new BadRequestException('No editable Advanced Staff Profile fields were provided');
 
     const profileData = this.mapProfileData(safeData);
-    const canonical = this.toJsonSafe(this.profileToReturnValues({ ...profile, ...safeData, dynamicFields: safeData.dynamicFields ?? profile.dynamicFields }));
+    const dynamicFields = { ...((safeData.dynamicFields as any) || (profile.dynamicFields as any) || {}) };
+    const returnFields = (safeData.returnFields || {}) as Record<string, any>;
+    const returnColumns = new Map<string, any>();
+    for (const submission of draftReturns) for (const column of submission.template.columns) returnColumns.set(column.columnName, column);
+    let firstName: any;
+    let surname: any;
+    for (const [columnName, value] of Object.entries(returnFields)) {
+      const column = returnColumns.get(columnName);
+      if (!column) continue;
+      const sourceKey = resolveCanonicalFieldKey(column);
+      if (sourceKey === 'staff.fullName') profileData.teacherName = value || null;
+      else if (sourceKey === 'staff.firstName') firstName = value;
+      else if (sourceKey === 'staff.surname') surname = value;
+      else this.applyCanonicalProfileValue(sourceKey, value, profileData, dynamicFields);
+    }
+    if (firstName !== undefined || surname !== undefined) {
+      const currentName = String(profile.teacherName || '').trim().split(/\s+/);
+      profileData.teacherName = `${firstName ?? currentName.slice(0, -1).join(' ')} ${surname ?? currentName.at(-1) ?? ''}`.trim();
+    }
+    if (Object.keys(returnFields).length || safeData.dynamicFields !== undefined) profileData.dynamicFields = dynamicFields;
+    const canonical = this.toJsonSafe(this.profileToReturnValues({ ...profile, ...safeData, ...profileData, dynamicFields }));
+    for (const [columnName, value] of Object.entries(returnFields)) canonical[columnName] = value ?? '';
     const updated = await this.prisma.$transaction(async (tx) => {
       const updatedProfile = await tx.staffHrProfile.update({ where: { id: profile.id }, data: profileData });
 
@@ -179,7 +215,7 @@ export class StaffRecordsService {
           }
         }
         row.missing = (submission.template.columns || [])
-          .filter((column: any) => column.isRequired && !row.values?.[column.columnName])
+          .filter((column: any) => column.isRequired && (row.values?.[column.columnName] === null || row.values?.[column.columnName] === undefined || row.values?.[column.columnName] === ''))
           .map((column: any) => ({ key: column.columnName, label: column.columnLabel }));
         row.status = row.missing.length ? 'INCOMPLETE' : 'COMPLETE';
         await tx.staffReturnSubmission.update({
@@ -250,10 +286,11 @@ export class StaffRecordsService {
     const values: Record<string, any> = {
       'staff.surname': name.length > 1 ? name[name.length - 1] : '',
       'staff.firstName': name.length > 1 ? name.slice(0, -1).join(' ') : name[0] || '',
+      'staff.fullName': profile.teacherName,
       'staff.nrcNumber': profile.nrcNumber, 'staff.manTsNumber': profile.tsNumber, 'staff.employeeNumber': profile.employeeNumber,
       'staff.dateOfBirth': profile.dateOfBirth, 'staff.gender': profile.gender, 'staff.firstAppointmentDate': profile.dateOfFirstAppointment,
       'staff.currentPostAppointmentDate': profile.dateOfPresentAppointment, 'staff.maritalStatus': profile.maritalStatus,
-      'staff.nationality': profile.nationality, 'staff.substantivePosition': profile.substantivePosition,
+      'staff.nationality': profile.nationality, 'staff.emailAddress': profile.emailAddress, 'staff.substantivePosition': profile.substantivePosition,
       'staff.currentPosition': profile.currentPosition || profile.actingPosition, 'staff.highestLevelOfEducation': profile.academicQualification,
       'staff.highestTeacherQualification': profile.professionalQualification, 'staff.additionalResponsibilities': profile.administration,
       'staff.employmentStatus': profile.employmentStatus, 'staff.mainGradeTaught': profile.gradeLevel, 'staff.phoneNumber': profile.phoneNumber,
@@ -269,6 +306,25 @@ export class StaffRecordsService {
       return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, this.toJsonSafe(item)]));
     }
     return value;
+  }
+
+  private applyCanonicalProfileValue(key: string, value: any, profileData: Record<string, any>, dynamicFields: Record<string, any>) {
+    const directFields: Record<string, string> = {
+      'staff.nrcNumber': 'nrcNumber', 'staff.manTsNumber': 'tsNumber', 'staff.employeeNumber': 'employeeNumber',
+      'staff.gender': 'gender', 'staff.maritalStatus': 'maritalStatus', 'staff.nationality': 'nationality',
+      'staff.emailAddress': 'emailAddress', 'staff.phoneNumber': 'phoneNumber', 'staff.substantivePosition': 'substantivePosition',
+      'staff.currentPosition': 'currentPosition', 'staff.highestLevelOfEducation': 'academicQualification',
+      'staff.highestAcademicQualification': 'academicQualification', 'staff.highestTeacherQualification': 'professionalQualification',
+      'staff.employmentStatus': 'employmentStatus', 'staff.mainGradeTaught': 'gradeLevel',
+      'staff.dateOfBirth': 'dateOfBirth', 'staff.firstAppointmentDate': 'dateOfFirstAppointment',
+      'staff.currentPostAppointmentDate': 'dateOfPresentAppointment',
+    };
+    const field = directFields[key];
+    if (field) {
+      profileData[field] = ['dateOfBirth', 'dateOfFirstAppointment', 'dateOfPresentAppointment'].includes(field) && value ? new Date(value) : value || null;
+      return;
+    }
+    dynamicFields[key.replace(/^staff\./, '')] = value ?? null;
   }
 
   private async createAuditLog(data: {
