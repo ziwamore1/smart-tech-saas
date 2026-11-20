@@ -674,6 +674,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const selectedTemplateIdRef = useRef<string | null>(null);
   const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null);
+  const [columnInsertDirection, setColumnInsertDirection] = useState<'before' | 'after' | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [sampleRows, setSampleRows] = useState<any[]>([]);
   const [selectedSampleRow, setSelectedSampleRow] = useState<number | null>(null);
@@ -699,6 +700,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
       setEditTemplate(t);
       setTemplateName(t?.name || '');
       setSelectedColumnId(null);
+      setColumnInsertDirection(null);
       setSelectedSampleRow(null);
       setSampleRows([]);
       selectedTemplateIdRef.current = templateId;
@@ -760,10 +762,12 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
     const sorted = [...templateColumns].sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0));
     const selectedIndex = sorted.findIndex((column: any) => column.id === columnId);
     if (selectedIndex < 0) return;
+    setColumnInsertDirection(direction);
     withBtnLoading('insertColumn', async () => {
       try {
+        const columnName = `field_${Date.now()}`;
         const response = await premiumStaffRecordsApi.addColumn(tid, {
-          columnName: `field_${Date.now()}`,
+          columnName,
           columnLabel: 'New Field',
           columnOrder: sorted.length + 1,
           dataType: 'string',
@@ -771,8 +775,14 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
           isEditable: true,
           isVisible: true,
         });
-        const created = response.data?.data || response.data;
-        if (!created?.id) throw new Error('Inserted column was not returned');
+        let created = response.data?.data || response.data;
+        if (Array.isArray(created)) created = created[created.length - 1];
+        if (!created?.id) {
+          const refreshed = await premiumStaffRecordsApi.getTemplateById(tid);
+          const refreshedTemplate = refreshed.data?.data || refreshed.data;
+          created = refreshedTemplate?.columns?.find((column: any) => column.columnName === columnName);
+        }
+        if (!created?.id) throw new Error('The server did not return the inserted column.');
         const insertIndex = direction === 'before' ? selectedIndex : selectedIndex + 1;
         const reordered = [...sorted];
         reordered.splice(insertIndex, 0, created);
@@ -781,7 +791,10 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
         showToast('success', `Column inserted ${direction === 'before' ? 'before' : 'after'} the selected column`);
         fetchColumns(tid);
       } catch (err: any) {
-        showToast('error', err?.response?.data?.message || 'Failed to insert column');
+        const message = err?.response?.data?.message || err?.message || 'Failed to insert column';
+        showToast('error', Array.isArray(message) ? message.join(', ') : message);
+      } finally {
+        setColumnInsertDirection(null);
       }
     });
   };
@@ -1122,8 +1135,8 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '8px 10px', border: '1px solid #fed7aa', borderRadius: 6, background: '#fff7ed', fontSize: 12 }}>
                      <strong style={{ color: '#9a3412' }}>Selected column:</strong>
                      <span style={{ flex: 1, color: '#7c2d12' }}>{templateColumns.find((column: any) => column.id === selectedColumnId)?.columnLabel || 'New Field'}</span>
-                     <button onClick={() => handleInsertColumn(selectedColumnId, 'before')} disabled={!!btnLoading.insertColumn} style={{ padding: '4px 9px', border: '1px solid #fdba74', borderRadius: 4, background: '#fff', color: '#9a3412', cursor: 'pointer', fontSize: 11 }}>Insert Before</button>
-                     <button onClick={() => handleInsertColumn(selectedColumnId, 'after')} disabled={!!btnLoading.insertColumn} style={{ padding: '4px 9px', border: '1px solid #fdba74', borderRadius: 4, background: '#fff', color: '#9a3412', cursor: 'pointer', fontSize: 11 }}>Insert After</button>
+                     <button onClick={() => handleInsertColumn(selectedColumnId, 'before')} disabled={!!btnLoading.insertColumn} aria-pressed={columnInsertDirection === 'before'} style={{ padding: '4px 9px', border: columnInsertDirection === 'before' ? '2px solid #c2410c' : '1px solid #fdba74', borderRadius: 4, background: columnInsertDirection === 'before' ? '#fed7aa' : '#fff', color: '#9a3412', cursor: btnLoading.insertColumn ? 'not-allowed' : 'pointer', fontSize: 11, fontWeight: columnInsertDirection === 'before' ? 700 : 500 }}>{columnInsertDirection === 'before' && btnLoading.insertColumn ? 'Inserting...' : 'Insert Before'}</button>
+                     <button onClick={() => handleInsertColumn(selectedColumnId, 'after')} disabled={!!btnLoading.insertColumn} aria-pressed={columnInsertDirection === 'after'} style={{ padding: '4px 9px', border: columnInsertDirection === 'after' ? '2px solid #c2410c' : '1px solid #fdba74', borderRadius: 4, background: columnInsertDirection === 'after' ? '#fed7aa' : '#fff', color: '#9a3412', cursor: btnLoading.insertColumn ? 'not-allowed' : 'pointer', fontSize: 11, fontWeight: columnInsertDirection === 'after' ? 700 : 500 }}>{columnInsertDirection === 'after' && btnLoading.insertColumn ? 'Inserting...' : 'Insert After'}</button>
                    </div>
                  )}
 
