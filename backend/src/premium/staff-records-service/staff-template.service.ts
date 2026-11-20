@@ -462,6 +462,49 @@ export class StaffTemplateService {
     });
   }
 
+  async insertColumn(
+    templateId: string,
+    schoolId: string,
+    data: {
+      selectedColumnId: string;
+      direction: 'before' | 'after';
+      columnName: string;
+      columnLabel: string;
+      dataType?: string;
+      isRequired?: boolean;
+      width?: number;
+      alignment?: string;
+    },
+  ) {
+    const template = await this.prisma.staffReturnTemplate.findUnique({
+      where: { id: templateId },
+      include: { columns: { orderBy: { columnOrder: 'asc' } } },
+    });
+    if (!template || template.schoolId !== schoolId) throw new NotFoundException('Template not found');
+    const selectedIndex = template.columns.findIndex((column) => column.id === data.selectedColumnId);
+    if (selectedIndex < 0) throw new NotFoundException('Selected column not found');
+    const insertOrder = selectedIndex + (data.direction === 'after' ? 2 : 1);
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.staffReturnColumn.updateMany({
+        where: { templateId, columnOrder: { gte: insertOrder } },
+        data: { columnOrder: { increment: 1 } },
+      });
+      return tx.staffReturnColumn.create({
+        data: {
+          templateId,
+          columnName: data.columnName,
+          columnLabel: data.columnLabel,
+          columnOrder: insertOrder,
+          dataType: data.dataType || 'string',
+          isRequired: data.isRequired || false,
+          width: data.width || 120,
+          alignment: data.alignment || 'left',
+        },
+      });
+    }, { timeout: 120000, maxWait: 10000 });
+  }
+
   async updateColumn(
     id: string,
     schoolId: string,

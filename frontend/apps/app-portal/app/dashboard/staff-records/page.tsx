@@ -766,10 +766,11 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
     withBtnLoading('insertColumn', async () => {
       try {
         const columnName = `field_${Date.now()}`;
-        const response = await premiumStaffRecordsApi.addColumn(tid, {
+        const response = await premiumStaffRecordsApi.insertColumn(tid, {
+          selectedColumnId: columnId,
+          direction,
           columnName,
           columnLabel: 'New Field',
-          columnOrder: sorted.length + 1,
           dataType: 'string',
           isRequired: false,
           isEditable: true,
@@ -777,16 +778,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
         });
         let created = response.data?.data || response.data;
         if (Array.isArray(created)) created = created[created.length - 1];
-        if (!created?.id) {
-          const refreshed = await premiumStaffRecordsApi.getTemplateById(tid);
-          const refreshedTemplate = refreshed.data?.data || refreshed.data;
-          created = refreshedTemplate?.columns?.find((column: any) => column.columnName === columnName);
-        }
         if (!created?.id) throw new Error('The server did not return the inserted column.');
-        const insertIndex = direction === 'before' ? selectedIndex : selectedIndex + 1;
-        const reordered = [...sorted];
-        reordered.splice(insertIndex, 0, created);
-        await premiumStaffRecordsApi.reorderColumns(tid, reordered.map((column: any, index: number) => ({ id: column.id, order: index + 1 })));
         setSelectedColumnId(created.id);
         showToast('success', `Column inserted ${direction === 'before' ? 'before' : 'after'} the selected column`);
         fetchColumns(tid);

@@ -276,6 +276,12 @@ export class StaffRecordsController {
     return this.staffTemplateService.addColumn(templateId, req.user.schoolId, body);
   }
 
+  @Post('templates/:templateId/columns/insert')
+  @Roles(...ADMIN_ROLES)
+  insertColumn(@Param('templateId') templateId: string, @Body() body: any, @Req() req: any) {
+    return this.staffTemplateService.insertColumn(templateId, req.user.schoolId, body);
+  }
+
   @Put('columns/:id')
   @Roles(...ADMIN_ROLES)
   updateColumn(@Param('id') id: string, @Body() body: any, @Req() req: any) {

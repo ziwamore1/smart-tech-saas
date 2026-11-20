@@ -2286,6 +2286,7 @@ export const premiumStaffRecordsApi = {
 
   // Template Columns
   addColumn: (templateId: string, data: any) => api.post(`/premium/staff-records/templates/${templateId}/columns`, data),
+  insertColumn: (templateId: string, data: any) => api.post(`/premium/staff-records/templates/${templateId}/columns/insert`, data),
   updateColumn: (id: string, data: any) => api.put(`/premium/staff-records/columns/${id}`, data),
   deleteColumn: (id: string) => api.delete(`/premium/staff-records/columns/${id}`),
   reorderColumns: (templateId: string, columns: { id: string; order: number }[]) =>
