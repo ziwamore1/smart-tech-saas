@@ -673,8 +673,10 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
   const [templatePeriod, setTemplatePeriod] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const selectedTemplateIdRef = useRef<string | null>(null);
+  const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [sampleRows, setSampleRows] = useState<any[]>([]);
+  const [selectedSampleRow, setSelectedSampleRow] = useState<number | null>(null);
   const [btnLoading, setBtnLoading] = useState<Record<string, boolean>>({});
   const [compileResult, setCompileResult] = useState<any>(null);
 
@@ -696,6 +698,9 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
       else setTemplateColumns([]);
       setEditTemplate(t);
       setTemplateName(t?.name || '');
+      setSelectedColumnId(null);
+      setSelectedSampleRow(null);
+      setSampleRows([]);
       selectedTemplateIdRef.current = templateId;
     } catch {
       setTemplateColumns([]);
@@ -745,6 +750,38 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
         fetchColumns(tid);
       } catch (err: any) {
         showToast('error', err?.response?.data?.message || 'Failed to add column');
+      }
+    });
+  };
+
+  const handleInsertColumn = async (columnId: string, direction: 'before' | 'after') => {
+    const tid = selectedTemplateIdRef.current;
+    if (!tid) return;
+    const sorted = [...templateColumns].sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0));
+    const selectedIndex = sorted.findIndex((column: any) => column.id === columnId);
+    if (selectedIndex < 0) return;
+    withBtnLoading('insertColumn', async () => {
+      try {
+        const response = await premiumStaffRecordsApi.addColumn(tid, {
+          columnName: `field_${Date.now()}`,
+          columnLabel: 'New Field',
+          columnOrder: sorted.length + 1,
+          dataType: 'string',
+          isRequired: false,
+          isEditable: true,
+          isVisible: true,
+        });
+        const created = response.data?.data || response.data;
+        if (!created?.id) throw new Error('Inserted column was not returned');
+        const insertIndex = direction === 'before' ? selectedIndex : selectedIndex + 1;
+        const reordered = [...sorted];
+        reordered.splice(insertIndex, 0, created);
+        await premiumStaffRecordsApi.reorderColumns(tid, reordered.map((column: any, index: number) => ({ id: column.id, order: index + 1 })));
+        setSelectedColumnId(created.id);
+        showToast('success', `Column inserted ${direction === 'before' ? 'before' : 'after'} the selected column`);
+        fetchColumns(tid);
+      } catch (err: any) {
+        showToast('error', err?.response?.data?.message || 'Failed to insert column');
       }
     });
   };
@@ -841,6 +878,31 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
         showToast('error', 'Failed to reorder columns');
       }
     });
+  };
+
+  const createBlankSampleRow = () => {
+    const row: Record<string, any> = {};
+    [...templateColumns].sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0)).forEach((column: any) => {
+      const dataType = String(column.dataType || '').toLowerCase();
+      row[column.columnName] = dataType === 'number' || dataType === 'currency' ? 0 : dataType === 'boolean' ? false : dataType === 'date' ? new Date().toISOString().slice(0, 10) : '';
+    });
+    return row;
+  };
+
+  const handleInsertSampleRow = (direction: 'above' | 'below') => {
+    const newRow = createBlankSampleRow();
+    if (selectedSampleRow === null) {
+      setSampleRows(rows => [...rows, newRow]);
+      setSelectedSampleRow(sampleRows.length);
+      return;
+    }
+    const insertIndex = direction === 'above' ? selectedSampleRow : selectedSampleRow + 1;
+    setSampleRows(rows => {
+      const next = [...rows];
+      next.splice(insertIndex, 0, newRow);
+      return next;
+    });
+    setSelectedSampleRow(insertIndex);
   };
 
   const handleExportTemplate = async (templateId: string) => {
@@ -999,8 +1061,8 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
                         </tr>
                       </thead>
                       <tbody>
-                        {templateColumns.sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0)).map((col: any, idx: number) => (
-                          <tr key={col.id} style={{ borderTop: '1px solid #f3eee8' }}>
+                         {templateColumns.sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0)).map((col: any, idx: number) => (
+                           <tr key={col.id} onClick={() => setSelectedColumnId(col.id)} style={{ borderTop: '1px solid #f3eee8', background: selectedColumnId === col.id ? '#fff7ed' : '#fff', cursor: 'pointer' }}>
                             <td style={{ padding: '6px 10px', color: '#6b7280', fontSize: 11 }}>{idx + 1}</td>
                             <td style={{ padding: '6px 10px', fontFamily: 'monospace', fontSize: 12 }}>{col.columnName}</td>
                             <td style={{ padding: '6px 10px' }}>
@@ -1054,32 +1116,29 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
                         ))}
                       </tbody>
                     </table>
-                  </div>
-                )}
+                   </div>
+                 )}
+                 {selectedColumnId && templateColumns.some((column: any) => column.id === selectedColumnId) && (
+                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '8px 10px', border: '1px solid #fed7aa', borderRadius: 6, background: '#fff7ed', fontSize: 12 }}>
+                     <strong style={{ color: '#9a3412' }}>Selected column:</strong>
+                     <span style={{ flex: 1, color: '#7c2d12' }}>{templateColumns.find((column: any) => column.id === selectedColumnId)?.columnLabel || 'New Field'}</span>
+                     <button onClick={() => handleInsertColumn(selectedColumnId, 'before')} disabled={!!btnLoading.insertColumn} style={{ padding: '4px 9px', border: '1px solid #fdba74', borderRadius: 4, background: '#fff', color: '#9a3412', cursor: 'pointer', fontSize: 11 }}>Insert Before</button>
+                     <button onClick={() => handleInsertColumn(selectedColumnId, 'after')} disabled={!!btnLoading.insertColumn} style={{ padding: '4px 9px', border: '1px solid #fdba74', borderRadius: 4, background: '#fff', color: '#9a3412', cursor: 'pointer', fontSize: 11 }}>Insert After</button>
+                   </div>
+                 )}
 
-                {templateColumns.length > 0 && (
+                 {templateColumns.length > 0 && (
                   <div style={{ marginTop: 16, borderTop: '1px solid #e8ddd0', paddingTop: 16 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                       <span style={{ fontWeight: 600, fontSize: 14 }}>Template Preview</span>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button
-                          onClick={() => {
-                            const newRow: any = {};
-                            const sorted = [...templateColumns].sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0));
-                            sorted.forEach((col: any) => {
-                              if (col.dataType === 'NUMBER') newRow[col.columnName] = 0;
-                              else if (col.dataType === 'DATE') newRow[col.columnName] = new Date().toISOString().slice(0, 10);
-                              else if (col.dataType === 'BOOLEAN') newRow[col.columnName] = false;
-                              else if (col.dataType === 'CURRENCY') newRow[col.columnName] = 0;
-                              else newRow[col.columnName] = '';
-                            });
-                            setSampleRows([...sampleRows, newRow]);
-                          }}
+                         <button
+                           onClick={() => handleInsertSampleRow('below')}
                           style={{ padding: '4px 10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
                         ><i className="fas fa-plus"></i> Add Row
                         </button>
                         <button
-                          onClick={() => setSampleRows([])}
+                           onClick={() => { setSampleRows([]); setSelectedSampleRow(null); }}
                           style={{ padding: '4px 10px', background: '#6b7280', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
                         >Clear</button>
                       </div>
@@ -1107,8 +1166,8 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
                               </td>
                             </tr>
                           ) : (
-                            sampleRows.map((row: any, rIdx: number) => (
-                              <tr key={rIdx} style={{ borderTop: '1px solid #f3eee8' }}>
+                             sampleRows.map((row: any, rIdx: number) => (
+                               <tr key={rIdx} onClick={() => setSelectedSampleRow(rIdx)} style={{ borderTop: '1px solid #f3eee8', background: selectedSampleRow === rIdx ? '#eff6ff' : '#fff', cursor: 'pointer' }}>
                                 <td style={{ padding: '4px 8px', color: '#6b7280', fontSize: 11 }}>{rIdx + 1}</td>
                                 {templateColumns.sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0)).map((col: any) => (
                                   <td key={col.id} style={{ padding: '4px 8px' }}>
@@ -1126,17 +1185,25 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
                                 ))}
                                 <td style={{ padding: '4px 8px' }}>
                                   <button
-                                    onClick={() => setSampleRows(sampleRows.filter((_: any, i: number) => i !== rIdx))}
+                                     onClick={(event) => { event.stopPropagation(); setSampleRows(sampleRows.filter((_: any, i: number) => i !== rIdx)); setSelectedSampleRow(null); }}
                                     style={{ padding: '2px 6px', background: '#fecaca', color: '#dc2626', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
                                   >Delete</button>
                                 </td>
                               </tr>
                             ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                         )}
+                       </tbody>
+                     </table>
+                   </div>
+                   {selectedSampleRow !== null && sampleRows[selectedSampleRow] && (
+                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '8px 10px', border: '1px solid #bfdbfe', borderRadius: 6, background: '#eff6ff', fontSize: 12 }}>
+                       <strong style={{ color: '#1d4ed8' }}>Selected row {selectedSampleRow + 1}:</strong>
+                       <span style={{ flex: 1, color: '#1e40af' }}>Choose where to insert the next row.</span>
+                       <button onClick={() => handleInsertSampleRow('above')} style={{ padding: '4px 9px', border: '1px solid #93c5fd', borderRadius: 4, background: '#fff', color: '#1d4ed8', cursor: 'pointer', fontSize: 11 }}>Insert Above</button>
+                       <button onClick={() => handleInsertSampleRow('below')} style={{ padding: '4px 9px', border: '1px solid #93c5fd', borderRadius: 4, background: '#fff', color: '#1d4ed8', cursor: 'pointer', fontSize: 11 }}>Insert Below</button>
+                     </div>
+                   )}
+                 </div>
                 )}
               </div>
             ) : (
