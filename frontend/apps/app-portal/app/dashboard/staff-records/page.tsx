@@ -926,10 +926,11 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
 
   const handleQuickCompile = async (templateId: string) => {
     withBtnLoading(`compile_${templateId}`, async () => {
+      const period = templatePeriod || new Date().toISOString().slice(0, 7);
       try {
         const response = await premiumStaffRecordsApi.quickCompile({
           templateId,
-          period: templatePeriod || new Date().toISOString().slice(0, 7),
+          period,
         });
         const payload = response.data;
         const result = payload?.data?.id ? payload.data : payload;
@@ -937,7 +938,27 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
         showToast('success', 'Staff records loaded into the configured return');
         onRefresh();
       } catch (err: any) {
-        showToast('error', err?.response?.data?.message || 'Could not compile return');
+        const timedOut = err?.code === 'ECONNABORTED' || err?.code === 'ETIMEDOUT';
+        if (timedOut) {
+          for (let attempt = 0; attempt < 6; attempt += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+            try {
+              const submissionsResponse = await premiumStaffRecordsApi.getSubmissions(templateId);
+              const submissions = submissionsResponse.data?.data || submissionsResponse.data || [];
+              const completedDraft = submissions.find((submission: any) => submission.period === period && submission.status === 'DRAFT' && Array.isArray(submission.data) && submission.data.length > 0);
+              if (completedDraft) {
+                setCompileResult(completedDraft);
+                showToast('success', 'Staff records were loaded successfully. The server completed the operation after the initial response timed out.');
+                onRefresh();
+                return;
+              }
+            } catch {
+              // Keep polling briefly because the compile may still be finishing on the server.
+            }
+          }
+        }
+        const message = err?.response?.data?.message || err?.message || 'Could not compile return';
+        showToast('error', Array.isArray(message) ? message.join(', ') : message);
       }
     });
   };

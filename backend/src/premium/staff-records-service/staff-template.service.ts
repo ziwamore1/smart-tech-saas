@@ -203,10 +203,23 @@ export class StaffTemplateService {
     });
     const duplicateIssues = this.findDuplicateIdentityIssues(profiles);
     const snapshot = { templateId: template.id, templateCode: template.templateCode, templateVersion: template.version, period: data.period, school, generatedAt: new Date().toISOString(), generatedBy: data.performedBy, staffPopulation: rows.map((row) => row.staffId), validationIssues: duplicateIssues, rows };
-    const submission = await this.prisma.staffReturnSubmission.create({
-      data: { templateId: template.id, schoolId: data.schoolId, period: data.period, academicYear: data.period, status: duplicateIssues.length ? 'DRAFT' : 'DRAFT', data: rows as any, snapshot: snapshot as any, templateVersion: template.version },
+    const existingDraft = await this.prisma.staffReturnSubmission.findFirst({
+      where: { templateId: template.id, schoolId: data.schoolId, period: data.period, status: 'DRAFT' },
+      orderBy: { updatedAt: 'desc' },
     });
-    await this.createAuditLog({ submissionId: submission.id, schoolId: data.schoolId, action: 'QUICK_COMPILE', entityType: 'INSTITUTIONAL_RETURN', entityId: submission.id, performedBy: data.performedBy, metadata: { templateVersion: template.version, detectedStaff: rows.length, missingFields: rows.reduce((count, row) => count + row.missing.length, 0) } });
+    const submission = existingDraft
+      ? await this.prisma.staffReturnSubmission.update({
+          where: { id: existingDraft.id },
+          data: { academicYear: data.period, data: rows as any, snapshot: snapshot as any, templateVersion: template.version },
+        })
+      : await this.prisma.staffReturnSubmission.create({
+          data: { templateId: template.id, schoolId: data.schoolId, period: data.period, academicYear: data.period, status: 'DRAFT', data: rows as any, snapshot: snapshot as any, templateVersion: template.version },
+        });
+    try {
+      await this.createAuditLog({ submissionId: submission.id, schoolId: data.schoolId, action: 'QUICK_COMPILE', entityType: 'INSTITUTIONAL_RETURN', entityId: submission.id, performedBy: data.performedBy, metadata: { templateVersion: template.version, detectedStaff: rows.length, missingFields: rows.reduce((count, row) => count + row.missing.length, 0) } });
+    } catch (error: any) {
+      this.logger.warn(`Staff return ${submission.id} loaded, but quick-compile audit logging failed: ${error?.message || error}`);
+    }
     return { ...submission, summary: { detected: rows.length, complete: rows.filter((row) => row.status === 'COMPLETE').length, incomplete: rows.filter((row) => row.status === 'INCOMPLETE').length, invalid: duplicateIssues.length }, validationIssues: duplicateIssues };
   }
 
