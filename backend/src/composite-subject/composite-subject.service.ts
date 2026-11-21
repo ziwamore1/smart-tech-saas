@@ -225,10 +225,11 @@ export class CompositeSubjectService {
         ? (computedMap.get(component.subjectId) ?? null)
         : await this.prisma.computedResult.findUnique({
             where: {
-              studentId_subjectId_termId: {
+              studentId_subjectId_termId_examType: {
                 studentId,
                 subjectId: component.subjectId,
                 termId,
+                examType: 'END_TERM',
               },
             },
             include: { subject: true },

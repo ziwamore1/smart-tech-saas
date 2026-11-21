@@ -385,10 +385,11 @@ export class ResultService {
 
       await this.prisma.computedResult.upsert({
         where: {
-          studentId_subjectId_termId: {
+          studentId_subjectId_termId_examType: {
             studentId,
             subjectId,
             termId,
+            examType: 'END_TERM',
           },
         },
         update: {
@@ -442,10 +443,11 @@ export class ResultService {
 
       await this.prisma.computedResult.upsert({
         where: {
-          studentId_subjectId_termId: {
+          studentId_subjectId_termId_examType: {
             studentId,
             subjectId,
             termId,
+            examType: 'END_TERM',
           },
         },
         update: {
@@ -866,10 +868,11 @@ export class ResultService {
 
             await tx.computedResult.upsert({
               where: {
-                studentId_subjectId_termId: {
+                studentId_subjectId_termId_examType: {
                   studentId: item.studentId,
                   subjectId: item.subjectId,
                   termId: item.termId,
+                  examType: 'END_TERM',
                 },
               },
               update: {
@@ -1090,10 +1093,11 @@ export class ResultService {
 
     await this.prisma.computedResult.upsert({
       where: {
-        studentId_subjectId_termId: {
+        studentId_subjectId_termId_examType: {
           studentId: result.studentId,
           subjectId: result.subjectId,
           termId: result.termId,
+          examType: 'END_TERM',
         },
       },
       update: {
@@ -1784,10 +1788,11 @@ export class ResultService {
         // Keep ComputedResult in sync (respect X/A absent students for analytics)
         await this.prisma.computedResult.upsert({
           where: {
-            studentId_subjectId_termId: {
+            studentId_subjectId_termId_examType: {
               studentId: student.id,
               subjectId,
               termId,
+              examType: 'END_TERM',
             },
           },
           update: {
@@ -1918,10 +1923,11 @@ export class ResultService {
       // reports and the Results Management (Central Hub) workflow.
       await this.prisma.computedResult.upsert({
         where: {
-          studentId_subjectId_termId: {
+          studentId_subjectId_termId_examType: {
             studentId: result.studentId,
             subjectId: result.subjectId,
             termId,
+            examType: 'END_TERM',
           },
         },
         update: {
@@ -2022,10 +2028,11 @@ export class ResultService {
 
       await this.prisma.computedResult.upsert({
         where: {
-          studentId_subjectId_termId: {
+          studentId_subjectId_termId_examType: {
             studentId: result.studentId,
             subjectId: result.subjectId,
             termId,
+            examType: 'END_TERM',
           },
         },
         update: {

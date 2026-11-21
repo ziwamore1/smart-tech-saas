@@ -909,20 +909,20 @@ export const reportTemplateApi = {
 };
 
 export const analyticsApi = {
-  getClassPerformance: (classId: string, termId: string) =>
-    api.get('/analytics/class-performance', { params: { classId, term: termId } }),
+  getClassPerformance: (classId: string, termId: string, examType?: string) =>
+    api.get('/analytics/class-performance', { params: { classId, term: termId, examType } }),
   
-  getClassRanking: (classId: string, termId: string) =>
-    api.get('/analytics/class-ranking', { params: { classId, term: termId } }),
+  getClassRanking: (classId: string, termId: string, examType?: string) =>
+    api.get('/analytics/class-ranking', { params: { classId, term: termId, examType } }),
   
-  getSubjectPerformance: (classId: string, termId: string) =>
-    api.get('/analytics/subject-performance', { params: { classId, termId } }),
+  getSubjectPerformance: (classId: string, termId: string, examType?: string) =>
+    api.get('/analytics/subject-performance', { params: { classId, termId, examType } }),
   
-  getGradeDistribution: (classId: string, termId: string) =>
-    api.get('/analytics/grade-distribution', { params: { classId, termId } }),
+  getGradeDistribution: (classId: string, termId: string, examType?: string) =>
+    api.get('/analytics/grade-distribution', { params: { classId, termId, examType } }),
   
-  getGenderPerformance: (classId: string, termId: string) =>
-    api.get('/analytics/gender-performance', { params: { classId, termId } }),
+  getGenderPerformance: (classId: string, termId: string, examType?: string) =>
+    api.get('/analytics/gender-performance', { params: { classId, termId, examType } }),
   
   getTeacherPerformance: (termId: string) =>
     api.get('/analytics/teacher-performance', { params: { termId } }),
@@ -930,8 +930,8 @@ export const analyticsApi = {
   getDirectorDashboard: (classId: string, termId: string) =>
     api.get('/analytics/director-dashboard', { params: { classId, termId } }),
   
-  getSubjectHeatmap: (classId: string, termId: string) =>
-    api.get(`/analytics/heatmap/${classId}/${termId}`),
+  getSubjectHeatmap: (classId: string, termId: string, examType?: string) =>
+    api.get(`/analytics/heatmap/${classId}/${termId}`, { params: { examType } }),
   
   getPerformanceAlerts: (classId: string, termId: string, previousTermId?: string) =>
     api.get(`/analytics/alerts/${classId}/${termId}`, {

@@ -5201,6 +5201,7 @@ model ComputedResult {
   studentId          String
   subjectId          String
   termId             String
+  examType           String               @default("END_TERM")
   classId            String
   schoolId           String
   totalRawScore      Float?
@@ -5226,10 +5227,11 @@ model ComputedResult {
   subject            Subject              @relation(fields: [subjectId], references: [id])
   term               Term                 @relation(fields: [termId], references: [id])
 
-  @@unique([studentId, subjectId, termId])
+  @@unique([studentId, subjectId, termId, examType])
   @@index([studentId])
   @@index([subjectId])
   @@index([termId])
+  @@index([examType])
   @@index([classId])
   @@index([schoolId])
   @@index([status])

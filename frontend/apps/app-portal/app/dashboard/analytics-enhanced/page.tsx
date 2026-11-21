@@ -19,6 +19,7 @@ export default function AnalyticsEnhancedPage() {
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
   const [selectedClass2, setSelectedClass2] = useState('');
+  const [selectedExamType, setSelectedExamType] = useState('END_TERM');
 
   const { data: classes } = useQuery({
     queryKey: ['classes'],
@@ -46,39 +47,51 @@ export default function AnalyticsEnhancedPage() {
   }, [classes, terms, selectedClass, selectedTerm]);
 
   const { data: heatmapData, isLoading: heatmapLoading } = useQuery({
-    queryKey: ['heatmap', selectedClass, selectedTerm],
-    queryFn: () => analyticsApi.getSubjectHeatmap(selectedClass, selectedTerm).then(r => r.data?.data || r.data),
+    queryKey: ['heatmap', selectedClass, selectedTerm, selectedExamType],
+    queryFn: () => analyticsApi.getSubjectHeatmap(selectedClass, selectedTerm, selectedExamType).then(r => r.data?.data || r.data),
     enabled: !!selectedClass && !!selectedTerm,
   });
 
   const { data: classPerf, isLoading: perfLoading } = useQuery({
-    queryKey: ['class-perf', selectedClass, selectedTerm],
-    queryFn: () => analyticsApi.getClassPerformance(selectedClass, selectedTerm).then(r => r.data?.data || r.data),
+    queryKey: ['class-perf', selectedClass, selectedTerm, selectedExamType],
+    queryFn: () => analyticsApi.getClassPerformance(selectedClass, selectedTerm, selectedExamType).then(r => r.data?.data || r.data),
     enabled: !!selectedClass && !!selectedTerm,
   });
 
   const { data: classRanking, isLoading: rankingLoading } = useQuery({
-    queryKey: ['class-ranking', selectedClass, selectedTerm],
-    queryFn: () => analyticsApi.getClassRanking(selectedClass, selectedTerm).then(r => r.data?.data || r.data),
+    queryKey: ['class-ranking', selectedClass, selectedTerm, selectedExamType],
+    queryFn: () => analyticsApi.getClassRanking(selectedClass, selectedTerm, selectedExamType).then(r => r.data?.data || r.data),
     enabled: !!selectedClass && !!selectedTerm,
   });
 
   const { data: subjectPerf, isLoading: subjectLoading } = useQuery({
-    queryKey: ['subject-perf', selectedClass, selectedTerm],
-    queryFn: () => analyticsApi.getSubjectPerformance(selectedClass, selectedTerm).then(r => r.data?.data || r.data),
+    queryKey: ['subject-perf', selectedClass, selectedTerm, selectedExamType],
+    queryFn: () => analyticsApi.getSubjectPerformance(selectedClass, selectedTerm, selectedExamType).then(r => r.data?.data || r.data),
     enabled: !!selectedClass && !!selectedTerm,
   });
 
   const { data: gradeDist, isLoading: gradeLoading } = useQuery({
-    queryKey: ['grade-dist', selectedClass, selectedTerm],
-    queryFn: () => analyticsApi.getGradeDistribution(selectedClass, selectedTerm).then(r => r.data?.data || r.data),
+    queryKey: ['grade-dist', selectedClass, selectedTerm, selectedExamType],
+    queryFn: () => analyticsApi.getGradeDistribution(selectedClass, selectedTerm, selectedExamType).then(r => r.data?.data || r.data),
     enabled: !!selectedClass && !!selectedTerm,
   });
 
   const { data: genderPerf, isLoading: genderLoading } = useQuery({
-    queryKey: ['gender-perf', selectedClass, selectedTerm],
-    queryFn: () => analyticsApi.getGenderPerformance(selectedClass, selectedTerm).then(r => r.data?.data || r.data),
+    queryKey: ['gender-perf', selectedClass, selectedTerm, selectedExamType],
+    queryFn: () => analyticsApi.getGenderPerformance(selectedClass, selectedTerm, selectedExamType).then(r => r.data?.data || r.data),
     enabled: !!selectedClass && !!selectedTerm,
+  });
+
+  const { data: midTermSubjectPerf } = useQuery({
+    queryKey: ['subject-perf', selectedClass, selectedTerm, 'MID_TERM'],
+    queryFn: () => analyticsApi.getSubjectPerformance(selectedClass, selectedTerm, 'MID_TERM').then(r => r.data?.data || r.data),
+    enabled: !!selectedClass && !!selectedTerm && activeTab === 'comparison',
+  });
+
+  const { data: endTermSubjectPerf } = useQuery({
+    queryKey: ['subject-perf', selectedClass, selectedTerm, 'END_TERM'],
+    queryFn: () => analyticsApi.getSubjectPerformance(selectedClass, selectedTerm, 'END_TERM').then(r => r.data?.data || r.data),
+    enabled: !!selectedClass && !!selectedTerm && activeTab === 'comparison',
   });
 
   const tabs: { key: Tab; label: string; icon: string }[] = [
@@ -177,6 +190,13 @@ export default function AnalyticsEnhancedPage() {
               ))}
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Assessment</label>
+            <select value={selectedExamType} onChange={(e) => setSelectedExamType(e.target.value)} className="w-full px-3 py-2 border rounded-lg">
+              <option value="END_TERM">End-of-Term</option>
+              <option value="MID_TERM">Mid-Term</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -251,6 +271,22 @@ export default function AnalyticsEnhancedPage() {
 
       {activeTab === 'comparison' && (
         <div className="space-y-6">
+          {(() => {
+            const midRows = Array.isArray(midTermSubjectPerf) ? midTermSubjectPerf : midTermSubjectPerf?.subjects || [];
+            const endRows = Array.isArray(endTermSubjectPerf) ? endTermSubjectPerf : endTermSubjectPerf?.subjects || [];
+            const subjects = [...new Set([...midRows, ...endRows].map((s: any) => s.name || s.subject))];
+            const scoreFor = (rows: any[], subject: string) => rows.find((s: any) => (s.name || s.subject) === subject)?.average || 0;
+            return subjects.length > 0 ? (
+              <ComparisonChart
+                categories={subjects}
+                groups={[
+                  { name: 'Mid-Term', values: subjects.map((subject) => scoreFor(midRows, subject)), color: '#8b5cf6' },
+                  { name: 'End-of-Term', values: subjects.map((subject) => scoreFor(endRows, subject)), color: '#ea6645' },
+                ]}
+                title="Mid-Term vs End-of-Term by Subject"
+              />
+            ) : null;
+          })()}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {subjectRows.length > 0 && (
               <ComparisonChart

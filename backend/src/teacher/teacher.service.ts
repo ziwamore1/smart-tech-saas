@@ -634,10 +634,11 @@ export class TeacherService {
 
     await this.prisma.computedResult.upsert({
       where: {
-        studentId_subjectId_termId: {
+        studentId_subjectId_termId_examType: {
           studentId: data.studentId,
           subjectId: data.subjectId,
           termId: data.termId,
+          examType: 'END_TERM',
         },
       },
       update: {
@@ -770,10 +771,11 @@ export class TeacherService {
 
       await this.prisma.computedResult.upsert({
         where: {
-          studentId_subjectId_termId: {
+          studentId_subjectId_termId_examType: {
             studentId: s.studentId,
             subjectId,
             termId,
+            examType: 'END_TERM',
           },
         },
         update: {

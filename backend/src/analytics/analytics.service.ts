@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { PrismaService } from '../prisma/prisma.service';
 import { StudentSubjectService } from '../student-subject/student-subject.service';
+import { normalizeExamType } from '../common/utils/exam-type.util';
 
 @Injectable()
 export class AnalyticsService {
@@ -31,6 +32,10 @@ export class AnalyticsService {
       const validIds = subjectMap.get(r.studentId);
       return validIds ? validIds.includes(r.subjectId) : true;
     });
+  }
+
+  private examTypeWhere(examType?: string) {
+    return examType ? { examType: normalizeExamType(examType) } : {};
   }
 
   private async resolveLegacyScores(results: any[], termId: string, schoolId: string) {
@@ -72,12 +77,13 @@ export class AnalyticsService {
     return { grade: '9', remark: 'Fail' };
   }
 
-  async getClassPerformance(schoolId: string, classId: string, termId: string) {
+  async getClassPerformance(schoolId: string, classId: string, termId: string, examType?: string) {
     let results = await this.prisma.computedResult.findMany({
       where: {
         classId,
         termId,
         schoolId,
+        ...this.examTypeWhere(examType),
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         isAbsent: false,
         student: { status: 'ACTIVE' },
@@ -131,12 +137,14 @@ export class AnalyticsService {
     classId: string,
     termId: string,
     gradingSystem: 'ECZ' | 'GPA' = 'ECZ',
+    examType?: string,
   ) {
     let computedResults = await this.prisma.computedResult.findMany({
       where: {
         classId,
         termId,
         schoolId,
+        ...this.examTypeWhere(examType),
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         isAbsent: false,
         student: { status: 'ACTIVE' },
@@ -360,11 +368,12 @@ export class AnalyticsService {
 
     return parts.join(' ');
   }
-  async getSubjectPerformance(classId: string, termId: string) {
+  async getSubjectPerformance(classId: string, termId: string, examType?: string) {
     let results = await this.prisma.computedResult.findMany({
       where: {
         classId,
         termId,
+        ...this.examTypeWhere(examType),
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
         isAbsent: false,
@@ -399,11 +408,12 @@ export class AnalyticsService {
       average: s.total / s.count,
     }));
   }
-  async getGradeDistribution(classId: string, termId: string) {
+  async getGradeDistribution(classId: string, termId: string, examType?: string) {
     let results = await this.prisma.computedResult.findMany({
       where: {
         classId,
         termId,
+        ...this.examTypeWhere(examType),
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         isAbsent: false,
         student: { status: 'ACTIVE' },
@@ -426,11 +436,12 @@ export class AnalyticsService {
 
     return distribution;
   }
-  async getGenderPerformance(classId: string, termId: string) {
+  async getGenderPerformance(classId: string, termId: string, examType?: string) {
     let results = await this.prisma.computedResult.findMany({
       where: {
         classId,
         termId,
+        ...this.examTypeWhere(examType),
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         finalPercentage: { not: null },
         isAbsent: false,
@@ -933,7 +944,7 @@ Respond with ONLY valid JSON, no markdown.`;
   // ----------------------
   // 3️⃣ Subject Heatmap
   // ----------------------
-  async getSubjectHeatmap(classId: string, termId: string) {
+  async getSubjectHeatmap(classId: string, termId: string, examType?: string) {
     const enrollments = await this.prisma.enrollment.findMany({
       where: { classId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       include: { student: true },
@@ -956,6 +967,7 @@ Respond with ONLY valid JSON, no markdown.`;
       where: {
         studentId: { in: studentIds },
         termId,
+        ...this.examTypeWhere(examType),
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         isAbsent: false,
         student: { status: 'ACTIVE' },

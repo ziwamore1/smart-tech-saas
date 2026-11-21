@@ -406,10 +406,11 @@ export class GradingEngineService {
 
         return await this.prisma.computedResult.upsert({
           where: {
-            studentId_subjectId_termId: {
+            studentId_subjectId_termId_examType: {
               studentId: enrollment.studentId,
               subjectId,
               termId,
+              examType: 'END_TERM',
             },
           },
           update: {

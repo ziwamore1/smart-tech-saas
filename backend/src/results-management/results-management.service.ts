@@ -425,6 +425,7 @@ export class ResultsManagementService {
         studentId: { in: students.map((s) => s.id) },
         termId: sheet.termId,
         classId: sheet.classId,
+        examType: sheet.examType,
         student: { status: 'ACTIVE' },
       },
       include: {
@@ -438,6 +439,7 @@ export class ResultsManagementService {
         where: {
           studentId: { in: students.map((s) => s.id) },
           termId: sheet.termId,
+          examType: sheet.examType,
           student: { status: 'ACTIVE' },
         },
         include: {
@@ -1096,6 +1098,7 @@ export class ResultsManagementService {
           classId: sheet.classId,
           termId: sheet.termId,
           schoolId: sheet.schoolId,
+          examType: sheet.examType,
           status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
           student: { status: 'ACTIVE' },
         },
@@ -1556,7 +1559,11 @@ export class ResultsManagementService {
           },
         },
       },
-      orderBy: { student: { lastName: 'asc' } },
+      orderBy: [
+        { student: { lastName: 'asc' } },
+        { student: { firstName: 'asc' } },
+        { student: { id: 'asc' } },
+      ],
     });
 
     const students = enrollments.map((e) => e.student);
@@ -1567,6 +1574,7 @@ export class ResultsManagementService {
         classId: sheet.classId,
         termId: sheet.termId,
         studentId: { in: studentIds },
+        examType: sheet.examType,
         student: { status: 'ACTIVE' },
       },
     });
@@ -1576,6 +1584,7 @@ export class ResultsManagementService {
         where: {
           termId: sheet.termId,
           studentId: { in: studentIds },
+          examType: sheet.examType,
           student: { status: 'ACTIVE' },
         },
       });

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CompositeSubjectService } from '../composite-subject/composite-subject.service';
 import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { StudentSubjectService } from '../student-subject/student-subject.service';
+import { normalizeExamType } from '../common/utils/exam-type.util';
 import {
   checkEczEligibility,
   detectEczGradingSystem,
@@ -94,11 +95,14 @@ let resultSheet = examType
       });
     }
 
+    const selectedExamType = normalizeExamType(examType || resultSheet?.examType);
+
     const computedResults = await this.prisma.computedResult.findMany({
       where: {
         studentId,
         termId,
         classId: enrollment.classId,
+        examType: selectedExamType,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         student: { status: 'ACTIVE' },
       },
@@ -110,7 +114,7 @@ let resultSheet = examType
       ],
     });
 
-    const assessmentResults = await this.prisma.studentAssessmentResult.findMany({
+    const assessmentResults = (await this.prisma.studentAssessmentResult.findMany({
       where: {
         studentId,
         termId,
@@ -125,7 +129,7 @@ let resultSheet = examType
         { subject: { name: 'asc' } },
         { assessmentDef: { sortOrder: 'asc' } },
       ],
-    });
+    })).filter(result => normalizeExamType(result.assessmentDef.examType) === selectedExamType);
 
     // Filter by student's assigned subjects
     const validSubjectIds = await this.studentSubjectService.getClassSubjectsForStudent(studentId, enrollment.classId);

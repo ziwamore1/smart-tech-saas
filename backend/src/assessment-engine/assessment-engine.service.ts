@@ -375,11 +375,24 @@ export class AssessmentEngineService {
     subjectId: string,
     termId: string,
     schoolId: string,
+    assessmentDefId?: string,
   ) {
-    const configs = await this.prisma.termAssessmentConfiguration.findMany({
+    const allConfigs = await this.prisma.termAssessmentConfiguration.findMany({
       where: { classId, subjectId, termId },
+      include: { assessmentDef: { select: { examType: true } } },
     });
-
+    const triggeringDefinition = assessmentDefId
+      ? await this.prisma.assessmentDefinition.findUnique({
+          where: { id: assessmentDefId },
+          select: { examType: true },
+        })
+      : null;
+    const resolvedExamType = triggeringDefinition?.examType
+      ? normalizeExamType(triggeringDefinition.examType)
+      : null;
+    const configs = resolvedExamType
+      ? allConfigs.filter(c => normalizeExamType(c.assessmentDef.examType) === resolvedExamType)
+      : allConfigs;
     // Resolve the academic year for this term so the enrollment query is
     // reliable even when the Term ↔ AcademicYear join is missing or the
     // nested Prisma query doesn't traverse correctly.
@@ -403,7 +416,7 @@ export class AssessmentEngineService {
       // Include absent entries (rawScore is null when isAbsent) so that
       // students who were absent for every component are recognised instead
       // of being treated as having no data at all.
-      const results = await this.prisma.studentAssessmentResult.findMany({
+      const allResults = await this.prisma.studentAssessmentResult.findMany({
         where: {
           studentId: enrollment.studentId,
           subjectId,
@@ -411,7 +424,11 @@ export class AssessmentEngineService {
           classId,
           OR: [{ rawScore: { not: null } }, { isAbsent: true }],
         },
+        include: { assessmentDef: { select: { examType: true } } },
       });
+      const results = resolvedExamType
+        ? allResults.filter(r => normalizeExamType(r.assessmentDef.examType) === resolvedExamType)
+        : allResults;
 
       if (configs.length === 0) {
         const scoredResults = results.filter(r => r.rawScore != null);
@@ -425,16 +442,17 @@ export class AssessmentEngineService {
 
           await this.prisma.computedResult.upsert({
             where: {
-              studentId_subjectId_termId: {
+              studentId_subjectId_termId_examType: {
                 studentId: enrollment.studentId,
                 subjectId,
                 termId,
+                examType: resolvedExamType || 'END_TERM',
               },
             },
             update: { classId, schoolId, totalRawScore: totalRaw, finalPercentage: pct, finalGrade: grade, isAbsent: false, status: 'COMPUTED', computedAt: new Date() },
             create: {
               studentId: enrollment.studentId,
-              subjectId, termId, classId, schoolId,
+              subjectId, termId, examType: resolvedExamType || 'END_TERM', classId, schoolId,
               totalRawScore: totalRaw, finalPercentage: pct, finalGrade: grade, isAbsent: false, status: 'COMPUTED', computedAt: new Date(),
             },
           });
@@ -443,16 +461,17 @@ export class AssessmentEngineService {
           // subject flagged as ABSENT rather than silently scoring zero.
           await this.prisma.computedResult.upsert({
             where: {
-              studentId_subjectId_termId: {
+              studentId_subjectId_termId_examType: {
                 studentId: enrollment.studentId,
                 subjectId,
                 termId,
+                examType: resolvedExamType || 'END_TERM',
               },
             },
             update: { classId, schoolId, totalRawScore: 0, finalPercentage: null, finalGrade: null, finalRemark: 'ABSENT (X)', points: null, isAbsent: true, status: 'COMPUTED', metadata: { absentCode: 'X' }, computedAt: new Date() },
             create: {
               studentId: enrollment.studentId,
-              subjectId, termId, classId, schoolId,
+              subjectId, termId, examType: resolvedExamType || 'END_TERM', classId, schoolId,
               totalRawScore: 0, finalPercentage: null, finalGrade: null, finalRemark: 'ABSENT (X)', points: null, isAbsent: true, status: 'COMPUTED', metadata: { absentCode: 'X' }, computedAt: new Date(),
             },
           });
@@ -499,10 +518,11 @@ export class AssessmentEngineService {
       if (totalWeight > 0) {
         await this.prisma.computedResult.upsert({
           where: {
-            studentId_subjectId_termId: {
+            studentId_subjectId_termId_examType: {
               studentId: enrollment.studentId,
               subjectId,
               termId,
+              examType: resolvedExamType || 'END_TERM',
             },
           },
           update: {
@@ -518,7 +538,7 @@ export class AssessmentEngineService {
           },
           create: {
             studentId: enrollment.studentId,
-            subjectId, termId, classId, schoolId,
+            subjectId, termId, examType: resolvedExamType || 'END_TERM', classId, schoolId,
             totalRawScore: results.reduce((s, r) => s + (r.rawScore ?? 0), 0),
             totalWeightedScore: totalWeighted,
             finalPercentage: finalPct,
@@ -533,10 +553,11 @@ export class AssessmentEngineService {
         const metadata = allComponentsAbsent ? { absentCode: 'X' } : {};
         await this.prisma.computedResult.upsert({
           where: {
-            studentId_subjectId_termId: {
+            studentId_subjectId_termId_examType: {
               studentId: enrollment.studentId,
               subjectId,
               termId,
+              examType: resolvedExamType || 'END_TERM',
             },
           },
           update: {
@@ -555,7 +576,7 @@ export class AssessmentEngineService {
           },
           create: {
             studentId: enrollment.studentId,
-            subjectId, termId, classId, schoolId,
+            subjectId, termId, examType: resolvedExamType || 'END_TERM', classId, schoolId,
             totalRawScore: 0,
             totalWeightedScore: null,
             finalPercentage: null,
@@ -576,6 +597,7 @@ export class AssessmentEngineService {
             studentId: enrollment.studentId,
             subjectId,
             termId,
+            examType: resolvedExamType || 'END_TERM',
           },
         });
       }
@@ -850,7 +872,7 @@ export class AssessmentEngineService {
     this.logger.log(`Bulk entered ${results.length} scores for batch ${batch.id}`);
 
     // Sync computed results and result sheet for real-time web analytics (fire-and-forget)
-    this.syncComputedResult(classId, subjectId, termId, schoolId).catch(e =>
+    this.syncComputedResult(classId, subjectId, termId, schoolId, assessmentDefId).catch(e =>
       this.logger.error(`syncComputedResult failed: ${e.message}`),
     );
     this.compositeSubjectService.recomputeAllComposites(subjectId, classId, termId, schoolId).catch(e =>
@@ -980,7 +1002,7 @@ export class AssessmentEngineService {
       });
 
       // Sync computed results and result sheet for real-time web analytics
-      await this.syncComputedResult(data.classId, data.subjectId, data.termId, schoolId).catch(e =>
+      await this.syncComputedResult(data.classId, data.subjectId, data.termId, schoolId, data.assessmentDefId).catch(e =>
         this.logger.error(`syncComputedResult failed: ${e.message}`),
       );
       await this.compositeSubjectService.recomputeAllComposites(data.subjectId, data.classId, data.termId, schoolId).catch(e =>
@@ -1086,7 +1108,7 @@ export class AssessmentEngineService {
     });
 
     // Sync computed results and result sheet for real-time web analytics
-    await this.syncComputedResult(data.classId, data.subjectId, data.termId, schoolId).catch(e =>
+    await this.syncComputedResult(data.classId, data.subjectId, data.termId, schoolId, data.assessmentDefId).catch(e =>
       this.logger.error(`syncComputedResult failed: ${e.message}`),
     );
     // Recompute any composite subjects that include this subject
@@ -1178,6 +1200,8 @@ export class AssessmentEngineService {
       },
       orderBy: [
         { student: { lastName: 'asc' } },
+        { student: { firstName: 'asc' } },
+        { student: { id: 'asc' } },
         { assessmentDef: { sortOrder: 'asc' } },
       ],
     });
@@ -1202,7 +1226,11 @@ export class AssessmentEngineService {
               },
             },
           },
-          orderBy: { student: { lastName: 'asc' } },
+          orderBy: [
+            { student: { lastName: 'asc' } },
+            { student: { firstName: 'asc' } },
+            { student: { id: 'asc' } },
+          ],
         },
       },
     });

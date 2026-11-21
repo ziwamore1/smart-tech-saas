@@ -463,10 +463,11 @@ export class AiTutorService {
             if (studentId && term) {
               const computed = await this.prisma.computedResult.findUnique({
                 where: {
-                  studentId_subjectId_termId: {
+                  studentId_subjectId_termId_examType: {
                     studentId,
                     subjectId: component.subjectId,
                     termId: term.id,
+                    examType: 'END_TERM',
                   },
                 },
               }).catch(() => null);

@@ -427,7 +427,7 @@ export class AssessmentService {
 
     const result = await this.prisma.result.upsert({
       where: {
-        studentId_subjectId_termId: { studentId, subjectId, termId },
+        studentId_subjectId_termId_examType: { studentId, subjectId, termId, examType: 'END_TERM' },
       },
       update: {
         score: finalScore,

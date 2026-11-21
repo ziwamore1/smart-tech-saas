@@ -276,10 +276,11 @@ async function main() {
     const score = row.isAbsent ? null : row.percentage ?? row.rawScore;
     const existing = await prisma.computedResult.findUnique({
       where: {
-        studentId_subjectId_termId: {
+        studentId_subjectId_termId_examType: {
           studentId: row.studentId,
           subjectId: row.subjectId,
           termId: row.termId,
+          examType: 'END_TERM',
         },
       },
       select: { id: true, finalPercentage: true, classId: true, schoolId: true },
@@ -290,10 +291,11 @@ async function main() {
     if (APPLY) {
       await prisma.computedResult.upsert({
         where: {
-          studentId_subjectId_termId: {
+          studentId_subjectId_termId_examType: {
             studentId: row.studentId,
             subjectId: row.subjectId,
             termId: row.termId,
+            examType: 'END_TERM',
           },
         },
         update: {

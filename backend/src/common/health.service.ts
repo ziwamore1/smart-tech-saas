@@ -115,14 +115,14 @@ export class HealthService {
         continue;
       }
       const existing = await this.prisma.computedResult.findUnique({
-        where: { studentId_subjectId_termId: { studentId: row.studentId, subjectId: row.subjectId, termId: row.termId } },
+        where: { studentId_subjectId_termId_examType: { studentId: row.studentId, subjectId: row.subjectId, termId: row.termId, examType: 'END_TERM' } },
         select: { id: true, finalPercentage: true, classId: true, schoolId: true },
       });
       const needsRepair = !existing || existing.finalPercentage == null || existing.classId !== classId || existing.schoolId !== row.schoolId;
       if (!needsRepair) continue;
       if (apply) {
         await this.prisma.computedResult.upsert({
-          where: { studentId_subjectId_termId: { studentId: row.studentId, subjectId: row.subjectId, termId: row.termId } },
+          where: { studentId_subjectId_termId_examType: { studentId: row.studentId, subjectId: row.subjectId, termId: row.termId, examType: 'END_TERM' } },
           update: {
             classId,
             schoolId: row.schoolId,
@@ -170,7 +170,7 @@ export class HealthService {
     for (const row of componentRows) {
       const score = row.isAbsent ? null : row.percentage ?? row.rawScore;
       const existing = await this.prisma.computedResult.findUnique({
-        where: { studentId_subjectId_termId: { studentId: row.studentId, subjectId: row.subjectId, termId: row.termId } },
+        where: { studentId_subjectId_termId_examType: { studentId: row.studentId, subjectId: row.subjectId, termId: row.termId, examType: 'END_TERM' } },
         select: { id: true, finalPercentage: true, classId: true, schoolId: true },
       });
       const schoolId = row.class.schoolId;
@@ -178,7 +178,7 @@ export class HealthService {
       if (!needsRepair) continue;
       if (apply) {
         await this.prisma.computedResult.upsert({
-          where: { studentId_subjectId_termId: { studentId: row.studentId, subjectId: row.subjectId, termId: row.termId } },
+          where: { studentId_subjectId_termId_examType: { studentId: row.studentId, subjectId: row.subjectId, termId: row.termId, examType: 'END_TERM' } },
           update: {
             classId: row.classId,
             schoolId,

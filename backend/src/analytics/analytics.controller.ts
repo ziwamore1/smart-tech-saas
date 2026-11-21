@@ -14,6 +14,7 @@ export class AnalyticsController {
     @Req() req: Request,
     @Query('classId') classId: string,
     @Query('term') term: string,
+    @Query('examType') examType?: string,
   ) {
     const user = (req as any).user;
 
@@ -21,6 +22,7 @@ export class AnalyticsController {
       user.schoolId,
       classId,
       term,
+      examType,
     );
   }
   @Get('class-ranking')
@@ -29,10 +31,11 @@ export class AnalyticsController {
     @Req() req: Request,
     @Query('classId') classId: string,
     @Query('term') term: string,
+    @Query('examType') examType?: string,
   ) {
     const user = (req as any).user;
 
-    return this.analyticsService.getClassRanking(user.schoolId, classId, term);
+    return this.analyticsService.getClassRanking(user.schoolId, classId, term, 'ECZ', examType);
   }
   @Get('student-comment')
   @UseGuards(JwtAuthGuard)
@@ -53,24 +56,27 @@ export class AnalyticsController {
   async subjectPerformance(
     @Query('classId') classId: string,
     @Query('termId') termId: string,
+    @Query('examType') examType?: string,
   ) {
-    return this.analyticsService.getSubjectPerformance(classId, termId);
+    return this.analyticsService.getSubjectPerformance(classId, termId, examType);
   }
 
   @Get('grade-distribution')
   getGradeDistribution(
     @Query('classId') classId: string,
     @Query('termId') termId: string,
+    @Query('examType') examType?: string,
   ) {
-    return this.analyticsService.getGradeDistribution(classId, termId);
+    return this.analyticsService.getGradeDistribution(classId, termId, examType);
   }
 
   @Get('gender-performance')
   genderPerformance(
     @Query('classId') classId: string,
     @Query('termId') termId: string,
+    @Query('examType') examType?: string,
   ) {
-    return this.analyticsService.getGenderPerformance(classId, termId);
+    return this.analyticsService.getGenderPerformance(classId, termId, examType);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -112,8 +118,9 @@ export class AnalyticsController {
   async getSubjectHeatmap(
     @Param('classId') classId: string,
     @Param('termId') termId: string,
+    @Query('examType') examType?: string,
   ) {
-    return this.analyticsService.getSubjectHeatmap(classId, termId);
+    return this.analyticsService.getSubjectHeatmap(classId, termId, examType);
   }
 
   @Get('alerts/:classId/:termId')

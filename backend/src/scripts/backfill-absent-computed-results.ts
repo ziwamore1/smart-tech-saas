@@ -285,10 +285,11 @@ async function main() {
 
     const existing = await prisma.computedResult.findUnique({
       where: {
-        studentId_subjectId_termId: {
+        studentId_subjectId_termId_examType: {
           studentId: group.studentId,
           subjectId: group.subjectId,
           termId: group.termId,
+          examType: 'END_TERM',
         },
       },
       select: {
@@ -326,10 +327,11 @@ async function main() {
     if (APPLY) {
       await prisma.computedResult.upsert({
         where: {
-          studentId_subjectId_termId: {
+          studentId_subjectId_termId_examType: {
             studentId: group.studentId,
             subjectId: group.subjectId,
             termId: group.termId,
+            examType: 'END_TERM',
           },
         },
         update: {
