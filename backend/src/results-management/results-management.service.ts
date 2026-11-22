@@ -1761,7 +1761,7 @@ export class ResultsManagementService {
 
       return `<tr>
         <td style="text-align:center;padding:6px 12px;border:1px solid #c4b5a3;font-weight:700;color:#3d2f24">${s.rank || '-'}</td>
-        <td style="padding:6px 12px;border:1px solid #c4b5a3;font-weight:700">${s.student?.firstName || ''} ${s.student?.lastName || ''}</td>
+        <td style="padding:6px 12px;border:1px solid #c4b5a3;font-weight:700">${s.student?.lastName || ''}, ${s.student?.firstName || ''}</td>
         <td style="padding:6px 12px;border:1px solid #c4b5a3;color:#374151;font-size:12px">${s.student?.admissionNumber || '-'}</td>
         <td style="padding:6px 12px;border:1px solid #c4b5a3;color:#374151;font-size:12px">${s.student?.gender || '-'}</td>
         ${subjectCells.join('')}

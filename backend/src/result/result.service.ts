@@ -65,7 +65,9 @@ export class ResultService {
         term: true,
       },
       orderBy: [
+        { student: { lastName: 'asc' } },
         { student: { firstName: 'asc' } },
+        { student: { id: 'asc' } },
         { subject: { name: 'asc' } },
       ],
     });
@@ -136,7 +138,9 @@ export class ResultService {
         subject: { select: { id: true, name: true, code: true } },
       },
       orderBy: [
+        { student: { lastName: 'asc' } },
         { student: { firstName: 'asc' } },
+        { student: { id: 'asc' } },
         { subject: { name: 'asc' } },
       ],
     });
@@ -210,7 +214,9 @@ export class ResultService {
     }
 
     return output.sort((a: any, b: any) =>
-      (a.student?.firstName || '').localeCompare(b.student?.firstName || '')
+      (a.student?.lastName || '').localeCompare(b.student?.lastName || '')
+      || (a.student?.firstName || '').localeCompare(b.student?.firstName || '')
+      || (a.studentId || '').localeCompare(b.studentId || '')
       || (a.subject?.name || '').localeCompare(b.subject?.name || ''),
     );
   }
@@ -1374,7 +1380,11 @@ export class ResultService {
         student: { status: 'ACTIVE' },
       },
       include: { student: true, class: true },
-      orderBy: { student: { firstName: 'asc' } },
+      orderBy: [
+        { student: { lastName: 'asc' } },
+        { student: { firstName: 'asc' } },
+        { student: { id: 'asc' } },
+      ],
     });
 
     return this.createExcelTemplate({

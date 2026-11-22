@@ -193,7 +193,8 @@ export default function ViewResultsPage() {
       const rankB = (b as any).rank;
       if (sortField === 'average') return (b.average ?? -1) - (a.average ?? -1);
       if (sortField === 'rank') return (rankA || 999) - (rankB || 999);
-      return `${a.firstName}${a.lastName}`.localeCompare(`${b.firstName}${b.lastName}`);
+      return (a.lastName || '').localeCompare(b.lastName || '', undefined, { sensitivity: 'base' })
+        || (a.firstName || '').localeCompare(b.firstName || '', undefined, { sensitivity: 'base' });
     });
     if (sortDir === 'desc') sorted.reverse();
     return sorted;
@@ -466,7 +467,7 @@ export default function ViewResultsPage() {
                       onMouseEnter={e => e.currentTarget.style.background = '#f5efe8'}
                       onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fefcf9' : '#faf7f4'}>
                       <td style={{ textAlign: 'center', padding: '8px', color: '#6b7280', fontSize: '12px', borderBottom: '1px solid #e8ddd0', background: '#fdfaf7', position: 'sticky', left: 0 }}>{idx + 1}</td>
-                      <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1f2937', borderBottom: '1px solid #e8ddd0', background: '#fdfaf7', position: 'sticky', left: '40px' }}>{s.firstName} {s.lastName}</td>
+                      <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1f2937', borderBottom: '1px solid #e8ddd0', background: '#fdfaf7', position: 'sticky', left: '40px' }}>{s.lastName}, {s.firstName}</td>
                       <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: '12px', borderBottom: '1px solid #e8ddd0', background: '#fdfaf7', position: 'sticky', left: '220px' }}>{s.admissionNumber || '-'}</td>
                       {subjects.map((subj) => {
                         const r = resultBySubject[subj];
@@ -546,7 +547,7 @@ export default function ViewResultsPage() {
                 <div key={s.admissionNumber || i} style={{ padding: '12px 20px', borderBottom: '1px solid #e8ddd0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ fontSize: '14px', width: '24px' }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}</span>
-                    <span style={{ fontWeight: 600, color: '#1f2937' }}>{s.firstName} {s.lastName}</span>
+                    <span style={{ fontWeight: 600, color: '#1f2937' }}>{s.lastName}, {s.firstName}</span>
                   </div>
                   <span style={{ padding: '3px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, background: '#d1fae5', color: '#059669' }}>{s.average?.toFixed(1)}%</span>
                 </div>
@@ -562,7 +563,7 @@ export default function ViewResultsPage() {
                 <div key={s.admissionNumber || i} style={{ padding: '12px 20px', borderBottom: '1px solid #e8ddd0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ fontSize: '12px', color: '#9ca3af', width: '24px' }}>{i + 1}.</span>
-                    <span style={{ fontWeight: 600, color: '#1f2937' }}>{s.firstName} {s.lastName}</span>
+                    <span style={{ fontWeight: 600, color: '#1f2937' }}>{s.lastName}, {s.firstName}</span>
                   </div>
                   <span style={{ padding: '3px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, background: '#fee2e2', color: '#dc2626' }}>{s.average?.toFixed(1)}%</span>
                 </div>

@@ -1316,7 +1316,7 @@ export default function ResultEntryPage() {
                       <tr key={student.id} style={{ background: rowClass }}>
                         <td style={{ textAlign: 'center', padding: '10px 8px', color: '#475569', borderBottom: '1px solid #cbd5e1', borderRight: '1px solid #cbd5e1', fontWeight: 600, fontSize: '13px' }}>{idx + 1}</td>
                         <td style={{ position: 'sticky', left: 0, background: rowClass, zIndex: 2, padding: '10px 14px', fontWeight: 600, color: '#0f172a', borderBottom: '1px solid #cbd5e1', borderRight: '1px solid #cbd5e1', fontSize: '13px' }}>
-                          {student.firstName} {student.lastName}
+                          {student.lastName}, {student.firstName}
                         </td>
                         <td style={{ padding: '10px 14px', color: '#1e293b', fontSize: '13px', fontWeight: 600, borderBottom: '1px solid #cbd5e1', borderRight: '1px solid #cbd5e1' }}>
                           {student.admissionNumber || '-'}
@@ -1452,7 +1452,7 @@ export default function ResultEntryPage() {
                         borderBottom: '1px solid #e5e7eb',
                         boxShadow: isActive ? 'inset 3px 0 0 #4f46e5' : 'none'
                       }}>
-                        {student.firstName} {student.lastName}
+                        {student.lastName}, {student.firstName}
                       </td>
                       <td style={{
                         position: 'sticky', left: '180px', background: rowClass, zIndex: 2,

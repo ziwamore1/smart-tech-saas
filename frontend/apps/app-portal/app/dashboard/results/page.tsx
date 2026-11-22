@@ -661,7 +661,7 @@ function ReviewResultsTab({
 
   const incompleteStudents = students
     .map((s: any) => ({
-      name: `${s.firstName} ${s.lastName}`,
+      name: `${s.lastName}, ${s.firstName}`,
       admissionNumber: s.admissionNumber,
       missing: subjectColumns
         .filter((subj) => {
@@ -834,7 +834,7 @@ function ReviewResultsTab({
                 return (
                   <tr key={student.id} className="border-t">
                     <td className="py-3 px-4">
-                      <div className="font-medium">{student.firstName} {student.lastName}</div>
+                      <div className="font-medium">{student.lastName}, {student.firstName}</div>
                       <div className="text-sm text-gray-500">{student.admissionNumber}</div>
                     </td>
                     <td className="py-3 px-4 text-center">
@@ -1780,7 +1780,7 @@ export default function ResultsPage() {
                     return (
                       <tr key={row.student?.id} className="border-t hover:bg-gray-50">
                         <td className="py-2 px-4 font-medium sticky left-0 bg-white z-10">
-                          {row.student?.firstName} {row.student?.lastName}
+                          {row.student?.lastName}, {row.student?.firstName}
                         </td>
                         {subjectColumns.map((subject) => {
                           const result = row.cells.get(subject.id);
