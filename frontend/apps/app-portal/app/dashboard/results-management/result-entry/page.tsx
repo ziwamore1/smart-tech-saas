@@ -245,7 +245,7 @@ export default function ResultEntryPage() {
   });
 
   const { data: subjectConfigsData } = useQuery({
-    queryKey: ['assessment-configs-single', selectedClass, selectedSubject, selectedTerm],
+    queryKey: ['assessment-configs-single', selectedClass, selectedSubject, selectedTerm, selectedExamType],
     queryFn: async () => {
       if (!selectedClass || !selectedSubject || !selectedTerm || selectedSubject === 'all') return [];
       const r = await assessmentEngineApi.configurations.get(selectedClass, selectedSubject, selectedTerm);
@@ -255,12 +255,18 @@ export default function ResultEntryPage() {
     enabled: !!selectedClass && !!selectedSubject && selectedSubject !== 'all' && !!selectedTerm,
     staleTime: 5 * 60 * 1000,
   });
-  const subjectConfigs = useMemo(() => Array.isArray(subjectConfigsData) ? subjectConfigsData : [], [subjectConfigsData]);
+  const subjectConfigs = useMemo(() => {
+    if (!Array.isArray(subjectConfigsData)) return [];
+    if (!selectedExamType) return subjectConfigsData;
+    return subjectConfigsData.filter((config: any) =>
+      String(config.assessmentDef?.examType || '').toUpperCase() === String(selectedExamType).toUpperCase()
+    );
+  }, [subjectConfigsData, selectedExamType]);
 
   const componentMode = entryMode === 'single' && selectedSubject !== 'all' && subjectConfigs.length > 0;
 
   const { data: existingComponentsData } = useQuery({
-    queryKey: ['assessment-results-single', selectedClass, selectedSubject, selectedTerm],
+    queryKey: ['assessment-results-single', selectedClass, selectedSubject, selectedTerm, selectedExamType],
     queryFn: async () => {
       if (!selectedClass || !selectedSubject || !selectedTerm || selectedSubject === 'all') return [];
       const r = await assessmentEngineApi.results.class(selectedClass, selectedSubject, selectedTerm);
@@ -286,13 +292,15 @@ export default function ResultEntryPage() {
     const data = existingComponentsData;
     if (!Array.isArray(data) || data.length === 0) return;
     const map: Record<string, Record<string, { rawScore: number | null; isAbsent: boolean }>> = {};
-    data.forEach((r: any) => {
+    data.filter((r: any) => !selectedExamType ||
+      String(r.assessmentDef?.examType || '').toUpperCase() === String(selectedExamType).toUpperCase()
+    ).forEach((r: any) => {
       const key = `${r.studentId}::${r.subjectId}`;
       map[key] = map[key] || {};
       map[key][r.assessmentDefId] = { rawScore: r.rawScore ?? null, isAbsent: !!r.isAbsent };
     });
-      setComponentScores(map);
-  }, [existingComponentsData]);
+    setComponentScores(map);
+  }, [existingComponentsData, selectedExamType]);
 
   // Find-or-create the result sheet for the selected class + term + exam.
   // The backend auto-provisions a DRAFT sheet when none matches yet, so this
@@ -328,10 +336,10 @@ export default function ResultEntryPage() {
   }, [sheetData, requestedSheetId, selectedClass, selectedTerm, selectedExamType]);
 
   const { data: studentsData, isLoading: studentsLoading } = useQuery({
-    queryKey: ['sheet-students', selectedClass, selectedTerm, requestedSheetId || sheetData?.id],
+    queryKey: ['sheet-students', selectedClass, selectedTerm, selectedExamType, sheetData?.id || requestedSheetId],
     queryFn: async () => {
       if (!selectedClass || !selectedTerm) return [];
-      const activeSheetId = requestedSheetId || sheetData?.id;
+      const activeSheetId = sheetData?.id || requestedSheetId;
       if (activeSheetId) {
         try {
           const sr = await api.get(`/results-management/sheets/${activeSheetId}/students`);

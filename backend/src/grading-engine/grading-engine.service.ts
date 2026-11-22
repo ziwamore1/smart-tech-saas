@@ -221,6 +221,8 @@ export class GradingEngineService {
     classId: string,
     schoolId: string,
     cache?: Map<string, any>,
+    examType = 'END_TERM',
+    allowLegacyFallback = true,
   ): Promise<{
     totalRawScore: number | null;
     totalWeightedScore: number | null;
@@ -232,15 +234,25 @@ export class GradingEngineService {
   }> {
     const configs = await this.memoLookup(
       cache,
-      `configs|${classId}|${subjectId}|${termId}`,
+      `configs|${classId}|${subjectId}|${termId}|${examType}`,
       () => this.prisma.termAssessmentConfiguration.findMany({
-        where: { classId, subjectId, termId },
+        where: { classId, subjectId, termId, assessmentDef: { examType } },
         orderBy: { sequenceOrder: 'asc' },
       }),
     );
 
     if (configs.length === 0) {
-      return this.getLegacyResultFallback(studentId, subjectId, termId, classId, schoolId, cache);
+      return allowLegacyFallback
+        ? this.getLegacyResultFallback(studentId, subjectId, termId, classId, schoolId, cache)
+        : {
+            totalRawScore: null,
+            totalWeightedScore: null,
+            finalPercentage: null,
+            finalGrade: null,
+            finalRemark: null,
+            points: null,
+            gpa: null,
+          };
     }
 
     const results = await this.prisma.studentAssessmentResult.findMany({
@@ -280,8 +292,10 @@ export class GradingEngineService {
     }
 
     if (totalWeight === 0 || !hasAllMandatory) {
-      const fallback = await this.getLegacyResultFallback(studentId, subjectId, termId, classId, schoolId, cache);
-      if (fallback.finalPercentage != null) return fallback;
+      if (allowLegacyFallback) {
+        const fallback = await this.getLegacyResultFallback(studentId, subjectId, termId, classId, schoolId, cache);
+        if (fallback.finalPercentage != null) return fallback;
+      }
       return {
         totalRawScore: totalRawScore.toNumber(),
         totalWeightedScore: null,
@@ -371,6 +385,8 @@ export class GradingEngineService {
     subjectId: string,
     termId: string,
     schoolId: string,
+    examType = 'END_TERM',
+    allowLegacyFallback = true,
   ): Promise<{
     computed: number;
     failed: number;
@@ -402,7 +418,13 @@ export class GradingEngineService {
           classId,
           schoolId,
           cache,
+          examType,
+          allowLegacyFallback,
         );
+
+        if (!allowLegacyFallback && result.finalPercentage == null && result.totalRawScore == null && result.totalWeightedScore == null) {
+          return null;
+        }
 
         return await this.prisma.computedResult.upsert({
           where: {
@@ -410,7 +432,7 @@ export class GradingEngineService {
               studentId: enrollment.studentId,
               subjectId,
               termId,
-              examType: 'END_TERM',
+              examType,
             },
           },
           update: {
@@ -422,6 +444,7 @@ export class GradingEngineService {
             studentId: enrollment.studentId,
             subjectId,
             termId,
+            examType,
             classId,
             schoolId,
             ...result,

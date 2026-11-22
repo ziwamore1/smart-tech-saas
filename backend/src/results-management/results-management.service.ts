@@ -121,7 +121,7 @@ export class ResultsManagementService {
   async recalculateSheetCounts(sheetId: string): Promise<{ totalStudents: number; enteredCount: number }> {
     const sheet = await this.prisma.resultSheet.findUnique({
       where: { id: sheetId },
-      select: { classId: true, termId: true, schoolId: true, academicYearId: true, id: true },
+      select: { classId: true, termId: true, schoolId: true, academicYearId: true, examType: true, id: true },
     });
     if (!sheet) return { totalStudents: 0, enteredCount: 0 };
 
@@ -136,9 +136,16 @@ export class ResultsManagementService {
       this.prisma.enrollment.count({
         where: { classId: sheet.classId, academicYearId: ayId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       }),
-      this.prisma.result.groupBy({
+      this.prisma.computedResult.groupBy({
         by: ['studentId'],
-        where: { schoolId: sheet.schoolId, termId: sheet.termId, student: { enrollments: { some: { classId: sheet.classId, academicYearId: ayId, status: 'ACTIVE' } }, status: 'ACTIVE' } },
+        where: {
+          schoolId: sheet.schoolId,
+          classId: sheet.classId,
+          termId: sheet.termId,
+          examType: sheet.examType,
+          OR: [{ finalPercentage: { not: null } }, { isAbsent: true }],
+          student: { status: 'ACTIVE' },
+        },
       }),
     ]);
     const enteredCount = enteredResults.length;
@@ -153,12 +160,12 @@ export class ResultsManagementService {
 
   private computingKeys = new Set<string>();
 
-  private ensureComputedResults(classId: string, termId: string, schoolId: string): void {
-    const key = `${classId}:${termId}:${schoolId}`;
+  private ensureComputedResults(classId: string, termId: string, schoolId: string, examType = 'END_TERM'): void {
+    const key = `${classId}:${termId}:${schoolId}:${examType}`;
     if (this.computingKeys.has(key)) return;
     this.computingKeys.add(key);
 
-    const activeWhere: Prisma.ComputedResultWhereInput = { classId, termId, schoolId, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, student: { status: 'ACTIVE' } };
+    const activeWhere: Prisma.ComputedResultWhereInput = { classId, termId, schoolId, examType, status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] }, student: { status: 'ACTIVE' } };
 
     Promise.all([
       this.prisma.computedResult.count({ where: activeWhere }),
@@ -174,7 +181,7 @@ export class ResultsManagementService {
       this.logger.log(`Auto-computing results for class ${classId}, term ${termId} (${classSubjects.length} subjects)`);
       return Promise.allSettled(
         classSubjects.map(cs =>
-          this.gradingEngine.computeAllClassResults(classId, cs.subjectId, termId, schoolId)
+          this.gradingEngine.computeAllClassResults(classId, cs.subjectId, termId, schoolId, examType, false)
             .catch(err => this.logger.warn(`Auto-compute failed for subject ${cs.subjectId}: ${err.message}`))
         ),
       );
@@ -357,7 +364,7 @@ export class ResultsManagementService {
   async getSheetStudents(sheetId: string) {
     const sheet = await this.prisma.resultSheet.findUnique({
       where: { id: sheetId },
-      select: { classId: true, termId: true, schoolId: true, academicYearId: true },
+      select: { classId: true, termId: true, schoolId: true, academicYearId: true, examType: true },
     });
 
     if (!sheet) {
@@ -449,30 +456,12 @@ export class ResultsManagementService {
       });
     }
 
-    const rawResults = await this.prisma.result.findMany({
-      where: {
-        studentId: { in: students.map((s) => s.id) },
-        termId: sheet.termId,
-        schoolId: sheet.schoolId,
-        student: { status: 'ACTIVE' },
-      },
-      include: {
-        subject: { select: { id: true, name: true, code: true } },
-      },
-    });
-
-    const rawResultMap = new Map<string, { score: number; grade: string | null; remark: string | null; subjectId: string; subject?: any }>();
-    for (const r of rawResults) {
-      rawResultMap.set(`${r.studentId}::${r.subjectId}`, {
-        score: r.score, grade: r.grade, remark: r.remark, subjectId: r.subjectId, subject: r.subject,
-      });
-    }
-
     const componentResults = await this.prisma.studentAssessmentResult.findMany({
       where: {
         studentId: { in: students.map((s) => s.id) },
         classId: sheet.classId,
         termId: sheet.termId,
+        assessmentDef: { examType: sheet.examType },
         OR: [{ rawScore: { not: null } }, { isAbsent: true }],
         student: { status: 'ACTIVE' },
       },
@@ -488,6 +477,7 @@ export class ResultsManagementService {
             classId: sheet.classId,
             termId: sheet.termId,
             subjectId: { in: configSubjectIds },
+            assessmentDef: { examType: sheet.examType },
           },
         })
       : [];
@@ -536,34 +526,16 @@ export class ResultsManagementService {
         const crResults = computedResults
           .filter((r) => r.studentId === student.id && (r.finalPercentage != null || r.totalRawScore > 0 || r.isAbsent))
           .map((cr) => {
-          const raw = rawResultMap.get(`${cr.studentId}::${cr.subjectId}`);
-          return {
-            ...cr,
-            score: cr.isAbsent ? null : (cr.finalPercentage ?? cr.totalRawScore ?? raw?.score ?? null),
-            grade: cr.finalGrade ?? raw?.grade ?? null,
-            remark: cr.finalRemark ?? raw?.remark ?? null,
-          };
-        });
-        const extraRawResults: any[] = [];
-        for (const [key, raw] of rawResultMap) {
-          if (key.startsWith(`${student.id}::`) && !crSubjects.has(raw.subjectId)) {
-            extraRawResults.push({
-              studentId: student.id,
-              subjectId: raw.subjectId,
-              subject: raw.subject,
-              totalRawScore: raw.score,
-              totalMaxScore: 100,
-              finalPercentage: raw.score,
-              finalGrade: raw.grade,
-              finalRemark: raw.remark,
-              score: raw.score,
-              grade: raw.grade,
-              remark: raw.remark,
-            });
-          }
-        }
+            return {
+              ...cr,
+              score: cr.isAbsent ? null : (cr.finalPercentage ?? cr.totalRawScore ?? null),
+              grade: cr.finalGrade ?? null,
+              remark: cr.finalRemark ?? null,
+            };
+          });
+        const extraResults: any[] = [];
         for (const [key, agg] of componentAggMap) {
-          if (!key.startsWith(`${student.id}::`) || crSubjects.has(agg.subjectId) || rawResultMap.has(key)) continue;
+          if (!key.startsWith(`${student.id}::`) || crSubjects.has(agg.subjectId)) continue;
           const subjectConfigs = configMap.get(agg.subjectId) || [];
           const allEntriesAbsent = agg.entries.length > 0 && agg.entries.every((e: any) => e.isAbsent);
           let totalWeighted = 0;
@@ -582,7 +554,7 @@ export class ResultsManagementService {
           const aggregatedPct = totalWeight > 0
             ? parseFloat(((totalWeighted / totalWeight) * 100).toFixed(2))
             : null;
-          extraRawResults.push({
+          extraResults.push({
             studentId: student.id,
             subjectId: agg.subjectId,
             subject: agg.subject,
@@ -594,7 +566,7 @@ export class ResultsManagementService {
             remark: agg.entries[0]?.remarks ?? null,
           });
         }
-        return { ...student, results: [...crResults, ...extraRawResults] };
+        return { ...student, results: [...crResults, ...extraResults] };
       }),
     };
   }
@@ -602,7 +574,7 @@ export class ResultsManagementService {
   async getSheetSubjects(sheetId: string) {
     const sheet = await this.prisma.resultSheet.findUnique({
       where: { id: sheetId },
-      select: { classId: true, termId: true, schoolId: true },
+      select: { classId: true, termId: true, schoolId: true, examType: true },
     });
 
     if (!sheet) {
@@ -624,7 +596,12 @@ export class ResultsManagementService {
     const subjectsWithStatus = await Promise.all(
       classSubjects.map(async (cs) => {
         const configs = await this.prisma.termAssessmentConfiguration.findMany({
-          where: { classId: sheet.classId, subjectId: cs.subjectId, termId: sheet.termId },
+          where: {
+            classId: sheet.classId,
+            subjectId: cs.subjectId,
+            termId: sheet.termId,
+            assessmentDef: { examType: sheet.examType },
+          },
         });
 
         if (configs.length === 0) {
@@ -637,6 +614,7 @@ export class ResultsManagementService {
             subjectId: cs.subjectId,
             termId: sheet.termId,
             rawScore: { not: null },
+            assessmentDef: { examType: sheet.examType },
             student: { status: 'ACTIVE' },
           },
         });
@@ -1060,14 +1038,14 @@ export class ResultsManagementService {
   async getRankings(sheetId: string, type: string = 'class') {
     const sheet = await this.prisma.resultSheet.findUnique({
       where: { id: sheetId },
-      select: { classId: true, termId: true, schoolId: true },
+      select: { classId: true, termId: true, schoolId: true, examType: true },
     });
 
     if (!sheet) {
       throw new NotFoundException('Result sheet not found');
     }
 
-    this.ensureComputedResults(sheet.classId, sheet.termId, sheet.schoolId);
+    this.ensureComputedResults(sheet.classId, sheet.termId, sheet.schoolId, sheet.examType);
 
     if (type === 'subject') {
       const classSubjects = await this.prisma.classSubject.findMany({
@@ -1180,10 +1158,10 @@ export class ResultsManagementService {
     const category = options.category || 'OVERALL_AVERAGE';
     const sheet = await this.prisma.resultSheet.findUnique({
       where: { id: sheetId },
-      select: { classId: true, termId: true, schoolId: true },
+      select: { classId: true, termId: true, schoolId: true, examType: true },
     });
     if (!sheet) throw new NotFoundException('Result sheet not found');
-    await this.ensureComputedResults(sheet.classId, sheet.termId, sheet.schoolId);
+    await this.ensureComputedResults(sheet.classId, sheet.termId, sheet.schoolId, sheet.examType);
 
     if (category === 'SUBJECT_PERCENTAGE') {
       if (!options.subjectId) throw new BadRequestException('subjectId is required for subject performers');
@@ -1215,14 +1193,14 @@ export class ResultsManagementService {
   async getAnalysis(sheetId: string) {
     const sheet = await this.prisma.resultSheet.findUnique({
       where: { id: sheetId },
-      select: { classId: true, termId: true, schoolId: true },
+      select: { classId: true, termId: true, schoolId: true, examType: true },
     });
 
     if (!sheet) {
       throw new NotFoundException('Result sheet not found');
     }
 
-    this.ensureComputedResults(sheet.classId, sheet.termId, sheet.schoolId);
+    this.ensureComputedResults(sheet.classId, sheet.termId, sheet.schoolId, sheet.examType);
 
     const classRecord = await this.prisma.class.findUnique({
       where: { id: sheet.classId },
@@ -1269,6 +1247,7 @@ export class ResultsManagementService {
         classId: sheet.classId,
         termId: sheet.termId,
         schoolId: sheet.schoolId,
+        examType: sheet.examType,
         status: { in: ['COMPUTED', 'VERIFIED', 'PUBLISHED', 'LOCKED'] },
         student: { status: 'ACTIVE' },
       },
@@ -1295,39 +1274,8 @@ export class ResultsManagementService {
       return emptyAnalysis;
     }
 
-    const studentIds = [...new Set(computedResults.map(r => r.studentId))];
-    const subjectIds = [...new Set(computedResults.map(r => r.subjectId).filter(Boolean))];
-
-    const rawResults = await this.prisma.result.findMany({
-      where: {
-        studentId: { in: studentIds },
-        subjectId: { in: subjectIds },
-        termId: sheet.termId,
-        schoolId: sheet.schoolId,
-        student: { status: 'ACTIVE' },
-      },
-      select: {
-        studentId: true,
-        subjectId: true,
-        score: true,
-      },
-    });
-
-    const rawScoreMap = new Map<string, number>();
-    for (const r of rawResults) {
-      if (r.score != null) {
-        rawScoreMap.set(`${r.studentId}::${r.subjectId}`, r.score);
-      }
-    }
-
     const records = computedResults.map(cr => {
-      let effectivePercentage = cr.finalPercentage;
-      if (effectivePercentage == null || effectivePercentage === 0) {
-        const rawScore = cr.subjectId ? rawScoreMap.get(`${cr.studentId}::${cr.subjectId}`) : undefined;
-        if (rawScore != null) {
-          effectivePercentage = rawScore;
-        }
-      }
+      const effectivePercentage = cr.finalPercentage;
 
       const scale = percentageScale(effectivePercentage, scales);
       const grade = scale?.grade || cr.finalGrade || null;
@@ -1526,7 +1474,7 @@ export class ResultsManagementService {
   async getMarkSchedule(sheetId: string) {
     const sheet = await this.prisma.resultSheet.findUnique({
       where: { id: sheetId },
-      select: { classId: true, termId: true, schoolId: true, academicYearId: true },
+      select: { classId: true, termId: true, schoolId: true, academicYearId: true, examType: true },
     });
 
     if (!sheet) {
@@ -1590,34 +1538,12 @@ export class ResultsManagementService {
       });
     }
 
-    const rawResults = await this.prisma.result.findMany({
-      where: {
-        studentId: { in: studentIds },
-        termId: sheet.termId,
-        schoolId: sheet.schoolId,
-        student: { status: 'ACTIVE' },
-      },
-      select: {
-        studentId: true,
-        subjectId: true,
-        score: true,
-        grade: true,
-        remark: true,
-      },
-    });
-
-    const rawResultMap = new Map<string, { score: number; grade: string | null; remark: string | null }>();
-    for (const r of rawResults) {
-      rawResultMap.set(`${r.studentId}::${r.subjectId}`, { score: r.score, grade: r.grade, remark: r.remark });
-    }
-
     const schedule = students.map((student) => {
       const subjects = classSubjects.map((cs) => {
         const cr = computedResults.find(
           (r) => r.studentId === student.id && r.subjectId === cs.subjectId,
         );
-        const raw = rawResultMap.get(`${student.id}::${cs.subjectId}`);
-        const finalPercentage = cr?.finalPercentage ?? raw?.score ?? null;
+        const finalPercentage = cr?.finalPercentage ?? null;
         const points = cr?.points ?? (finalPercentage != null
           ? finalPercentage >= 75 ? 1
             : finalPercentage >= 65 ? 2
@@ -1625,7 +1551,7 @@ export class ResultsManagementService {
             : finalPercentage >= 40 ? 4
             : 5
           : null);
-        const grade = cr?.finalGrade ?? raw?.grade ?? (finalPercentage != null
+        const grade = cr?.finalGrade ?? (finalPercentage != null
           ? finalPercentage >= 75 ? 'A'
             : finalPercentage >= 65 ? 'B'
             : finalPercentage >= 50 ? 'C'
@@ -1636,11 +1562,11 @@ export class ResultsManagementService {
           subjectId: cs.subjectId,
           subjectName: cs.subject.name,
           subjectCode: cs.subject.code,
-          totalRawScore: cr?.totalRawScore ?? raw?.score ?? null,
+          totalRawScore: cr?.totalRawScore ?? null,
           totalWeightedScore: cr?.totalWeightedScore ?? null,
           finalPercentage,
           finalGrade: grade,
-          finalRemark: cr?.finalRemark ?? raw?.remark ?? null,
+          finalRemark: cr?.finalRemark ?? null,
           points,
           gpa: cr?.gpa ?? null,
           classRank: cr?.classRank ?? null,
@@ -2082,10 +2008,54 @@ export class ResultsManagementService {
         const gradeResult = await this.gradingEngine.computeGradeFull(
           score, enrollment?.classId || classId, subjectId, termId, schoolId,
         );
-        await this.prisma.result.upsert({
-          where: { studentId_subjectId_termId: { studentId: student.id, subjectId, termId } },
-          update: { score, grade: gradeResult.grade, remark: gradeResult.remark, teacherId: userId },
-          create: { studentId: student.id, subjectId, termId, schoolId, teacherId: userId, score, grade: gradeResult.grade, remark: gradeResult.remark },
+        if (normalisedExamType === 'END_TERM') {
+          await this.prisma.result.upsert({
+            where: { studentId_subjectId_termId: { studentId: student.id, subjectId, termId } },
+            update: { score, grade: gradeResult.grade, remark: gradeResult.remark, teacherId: userId },
+            create: { studentId: student.id, subjectId, termId, schoolId, teacherId: userId, score, grade: gradeResult.grade, remark: gradeResult.remark },
+          });
+        }
+        await this.prisma.computedResult.upsert({
+          where: {
+            studentId_subjectId_termId_examType: {
+              studentId: student.id,
+              subjectId,
+              termId,
+              examType: normalisedExamType,
+            },
+          },
+          update: {
+            classId: enrollment?.classId || classId,
+            schoolId,
+            totalRawScore: score,
+            totalWeightedScore: score,
+            finalPercentage: score,
+            finalGrade: gradeResult.grade,
+            finalRemark: gradeResult.remark,
+            points: gradeResult.points ?? null,
+            gpa: gradeResult.gpa ?? null,
+            isAbsent: false,
+            status: 'COMPUTED',
+            computedAt: new Date(),
+          },
+          create: {
+            studentId: student.id,
+            subjectId,
+            termId,
+            examType: normalisedExamType,
+            classId: enrollment?.classId || classId,
+            schoolId,
+            totalRawScore: score,
+            totalWeightedScore: score,
+            finalPercentage: score,
+            finalGrade: gradeResult.grade,
+            finalRemark: gradeResult.remark,
+            points: gradeResult.points ?? null,
+            gpa: gradeResult.gpa ?? null,
+            isAbsent: false,
+            status: 'COMPUTED',
+            computedAt: new Date(),
+          },
         });
         if (existingMap.has(`${student.id}:${subjectId}`)) rowUpdated++;
         else rowCreated++;
@@ -2099,7 +2069,7 @@ export class ResultsManagementService {
       errors.push(...stats.rowErrors);
     }
 
-    this.ensureComputedResults(classId, termId, schoolId);
+    this.ensureComputedResults(classId, termId, schoolId, resultSheet.examType);
 
     // Audit log
     await this.prisma.resultAuditLog.create({
