@@ -456,55 +456,6 @@ export class ResultsManagementService {
       });
     }
 
-    const componentResults = await this.prisma.studentAssessmentResult.findMany({
-      where: {
-        studentId: { in: students.map((s) => s.id) },
-        classId: sheet.classId,
-        termId: sheet.termId,
-        assessmentDef: { examType: sheet.examType },
-        OR: [{ rawScore: { not: null } }, { isAbsent: true }],
-        student: { status: 'ACTIVE' },
-      },
-      include: { subject: { select: { id: true, name: true, code: true } } },
-      orderBy: { updatedAt: 'desc' },
-    });
-
-    // Collect all assessment configurations needed to aggregate component scores
-    const configSubjectIds = [...new Set(componentResults.map(c => c.subjectId))];
-    const configs = configSubjectIds.length > 0
-      ? await this.prisma.termAssessmentConfiguration.findMany({
-          where: {
-            classId: sheet.classId,
-            termId: sheet.termId,
-            subjectId: { in: configSubjectIds },
-            assessmentDef: { examType: sheet.examType },
-          },
-        })
-      : [];
-    const configMap = new Map<string, { assessmentDefId: string; maxScore: number; weightPercentage: number }[]>();
-    for (const cfg of configs) {
-      const arr = configMap.get(cfg.subjectId) || [];
-      arr.push({ assessmentDefId: cfg.assessmentDefId, maxScore: cfg.maxScore, weightPercentage: cfg.weightPercentage });
-      configMap.set(cfg.subjectId, arr);
-    }
-
-    // Aggregate all component results per student+subject into a weighted percentage
-    const componentAggMap = new Map<string, any>();
-    for (const result of componentResults) {
-      const key = `${result.studentId}::${result.subjectId}`;
-      const existing = componentAggMap.get(key);
-      if (!existing) {
-        componentAggMap.set(key, {
-          studentId: result.studentId,
-          subjectId: result.subjectId,
-          subject: result.subject,
-          entries: [result],
-        });
-      } else {
-        existing.entries.push(result);
-      }
-    }
-
     // Clean up phantom ComputedResult records that have null finalPercentage
     // and no raw scores. These were created by earlier syncComputedResult runs
     // that found no component data but still upserted a PENDING record.
@@ -518,11 +469,6 @@ export class ResultsManagementService {
 
     return {
       students: students.map((student) => {
-        const crSubjects = new Set(
-          computedResults
-            .filter((r) => r.studentId === student.id && (r.finalPercentage != null || r.totalRawScore > 0 || r.isAbsent))
-            .map((r) => r.subjectId)
-        );
         const crResults = computedResults
           .filter((r) => r.studentId === student.id && (r.finalPercentage != null || r.totalRawScore > 0 || r.isAbsent))
           .map((cr) => {
@@ -533,40 +479,7 @@ export class ResultsManagementService {
               remark: cr.finalRemark ?? null,
             };
           });
-        const extraResults: any[] = [];
-        for (const [key, agg] of componentAggMap) {
-          if (!key.startsWith(`${student.id}::`) || crSubjects.has(agg.subjectId)) continue;
-          const subjectConfigs = configMap.get(agg.subjectId) || [];
-          const allEntriesAbsent = agg.entries.length > 0 && agg.entries.every((e: any) => e.isAbsent);
-          let totalWeighted = 0;
-          let totalWeight = 0;
-          for (const entry of agg.entries) {
-            if (entry.isAbsent) continue;
-            const cfg = subjectConfigs.find(c => c.assessmentDefId === entry.assessmentDefId);
-            const maxScore = cfg?.maxScore || entry.maxScore || 100;
-            const weight = cfg?.weightPercentage || 0;
-            if (entry.rawScore != null && weight > 0) {
-              const pct = (entry.rawScore / maxScore) * 100;
-              totalWeighted += pct * (weight / 100);
-              totalWeight += weight;
-            }
-          }
-          const aggregatedPct = totalWeight > 0
-            ? parseFloat(((totalWeighted / totalWeight) * 100).toFixed(2))
-            : null;
-          extraResults.push({
-            studentId: student.id,
-            subjectId: agg.subjectId,
-            subject: agg.subject,
-            finalPercentage: aggregatedPct,
-            score: aggregatedPct,
-            isAbsent: allEntriesAbsent,
-            totalRawScore: agg.entries.reduce((s: number, e: any) => s + (e.rawScore ?? 0), 0),
-            grade: agg.entries[0]?.grade ?? null,
-            remark: agg.entries[0]?.remarks ?? null,
-          });
-        }
-        return { ...student, results: [...crResults, ...extraResults] };
+        return { ...student, results: crResults };
       }),
     };
   }
@@ -600,7 +513,6 @@ export class ResultsManagementService {
             classId: sheet.classId,
             subjectId: cs.subjectId,
             termId: sheet.termId,
-            assessmentDef: { examType: sheet.examType },
           },
         });
 
@@ -614,7 +526,6 @@ export class ResultsManagementService {
             subjectId: cs.subjectId,
             termId: sheet.termId,
             rawScore: { not: null },
-            assessmentDef: { examType: sheet.examType },
             student: { status: 'ACTIVE' },
           },
         });

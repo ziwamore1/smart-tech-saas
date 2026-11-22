@@ -255,13 +255,7 @@ export default function ResultEntryPage() {
     enabled: !!selectedClass && !!selectedSubject && selectedSubject !== 'all' && !!selectedTerm,
     staleTime: 5 * 60 * 1000,
   });
-  const subjectConfigs = useMemo(() => {
-    if (!Array.isArray(subjectConfigsData)) return [];
-    if (!selectedExamType) return subjectConfigsData;
-    return subjectConfigsData.filter((config: any) =>
-      String(config.assessmentDef?.examType || '').toUpperCase() === String(selectedExamType).toUpperCase()
-    );
-  }, [subjectConfigsData, selectedExamType]);
+  const subjectConfigs = useMemo(() => Array.isArray(subjectConfigsData) ? subjectConfigsData : [], [subjectConfigsData]);
 
   const componentMode = entryMode === 'single' && selectedSubject !== 'all' && subjectConfigs.length > 0;
 
@@ -292,15 +286,13 @@ export default function ResultEntryPage() {
     const data = existingComponentsData;
     if (!Array.isArray(data) || data.length === 0) return;
     const map: Record<string, Record<string, { rawScore: number | null; isAbsent: boolean }>> = {};
-    data.filter((r: any) => !selectedExamType ||
-      String(r.assessmentDef?.examType || '').toUpperCase() === String(selectedExamType).toUpperCase()
-    ).forEach((r: any) => {
+    data.forEach((r: any) => {
       const key = `${r.studentId}::${r.subjectId}`;
       map[key] = map[key] || {};
       map[key][r.assessmentDefId] = { rawScore: r.rawScore ?? null, isAbsent: !!r.isAbsent };
     });
     setComponentScores(map);
-  }, [existingComponentsData, selectedExamType]);
+  }, [existingComponentsData]);
 
   // Find-or-create the result sheet for the selected class + term + exam.
   // The backend auto-provisions a DRAFT sheet when none matches yet, so this
@@ -580,6 +572,7 @@ export default function ResultEntryPage() {
           subjectId,
           termId: selectedTerm,
           assessmentDefId: defId,
+          examType: selectedExamType,
           maxScore: config?.maxScore || 100,
           scores: entriesForDef[defId].map(e => ({
             studentId: e.studentId,

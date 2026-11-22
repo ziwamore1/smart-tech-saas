@@ -44,6 +44,7 @@ export interface BulkScoreEntryDto {
   subjectId: string;
   termId: string;
   assessmentDefId: string;
+  examType?: string;
   title?: string;
   description?: string;
   maxScore: number;
@@ -63,6 +64,7 @@ export interface ScoreEntryDto {
   termId: string;
   classId: string;
   assessmentDefId: string;
+  examType?: string;
   rawScore: number | null;
   isAbsent?: boolean;
   absentCode?: 'X' | 'A';
@@ -376,6 +378,7 @@ export class AssessmentEngineService {
     termId: string,
     schoolId: string,
     assessmentDefId?: string,
+    targetExamType?: string,
   ) {
     const allConfigs = await this.prisma.termAssessmentConfiguration.findMany({
       where: { classId, subjectId, termId },
@@ -387,12 +390,16 @@ export class AssessmentEngineService {
           select: { examType: true },
         })
       : null;
-    const resolvedExamType = triggeringDefinition?.examType
-      ? normalizeExamType(triggeringDefinition.examType)
-      : null;
-    const configs = resolvedExamType
-      ? allConfigs.filter(c => normalizeExamType(c.assessmentDef.examType) === resolvedExamType)
-      : allConfigs;
+    const resolvedExamType = targetExamType
+      ? normalizeExamType(targetExamType)
+      : triggeringDefinition?.examType
+        ? normalizeExamType(triggeringDefinition.examType)
+        : null;
+    const configs = targetExamType
+      ? allConfigs
+      : resolvedExamType
+        ? allConfigs.filter(c => normalizeExamType(c.assessmentDef.examType) === resolvedExamType)
+        : allConfigs;
     // Resolve the academic year for this term so the enrollment query is
     // reliable even when the Term ↔ AcademicYear join is missing or the
     // nested Prisma query doesn't traverse correctly.
@@ -426,9 +433,11 @@ export class AssessmentEngineService {
         },
         include: { assessmentDef: { select: { examType: true } } },
       });
-      const results = resolvedExamType
-        ? allResults.filter(r => normalizeExamType(r.assessmentDef.examType) === resolvedExamType)
-        : allResults;
+      const results = targetExamType
+        ? allResults
+        : resolvedExamType
+          ? allResults.filter(r => normalizeExamType(r.assessmentDef.examType) === resolvedExamType)
+          : allResults;
 
       if (configs.length === 0) {
         const scoredResults = results.filter(r => r.rawScore != null);
@@ -872,7 +881,7 @@ export class AssessmentEngineService {
     this.logger.log(`Bulk entered ${results.length} scores for batch ${batch.id}`);
 
     // Sync computed results and result sheet for real-time web analytics (fire-and-forget)
-    this.syncComputedResult(classId, subjectId, termId, schoolId, assessmentDefId).catch(e =>
+    this.syncComputedResult(classId, subjectId, termId, schoolId, assessmentDefId, data.examType).catch(e =>
       this.logger.error(`syncComputedResult failed: ${e.message}`),
     );
     this.compositeSubjectService.recomputeAllComposites(subjectId, classId, termId, schoolId).catch(e =>
@@ -884,7 +893,7 @@ export class AssessmentEngineService {
     });
     const sheet = await this.syncResultSheet(
       schoolId, classId, termId, enteredBy,
-      def?.examType as string | undefined,
+      (data.examType || def?.examType) as string | undefined,
     ).catch(e => {
       this.logger.error(`syncResultSheet failed: ${e.message}`);
       return null;
@@ -1002,7 +1011,7 @@ export class AssessmentEngineService {
       });
 
       // Sync computed results and result sheet for real-time web analytics
-      await this.syncComputedResult(data.classId, data.subjectId, data.termId, schoolId, data.assessmentDefId).catch(e =>
+      await this.syncComputedResult(data.classId, data.subjectId, data.termId, schoolId, data.assessmentDefId, data.examType).catch(e =>
         this.logger.error(`syncComputedResult failed: ${e.message}`),
       );
       await this.compositeSubjectService.recomputeAllComposites(data.subjectId, data.classId, data.termId, schoolId).catch(e =>
@@ -1014,7 +1023,7 @@ export class AssessmentEngineService {
       });
       await this.syncResultSheet(
         schoolId, data.classId, data.termId, data.enteredBy,
-        absentDef?.examType as string | undefined,
+        (data.examType || absentDef?.examType) as string | undefined,
       ).catch(e => {
         this.logger.error(`syncResultSheet failed: ${e.message}`);
       });
@@ -1108,7 +1117,7 @@ export class AssessmentEngineService {
     });
 
     // Sync computed results and result sheet for real-time web analytics
-    await this.syncComputedResult(data.classId, data.subjectId, data.termId, schoolId, data.assessmentDefId).catch(e =>
+    await this.syncComputedResult(data.classId, data.subjectId, data.termId, schoolId, data.assessmentDefId, data.examType).catch(e =>
       this.logger.error(`syncComputedResult failed: ${e.message}`),
     );
     // Recompute any composite subjects that include this subject
@@ -1121,7 +1130,7 @@ export class AssessmentEngineService {
     });
     await this.syncResultSheet(
       schoolId, data.classId, data.termId, data.enteredBy,
-      scoreDef?.examType as string | undefined,
+      (data.examType || scoreDef?.examType) as string | undefined,
     ).catch(e => {
       this.logger.error(`syncResultSheet failed: ${e.message}`);
     });

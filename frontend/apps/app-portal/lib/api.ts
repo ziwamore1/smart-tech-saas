@@ -2846,6 +2846,7 @@ export async function bulkSaveAssessmentScores(
     subjectId: string;
     termId: string;
     assessmentDefId: string;
+    examType?: string;
     maxScore: number;
     scores: any[];
   },
