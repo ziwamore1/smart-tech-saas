@@ -8,6 +8,24 @@ export class StaffTemplateService {
 
   constructor(private prisma: PrismaService) {}
 
+  private normalizeTemplateConfig(config: any) {
+    const value = config && typeof config === 'object' ? config : {};
+    if (Array.isArray(value.sheets) && value.sheets.length) return value;
+    const headerRow = Number(value.headerRow || 4);
+    return {
+      ...value,
+      sheets: [{
+        key: 'main',
+        name: value.sheetName || 'Staff Return',
+        label: value.sheetLabel || value.sheetName || 'Main Return',
+        headerRow,
+        dataStartRow: Number(value.dataStartRow || headerRow + 1),
+        workbookAsset: value.workbookAsset,
+        inheritInstitutionHeader: true,
+      }],
+    };
+  }
+
   getCanonicalFields() {
     return CANONICAL_HR_FIELDS;
   }
@@ -89,7 +107,7 @@ export class StaffTemplateService {
         data: {
           schoolId, templateCode: definition.code, version: '2026-v1', status: 'PUBLISHED', authority: 'MINISTRY_OF_EDUCATION',
           name: definition.name, returnType: 'ANNUAL', category: definition.nonTeaching ? 'NON_TEACHING_STAFF' : 'TEACHING_STAFF',
-          config: { sheetName: definition.sheetName, headerRow: definition.headerRow, dataStartRow: definition.headerRow + 1, workbookAsset: definition.workbook, staffType: definition.nonTeaching ? 'NON_TEACHING' : 'TEACHING' } as any,
+           config: { sheetName: definition.sheetName, headerRow: definition.headerRow, dataStartRow: definition.headerRow + 1, workbookAsset: definition.workbook, staffType: definition.nonTeaching ? 'NON_TEACHING' : 'TEACHING', sheets: [{ key: 'main', name: definition.sheetName, label: definition.sheetName, headerRow: definition.headerRow, dataStartRow: definition.headerRow + 1, workbookAsset: definition.workbook, inheritInstitutionHeader: true }] } as any,
           columns: { create: headers.map((label, index) => {
             const match = detectCanonicalField(label);
             const key = label.trim().toLowerCase() === 'sn' ? 'return.serialNumber' : (match?.field.key || `unmapped.${index + 1}`);
@@ -371,7 +389,7 @@ export class StaffTemplateService {
         isActive: data.isActive,
         isDefault: data.isDefault,
         category: data.category,
-        config: data.config !== undefined ? (data.config as any) : undefined,
+        config: data.config !== undefined ? (this.normalizeTemplateConfig(data.config) as any) : undefined,
       },
       include: {
         columns: { orderBy: { columnOrder: 'asc' } },
@@ -450,6 +468,7 @@ export class StaffTemplateService {
       width?: number;
       alignment?: string;
       defaultValue?: string;
+      validationRules?: any;
     },
   ) {
     const template = await this.prisma.staffReturnTemplate.findUnique({
@@ -471,6 +490,7 @@ export class StaffTemplateService {
         width: data.width || 120,
         alignment: data.alignment || 'left',
         defaultValue: data.defaultValue,
+        validationRules: data.validationRules !== undefined ? (data.validationRules as any) : undefined,
       },
     });
   }
@@ -487,6 +507,7 @@ export class StaffTemplateService {
       isRequired?: boolean;
       width?: number;
       alignment?: string;
+      validationRules?: any;
     },
   ) {
     const template = await this.prisma.staffReturnTemplate.findUnique({
@@ -494,15 +515,17 @@ export class StaffTemplateService {
       include: { columns: { orderBy: { columnOrder: 'asc' } } },
     });
     if (!template || template.schoolId !== schoolId) throw new NotFoundException('Template not found');
-    const selectedIndex = template.columns.findIndex((column) => column.id === data.selectedColumnId);
+    const selectedColumn = template.columns.find((column) => column.id === data.selectedColumnId);
+    const sheetKey = (data.validationRules as any)?.sheetKey || (selectedColumn?.validationRules as any)?.sheetKey || 'main';
+    const sheetColumns = template.columns.filter((column) => String((column.validationRules as any)?.sheetKey || 'main') === String(sheetKey));
+    const selectedIndex = sheetColumns.findIndex((column) => column.id === data.selectedColumnId);
     if (selectedIndex < 0) throw new NotFoundException('Selected column not found');
     const insertOrder = selectedIndex + (data.direction === 'after' ? 2 : 1);
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.staffReturnColumn.updateMany({
-        where: { templateId, columnOrder: { gte: insertOrder } },
-        data: { columnOrder: { increment: 1 } },
-      });
+      for (const column of sheetColumns.filter((item) => item.columnOrder >= insertOrder)) {
+        await tx.staffReturnColumn.update({ where: { id: column.id }, data: { columnOrder: { increment: 1 } } });
+      }
       return tx.staffReturnColumn.create({
         data: {
           templateId,
@@ -513,6 +536,7 @@ export class StaffTemplateService {
           isRequired: data.isRequired || false,
           width: data.width || 120,
           alignment: data.alignment || 'left',
+          validationRules: data.validationRules !== undefined ? (data.validationRules as any) : undefined,
         },
       });
     }, { timeout: 120000, maxWait: 10000 });

@@ -374,6 +374,7 @@ function AdvancedStaffProfileCard() {
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [activeReturnSheet, setActiveReturnSheet] = useState('main');
 
   useEffect(() => {
     if (!message) return;
@@ -401,6 +402,8 @@ function AdvancedStaffProfileCard() {
       setLookups(grouped);
       const returnFields = Object.fromEntries((value.draftReturns || []).flatMap((draft: any) => (draft.fields || []).map((field: any) => [field.columnName, field.value ?? ''])));
       setForm({ ...(value.profile || {}), dynamicFields: { ...((value.profile?.dynamicFields as any) || {}) }, returnFields });
+      const firstSheet = (value.draftReturns || []).flatMap((draft: any) => draft.fields || [])[0]?.sheetKey || 'main';
+      setActiveReturnSheet(firstSheet);
     } catch (error: any) {
       setMessage({ type: 'error', text: error?.response?.data?.message || 'Advanced Staff Profile could not be loaded.' });
     } finally { setLoading(false); }
@@ -448,6 +451,8 @@ function AdvancedStaffProfileCard() {
 
   const editable = Boolean(profile.editable);
   const configuredFields = Array.from(new Map((profile.draftReturns || []).flatMap((draft: any) => (draft.fields || []).map((field: any) => [field.columnName, field]))).values());
+  const returnSheets = Array.from(new Map(configuredFields.map((field: any) => [field.sheetKey || 'main', { key: field.sheetKey || 'main', label: field.sheetLabel || 'Main Return' }])).values());
+  const activeFields = configuredFields.filter((field: any) => (field.sheetKey || 'main') === activeReturnSheet);
   const returnCategory = (sourceKey: string) => {
     if (sourceKey === 'staff.gender') return 'GENDER';
     if (sourceKey === 'staff.maritalStatus') return 'MARITAL_STATUS';
@@ -547,7 +552,7 @@ function AdvancedStaffProfileCard() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>{ADVANCED_FIELDS.map(field => renderInput(field))}</div>
                <h4 style={{ margin: '24px 0 12px', color: '#374151' }}>Staff Return Guidance Fields</h4>
                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>{ADVANCED_DYNAMIC_FIELDS.map(field => renderInput(field, true))}</div>
-               {configuredFields.length > 0 && <><h4 style={{ margin: '24px 0 12px', color: '#374151' }}>Current Staff Return Template Fields</h4><p style={{ margin: '0 0 12px', color: '#6b7280', fontSize: 12 }}>These fields come directly from the open DRAFT template. Existing staff information is prefilled where available.</p><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>{configuredFields.map(renderConfiguredInput)}</div></>}
+                {configuredFields.length > 0 && <><h4 style={{ margin: '24px 0 12px', color: '#374151' }}>Current Staff Return Template Fields</h4><p style={{ margin: '0 0 12px', color: '#6b7280', fontSize: 12 }}>Fields are separated by worksheet. Institution and school details are inherited from the Main Staff Return Hub.</p><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>{returnSheets.map((sheet: any) => <button type="button" key={sheet.key} onClick={() => setActiveReturnSheet(sheet.key)} style={{ padding: '7px 11px', border: activeReturnSheet === sheet.key ? '2px solid #4f46e5' : '1px solid #cbd5e1', borderRadius: 7, background: activeReturnSheet === sheet.key ? '#eef2ff' : '#fff', color: activeReturnSheet === sheet.key ? '#3730a3' : '#475569', cursor: 'pointer', fontSize: 12, fontWeight: activeReturnSheet === sheet.key ? 700 : 600 }}>{sheet.label}</button>)}</div><div style={{ marginBottom: 8, color: '#3730a3', fontSize: 12, fontWeight: 700 }}>Editing worksheet: {returnSheets.find((sheet: any) => sheet.key === activeReturnSheet)?.label || 'Main Return'}</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>{activeFields.map(renderConfiguredInput)}</div></>}
             </div>
             <div style={{ padding: '12px 22px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button onClick={() => setOpen(false)} style={{ padding: '9px 16px', border: '1px solid #d1d5db', background: '#fff', borderRadius: 7, cursor: 'pointer' }}>Close</button>

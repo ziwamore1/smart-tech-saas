@@ -680,6 +680,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
   const [selectedSampleRow, setSelectedSampleRow] = useState<number | null>(null);
   const [btnLoading, setBtnLoading] = useState<Record<string, boolean>>({});
   const [compileResult, setCompileResult] = useState<any>(null);
+  const [activeSheetKey, setActiveSheetKey] = useState('main');
 
   const withBtnLoading = useCallback(async (key: string, fn: () => Promise<void>) => {
     setBtnLoading(prev => ({ ...prev, [key]: true }));
@@ -698,7 +699,8 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
       if (t?.columns) setTemplateColumns(t.columns);
       else setTemplateColumns([]);
       setEditTemplate(t);
-      setTemplateName(t?.name || '');
+       setTemplateName(t?.name || '');
+       setActiveSheetKey(t?.config?.sheets?.[0]?.key || 'main');
       setSelectedColumnId(null);
       setColumnInsertDirection(null);
       setSelectedSampleRow(null);
@@ -725,13 +727,41 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
     if (!editTemplate?.id) return;
     withBtnLoading('saveTemplate', async () => {
       try {
-        await premiumStaffRecordsApi.updateTemplate(editTemplate.id, { name: templateName });
+        await premiumStaffRecordsApi.updateTemplate(editTemplate.id, { name: templateName, config: editTemplate.config });
         showToast('success', 'Template saved');
         onRefresh();
       } catch {
         showToast('error', 'Failed to save template');
       }
     });
+  };
+
+  const templateSheets = (editTemplate?.config?.sheets?.length ? editTemplate.config.sheets : [{ key: 'main', label: 'Main Return', name: editTemplate?.config?.sheetName || 'Main Return' }]);
+  const activeSheet = templateSheets.find((sheet: any) => sheet.key === activeSheetKey) || templateSheets[0];
+  const sheetColumns = templateColumns.filter((column: any) => String(column.validationRules?.sheetKey || 'main') === String(activeSheet?.key || 'main'));
+
+  const handleAddSheet = async () => {
+    if (!editTemplate?.id) return;
+    const key = `sheet_${Date.now()}`;
+    const nextSheets = [...templateSheets, { key, name: 'Additional Return', label: 'Additional Return', headerRow: 1, dataStartRow: 2, inheritInstitutionHeader: true }];
+    await withBtnLoading('addSheet', async () => {
+      try {
+        const response = await premiumStaffRecordsApi.updateTemplate(editTemplate.id, { config: { ...(editTemplate.config || {}), sheets: nextSheets } });
+        const updated = response.data?.data || response.data;
+        setEditTemplate(updated);
+        setActiveSheetKey(key);
+        showToast('success', 'Worksheet added');
+      } catch { showToast('error', 'Failed to add worksheet'); }
+    });
+  };
+
+  const handleRenameSheet = async (sheet: any, label: string) => {
+    if (!editTemplate?.id || !label.trim()) return;
+    const nextSheets = templateSheets.map((item: any) => item.key === sheet.key ? { ...item, label: label.trim(), name: label.trim() } : item);
+    try {
+      const response = await premiumStaffRecordsApi.updateTemplate(editTemplate.id, { config: { ...(editTemplate.config || {}), sheets: nextSheets } });
+      setEditTemplate(response.data?.data || response.data);
+    } catch { showToast('error', 'Failed to rename worksheet'); }
   };
 
   const handleAddColumn = async () => {
@@ -742,11 +772,12 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
         await premiumStaffRecordsApi.addColumn(tid, {
           columnName: `field_${Date.now()}`,
           columnLabel: 'New Field',
-          columnOrder: templateColumns.length + 1,
+           columnOrder: sheetColumns.length + 1,
           dataType: 'string',
           isRequired: false,
           isEditable: true,
-          isVisible: true,
+           isVisible: true,
+           validationRules: { sheetKey: activeSheet?.key || 'main' },
         });
         showToast('success', 'Column added');
         fetchColumns(tid);
@@ -759,7 +790,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
   const handleInsertColumn = async (columnId: string, direction: 'before' | 'after') => {
     const tid = selectedTemplateIdRef.current;
     if (!tid) return;
-    const sorted = [...templateColumns].sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0));
+     const sorted = [...sheetColumns].sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0));
     const selectedIndex = sorted.findIndex((column: any) => column.id === columnId);
     if (selectedIndex < 0) return;
     setColumnInsertDirection(direction);
@@ -774,7 +805,8 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
           dataType: 'string',
           isRequired: false,
           isEditable: true,
-          isVisible: true,
+           isVisible: true,
+           validationRules: { sheetKey: activeSheet?.key || 'main' },
         });
         let created = response.data?.data || response.data;
         if (Array.isArray(created)) created = created[created.length - 1];
@@ -990,6 +1022,11 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
     }
   }, [templates, selectedTemplateId, fetchColumns]);
 
+  useEffect(() => {
+    if (activeSheetKey && templateSheets.some((sheet: any) => sheet.key === activeSheetKey)) return;
+    setActiveSheetKey(templateSheets[0]?.key || 'main');
+  }, [editTemplate?.id]);
+
   return (
     <div>
       <div style={{ background: '#fff', border: '1px solid #94a3b8', borderRadius: 12, padding: 16, marginBottom: 16 }}>
@@ -1065,11 +1102,16 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
                      <StatCard icon="fa-times" label="Invalid" value={compileResult.summary?.invalid || 0} color="#dc2626" />
                    </div>
                  )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>Columns ({templateColumns.length})</span>
-                  <button onClick={handleAddColumn} disabled={btnLoading['addColumn']} style={{ padding: '4px 10px', background: btnLoading['addColumn'] ? '#d1d5db' : '#ea6645', color: '#fff', border: 'none', borderRadius: 4, cursor: btnLoading['addColumn'] ? 'not-allowed' : 'pointer', fontSize: 12 }}><i className={`fas ${btnLoading['addColumn'] ? 'fa-spinner fa-spin' : 'fa-plus'}`}></i> {btnLoading['addColumn'] ? 'Adding...' : 'Add Column'}</button>
-                </div>
-                {templateColumns.length === 0 ? (
+                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+                   {templateSheets.map((sheet: any) => <button key={sheet.key} onClick={() => setActiveSheetKey(sheet.key)} style={{ padding: '6px 10px', border: activeSheet?.key === sheet.key ? '2px solid #c2410c' : '1px solid #d1d5db', borderRadius: 6, background: activeSheet?.key === sheet.key ? '#fff7ed' : '#fff', color: '#374151', cursor: 'pointer', fontSize: 12, fontWeight: activeSheet?.key === sheet.key ? 700 : 500 }}>{sheet.label || sheet.name}</button>)}
+                   <button onClick={handleAddSheet} disabled={btnLoading['addSheet']} style={{ padding: '6px 10px', border: '1px dashed #ea6645', borderRadius: 6, background: '#fff', color: '#c2410c', cursor: btnLoading['addSheet'] ? 'not-allowed' : 'pointer', fontSize: 12 }}>+ Add Worksheet</button>
+                   {activeSheet && <input defaultValue={activeSheet.label || activeSheet.name} onBlur={e => handleRenameSheet(activeSheet, e.target.value)} aria-label="Worksheet name" style={{ minWidth: 150, padding: '5px 8px', border: '1px solid #d1d5db', borderRadius: 5, fontSize: 12 }} />}
+                 </div>
+                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                   <span style={{ fontWeight: 600, fontSize: 14 }}>{activeSheet?.label || 'Worksheet'} Columns ({sheetColumns.length})</span>
+                   <button onClick={handleAddColumn} disabled={btnLoading['addColumn']} style={{ padding: '4px 10px', background: btnLoading['addColumn'] ? '#d1d5db' : '#ea6645', color: '#fff', border: 'none', borderRadius: 4, cursor: btnLoading['addColumn'] ? 'not-allowed' : 'pointer', fontSize: 12 }}><i className={`fas ${btnLoading['addColumn'] ? 'fa-spinner fa-spin' : 'fa-plus'}`}></i> {btnLoading['addColumn'] ? 'Adding...' : 'Add Column'}</button>
+                 </div>
+                 {sheetColumns.length === 0 ? (
                   <div style={{ textAlign: 'center', color: '#6b7280', padding: 20, fontSize: 13 }}>No columns. Add a column to start building your return template.</div>
                 ) : (
                   <div>
@@ -1087,7 +1129,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
                         </tr>
                       </thead>
                       <tbody>
-                         {templateColumns.sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0)).map((col: any, idx: number) => (
+                          {sheetColumns.sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0)).map((col: any, idx: number) => (
                            <tr key={col.id} onClick={() => setSelectedColumnId(col.id)} style={{ borderTop: '1px solid #f3eee8', background: selectedColumnId === col.id ? '#fff7ed' : '#fff', cursor: 'pointer' }}>
                             <td style={{ padding: '6px 10px', color: '#6b7280', fontSize: 11 }}>{idx + 1}</td>
                             <td style={{ padding: '6px 10px', fontFamily: 'monospace', fontSize: 12 }}>{col.columnName}</td>
@@ -1134,7 +1176,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
                             <td style={{ padding: '6px 10px' }}>
                               <div style={{ display: 'flex', gap: 2 }}>
                                 <button onClick={() => handleReorderColumn(col.id, 'up')} disabled={idx === 0 || !!btnLoading[`reorder_${col.id}`]} style={{ padding: '2px 5px', border: '1px solid #d1d5db', borderRadius: 4, cursor: idx === 0 || btnLoading[`reorder_${col.id}`] ? 'not-allowed' : 'pointer', fontSize: 11, background: '#fff', opacity: idx === 0 || btnLoading[`reorder_${col.id}`] ? 0.4 : 1 }}>▲</button>
-                                <button onClick={() => handleReorderColumn(col.id, 'down')} disabled={idx === templateColumns.length - 1 || !!btnLoading[`reorder_${col.id}`]} style={{ padding: '2px 5px', border: '1px solid #d1d5db', borderRadius: 4, cursor: idx === templateColumns.length - 1 || btnLoading[`reorder_${col.id}`] ? 'not-allowed' : 'pointer', fontSize: 11, background: '#fff', opacity: idx === templateColumns.length - 1 || btnLoading[`reorder_${col.id}`] ? 0.4 : 1 }}>▼</button>
+                               <button onClick={() => handleReorderColumn(col.id, 'down')} disabled={idx === sheetColumns.length - 1 || !!btnLoading[`reorder_${col.id}`]} style={{ padding: '2px 5px', border: '1px solid #d1d5db', borderRadius: 4, cursor: idx === sheetColumns.length - 1 || btnLoading[`reorder_${col.id}`] ? 'not-allowed' : 'pointer', fontSize: 11, background: '#fff', opacity: idx === sheetColumns.length - 1 || btnLoading[`reorder_${col.id}`] ? 0.4 : 1 }}>▼</button>
                                 <button onClick={() => handleDeleteColumn(col.id)} disabled={btnLoading[`deleteCol_${col.id}`]} style={{ padding: '2px 6px', background: btnLoading[`deleteCol_${col.id}`] ? '#e5e7eb' : '#fecaca', color: '#dc2626', border: 'none', borderRadius: 4, cursor: btnLoading[`deleteCol_${col.id}`] ? 'not-allowed' : 'pointer', fontSize: 11 }}>{btnLoading[`deleteCol_${col.id}`] ? '...' : 'Delete'}</button>
                               </div>
                             </td>
@@ -1153,7 +1195,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
                    </div>
                  )}
 
-                 {templateColumns.length > 0 && (
+                  {sheetColumns.length > 0 && (
                   <div style={{ marginTop: 16, borderTop: '1px solid #e8ddd0', paddingTop: 16 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                       <span style={{ fontWeight: 600, fontSize: 14 }}>Template Preview</span>
@@ -1174,7 +1216,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
                         <thead>
                           <tr style={{ background: '#f9f5f0', textAlign: 'left' }}>
                             <th style={{ padding: '6px 8px', fontWeight: 600, width: 30 }}>#</th>
-                            {templateColumns.sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0)).map((col: any) => (
+                             {sheetColumns.sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0)).map((col: any) => (
                               <th key={col.id} style={{ padding: '6px 8px', fontWeight: 600, whiteSpace: 'nowrap' }}>
                                 {col.columnLabel || col.columnName}
                                 {col.isRequired && <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span>}
@@ -1187,7 +1229,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
                         <tbody>
                           {sampleRows.length === 0 ? (
                             <tr>
-                              <td colSpan={templateColumns.length + 2} style={{ padding: 16, textAlign: 'center', color: '#9ca3af' }}>
+                               <td colSpan={sheetColumns.length + 2} style={{ padding: 16, textAlign: 'center', color: '#9ca3af' }}>
                                 No rows yet. Click "Add Row" to add sample data for preview.
                               </td>
                             </tr>
@@ -1195,7 +1237,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
                              sampleRows.map((row: any, rIdx: number) => (
                                <tr key={rIdx} onClick={() => setSelectedSampleRow(rIdx)} style={{ borderTop: '1px solid #f3eee8', background: selectedSampleRow === rIdx ? '#eff6ff' : '#fff', cursor: 'pointer' }}>
                                 <td style={{ padding: '4px 8px', color: '#6b7280', fontSize: 11 }}>{rIdx + 1}</td>
-                                {templateColumns.sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0)).map((col: any) => (
+                                 {sheetColumns.sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0)).map((col: any) => (
                                   <td key={col.id} style={{ padding: '4px 8px' }}>
                                     <input
                                       value={row[col.columnName] ?? ''}

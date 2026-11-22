@@ -143,6 +143,8 @@ export class StaffRecordsService {
           status: submission.status,
           fields: submission.template.columns.map((column: any) => ({
             ...column,
+            sheetKey: (column.validationRules as any)?.sheetKey || 'main',
+            sheetLabel: (submission.template.config as any)?.sheets?.find((sheet: any) => sheet.key === ((column.validationRules as any)?.sheetKey || 'main'))?.label || 'Main Return',
             sourceKey: resolveCanonicalFieldKey(column),
             value: row?.values?.[column.columnName] ?? canonicalValues[resolveCanonicalFieldKey(column)] ?? '',
           })),

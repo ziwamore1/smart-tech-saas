@@ -31,6 +31,16 @@ export class StaffExcelService {
 
   constructor(private prisma: PrismaService) {}
 
+  private getTemplateSheets(config: any, fallbackName: string) {
+    if (Array.isArray(config?.sheets) && config.sheets.length) return config.sheets;
+    const headerRow = Number(config?.headerRow || 4);
+    return [{ key: 'main', name: config?.sheetName || fallbackName, label: config?.sheetLabel || config?.sheetName || 'Main Return', headerRow, dataStartRow: Number(config?.dataStartRow || headerRow + 1), workbookAsset: config?.workbookAsset, inheritInstitutionHeader: true }];
+  }
+
+  private columnsForSheet(columns: any[], sheetKey: string) {
+    return columns.filter((column) => String((column.validationRules as any)?.sheetKey || 'main') === sheetKey && column.isVisible !== false).sort((a, b) => (a.columnOrder || 0) - (b.columnOrder || 0));
+  }
+
   async generateInstitutionalReturnExcel(submissionId: string, schoolId: string, options: ExportOptions = {}): Promise<ExcelJS.Buffer> {
     const submission = await this.prisma.staffReturnSubmission.findUnique({
       where: { id: submissionId },
@@ -39,32 +49,35 @@ export class StaffExcelService {
     if (!submission || submission.schoolId !== schoolId) throw new Error('Submission not found');
     const config = (submission.template.config || {}) as any;
     const asset = config.workbookAsset;
-    if (!asset || !config.sheetName) return this.generateStaffReturnExcel(submissionId, schoolId, options);
+    if (!asset && !config.sheets?.length) return this.generateStaffReturnExcel(submissionId, schoolId, options);
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(path.join(process.cwd(), 'hr_profile_docs', asset));
-    const worksheet = workbook.getWorksheet(config.sheetName);
-    if (!worksheet) throw new Error(`Template worksheet not found: ${config.sheetName}`);
+    if (asset) await workbook.xlsx.readFile(path.join(process.cwd(), 'hr_profile_docs', asset));
     const rows = (submission.data as any[]) || [];
-    const headerRow = Number(config.headerRow || 4);
-    let dataStartRow = Number(config.dataStartRow || headerRow + 1);
     const columns = submission.template.columns;
-    worksheet.spliceRows(1, 0, ...Array.from({ length: this.schoolHeaderRows }, () => []));
-    this.shiftWorksheetValidations(workbook, worksheet, this.schoolHeaderRows);
-    dataStartRow += this.schoolHeaderRows;
-    this.writeSchoolHeader(worksheet, options, submission.template.name, submission.period, columns.length);
-    const columnOffset = this.resolveHeaderColumnOffset(worksheet, headerRow + this.schoolHeaderRows, columns);
-    this.writeColumnHeaders(worksheet, headerRow + this.schoolHeaderRows, columns, columnOffset);
-    worksheet.pageSetup.printTitlesRow = `1:${headerRow + this.schoolHeaderRows}`;
-    rows.forEach((rowData: any, rowIndex: number) => {
-      const row = rowData?.values || rowData;
-      const target = worksheet.getRow(dataStartRow + rowIndex);
-      columns.forEach((column: any, columnIndex: number) => {
-        const value = row[column.columnName] ?? '';
-        const cell = target.getCell(columnIndex + columnOffset);
-        cell.value = this.coerceExcelValue(value, column.dataType);
-        this.applyDateFormat(cell, column.dataType);
+    for (const sheetConfig of this.getTemplateSheets(config, submission.template.name)) {
+      const sheetColumns = this.columnsForSheet(columns, sheetConfig.key || 'main');
+      if (!sheetColumns.length) continue;
+      const worksheet = workbook.getWorksheet(sheetConfig.name) || workbook.addWorksheet(sheetConfig.name);
+      const headerRow = Number(sheetConfig.headerRow || 4);
+      let dataStartRow = Number(sheetConfig.dataStartRow || headerRow + 1);
+      worksheet.spliceRows(1, 0, ...Array.from({ length: this.schoolHeaderRows }, () => []));
+      this.shiftWorksheetValidations(workbook, worksheet, this.schoolHeaderRows);
+      dataStartRow += this.schoolHeaderRows;
+      this.writeSchoolHeader(worksheet, options, sheetConfig.label || submission.template.name, submission.period, sheetColumns.length);
+      const columnOffset = this.resolveHeaderColumnOffset(worksheet, headerRow + this.schoolHeaderRows, sheetColumns);
+      this.writeColumnHeaders(worksheet, headerRow + this.schoolHeaderRows, sheetColumns, columnOffset);
+      worksheet.pageSetup.printTitlesRow = `1:${headerRow + this.schoolHeaderRows}`;
+      rows.forEach((rowData: any, rowIndex: number) => {
+        const row = rowData?.values || rowData;
+        const target = worksheet.getRow(dataStartRow + rowIndex);
+        sheetColumns.forEach((column: any, columnIndex: number) => {
+          const value = row[column.columnName] ?? '';
+          const cell = target.getCell(columnIndex + columnOffset);
+          cell.value = this.coerceExcelValue(value, column.dataType);
+          this.applyDateFormat(cell, column.dataType);
+        });
       });
-    });
+    }
     workbook.creator = options.generatedBy || 'SmartTech SaaS';
     workbook.modified = new Date();
     const buffer = await workbook.xlsx.writeBuffer();
@@ -140,6 +153,38 @@ export class StaffExcelService {
 
     if (!submission || submission.schoolId !== schoolId) {
       throw new Error('Submission not found');
+    }
+
+    const configuredSheets = this.getTemplateSheets(submission.template.config || {}, submission.template.name);
+    if (configuredSheets.length > 1) {
+      const workbook = new ExcelJS.Workbook();
+      const rows = (submission.data as any[]) || [];
+      for (const sheetConfig of configuredSheets) {
+        const sheetColumns = this.columnsForSheet(submission.template.columns, sheetConfig.key || 'main');
+        if (!sheetColumns.length) continue;
+        const worksheet = workbook.addWorksheet(sheetConfig.name || sheetConfig.key, { pageSetup: { orientation: 'landscape', fitToPage: true } });
+        this.writeSchoolHeader(worksheet, options, sheetConfig.label || submission.template.name, submission.period, sheetColumns.length);
+        const headerRow = this.schoolHeaderRows + 1;
+        this.writeColumnHeaders(worksheet, headerRow, sheetColumns, 1, { fontColor: 'FFFFFF', fillColor: '1A1A2E', defaultAlignment: 'left' });
+        rows.forEach((rowData: any, rowIndex: number) => {
+          const sourceRow = rowData?.values || rowData;
+          const row = worksheet.getRow(headerRow + rowIndex + 1);
+          sheetColumns.forEach((column: any, index: number) => {
+            const cell = row.getCell(index + 1);
+            const value = sourceRow[column.columnName] ?? '';
+            cell.value = this.coerceExcelValue(value, column.dataType);
+            this.applyDateFormat(cell, column.dataType);
+            cell.alignment = { vertical: 'middle', wrapText: true };
+            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+          });
+        });
+        sheetColumns.forEach((column: any, index: number) => { worksheet.getColumn(index + 1).width = column.width ? Math.max(column.width / 7, 10) : 18; });
+        worksheet.autoFilter = { from: { row: headerRow, column: 1 }, to: { row: headerRow + rows.length, column: sheetColumns.length } };
+        worksheet.pageSetup.printTitlesRow = `1:${headerRow}`;
+      }
+      const buffer = await workbook.xlsx.writeBuffer();
+      await this.prisma.staffReturnSubmission.update({ where: { id: submissionId }, data: { status: submission.status === 'APPROVED' ? 'APPROVED' : 'EXPORTED', generatedBy: options.generatedBy, generatedAt: new Date() } });
+      return buffer;
     }
 
     const columns = submission.template.columns;
@@ -334,43 +379,29 @@ export class StaffExcelService {
 
     const columns = template.columns;
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet(template.name, {
-      pageSetup: { orientation: 'landscape', fitToPage: true },
-    });
-
-    this.writeSchoolHeader(worksheet, options, template.name, options.academicYear, columns.length);
-
-    // Column headers
-    const columnHeaderRowIndex = this.schoolHeaderRows + 1;
-    const headerRow = worksheet.getRow(columnHeaderRowIndex);
-    headerRow.height = 30;
-    this.writeColumnHeaders(worksheet, columnHeaderRowIndex, columns, 1, {
-      fontColor: 'FFFFFF',
-      fillColor: 'EA6645',
-      defaultAlignment: 'center',
-    });
-
-    // Empty data rows (for manual entry)
-    for (let i = 0; i < 50; i++) {
-      const row = worksheet.getRow(columnHeaderRowIndex + 1 + i);
-      for (let j = 0; j < columns.length; j++) {
-        const cell = row.getCell(j + 1);
-        cell.border = {
-          top: { style: 'thin' }, left: { style: 'thin' },
-          bottom: { style: 'thin' }, right: { style: 'thin' },
-        };
-        cell.font = { name: 'Calibri', size: 10 };
-        cell.alignment = { wrapText: true, vertical: 'middle' };
+    for (const sheetConfig of this.getTemplateSheets(template.config || {}, template.name)) {
+      const sheetColumns = this.columnsForSheet(columns, sheetConfig.key || 'main');
+      if (!sheetColumns.length) continue;
+      const worksheet = workbook.addWorksheet(sheetConfig.name || template.name, { pageSetup: { orientation: 'landscape', fitToPage: true } });
+      this.writeSchoolHeader(worksheet, options, sheetConfig.label || template.name, options.academicYear, sheetColumns.length);
+      const columnHeaderRowIndex = this.schoolHeaderRows + 1;
+      const headerRow = worksheet.getRow(columnHeaderRowIndex);
+      headerRow.height = 30;
+      this.writeColumnHeaders(worksheet, columnHeaderRowIndex, sheetColumns, 1, { fontColor: 'FFFFFF', fillColor: 'EA6645', defaultAlignment: 'center' });
+      for (let i = 0; i < 50; i++) {
+        const row = worksheet.getRow(columnHeaderRowIndex + 1 + i);
+        for (let j = 0; j < sheetColumns.length; j++) {
+          const cell = row.getCell(j + 1);
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+          cell.font = { name: 'Calibri', size: 10 };
+          cell.alignment = { wrapText: true, vertical: 'middle' };
+        }
+        row.height = 20;
       }
-      row.height = 20;
+      sheetColumns.forEach((col, index) => { worksheet.getColumn(index + 1).width = col.width ? Math.max(col.width / 7, 12) : 20; });
+      worksheet.pageSetup.orientation = 'landscape';
+      worksheet.pageSetup.printTitlesRow = `1:${columnHeaderRowIndex}`;
     }
-
-    columns.forEach((col, index) => {
-      worksheet.getColumn(index + 1).width = col.width ? Math.max(col.width / 7, 12) : 20;
-    });
-
-    worksheet.pageSetup.orientation = 'landscape';
-    worksheet.pageSetup.printTitlesRow = `1:${columnHeaderRowIndex}`;
     return await workbook.xlsx.writeBuffer();
   }
 
