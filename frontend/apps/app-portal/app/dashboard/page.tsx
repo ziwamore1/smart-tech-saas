@@ -9,6 +9,7 @@ import Icon3D from '@/components/Icon3D';
 import { INSTITUTION_TYPE_LABELS, INSTITUTION_TYPE_FEATURES, InstitutionTypeCode } from '@/lib/institution-types';
 import { accessApi } from '@/lib/api';
 import { useSchoolSocket } from '@/lib/use-school-socket';
+import SchoolPerformanceOverview from '@/components/dashboard/SchoolPerformanceOverview';
 
 export default function DashboardPage() {
   const { user, allRoles, isSuperAdmin, isPureSuperAdmin, isDirector } = useAuth();
@@ -16,6 +17,7 @@ export default function DashboardPage() {
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
   const [liveActivities, setLiveActivities] = useState<any[]>([]);
+  const [isLiveExpanded, setIsLiveExpanded] = useState(false);
 
   const { data: schoolData, isLoading: schoolLoading, error: schoolError } = useQuery({
     queryKey: ['school', user?.schoolId],
@@ -751,6 +753,24 @@ export default function DashboardPage() {
       )}
 
       {/* Intelligence Modules - Admin only */}
+      <div style={{ marginBottom: '32px' }}>
+        <SchoolPerformanceOverview termId={selectedTermId || currentTerm?.id} accent="#ea6645" />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
+          <Link
+            href="/dashboard/analytics-enhanced"
+            style={{
+              color: '#0f766e',
+              fontSize: '13px',
+              fontWeight: 700,
+              textDecoration: 'none',
+            }}
+          >
+            Open Mid-Term / End-of-Term analytics →
+          </Link>
+        </div>
+      </div>
+
+      {/* Intelligence Modules - Admin only */}
       {(isPureSuperAdmin || isDirector) && (
       <div style={{
         background: '#fefcf9',
@@ -879,7 +899,7 @@ export default function DashboardPage() {
       {/* Live Results Monitoring */}
       {canViewLive && (
         <div style={{ background: '#ffffff', borderRadius: '16px', padding: '24px', marginBottom: '24px', color: '#0f172a', boxShadow: '0 12px 30px rgba(15,23,42,0.10)', border: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: isLiveExpanded ? '20px' : 0, flexWrap: 'wrap' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#059669', boxShadow: '0 0 0 5px rgba(5,150,105,0.16)' }} />
@@ -887,8 +907,19 @@ export default function DashboardPage() {
               </div>
               <p style={{ margin: '8px 0 0', color: '#475569', fontSize: '13px' }}>See who is entering results, for which class and subject, as work happens.</p>
             </div>
-            <span style={{ color: '#047857', background: '#ecfdf5', fontSize: '12px', fontWeight: 700, padding: '7px 10px', border: '1px solid #a7f3d0', borderRadius: '999px' }}>LIVE · AUTO-SYNC</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#047857', background: '#ecfdf5', fontSize: '12px', fontWeight: 700, padding: '7px 10px', border: '1px solid #a7f3d0', borderRadius: '999px' }}>LIVE · AUTO-SYNC</span>
+              <button
+                type="button"
+                onClick={() => setIsLiveExpanded((expanded) => !expanded)}
+                aria-expanded={isLiveExpanded}
+                style={{ color: '#334155', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '7px 10px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+              >
+                {isLiveExpanded ? 'Collapse' : 'Expand'}
+              </button>
+            </div>
           </div>
+          {isLiveExpanded && <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '16px' }}>
             {[
               ['Entries tracked', liveActivities.length, '#bfdbfe'],
@@ -909,6 +940,7 @@ export default function DashboardPage() {
               ))}
             </div>
           )}
+          </>}
         </div>
       )}
 
