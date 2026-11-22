@@ -276,6 +276,29 @@ export default function PrimaryDashboardPage() {
         </Link>
       </div>
 
+      <section className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 p-5 text-white shadow-lg md:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">Results intelligence</p>
+            <h2 className="mt-1 text-2xl font-bold">Assessment Analytics</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/80">
+              Review Mid-Term and End-of-Term performance independently, compare subject averages, and inspect class, gender, grade, and heatmap trends.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/dashboard/analytics-enhanced?examType=MID_TERM" className="rounded-lg bg-violet-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-400">
+              Mid-Term
+            </Link>
+            <Link href="/dashboard/analytics-enhanced?examType=END_TERM" className="rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-400">
+              End-of-Term
+            </Link>
+            <Link href="/dashboard/analytics-enhanced" className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white hover:bg-white/20">
+              Compare & View Charts
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <div className={`grid grid-cols-1 ${TIER_ORDER[currentTier] >= TIER_ORDER.STANDARD ? 'lg:grid-cols-3' : ''} gap-6`}>
         {TIER_ORDER[currentTier] >= TIER_ORDER.STANDARD ? (
           <div className="lg:col-span-2">

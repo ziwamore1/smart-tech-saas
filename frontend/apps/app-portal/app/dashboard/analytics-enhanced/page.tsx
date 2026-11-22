@@ -19,7 +19,9 @@ export default function AnalyticsEnhancedPage() {
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
   const [selectedClass2, setSelectedClass2] = useState('');
-  const [selectedExamType, setSelectedExamType] = useState('END_TERM');
+  const [selectedExamType, setSelectedExamType] = useState(() =>
+    typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('examType') || 'END_TERM' : 'END_TERM',
+  );
 
   const { data: classes } = useQuery({
     queryKey: ['classes'],
