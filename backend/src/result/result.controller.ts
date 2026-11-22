@@ -232,6 +232,7 @@ export class ResultController {
         score: number;
         isAbsent?: boolean;
         absentCode?: string | null;
+        examType?: string;
       }>;
     },
     @Req() req: any,
@@ -262,6 +263,7 @@ export class ResultController {
       body.results,
       req.user.roles || [],
       req.user.isSuperAdmin === true,
+      body.examType || body.results?.[0]?.examType,
     );
   }
 

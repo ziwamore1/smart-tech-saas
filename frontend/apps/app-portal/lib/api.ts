@@ -2776,7 +2776,7 @@ generatePdf: (data: { type: string; studentId?: string; classId?: string; termId
  * concurrently with exponential backoff retry on transient failures.
  */
 export async function bulkSaveResults(
-  results: Array<{ studentId: string; subjectId: string; termId: string; score: number; isAbsent?: boolean; absentCode?: 'X' | 'A' }>,
+  results: Array<{ studentId: string; subjectId: string; termId: string; score: number; isAbsent?: boolean; absentCode?: 'X' | 'A'; examType?: string }>,
   options?: {
     chunkSize?: number;
     maxRetries?: number;

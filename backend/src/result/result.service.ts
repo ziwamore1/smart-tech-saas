@@ -549,10 +549,11 @@ export class ResultService {
     classId: string,
     termId: string,
     userId: string,
+    examType = 'END_TERM',
   ): Promise<void> {
     try {
       const sheet = await this.prisma.resultSheet.findFirst({
-        where: { schoolId, classId, termId, status: { not: 'LOCKED' } },
+        where: { schoolId, classId, termId, examType: normalizeExamType(examType), status: { not: 'LOCKED' } },
       });
       if (!sheet) return;
 
@@ -613,10 +614,11 @@ export class ResultService {
     termId: string,
     academicYearId: string,
     userId: string,
+    examType = 'END_TERM',
   ): Promise<{ sheetId: string | null; justCreated: boolean }> {
     try {
       const existing = await this.prisma.resultSheet.findFirst({
-        where: { schoolId, classId, termId },
+        where: { schoolId, classId, termId, examType: normalizeExamType(examType) },
         select: { id: true, totalStudents: true },
       });
       if (existing) {
@@ -632,10 +634,15 @@ export class ResultService {
       const totalStudents = await this.prisma.enrollment.count({
         where: { classId, academicYearId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       });
-      const enteredStudents = await this.prisma.result.groupBy({
-        by: ['studentId'],
-        where: { schoolId, termId, student: { enrollments: { some: { classId, academicYearId, status: 'ACTIVE' } }, status: 'ACTIVE' } },
-      });
+      const enteredStudents = normalizeExamType(examType) === 'END_TERM'
+        ? await this.prisma.result.groupBy({
+            by: ['studentId'],
+            where: { schoolId, termId, student: { enrollments: { some: { classId, academicYearId, status: 'ACTIVE' } }, status: 'ACTIVE' } },
+          })
+        : await this.prisma.computedResult.groupBy({
+            by: ['studentId'],
+            where: { schoolId, classId, termId, examType: normalizeExamType(examType) },
+          });
 
       const sheet = await this.prisma.resultSheet.create({
         data: {
@@ -682,11 +689,15 @@ export class ResultService {
       score: number;
       isAbsent?: boolean;
       absentCode?: string | null;
+      examType?: string;
     }>,
     roles: string[] = [],
     isSuperAdmin = false,
+    examType?: string,
   ) {
     if (results.length === 0) return { created: 0, errors: 0, details: [] };
+
+    const normalizedExamType = normalizeExamType(examType || results[0].examType);
 
     const term = await this.prisma.term.findUnique({
       where: { id: results[0].termId },
@@ -840,31 +851,33 @@ export class ResultService {
             : computeGradeInMemory(item.score, classId);
 
           const result = await this.prisma.$transaction(async (tx) => {
-            const saved = await tx.result.upsert({
-              where: {
-                studentId_subjectId_termId: {
-                  studentId: item.studentId,
-                  subjectId: item.subjectId,
-                  termId: item.termId,
-                },
-              },
-              update: {
-                score: effectiveScore,
-                grade: gradeData.grade,
-                remark: gradeData.remark,
-                teacherId,
-              },
-              create: {
-                studentId: item.studentId,
-                subjectId: item.subjectId,
-                termId: item.termId,
-                teacherId,
-                schoolId,
-                score: effectiveScore,
-                grade: gradeData.grade,
-                remark: gradeData.remark,
-              },
-              });
+            const saved = normalizedExamType === 'END_TERM'
+              ? await tx.result.upsert({
+                  where: {
+                    studentId_subjectId_termId: {
+                      studentId: item.studentId,
+                      subjectId: item.subjectId,
+                      termId: item.termId,
+                    },
+                  },
+                  update: {
+                    score: effectiveScore,
+                    grade: gradeData.grade,
+                    remark: gradeData.remark,
+                    teacherId,
+                  },
+                  create: {
+                    studentId: item.studentId,
+                    subjectId: item.subjectId,
+                    termId: item.termId,
+                    teacherId,
+                    schoolId,
+                    score: effectiveScore,
+                    grade: gradeData.grade,
+                    remark: gradeData.remark,
+                  },
+                })
+              : { id: `${item.studentId}:${item.subjectId}:${item.termId}:${normalizedExamType}`, studentId: item.studentId };
 
             await tx.computedResult.upsert({
               where: {
@@ -872,7 +885,7 @@ export class ResultService {
                   studentId: item.studentId,
                   subjectId: item.subjectId,
                   termId: item.termId,
-                  examType: 'END_TERM',
+                  examType: normalizedExamType,
                 },
               },
               update: {
@@ -943,7 +956,7 @@ export class ResultService {
 
       // Batch-fetch existing sheets
       const existingSheets = await this.prisma.resultSheet.findMany({
-        where: { classId: { in: classIds }, termId: firstTermId, schoolId },
+        where: { classId: { in: classIds }, termId: firstTermId, schoolId, examType: normalizedExamType },
         select: { classId: true, id: true },
       });
       const sheetMap = new Map(existingSheets.map(s => [s.classId, s]));
@@ -951,19 +964,19 @@ export class ResultService {
       for (const classId of classIds) {
         const enrolled = enrollmentCountMap.get(classId) || 0;
         const entered = created.filter(r => enrollmentMap.get(r.studentId) === classId).length;
-        const sheetInfo = await this.ensureSheet(schoolId, classId, firstTermId, academicYearId, teacherId);
+        const sheetInfo = await this.ensureSheet(schoolId, classId, firstTermId, academicYearId, teacherId, normalizedExamType);
         if (sheetInfo.justCreated) {
           await this.prisma.resultSheet.updateMany({
-            where: { classId, termId: firstTermId, schoolId },
+            where: { classId, termId: firstTermId, schoolId, examType: normalizedExamType },
             data: { totalStudents: enrolled },
           });
         } else {
           await this.prisma.resultSheet.updateMany({
-            where: { classId, termId: firstTermId, schoolId },
+            where: { classId, termId: firstTermId, schoolId, examType: normalizedExamType },
             data: { totalStudents: enrolled, enteredCount: { increment: entered } },
           });
         }
-        await this.autoSubmitSheet(schoolId, classId, firstTermId, teacherId);
+        await this.autoSubmitSheet(schoolId, classId, firstTermId, teacherId, normalizedExamType);
       }
 
       // ── Emit real-time events (fire-and-forget) ──
@@ -1097,7 +1110,7 @@ export class ResultService {
           studentId: result.studentId,
           subjectId: result.subjectId,
           termId: result.termId,
-          examType: 'END_TERM',
+          examType: normalizeExamType(examType),
         },
       },
       update: {

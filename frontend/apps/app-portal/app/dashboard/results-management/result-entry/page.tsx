@@ -628,7 +628,7 @@ export default function ResultEntryPage() {
       return;
     }
     if (bulkSaving || bulkSaveMutation.isPending) return;
-    const scoreList: Array<{ studentId: string; subjectId: string; termId: string; score: number; isAbsent?: boolean; absentCode?: 'X' | 'A' }> = [];
+    const scoreList: Array<{ studentId: string; subjectId: string; termId: string; score: number; isAbsent?: boolean; absentCode?: 'X' | 'A'; examType?: string }> = [];
     dirtyCells.forEach(key => {
       const [studentId, subjectId] = key.split('::');
       const isAbsent = absentCells.has(key);
@@ -640,6 +640,7 @@ export default function ResultEntryPage() {
           subjectId,
           termId: selectedTerm,
           score: scoreToSave as number,
+          examType: selectedExamType,
           ...(isAbsent ? { isAbsent: true, absentCode: 'X' as const } : {}),
         });
       }
