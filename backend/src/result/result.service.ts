@@ -656,7 +656,7 @@ export class ResultService {
           classId,
           termId,
           academicYearId,
-          examType: 'END_TERM',
+          examType: normalizeExamType(examType),
           status: 'SUBMITTED',
           totalStudents,
           enteredCount: enteredStudents.length,
@@ -1116,7 +1116,7 @@ export class ResultService {
           studentId: result.studentId,
           subjectId: result.subjectId,
           termId: result.termId,
-          examType: normalizeExamType(examType),
+          examType: 'END_TERM',
         },
       },
       update: {

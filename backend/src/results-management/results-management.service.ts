@@ -232,9 +232,9 @@ export class ResultsManagementService {
               const totalStudents = await this.prisma.enrollment.count({
                 where: { classId: cls.id, academicYearId: currentYear.id, status: 'ACTIVE', student: { status: 'ACTIVE' } },
               });
-              const enteredStudents = await this.prisma.result.groupBy({
+              const enteredStudents = await this.prisma.computedResult.groupBy({
                 by: ['studentId'],
-                where: { schoolId, termId, student: { enrollments: { some: { classId: cls.id, academicYearId: currentYear.id, status: 'ACTIVE' } }, status: 'ACTIVE' } },
+                where: { schoolId, classId: cls.id, termId, examType, OR: [{ finalPercentage: { not: null } }, { isAbsent: true }], student: { status: 'ACTIVE' } },
               });
               await this.prisma.resultSheet.create({
                 data: {
@@ -279,9 +279,9 @@ export class ResultsManagementService {
       const liveTotal = await this.prisma.enrollment.count({
         where: { classId: sheet.classId, academicYearId: ayId, status: 'ACTIVE', student: { status: 'ACTIVE' } },
       });
-      const liveEntered = await this.prisma.result.groupBy({
+      const liveEntered = await this.prisma.computedResult.groupBy({
         by: ['studentId'],
-        where: { schoolId, termId: sheet.termId, student: { enrollments: { some: { classId: sheet.classId, academicYearId: ayId, status: 'ACTIVE' } }, status: 'ACTIVE' } },
+        where: { schoolId, classId: sheet.classId, termId: sheet.termId, examType: normalizeExamType(sheet.examType), OR: [{ finalPercentage: { not: null } }, { isAbsent: true }], student: { status: 'ACTIVE' } },
       });
       const liveEnteredCount = liveEntered.length;
 
@@ -305,9 +305,9 @@ export class ResultsManagementService {
         const totalStudents = await this.prisma.enrollment.count({
           where: { classId: filters.classId, academicYearId: term.academicYear.id, status: 'ACTIVE', student: { status: 'ACTIVE' } },
         });
-        const enteredStudents = await this.prisma.result.groupBy({
+        const enteredStudents = await this.prisma.computedResult.groupBy({
           by: ['studentId'],
-          where: { schoolId, termId: targetTermId, student: { enrollments: { some: { classId: filters.classId, academicYearId: term.academicYear.id, status: 'ACTIVE' } }, status: 'ACTIVE' } },
+          where: { schoolId, classId: filters.classId, termId: targetTermId, examType, OR: [{ finalPercentage: { not: null } }, { isAbsent: true }], student: { status: 'ACTIVE' } },
         });
         const newSheet = await this.prisma.resultSheet.create({
           data: {
@@ -2046,12 +2046,15 @@ export class ResultsManagementService {
       },
     });
 
-    const enteredStudents = await this.prisma.result.groupBy({
+    const enteredStudents = await this.prisma.computedResult.groupBy({
       by: ['studentId'],
       where: {
         schoolId: data.schoolId,
+        classId: data.classId,
         termId: data.termId,
-        student: { enrollments: { some: { classId: data.classId, academicYearId, status: 'ACTIVE' } }, status: 'ACTIVE' },
+        examType,
+        OR: [{ finalPercentage: { not: null } }, { isAbsent: true }],
+        student: { status: 'ACTIVE' },
       },
     });
 
