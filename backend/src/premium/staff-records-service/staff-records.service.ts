@@ -144,9 +144,15 @@ export class StaffRecordsService {
           fields: submission.template.columns.map((column: any) => ({
             ...column,
             sheetKey: (column.validationRules as any)?.sheetKey || 'main',
-            sheetLabel: (submission.template.config as any)?.sheets?.find((sheet: any) => sheet.key === ((column.validationRules as any)?.sheetKey || 'main'))?.label || 'Main Return',
+            sheetLabel: (() => {
+              const sheetKey = (column.validationRules as any)?.sheetKey || 'main';
+              const configuredLabel = (submission.template.config as any)?.sheets?.find((sheet: any) => sheet.key === sheetKey)?.label;
+              return configuredLabel && (sheetKey === 'main' || !/^main return$/i.test(configuredLabel)) ? configuredLabel : sheetKey === 'main' ? 'Main Return' : 'Additional Return';
+            })(),
             sourceKey: resolveCanonicalFieldKey(column),
-            value: row?.values?.[column.columnName] ?? canonicalValues[resolveCanonicalFieldKey(column)] ?? '',
+            value: row?.values?.[column.columnName] !== undefined && row?.values?.[column.columnName] !== null && row?.values?.[column.columnName] !== ''
+              ? row.values[column.columnName]
+              : canonicalValues[resolveCanonicalFieldKey(column)] ?? '',
           })),
         };
       }),
@@ -276,7 +282,7 @@ export class StaffRecordsService {
   private async findDraftReturnsForStaff(staffId: string, schoolId: string) {
     const submissions = await this.prisma.staffReturnSubmission.findMany({
       where: { schoolId, status: 'DRAFT' },
-      include: { template: { select: { id: true, name: true, columns: true } } },
+       include: { template: { select: { id: true, name: true, config: true, columns: true } } },
       orderBy: { updatedAt: 'desc' },
     });
     return submissions.filter((submission: any) => ((submission.data as any[]) || []).some((row) => row.staffId === staffId));

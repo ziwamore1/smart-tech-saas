@@ -10,7 +10,38 @@ export class StaffTemplateService {
 
   private normalizeTemplateConfig(config: any) {
     const value = config && typeof config === 'object' ? config : {};
-    if (Array.isArray(value.sheets) && value.sheets.length) return value;
+    if (Array.isArray(value.sheets) && value.sheets.length) {
+      const usedKeys = new Set<string>();
+      const usedNames = new Set<string>();
+      const sheets = value.sheets.map((sheet: any, index: number) => {
+        const isMain = index === 0;
+        let key = String(sheet?.key || (isMain ? 'main' : `sheet_${index}`)).trim() || (isMain ? 'main' : `sheet_${index}`);
+        while (usedKeys.has(key)) key = `${key}_${index}`;
+        usedKeys.add(key);
+
+        const fallbackLabel = isMain ? (value.sheetLabel || value.sheetName || 'Main Return') : `Additional Return ${index}`;
+        let label = String(sheet?.label || sheet?.name || fallbackLabel).trim() || fallbackLabel;
+        if (!isMain && /^main return$/i.test(label)) label = `Additional Return ${index}`;
+        let name = String(sheet?.name || label).trim() || label;
+        if (!isMain && /^main return$/i.test(name)) name = label;
+        let uniqueName = name;
+        let suffix = 2;
+        while (usedNames.has(uniqueName.toLowerCase())) uniqueName = `${name} ${suffix++}`;
+        usedNames.add(uniqueName.toLowerCase());
+
+        return {
+          ...sheet,
+          key,
+          name: uniqueName,
+          label,
+          headerRow: Number(sheet?.headerRow || (isMain ? value.headerRow || 4 : 1)),
+          dataStartRow: Number(sheet?.dataStartRow || Number(sheet?.headerRow || (isMain ? value.headerRow || 4 : 1)) + 1),
+          workbookAsset: sheet?.workbookAsset || value.workbookAsset,
+          inheritInstitutionHeader: sheet?.inheritInstitutionHeader !== false,
+        };
+      });
+      return { ...value, sheets };
+    }
     const headerRow = Number(value.headerRow || 4);
     return {
       ...value,
@@ -311,7 +342,7 @@ export class StaffTemplateService {
       throw new NotFoundException('Template not found');
     }
 
-    return template;
+    return { ...template, config: this.normalizeTemplateConfig(template.config) };
   }
 
   async createTemplate(data: {

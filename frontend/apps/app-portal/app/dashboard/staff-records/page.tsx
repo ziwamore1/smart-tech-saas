@@ -681,6 +681,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
   const [btnLoading, setBtnLoading] = useState<Record<string, boolean>>({});
   const [compileResult, setCompileResult] = useState<any>(null);
   const [activeSheetKey, setActiveSheetKey] = useState('main');
+  const [sheetNameDraft, setSheetNameDraft] = useState('Main Return');
 
   const withBtnLoading = useCallback(async (key: string, fn: () => Promise<void>) => {
     setBtnLoading(prev => ({ ...prev, [key]: true }));
@@ -701,6 +702,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
       setEditTemplate(t);
        setTemplateName(t?.name || '');
        setActiveSheetKey(t?.config?.sheets?.[0]?.key || 'main');
+       setSheetNameDraft(t?.config?.sheets?.[0]?.label || t?.config?.sheets?.[0]?.name || 'Main Return');
       setSelectedColumnId(null);
       setColumnInsertDirection(null);
       setSelectedSampleRow(null);
@@ -727,7 +729,9 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
     if (!editTemplate?.id) return;
     withBtnLoading('saveTemplate', async () => {
       try {
-        await premiumStaffRecordsApi.updateTemplate(editTemplate.id, { name: templateName, config: editTemplate.config });
+        const config = editTemplate.config || {};
+        const sheets = (Array.isArray(config.sheets) && config.sheets.length ? config.sheets : [{ key: 'main', name: config.sheetName || 'Main Return', label: 'Main Return' }]).map((sheet: any) => sheet.key === activeSheetKey ? { ...sheet, name: sheetNameDraft.trim() || sheet.name || 'Main Return', label: sheetNameDraft.trim() || sheet.label || 'Main Return' } : sheet);
+        await premiumStaffRecordsApi.updateTemplate(editTemplate.id, { name: templateName, config: { ...config, sheets } });
         showToast('success', 'Template saved');
         onRefresh();
       } catch {
@@ -743,13 +747,16 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
   const handleAddSheet = async () => {
     if (!editTemplate?.id) return;
     const key = `sheet_${Date.now()}`;
-    const nextSheets = [...templateSheets, { key, name: 'Additional Return', label: 'Additional Return', headerRow: 1, dataStartRow: 2, inheritInstitutionHeader: true }];
+    const additionalNumber = templateSheets.filter((sheet: any) => String(sheet.key) !== 'main').length + 1;
+    const sheetName = `Additional Return ${additionalNumber}`;
+    const nextSheets = [...templateSheets, { key, name: sheetName, label: sheetName, headerRow: 1, dataStartRow: 2, inheritInstitutionHeader: true }];
     await withBtnLoading('addSheet', async () => {
       try {
         const response = await premiumStaffRecordsApi.updateTemplate(editTemplate.id, { config: { ...(editTemplate.config || {}), sheets: nextSheets } });
         const updated = response.data?.data || response.data;
         setEditTemplate(updated);
         setActiveSheetKey(key);
+        setSheetNameDraft(sheetName);
         showToast('success', 'Worksheet added');
       } catch { showToast('error', 'Failed to add worksheet'); }
     });
@@ -761,6 +768,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
     try {
       const response = await premiumStaffRecordsApi.updateTemplate(editTemplate.id, { config: { ...(editTemplate.config || {}), sheets: nextSheets } });
       setEditTemplate(response.data?.data || response.data);
+      setSheetNameDraft(label.trim());
     } catch { showToast('error', 'Failed to rename worksheet'); }
   };
 
@@ -898,7 +906,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
   const handleReorderColumn = async (columnId: string, direction: 'up' | 'down') => {
     const tid = selectedTemplateIdRef.current;
     if (!tid) return;
-    const sorted = [...templateColumns].sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0));
+    const sorted = [...sheetColumns].sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0));
     const idx = sorted.findIndex((c: any) => c.id === columnId);
     if (idx < 0) return;
     if (direction === 'up' && idx === 0) return;
@@ -919,7 +927,7 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
 
   const createBlankSampleRow = () => {
     const row: Record<string, any> = {};
-    [...templateColumns].sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0)).forEach((column: any) => {
+    [...sheetColumns].sort((a: any, b: any) => (a.columnOrder || 0) - (b.columnOrder || 0)).forEach((column: any) => {
       const dataType = String(column.dataType || '').toLowerCase();
       row[column.columnName] = dataType === 'number' || dataType === 'currency' ? 0 : dataType === 'boolean' ? false : dataType === 'date' ? new Date().toISOString().slice(0, 10) : '';
     });
@@ -1027,6 +1035,10 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
     setActiveSheetKey(templateSheets[0]?.key || 'main');
   }, [editTemplate?.id]);
 
+  useEffect(() => {
+    setSheetNameDraft(activeSheet?.label || activeSheet?.name || 'Main Return');
+  }, [activeSheet?.key]);
+
   return (
     <div>
       <div style={{ background: '#fff', border: '1px solid #94a3b8', borderRadius: 12, padding: 16, marginBottom: 16 }}>
@@ -1103,9 +1115,9 @@ function ReturnsTabWithTemplates({ profiles, templates, submissions, templateLoa
                    </div>
                  )}
                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
-                   {templateSheets.map((sheet: any) => <button key={sheet.key} onClick={() => setActiveSheetKey(sheet.key)} style={{ padding: '6px 10px', border: activeSheet?.key === sheet.key ? '2px solid #c2410c' : '1px solid #d1d5db', borderRadius: 6, background: activeSheet?.key === sheet.key ? '#fff7ed' : '#fff', color: '#374151', cursor: 'pointer', fontSize: 12, fontWeight: activeSheet?.key === sheet.key ? 700 : 500 }}>{sheet.label || sheet.name}</button>)}
-                   <button onClick={handleAddSheet} disabled={btnLoading['addSheet']} style={{ padding: '6px 10px', border: '1px dashed #ea6645', borderRadius: 6, background: '#fff', color: '#c2410c', cursor: btnLoading['addSheet'] ? 'not-allowed' : 'pointer', fontSize: 12 }}>+ Add Worksheet</button>
-                   {activeSheet && <input defaultValue={activeSheet.label || activeSheet.name} onBlur={e => handleRenameSheet(activeSheet, e.target.value)} aria-label="Worksheet name" style={{ minWidth: 150, padding: '5px 8px', border: '1px solid #d1d5db', borderRadius: 5, fontSize: 12 }} />}
+                    {templateSheets.map((sheet: any) => <button key={sheet.key} onClick={() => setActiveSheetKey(sheet.key)} style={{ padding: '6px 10px', border: activeSheet?.key === sheet.key ? '2px solid #c2410c' : '1px solid #d1d5db', borderRadius: 6, background: activeSheet?.key === sheet.key ? '#fff7ed' : '#fff', color: '#374151', cursor: 'pointer', fontSize: 12, fontWeight: activeSheet?.key === sheet.key ? 700 : 500 }}>{sheet.label || sheet.name}</button>)}
+                    <button onClick={handleAddSheet} disabled={btnLoading['addSheet']} style={{ padding: '6px 10px', border: '1px dashed #ea6645', borderRadius: 6, background: '#fff', color: '#c2410c', cursor: btnLoading['addSheet'] ? 'not-allowed' : 'pointer', fontSize: 12 }}>+ Add Worksheet</button>
+                    {activeSheet && <input key={activeSheet.key} value={sheetNameDraft} onChange={e => setSheetNameDraft(e.target.value)} onBlur={e => handleRenameSheet(activeSheet, e.target.value)} aria-label="Worksheet name" style={{ minWidth: 150, padding: '5px 8px', border: '1px solid #d1d5db', borderRadius: 5, fontSize: 12 }} />}
                  </div>
                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                    <span style={{ fontWeight: 600, fontSize: 14 }}>{activeSheet?.label || 'Worksheet'} Columns ({sheetColumns.length})</span>

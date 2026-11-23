@@ -32,13 +32,49 @@ export class StaffExcelService {
   constructor(private prisma: PrismaService) {}
 
   private getTemplateSheets(config: any, fallbackName: string) {
-    if (Array.isArray(config?.sheets) && config.sheets.length) return config.sheets;
+    if (Array.isArray(config?.sheets) && config.sheets.length) {
+      const usedNames = new Set<string>();
+      return config.sheets.map((sheet: any, index: number) => {
+        const isMain = index === 0;
+        const fallbackLabel = isMain ? (config?.sheetLabel || config?.sheetName || 'Main Return') : `Additional Return ${index}`;
+        let label = String(sheet?.label || sheet?.name || fallbackLabel).trim() || fallbackLabel;
+        if (!isMain && /^main return$/i.test(label)) label = `Additional Return ${index}`;
+        let name = String(sheet?.name || label).trim() || label;
+        if (!isMain && /^main return$/i.test(name)) name = label;
+        let uniqueName = name;
+        let suffix = 2;
+        while (usedNames.has(uniqueName.toLowerCase())) uniqueName = `${name} ${suffix++}`;
+        usedNames.add(uniqueName.toLowerCase());
+        const headerRow = Number(sheet?.headerRow || (isMain ? config?.headerRow || 4 : 1));
+        return { ...sheet, key: String(sheet?.key || (isMain ? 'main' : `sheet_${index}`)), name: uniqueName, label, headerRow, dataStartRow: Number(sheet?.dataStartRow || headerRow + 1), workbookAsset: sheet?.workbookAsset || config?.workbookAsset, inheritInstitutionHeader: sheet?.inheritInstitutionHeader !== false };
+      });
+    }
     const headerRow = Number(config?.headerRow || 4);
     return [{ key: 'main', name: config?.sheetName || fallbackName, label: config?.sheetLabel || config?.sheetName || 'Main Return', headerRow, dataStartRow: Number(config?.dataStartRow || headerRow + 1), workbookAsset: config?.workbookAsset, inheritInstitutionHeader: true }];
   }
 
   private columnsForSheet(columns: any[], sheetKey: string) {
     return columns.filter((column) => String((column.validationRules as any)?.sheetKey || 'main') === sheetKey && column.isVisible !== false).sort((a, b) => (a.columnOrder || 0) - (b.columnOrder || 0));
+  }
+
+  private isDateColumn(column: any) {
+    return String(column?.dataType || '').toLowerCase() === 'date' || /date|dob|appointment/i.test(String(column?.columnLabel || column?.columnName || ''));
+  }
+
+  private setColumnWidths(worksheet: ExcelJS.Worksheet, columns: any[], columnOffset: number, rows: any[] = []) {
+    columns.forEach((column: any, index: number) => {
+      const values = rows.map((rowData: any) => String((rowData?.values || rowData)?.[column.columnName] ?? ''));
+      const longest = Math.max(String(column.columnLabel || column.columnName || '').length, ...values.map((value) => value.length));
+      const minimum = this.isDateColumn(column) ? 16 : 14;
+      const width = Math.min(48, Math.max(minimum, Math.ceil(longest * 1.05) + 2));
+      worksheet.getColumn(index + columnOffset).width = Math.max(Number(worksheet.getColumn(index + columnOffset).width || 0), width);
+    });
+  }
+
+  private wrappedLineCount(value: any, width: number) {
+    const text = String(value ?? '');
+    if (!text) return 1;
+    return Math.max(1, text.split(/\r?\n/).reduce((total, line) => total + Math.ceil(line.length / Math.max(8, Math.floor(width * 1.1))), 0));
   }
 
   async generateInstitutionalReturnExcel(submissionId: string, schoolId: string, options: ExportOptions = {}): Promise<ExcelJS.Buffer> {
@@ -65,17 +101,22 @@ export class StaffExcelService {
       dataStartRow += this.schoolHeaderRows;
       this.writeSchoolHeader(worksheet, options, sheetConfig.label || submission.template.name, submission.period, sheetColumns.length);
       const columnOffset = this.resolveHeaderColumnOffset(worksheet, headerRow + this.schoolHeaderRows, sheetColumns);
+      this.setColumnWidths(worksheet, sheetColumns, columnOffset, rows);
       this.writeColumnHeaders(worksheet, headerRow + this.schoolHeaderRows, sheetColumns, columnOffset);
       worksheet.pageSetup.printTitlesRow = `1:${headerRow + this.schoolHeaderRows}`;
       rows.forEach((rowData: any, rowIndex: number) => {
         const row = rowData?.values || rowData;
         const target = worksheet.getRow(dataStartRow + rowIndex);
+        let maxLines = 1;
         sheetColumns.forEach((column: any, columnIndex: number) => {
           const value = row[column.columnName] ?? '';
           const cell = target.getCell(columnIndex + columnOffset);
-          cell.value = this.coerceExcelValue(value, column.dataType);
-          this.applyDateFormat(cell, column.dataType);
+          cell.value = this.coerceExcelValue(value, this.isDateColumn(column) ? 'date' : column.dataType);
+          this.applyDateFormat(cell, this.isDateColumn(column) ? 'date' : column.dataType);
+          cell.alignment = { ...(cell.alignment || {}), vertical: 'middle', wrapText: true, shrinkToFit: false };
+          maxLines = Math.max(maxLines, this.wrappedLineCount(value, Number(worksheet.getColumn(columnIndex + columnOffset).width || 14)));
         });
+        target.height = Math.min(180, Math.max(22, maxLines * 16));
       });
     }
     workbook.creator = options.generatedBy || 'SmartTech SaaS';
@@ -165,20 +206,24 @@ export class StaffExcelService {
         const worksheet = workbook.addWorksheet(sheetConfig.name || sheetConfig.key, { pageSetup: { orientation: 'landscape', fitToPage: true } });
         this.writeSchoolHeader(worksheet, options, sheetConfig.label || submission.template.name, submission.period, sheetColumns.length);
         const headerRow = this.schoolHeaderRows + 1;
+        this.setColumnWidths(worksheet, sheetColumns, 1, rows);
         this.writeColumnHeaders(worksheet, headerRow, sheetColumns, 1, { fontColor: 'FFFFFF', fillColor: '1A1A2E', defaultAlignment: 'left' });
         rows.forEach((rowData: any, rowIndex: number) => {
           const sourceRow = rowData?.values || rowData;
           const row = worksheet.getRow(headerRow + rowIndex + 1);
+          let maxLines = 1;
           sheetColumns.forEach((column: any, index: number) => {
             const cell = row.getCell(index + 1);
             const value = sourceRow[column.columnName] ?? '';
-            cell.value = this.coerceExcelValue(value, column.dataType);
-            this.applyDateFormat(cell, column.dataType);
-            cell.alignment = { vertical: 'middle', wrapText: true };
+            cell.value = this.coerceExcelValue(value, this.isDateColumn(column) ? 'date' : column.dataType);
+            this.applyDateFormat(cell, this.isDateColumn(column) ? 'date' : column.dataType);
+            cell.alignment = { vertical: 'middle', wrapText: true, shrinkToFit: false };
             cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+            maxLines = Math.max(maxLines, this.wrappedLineCount(value, Number(worksheet.getColumn(index + 1).width || 14)));
           });
+          row.height = Math.min(180, Math.max(22, maxLines * 16));
         });
-        sheetColumns.forEach((column: any, index: number) => { worksheet.getColumn(index + 1).width = column.width ? Math.max(column.width / 7, 10) : 18; });
+        this.setColumnWidths(worksheet, sheetColumns, 1, rows);
         worksheet.autoFilter = { from: { row: headerRow, column: 1 }, to: { row: headerRow + rows.length, column: sheetColumns.length } };
         worksheet.pageSetup.printTitlesRow = `1:${headerRow}`;
       }
@@ -201,6 +246,7 @@ export class StaffExcelService {
     );
 
     this.writeSchoolHeader(worksheet, options, submission.template.name, submission.period, columns.length);
+    this.setColumnWidths(worksheet, columns, 1, rows);
 
     // ── Column Headers ──
     const headerBgColor = '1A1A2E';
@@ -210,6 +256,7 @@ export class StaffExcelService {
     const columnHeaderRowIndex = this.schoolHeaderRows + 1;
     const headerRow = worksheet.getRow(columnHeaderRowIndex);
     headerRow.height = 32;
+    this.setColumnWidths(worksheet, columns, 1, rows);
     this.writeColumnHeaders(worksheet, columnHeaderRowIndex, columns, 1, {
       fontColor: whiteText,
       fillColor: headerBgColor,
@@ -226,14 +273,15 @@ export class StaffExcelService {
       columns.forEach((col, index) => {
         const cell = row.getCell(index + 1);
         const value = sourceRow[col.columnName] !== undefined ? sourceRow[col.columnName] : '';
-        cell.value = this.coerceExcelValue(value, col.dataType);
-        this.applyDateFormat(cell, col.dataType);
+        cell.value = this.coerceExcelValue(value, this.isDateColumn(col) ? 'date' : col.dataType);
+        this.applyDateFormat(cell, this.isDateColumn(col) ? 'date' : col.dataType);
 
         cell.font = { name: 'Calibri', size: 10, color: { argb: darkText } };
         cell.alignment = {
           horizontal: (col.alignment as any) || 'left',
           vertical: 'middle',
           wrapText: true,
+          shrinkToFit: false,
         };
         cell.border = {
           top: { style: 'thin' },
@@ -243,7 +291,7 @@ export class StaffExcelService {
         };
 
         const strVal = String(value || '');
-        const lines = Math.ceil(strVal.length / 30) || 1;
+        const lines = this.wrappedLineCount(strVal, Number(worksheet.getColumn(index + 1).width || 14));
         if (lines > maxLines) maxLines = lines;
       });
 
@@ -387,6 +435,7 @@ export class StaffExcelService {
       const columnHeaderRowIndex = this.schoolHeaderRows + 1;
       const headerRow = worksheet.getRow(columnHeaderRowIndex);
       headerRow.height = 30;
+      this.setColumnWidths(worksheet, sheetColumns, 1);
       this.writeColumnHeaders(worksheet, columnHeaderRowIndex, sheetColumns, 1, { fontColor: 'FFFFFF', fillColor: 'EA6645', defaultAlignment: 'center' });
       for (let i = 0; i < 50; i++) {
         const row = worksheet.getRow(columnHeaderRowIndex + 1 + i);
@@ -517,6 +566,7 @@ export class StaffExcelService {
         horizontal: (column.alignment as any) || options.defaultAlignment || 'center',
         vertical: 'middle',
         wrapText: true,
+        shrinkToFit: false,
       };
       cell.border = {
         top: { style: 'thin' },
