@@ -161,11 +161,16 @@ export class StaffTemplateService {
     const school = schoolRecord ? normalizeStaffReturnSchool(schoolRecord) : schoolRecord;
     if (!school) throw new NotFoundException('School profile not found');
     const staffType = config.staffType || 'TEACHING';
+    const hasAdditionalReturn = Array.isArray(config.sheets) && config.sheets.some((sheet: any, index: number) => index > 0 || String(sheet?.key || '') !== 'main');
     await this.ensureStaffProfilesFromTeachers(data.schoolId);
     const profiles = await this.prisma.staffHrProfile.findMany({
       where: {
         schoolId: data.schoolId,
-        ...(staffType === 'NON_TEACHING' ? { employmentType: 'NON_TEACHING' } : { employmentType: { not: 'NON_TEACHING' } }),
+        ...(staffType === 'NON_TEACHING'
+          ? { employmentType: 'NON_TEACHING' }
+          : hasAdditionalReturn || config.includeNonTeachingStaff === true
+            ? {}
+            : { employmentType: { not: 'NON_TEACHING' } }),
         employmentStatus: { notIn: ['INACTIVE', 'TERMINATED', 'TRANSFERRED', 'RETIRED', 'RESIGNED'] },
       },
       include: { qualifications: true, positions: true }, orderBy: { teacherName: 'asc' },
@@ -223,7 +228,7 @@ export class StaffTemplateService {
         'staff.dateOfBirth': profile.dateOfBirth, 'staff.gender': profile.gender, 'staff.firstAppointmentDate': profile.dateOfFirstAppointment,
         'staff.currentPostAppointmentDate': profile.dateOfPresentAppointment, 'staff.maritalStatus': profile.maritalStatus,
         'staff.differentlyAbled': profile.dynamicFields?.differentlyAbled, 'staff.nationality': profile.nationality,
-        'staff.substantivePosition': profile.substantivePosition, 'staff.currentPosition': profile.currentPosition || profile.actingPosition,
+        'staff.substantivePosition': profile.substantivePosition, 'staff.substantiveScale': profile.substantiveScale, 'staff.payrollPoint': profile.payrollPoint, 'staff.currentPosition': profile.currentPosition || profile.actingPosition,
         'staff.highestLevelOfEducation': profile.academicQualification, 'staff.highestTeacherQualification': profile.professionalQualification || profile.qualifications?.[0]?.qualificationName,
         'staff.additionalResponsibilities': profile.administration, 'staff.inServiceTraining': profile.dynamicFields?.inServiceTraining,
         'staff.employmentStatus': profile.employmentStatus, 'staff.mainGradeTaught': assignedGrades.length ? assignedGrades.join(', ') : profile.gradeLevel,
@@ -808,7 +813,7 @@ export class StaffTemplateService {
     if (!profile) throw new NotFoundException('Canonical staff profile not found');
     const directFields: Record<string, string> = {
       'staff.nrcNumber': 'nrcNumber', 'staff.manTsNumber': 'tsNumber', 'staff.employeeNumber': 'employeeNumber', 'staff.gender': 'gender',
-      'staff.maritalStatus': 'maritalStatus', 'staff.nationality': 'nationality', 'staff.substantivePosition': 'substantivePosition',
+      'staff.maritalStatus': 'maritalStatus', 'staff.nationality': 'nationality', 'staff.substantivePosition': 'substantivePosition', 'staff.substantiveScale': 'substantiveScale', 'staff.payrollPoint': 'payrollPoint',
       'staff.currentPosition': 'currentPosition', 'staff.highestLevelOfEducation': 'academicQualification', 'staff.highestAcademicQualification': 'academicQualification',
       'staff.highestTeacherQualification': 'professionalQualification', 'staff.employmentStatus': 'employmentStatus', 'staff.mainGradeTaught': 'gradeLevel',
       'staff.dateOfBirth': 'dateOfBirth', 'staff.firstAppointmentDate': 'dateOfFirstAppointment', 'staff.currentPostAppointmentDate': 'dateOfPresentAppointment', 'staff.phoneNumber': 'phoneNumber', 'staff.emailAddress': 'emailAddress',
@@ -853,7 +858,7 @@ export class StaffTemplateService {
     const directFields: Record<string, string> = {
       'staff.nrcNumber': 'nrcNumber', 'staff.manTsNumber': 'tsNumber', 'staff.employeeNumber': 'employeeNumber',
       'staff.gender': 'gender', 'staff.maritalStatus': 'maritalStatus', 'staff.nationality': 'nationality',
-      'staff.substantivePosition': 'substantivePosition', 'staff.currentPosition': 'currentPosition',
+      'staff.substantivePosition': 'substantivePosition', 'staff.substantiveScale': 'substantiveScale', 'staff.payrollPoint': 'payrollPoint', 'staff.currentPosition': 'currentPosition',
       'staff.highestLevelOfEducation': 'academicQualification', 'staff.highestAcademicQualification': 'academicQualification',
       'staff.highestTeacherQualification': 'professionalQualification', 'staff.employmentStatus': 'employmentStatus',
       'staff.mainGradeTaught': 'gradeLevel', 'staff.dateOfBirth': 'dateOfBirth',

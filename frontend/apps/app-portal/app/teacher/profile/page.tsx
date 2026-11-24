@@ -31,6 +31,7 @@ const ADVANCED_FIELDS = [
   { key: 'phoneNumber', label: 'Staff Return Phone' },
   { key: 'substantivePosition', label: 'Substantive Position', category: 'POSITION' },
   { key: 'substantiveScale', label: 'Substantive Scale' },
+  { key: 'payrollPoint', label: 'District Payroll Point' },
   { key: 'currentPosition', label: 'Current Position', category: 'POSITION' },
   { key: 'actingPosition', label: 'Acting Position', category: 'POSITION' },
   { key: 'administration', label: 'Additional Responsibility', category: 'ADDITIONAL_RESPONSIBILITY' },

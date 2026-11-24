@@ -26,6 +26,9 @@ describe('StaffRecordsService advanced staff profile saves', () => {
       teacher: { findFirst: jest.fn().mockResolvedValue({ id: 'teacher-1' }) },
       staffHrProfile: { findUnique: jest.fn().mockResolvedValue(profile) },
       staffReturnSubmission: { findMany: jest.fn().mockResolvedValue([submission]) },
+      staffReturnTemplate: { findMany: jest.fn().mockResolvedValue([]) },
+      schoolUser: { findFirst: jest.fn().mockResolvedValue(null) },
+      userRole: { findMany: jest.fn().mockResolvedValue([]) },
       staffAuditLog: { create: jest.fn().mockResolvedValue({ id: 'audit-1' }) },
       $transaction: jest.fn(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx)),
     };
@@ -57,6 +60,9 @@ describe('StaffRecordsService advanced staff profile saves', () => {
       teacher: { findFirst: jest.fn().mockResolvedValue({ id: 'teacher-1' }) },
       staffHrProfile: { findUnique: jest.fn().mockResolvedValue(profile) },
       staffReturnSubmission: { findMany: jest.fn().mockResolvedValue([submission]) },
+      staffReturnTemplate: { findMany: jest.fn().mockResolvedValue([]) },
+      schoolUser: { findFirst: jest.fn().mockResolvedValue(null) },
+      userRole: { findMany: jest.fn().mockResolvedValue([]) },
       staffAuditLog: { create: jest.fn().mockRejectedValue(new Error('audit database unavailable')) },
       $transaction: jest.fn(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx)),
     };
@@ -66,5 +72,43 @@ describe('StaffRecordsService advanced staff profile saves', () => {
       editable: true,
       syncedDraftReturns: 1,
     });
+  });
+
+  it('uses a Main Return value for the same field on Additional Return 1', async () => {
+    const profile = {
+      id: 'profile-1',
+      staffId: 'teacher-1',
+      teacherName: 'Test Teacher',
+      dynamicFields: {},
+      substantiveScale: null,
+    };
+    const submission = {
+      id: 'submission-1',
+      period: '2026',
+      data: [{ staffId: 'teacher-1', values: { mainScale: 'S2', additionalScale: '' } }],
+      template: {
+        name: 'Main Staff Return',
+        config: { sheets: [{ key: 'main', label: 'Main Return' }, { key: 'sheet_1', label: 'Additional Return 1' }] },
+        columns: [
+          { columnName: 'mainScale', columnLabel: 'Substantive Scale', validationRules: { sheetKey: 'main' } },
+          { columnName: 'additionalScale', columnLabel: 'Substantive Scale', validationRules: { sheetKey: 'sheet_1' } },
+        ],
+      },
+    };
+    const prisma = {
+      teacher: { findFirst: jest.fn().mockResolvedValue({ id: 'teacher-1', staffType: 'TEACHING' }) },
+      staffHrProfile: { findFirst: jest.fn().mockResolvedValue(profile) },
+      staffReturnSubmission: { findMany: jest.fn().mockResolvedValue([submission]) },
+      staffReturnTemplate: { findMany: jest.fn().mockResolvedValue([]) },
+      schoolUser: { findFirst: jest.fn().mockResolvedValue(null) },
+      userRole: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const service = new StaffRecordsService(prisma as any, {} as any);
+
+    const result = await service.getMyAdvancedProfile('user-1', 'school-1');
+    const fields = result.draftReturns[0].fields;
+
+    expect(fields[0].value).toBe('S2');
+    expect(fields[1].value).toBe('S2');
   });
 });

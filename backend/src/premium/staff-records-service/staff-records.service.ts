@@ -138,7 +138,8 @@ export class StaffRecordsService {
     }
     if (!profile) throw new NotFoundException('Advanced Staff Profile is not available');
 
-    const draftReturns = await this.findDraftReturnsForStaff(staffId, schoolId);
+    const currentReturns = await this.findCurrentReturnsForStaff(staffId, schoolId);
+    const draftReturns = currentReturns.filter((submission: any) => submission.status === 'DRAFT');
     const profileRoles = await this.getProfileRoles(userId, schoolId, roles);
     const unlocked = this.canEditWithoutDraftReturn(profileRoles, staff.staffType);
     const editable = unlocked || draftReturns.length > 0;
@@ -146,8 +147,9 @@ export class StaffRecordsService {
     return {
       profile,
       editable,
-      draftReturns: draftReturns.map((submission: any) => {
+      draftReturns: currentReturns.map((submission: any) => {
         const row = ((submission.data as any[]) || []).find((candidate) => candidate.staffId === staffId);
+        const returnValues = this.returnValuesBySource(submission.template.columns, row?.values || {});
         return {
           id: submission.id,
           name: submission.template.name,
@@ -164,7 +166,7 @@ export class StaffRecordsService {
             sourceKey: resolveCanonicalFieldKey(column),
             value: row?.values?.[column.columnName] !== undefined && row?.values?.[column.columnName] !== null && row?.values?.[column.columnName] !== ''
               ? row.values[column.columnName]
-              : canonicalValues[resolveCanonicalFieldKey(column)] ?? '',
+              : returnValues[resolveCanonicalFieldKey(column)] ?? canonicalValues[resolveCanonicalFieldKey(column)] ?? '',
           })),
         };
       }),
@@ -183,7 +185,9 @@ export class StaffRecordsService {
     const profile = await this.prisma.staffHrProfile.findFirst({ where: { staffId, schoolId } });
     if (!profile) throw new NotFoundException('Advanced Staff Profile is not available');
 
-    const draftReturns = await this.findDraftReturnsForStaff(staffId, schoolId);
+    const currentReturns = await this.findCurrentReturnsForStaff(staffId, schoolId);
+    const draftReturns = currentReturns.filter((submission: any) => submission.status === 'DRAFT');
+    const editableReturns = currentReturns.filter((submission: any) => submission.status === 'DRAFT' || submission.status === 'TEMPLATE');
     const profileRoles = await this.getProfileRoles(userId, schoolId, roles);
     if (!draftReturns.length && !this.canEditWithoutDraftReturn(profileRoles, staff.staffType)) {
       throw new BadRequestException('This Advanced Staff Profile is locked. A new DRAFT Staff Return must be compiled before you can make updates.');
@@ -191,7 +195,7 @@ export class StaffRecordsService {
 
     const allowed = new Set([
       'gender', 'dateOfBirth', 'maritalStatus', 'nrcNumber', 'tsNumber', 'aesNumber',
-      'substantivePosition', 'substantiveScale', 'actingPosition', 'administration', 'actingType',
+      'substantivePosition', 'substantiveScale', 'payrollPoint', 'actingPosition', 'administration', 'actingType',
       'dateOfFirstAppointment', 'dateOfPresentAppointment', 'dateOfActingAppointment', 'confirmed',
       'expectedConfirmationDate', 'academicQualification', 'professionalQualification', 'yearOfQualification',
       'specialization', 'nationality', 'emailAddress', 'phoneNumber', 'currentPosition', 'gradeLevel',
@@ -204,7 +208,7 @@ export class StaffRecordsService {
     const dynamicFields = { ...((safeData.dynamicFields as any) || (profile.dynamicFields as any) || {}) };
     const returnFields = (safeData.returnFields || {}) as Record<string, any>;
     const returnColumns = new Map<string, any>();
-    for (const submission of draftReturns) for (const column of submission.template.columns) returnColumns.set(column.columnName, column);
+    for (const submission of editableReturns) for (const column of submission.template.columns) returnColumns.set(column.columnName, column);
     let firstName: any;
     let surname: any;
     for (const [columnName, value] of Object.entries(returnFields)) {
@@ -226,24 +230,47 @@ export class StaffRecordsService {
     const updated = await this.prisma.$transaction(async (tx) => {
       const updatedProfile = await tx.staffHrProfile.update({ where: { id: profile.id }, data: profileData });
 
-      for (const submission of draftReturns) {
+      for (const submission of editableReturns) {
         const rows = ((submission.data as any[]) || []).map((candidate) => ({ ...candidate }));
-        const row = rows.find((candidate) => candidate.staffId === staffId);
-        if (!row) continue;
+        const row = rows.find((candidate) => candidate.staffId === staffId) || {
+          staffId,
+          staffName: profile.teacherName || 'Staff member',
+          values: {},
+          missing: [],
+          status: 'INCOMPLETE',
+        };
+        if (!rows.includes(row)) rows.push(row);
         const columns = (submission.template.columns || []).filter((column: any) => column.isEditable !== false);
         for (const column of columns) {
-          if (Object.prototype.hasOwnProperty.call(canonical, column.columnName)) {
-            row.values = { ...(row.values || {}), [column.columnName]: canonical[column.columnName] ?? '' };
-          }
+          const sourceKey = resolveCanonicalFieldKey(column);
+          const hasColumnValue = Object.prototype.hasOwnProperty.call(canonical, column.columnName);
+          const hasSourceValue = Object.prototype.hasOwnProperty.call(canonical, sourceKey);
+          if (hasColumnValue || hasSourceValue) row.values = { ...(row.values || {}), [column.columnName]: canonical[hasColumnValue ? column.columnName : sourceKey] ?? '' };
         }
         row.missing = (submission.template.columns || [])
           .filter((column: any) => column.isRequired && (row.values?.[column.columnName] === null || row.values?.[column.columnName] === undefined || row.values?.[column.columnName] === ''))
           .map((column: any) => ({ key: column.columnName, label: column.columnLabel }));
         row.status = row.missing.length ? 'INCOMPLETE' : 'COMPLETE';
-        await tx.staffReturnSubmission.update({
-          where: { id: submission.id },
-          data: { data: rows as any, snapshot: { ...((submission.snapshot as any) || {}), rows } as any, status: 'DRAFT' },
-        });
+        if (submission.status === 'TEMPLATE') {
+          const created = await tx.staffReturnSubmission.create({
+            data: {
+              templateId: submission.templateId,
+              schoolId,
+              period: submission.period,
+              academicYear: submission.period,
+              status: 'DRAFT',
+              data: rows as any,
+              snapshot: { rows } as any,
+              templateVersion: submission.template.version,
+            },
+          });
+          submission.id = created.id;
+        } else {
+          await tx.staffReturnSubmission.update({
+            where: { id: submission.id },
+            data: { data: rows as any, snapshot: { ...((submission.snapshot as any) || {}), rows } as any, status: 'DRAFT' },
+          });
+        }
       }
 
       const subjectValues = ['subjectBeingTaughtA', 'subjectBeingTaughtB', 'subjectQualifiedToTeachA', 'subjectQualifiedToTeachB']
@@ -315,13 +342,44 @@ export class StaffRecordsService {
     return Array.from(roleNames);
   }
 
-  private async findDraftReturnsForStaff(staffId: string, schoolId: string) {
-    const submissions = await this.prisma.staffReturnSubmission.findMany({
-      where: { schoolId, status: 'DRAFT' },
-       include: { template: { select: { id: true, name: true, config: true, columns: true } } },
-      orderBy: { updatedAt: 'desc' },
-    });
-    return submissions.filter((submission: any) => ((submission.data as any[]) || []).some((row) => row.staffId === staffId));
+  private async findCurrentReturnsForStaff(staffId: string, schoolId: string) {
+    const [submissions, templates] = await Promise.all([
+      this.prisma.staffReturnSubmission.findMany({
+        where: { schoolId, status: { notIn: ['ARCHIVED'] } },
+        include: { template: { select: { id: true, name: true, config: true, columns: true, version: true } } },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      this.prisma.staffReturnTemplate.findMany({
+        where: { schoolId, isActive: true },
+        include: { columns: { orderBy: { columnOrder: 'asc' } } },
+        orderBy: { updatedAt: 'desc' },
+      }),
+    ]);
+    const current = new Map<string, any>();
+    const representedTemplates = new Set<string>();
+    for (const submission of submissions) {
+      const hasStaffRow = ((submission.data as any[]) || []).some((row) => row.staffId === staffId);
+      if (!hasStaffRow && submission.status !== 'DRAFT') continue;
+      const key = `${submission.templateId}:${submission.period || ''}`;
+      if (!current.has(key)) {
+        current.set(key, submission);
+        representedTemplates.add(submission.templateId);
+      }
+    }
+    const period = String(new Date().getFullYear());
+    for (const template of templates) {
+      if (representedTemplates.has(template.id)) continue;
+      current.set(`${template.id}:${period}`, {
+        id: null,
+        templateId: template.id,
+        period,
+        status: 'TEMPLATE',
+        data: [],
+        snapshot: {},
+        template,
+      });
+    }
+    return Array.from(current.values());
   }
 
   private profileToReturnValues(profile: any): Record<string, any> {
@@ -334,12 +392,24 @@ export class StaffRecordsService {
       'staff.nrcNumber': profile.nrcNumber, 'staff.manTsNumber': profile.tsNumber, 'staff.employeeNumber': profile.employeeNumber,
       'staff.dateOfBirth': profile.dateOfBirth, 'staff.gender': profile.gender, 'staff.firstAppointmentDate': profile.dateOfFirstAppointment,
       'staff.currentPostAppointmentDate': profile.dateOfPresentAppointment, 'staff.maritalStatus': profile.maritalStatus,
-      'staff.nationality': profile.nationality, 'staff.emailAddress': profile.emailAddress, 'staff.substantivePosition': profile.substantivePosition,
+      'staff.nationality': profile.nationality, 'staff.emailAddress': profile.emailAddress, 'staff.substantivePosition': profile.substantivePosition, 'staff.substantiveScale': profile.substantiveScale, 'staff.payrollPoint': profile.payrollPoint,
       'staff.currentPosition': profile.currentPosition || profile.actingPosition, 'staff.highestLevelOfEducation': profile.academicQualification,
       'staff.highestTeacherQualification': profile.professionalQualification, 'staff.additionalResponsibilities': profile.administration,
       'staff.employmentStatus': profile.employmentStatus, 'staff.mainGradeTaught': profile.gradeLevel, 'staff.phoneNumber': profile.phoneNumber,
     };
     for (const [key, value] of Object.entries(dynamicFields)) values[`staff.${key.replace(/^staff\./, '')}`] = value;
+    return values;
+  }
+
+  private returnValuesBySource(columns: any[], rowValues: Record<string, any>) {
+    const values: Record<string, any> = {};
+    for (const column of columns || []) {
+      const value = rowValues[column.columnName];
+      if (value === undefined || value === null || value === '') continue;
+      const sourceKey = resolveCanonicalFieldKey(column);
+      const sheetKey = (column.validationRules as any)?.sheetKey || 'main';
+      if (sheetKey === 'main' || values[sourceKey] === undefined) values[sourceKey] = value;
+    }
     return values;
   }
 
@@ -357,6 +427,8 @@ export class StaffRecordsService {
       'staff.nrcNumber': 'nrcNumber', 'staff.manTsNumber': 'tsNumber', 'staff.employeeNumber': 'employeeNumber',
       'staff.gender': 'gender', 'staff.maritalStatus': 'maritalStatus', 'staff.nationality': 'nationality',
       'staff.emailAddress': 'emailAddress', 'staff.phoneNumber': 'phoneNumber', 'staff.substantivePosition': 'substantivePosition',
+      'staff.substantiveScale': 'substantiveScale',
+      'staff.payrollPoint': 'payrollPoint',
       'staff.currentPosition': 'currentPosition', 'staff.highestLevelOfEducation': 'academicQualification',
       'staff.highestAcademicQualification': 'academicQualification', 'staff.highestTeacherQualification': 'professionalQualification',
       'staff.employmentStatus': 'employmentStatus', 'staff.mainGradeTaught': 'gradeLevel',

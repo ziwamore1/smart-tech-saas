@@ -39,18 +39,22 @@ export class StaffExcelService {
         const fallbackLabel = isMain ? (config?.sheetLabel || config?.sheetName || 'Main Return') : `Additional Return ${index}`;
         let label = String(sheet?.label || sheet?.name || fallbackLabel).trim() || fallbackLabel;
         if (!isMain && /^main return$/i.test(label)) label = `Additional Return ${index}`;
-        let name = String(sheet?.name || label).trim() || label;
+        let name = this.sanitizeWorksheetName(String(sheet?.name || label).trim() || label);
         if (!isMain && /^main return$/i.test(name)) name = label;
         let uniqueName = name;
         let suffix = 2;
-        while (usedNames.has(uniqueName.toLowerCase())) uniqueName = `${name} ${suffix++}`;
+        while (usedNames.has(uniqueName.toLowerCase())) uniqueName = this.sanitizeWorksheetName(`${name} ${suffix++}`);
         usedNames.add(uniqueName.toLowerCase());
         const headerRow = Number(sheet?.headerRow || (isMain ? config?.headerRow || 4 : 1));
         return { ...sheet, key: String(sheet?.key || (isMain ? 'main' : `sheet_${index}`)), name: uniqueName, label, headerRow, dataStartRow: Number(sheet?.dataStartRow || headerRow + 1), workbookAsset: sheet?.workbookAsset || config?.workbookAsset, inheritInstitutionHeader: sheet?.inheritInstitutionHeader !== false };
       });
     }
     const headerRow = Number(config?.headerRow || 4);
-    return [{ key: 'main', name: config?.sheetName || fallbackName, label: config?.sheetLabel || config?.sheetName || 'Main Return', headerRow, dataStartRow: Number(config?.dataStartRow || headerRow + 1), workbookAsset: config?.workbookAsset, inheritInstitutionHeader: true }];
+    return [{ key: 'main', name: this.sanitizeWorksheetName(config?.sheetName || fallbackName), label: config?.sheetLabel || config?.sheetName || 'Main Return', headerRow, dataStartRow: Number(config?.dataStartRow || headerRow + 1), workbookAsset: config?.workbookAsset, inheritInstitutionHeader: true }];
+  }
+
+  private sanitizeWorksheetName(value: string) {
+    return String(value || 'Staff Return').replace(/[\\/*?:\[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 31) || 'Staff Return';
   }
 
   private columnsForSheet(columns: any[], sheetKey: string) {
@@ -103,7 +107,7 @@ export class StaffExcelService {
       const columnOffset = this.resolveHeaderColumnOffset(worksheet, headerRow + this.schoolHeaderRows, sheetColumns);
       this.setColumnWidths(worksheet, sheetColumns, columnOffset, rows);
       this.writeColumnHeaders(worksheet, headerRow + this.schoolHeaderRows, sheetColumns, columnOffset);
-      worksheet.pageSetup.printTitlesRow = `1:${headerRow + this.schoolHeaderRows}`;
+      this.configurePrintableWorksheet(worksheet, headerRow + this.schoolHeaderRows, dataStartRow + rows.length - 1, columnOffset, columnOffset + sheetColumns.length - 1);
       rows.forEach((rowData: any, rowIndex: number) => {
         const row = rowData?.values || rowData;
         const target = worksheet.getRow(dataStartRow + rowIndex);
@@ -225,7 +229,7 @@ export class StaffExcelService {
         });
         this.setColumnWidths(worksheet, sheetColumns, 1, rows);
         worksheet.autoFilter = { from: { row: headerRow, column: 1 }, to: { row: headerRow + rows.length, column: sheetColumns.length } };
-        worksheet.pageSetup.printTitlesRow = `1:${headerRow}`;
+        this.configurePrintableWorksheet(worksheet, headerRow, headerRow + rows.length, 1, sheetColumns.length);
       }
       const buffer = await workbook.xlsx.writeBuffer();
       await this.prisma.staffReturnSubmission.update({ where: { id: submissionId }, data: { status: submission.status === 'APPROVED' ? 'APPROVED' : 'EXPORTED', generatedBy: options.generatedBy, generatedAt: new Date() } });
@@ -311,7 +315,7 @@ export class StaffExcelService {
     // ── Set column widths ──
     columns.forEach((col, index) => {
       const width = col.width ? Math.max(col.width / 7, 10) : 18;
-      worksheet.getColumn(index + 1).width = width;
+      worksheet.getColumn(index + 1).width = Math.max(Number(worksheet.getColumn(index + 1).width || 0), width);
     });
 
     // ── Auto-filter ──
@@ -325,11 +329,7 @@ export class StaffExcelService {
     }
 
     // ── Print settings ──
-    worksheet.pageSetup.printTitlesRow = `1:${columnHeaderRowIndex}`;
-    worksheet.pageSetup.paperSize = 9; // A4
-    worksheet.pageSetup.orientation = 'landscape';
-    worksheet.pageSetup.fitToPage = true;
-    worksheet.pageSetup.fitToWidth = 1;
+    this.configurePrintableWorksheet(worksheet, columnHeaderRowIndex, columnHeaderRowIndex + rows.length, 1, columns.length);
 
     return await workbook.xlsx.writeBuffer();
   }
@@ -401,10 +401,7 @@ export class StaffExcelService {
       worksheet.getColumn(i).width = [18, 28, 10, 24, 12, 12, 16, 28][i - 1] || 18;
     }
 
-    worksheet.pageSetup.orientation = 'landscape';
-    worksheet.pageSetup.fitToPage = true;
-    worksheet.pageSetup.fitToWidth = 1;
-    worksheet.pageSetup.printTitlesRow = `1:${columnHeaderRowIndex}`;
+    this.configurePrintableWorksheet(worksheet, columnHeaderRowIndex, columnHeaderRowIndex + profiles.length, 1, headers.length);
 
     return await workbook.xlsx.writeBuffer();
   }
@@ -447,9 +444,11 @@ export class StaffExcelService {
         }
         row.height = 20;
       }
-      sheetColumns.forEach((col, index) => { worksheet.getColumn(index + 1).width = col.width ? Math.max(col.width / 7, 12) : 20; });
-      worksheet.pageSetup.orientation = 'landscape';
-      worksheet.pageSetup.printTitlesRow = `1:${columnHeaderRowIndex}`;
+      sheetColumns.forEach((col, index) => {
+        const width = col.width ? Math.max(col.width / 7, 12) : 20;
+        worksheet.getColumn(index + 1).width = Math.max(Number(worksheet.getColumn(index + 1).width || 0), width);
+      });
+      this.configurePrintableWorksheet(worksheet, columnHeaderRowIndex, columnHeaderRowIndex + 50, 1, sheetColumns.length);
     }
     return await workbook.xlsx.writeBuffer();
   }
@@ -583,14 +582,41 @@ export class StaffExcelService {
     return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
   }
 
+  private configurePrintableWorksheet(worksheet: ExcelJS.Worksheet, headerRow: number, lastRow: number, firstColumn: number, lastColumn: number) {
+    worksheet.pageSetup = {
+      ...(worksheet.pageSetup || {}),
+      paperSize: 9,
+      orientation: 'landscape',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: { left: 0.25, right: 0.25, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 },
+    };
+    worksheet.pageSetup.printTitlesRow = `1:${Math.max(1, headerRow)}`;
+    worksheet.views = [{ state: 'normal', showGridLines: false }];
+    if (firstColumn > 0 && lastColumn >= firstColumn) worksheet.pageSetup.printArea = `${this.excelColumnName(firstColumn)}1:${this.excelColumnName(lastColumn)}${Math.max(headerRow, lastRow)}`;
+  }
+
+  private excelColumnName(column: number) {
+    let value = Math.max(1, Math.floor(column));
+    let name = '';
+    while (value > 0) {
+      const remainder = (value - 1) % 26;
+      name = String.fromCharCode(65 + remainder) + name;
+      value = Math.floor((value - 1) / 26);
+    }
+    return name;
+  }
+
   private shiftWorksheetValidations(workbook: ExcelJS.Workbook, worksheet: ExcelJS.Worksheet, rowsInserted: number) {
     workbook.definedNames.spliceRows(worksheet.name, 1, 0, rowsInserted);
     Object.values(worksheet.tables).forEach((table: any) => {
       const tableRef = table.model?.tableRef;
       if (!tableRef) return;
-      table.model.tableRef = tableRef.replace(/^(\$?[A-Z]{1,3}\$?)?(\d+):(\$?[A-Z]{1,3}\$?)(\d+)$/, (_match: string, startColumn = '', startRow: string, endColumn: string, endRow: string) =>
-        `${startColumn}${Number(startRow) + rowsInserted}:${endColumn}${Number(endRow) + rowsInserted}`,
-      );
+      const shiftRef = (reference: string) => reference.replace(/^(\$?[A-Z]{1,3}\$?)?(\d+):(\$?[A-Z]{1,3}\$?)(\d+)$/, (_match: string, startColumn = '', startRow: string, endColumn: string, endRow: string) =>
+        `${startColumn}${Number(startRow) + rowsInserted}:${endColumn}${Number(endRow) + rowsInserted}`);
+      table.model.tableRef = shiftRef(tableRef);
+      if (table.model.autoFilter?.ref) table.model.autoFilter.ref = shiftRef(table.model.autoFilter.ref);
     });
     const existing = worksheet.dataValidations.model as Record<string, any>;
     const shifted: Record<string, any> = {};
