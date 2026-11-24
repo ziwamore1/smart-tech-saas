@@ -7,6 +7,7 @@ const STAFF_ROLES = [
   'HOD',
   'Accountant',
   'Secretary',
+  'Non-Teaching Staff',
   'Teacher',
   'Class Teacher',
   'Lower Primary Senior Teacher',

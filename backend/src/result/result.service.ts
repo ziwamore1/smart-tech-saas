@@ -960,28 +960,42 @@ export class ResultService {
       });
       const enrollmentCountMap = new Map(enrollmentCounts.map(e => [e.classId, e._count.id]));
 
-      // Batch-fetch existing sheets
-      const existingSheets = await this.prisma.resultSheet.findMany({
-        where: { classId: { in: classIds }, termId: firstTermId, schoolId, examType: normalizedExamType },
-        select: { classId: true, id: true },
+      // Recompute entered students instead of incrementing per score: a student
+      // with several subjects must only count once, and re-saving must not
+      // inflate the sheet above its enrolled size.
+      const enteredRows = await this.prisma.computedResult.findMany({
+        where: {
+          classId: { in: classIds },
+          termId: firstTermId,
+          examType: normalizedExamType,
+          student: { status: 'ACTIVE' },
+          OR: [{ finalPercentage: { not: null } }, { isAbsent: true }],
+        },
+        select: { classId: true, studentId: true },
+        distinct: ['classId', 'studentId'],
       });
-      const sheetMap = new Map(existingSheets.map(s => [s.classId, s]));
+      const enteredCountMap = new Map<string, number>();
+      for (const row of enteredRows) {
+        if (!row.classId) continue;
+        enteredCountMap.set(row.classId, (enteredCountMap.get(row.classId) || 0) + 1);
+      }
 
       for (const classId of classIds) {
         const enrolled = enrollmentCountMap.get(classId) || 0;
-        const entered = created.filter(r => enrollmentMap.get(r.studentId) === classId).length;
+        const entered = enteredCountMap.get(classId) || 0;
         const sheetInfo = await this.ensureSheet(schoolId, classId, firstTermId, academicYearId, teacherId, normalizedExamType);
         if (sheetInfo.justCreated) {
           await this.prisma.resultSheet.updateMany({
             where: { classId, termId: firstTermId, schoolId, examType: normalizedExamType },
-            data: { totalStudents: enrolled },
+            data: { totalStudents: enrolled, enteredCount: entered },
           });
         } else {
           await this.prisma.resultSheet.updateMany({
             where: { classId, termId: firstTermId, schoolId, examType: normalizedExamType },
-            data: { totalStudents: enrolled, enteredCount: { increment: entered } },
+            data: { totalStudents: enrolled, enteredCount: entered },
           });
         }
+
         await this.autoSubmitSheet(schoolId, classId, firstTermId, teacherId, normalizedExamType);
       }
 

@@ -14,6 +14,7 @@ export type UserRole =
   | 'Deputy Head'
   | 'Accountant'
   | 'Secretary'
+  | 'Non-Teaching Staff'
   | 'Teacher'
   | 'Class Teacher'
   | 'HOD'

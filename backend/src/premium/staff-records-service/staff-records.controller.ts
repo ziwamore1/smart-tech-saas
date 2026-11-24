@@ -16,6 +16,7 @@ export const STAFF_SELF_ROLES = [
   'Head Teacher', 'Deputy Head', 'Deputy Head Teacher', 'Deputy', 'Deputy Director',
   'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Senior Teacher',
   'Lecturer', 'Research Supervisor',
+  'Accountant', 'Secretary', 'Non-Teaching Staff', 'Non Teaching Staff', 'NON_TEACHING',
 ];
 
 @Controller('premium/staff-records')
@@ -29,6 +30,10 @@ export class StaffRecordsController {
     private readonly staffExcelService: StaffExcelService,
   ) {}
 
+  private selfProfileRoles(req: any): string[] {
+    return [...(req.user?.roles || []), ...(req.user?.schoolRoles || [])];
+  }
+
   // ══════════════════════════════════════════
   // HR PROFILES
   // ══════════════════════════════════════════
@@ -36,13 +41,22 @@ export class StaffRecordsController {
   @Get('my-advanced-profile')
   @Roles(...STAFF_SELF_ROLES)
   getMyAdvancedProfile(@Req() req: any) {
-    return this.staffRecordsService.getMyAdvancedProfile(req.user?.sub || req.user?.id, req.user.schoolId);
+    return this.staffRecordsService.getMyAdvancedProfile(
+      req.user?.sub || req.user?.id,
+      req.user.schoolId,
+      this.selfProfileRoles(req),
+    );
   }
 
   @Put('my-advanced-profile')
   @Roles(...STAFF_SELF_ROLES)
   updateMyAdvancedProfile(@Req() req: any, @Body() body: any) {
-    return this.staffRecordsService.updateMyAdvancedProfile(req.user?.sub || req.user?.id, req.user.schoolId, body);
+    return this.staffRecordsService.updateMyAdvancedProfile(
+      req.user?.sub || req.user?.id,
+      req.user.schoolId,
+      body,
+      this.selfProfileRoles(req),
+    );
   }
 
   @Get('my-advanced-profile/lookups')

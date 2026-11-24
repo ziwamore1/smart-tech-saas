@@ -29,6 +29,39 @@ export const PERMISSIONS = {
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
+const PUBLIC_DATA_PERMISSIONS: Permission[] = [PERMISSIONS.CALENDAR_VIEW];
+
+const PUBLIC_ONLY_ROLES = new Set([
+  'ACCOUNTANT',
+  'SECRETARY',
+  'NONTEACHING',
+  'NONTEACHINGSTAFF',
+  'STAFF',
+  'SCHOOLSTAFF',
+]);
+
+const PRIVILEGED_ROLES = new Set([
+  'DIRECTOR',
+  'DEPUTYDIRECTOR',
+  'HEADTEACHER',
+  'DEPUTY',
+  'SUPERADMIN',
+  'HOD',
+  'TEACHER',
+  'CLASSTEACHER',
+  'PRIMARYTEACHER',
+  'SUBJECTTEACHER',
+  'LOWERPRIMARYSENIORTEACHER',
+  'UPPERPRIMARYSENIORTEACHER',
+  'SENIORTEACHER',
+  'LECTURER',
+  'RESEARCHSUPERVISOR',
+  'PRINCIPAL',
+  'REGISTRAR',
+  'DEAN',
+  'VICECHANCELLOR',
+]);
+
 const ROLE_DEFAULTS: Record<string, Permission[]> = {
   TEACHER: [
     PERMISSIONS.CLASS_VIEW,
@@ -68,8 +101,12 @@ const ROLE_DEFAULTS: Record<string, Permission[]> = {
     PERMISSIONS.ANALYTICS_VIEW,
     PERMISSIONS.CALENDAR_VIEW,
   ],
-  'SCHOOL STAFF': [PERMISSIONS.CALENDAR_VIEW],
-  STAFF: [PERMISSIONS.CALENDAR_VIEW],
+  'SCHOOL STAFF': PUBLIC_DATA_PERMISSIONS,
+  STAFF: PUBLIC_DATA_PERMISSIONS,
+  ACCOUNTANT: PUBLIC_DATA_PERMISSIONS,
+  SECRETARY: PUBLIC_DATA_PERMISSIONS,
+  NONTEACHING: PUBLIC_DATA_PERMISSIONS,
+  NONTEACHINGSTAFF: PUBLIC_DATA_PERMISSIONS,
   HEADTEACHER: [PERMISSIONS.CALENDAR_VIEW, PERMISSIONS.CALENDAR_CREATE, PERMISSIONS.CALENDAR_UPDATE, PERMISSIONS.CALENDAR_DELETE, PERMISSIONS.CALENDAR_MANAGE, PERMISSIONS.CALENDAR_PUBLISH, PERMISSIONS.CALENDAR_EXPORT, PERMISSIONS.CALENDAR_IMPORT, PERMISSIONS.CALENDAR_MANAGE_REMINDERS, PERMISSIONS.CALENDAR_MANAGE_SETTINGS],
   DEPUTY: [PERMISSIONS.CALENDAR_VIEW, PERMISSIONS.CALENDAR_CREATE, PERMISSIONS.CALENDAR_UPDATE, PERMISSIONS.CALENDAR_DELETE, PERMISSIONS.CALENDAR_MANAGE, PERMISSIONS.CALENDAR_PUBLISH, PERMISSIONS.CALENDAR_EXPORT, PERMISSIONS.CALENDAR_IMPORT, PERMISSIONS.CALENDAR_MANAGE_REMINDERS, PERMISSIONS.CALENDAR_MANAGE_SETTINGS],
   'DEPUTY DIRECTOR': Object.values(PERMISSIONS),
@@ -81,7 +118,23 @@ export function normalizeRole(role: string): string {
   const normalized = role.trim().toUpperCase();
   if (normalized === 'DEPUTY HEAD') return 'DEPUTY';
   if (normalized === 'SUPER_ADMIN') return 'SUPERADMIN';
+  if (['NON_TEACHING', 'NON-TEACHING', 'NON TEACHING', 'NON-TEACHING STAFF', 'NON TEACHING STAFF'].includes(normalized)) return 'NONTEACHINGSTAFF';
   return normalized;
+}
+
+function compactRole(role: string): string {
+  return normalizeRole(role).replace(/[^A-Z0-9]/g, '');
+}
+
+export function isPublicOnlyRoleSet(roles: string[] = []): boolean {
+  const normalized = roles.map(compactRole).filter(Boolean);
+  if (!normalized.length) return false;
+  if (normalized.some((role) => PRIVILEGED_ROLES.has(role))) return false;
+  return normalized.some((role) => PUBLIC_ONLY_ROLES.has(role));
+}
+
+export function restrictToPublicData(permissions: Permission[]): Permission[] {
+  return permissions.filter((permission) => PUBLIC_DATA_PERMISSIONS.includes(permission));
 }
 
 export function getDefaultPermissions(roles: string[] = []): Permission[] {
@@ -89,5 +142,6 @@ export function getDefaultPermissions(roles: string[] = []): Permission[] {
   for (const role of roles) {
     for (const permission of ROLE_DEFAULTS[normalizeRole(role)] || []) permissions.add(permission);
   }
-  return Array.from(permissions);
+  const result = Array.from(permissions);
+  return isPublicOnlyRoleSet(roles) ? restrictToPublicData(result) : result;
 }

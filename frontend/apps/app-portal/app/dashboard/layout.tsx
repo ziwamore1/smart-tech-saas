@@ -21,10 +21,11 @@ type NavItem = {
   institutionTypes?: string[];
 };
 
-const ALL_SECONDARY = ['Director', 'Deputy Director', 'Deputy', 'Deputy Head', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Accountant', 'Secretary', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
-const ALL_PRIMARY = ['Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Primary Teacher', 'Accountant', 'Secretary'];
-const ALL_COLLEGE = ['Principal', 'Registrar', 'Lecturer', 'Accountant', 'Secretary'];
-const ALL_UNIVERSITY = ['Vice Chancellor', 'Dean', 'Lecturer', 'Research Supervisor', 'Accountant', 'Secretary'];
+const NON_TEACHING_ROLES = ['Accountant', 'Secretary', 'Non-Teaching Staff', 'Non Teaching Staff', 'NON_TEACHING'];
+const ALL_SECONDARY = ['Director', 'Deputy Director', 'Deputy', 'Deputy Head', 'Head Teacher', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'];
+const ALL_PRIMARY = ['Director', 'Head Teacher', 'Deputy Head', 'Deputy', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Primary Teacher'];
+const ALL_COLLEGE = ['Principal', 'Registrar', 'Lecturer'];
+const ALL_UNIVERSITY = ['Vice Chancellor', 'Dean', 'Lecturer', 'Research Supervisor'];
 
 const ROLE_MAP: Record<string, Record<string, string[]>> = {
   admin: {
@@ -90,6 +91,20 @@ const ROLE_MAP: Record<string, Record<string, string[]>> = {
     COLLEGE: ALL_COLLEGE.concat(['Student']),
     UNIVERSITY: ALL_UNIVERSITY.concat(['Student']),
   },
+  public: {
+    PRIMARY_SCHOOL: ALL_PRIMARY.concat(NON_TEACHING_ROLES, ['Parent', 'Learner']),
+    SECONDARY_SCHOOL: ALL_SECONDARY.concat(NON_TEACHING_ROLES, ['Parent', 'Student']),
+    ADVANCED_SECONDARY: ALL_SECONDARY.concat(NON_TEACHING_ROLES, ['Parent', 'Student']),
+    COLLEGE: ALL_COLLEGE.concat(NON_TEACHING_ROLES, ['Student']),
+    UNIVERSITY: ALL_UNIVERSITY.concat(NON_TEACHING_ROLES, ['Student']),
+  },
+  staffProfile: {
+    PRIMARY_SCHOOL: ALL_PRIMARY.concat(NON_TEACHING_ROLES, ['Primary Teacher']),
+    SECONDARY_SCHOOL: ALL_SECONDARY.concat(NON_TEACHING_ROLES),
+    ADVANCED_SECONDARY: ALL_SECONDARY.concat(NON_TEACHING_ROLES),
+    COLLEGE: ALL_COLLEGE.concat(NON_TEACHING_ROLES, ['Registrar']),
+    UNIVERSITY: ALL_UNIVERSITY.concat(NON_TEACHING_ROLES, ['Dean']),
+  },
 };
 
 const regularNav: NavItem[] = [
@@ -97,8 +112,8 @@ const regularNav: NavItem[] = [
     name: 'Academic Progress',
     href: '/dashboard/academic-progress',
     icon: 'fa-line-chart',
-    color: '#7c3aed',
-    typeRoles: ROLE_MAP.everyone,
+    color: '#0ea5e9',
+    typeRoles: ROLE_MAP.teaching,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
   {
@@ -128,7 +143,7 @@ const regularNav: NavItem[] = [
     href: '/teacher/profile?section=advanced',
     icon: 'fa-id-card',
     color: '#4f46e5',
-    typeRoles: ROLE_MAP.teaching,
+    typeRoles: ROLE_MAP.staffProfile,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
   { 
@@ -762,7 +777,7 @@ const regularNav: NavItem[] = [
     href: '/dashboard/profile', 
     icon: 'fa-user-circle',
     color: '#ea6645',
-    typeRoles: ROLE_MAP.everyone,
+    typeRoles: ROLE_MAP.public,
     institutionTypes: ['PRIMARY_SCHOOL', 'SECONDARY_SCHOOL', 'ADVANCED_SECONDARY', 'COLLEGE', 'UNIVERSITY']
   },
 ];

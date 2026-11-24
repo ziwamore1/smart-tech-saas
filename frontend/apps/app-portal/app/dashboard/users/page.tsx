@@ -35,6 +35,7 @@ export default function UserManagementPage() {
     { name: 'Deputy', color: 'bg-indigo-100 text-indigo-700', icon: '⭐' },
     { name: 'Accountant', color: 'bg-green-100 text-green-700', icon: '💰' },
     { name: 'Secretary', color: 'bg-pink-100 text-pink-700', icon: '📋' },
+    { name: 'Non-Teaching Staff', color: 'bg-slate-100 text-slate-700', icon: '👔' },
     { name: 'Teacher', color: 'bg-blue-100 text-blue-700', icon: '👨‍🏫' },
   ] : [
     { name: 'Director', color: 'bg-red-100 text-red-700', icon: '👑' },
@@ -43,6 +44,7 @@ export default function UserManagementPage() {
     { name: 'Deputy', color: 'bg-indigo-100 text-indigo-700', icon: '⭐' },
     { name: 'Accountant', color: 'bg-green-100 text-green-700', icon: '💰' },
     { name: 'Secretary', color: 'bg-pink-100 text-pink-700', icon: '📋' },
+    { name: 'Non-Teaching Staff', color: 'bg-slate-100 text-slate-700', icon: '👔' },
     { name: 'Teacher', color: 'bg-blue-100 text-blue-700', icon: '👨‍🏫' },
     { name: 'Class Teacher', color: 'bg-amber-100 text-amber-700', icon: '🏫' },
     { name: 'HOD', color: 'bg-teal-100 text-teal-700', icon: '📚' },

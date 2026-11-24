@@ -15,16 +15,29 @@ export class RoleController {
     private staffPositionService: StaffPositionService,
   ) {}
 
+  private async ensureManagedRoles() {
+    const roleNames = [
+      'Director', 'Deputy Director', 'SuperAdmin', 'Teacher', 'Head Teacher', 'Deputy',
+      'Accountant', 'Secretary', 'Non-Teaching Staff', 'Class Teacher', 'HOD',
+      'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher',
+    ];
+    for (const name of roleNames) {
+      await this.prisma.role.upsert({ where: { name }, update: {}, create: { name } });
+    }
+  }
+
   @Get()
-  findAll() {
+  async findAll() {
+    await this.ensureManagedRoles();
     return this.prisma.role.findMany({ orderBy: { name: 'asc' } });
   }
 
   @Get('school')
-  findSchoolRoles(@Req() req: any) {
+  async findSchoolRoles(@Req() req: any) {
+    await this.ensureManagedRoles();
     return this.prisma.role.findMany({
       where: {
-        name: { in: ['Director', 'Deputy Director', 'SuperAdmin', 'Teacher', 'Head Teacher', 'Deputy', 'Accountant', 'Secretary', 'Class Teacher', 'HOD', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'] },
+        name: { in: ['Director', 'Deputy Director', 'SuperAdmin', 'Teacher', 'Head Teacher', 'Deputy', 'Accountant', 'Secretary', 'Non-Teaching Staff', 'Class Teacher', 'HOD', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'] },
       },
       orderBy: { name: 'asc' },
     });

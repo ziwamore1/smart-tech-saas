@@ -13,6 +13,9 @@ describe('Advanced Staff Profile role access', () => {
       'Class Teacher',
       'Lower Primary Senior Teacher',
       'Upper Primary Senior Teacher',
+      'Accountant',
+      'Secretary',
+      'Non-Teaching Staff',
     ]));
   });
 

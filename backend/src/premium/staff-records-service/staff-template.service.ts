@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CANONICAL_HR_FIELDS, detectCanonicalField, resolveCanonicalFieldKey, MOE_NON_TEACHING_HEADERS, INSTITUTIONAL_LOOKUP_SEEDS, ZAMBIA_GEOGRAPHY_SEEDS } from './institutional-returns.registry';
+import { normalizeStaffReturnSchool } from './school-header.utils';
 
 @Injectable()
 export class StaffTemplateService {
@@ -156,7 +157,8 @@ export class StaffTemplateService {
     });
     if (!template) throw new NotFoundException('Return template not found');
     const config = (template.config || {}) as any;
-    const school = await this.prisma.school.findUnique({ where: { id: data.schoolId } });
+    const schoolRecord = await this.prisma.school.findUnique({ where: { id: data.schoolId } });
+    const school = schoolRecord ? normalizeStaffReturnSchool(schoolRecord) : schoolRecord;
     if (!school) throw new NotFoundException('School profile not found');
     const staffType = config.staffType || 'TEACHING';
     await this.ensureStaffProfilesFromTeachers(data.schoolId);

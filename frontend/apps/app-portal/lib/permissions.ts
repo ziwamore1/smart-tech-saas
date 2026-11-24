@@ -203,11 +203,17 @@ export const PERMISSION_CATEGORIES: Record<string, { label: string; permissions:
 export const ALL_PERMISSIONS: Permission[] = Object.values(PERMISSION_CATEGORIES)
   .flatMap(c => c.permissions) as Permission[];
 
-type RoleKey = 'SuperAdmin' | 'Director' | 'Deputy Director' | 'Head Teacher' | 'Deputy Head Teacher' | 'Deputy Head' | 'Deputy' | 'HOD' | 'Teacher' | 'Class Teacher' | 'Lower Primary Senior Teacher' | 'Upper Primary Senior Teacher';
+type RoleKey = 'SuperAdmin' | 'Director' | 'Deputy Director' | 'Head Teacher' | 'Deputy Head Teacher' | 'Deputy Head' | 'Deputy' | 'HOD' | 'Teacher' | 'Class Teacher' | 'Lower Primary Senior Teacher' | 'Upper Primary Senior Teacher' | 'Accountant' | 'Secretary' | 'Non-Teaching Staff' | 'Non Teaching Staff' | 'NON_TEACHING' | 'Staff' | 'School Staff';
+
+const PUBLIC_DATA_PERMISSIONS: Permission[] = ['calendar.view', 'communications.view', 'library.view', 'gallery.view'];
+
+const PUBLIC_ONLY_ROLES = new Set(['Accountant', 'Secretary', 'Non-Teaching Staff', 'Non Teaching Staff', 'NON_TEACHING', 'Staff', 'School Staff']);
+
+const PRIVILEGED_ROLES = new Set(['SuperAdmin', 'Director', 'Deputy Director', 'Head Teacher', 'Deputy Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher']);
 
 export function isRoleKey(role: string): role is RoleKey {
   const normalized = normalizeRoleName(role);
-  return ['SuperAdmin', 'Director', 'Deputy Director', 'Head Teacher', 'Deputy Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher'].includes(normalized);
+  return ['SuperAdmin', 'Director', 'Deputy Director', 'Head Teacher', 'Deputy Head Teacher', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher', 'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher', 'Accountant', 'Secretary', 'Non-Teaching Staff', 'Non Teaching Staff', 'NON_TEACHING', 'Staff', 'School Staff'].includes(normalized);
 }
 
 const ALL: Permission[] = ALL_PERMISSIONS;
@@ -392,7 +398,21 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
     'curriculum.view',
     'staff.view',
   ],
+  'Accountant': PUBLIC_DATA_PERMISSIONS,
+  'Secretary': PUBLIC_DATA_PERMISSIONS,
+  'Non-Teaching Staff': PUBLIC_DATA_PERMISSIONS,
+  'Non Teaching Staff': PUBLIC_DATA_PERMISSIONS,
+  'NON_TEACHING': PUBLIC_DATA_PERMISSIONS,
+  'Staff': PUBLIC_DATA_PERMISSIONS,
+  'School Staff': PUBLIC_DATA_PERMISSIONS,
 };
+
+function isPublicOnlyRoles(roles: string[]): boolean {
+  const normalized = roles.map(normalizeRoleName);
+  if (!normalized.length) return false;
+  if (normalized.some(role => PRIVILEGED_ROLES.has(role))) return false;
+  return normalized.some(role => PUBLIC_ONLY_ROLES.has(role));
+}
 
 export function getDefaultPermissions(roles: string[]): Permission[] {
   const permissions = new Set<Permission>();
@@ -404,7 +424,8 @@ export function getDefaultPermissions(roles: string[]): Permission[] {
       }
     }
   }
-  return Array.from(permissions);
+  const result = Array.from(permissions);
+  return isPublicOnlyRoles(roles) ? result.filter(permission => PUBLIC_DATA_PERMISSIONS.includes(permission)) : result;
 }
 
 export function getMergedRoles(source: RoleSource): string[] {
@@ -433,6 +454,11 @@ function normalizeRoleName(role: string): string {
   if (compact === 'headteacher') return 'Head Teacher';
   if (compact === 'deputyheadteacher') return 'Deputy Head Teacher';
   if (compact === 'deputyhead') return 'Deputy Head';
+  if (compact === 'accountant') return 'Accountant';
+  if (compact === 'secretary') return 'Secretary';
+  if (compact === 'nonteaching' || compact === 'nonteachingstaff') return 'Non-Teaching Staff';
+  if (compact === 'schoolstaff') return 'School Staff';
+  if (compact === 'staff') return 'Staff';
   return role;
 }
 

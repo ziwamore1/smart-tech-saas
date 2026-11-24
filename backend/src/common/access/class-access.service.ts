@@ -1,7 +1,14 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import pLimit from 'p-limit';
 import { PrismaService } from '../../prisma/prisma.service';
-import { getDefaultPermissions, normalizeRole, Permission, PERMISSIONS } from './permission-registry';
+import {
+  getDefaultPermissions,
+  isPublicOnlyRoleSet,
+  normalizeRole,
+  Permission,
+  PERMISSIONS,
+  restrictToPublicData,
+} from './permission-registry';
 
 type AccessUser = {
   id: string;
@@ -43,10 +50,11 @@ export class ClassAccessService {
   }
 
   async getPermissions(user: AccessUser): Promise<Permission[]> {
-    const defaults = new Set(getDefaultPermissions(await this.effectiveRoles(user)));
-    if (!user.schoolId) return Array.from(defaults);
+    const roles = await this.effectiveRoles(user);
+    const defaults = new Set(getDefaultPermissions(roles));
+    if (!user.schoolId) return isPublicOnlyRoleSet(roles) ? restrictToPublicData(Array.from(defaults)) : Array.from(defaults);
     const membership = await this.prisma.schoolUser.findFirst({ where: { userId: user.id, schoolId: user.schoolId } });
-    if (!membership) return Array.from(defaults);
+    if (!membership) return isPublicOnlyRoleSet(roles) ? restrictToPublicData(Array.from(defaults)) : Array.from(defaults);
     let overrides: Array<{ permission: string; granted: boolean }> = [];
     try {
       overrides = await this.prisma.userPermissionOverride.findMany({
@@ -62,7 +70,8 @@ export class ClassAccessService {
       if (override.granted) defaults.add(override.permission as Permission);
       else defaults.delete(override.permission as Permission);
     }
-    return Array.from(defaults);
+    const permissions = Array.from(defaults);
+    return isPublicOnlyRoleSet(roles) ? restrictToPublicData(permissions) : permissions;
   }
 
   private async isSchoolAdministrator(user: AccessUser): Promise<boolean> {
@@ -165,12 +174,58 @@ export class ClassAccessService {
     const assignedIds = new Set(assignments.map(({ subjectId }) => subjectId));
     const delegated = await this.delegatedEntries(user, yearId, classId);
     const delegatedIds = new Set(delegated.map(({ subjectId }) => subjectId));
-    if (assignedIds.size === 0 && (await this.canAccessClasses(user))) {
-      return classSubjects.map(({ subject }) => subject);
+    const directEntryIds = await this.directEntrySubjectIds(classId, yearId);
+    const hasClassAccess = await this.hasClassLevelAccess(user, classId, yearId);
+    if (!hasClassAccess) {
+      const anyAssignment = await this.prisma.teachingAssignment.findFirst({
+        where: { teacherId: user.id, schoolId: user.schoolId, academicYearId: yearId },
+        select: { id: true },
+      });
+      if (!anyAssignment && (await this.canAccessClasses(user))) {
+        return classSubjects.map(({ subject }) => subject);
+      }
+      return [];
     }
     return classSubjects
-      .filter(({ subject }) => assignedIds.has(subject.id) || delegatedIds.has(subject.id))
+      .filter(({ subject }) =>
+        assignedIds.has(subject.id) ||
+        delegatedIds.has(subject.id) ||
+        directEntryIds.has(subject.id),
+      )
       .map(({ subject }) => subject);
+  }
+
+  private async directEntrySubjectIds(classId: string, academicYearId: string): Promise<Set<string>> {
+    const [classSubjects, weighted] = await Promise.all([
+      this.prisma.classSubject.findMany({ where: { classId }, select: { subjectId: true } }),
+      this.prisma.termAssessmentConfiguration.findMany({
+        where: { classId, term: { academicYearId } },
+        select: { subjectId: true },
+        distinct: ['subjectId'],
+      }),
+    ]);
+    const weightedIds = new Set(weighted.map(({ subjectId }) => subjectId));
+    return new Set(classSubjects.map(({ subjectId }) => subjectId).filter((id) => !weightedIds.has(id)));
+  }
+
+  private async hasClassLevelAccess(user: AccessUser, classId: string, academicYearId: string): Promise<boolean> {
+    if (await this.isSchoolAdministrator(user)) return true;
+    const [subjectAssignment, classAssignment, directClass, delegated] = await Promise.all([
+      this.prisma.teachingAssignment.findFirst({
+        where: { teacherId: user.id, schoolId: user.schoolId, classId, academicYearId },
+        select: { id: true },
+      }),
+      this.prisma.classTeacherAssignment.findFirst({
+        where: { teacherId: user.id, schoolId: user.schoolId, classId, academicYearId, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.class.findFirst({
+        where: { id: classId, schoolId: user.schoolId, classTeacherId: user.id },
+        select: { id: true },
+      }),
+      this.delegatedEntries(user, academicYearId, classId),
+    ]);
+    return !!(subjectAssignment || classAssignment || directClass || delegated.length > 0);
   }
 
   async assertCanEnterResults(user: AccessUser, classId: string, subjectId: string, academicYearId: string) {
@@ -183,6 +238,7 @@ export class ClassAccessService {
     if (!classEntity || classEntity.schoolId !== user.schoolId) throw new ForbiddenException('This class belongs to a different school');
     if (!subject || subject.schoolId !== user.schoolId) throw new ForbiddenException('This subject belongs to a different school');
     if (!year || year.schoolId !== user.schoolId) throw new ForbiddenException('Invalid academic year');
+    if (isPublicOnlyRoleSet(await this.effectiveRoles(user))) throw new ForbiddenException('Non-teaching staff cannot access student results.');
     // School administrators (Director / SuperAdmin) have full, unrestricted
     // results-entry access across every class and subject in their school.
     // They are never bound by teaching-assignment or delegation rows, matching
@@ -206,6 +262,13 @@ export class ClassAccessService {
     if (!permissions.includes(PERMISSIONS.RESULTS_ENTER)) {
       throw new ForbiddenException('You do not have permission to enter results. Contact the Director to request access for this class and subject.');
     }
+
+    // Unweighted subjects are entered directly as a single final mark, with no
+    // assessment components. Allow them once the user has RESULTS_ENTER so a
+    // teacher assigned to one subject in a class can still complete the rest of
+    // the class's direct-entry subjects.
+    const directEntryIds = await this.directEntrySubjectIds(classId, academicYearId);
+    if (directEntryIds.has(subjectId) && (await this.hasClassLevelAccess(user, classId, academicYearId))) return true;
 
     // ── 4. Fallback: no teaching assignments at all in this academic year ──
     // When the school has not set up teaching assignments, RESULTS_ENTER is the

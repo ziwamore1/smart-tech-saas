@@ -507,7 +507,7 @@ function AdvancedStaffProfileCard() {
           <h2 style={{ margin: 0, fontSize: 19, color: '#1e1b4b' }}><i className="fa fa-id-card" style={{ marginRight: 8, color: '#4f46e5' }}></i>Advanced Staff Profile</h2>
           <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: 13 }}>Separate from your login profile. These records support current and future Staff Return templates.</p>
         </div>
-        <span style={{ padding: '6px 10px', borderRadius: 999, fontSize: 12, fontWeight: 700, color: editable ? '#166534' : '#92400e', background: editable ? '#dcfce7' : '#fef3c7' }}>{editable ? 'DRAFT OPEN - EDITABLE' : 'LOCKED'}</span>
+        <span style={{ padding: '6px 10px', borderRadius: 999, fontSize: 12, fontWeight: 700, color: editable ? '#166534' : '#92400e', background: editable ? '#dcfce7' : '#fef3c7' }}>{editable ? (profile.draftReturns?.length ? 'DRAFT OPEN - EDITABLE' : 'EDITABLE') : 'LOCKED'}</span>
       </div>
 
       <div style={{ marginTop: 16, padding: 14, borderRadius: 9, background: editable ? '#eef2ff' : '#fff7ed', color: editable ? '#3730a3' : '#9a3412', fontSize: 13, lineHeight: 1.5 }}>

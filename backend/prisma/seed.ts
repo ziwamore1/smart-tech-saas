@@ -11,6 +11,7 @@ async function main() {
     'Deputy',
     'Accountant',
     'Secretary',
+    'Non-Teaching Staff',
     'Teacher',
     'Class Teacher',
     'HOD',

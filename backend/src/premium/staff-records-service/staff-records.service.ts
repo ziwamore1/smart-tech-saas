@@ -1,8 +1,16 @@
 import { Injectable, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { normalizeStaffReturnSchool } from './school-header.utils';
 import { StaffSyncEngineService } from '../../shared/staff-sync-engine/staff-sync-engine.service';
 import { v4 as uuidv4 } from 'uuid';
 import { resolveCanonicalFieldKey } from './institutional-returns.registry';
+
+const SELF_PROFILE_UNLOCKED_ROLES = new Set([
+  'ACCOUNTANT',
+  'SECRETARY',
+  'NONTEACHING',
+  'NONTEACHINGSTAFF',
+]);
 
 @Injectable()
 export class StaffRecordsService {
@@ -119,8 +127,9 @@ export class StaffRecordsService {
     return profile;
   }
 
-  async getMyAdvancedProfile(userId: string, schoolId: string) {
-    const staffId = await this.resolveAdvancedProfileStaffId(userId, schoolId);
+  async getMyAdvancedProfile(userId: string, schoolId: string, roles: string[] = []) {
+    const staff = await this.resolveAdvancedProfileStaff(userId, schoolId);
+    const staffId = staff.id;
 
     let profile = await this.prisma.staffHrProfile.findFirst({ where: { staffId, schoolId } });
     if (!profile) {
@@ -130,10 +139,13 @@ export class StaffRecordsService {
     if (!profile) throw new NotFoundException('Advanced Staff Profile is not available');
 
     const draftReturns = await this.findDraftReturnsForStaff(staffId, schoolId);
+    const profileRoles = await this.getProfileRoles(userId, schoolId, roles);
+    const unlocked = this.canEditWithoutDraftReturn(profileRoles, staff.staffType);
+    const editable = unlocked || draftReturns.length > 0;
     const canonicalValues = this.profileToReturnValues(profile);
     return {
       profile,
-      editable: draftReturns.length > 0,
+      editable,
       draftReturns: draftReturns.map((submission: any) => {
         const row = ((submission.data as any[]) || []).find((candidate) => candidate.staffId === staffId);
         return {
@@ -157,21 +169,23 @@ export class StaffRecordsService {
         };
       }),
       guidance: {
-        message: draftReturns.length
-          ? 'Complete the fields you know from the lookup choices and your official records. Fields not available to you can be completed by the Staff Return Hub administrator.'
+        message: editable
+          ? 'You can update your own Advanced Staff Profile at any time. Fields linked to an open DRAFT Staff Return will also be synced to that return.'
           : 'Your Advanced Staff Profile is locked because there is no open DRAFT Staff Return for your school. It will be available when the next return is compiled as DRAFT.',
-        lockedAfter: 'SUBMITTED_OR_APPROVED',
+        lockedAfter: editable && draftReturns.length === 0 ? 'NO_OPEN_DRAFT' : 'SUBMITTED_OR_APPROVED',
       },
     };
   }
 
-  async updateMyAdvancedProfile(userId: string, schoolId: string, data: any) {
-    const staffId = await this.resolveAdvancedProfileStaffId(userId, schoolId);
+  async updateMyAdvancedProfile(userId: string, schoolId: string, data: any, roles: string[] = []) {
+    const staff = await this.resolveAdvancedProfileStaff(userId, schoolId);
+    const staffId = staff.id;
     const profile = await this.prisma.staffHrProfile.findFirst({ where: { staffId, schoolId } });
     if (!profile) throw new NotFoundException('Advanced Staff Profile is not available');
 
     const draftReturns = await this.findDraftReturnsForStaff(staffId, schoolId);
-    if (!draftReturns.length) {
+    const profileRoles = await this.getProfileRoles(userId, schoolId, roles);
+    if (!draftReturns.length && !this.canEditWithoutDraftReturn(profileRoles, staff.staffType)) {
       throw new BadRequestException('This Advanced Staff Profile is locked. A new DRAFT Staff Return must be compiled before you can make updates.');
     }
 
@@ -263,20 +277,42 @@ export class StaffRecordsService {
     return { profile: updated, syncedDraftReturns: draftReturns.length, editable: true };
   }
 
-  private async resolveAdvancedProfileStaffId(userId: string, schoolId: string) {
-    const teacher = await this.prisma.teacher.findFirst({ where: { userId, schoolId }, select: { id: true } });
-    if (teacher) return teacher.id;
+  private async resolveAdvancedProfileStaff(userId: string, schoolId: string) {
+    const teacher = await this.prisma.teacher.findFirst({ where: { userId, schoolId }, select: { id: true, staffType: true } });
+    if (teacher) return { id: teacher.id, staffType: teacher.staffType };
 
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
     if (user?.email) {
       const profile = await this.prisma.staffHrProfile.findFirst({
         where: { schoolId, emailAddress: { equals: user.email, mode: 'insensitive' } },
-        select: { staffId: true },
+        select: { staffId: true, employmentType: true },
       });
-      if (profile) return profile.staffId;
+      if (profile) return { id: profile.staffId, staffType: profile.employmentType };
     }
 
     throw new NotFoundException('No staff profile is linked to this account in the active school. Ask a school administrator to link your staff record.');
+  }
+
+  private canEditWithoutDraftReturn(roles: string[] = [], staffType?: string | null) {
+    const candidates = [...roles, staffType].filter(Boolean) as string[];
+    return candidates.some((role) => {
+      const normalized = role.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      return SELF_PROFILE_UNLOCKED_ROLES.has(normalized);
+    });
+  }
+
+  private async getProfileRoles(userId: string, schoolId: string, roles: string[] = []) {
+    const roleNames = new Set(roles);
+    const [membership, userRoles] = await Promise.all([
+      this.prisma.schoolUser.findFirst({
+        where: { userId, schoolId },
+        include: { SchoolRoleAssignment: { where: { isActive: true }, select: { role: true } } },
+      }),
+      this.prisma.userRole.findMany({ where: { userId }, include: { role: { select: { name: true } } } }),
+    ]);
+    for (const assignment of membership?.SchoolRoleAssignment || []) roleNames.add(assignment.role);
+    for (const assignment of userRoles) roleNames.add(assignment.role.name);
+    return Array.from(roleNames);
   }
 
   private async findDraftReturnsForStaff(staffId: string, schoolId: string) {
@@ -667,7 +703,7 @@ export class StaffRecordsService {
   }
 
   async getSchoolInfo(schoolId: string) {
-    return this.prisma.school.findUnique({
+    const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
       select: {
         id: true, name: true, province: true, district: true, logoUrl: true,
@@ -675,6 +711,7 @@ export class StaffRecordsService {
         website: true, motto: true, schoolType: true, constituency: true, ward: true, zone: true,
       },
     });
+    return school ? normalizeStaffReturnSchool(school) : school;
   }
 
   // ══════════════════════════════════════════

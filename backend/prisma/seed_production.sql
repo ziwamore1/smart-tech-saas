@@ -16,6 +16,7 @@ INSERT INTO "Role" ("id", "name") VALUES
   (gen_random_uuid(), 'Deputy'),
   (gen_random_uuid(), 'Accountant'),
   (gen_random_uuid(), 'Secretary'),
+  (gen_random_uuid(), 'Non-Teaching Staff'),
   (gen_random_uuid(), 'Teacher'),
   (gen_random_uuid(), 'Class Teacher'),
   (gen_random_uuid(), 'HOD'),

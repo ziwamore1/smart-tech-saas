@@ -1273,7 +1273,7 @@ Email: ${director.email}
 
     const validRoles = [
       'Director', 'Deputy Director', 'Head Teacher', 'Deputy', 'Deputy Head', 'Teacher',
-      'Class Teacher', 'HOD', 'Accountant', 'Secretary',
+      'Class Teacher', 'HOD', 'Accountant', 'Secretary', 'Non-Teaching Staff',
       'Lower Primary Senior Teacher', 'Upper Primary Senior Teacher',
     ];
     if (!validRoles.includes(role)) {

@@ -9,6 +9,7 @@ export type UserRole =
   | 'Class Teacher'
   | 'Accountant'
   | 'Secretary'
+  | 'Non-Teaching Staff'
   | 'Student'
   | 'Parent'
   | 'Principal'
