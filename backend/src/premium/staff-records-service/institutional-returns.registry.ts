@@ -22,7 +22,8 @@ const staffFields: CanonicalField[] = [
   { key: 'staff.nationality', label: 'Nationality', scope: 'staff', type: 'lookup', aliases: [] },
   { key: 'staff.substantivePosition', label: 'Substantive Position', scope: 'staff', type: 'lookup', aliases: ['substantive post'] },
   { key: 'staff.substantiveScale', label: 'Substantive Scale', scope: 'staff', type: 'text', aliases: ['substantive scale', 'scale'] },
-  { key: 'staff.payrollPoint', label: 'District Payroll Point', scope: 'staff', type: 'text', aliases: ['district payroll point', 'payroll point', 'payrollpoint'] },
+  { key: 'staff.district', label: 'District Payroll Station', scope: 'staff', type: 'lookup', aliases: ['district payroll station', 'payroll district', 'staff district'] },
+  { key: 'staff.payrollPoint', label: 'Payroll Point (Station)', scope: 'staff', type: 'text', aliases: ['district payroll point', 'payroll point', 'payroll point station', 'payroll station', 'payrollpoint'] },
   { key: 'staff.currentPosition', label: 'Current Position', scope: 'staff', type: 'lookup', aliases: ['position'] },
   { key: 'staff.highestLevelOfEducation', label: 'Highest Level of Education', scope: 'staff', type: 'lookup', aliases: ['highest academic'] },
   { key: 'staff.highestTeacherQualification', label: 'Highest Teacher Qualification', scope: 'staff', type: 'lookup', aliases: ['professional qualification'] },
@@ -74,8 +75,11 @@ export function detectCanonicalField(label: string): { field: CanonicalField; co
 
 export function resolveCanonicalFieldKey(column: { columnName?: string; columnLabel?: string; validationRules?: any }): string {
   const configuredSource = column.validationRules?.source;
-  const detected = detectCanonicalField(String(column.columnLabel || column.columnName || ''))?.field.key;
-  if (detected === 'staff.payrollPoint') return detected;
+  const detectedMatch = detectCanonicalField(String(column.columnLabel || column.columnName || ''));
+  const normalizedLabel = normalize(String(column.columnLabel || ''));
+  if (['sn', 'serial', 'serialnumber'].includes(normalizedLabel)) return 'return.serialNumber';
+  const detected = detectedMatch?.field.key;
+  if (detectedMatch?.confidence === 1) return detected;
   if (typeof configuredSource === 'string' && configuredSource && !configuredSource.startsWith('unmapped.') && !/^field_\d+$/i.test(configuredSource)) return configuredSource;
   return detected || (typeof configuredSource === 'string' && configuredSource) || String(column.columnName || '');
 }

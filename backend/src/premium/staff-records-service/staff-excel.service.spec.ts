@@ -62,8 +62,9 @@ describe('StaffExcelService school headers', () => {
       period: '2026',
       status: 'DRAFT',
       data: [{ values: {
-        'return.serialNumber': 1,
+        'return.serialNumber': 902003,
         'school.name': 'Example School',
+        'school.district': 'Kazungula',
         'field.17': '1981-03-15T00:00:00.000Z',
         'field.19': '2002-08-01T00:00:00.000Z',
       } }],
@@ -91,7 +92,7 @@ describe('StaffExcelService school headers', () => {
     };
     const service = new StaffExcelService(prisma as any);
 
-    const buffer = await service.generateInstitutionalReturnExcel('submission-2', 'school-1', { schoolName: 'Example School' });
+    const buffer = await service.generateInstitutionalReturnExcel('submission-2', 'school-1', { schoolName: 'Example School', district: 'Choma' });
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
     const worksheet = workbook.getWorksheet('8 A. Teaching Staffing')!;
@@ -101,6 +102,7 @@ describe('StaffExcelService school headers', () => {
     expect(worksheet.getCell('AN8').value).toBe('Number of Days Absent');
     expect(worksheet.getCell('B9').value).toBe(1);
     expect(worksheet.getCell('C9').value).toBe('Example School');
+    expect(worksheet.getCell('E9').value).toBe('Choma');
     expect(worksheet.getCell('S9').value).toBeInstanceOf(Date);
     expect(worksheet.getCell('U9').value).toBeInstanceOf(Date);
     expect(worksheet.getCell('S9').numFmt).toBe('dd/mm/yyyy');
@@ -146,5 +148,50 @@ describe('StaffExcelService school headers', () => {
     expect(appointment.numFmt).toBe('dd/mm/yyyy');
     expect((dob.value as Date).toISOString().slice(0, 10)).toBe('1981-03-15');
     expect((appointment.value as Date).toISOString().slice(0, 10)).toBe('2002-08-01');
+  });
+
+  it('uses serial numbers, corrected district, and staff payroll values when exporting', async () => {
+    const submission = {
+      id: 'submission-4',
+      schoolId: 'school-1',
+      period: '2026',
+      status: 'DRAFT',
+      data: [{ staffId: 'teacher-1', values: {
+        'school.emisNumber': 902003,
+        'school.district': 'Kazungula',
+        'staff.district': 'Kazungula',
+        'staff.payrollPoint': 'Kazungula',
+      } }],
+      template: {
+        name: 'Staff Return',
+        config: { sheetName: '', headerRow: 4, dataStartRow: 5 },
+        columns: [
+          { columnName: 'school.emisNumber', columnLabel: 'S/N', columnOrder: 0, dataType: 'text' },
+          { columnName: 'school.district', columnLabel: 'District', columnOrder: 1, dataType: 'text' },
+          { columnName: 'staff.district', columnLabel: 'District Payroll Station', columnOrder: 2, dataType: 'text' },
+          { columnName: 'staff.payrollPoint', columnLabel: 'Payroll Point (Station)', columnOrder: 3, dataType: 'text' },
+        ],
+      },
+    };
+    const prisma = {
+      staffReturnSubmission: {
+        findUnique: jest.fn().mockResolvedValue(submission),
+        update: jest.fn().mockResolvedValue(submission),
+      },
+      staffHrProfile: {
+        findMany: jest.fn().mockResolvedValue([{ staffId: 'teacher-1', district: 'Choma', payrollPoint: 'St Mulumba Special' }]),
+      },
+    };
+    const service = new StaffExcelService(prisma as any);
+
+    const buffer = await service.generateStaffReturnExcel('submission-4', 'school-1', { district: 'Choma' });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const worksheet = workbook.worksheets[0];
+
+    expect(worksheet.getCell('A6').value).toBe(1);
+    expect(worksheet.getCell('B6').value).toBe('Choma');
+    expect(worksheet.getCell('C6').value).toBe('Choma');
+    expect(worksheet.getCell('D6').value).toBe('St Mulumba Special');
   });
 });

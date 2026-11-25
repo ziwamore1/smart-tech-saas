@@ -29,9 +29,10 @@ const ADVANCED_FIELDS = [
   { key: 'tsNumber', label: 'MAN/TS Number' },
   { key: 'aesNumber', label: 'AES Number' },
   { key: 'phoneNumber', label: 'Staff Return Phone' },
+  { key: 'district', label: 'District Payroll Station', category: 'DISTRICT' },
   { key: 'substantivePosition', label: 'Substantive Position', category: 'POSITION' },
   { key: 'substantiveScale', label: 'Substantive Scale' },
-  { key: 'payrollPoint', label: 'District Payroll Point' },
+  { key: 'payrollPoint', label: 'District Payroll Station' },
   { key: 'currentPosition', label: 'Current Position', category: 'POSITION' },
   { key: 'actingPosition', label: 'Acting Position', category: 'POSITION' },
   { key: 'administration', label: 'Additional Responsibility', category: 'ADDITIONAL_RESPONSIBILITY' },
@@ -462,6 +463,7 @@ function AdvancedStaffProfileCard() {
     if (sourceKey.includes('Position')) return 'POSITION';
     if (sourceKey.includes('Qualification')) return sourceKey.includes('Teacher') ? 'TEACHER_QUALIFICATION' : 'QUALIFICATION';
     if (sourceKey.includes('Subject')) return 'SUBJECT';
+    if (sourceKey === 'staff.district') return 'DISTRICT';
     if (sourceKey === 'staff.mainGradeTaught') return 'MAIN_GRADE_TAUGHT';
     if (sourceKey === 'staff.staffPresence') return 'STAFF_PRESENCE';
     if (sourceKey === 'staff.employer') return 'EMPLOYER';

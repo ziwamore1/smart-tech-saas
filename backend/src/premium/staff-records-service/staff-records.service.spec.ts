@@ -81,17 +81,22 @@ describe('StaffRecordsService advanced staff profile saves', () => {
       teacherName: 'Test Teacher',
       dynamicFields: {},
       substantiveScale: null,
+      district: 'Choma',
+      payrollPoint: 'St Mulumba Special',
     };
     const submission = {
       id: 'submission-1',
       period: '2026',
-      data: [{ staffId: 'teacher-1', values: { mainScale: 'S2', additionalScale: '' } }],
+      data: [{ staffId: 'teacher-1', values: { mainScale: 'S2', additionalScale: '', schoolDistrict: 'Kazungula', staffDistrict: 'Kazungula', staffPayroll: 'Kazungula' } }],
       template: {
         name: 'Main Staff Return',
         config: { sheets: [{ key: 'main', label: 'Main Return' }, { key: 'sheet_1', label: 'Additional Return 1' }] },
         columns: [
           { columnName: 'mainScale', columnLabel: 'Substantive Scale', validationRules: { sheetKey: 'main' } },
           { columnName: 'additionalScale', columnLabel: 'Substantive Scale', validationRules: { sheetKey: 'sheet_1' } },
+          { columnName: 'schoolDistrict', columnLabel: 'District', validationRules: { sheetKey: 'main' } },
+          { columnName: 'staffDistrict', columnLabel: 'District Payroll Station', validationRules: { sheetKey: 'main' } },
+          { columnName: 'staffPayroll', columnLabel: 'Payroll Point (Station)', validationRules: { sheetKey: 'sheet_1' } },
         ],
       },
     };
@@ -100,6 +105,7 @@ describe('StaffRecordsService advanced staff profile saves', () => {
       staffHrProfile: { findFirst: jest.fn().mockResolvedValue(profile) },
       staffReturnSubmission: { findMany: jest.fn().mockResolvedValue([submission]) },
       staffReturnTemplate: { findMany: jest.fn().mockResolvedValue([]) },
+      school: { findUnique: jest.fn().mockResolvedValue({ name: 'ADASTRA SECONDARY SCHOOL', province: 'Central', district: 'Kazungula', emisNumber: 'wrong' }) },
       schoolUser: { findFirst: jest.fn().mockResolvedValue(null) },
       userRole: { findMany: jest.fn().mockResolvedValue([]) },
     };
@@ -110,5 +116,8 @@ describe('StaffRecordsService advanced staff profile saves', () => {
 
     expect(fields[0].value).toBe('S2');
     expect(fields[1].value).toBe('S2');
+    expect(fields[2].value).toBe('Choma');
+    expect(fields[3].value).toBe('Choma');
+    expect(fields[4].value).toBe('St Mulumba Special');
   });
 });

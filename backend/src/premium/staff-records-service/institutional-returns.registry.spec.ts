@@ -6,6 +6,8 @@ describe('institutional returns field registry', () => {
     expect(detectCanonicalField('Gender')?.field.key).toBe('staff.gender');
     expect(detectCanonicalField('Substantive Scale')?.field.key).toBe('staff.substantiveScale');
     expect(detectCanonicalField('District Payroll Point')?.field.key).toBe('staff.payrollPoint');
+    expect(detectCanonicalField('District Payroll Station')?.field.key).toBe('staff.district');
+    expect(detectCanonicalField('Payroll Point (Station)')?.field.key).toBe('staff.payrollPoint');
     expect(detectCanonicalField('EMIS Number')?.field.key).toBe('school.emisNumber');
   });
 
@@ -22,5 +24,8 @@ describe('institutional returns field registry', () => {
     expect(resolveCanonicalFieldKey({ columnName: 'field_2', columnLabel: 'Email Address' })).toBe('staff.emailAddress');
     expect(resolveCanonicalFieldKey({ columnName: 'field_3', columnLabel: 'Substantive Scale' })).toBe('staff.substantiveScale');
     expect(resolveCanonicalFieldKey({ columnName: 'field_4', columnLabel: 'District Payroll Point', validationRules: { source: 'school.district' } })).toBe('staff.payrollPoint');
+    expect(resolveCanonicalFieldKey({ columnName: 'field_6', columnLabel: 'District Payroll Station', validationRules: { source: 'school.district' } })).toBe('staff.district');
+    expect(resolveCanonicalFieldKey({ columnName: 'school.emisNumber', columnLabel: 'S/N', validationRules: { source: 'school.emisNumber' } })).toBe('return.serialNumber');
+    expect(resolveCanonicalFieldKey({ columnName: 'field_5', columnLabel: 'District', validationRules: { source: 'school.emisNumber' } })).toBe('school.district');
   });
 });

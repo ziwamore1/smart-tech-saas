@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { resolveCanonicalFieldKey } from './institutional-returns.registry';
 import * as ExcelJS from 'exceljs';
 import * as path from 'path';
 
@@ -93,6 +94,7 @@ export class StaffExcelService {
     const workbook = new ExcelJS.Workbook();
     if (asset) await workbook.xlsx.readFile(path.join(process.cwd(), 'hr_profile_docs', asset));
     const rows = (submission.data as any[]) || [];
+    const profileValues = await this.getStaffProfileValues(schoolId, rows);
     const columns = submission.template.columns;
     for (const sheetConfig of this.getTemplateSheets(config, submission.template.name)) {
       const sheetColumns = this.columnsForSheet(columns, sheetConfig.key || 'main');
@@ -113,7 +115,7 @@ export class StaffExcelService {
         const target = worksheet.getRow(dataStartRow + rowIndex);
         let maxLines = 1;
         sheetColumns.forEach((column: any, columnIndex: number) => {
-          const value = row[column.columnName] ?? '';
+          const value = this.exportValue(column, row, rowIndex, options, profileValues, rowData?.staffId);
           const cell = target.getCell(columnIndex + columnOffset);
           cell.value = this.coerceExcelValue(value, this.isDateColumn(column) ? 'date' : column.dataType);
           this.applyDateFormat(cell, this.isDateColumn(column) ? 'date' : column.dataType);
@@ -204,6 +206,7 @@ export class StaffExcelService {
     if (configuredSheets.length > 1) {
       const workbook = new ExcelJS.Workbook();
       const rows = (submission.data as any[]) || [];
+      const profileValues = await this.getStaffProfileValues(schoolId, rows);
       for (const sheetConfig of configuredSheets) {
         const sheetColumns = this.columnsForSheet(submission.template.columns, sheetConfig.key || 'main');
         if (!sheetColumns.length) continue;
@@ -218,7 +221,7 @@ export class StaffExcelService {
           let maxLines = 1;
           sheetColumns.forEach((column: any, index: number) => {
             const cell = row.getCell(index + 1);
-            const value = sourceRow[column.columnName] ?? '';
+            const value = this.exportValue(column, sourceRow, rowIndex, options, profileValues, rowData?.staffId);
             cell.value = this.coerceExcelValue(value, this.isDateColumn(column) ? 'date' : column.dataType);
             this.applyDateFormat(cell, this.isDateColumn(column) ? 'date' : column.dataType);
             cell.alignment = { vertical: 'middle', wrapText: true, shrinkToFit: false };
@@ -238,6 +241,7 @@ export class StaffExcelService {
 
     const columns = submission.template.columns;
     const rows = (submission.data as any[]) || [];
+    const profileValues = await this.getStaffProfileValues(schoolId, rows);
     const workbook = new ExcelJS.Workbook();
     workbook.creator = options.generatedBy || 'SmartTech SaaS';
     workbook.created = new Date();
@@ -276,7 +280,7 @@ export class StaffExcelService {
 
       columns.forEach((col, index) => {
         const cell = row.getCell(index + 1);
-        const value = sourceRow[col.columnName] !== undefined ? sourceRow[col.columnName] : '';
+        const value = this.exportValue(col, sourceRow, rowIndex - columnHeaderRowIndex - 1, options, profileValues, rowData?.staffId);
         cell.value = this.coerceExcelValue(value, this.isDateColumn(col) ? 'date' : col.dataType);
         this.applyDateFormat(cell, this.isDateColumn(col) ? 'date' : col.dataType);
 
@@ -580,6 +584,26 @@ export class StaffExcelService {
 
   private normalizeHeaderLabel(value: any) {
     return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+  }
+
+  private async getStaffProfileValues(schoolId: string, rows: any[]) {
+    const staffIds = [...new Set(rows.map((row) => row?.staffId).filter(Boolean))];
+    if (!staffIds.length || !this.prisma.staffHrProfile?.findMany) return new Map<string, any>();
+    const profiles = await this.prisma.staffHrProfile.findMany({
+      where: { schoolId, staffId: { in: staffIds } },
+      select: { staffId: true, district: true, payrollPoint: true },
+    });
+    return new Map(profiles.map((profile: any) => [profile.staffId, profile]));
+  }
+
+  private exportValue(column: any, row: Record<string, any>, rowIndex: number, options: ExportOptions, profileValues: Map<string, any>, staffId?: string) {
+    const sourceKey = resolveCanonicalFieldKey(column);
+    const profile = staffId ? profileValues.get(staffId) : undefined;
+    if (sourceKey === 'return.serialNumber') return rowIndex + 1;
+    if (sourceKey === 'school.district' && options.district) return options.district;
+    if (sourceKey === 'staff.district' && profile?.district) return profile.district;
+    if (sourceKey === 'staff.payrollPoint' && profile?.payrollPoint) return profile.payrollPoint;
+    return row[column.columnName] ?? '';
   }
 
   private configurePrintableWorksheet(worksheet: ExcelJS.Worksheet, headerRow: number, lastRow: number, firstColumn: number, lastColumn: number) {

@@ -142,7 +142,8 @@ export class StaffTemplateService {
            config: { sheetName: definition.sheetName, headerRow: definition.headerRow, dataStartRow: definition.headerRow + 1, workbookAsset: definition.workbook, staffType: definition.nonTeaching ? 'NON_TEACHING' : 'TEACHING', sheets: [{ key: 'main', name: definition.sheetName, label: definition.sheetName, headerRow: definition.headerRow, dataStartRow: definition.headerRow + 1, workbookAsset: definition.workbook, inheritInstitutionHeader: true }] } as any,
           columns: { create: headers.map((label, index) => {
             const match = detectCanonicalField(label);
-            const key = label.trim().toLowerCase() === 'sn' ? 'return.serialNumber' : (match?.field.key || `unmapped.${index + 1}`);
+            const normalizedLabel = label.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+            const key = ['sn', 'serial', 'serialnumber'].includes(normalizedLabel) ? 'return.serialNumber' : (match?.field.key || `unmapped.${index + 1}`);
             return { columnName: key, columnLabel: label, columnOrder: index, dataType: match?.field.type || 'text', isRequired: label.trim().toLowerCase() !== 'sn', validationRules: { source: key, confidence: match?.confidence || 0 } as any };
           }) },
         },
@@ -228,7 +229,7 @@ export class StaffTemplateService {
         'staff.dateOfBirth': profile.dateOfBirth, 'staff.gender': profile.gender, 'staff.firstAppointmentDate': profile.dateOfFirstAppointment,
         'staff.currentPostAppointmentDate': profile.dateOfPresentAppointment, 'staff.maritalStatus': profile.maritalStatus,
         'staff.differentlyAbled': profile.dynamicFields?.differentlyAbled, 'staff.nationality': profile.nationality,
-        'staff.substantivePosition': profile.substantivePosition, 'staff.substantiveScale': profile.substantiveScale, 'staff.payrollPoint': profile.payrollPoint, 'staff.currentPosition': profile.currentPosition || profile.actingPosition,
+        'staff.district': profile.district, 'staff.substantivePosition': profile.substantivePosition, 'staff.substantiveScale': profile.substantiveScale, 'staff.payrollPoint': profile.payrollPoint, 'staff.currentPosition': profile.currentPosition || profile.actingPosition,
         'staff.highestLevelOfEducation': profile.academicQualification, 'staff.highestTeacherQualification': profile.professionalQualification || profile.qualifications?.[0]?.qualificationName,
         'staff.additionalResponsibilities': profile.administration, 'staff.inServiceTraining': profile.dynamicFields?.inServiceTraining,
         'staff.employmentStatus': profile.employmentStatus, 'staff.mainGradeTaught': assignedGrades.length ? assignedGrades.join(', ') : profile.gradeLevel,
@@ -813,7 +814,7 @@ export class StaffTemplateService {
     if (!profile) throw new NotFoundException('Canonical staff profile not found');
     const directFields: Record<string, string> = {
       'staff.nrcNumber': 'nrcNumber', 'staff.manTsNumber': 'tsNumber', 'staff.employeeNumber': 'employeeNumber', 'staff.gender': 'gender',
-      'staff.maritalStatus': 'maritalStatus', 'staff.nationality': 'nationality', 'staff.substantivePosition': 'substantivePosition', 'staff.substantiveScale': 'substantiveScale', 'staff.payrollPoint': 'payrollPoint',
+      'staff.maritalStatus': 'maritalStatus', 'staff.nationality': 'nationality', 'staff.district': 'district', 'staff.substantivePosition': 'substantivePosition', 'staff.substantiveScale': 'substantiveScale', 'staff.payrollPoint': 'payrollPoint',
       'staff.currentPosition': 'currentPosition', 'staff.highestLevelOfEducation': 'academicQualification', 'staff.highestAcademicQualification': 'academicQualification',
       'staff.highestTeacherQualification': 'professionalQualification', 'staff.employmentStatus': 'employmentStatus', 'staff.mainGradeTaught': 'gradeLevel',
       'staff.dateOfBirth': 'dateOfBirth', 'staff.firstAppointmentDate': 'dateOfFirstAppointment', 'staff.currentPostAppointmentDate': 'dateOfPresentAppointment', 'staff.phoneNumber': 'phoneNumber', 'staff.emailAddress': 'emailAddress',
@@ -858,7 +859,7 @@ export class StaffTemplateService {
     const directFields: Record<string, string> = {
       'staff.nrcNumber': 'nrcNumber', 'staff.manTsNumber': 'tsNumber', 'staff.employeeNumber': 'employeeNumber',
       'staff.gender': 'gender', 'staff.maritalStatus': 'maritalStatus', 'staff.nationality': 'nationality',
-      'staff.substantivePosition': 'substantivePosition', 'staff.substantiveScale': 'substantiveScale', 'staff.payrollPoint': 'payrollPoint', 'staff.currentPosition': 'currentPosition',
+      'staff.district': 'district', 'staff.substantivePosition': 'substantivePosition', 'staff.substantiveScale': 'substantiveScale', 'staff.payrollPoint': 'payrollPoint', 'staff.currentPosition': 'currentPosition',
       'staff.highestLevelOfEducation': 'academicQualification', 'staff.highestAcademicQualification': 'academicQualification',
       'staff.highestTeacherQualification': 'professionalQualification', 'staff.employmentStatus': 'employmentStatus',
       'staff.mainGradeTaught': 'gradeLevel', 'staff.dateOfBirth': 'dateOfBirth',

@@ -144,6 +144,20 @@ export class StaffRecordsService {
     const unlocked = this.canEditWithoutDraftReturn(profileRoles, staff.staffType);
     const editable = unlocked || draftReturns.length > 0;
     const canonicalValues = this.profileToReturnValues(profile);
+    const school = await this.getSchoolInfo(schoolId);
+    const schoolValues: Record<string, any> = school ? {
+      'school.name': school.name,
+      'school.province': school.province,
+      'school.district': school.district,
+      'school.constituency': school.constituency,
+      'school.ward': school.ward,
+      'school.zone': school.zone,
+      'school.location': (school as any).locationType,
+      'school.runningAgency': (school as any).runningAgency,
+      'school.type': school.schoolType,
+      'school.emisNumber': school.emisNumber,
+      'school.distanceFromDebOffice': (school as any).distanceFromDebOffice,
+    } : {};
     return {
       profile,
       editable,
@@ -164,9 +178,13 @@ export class StaffRecordsService {
               return configuredLabel && (sheetKey === 'main' || !/^main return$/i.test(configuredLabel)) ? configuredLabel : sheetKey === 'main' ? 'Main Return' : 'Additional Return';
             })(),
             sourceKey: resolveCanonicalFieldKey(column),
-            value: row?.values?.[column.columnName] !== undefined && row?.values?.[column.columnName] !== null && row?.values?.[column.columnName] !== ''
-              ? row.values[column.columnName]
-              : returnValues[resolveCanonicalFieldKey(column)] ?? canonicalValues[resolveCanonicalFieldKey(column)] ?? '',
+            value: schoolValues[resolveCanonicalFieldKey(column)] !== undefined
+              ? schoolValues[resolveCanonicalFieldKey(column)]
+              : ['staff.district', 'staff.payrollPoint'].includes(resolveCanonicalFieldKey(column)) && canonicalValues[resolveCanonicalFieldKey(column)]
+                ? canonicalValues[resolveCanonicalFieldKey(column)]
+                : row?.values?.[column.columnName] !== undefined && row?.values?.[column.columnName] !== null && row?.values?.[column.columnName] !== ''
+                  ? row.values[column.columnName]
+                  : returnValues[resolveCanonicalFieldKey(column)] ?? canonicalValues[resolveCanonicalFieldKey(column)] ?? '',
           })),
         };
       }),
@@ -195,7 +213,7 @@ export class StaffRecordsService {
 
     const allowed = new Set([
       'gender', 'dateOfBirth', 'maritalStatus', 'nrcNumber', 'tsNumber', 'aesNumber',
-      'substantivePosition', 'substantiveScale', 'payrollPoint', 'actingPosition', 'administration', 'actingType',
+      'district', 'substantivePosition', 'substantiveScale', 'payrollPoint', 'actingPosition', 'administration', 'actingType',
       'dateOfFirstAppointment', 'dateOfPresentAppointment', 'dateOfActingAppointment', 'confirmed',
       'expectedConfirmationDate', 'academicQualification', 'professionalQualification', 'yearOfQualification',
       'specialization', 'nationality', 'emailAddress', 'phoneNumber', 'currentPosition', 'gradeLevel',
@@ -215,6 +233,7 @@ export class StaffRecordsService {
       const column = returnColumns.get(columnName);
       if (!column) continue;
       const sourceKey = resolveCanonicalFieldKey(column);
+      if (sourceKey.startsWith('school.')) continue;
       if (sourceKey === 'staff.fullName') profileData.teacherName = value || null;
       else if (sourceKey === 'staff.firstName') firstName = value;
       else if (sourceKey === 'staff.surname') surname = value;
@@ -392,7 +411,7 @@ export class StaffRecordsService {
       'staff.nrcNumber': profile.nrcNumber, 'staff.manTsNumber': profile.tsNumber, 'staff.employeeNumber': profile.employeeNumber,
       'staff.dateOfBirth': profile.dateOfBirth, 'staff.gender': profile.gender, 'staff.firstAppointmentDate': profile.dateOfFirstAppointment,
       'staff.currentPostAppointmentDate': profile.dateOfPresentAppointment, 'staff.maritalStatus': profile.maritalStatus,
-      'staff.nationality': profile.nationality, 'staff.emailAddress': profile.emailAddress, 'staff.substantivePosition': profile.substantivePosition, 'staff.substantiveScale': profile.substantiveScale, 'staff.payrollPoint': profile.payrollPoint,
+      'staff.nationality': profile.nationality, 'staff.emailAddress': profile.emailAddress, 'staff.district': profile.district, 'staff.substantivePosition': profile.substantivePosition, 'staff.substantiveScale': profile.substantiveScale, 'staff.payrollPoint': profile.payrollPoint,
       'staff.currentPosition': profile.currentPosition || profile.actingPosition, 'staff.highestLevelOfEducation': profile.academicQualification,
       'staff.highestTeacherQualification': profile.professionalQualification, 'staff.additionalResponsibilities': profile.administration,
       'staff.employmentStatus': profile.employmentStatus, 'staff.mainGradeTaught': profile.gradeLevel, 'staff.phoneNumber': profile.phoneNumber,
@@ -426,7 +445,7 @@ export class StaffRecordsService {
     const directFields: Record<string, string> = {
       'staff.nrcNumber': 'nrcNumber', 'staff.manTsNumber': 'tsNumber', 'staff.employeeNumber': 'employeeNumber',
       'staff.gender': 'gender', 'staff.maritalStatus': 'maritalStatus', 'staff.nationality': 'nationality',
-      'staff.emailAddress': 'emailAddress', 'staff.phoneNumber': 'phoneNumber', 'staff.substantivePosition': 'substantivePosition',
+      'staff.emailAddress': 'emailAddress', 'staff.phoneNumber': 'phoneNumber', 'staff.district': 'district', 'staff.substantivePosition': 'substantivePosition',
       'staff.substantiveScale': 'substantiveScale',
       'staff.payrollPoint': 'payrollPoint',
       'staff.currentPosition': 'currentPosition', 'staff.highestLevelOfEducation': 'academicQualification',
