@@ -10,6 +10,7 @@ import { GradingEngineService } from '../grading-engine/grading-engine.service';
 import { SchoolActivityService } from '../common/services/school-activity.service';
 import { ActivityEventType, ActivityCategory, ActivitySeverity } from '../common/types/activity-event.types';
 import { mapBounded } from '../common/utils/concurrency.util';
+import { normalizeExamType } from '../common/utils/exam-type.util';
 
 @Injectable()
 export class ResultService {
@@ -730,8 +731,8 @@ export class ResultService {
     });
     const enrollmentMap = new Map(allEnrollments.map(e => [e.studentId, e.classId]));
 
-    // ── Batch 2: Pre-check permissions once per unique (classId, subjectId) ──
-    const uniqueClassSubjectPairs = new Set<string>();
+    // ── Batch 2: Pre-check permissions once for the whole score-entry batch ──
+    const accessScopes: Array<{ classId: string; subjectId: string; academicYearId: string }> = [];
     const missingEnrollment: any[] = [];
     for (const item of results) {
       const cid = enrollmentMap.get(item.studentId);
@@ -739,25 +740,13 @@ export class ResultService {
         missingEnrollment.push({ studentId: item.studentId, subjectId: item.subjectId, error: 'Student not enrolled in this academic year' });
         continue;
       }
-      uniqueClassSubjectPairs.add(`${cid}::${item.subjectId}`);
+      accessScopes.push({ classId: cid, subjectId: item.subjectId, academicYearId });
     }
 
-    const permissionErrors: any[] = [];
-    const permissionChecks = await mapBounded([...uniqueClassSubjectPairs], async (pair) => {
-      const [classId, subjectId] = pair.split('::');
-      try {
-        await this.classAccess.assertCanEnterResults(
-          { id: teacherId, schoolId, roles, isSuperAdmin },
-          classId,
-          subjectId,
-          academicYearId,
-        );
-        return null;
-      } catch (e: any) {
-        return { classId, subjectId, error: e.message };
-      }
-    }, 8);
-    permissionErrors.push(...permissionChecks.filter(Boolean));
+    const permissionErrors = await this.classAccess.checkResultsEntryAccessBatch(
+      { id: teacherId, schoolId, roles, isSuperAdmin },
+      accessScopes,
+    );
 
     if (permissionErrors.length > 0 || missingEnrollment.length > 0) {
       const allErrors = [...missingEnrollment, ...permissionErrors];
@@ -834,29 +823,30 @@ export class ResultService {
     const errors: any[] = [...missingEnrollment];
     const permBlockedPairs = new Set(permissionErrors.map(e => `${e.classId}::${e.subjectId}`));
 
-    // Keep each score atomic, but persist independent scores concurrently.
-    // This avoids holding one interactive transaction open for the whole batch.
-    const CHUNK_SIZE = 50;
+    // One transaction per chunk keeps the connection pool free while still
+    // committing many scores together, instead of opening a transaction per
+    // individual score.
+    const CHUNK_SIZE = 100;
     for (let i = 0; i < results.length; i += CHUNK_SIZE) {
       const chunk = results.slice(i, i + CHUNK_SIZE);
-      const chunkResult = await mapBounded(chunk, async (item) => {
-        try {
-          const classId = enrollmentMap.get(item.studentId);
-          if (!classId) return { result: null, error: null };
+      const chunkResult = await this.prisma.$transaction(async (tx) => {
+        return Promise.all(chunk.map(async (item) => {
+          try {
+            const classId = enrollmentMap.get(item.studentId);
+            if (!classId) return { result: null, error: null };
 
-          const pairKey = `${classId}::${item.subjectId}`;
-          if (permBlockedPairs.has(pairKey)) return { result: null, error: null };
+            const pairKey = `${classId}::${item.subjectId}`;
+            if (permBlockedPairs.has(pairKey)) return { result: null, error: null };
 
-          // X/A absences are stored with score 0 in the legacy Result table
-          // but remain explicitly flagged in ComputedResult.
-          const isAbsent = !!item.isAbsent;
-          const absentCode = item.absentCode ?? 'X';
-          const effectiveScore = isAbsent ? 0 : item.score;
-          const gradeData = isAbsent
-            ? { grade: null, remark: `ABSENT (${absentCode})`, points: null, gpa: null }
-            : computeGradeInMemory(item.score, classId);
+            // X/A absences are stored with score 0 in the legacy Result table
+            // but remain explicitly flagged in ComputedResult.
+            const isAbsent = !!item.isAbsent;
+            const absentCode = item.absentCode ?? 'X';
+            const effectiveScore = isAbsent ? 0 : item.score;
+            const gradeData = isAbsent
+              ? { grade: null, remark: `ABSENT (${absentCode})`, points: null, gpa: null }
+              : computeGradeInMemory(item.score, classId);
 
-          const result = await this.prisma.$transaction(async (tx) => {
             const saved = normalizedExamType === 'END_TERM'
               ? await tx.result.upsert({
                   where: {
@@ -928,23 +918,24 @@ export class ResultService {
                 computedAt: new Date(),
               },
             });
-            return saved;
-          }, { maxWait: 30000, timeout: 60000 });
-          return { result, error: null };
-        } catch (error: any) {
-          return {
-            result: null,
-            error: { studentId: item.studentId, subjectId: item.subjectId, error: error.message },
-          };
-        }
-      }, 10);
+            return { result: saved, error: null };
+          } catch (error: any) {
+            return {
+              result: null,
+              error: { studentId: item.studentId, subjectId: item.subjectId, error: error.message },
+            };
+          }
+        }));
+      }, { maxWait: 30000, timeout: 60000 });
 
       created.push(...chunkResult.filter((entry) => entry.result).map((entry) => entry.result));
       errors.push(...chunkResult.filter((entry) => entry.error).map((entry) => entry.error));
     }
 
-    // ── Post-batch: Update result sheets ──
+    // Post-save housekeeping must never hold up the save response. Sheet
+    // counts, events and composite recomputes catch up asynchronously.
     if (created.length > 0) {
+      void (async () => {
       const classIds = [...new Set(created.map(r => enrollmentMap.get(r.studentId)).filter(Boolean))] as string[];
 
       // Batch-fetch enrollment counts
@@ -983,19 +974,11 @@ export class ResultService {
       for (const classId of classIds) {
         const enrolled = enrollmentCountMap.get(classId) || 0;
         const entered = enteredCountMap.get(classId) || 0;
-        const sheetInfo = await this.ensureSheet(schoolId, classId, firstTermId, academicYearId, teacherId, normalizedExamType);
-        if (sheetInfo.justCreated) {
-          await this.prisma.resultSheet.updateMany({
-            where: { classId, termId: firstTermId, schoolId, examType: normalizedExamType },
-            data: { totalStudents: enrolled, enteredCount: entered },
-          });
-        } else {
-          await this.prisma.resultSheet.updateMany({
-            where: { classId, termId: firstTermId, schoolId, examType: normalizedExamType },
-            data: { totalStudents: enrolled, enteredCount: entered },
-          });
-        }
-
+        await this.ensureSheet(schoolId, classId, firstTermId, academicYearId, teacherId, normalizedExamType);
+        await this.prisma.resultSheet.updateMany({
+          where: { classId, termId: firstTermId, schoolId, examType: normalizedExamType },
+          data: { totalStudents: enrolled, enteredCount: entered },
+        });
         await this.autoSubmitSheet(schoolId, classId, firstTermId, teacherId, normalizedExamType);
       }
 
@@ -1051,13 +1034,14 @@ export class ResultService {
 
       // Recompute composite subjects for all affected class+subject combinations
       const affectedSubjects = [...new Set(created.map(r => r.subjectId))];
-      for (const subjectId of affectedSubjects) {
-        for (const classId of uniqueClassIds) {
-          await this.compositeSubjectService.recomputeAllComposites(subjectId, classId, firstTermId, schoolId).catch(e =>
+      await Promise.all(affectedSubjects.flatMap(subjectId =>
+        uniqueClassIds.map(classId =>
+          this.compositeSubjectService.recomputeAllComposites(subjectId, classId, firstTermId, schoolId).catch(e =>
             this.logger.warn(`Composite recompute failed for subject ${subjectId}: ${e.message}`),
-          );
-        }
-      }
+          ),
+        ),
+      ));
+      })().catch(error => this.logger.warn(`Post-save result sync failed: ${error.message}`));
     }
 
     return {

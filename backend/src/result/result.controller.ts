@@ -23,6 +23,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { StudentSubjectService } from '../student-subject/student-subject.service';
 import { OwnershipService } from '../common/services/ownership.service';
+import { RESULTS_ENTRY_ROLES } from '../common/access/permission-registry';
 
 @Controller('results')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -37,7 +38,7 @@ export class ResultController {
   ) {}
 
   @Get()
-  @Roles('Director', 'Deputy Director', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
+  @Roles(...RESULTS_ENTRY_ROLES)
   findAll(
     @Query('classId') classId: string,
     @Query('termId') termId: string,
@@ -53,7 +54,7 @@ export class ResultController {
   }
 
   @Get('computed')
-  @Roles('Director', 'Deputy Director', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
+  @Roles(...RESULTS_ENTRY_ROLES)
   async findComputed(
     @Query('classId') classId: string,
     @Query('termId') termId: string,
@@ -67,7 +68,7 @@ export class ResultController {
   }
 
   @Get('template/:termId')
-  @Roles('Director', 'Deputy Director', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
+  @Roles(...RESULTS_ENTRY_ROLES)
   async downloadTemplate(
     @Param('termId') termId: string,
     @Query('classId') classId: string,
@@ -100,7 +101,7 @@ export class ResultController {
   }
 
   @Get(':id')
-  @Roles('Director', 'Deputy Director', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
+  @Roles(...RESULTS_ENTRY_ROLES)
   findOne(@Param('id') id: string, @Req() req: any) {
     return this.resultService.findOne(id, req.user.schoolId);
   }
@@ -180,7 +181,7 @@ export class ResultController {
   }
 
   @Post()
-  @Roles('Director', 'Deputy Director', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
+  @Roles(...RESULTS_ENTRY_ROLES)
   async create(
     @Body()
     body: {
@@ -221,7 +222,7 @@ export class ResultController {
   }
 
   @Post('bulk')
-  @Roles('Director', 'Deputy Director', 'Deputy Head', 'Deputy', 'HOD', 'Teacher', 'Class Teacher')
+  @Roles(...RESULTS_ENTRY_ROLES)
   async createBulk(
     @Body()
     body: {
@@ -234,6 +235,7 @@ export class ResultController {
         absentCode?: string | null;
         examType?: string;
       }>;
+      examType?: string;
     },
     @Req() req: any,
   ) {
@@ -268,7 +270,7 @@ export class ResultController {
   }
 
   @Post('upload/:termId')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles(...RESULTS_ENTRY_ROLES)
   @UseInterceptors(FileInterceptor('file'))
   async uploadResults(
     @UploadedFile() file: Express.Multer.File,
@@ -302,7 +304,7 @@ export class ResultController {
   }
 
   @Patch(':id')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles(...RESULTS_ENTRY_ROLES)
   async update(
     @Param('id') id: string,
     @Body() body: { score: number },
@@ -326,7 +328,7 @@ export class ResultController {
   }
 
   @Post('recalculate-grades')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles(...RESULTS_ENTRY_ROLES)
   async recalculateGrades(
     @Body() body: { classId: string; termId: string },
     @Req() req: any,
@@ -360,7 +362,7 @@ export class ResultController {
   }
 
   @Post('recalculate-points')
-  @Roles('Director', 'Teacher', 'Class Teacher')
+  @Roles(...RESULTS_ENTRY_ROLES)
   async recalculatePoints(
     @Body() body: { classId: string; termId: string },
     @Req() req: any,

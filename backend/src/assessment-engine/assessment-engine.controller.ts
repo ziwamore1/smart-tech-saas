@@ -17,15 +17,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RESULTS_ENTRY_ROLES } from '../common/access/permission-registry';
 
 @Controller('assessment-engine')
 @UseGuards(JwtAuthGuard, RolesGuard)
-// Keep in sync with result.controller.ts — HODs enter/verify component
-// scores (Mid-Term / End-of-Term) and Deputy Directors review them, so both
-// need the same access Teachers have here. 'Deputy Head' covers accounts
-// provisioned with either 'Deputy Head' or 'Deputy' (the guard normalizes
-// both to DEPUTY).
-@Roles('Director', 'Deputy Director', 'Head Teacher', 'Deputy Head', 'HOD', 'Teacher', 'Class Teacher')
+// Keep in sync with result.controller.ts — every teaching role that may save
+// results may also enter/verify component scores. Role aliases are normalized
+// by RolesGuard, so spaced and compact role labels behave identically.
+@Roles(...RESULTS_ENTRY_ROLES)
 export class AssessmentEngineController {
   constructor(
     private assessmentEngine: AssessmentEngineService,
@@ -34,18 +33,31 @@ export class AssessmentEngineController {
   ) {}
 
   private async assertCanEnterScores(req: any, entries: Array<{ classId: string; subjectId: string; termId: string }>) {
-    const pairs = new Set(entries.filter(e => e.classId && e.subjectId && e.termId).map(e => `${e.classId}::${e.subjectId}::${e.termId}`));
-    for (const pair of pairs) {
+    const pairs = new Set(
+      entries
+        .filter(e => e.classId && e.subjectId && e.termId)
+        .map(e => `${e.classId}::${e.subjectId}::${e.termId}`),
+    );
+    if (!pairs.size) return;
+
+    const termIds = [...new Set([...pairs].map(pair => pair.split('::')[2]))];
+    const terms = await this.prisma.term.findMany({
+      where: { id: { in: termIds }, academicYear: { schoolId: req.user.schoolId } },
+      select: { id: true, academicYearId: true },
+    });
+    const termMap = new Map(terms.map(term => [term.id, term]));
+
+    const scopes = [...pairs].map((pair) => {
       const [classId, subjectId, termId] = pair.split('::');
-      const term = await this.prisma.term.findUnique({ where: { id: termId }, select: { academicYearId: true } });
+      const term = termMap.get(termId);
       if (!term) throw new ForbiddenException('Invalid term for score entry');
-      await this.classAccess.assertCanEnterResults(
-        { id: req.user.id, schoolId: req.user.schoolId, roles: req.user.roles || [], isSuperAdmin: req.user.isSuperAdmin },
-        classId,
-        subjectId,
-        term.academicYearId,
-      );
-    }
+      return { classId, subjectId, academicYearId: term.academicYearId };
+    });
+
+    await this.classAccess.assertCanEnterResultsBatch(
+      { id: req.user.id, schoolId: req.user.schoolId, roles: req.user.roles || [], isSuperAdmin: req.user.isSuperAdmin },
+      scopes,
+    );
   }
 
   @Post('definitions')

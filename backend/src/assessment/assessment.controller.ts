@@ -17,6 +17,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClassAccessService } from '../common/access/class-access.service';
+import { RESULTS_ENTRY_ROLES } from '../common/access/permission-registry';
 
 @Controller('assessment')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -28,7 +29,7 @@ export class AssessmentController {
   ) {}
 
   @Get('types')
-  @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
+  @Roles(...RESULTS_ENTRY_ROLES)
   getTypes(
     @Query('subjectId') subjectId: string,
     @Query('termId') termId: string,
@@ -42,7 +43,7 @@ export class AssessmentController {
   }
 
   @Get('weights')
-  @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
+  @Roles(...RESULTS_ENTRY_ROLES)
   getWeights(
     @Query('subjectId') subjectId: string,
     @Query('termId') termId: string,
@@ -64,7 +65,7 @@ export class AssessmentController {
   }
 
   @Get('class-dashboard')
-  @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
+  @Roles(...RESULTS_ENTRY_ROLES)
   getDashboard(
     @Query('classId') classId: string,
     @Query('subjectId') subjectId: string,
@@ -74,7 +75,7 @@ export class AssessmentController {
   }
 
   @Get('teacher-heatmap')
-  @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
+  @Roles(...RESULTS_ENTRY_ROLES)
   getTeacherHeatmap(
     @Query('classId') classId: string,
     @Query('subjectId') subjectId: string,
@@ -84,7 +85,7 @@ export class AssessmentController {
   }
 
   @Post('create-type')
-  @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
+  @Roles(...RESULTS_ENTRY_ROLES)
   createType(@Body() body: any, @Req() req: any) {
     return this.service.createAssessmentType(
       req.user.schoolId,
@@ -97,7 +98,7 @@ export class AssessmentController {
   }
 
   @Post('bulk-create')
-  @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
+  @Roles(...RESULTS_ENTRY_ROLES)
   createBulkTypes(@Body() body: any, @Req() req: any) {
     return this.service.createBulkAssessmentTypes(
       req.user.schoolId,
@@ -108,7 +109,7 @@ export class AssessmentController {
   }
 
   @Patch('type/:id')
-  @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
+  @Roles(...RESULTS_ENTRY_ROLES)
   updateType(
     @Param('id') id: string,
     @Body() body: { name?: string; maxScore?: number; weight?: number },
@@ -124,7 +125,7 @@ export class AssessmentController {
   }
 
   @Post('enter-score')
-  @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
+  @Roles(...RESULTS_ENTRY_ROLES)
   async enterScore(@Body() body: any, @Req() req: any) {
     const userId = req.user.id || req.user.sub;
     await this.classAccess.assertCanEnterAssessmentScore(
@@ -161,16 +162,13 @@ export class AssessmentController {
   }
 
   @Post('bulk-enter-scores')
-  @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
+  @Roles(...RESULTS_ENTRY_ROLES)
   async enterBulkScores(@Body() body: any, @Req() req: any) {
     const userId = req.user.id || req.user.sub;
-    for (const item of body.scores || []) {
-      await this.classAccess.assertCanEnterAssessmentScore(
-        { id: userId, schoolId: req.user.schoolId, roles: req.user.roles || [], isSuperAdmin: req.user.isSuperAdmin },
-        item.studentId,
-        item.assessmentTypeId,
-      );
-    }
+    await this.classAccess.assertCanEnterAssessmentScoresBatch(
+      { id: userId, schoolId: req.user.schoolId, roles: req.user.roles || [], isSuperAdmin: req.user.isSuperAdmin },
+      body.scores || [],
+    );
     let teacherId = userId;
 
     let teacher = await this.prisma.teacher.findFirst({
@@ -198,7 +196,7 @@ export class AssessmentController {
   }
 
   @Patch('score/:id')
-  @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
+  @Roles(...RESULTS_ENTRY_ROLES)
   async updateScore(
     @Param('id') id: string,
     @Body() body: { score: number },
@@ -238,7 +236,7 @@ export class AssessmentController {
   }
 
   @Get('compute')
-  @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
+  @Roles(...RESULTS_ENTRY_ROLES)
   async computeResults(
     @Query('studentId') studentId: string,
     @Query('subjectId') subjectId: string,
@@ -286,7 +284,7 @@ export class AssessmentController {
   }
 
   @Post('compute-all')
-  @Roles('Teacher', 'Class Teacher', 'HOD', 'Deputy Director', 'Deputy Head', 'Deputy', 'Director')
+  @Roles(...RESULTS_ENTRY_ROLES)
   async computeAllResults(@Body() body: { classId: string; subjectId: string; termId: string }, @Req() req: any) {
     const userId = req.user.id || req.user.sub;
     const term = await this.prisma.term.findUnique({ where: { id: body.termId }, select: { academicYearId: true, academicYear: { select: { schoolId: true } } } });

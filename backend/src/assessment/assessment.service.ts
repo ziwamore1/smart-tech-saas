@@ -266,64 +266,69 @@ export class AssessmentService {
     const results: any[] = [];
     const errors: any[] = [];
 
-    for (const item of scores) {
-      try {
-        const assessmentType = await this.prisma.assessmentType.findUnique({
-          where: { id: item.assessmentTypeId },
-          include: { term: true },
-        });
+    const assessmentTypeIds = [...new Set(scores.map(item => item.assessmentTypeId))];
+    const assessmentTypes = await this.prisma.assessmentType.findMany({
+      where: { id: { in: assessmentTypeIds }, schoolId },
+      include: { term: true },
+    });
+    const typeMap = new Map(assessmentTypes.map(type => [type.id, type]));
 
-        if (!assessmentType || assessmentType.schoolId !== schoolId) {
-          errors.push({ ...item, error: 'Assessment type not found' });
-          continue;
-        }
+    const validScores = scores.filter((item) => {
+      const assessmentType = typeMap.get(item.assessmentTypeId);
+      if (!assessmentType) {
+        errors.push({ ...item, error: 'Assessment type not found' });
+        return false;
+      }
+      if (assessmentType.term.resultsLocked) {
+        errors.push({ ...item, error: 'Term is locked' });
+        return false;
+      }
+      return true;
+    });
 
-        if (assessmentType.term.resultsLocked) {
-          errors.push({ ...item, error: 'Term is locked' });
-          continue;
-        }
-
-        const record = await this.prisma.assessmentScore.upsert({
-          where: {
-            studentId_assessmentTypeId: {
+    const CHUNK_SIZE = 100;
+    for (let i = 0; i < validScores.length; i += CHUNK_SIZE) {
+      const chunk = validScores.slice(i, i + CHUNK_SIZE);
+      const chunkResults = await Promise.all(chunk.map(async (item) => {
+        try {
+          return await this.prisma.assessmentScore.upsert({
+            where: {
+              studentId_assessmentTypeId: {
+                studentId: item.studentId,
+                assessmentTypeId: item.assessmentTypeId,
+              },
+            },
+            update: { score: item.score, teacherId },
+            create: {
               studentId: item.studentId,
               assessmentTypeId: item.assessmentTypeId,
+              teacherId,
+              schoolId,
+              score: item.score,
             },
-          },
-          update: { score: item.score, teacherId },
-          create: {
-            studentId: item.studentId,
-            assessmentTypeId: item.assessmentTypeId,
-            teacherId,
-            schoolId,
-            score: item.score,
-          },
-        });
-
-        results.push(record);
-      } catch (error: any) {
-        errors.push({ ...item, error: error.message });
-      }
-    }
-
-    for (const item of scores) {
-      try {
-        const assessmentType = await this.prisma.assessmentType.findUnique({
-          where: { id: item.assessmentTypeId },
-        });
-        if (assessmentType) {
-          await this.aggregateStudentSubjectScore(
-            item.studentId,
-            assessmentType.subjectId,
-            assessmentType.termId,
-            schoolId,
-            teacherId,
-          );
+          });
+        } catch (error: any) {
+          errors.push({ ...item, error: error.message });
+          return null;
         }
-      } catch (error) {
-        // Ignore aggregation errors
-      }
+      }));
+      results.push(...chunkResults.filter(Boolean));
     }
+
+    // Aggregation is derived data; run it once per student/subject/term rather
+    // than once per score, and outside the save response.
+    const aggregateKeys = new Set(
+      validScores.map(item => {
+        const type = typeMap.get(item.assessmentTypeId)!;
+        return `${item.studentId}::${type.subjectId}::${type.termId}`;
+      }),
+    );
+    void Promise.allSettled(
+      [...aggregateKeys].map((key) => {
+        const [studentId, subjectId, termId] = key.split('::');
+        return this.aggregateStudentSubjectScore(studentId, subjectId, termId, schoolId, teacherId);
+      }),
+    );
 
     return { entered: results.length, errors: errors.length > 0 ? errors : undefined };
   }
@@ -427,7 +432,7 @@ export class AssessmentService {
 
     const result = await this.prisma.result.upsert({
       where: {
-        studentId_subjectId_termId_examType: { studentId, subjectId, termId, examType: 'END_TERM' },
+        studentId_subjectId_termId: { studentId, subjectId, termId },
       },
       update: {
         score: finalScore,

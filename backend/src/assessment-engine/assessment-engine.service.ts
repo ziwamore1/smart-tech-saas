@@ -880,61 +880,59 @@ export class AssessmentEngineService {
 
     this.logger.log(`Bulk entered ${results.length} scores for batch ${batch.id}`);
 
-    // Sync computed results and result sheet for real-time web analytics (fire-and-forget)
-    this.syncComputedResult(classId, subjectId, termId, schoolId, assessmentDefId, data.examType).catch(e =>
-      this.logger.error(`syncComputedResult failed: ${e.message}`),
-    );
-    this.compositeSubjectService.recomputeAllComposites(subjectId, classId, termId, schoolId).catch(e =>
-      this.logger.error(`composite recompute failed: ${e.message}`),
-    );
-    const def = await this.prisma.assessmentDefinition.findUnique({
-      where: { id: assessmentDefId },
-      select: { examType: true },
-    });
-    const sheet = await this.syncResultSheet(
-      schoolId, classId, termId, enteredBy,
-      (data.examType || def?.examType) as string | undefined,
-    ).catch(e => {
-      this.logger.error(`syncResultSheet failed: ${e.message}`);
-      return null;
-    });
+    // Everything below is derived from the saved scores and must not delay the
+    // response the teacher is waiting on.
+    void (async () => {
+      await this.syncComputedResult(classId, subjectId, termId, schoolId, assessmentDefId, data.examType);
+      await this.compositeSubjectService.recomputeAllComposites(subjectId, classId, termId, schoolId);
 
-    // Emit real-time WebSocket event (safe — server may be null in serverless)
-    try {
-      this.socketGateway.server?.emit?.(`result:updated:${schoolId}`, {
-        classId,
-        subjectId,
-        termId,
-        batchId: batch.id,
-        sheetId: sheet?.id,
-        enteredCount: results.filter(r => r.rawScore !== null).length,
-        timestamp: new Date(),
+      const def = await this.prisma.assessmentDefinition.findUnique({
+        where: { id: assessmentDefId },
+        select: { examType: true },
       });
-    } catch (e: any) {
-      this.logger.warn(`WebSocket emit failed: ${e.message}`);
-    }
-    await this.emitLiveResult(schoolId, { classId, subjectId, termId, enteredBy, score: results[0]?.rawScore ?? null }).catch(() => {});
+      const sheet = await this.syncResultSheet(
+        schoolId, classId, termId, enteredBy,
+        (data.examType || def?.examType) as string | undefined,
+      );
 
-    const [enteredUser, enteredClass, enteredSubject] = await Promise.all([
-      this.prisma.user.findUnique({ where: { id: enteredBy }, select: { firstName: true, lastName: true } }),
-      this.prisma.class.findUnique({ where: { id: classId }, select: { name: true } }),
-      this.prisma.subject.findUnique({ where: { id: subjectId }, select: { name: true } }),
-    ]).catch(() => [null, null, null] as any);
-    const enteredByName = enteredUser ? `${enteredUser.firstName ?? ''} ${enteredUser.lastName ?? ''}`.trim() : undefined;
-    const className = enteredClass?.name;
-    const subjectName = enteredSubject?.name;
+      // Emit real-time WebSocket event (safe — server may be null in serverless)
+      try {
+        this.socketGateway.server?.emit?.(`result:updated:${schoolId}`, {
+          classId,
+          subjectId,
+          termId,
+          batchId: batch.id,
+          sheetId: sheet?.id,
+          enteredCount: results.filter(r => r.rawScore !== null).length,
+          timestamp: new Date(),
+        });
+      } catch (e: any) {
+        this.logger.warn(`WebSocket emit failed: ${e.message}`);
+      }
+      await this.emitLiveResult(schoolId, { classId, subjectId, termId, enteredBy, score: results[0]?.rawScore ?? null });
 
-    this.activityService?.publish({
-      type: ActivityEventType.RESULT_BULK_ENTERED,
-      category: ActivityCategory.RESULTS,
-      severity: ActivitySeverity.SUCCESS,
-      schoolId,
-      userId: enteredBy,
-      userName: enteredByName || undefined,
-      title: 'Bulk results entered',
-      description: `${results?.length || 0} scores entered for ${className || 'class'} - ${subjectName || 'subject'}`,
-      metadata: { classId, subjectId, termId, count: results?.length || 0, teacherName: enteredByName, className, subjectName },
-    });
+      const [enteredUser, enteredClass, enteredSubject] = await Promise.all([
+        this.prisma.user.findUnique({ where: { id: enteredBy }, select: { firstName: true, lastName: true } }),
+        this.prisma.class.findUnique({ where: { id: classId }, select: { name: true } }),
+        this.prisma.subject.findUnique({ where: { id: subjectId }, select: { name: true } }),
+      ]).catch(() => [null, null, null] as any);
+      const enteredByName = enteredUser ? `${enteredUser.firstName ?? ''} ${enteredUser.lastName ?? ''}`.trim() : undefined;
+      const className = enteredClass?.name;
+      const subjectName = enteredSubject?.name;
+
+      this.activityService?.publish({
+        type: ActivityEventType.RESULT_BULK_ENTERED,
+        category: ActivityCategory.RESULTS,
+        severity: ActivitySeverity.SUCCESS,
+        schoolId,
+        userId: enteredBy,
+        userName: enteredByName || undefined,
+        title: 'Bulk results entered',
+        description: `${results?.length || 0} scores entered for ${className || 'class'} - ${subjectName || 'subject'}`,
+        metadata: { classId, subjectId, termId, count: results?.length || 0, teacherName: enteredByName, className, subjectName },
+      });
+    })().catch(error => this.logger.warn(`Post-save assessment sync failed: ${error.message}`));
+
 
     return {
       batch,
